@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:15
+    container_name: postgres-qr-badge
+    environment:
+      POSTGRES_DB: qr_badge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your-password
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+  app:
+    image: qrcodetest9:test
+    container_name: qr-badge-app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+  
+volumes:
+
+  postgres_data:
+    driver: local
+    
+networks:
+  default:
+    name: qr-badge-network
+    external: true

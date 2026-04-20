@@ -1,0 +1,414 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
+import { formatDate } from '../utils/dates'
+
+export default function Dashboard() {
+  const { user } = useAuth()
+  const [stats, setStats] = useState(null)
+  const [formationsEnCours, setFormationsEnCours] = useState([])
+  const [presencePeriod, setPresencePeriod] = useState('jour')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    loadDashboardData()
+    // Rafraîchissement périodique des indicateurs "live"
+    const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
+    return () => clearInterval(intervalId)
+  }, [])
+
+  const loadDashboardData = async ({ silent = false } = {}) => {
+    const [statsRes, enCoursRes] = await Promise.allSettled([
+      api.get('/formations/stats/'),
+      api.get('/formations/list/?statut=EN_COURS&seance_en_cours=true&page_size=10'),
+    ])
+
+    const unwrap = (res, fallback) => {
+      if (res.status !== 'fulfilled') return fallback
+      const d = res.value.data
+      return Array.isArray(d) ? d : (d.results || fallback)
+    }
+
+    if (statsRes.status === 'fulfilled') setStats(statsRes.value.data)
+    setFormationsEnCours(unwrap(enCoursRes, []))
+
+    const failures = [statsRes, enCoursRes].filter(r => r.status === 'rejected')
+    if (!silent) {
+      if (failures.length === 3) {
+        setError('Erreur lors du chargement des données')
+      } else if (failures.length > 0) {
+        setError('Certaines données n\'ont pas pu être chargées')
+      } else {
+        setError('')
+      }
+      setLoading(false)
+    }
+  }
+
+  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
+  const prochainesSeances = stats?.prochaines_seances || []
+
+  if (loading) return <div className="loading"><div className="spinner"></div></div>
+
+  return (
+    <div>
+      {error && <div className="error-message">{error}</div>}
+
+      {/* ── Bienvenue ── */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <h4 style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.15rem' }}>
+          Bonjour, {user?.first_name || user?.username} 👋
+        </h4>
+        <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>
+          {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+
+      <div className="headline-kpis">
+        <div className="headline-kpi-card headline-kpi-card-main">
+          <div className="headline-kpi-icon">
+            <i className="bi bi-mortarboard-fill"></i>
+          </div>
+          <div>
+            <div className="headline-kpi-topline">
+              <span className="headline-kpi-value">{stats?.total_modules || 0}</span>
+              <span className="headline-kpi-label">COURS</span>
+            </div>
+            <div className="headline-kpi-subline">
+              <span><i className="bi bi-play-circle-fill"></i> {stats?.modules_en_cours || 0} en cours</span>
+              <span><i className="bi bi-calendar2-check"></i> {stats?.modules_planifies || 0} planifiés</span>
+              <span><i className="bi bi-check-circle-fill"></i> {stats?.modules_termines || 0} terminés</span>
+            </div>
+          </div>
+        </div>
+        <div className="headline-kpi-card headline-kpi-card-side">
+          <div className="headline-kpi-icon">
+            <i className="bi bi-people-fill"></i>
+          </div>
+          <div>
+            <div className="headline-kpi-value">{stats?.total_participants || 0}</div>
+            <div className="headline-kpi-label">AUDITEURS</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Capacité du jour ── */}
+      <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+        CAPACITE DU JOUR
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        {[
+          { label: 'Personnes attendues', value: stats?.total_attendus_jour || 0, icon: 'bi-people-fill', color: '#2b6cb0', bg: 'rgba(43,108,178,0.1)' },
+          { label: 'Cours actifs', value: stats?.modules_en_cours || 0, icon: 'bi-play-circle-fill', color: '#276749', bg: 'rgba(39,103,73,0.1)' },
+          { label: "Séances planifiées aujourd'hui", value: stats?.seances_planifiees_aujourd_hui || 0, icon: 'bi-calendar-event', color: '#c05621', bg: 'rgba(245,124,0,0.1)' },
+        ].map(({ label, value, icon, color, bg }) => (
+          <div key={label} className="stat-card">
+            <div className="stat-body">
+              <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
+              <div>
+                <div className="stat-value" style={{ color }}>{value}</div>
+                <div className="stat-label">{label}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Exécution live ── */}
+      <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+        EXECUTION LIVE
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        {[
+          { label: 'Séances actives', value: stats?.seances_actives || 0, icon: 'bi-broadcast', color: '#805ad5', bg: 'rgba(128,90,213,0.1)' },
+          { label: 'Pointages du jour', value: stats?.pointages_aujourd_hui || 0, icon: 'bi-qr-code-scan', color: '#276749', bg: 'rgba(39,103,73,0.1)' },
+          { label: 'En salle maintenant', value: stats?.en_salle_now || 0, icon: 'bi-person-check-fill', color: '#2b6cb0', bg: 'rgba(43,108,178,0.1)' },
+        ].map(({ label, value, icon, color, bg }) => (
+          <div key={label} className="stat-card">
+            <div className="stat-body">
+              <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
+              <div>
+                <div className="stat-value" style={{ color }}>{value}</div>
+                <div className="stat-label">{label}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Qualité opérationnelle ── */}
+      <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
+        QUALITE OPERATIONNELLE
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.9rem' }}>
+        {[
+          { label: 'Taux présence (jour)', value: `${(stats?.taux_presence || 0).toFixed(1)}%`, icon: 'bi-graph-up-arrow', color: '#15803d', bg: 'rgba(22,163,74,0.1)' },
+          { label: 'Taux présence (semaine)', value: `${(stats?.taux_presence_semaine || 0).toFixed(1)}%`, icon: 'bi-calendar-week', color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)' },
+          { label: 'Taux présence (mois)', value: `${(stats?.taux_presence_mois || 0).toFixed(1)}%`, icon: 'bi-calendar-month', color: '#0f766e', bg: 'rgba(15,118,110,0.1)' },
+          { label: 'Taux présence (année)', value: `${(stats?.taux_presence_annee || 0).toFixed(1)}%`, icon: 'bi-calendar3', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
+          { label: 'Retard moyen', value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`, icon: 'bi-alarm', color: '#d97706', bg: 'rgba(217,119,6,0.1)' },
+        ].map(({ label, value, icon, color, bg }) => (
+          <div key={label} className="stat-card">
+            <div className="stat-body">
+              <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
+              <div>
+                <div className="stat-value" style={{ color }}>{value}</div>
+                <div className="stat-label">{label}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Taux d'absence du jour ── */}
+      {(() => {
+        const periodLabels = {
+          jour: "du jour",
+          semaine: "de la semaine",
+          mois: "du mois",
+          annee: "de l'année",
+        }
+        const periodFields = {
+          jour: {
+            attendus: stats?.total_attendus_jour || 0,
+            presents: stats?.presents_aujourd_hui || 0,
+            taux: stats?.taux_presence || 0,
+          },
+          semaine: {
+            attendus: stats?.total_attendus_semaine || 0,
+            presents: stats?.presents_semaine || 0,
+            taux: stats?.taux_presence_semaine || 0,
+          },
+          mois: {
+            attendus: stats?.total_attendus_mois || 0,
+            presents: stats?.presents_mois || 0,
+            taux: stats?.taux_presence_mois || 0,
+          },
+          annee: {
+            attendus: stats?.total_attendus_annee || 0,
+            presents: stats?.presents_annee || 0,
+            taux: stats?.taux_presence_annee || 0,
+          },
+        }
+        const selected = periodFields[presencePeriod] || periodFields.jour
+        const attendus = selected.attendus
+        const presents = selected.presents
+        const absents = Math.max(attendus - presents, 0)
+        const tauxPresence = selected.taux
+        const tauxAbsence = attendus > 0 ? Number((100 - tauxPresence).toFixed(1)) : 0
+        const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F57C00' : '#276749'
+        return (
+          <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>
+                <i className="bi bi-person-x-fill me-2" style={{ color: absColor }}></i>
+                Présences {periodLabels[presencePeriod]} — personnes (auditeurs + formateurs)
+              </span>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="btn-group btn-group-sm" role="group" aria-label="Période présence">
+                  {[
+                    { id: 'jour', label: 'Jour' },
+                    { id: 'semaine', label: 'Semaine' },
+                    { id: 'mois', label: 'Mois' },
+                    { id: 'annee', label: 'Année' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPresencePeriod(opt.id)}
+                      className={`btn ${presencePeriod === opt.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                      style={{ fontSize: '0.78rem' }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem', width: '100%', justifyContent: 'flex-end' }}>
+                <span><span style={{ fontWeight: 700, color: '#276749' }}>{presents}</span> <span className="text-muted">présents</span></span>
+                <span><span style={{ fontWeight: 700, color: absColor }}>{absents}</span> <span className="text-muted">absents</span></span>
+                <span><span style={{ fontWeight: 700, color: '#718096' }}>{attendus}</span> <span className="text-muted">attendus</span></span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 6, height: 10, position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${tauxPresence}%`, background: 'var(--ci-green)', borderRadius: 6, transition: 'width 0.4s' }}></div>
+                <div style={{ position: 'absolute', left: `${tauxPresence}%`, top: 0, height: '100%', width: `${tauxAbsence}%`, background: absColor, opacity: 0.7, borderRadius: '0 6px 6px 0', transition: 'width 0.4s' }}></div>
+              </div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#276749', whiteSpace: 'nowrap' }}>{tauxPresence.toFixed(1)}% présents</span>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: absColor, whiteSpace: 'nowrap' }}>{tauxAbsence.toFixed(1)}% absents</span>
+            </div>
+            {attendus === 0 && (
+              <div style={{ marginTop: '0.55rem', fontSize: '0.8rem', color: '#718096' }}>
+                Aucune personne attendue sur cette période pour les modules en cours.
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── Cours en cours ── */}
+      <div className="card">
+        <div className="card-header-bar">
+          <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-green)' }}></i>
+            <strong>{user?.role === 'ENCADRANT' ? 'Mes cours en cours' : 'Cours en cours'}</strong>
+          </span>
+          <Link to="/formations?statut=EN_COURS" className="btn btn-dfrc btn-sm">Voir tout</Link>
+        </div>
+        <div className="card-body-flush">
+          {formationsEnCours.length > 0 ? (
+            <div className="table-container">
+              <table className="table">
+                <thead><tr>
+                  <th>Module</th><th>Site </th><th>Catégorie</th>
+                  <th>Superviseur</th><th>Présents / Attendus (auditeurs)</th><th>Absents</th><th>Taux présence</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {formationsEnCours.map((f) => {
+                    const attendus = f.nb_participants || 0
+                    const presents = f.nb_presents || 0
+                    const absents = Math.max(attendus - presents, 0)
+                    const taux = attendus > 0 ? Math.round(presents / attendus * 100) : 0
+                    const tauxAbsence = attendus > 0 ? Math.round(absents / attendus * 100) : 0
+                    const tauxColor = taux >= 75 ? 'var(--ci-green)' : taux >= 50 ? 'var(--ci-orange)' : '#e53e3e'
+                    const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F57C00' : '#718096'
+                    const moduleLabel = f.module || f.intitule || f.formation || '—'
+                    const siteLabel = [f.site, f.batiment, f.salle].filter(Boolean).join(' / ') || '—'
+                    return (
+                      <tr key={f.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{moduleLabel}</div>
+                          <small className="text-muted">{formatDate(f.date_debut)} — {formatDate(f.date_fin)}</small>
+                        </td>
+                        <td><span style={{ fontSize: '0.85rem' }}>{siteLabel}</span></td>
+                        <td><span style={{ fontSize: '0.82rem', background: '#ebf4ff', color: '#2b6cb0', padding: '2px 7px', borderRadius: 4 }}>{f.categorie || f.grade || '—'}</span></td>
+                        <td><span style={{ fontSize: '0.85rem' }}>{f.superviseur_nom || <span className="text-muted">Non assigné</span>}</span></td>
+                        <td>
+                          <span style={{ fontWeight: 700, color: 'var(--ci-green)' }}>{presents}</span>
+                          <span className="text-muted"> / {attendus}</span>
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 700, color: absColor }}>{absents}</span>
+                          {attendus > 0 && <span className="text-muted" style={{ fontSize: '0.78rem' }}> ({tauxAbsence}%)</span>}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 4, height: 6, minWidth: 50 }}>
+                              <div style={{ width: `${taux}%`, background: tauxColor, borderRadius: 4, height: '100%', transition: 'width 0.3s' }}></div>
+                            </div>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: tauxColor }}>{taux}%</span>
+                          </div>
+                        </td>
+                        <td>
+                          <Link to={`/formations/${f.id}/modules/${f.module_id}`} className="btn btn-outline-primary btn-sm" title="Voir détail">
+                            <i className="bi bi-eye"></i>
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-4 text-muted">
+              <i className="bi bi-inbox" style={{ fontSize: '2rem' }}></i>
+              <p className="mt-2">Aucun module en cours</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Ligne du bas : planifiés + derniers pointages ── */}
+      <div className="row">
+        {/* Prochaines séances */}
+        <div className="col-lg-4">
+          <div className="card">
+            <div className="card-header-bar">
+              <span><i className="bi bi-calendar-event me-2" style={{ color: 'var(--ci-orange)' }}></i><strong>Prochaines séances</strong></span>
+            </div>
+            <div className="card-body-flush">
+              {prochainesSeances.length > 0 ? (
+                <div>
+                  {prochainesSeances.map((s) => (
+                    <div key={s.session_id} style={{ padding: '0.65rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ background: 'rgba(245,124,0,0.1)', color: 'var(--ci-orange)', borderRadius: 8, padding: '0.45rem 0.5rem' }}>
+                        <i className="bi bi-calendar3"></i>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {s.module || s.formation}
+                        </div>
+                        <small className="text-muted">
+                          {formatDate(s.date_journee)} {s.heure_debut_prevue ? `• ${String(s.heure_debut_prevue).slice(0, 5)}` : ''}
+                        </small>
+                      </div>
+                      <Link to={`/formations/${s.formation_id}/modules/${s.module_id}`} style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                        <i className="bi bi-chevron-right"></i>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted" style={{ fontSize: '0.9rem' }}>
+                  <i className="bi bi-calendar-x" style={{ fontSize: '1.5rem' }}></i>
+                  <p className="mt-1">Aucune séance à venir</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Derniers pointages */}
+        <div className="col-lg-8">
+          <div className="card">
+            <div className="card-header-bar">
+              <span><i className="bi bi-clock-history me-2" style={{ color: '#805ad5' }}></i><strong>Derniers pointages</strong></span>
+            </div>
+            <div className="card-body-flush">
+              {stats?.derniers_pointages?.length > 0 ? (
+                <div className="table-container">
+                  <table className="table">
+                    <thead><tr>
+                      <th>Nom</th><th>Matricule</th><th>Rôle</th><th>Module</th><th>Date</th><th>Entrée</th><th>Sortie</th>
+                    </tr></thead>
+                    <tbody>
+                      {stats.derniers_pointages.map((pt, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600, fontSize: '0.88rem' }}>{pt.nom}</td>
+                          <td><code style={{ fontSize: '0.78rem' }}>{pt.matricule}</code></td>
+                          <td>
+                            <span style={{
+                              background: pt.type === 'formateur' ? '#ebf4ff' : '#f0f4ff',
+                              color: pt.type === 'formateur' ? '#2b6cb0' : '#4a5568',
+                              borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem'
+                            }}>
+                              {pt.type === 'formateur' ? 'Formateur' : 'Auditeur'}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.82rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pt.module || '—'}</td>
+                          <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDate(pt.date)}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{fmtTime(pt.heure_entree)}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: pt.heure_sortie ? '#276749' : '#94a3b8' }}>
+                            {fmtTime(pt.heure_sortie)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-muted" style={{ fontSize: '0.9rem' }}>
+                  <i className="bi bi-qr-code" style={{ fontSize: '1.5rem' }}></i>
+                  <p className="mt-1">Aucun pointage récent</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

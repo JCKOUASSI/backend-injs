@@ -1,0 +1,773 @@
+from datetime import timedelta
+
+from django.conf import settings
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from rest_framework import generics, status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.response import Response
+
+from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC
+from presences.models import AuditLog, _log_audit
+from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
+FormationParticipant = ModuleParticipant
+FormationFormateur = ModuleFormateur
+from .serializers import (
+    FormationListSerializer,
+    FormationDetailSerializer,
+    ParticipantSerializer,
+    SecretariatSerializer,
+    FormateurSerializer,
+    FormationParticipantSerializer,
+    QRTokenSerializer,
+    AssignSuperviseurSerializer,
+)
+
+User = get_user_model()
+
+
+# ──────────────────────────────────────────────
+# Helper — grades autorisés par type de secrétariat
+# ──────────────────────────────────────────────
+
+def _participants_grade_filter(secretariat):
+    """Retourne un Q-filtre sur le grade selon le type du secrétariat.
+    Type A → grade commençant par 'A' (A1, A2, A3…)
+    Type B → grade commençant par 'B', Type C → 'C'
+    Pas de type → aucun filtre.
+    """
+    from django.db.models import Q
+    if secretariat and secretariat.type:
+        return Q(grade__istartswith=secretariat.type) | Q(grade='')
+    return Q()
+
+
+def _secretariat_scope(user):
+    """Retourne le secrétariat de l'utilisateur si rôle SECRETARIAT, CHEF_SECRETARIAT ou ENCADRANT."""
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT'):
+        return user.secretariat
+    return None
+
+
+# ──────────────────────────────────────────────
+# SECRETARIAT — Formations CRUD
+# ──────────────────────────────────────────────
+
+class FormationListCreateView(generics.ListCreateAPIView):
+    """DFRC/Secrétariat/Encadrant : lister et créer des formations."""
+    serializer_class = FormationListSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsSecretariatOrDFRC()]
+        return [IsSecretariatOrEncadrantOrDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            return Formation.objects.none() if not sec else Formation.objects.filter(
+                modules__secretariat=sec
+            ).distinct().order_by('id')
+        return Formation.objects.all().order_by('id')
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """DFRC/Secrétariat/Encadrant : détail / modifier / supprimer une formation."""
+    serializer_class = FormationDetailSerializer
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
+            return [IsSecretariatOrDFRC()]
+        return [IsSecretariatOrEncadrantOrDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            return Formation.objects.none() if not sec else Formation.objects.filter(
+                modules__secretariat=sec
+            ).distinct().order_by('id')
+        return Formation.objects.all().order_by('id')
+
+
+# ──────────────────────────────────────────────
+# DFRC — Assigner superviseur
+# ──────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrDFRC])
+def assign_superviseur(request, pk):
+    """DFRC : assigner un superviseur à une formation."""
+    try:
+        formation = Formation.objects.get(pk=pk)
+    except Formation.DoesNotExist:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = AssignSuperviseurSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+        superviseur = User.objects.get(
+            pk=serializer.validated_data['superviseur_id'],
+            role='ENCADRANT',
+        )
+    except User.DoesNotExist:
+        return Response(
+            {'detail': 'Encadrant introuvable ou rôle incorrect.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    formation.modules.update(superviseur=superviseur)
+
+    _log_audit(
+        action=AuditLog.Action.FORMATION_ASSIGN_SUPERVISEUR,
+        request=request,
+        formation=formation,
+        extra={'superviseur_id': superviseur.id, 'superviseur_nom': superviseur.get_full_name()},
+    )
+
+    return Response({
+        'detail': f'Superviseur {superviseur.get_full_name()} assigné à {formation.formation}.',
+        'formation': FormationDetailSerializer(formation).data,
+    })
+
+
+# ──────────────────────────────────────────────
+# SECRETARIAT — Participants CRUD
+# ──────────────────────────────────────────────
+
+class ParticipantListCreateView(generics.ListCreateAPIView):
+    """Secrétariat/CPFAE_ADMIN : lister et créer des participants. Encadrant : lecture seule."""
+    serializer_class = ParticipantSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsSecretariatOrDFRC()]
+        if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
+            return [IsEncadrant()]
+        return [IsDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            if not sec:
+                return Participant.objects.none()
+            grade_q = _participants_grade_filter(sec)
+            return Participant.objects.filter(secretariat=sec).filter(grade_q)
+        return Participant.objects.all()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        secretariat = user.secretariat if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') else None
+        instance = serializer.save(secretariat=secretariat)
+        _log_audit(
+            action=AuditLog.Action.PARTICIPANT_CREATE,
+            request=self.request,
+            cible_type='participant',
+            cible_numero=instance.matricule,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.PARTICIPANT_DELETE,
+            request=self.request,
+            cible_type='participant',
+            cible_numero=instance.matricule,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+        instance.delete()
+
+
+class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Secrétariat/CPFAE_ADMIN : détail / modifier / supprimer un participant. Encadrant : lecture seule."""
+    serializer_class = ParticipantSerializer
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
+            return [IsSecretariatOrDFRC()]
+        if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
+            return [IsEncadrant()]
+        return [IsDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            if not sec:
+                return Participant.objects.none()
+            grade_q = _participants_grade_filter(sec)
+            return Participant.objects.filter(secretariat=sec).filter(grade_q)
+        return Participant.objects.all()
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.PARTICIPANT_UPDATE,
+            request=self.request,
+            cible_type='participant',
+            cible_numero=instance.matricule,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.PARTICIPANT_DELETE,
+            request=self.request,
+            cible_type='participant',
+            cible_numero=instance.matricule,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+        instance.delete()
+
+
+# ──────────────────────────────────────────────
+# DFRC — Inscrire participants à une formation
+# ──────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrDFRC])
+def add_participant_to_formation(request, pk):
+    """DFRC/Secrétariat : inscrire un participant à une formation."""
+    try:
+        formation = Formation.objects.get(pk=pk)
+    except Formation.DoesNotExist:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    participant_id = request.data.get('participant_id')
+    if not participant_id:
+        return Response(
+            {'detail': 'participant_id requis.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        participant = Participant.objects.get(pk=participant_id)
+    except Participant.DoesNotExist:
+        return Response(
+            {'detail': 'Auditeur introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if request.user.role == 'SECRETARIAT' and participant.secretariat != request.user.secretariat:
+        return Response(
+            {'detail': 'Vous ne pouvez inscrire que les auditeurs de votre secrétariat.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    module_pk = request.data.get('module_id')
+    if not module_pk:
+        return Response(
+            {'detail': 'Le champ module_id est obligatoire.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        from .models import Module
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    fp, created = ModuleParticipant.objects.get_or_create(
+        module=module,
+        participant=participant,
+    )
+    if not created:
+        return Response(
+            {'detail': 'Auditeur déjà inscrit à ce module.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    _log_audit(
+        action=AuditLog.Action.PARTICIPANT_ADD_FORMATION,
+        request=request,
+        cible_type='participant',
+        cible_numero=participant.matricule,
+        cible_nom=f'{participant.nom} {participant.prenom}',
+        formation=formation,
+    )
+
+    return Response({
+        'detail': f'Auditeur {participant} inscrit au module « {module.intitule} ».',
+        'inscription': FormationParticipantSerializer(fp).data,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSecretariatOrDFRC])
+def remove_participant_from_formation(request, pk, participant_id):
+    """DFRC/Secrétariat : retirer un participant d'une formation."""
+    try:
+        fp = ModuleParticipant.objects.filter(
+            module__formation_id=pk,
+            participant_id=participant_id,
+        ).first()
+        if not fp:
+            raise ModuleParticipant.DoesNotExist
+    except ModuleParticipant.DoesNotExist:
+        return Response(
+            {'detail': 'Inscription introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    participant = fp.participant
+    formation = fp.formation
+    fp.delete()
+    _log_audit(
+        action=AuditLog.Action.PARTICIPANT_REMOVE_FORMATION,
+        request=request,
+        cible_type='participant',
+        cible_numero=participant.matricule,
+        cible_nom=f'{participant.nom} {participant.prenom}',
+        formation=formation,
+    )
+    return Response({'detail': 'Auditeur retiré de la formation.'})
+
+
+# ──────────────────────────────────────────────
+# DFRC/SECRETARIAT — Assigner formateurs à une formation
+# ──────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrDFRC])
+def add_formateur_to_formation(request, pk):
+    """DFRC/Secrétariat : assigner un formateur à une formation."""
+    try:
+        formation = Formation.objects.get(pk=pk)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    formateur_id = request.data.get('formateur_id')
+    if not formateur_id:
+        return Response({'detail': 'formateur_id requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        formateur = Formateur.objects.get(pk=formateur_id)
+    except Formateur.DoesNotExist:
+        return Response({'detail': 'Formateur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    module_pk = request.data.get('module_id')
+    if not module_pk:
+        return Response({'detail': 'Le champ module_id est obligatoire.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    ff, created = ModuleFormateur.objects.get_or_create(module=module, formateur=formateur)
+    if not created:
+        return Response({'detail': 'Formateur déjà assigné à ce module.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    _log_audit(
+        action=AuditLog.Action.FORMATEUR_ADD_FORMATION,
+        request=request,
+        cible_type='formateur',
+        cible_numero=formateur.numerobadge,
+        cible_nom=f'{formateur.nom} {formateur.prenom}',
+        formation=formation,
+    )
+
+    return Response({
+        'detail': f'{formateur} assigné à {formation.formation}.',
+        'formateur': FormateurSerializer(formateur).data,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsSecretariatOrDFRC])
+def remove_formateur_from_formation(request, pk, formateur_id):
+    """DFRC/Secrétariat : retirer un formateur d'une formation."""
+    ff = ModuleFormateur.objects.filter(module__formation_id=pk, formateur_id=formateur_id).first()
+    if not ff:
+        return Response({'detail': 'Assignation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    formateur = ff.formateur
+    formation = ff.formation
+    ff.delete()
+    _log_audit(
+        action=AuditLog.Action.FORMATEUR_REMOVE_FORMATION,
+        request=request,
+        cible_type='formateur',
+        cible_numero=formateur.numerobadge,
+        cible_nom=f'{formateur.nom} {formateur.prenom}',
+        formation=formation,
+    )
+    return Response({'detail': 'Formateur retiré de la formation.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_formateurs_of_formation(request, pk):
+    """Lister les formateurs assignés à une formation."""
+    try:
+        formation = Formation.objects.get(pk=pk)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    formateurs = Formateur.objects.filter(modules_assignes__module__formation=formation).distinct()
+    return Response(FormateurSerializer(formateurs, many=True).data)
+
+
+# ──────────────────────────────────────────────
+# SUPERVISEUR — Mes formations
+# ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsDFRCOrEncadrant])
+def superviseur_formations(request):
+    """Superviseur : lister mes formations assignées."""
+    formations = Formation.objects.filter(
+        modules__superviseur=request.user
+    ).distinct()
+    serializer = FormationListSerializer(formations, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsDFRCOrEncadrant])
+def superviseur_formation_detail(request, pk):
+    """Superviseur : détail d'une formation assignée."""
+    try:
+        formation = Formation.objects.get(pk=pk, modules__superviseur=request.user)
+    except Formation.DoesNotExist:
+        return Response(
+            {'detail': 'Formation introuvable ou non assignée.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(FormationDetailSerializer(formation).data)
+
+
+# ──────────────────────────────────────────────
+# SUPERVISEUR — Générer QR code (R1)
+# ──────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsDFRCOrEncadrant])
+def generate_qr(request, pk):
+    """Superviseur : générer un QR code pour sa formation (R1)."""
+    try:
+        formation = Formation.objects.get(pk=pk, superviseur=request.user)
+    except Formation.DoesNotExist:
+        return Response(
+            {'detail': 'Formation introuvable ou vous n\'êtes pas le superviseur assigné.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    session_id = request.data.get('session_id')
+    if not session_id:
+        return Response(
+            {'detail': 'session_id est obligatoire pour générer un QR.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        session = SessionModule.objects.get(pk=session_id, module__formation=formation)
+    except SessionModule.DoesNotExist:
+        return Response(
+            {'detail': 'Séance introuvable pour cette formation.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if session.est_terminee:
+        return Response(
+            {'detail': 'Impossible de générer un QR pour une séance terminée.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Désactiver les anciens QR tokens (formation + séance cible si fournie)
+    qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
+    if session is not None:
+        qr_filter = qr_filter.filter(session=session)
+    qr_filter.update(actif=False)
+
+    # Durée d'expiration configurable
+    expire_in = request.data.get('expire_in', None)
+    expire_unit = request.data.get('expire_unit', 'heures')  # minutes | heures | jours
+
+    if expire_in is not None:
+        expire_in = int(expire_in)
+        if expire_unit == 'minutes':
+            delta = timedelta(minutes=expire_in)
+        elif expire_unit == 'jours':
+            delta = timedelta(days=expire_in)
+        else:
+            delta = timedelta(hours=expire_in)
+    else:
+        lifetime_hours = getattr(settings, 'QR_TOKEN_LIFETIME_HOURS', 24)
+        delta = timedelta(hours=lifetime_hours)
+
+    qr_token = QRToken.objects.create(
+        session=session,
+        genere_par=request.user,
+        expire_at=timezone.now() + delta,
+    )
+
+    return Response({
+        'detail': 'QR code généré avec succès.',
+        'qr_token': QRTokenSerializer(qr_token).data,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsDFRCOrEncadrant])
+def get_active_qr(request, pk):
+    """Superviseur : récupérer le QR token actif de sa formation."""
+    try:
+        formation = Formation.objects.get(pk=pk, superviseur=request.user)
+    except Formation.DoesNotExist:
+        return Response(
+            {'detail': 'Formation introuvable ou non assignée.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    session_id = request.query_params.get('session_id')
+    qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
+    if session_id is not None:
+        qr_filter = qr_filter.filter(session_id=session_id)
+
+    qr_token = qr_filter.first()
+
+    if not qr_token or not qr_token.is_valid:
+        label = 'séance' if session_id else 'formation'
+        return Response(
+            {'detail': f'Aucun QR code actif pour cette {label}.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(QRTokenSerializer(qr_token).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def qr_image(request, pk):
+    """Génère l'image PNG du QR code actif d'une formation (A4 printable)."""
+    import io
+    import qrcode
+    from django.http import HttpResponse
+
+    user_role = getattr(request.user, 'role', None)
+    if user_role == 'SUPERVISEUR':
+        try:
+            formation = Formation.objects.get(pk=pk, superviseur=request.user)
+        except Formation.DoesNotExist:
+            return Response(
+                {'detail': 'Formation introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+    else:
+        try:
+            formation = Formation.objects.get(pk=pk)
+        except Formation.DoesNotExist:
+            return Response(
+                {'detail': 'Formation introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    qr_token = QRToken.objects.filter(
+        session__module__formation=formation, actif=True
+    ).first()
+
+    if not qr_token or not qr_token.is_valid:
+        return Response(
+            {'detail': 'Aucun QR code actif pour cette formation.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Construire l'URL complète de la page de badgeage
+    from django.conf import settings as django_settings
+    base_url = getattr(django_settings, 'BADGE_BASE_URL', '')
+    if not base_url:
+        scheme = 'https' if request.is_secure() else 'http'
+        base_url = f"{scheme}://{request.get_host()}"
+    qr_data = f"{base_url}/dashboard/badge/?token={qr_token.token}"
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=20,
+        border=4,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type='image/png')
+    response['Content-Disposition'] = f'inline; filename="qr_formation_{formation.id}.png"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def session_qr_image(request, pk, session_pk):
+    """Génère l'image PNG du QR code actif d'une séance spécifique."""
+    import io
+    import qrcode
+    from django.http import HttpResponse
+
+    user_role = getattr(request.user, 'role', None)
+    if user_role == 'SUPERVISEUR':
+        try:
+            formation = Formation.objects.get(pk=pk, superviseur=request.user)
+        except Formation.DoesNotExist:
+            return Response(
+                {'detail': 'Formation introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+    else:
+        try:
+            formation = Formation.objects.get(pk=pk)
+        except Formation.DoesNotExist:
+            return Response(
+                {'detail': 'Formation introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    try:
+        session = SessionModule.objects.get(pk=session_pk, module__formation=formation)
+    except SessionModule.DoesNotExist:
+        return Response(
+            {'detail': 'Séance introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    qr_token = QRToken.objects.filter(
+        session=session, actif=True
+    ).first()
+
+    if not qr_token or not qr_token.is_valid:
+        return Response(
+            {'detail': 'Aucun QR code actif pour cette séance.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Construire l'URL complète de la page de badgeage
+    from django.conf import settings as django_settings
+    base_url = getattr(django_settings, 'BADGE_BASE_URL', '')
+    if not base_url:
+        scheme = 'https' if request.is_secure() else 'http'
+        base_url = f"{scheme}://{request.get_host()}"
+    qr_data = f"{base_url}/dashboard/badge/?token={qr_token.token}"
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=20,
+        border=4,
+    )
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+
+    session_label = session.intitule or f"Session {session.numero}"
+    response = HttpResponse(buffer, content_type='image/png')
+    response['Content-Disposition'] = f'inline; filename="qr_{formation.id}_seance_{session.id}.png"'
+    return response
+
+
+# ──────────────────────────────────────────────
+# SECRETARIAT — Formateurs CRUD
+# ──────────────────────────────────────────────
+
+class FormateurListCreateView(generics.ListCreateAPIView):
+    """Secrétariat/CPFAE_ADMIN : lister et créer des formateurs. Encadrant : lecture seule."""
+    serializer_class = FormateurSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsSecretariatOrDFRC()]
+        if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
+            return [IsEncadrant()]
+        return [IsDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            if not sec:
+                return Formateur.objects.none()
+            return Formateur.objects.filter(secretariats=sec).distinct()
+        return Formateur.objects.all()
+
+
+class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Secrétariat/CPFAE_ADMIN : détail / modifier / supprimer un formateur. Encadrant : lecture seule."""
+    serializer_class = FormateurSerializer
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
+            return [IsSecretariatOrDFRC()]
+        if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
+            return [IsEncadrant()]
+        return [IsDFRC()]
+
+    def get_queryset(self):
+        user = self.request.user
+        sec = _secretariat_scope(user)
+        if sec is not None:
+            if not sec:
+                return Formateur.objects.none()
+            return Formateur.objects.filter(secretariats=sec).distinct()
+        return Formateur.objects.all()
+
+
+# ──────────────────────────────────────────────
+# DFRC — Secretariats CRUD
+# ──────────────────────────────────────────────
+
+class SecretariatListCreateView(generics.ListCreateAPIView):
+    """DFRC/Secrétariat : lister et créer des secrétariats."""
+    queryset = Secretariat.objects.select_related('responsable').all()
+    serializer_class = SecretariatSerializer
+    permission_classes = [IsSecretariatOrDFRC]
+
+
+class SecretariatDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """DFRC/Secrétariat : détail / modifier / supprimer un secrétariat."""
+    queryset = Secretariat.objects.select_related('responsable').all()
+    serializer_class = SecretariatSerializer
+    permission_classes = [IsSecretariatOrDFRC]
+
+
+# ──────────────────────────────────────────────
+# DFRC/SECRETARIAT — Participants d'un secrétariat
+# ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsDFRC])
+def secretariat_participants(request, pk):
+    """Lister les participants d'un secrétariat."""
+    try:
+        secretariat = Secretariat.objects.get(pk=pk)
+    except Secretariat.DoesNotExist:
+        return Response(
+            {'detail': 'Secrétariat introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    # Secrétariat ne peut voir que ses propres participants
+    user = request.user
+    if user.role == 'SECRETARIAT':
+        if not user.secretariat or user.secretariat_id != secretariat.pk:
+            return Response(
+                {'detail': 'Accès refusé.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+    participants = secretariat.participants.all()
+    serializer = ParticipantSerializer(participants, many=True)
+    return Response(serializer.data)
