@@ -1,0 +1,18 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/custom_admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+<div class="dfrc-branding">
+    <h1 id="site-name">
+        <a href="{% url 'admin:index' %}">CPFAE Admin</a>
+    </h1>
+    <p class="dfrc-branding-subtitle">Plateforme de gestion des formations</p>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

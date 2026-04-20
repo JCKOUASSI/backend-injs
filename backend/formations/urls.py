@@ -1,0 +1,107 @@
+from django.urls import path
+from . import views
+from . import api_views
+from . import session_views
+from .api_views import (
+    module_list_api, module_detail_api, module_full_detail_api,
+    module_add_participant, module_remove_participant,
+    module_add_formateur, module_remove_formateur,
+    module_assign_superviseur,
+    ref_type_secretariat_list, ref_type_secretariat_detail,
+)
+
+urlpatterns = [
+    # QR images (public) - available under both /formations/ and /api/formations/
+    path('<int:pk>/qr-image/', views.qr_image, name='qr-image'),
+    path('<int:pk>/sessions/<int:session_pk>/qr-image/', views.session_qr_image, name='session-qr-image'),
+    
+    # DFRC — Formations CRUD
+    path('', views.FormationListCreateView.as_view(), name='formation-list'),
+    path('<int:pk>/', views.FormationDetailView.as_view(), name='formation-detail'),
+    path('<int:pk>/assign-superviseur/', views.assign_superviseur, name='assign-superviseur'),
+    path('<int:pk>/participants/add/', views.add_participant_to_formation, name='add-participant'),
+    path('<int:pk>/participants/<int:participant_id>/remove/', views.remove_participant_from_formation, name='remove-participant'),
+    path('<int:pk>/formateurs/', views.list_formateurs_of_formation, name='formation-formateurs'),
+    path('<int:pk>/formateurs/add/', views.add_formateur_to_formation, name='add-formateur'),
+    path('<int:pk>/formateurs/<int:formateur_id>/remove/', views.remove_formateur_from_formation, name='remove-formateur'),
+
+    # DFRC — Participants CRUD
+    path('participants/', views.ParticipantListCreateView.as_view(), name='participant-list'),
+    path('participants/<int:pk>/', views.ParticipantDetailView.as_view(), name='participant-detail'),
+
+    # DFRC — Secretariats CRUD
+    path('secretariats/', views.SecretariatListCreateView.as_view(), name='secretariat-list'),
+    path('secretariats/<int:pk>/', views.SecretariatDetailView.as_view(), name='secretariat-detail'),
+    path('secretariats/<int:pk>/participants/', views.secretariat_participants, name='secretariat-participants'),
+
+    # SECRETARIAT — Formateurs CRUD
+    path('formateurs/', views.FormateurListCreateView.as_view(), name='formateur-list'),
+    path('formateurs/<int:pk>/', views.FormateurDetailView.as_view(), name='formateur-detail'),
+
+    # SUPERVISEUR — Mes formations
+    path('superviseur/', views.superviseur_formations, name='superviseur-formations'),
+    path('superviseur/<int:pk>/', views.superviseur_formation_detail, name='superviseur-formation-detail'),
+    path('superviseur/<int:pk>/generate-qr/', views.generate_qr, name='generate-qr'),
+    path('superviseur/<int:pk>/qr/', views.get_active_qr, name='get-active-qr'),
+
+    # ── Frontend API endpoints ──────────────────────────────────────────────
+    # Stats for dashboard
+    path('stats/', api_views.dashboard_stats, name='api-stats'),
+    
+    # List/filter formations (for React frontend)
+    path('list/', api_views.formation_list_api, name='api-formation-list'),
+    path('<int:pk>/detail/', api_views.formation_detail_api, name='api-formation-detail'),
+    
+    # QR code generation (simplified for frontend)
+    path('<int:formation_pk>/generate-qr/', api_views.api_generate_qr, name='api-generate-qr'),
+    path('<int:formation_pk>/sessions/<int:session_pk>/generate-qr/', api_views.api_generate_qr, name='api-session-generate-qr'),
+    
+    # Participants list
+    path('participants/list/', api_views.participant_list_api, name='api-participant-list'),
+    path('participants/<int:pk>/formations/', api_views.participant_formations_api, name='api-participant-formations'),
+    
+    # Formateurs list
+    path('formateurs/list/', api_views.formateur_list_api, name='api-formateur-list'),
+    
+    # Référentiels (listes déroulantes)
+    path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
+
+    # Référentiels CRUD
+    path('ref/formations/', api_views.ref_formation_list, name='api-ref-formation-list'),
+    path('ref/formations/<int:pk>/', api_views.ref_formation_detail, name='api-ref-formation-detail'),
+    path('ref/modules/', api_views.ref_module_list, name='api-ref-module-list'),
+    path('ref/modules/<int:pk>/', api_views.ref_module_detail, name='api-ref-module-detail'),
+    path('ref/sites/', api_views.ref_site_list, name='api-ref-site-list'),
+    path('ref/sites/<int:pk>/', api_views.ref_site_detail, name='api-ref-site-detail'),
+    path('ref/batiments/', api_views.ref_batiment_list, name='api-ref-batiment-list'),
+    path('ref/batiments/<int:pk>/', api_views.ref_batiment_detail, name='api-ref-batiment-detail'),
+    path('ref/salles/', api_views.ref_salle_list, name='api-ref-salle-list'),
+    path('ref/salles/<int:pk>/', api_views.ref_salle_detail, name='api-ref-salle-detail'),
+    path('ref/categories/', api_views.ref_categorie_list, name='api-ref-categorie-list'),
+    path('ref/categories/<int:pk>/', api_views.ref_categorie_detail, name='api-ref-categorie-detail'),
+    path('ref/grades/', api_views.ref_grade_list, name='api-ref-grade-list'),
+    path('ref/grades/<int:pk>/', api_views.ref_grade_detail, name='api-ref-grade-detail'),
+    path('ref/types-secretariat/', ref_type_secretariat_list, name='api-ref-type-secretariat-list'),
+    path('ref/types-secretariat/<int:pk>/', ref_type_secretariat_detail, name='api-ref-type-secretariat-detail'),
+
+    # Excel import (JWT-authenticated API endpoint)
+    path('import-excel/', api_views.api_import_excel, name='api-import-excel'),
+    
+    # Module management
+    path('<int:formation_pk>/modules/', module_list_api, name='api-module-list'),
+    path('<int:formation_pk>/modules/<int:module_pk>/', module_detail_api, name='api-module-detail'),
+    path('<int:formation_pk>/modules/<int:module_pk>/full/', module_full_detail_api, name='api-module-full-detail'),
+    path('<int:formation_pk>/modules/<int:module_pk>/participants/add/', module_add_participant, name='api-module-add-participant'),
+    path('<int:formation_pk>/modules/<int:module_pk>/participants/<int:participant_id>/remove/', module_remove_participant, name='api-module-remove-participant'),
+    path('<int:formation_pk>/modules/<int:module_pk>/formateurs/add/', module_add_formateur, name='api-module-add-formateur'),
+    path('<int:formation_pk>/modules/<int:module_pk>/formateurs/<int:formateur_id>/remove/', module_remove_formateur, name='api-module-remove-formateur'),
+    path('<int:formation_pk>/modules/<int:module_pk>/assign-superviseur/', module_assign_superviseur, name='api-module-assign-superviseur'),
+
+    # Session management (via module)
+    path('<int:formation_pk>/sessions/', session_views.session_list, name='api-session-list'),
+    path('<int:formation_pk>/modules/<int:module_pk>/sessions/new/', session_views.session_create, name='api-session-create'),
+    path('<int:formation_pk>/sessions/<int:session_pk>/start/', session_views.session_start, name='api-session-start'),
+    path('<int:formation_pk>/sessions/<int:session_pk>/stop/', session_views.session_stop, name='api-session-stop'),
+    path('<int:formation_pk>/sessions/<int:session_pk>/delete/', session_views.session_delete, name='api-session-delete'),
+    path('<int:formation_pk>/sessions/<int:session_pk>/update/', session_views.session_update, name='api-session-update'),
+]

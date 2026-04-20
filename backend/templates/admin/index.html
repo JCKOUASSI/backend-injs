@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="dfrc-admin-home">
+    <section class="dfrc-quick-links module">
+        <h2>Acces rapides</h2>
+        <div class="dfrc-quick-links-grid">
+            <a class="dfrc-quick-link" href="{% url 'admin:formations_formation_changelist' %}">
+                <span class="dfrc-quick-link-title">Formations</span>
+                <span class="dfrc-quick-link-subtitle">Consulter et modifier les formations</span>
+            </a>
+            <a class="dfrc-quick-link" href="{% url 'admin:formations_module_changelist' %}">
+                <span class="dfrc-quick-link-title">Modules</span>
+                <span class="dfrc-quick-link-subtitle">Organiser les modules et affectations</span>
+            </a>
+            <a class="dfrc-quick-link" href="{% url 'admin:formations_participant_changelist' %}">
+                <span class="dfrc-quick-link-title">Participants</span>
+                <span class="dfrc-quick-link-subtitle">Gerer les inscrits et profils</span>
+            </a>
+            <a class="dfrc-quick-link" href="{% url 'admin:presences_pointage_changelist' %}">
+                <span class="dfrc-quick-link-title">Pointages</span>
+                <span class="dfrc-quick-link-subtitle">Suivre les entrees et sorties</span>
+            </a>
+            <a class="dfrc-quick-link" href="{% url 'admin:authentication_user_changelist' %}">
+                <span class="dfrc-quick-link-title">Utilisateurs</span>
+                <span class="dfrc-quick-link-subtitle">Gerer les comptes et roles</span>
+            </a>
+        </div>
+    </section>
+
+    {% if app_list %}
+    <section class="dfrc-app-grid">
+        {% for app in app_list %}
+        <article class="dfrc-app-card module">
+            <h2>
+                <a href="{{ app.app_url }}">{{ app.name }}</a>
+            </h2>
+            <ul class="dfrc-model-list">
+                {% for model in app.models %}
+                <li class="dfrc-model-item">
+                    <span class="dfrc-model-name">{{ model.name }}</span>
+                    <span class="dfrc-model-actions">
+                        {% if model.admin_url %}
+                        <a href="{{ model.admin_url }}">Voir</a>
+                        {% endif %}
+                        {% if model.add_url %}
+                        <a href="{{ model.add_url }}">Ajouter</a>
+                        {% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    <p>Aucune application admin n'est disponible pour votre compte.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,525 @@
+import { useState, useEffect } from 'react'
+import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
+import ConfirmModal from '../components/ConfirmModal'
+import { useToast } from '../context/ToastContext'
+import { useDebounce } from '../hooks/useDebounce'
+import { formatDate } from '../utils/dates'
+
+const emptyForm = {
+  matricule: '',
+  nom: '', prenom: '', sexe: '', date_naissance: '', lieu_naissance: '',
+  email: '',
+  telephone: '', telephone2: '',
+  type_concours: '', libelle_concours: '',
+  categorie: '', grade: '', groupe: '', grade_groupe: '',
+  vague: '',
+  site: '', salle: '',
+}
+const emptyRefs = { categories: [], grades: [], sites: [], salles: [] }
+
+export default function Participants() {
+  const { user } = useAuth()
+  const [participants, setParticipants] = useState([])
+  const [refs, setRefs] = useState(emptyRefs)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [search, setSearch] = useState('')
+  const [sexeFilter, setSexeFilter] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState({ ...emptyForm })
+  const [formError, setFormError] = useState('')
+  useEffect(() => {
+    api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {})
+  }, [])
+  const [saving, setSaving] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  const { showToast } = useToast()
+  const [showDetail, setShowDetail] = useState(null)
+  const [detailFormations, setDetailFormations] = useState([])
+  const [detailFormationsLoading, setDetailFormationsLoading] = useState(false)
+
+  const debouncedSearch = useDebounce(search)
+  useEffect(() => { loadParticipants() }, [page, debouncedSearch, sexeFilter])
+
+  useEffect(() => {
+    if (!showDetail) { setDetailFormations([]); return }
+    setDetailFormationsLoading(true)
+    api.get(`/formations/participants/${showDetail.id}/formations/`)
+      .then(res => setDetailFormations(Array.isArray(res.data) ? res.data : (res.data.results || [])))
+      .catch(() => setDetailFormations([]))
+      .finally(() => setDetailFormationsLoading(false))
+  }, [showDetail])
+
+  const loadParticipants = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page })
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      if (sexeFilter) params.set('sexe', sexeFilter)
+      const response = await api.get(`/formations/participants/list/?${params}`)
+      const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
+      setParticipants(data)
+      setTotalPages(response.data.total_pages || 1)
+      setTotalCount(response.data.count || data.length)
+    } catch (err) {
+      setError('Erreur lors du chargement des auditeurs')
+      console.error(err)
+    } finally { setLoading(false) }
+  }
+
+  const f = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+
+  const openCreate = () => {
+    setEditingId(null)
+    setForm({ ...emptyForm })
+    setFormError('')
+    setShowModal(true)
+  }
+
+  const openEdit = (p) => {
+    setEditingId(p.id)
+    setForm({
+      matricule: p.matricule || '',
+      nom: p.nom || '',
+      prenom: p.prenom || '',
+      sexe: p.sexe || '',
+      date_naissance: p.date_naissance || '',
+      lieu_naissance: p.lieu_naissance || '',
+      email: p.email || '',
+      telephone: p.telephone || '',
+      telephone2: p.telephone2 || '',
+      type_concours: p.type_concours || '',
+      libelle_concours: p.libelle_concours || '',
+      categorie: p.categorie || '',
+      grade: p.grade || '',
+      groupe: p.groupe || '',
+      grade_groupe: p.grade_groupe || '',
+      vague: p.vague || '',
+      site: p.site || '',
+      salle: p.salle || '',
+    })
+    setFormError('')
+    setShowModal(true)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setFormError('')
+    setSaving(true)
+    try {
+      const payload = { ...form }
+      if (!payload.date_naissance) delete payload.date_naissance
+      if (editingId) {
+        await api.patch(`/formations/participants/${editingId}/`, payload)
+      } else {
+        await api.post('/formations/participants/', payload)
+      }
+      setShowModal(false)
+      loadParticipants()
+      showToast(editingId ? 'Auditeur modifié' : 'Auditeur créé')
+    } catch (err) {
+      const data = err.response?.data
+      if (data && typeof data === 'object') {
+        const msgs = Object.entries(data).map(([k, v]) => `${k} : ${Array.isArray(v) ? v.join(', ') : v}`)
+        setFormError(msgs.join('\n'))
+      } else {
+        setFormError('Erreur lors de la sauvegarde')
+      }
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      message: 'Supprimer cet auditeur ?',
+      detail: 'Cette action est définitive.',
+      onConfirm: async () => {
+        try { await api.delete(`/formations/participants/${id}/`); loadParticipants(); showToast('Auditeur supprimé') }
+        catch { showToast('Erreur lors de la suppression', 'error') }
+      }
+    })
+  }
+
+  const sexeLabel = (s) => ({ MASCULIN: 'Masculin', FEMININ: 'Féminin' }[s] || '-')
+  const sexeBadge = (s) => s === 'MASCULIN' ? 'badge-bg-info' : s === 'FEMININ' ? 'badge-bg-warning' : ''
+
+  const canManage = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+
+  return (
+    <div>
+      {/* Search + Filter bar */}
+      <div className="card">
+        <div className="card-body">
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: '1 1 250px' }}>
+              <div className="input-group">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input type="text" className="form-control" placeholder="Nom, prénom, matricule, corps…"
+                  value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+              </div>
+            </div>
+            <div>
+              <select className="form-control" value={sexeFilter}
+                onChange={(e) => { setSexeFilter(e.target.value); setPage(1) }}>
+                <option value="">Tous (sexe)</option>
+                <option value="MASCULIN">Masculin</option>
+                <option value="FEMININ">Féminin</option>
+              </select>
+            </div>
+            {canManage && (
+              <button onClick={openCreate} className="btn btn-dfrc">
+                <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {/* Table */}
+      <div className="card">
+        <div className="card-header-bar">
+          <span><i className="bi bi-people me-2"></i>Liste des auditeurs</span>
+          <span className="badge-bg-secondary">{totalCount} résultat(s)</span>
+        </div>
+        <div className="card-body-flush">
+          {loading ? <div className="loading"><div className="spinner"></div></div> : (
+            <>
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>N° d'inscription</th>
+                      <th>Nom &amp; Prénom</th>
+                      <th>Sexe</th>
+                      <th>Grade</th>
+                      <th>Téléphone</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participants.length > 0 ? participants.map((p) => (
+                      <tr key={p.id}>
+                        <td><span className="badge-bg-info">{p.matricule || '-'}</span></td>
+                        <td>
+                          <strong>{p.nom} {p.prenom}</strong>
+                          </td>
+                        <td>
+                          {p.sexe
+                            ? <span className={sexeBadge(p.sexe)}>{sexeLabel(p.sexe)}</span>
+                            : <span className="text-muted">-</span>}
+                        </td>
+                        <td>{p.grade || '-'}</td>
+                        <td><small>{p.telephone || '-'}</small></td>
+                        <td>
+                          <div className="btn-group">
+                            <button onClick={() => setShowDetail(p)} className="btn btn-outline-info btn-sm" title="Détail">
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            {canManage && (
+                              <button onClick={() => openEdit(p)} className="btn btn-outline-primary btn-sm" title="Modifier">
+                                <i className="bi bi-pencil"></i>
+                              </button>
+                            )}
+                            {canManage && (
+                              <button onClick={() => handleDelete(p.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="6" className="text-center py-4 text-muted">Aucun auditeur trouvé</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {totalPages > 1 && (
+                <div className="pagination">
+                  <button className="pagination-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                    <i className="bi bi-chevron-left"></i> Précédent
+                  </button>
+                  <span className="small">Page {page} / {totalPages}</span>
+                  <button className="pagination-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                    Suivant <i className="bi bi-chevron-right"></i>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {confirmDialog && (
+        <ConfirmModal
+          message={confirmDialog.message}
+          detail={confirmDialog.detail}
+          onConfirm={() => { setConfirmDialog(null); confirmDialog.onConfirm() }}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* Detail Modal */}
+      {showDetail && (
+        <div className="modal-overlay" onClick={() => setShowDetail(null)}>
+          <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-badge me-2"></i>{showDetail.nom} {showDetail.prenom}</h5>
+              <button className="btn-close" onClick={() => setShowDetail(null)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              {/* Fiche identité */}
+              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identité</p>
+              <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                <div><small className="text-muted">N° d'inscription</small><div><strong>{showDetail.matricule || '-'}</strong></div></div>
+                <div><small className="text-muted">Genre</small><div>{showDetail.sexe ? <span className={sexeBadge(showDetail.sexe)}>{sexeLabel(showDetail.sexe)}</span> : '-'}</div></div>
+                <div><small className="text-muted">Date de naissance</small><div>{formatDate(showDetail.date_naissance)}</div></div>
+                <div><small className="text-muted">Lieu de naissance</small><div>{showDetail.lieu_naissance || '-'}</div></div>
+                <div><small className="text-muted">Adresse e-mail</small><div>{showDetail.email || '-'}</div></div>
+                <div><small className="text-muted">Téléphone 1</small><div>{showDetail.telephone || '-'}</div></div>
+                <div><small className="text-muted">Téléphone 2</small><div>{showDetail.telephone2 || '-'}</div></div>
+                <div><small className="text-muted">Type concours</small><div>{showDetail.type_concours || '-'}</div></div>
+                <div><small className="text-muted">Libellé concours</small><div>{showDetail.libelle_concours || '-'}</div></div>
+              </div>
+
+              {/* Infos administratives */}
+              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administratif</p>
+              <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                <div><small className="text-muted">Catégorie</small><div>{showDetail.categorie || '-'}</div></div>
+                <div><small className="text-muted">Grade</small><div>{showDetail.grade || '-'}</div></div>
+                <div><small className="text-muted">Groupe</small><div>{showDetail.groupe || '-'}</div></div>
+                <div><small className="text-muted">Grade-Groupe</small><div>{showDetail.grade_groupe || '-'}</div></div>
+                <div><small className="text-muted">Vague</small><div>{showDetail.vague || '-'}</div></div>
+                <div><small className="text-muted">Site</small><div>{showDetail.site || '-'}</div></div>
+                <div><small className="text-muted">Salle</small><div>{showDetail.salle || '-'}</div></div>
+                <div><small className="text-muted">Secrétariat</small><div>{showDetail.secretariat_nom || '-'}</div></div>
+              </div>
+
+              {/* Modules inscrits */}
+              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <i className="bi bi-journal-bookmark me-1"></i>Modules inscrits
+              </p>
+              {detailFormationsLoading ? (
+                <div className="text-center py-2"><div className="spinner" style={{ width: '1.2rem', height: '1.2rem' }}></div></div>
+              ) : detailFormations.length === 0 ? (
+                <div className="text-muted small" style={{ padding: '0.5rem 0' }}>Aucun module assigné.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {detailFormations.map(m => (
+                    <div key={m.id} style={{ background: 'var(--bg-secondary, #f8fafc)', borderRadius: '6px', padding: '0.6rem 0.9rem', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div>
+                          <strong style={{ fontSize: '0.9rem' }}>{m.module}</strong>
+                          {m.formation && <span className="text-muted" style={{ fontSize: '0.8rem' }}> — {m.formation}</span>}
+                          <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
+                            {(m.site || m.salle) && <span><i className="bi bi-building me-1"></i>{[m.site, m.salle].filter(Boolean).join(' / ')} &nbsp;</span>}
+                            {m.date_debut && <span><i className="bi bi-calendar3 me-1"></i>{formatDate(m.date_debut)} → {m.date_fin ? formatDate(m.date_fin) : '?'}</span>}
+                          </div>
+                        </div>
+                        <span className={`badge ${{ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[m.statut] || 'badge-info'}`} style={{ whiteSpace: 'nowrap' }}>
+                          {{ 'PLANIFIEE': 'Planifiée', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminée', 'SUSPENDUE': 'Suspendue' }[m.statut] || m.statut}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              {canManage && (
+                <button className="btn btn-dfrc" onClick={() => { setShowDetail(null); openEdit(showDetail) }}>
+                  <i className="bi bi-pencil me-1"></i>Modifier
+                </button>
+              )}
+              <button className="btn btn-secondary" onClick={() => setShowDetail(null)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-plus me-2"></i>{editingId ? "Modifier l'auditeur" : 'Nouvel auditeur'}</h5>
+              <button className="btn-close" onClick={() => setShowModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+                {formError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{formError}</div>}
+
+                {/* Identité */}
+                <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identité</p>
+                <div className="form-group">
+                  <label className="form-label">N° d'inscription *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ex : P0042"
+                    required
+                    value={form.matricule}
+                    onChange={f('matricule')}
+                  />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Nom *</label>
+                    <input type="text" className="form-control" required value={form.nom} onChange={f('nom')} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Prénom *</label>
+                    <input type="text" className="form-control" required value={form.prenom} onChange={f('prenom')} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Sexe</label>
+                    <select className="form-control" value={form.sexe} onChange={f('sexe')}>
+                      <option value="">-- Sélectionner --</option>
+                      <option value="MASCULIN">Masculin</option>
+                      <option value="FEMININ">Féminin</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Date de naissance</label>
+                    <input type="date" className="form-control" value={form.date_naissance} onChange={f('date_naissance')} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Lieu de naissance</label>
+                  <input type="text" className="form-control" value={form.lieu_naissance} onChange={f('lieu_naissance')} />
+                </div>
+
+                {/* Coordonnées */}
+                <p className="text-muted small" style={{ fontWeight: 600, margin: '1rem 0 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordonnées</p>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Adresse e-mail</label>
+                    <input type="email" className="form-control" value={form.email} onChange={f('email')} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Téléphone 1</label>
+                    <input type="text" className="form-control" value={form.telephone} onChange={f('telephone')} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Téléphone 2</label>
+                    <input type="text" className="form-control" value={form.telephone2} onChange={f('telephone2')} />
+                  </div>
+                </div>
+
+                {/* Concours */}
+                <p className="text-muted small" style={{ fontWeight: 600, margin: '1rem 0 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Concours</p>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Type concours</label>
+                    <input type="text" className="form-control" value={form.type_concours} onChange={f('type_concours')} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Libellé concours</label>
+                    <input type="text" className="form-control" value={form.libelle_concours} onChange={f('libelle_concours')} />
+                  </div>
+                </div>
+
+                {/* Administratif */}
+                <p className="text-muted small" style={{ fontWeight: 600, margin: '1rem 0 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administratif</p>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Catégorie</label>
+                    {refs.categories.length > 0 ? (
+                      <select className="form-control" value={form.categorie}
+                        onChange={e => setForm(prev => ({ ...prev, categorie: e.target.value, grade: '' }))}>
+                        <option value="">-- Choisir --</option>
+                        {refs.categories.map(c => <option key={c.id} value={c.libelle}>{c.libelle}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className="form-control" placeholder="A, B, C…" value={form.categorie} onChange={f('categorie')} />
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Grade</label>
+                    {refs.grades.length > 0 ? (() => {
+                      const catObj = refs.categories.find(c => c.libelle === form.categorie)
+                      const filteredGrades = catObj
+                        ? refs.grades.filter(g => g.categorie_id === catObj.id)
+                        : refs.grades
+                      return (
+                        <select className="form-control" value={form.grade}
+                          onChange={e => setForm(prev => ({ ...prev, grade: e.target.value }))}>
+                          <option value="">-- Choisir --</option>
+                          {filteredGrades.map(g => <option key={g.id} value={g.libelle}>{g.libelle}</option>)}
+                        </select>
+                      )
+                    })() : (
+                      <input type="text" className="form-control" value={form.grade} onChange={f('grade')} />
+                    )}
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Groupe</label>
+                    <input type="text" className="form-control" value={form.groupe} onChange={f('groupe')} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Grade-Groupe</label>
+                    <input type="text" className="form-control" value={form.grade_groupe} onChange={f('grade_groupe')} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Vague</label>
+                    <input type="text" className="form-control" value={form.vague} onChange={f('vague')} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Site</label>
+                    {refs.sites && refs.sites.length > 0 ? (
+                      <select className="form-control" value={form.site}
+                        onChange={e => setForm(prev => ({ ...prev, site: e.target.value, salle: '' }))}>
+                        <option value="">-- Choisir --</option>
+                        {refs.sites.map(s => <option key={s.id} value={s.nom}>{s.nom}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className="form-control" value={form.site} onChange={f('site')} />
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Salle</label>
+                    {refs.salles && refs.salles.length > 0 ? (() => {
+                      const siteObj = refs.sites && refs.sites.find(s => s.nom === form.site)
+                      const filteredSalles = siteObj
+                        ? refs.salles.filter(s => s.site_id === siteObj.id)
+                        : refs.salles
+                      return (
+                        <select className="form-control" value={form.salle}
+                          onChange={e => setForm(prev => ({ ...prev, salle: e.target.value }))}>
+                          <option value="">-- Choisir --</option>
+                          {filteredSalles.map(s => <option key={s.id} value={s.nom}>{s.nom}</option>)}
+                        </select>
+                      )
+                    })() : (
+                      <input type="text" className="form-control" value={form.salle} onChange={f('salle')} />
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Annuler</button>
+                <button type="submit" className="btn btn-dfrc" disabled={saving}>
+                  {saving ? 'Enregistrement…' : (editingId ? 'Enregistrer' : 'Créer')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

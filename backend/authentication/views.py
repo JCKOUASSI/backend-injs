@@ -1,0 +1,154 @@
+from rest_framework import generics, status
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate, get_user_model
+from django.db.models import Q
+
+from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer, LoginSerializer, ChangePasswordSerializer
+from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
+from .throttles import LoginRateThrottle
+from .emails import send_welcome_email
+from presences.models import DeviceBinding
+
+User = get_user_model()
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
+def login_view(request):
+    """Connexion — retourne access + refresh tokens.
+    Si device_id est fourni (app mobile), vérifie le verrouillage appareil."""
+    serializer = LoginSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = authenticate(
+        username=serializer.validated_data['username'],
+        password=serializer.validated_data['password'],
+    )
+    if user is None:
+        return Response(
+            {'detail': 'Identifiants invalides.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    device_id = request.data.get('device_id', '').strip()
+
+    # ── Verrouillage appareil (participants / formateurs uniquement) ──
+    if device_id and user.role in ('AUDITEUR',):
+        existing = DeviceBinding.objects.filter(
+            device_id=device_id, is_active=True
+        ).select_related('user').first()
+
+        if existing and existing.user_id != user.id:
+            return Response({
+                'code': 'DEVICE_LOCKED',
+                'detail': (
+                    f'Cet appareil est déjà lié au compte de '
+                    f'{existing.user.get_full_name()}. '
+                    f'Contactez votre encadrant pour le débloquer.'
+                ),
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Bind device to this user if not already bound
+        if not existing:
+            DeviceBinding.objects.update_or_create(
+                device_id=device_id,
+                defaults={
+                    'user': user,
+                    'device_info': request.data.get('device_info', ''),
+                    'is_active': True,
+                },
+            )
+
+    refresh = RefreshToken.for_user(user)
+    refresh['role'] = user.role
+    refresh['full_name'] = user.get_full_name()
+    return Response({
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+        'user': UserSerializer(user).data,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me_view(request):
+    """Retourne le profil de l'utilisateur connecté."""
+    return Response(UserSerializer(request.user).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    """Permet à l'utilisateur connecté de changer son propre mot de passe."""
+    serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    request.user.set_password(serializer.validated_data['new_password'])
+    request.user.save()
+    return Response({'detail': 'Mot de passe modifié avec succès.'})
+
+
+class UserListCreateView(generics.ListCreateAPIView):
+    """DFRC/Secrétariat : lister et créer des utilisateurs."""
+    permission_classes = [IsSecretariatOrDFRC]
+
+    def get_queryset(self):
+        user = self.request.user
+        subordinates = get_creatable_roles(user.role)
+        qs = User.objects.filter(role__in=subordinates).order_by('last_name', 'first_name')
+        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+            qs = qs.filter(secretariat=user.secretariat)
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(username__icontains=search)
+            )
+        role = self.request.query_params.get('role')
+        if role:
+            qs = qs.filter(role=role)
+        return qs
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return UserCreateSerializer
+        return UserSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        plain_password = serializer.validated_data.get('password', '')
+        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and user.secretariat:
+            new_user = serializer.save(secretariat=user.secretariat)
+        else:
+            new_user = serializer.save()
+        send_welcome_email(new_user, plain_password)
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """DFRC/Secrétariat : détail / modifier / supprimer un utilisateur."""
+    permission_classes = [IsSecretariatOrDFRC]
+
+    def get_queryset(self):
+        user = self.request.user
+        subordinates = get_creatable_roles(user.role)
+        qs = User.objects.filter(role__in=subordinates)
+        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+            qs = qs.filter(secretariat=user.secretariat)
+        return qs
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return UserUpdateSerializer
+        return UserSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.pk == request.user.pk:
+            return Response(
+                {'detail': 'Impossible de supprimer votre propre compte.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)

@@ -1,0 +1,1412 @@
+import { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import api from '../services/api'
+import { useAuth } from '../context/AuthContext'
+import QRCodeModal from '../components/QRCodeModal'
+import ConfirmModal from '../components/ConfirmModal'
+import { useToast } from '../context/ToastContext'
+import { formatDate } from '../utils/dates'
+
+export default function ModuleDetail() {
+  const { formationId, moduleId } = useParams()
+  const { user } = useAuth()
+  const { showToast } = useToast()
+
+  const [module, setModule] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('seances')
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [selectedSessionId, setSelectedSessionId] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  const [startingSession, setStartingSession] = useState(null)
+  const [stoppingSession, setStoppingSession] = useState(null)
+  const [editSession, setEditSession] = useState(null)
+  const [editSessionForm, setEditSessionForm] = useState({ intitule: '', date_journee: '', heure_debut_prevue: '', heure_fin_prevue: '' })
+  const [savingSession, setSavingSession] = useState(false)
+  const [editModuleOpen, setEditModuleOpen] = useState(false)
+  const [editModuleForm, setEditModuleForm] = useState({})
+  const [savingModule, setSavingModule] = useState(false)
+
+  // Superviseur (encadrant) assignment
+  const [showAssignSup, setShowAssignSup] = useState(false)
+  const [encadrants, setEncadrants] = useState([])
+  const [selectedSup, setSelectedSup] = useState('')
+  const [assignSupError, setAssignSupError] = useState('')
+  const [assignSupSaving, setAssignSupSaving] = useState(false)
+
+  // Participants
+  const [showAddParticipant, setShowAddParticipant] = useState(false)
+  const [allParticipants, setAllParticipants] = useState([])
+  const [participantSearch, setParticipantSearch] = useState('')
+  const [participantLoading, setParticipantLoading] = useState(false)
+
+  // Formateurs
+  const [showAddFormateur, setShowAddFormateur] = useState(false)
+  const [allFormateurs, setAllFormateurs] = useState([])
+  const [formateurSearch, setFormateurSearch] = useState('')
+  const [formateurLoading, setFormateurLoading] = useState(false)
+
+  // Séances
+  const [showNewSession, setShowNewSession] = useState(false)
+  const [newSessionForm, setNewSessionForm] = useState({ intitule: '', date_journee: '', heure_debut_prevue: '', heure_fin_prevue: '' })
+  const [savingNewSession, setSavingNewSession] = useState(false)
+
+  // Présences
+  const [selectedPresenceDate, setSelectedPresenceDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [selectedPresenceSessionId, setSelectedPresenceSessionId] = useState('ALL')
+  const [presenceSearch, setPresenceSearch] = useState('')
+
+  // Forçage de badgeage
+  const [forceModal, setForceModal] = useState(false)
+  const [forceForm, setForceForm] = useState({ personne_id: '', type_personne: 'participant', action: 'ENTREE', motif: '' })
+  const [forceSaving, setForceSaving] = useState(false)
+  const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [] })
+
+  const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canManageModule = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+
+  useEffect(() => { loadModule() }, [formationId, moduleId])
+  useEffect(() => { api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {}) }, [])
+
+  // Auto-refresh toutes les 30s quand l'onglet présences est actif
+  useEffect(() => {
+    if (activeTab !== 'presences') return
+    const timer = setInterval(() => loadModule(true), 30000)
+    return () => clearInterval(timer)
+  }, [activeTab, formationId, moduleId])
+
+  const loadModule = async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const res = await api.get(`/formations/${formationId}/modules/${moduleId}/full/`)
+      setModule(res.data)
+    } catch {
+      if (!silent) setError('Erreur lors du chargement du module')
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  const getStatutBadge = (s) => ({ PLANIFIEE: 'badge-planifiee', EN_COURS: 'badge-en-cours', TERMINEE: 'badge-terminee' }[s] || 'badge-info')
+  const getStatutLabel = (s) => ({ PLANIFIEE: 'Planifiée', EN_COURS: 'En cours', TERMINEE: 'Terminée' }[s] || s)
+
+  const handleStartSession = (sid, label) => {
+    setConfirmDialog({
+      message: `Démarrer la séance « ${label} » ?`,
+      detail: "Attention : la séance passera immédiatement en cours et les badgeages seront ouverts.",
+      onConfirm: async () => {
+        setStartingSession(sid)
+        try { await api.post(`/formations/${formationId}/sessions/${sid}/start/`); loadModule(); showToast('Séance démarrée') }
+        catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+        finally { setStartingSession(null) }
+      },
+    })
+  }
+
+  const handleStopSession = (sid, label) => {
+    setConfirmDialog({
+      message: `Terminer la séance « ${label} » ?`,
+      detail: 'Cette action est irréversible.',
+      onConfirm: async () => {
+        setStoppingSession(sid)
+        try { await api.post(`/formations/${formationId}/sessions/${sid}/stop/`); loadModule(); showToast('Séance terminée') }
+        catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+        finally { setStoppingSession(null) }
+      }
+    })
+  }
+
+  const handleDeleteSession = (sid) => {
+    setConfirmDialog({
+      message: 'Supprimer cette séance ?',
+      onConfirm: async () => {
+        try { await api.delete(`/formations/${formationId}/sessions/${sid}/delete/`); loadModule(); showToast('Séance supprimée') }
+        catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+      }
+    })
+  }
+
+  const openEditSession = (s) => {
+    setEditSession(s)
+    setEditSessionForm({ intitule: s.intitule || '', date_journee: s.date || '', heure_debut_prevue: s.heure_debut || '', heure_fin_prevue: s.heure_fin || '' })
+  }
+
+  const handleUpdateSession = async (e) => {
+    e.preventDefault()
+    if (!editSessionForm.date_journee) { showToast('La date est obligatoire.', 'error'); return }
+    setSavingSession(true)
+    try {
+      await api.patch(`/formations/${formationId}/sessions/${editSession.id}/update/`, editSessionForm)
+      setEditSession(null); loadModule(); showToast('Séance modifiée')
+    } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+    finally { setSavingSession(false) }
+  }
+
+  const loadAvailableParticipants = async (search = '') => {
+    setParticipantLoading(true)
+    try {
+      const params = new URLSearchParams({ page_size: 50 })
+      if (search) params.set('search', search)
+      const res = await api.get(`/formations/participants/list/?${params}`)
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const enrolled = new Set((module.participants || []).map(p => p.id))
+      setAllParticipants(data.filter(p => !enrolled.has(p.id)))
+    } catch {} finally { setParticipantLoading(false) }
+  }
+
+  const openAddParticipant = () => {
+    setParticipantSearch('')
+    loadAvailableParticipants('')
+    setShowAddParticipant(true)
+  }
+
+  useEffect(() => {
+    if (!showAddParticipant) return
+    const t = setTimeout(() => loadAvailableParticipants(participantSearch), 300)
+    return () => clearTimeout(t)
+  }, [participantSearch, showAddParticipant])
+
+  const handleAddParticipant = async (pid) => {
+    try {
+      await api.post(`/formations/${formationId}/modules/${moduleId}/participants/add/`, { participant_id: pid })
+      loadModule()
+      loadAvailableParticipants(participantSearch)
+      showToast('Auditeur inscrit')
+    } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+  }
+
+  const handleRemoveParticipant = (pid, nom) => {
+    setConfirmDialog({
+      message: `Retirer ${nom} de ce module ?`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/formations/${formationId}/modules/${moduleId}/participants/${pid}/remove/`)
+          loadModule()
+          showToast('Auditeur retiré')
+        } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+      }
+    })
+  }
+
+  const loadAvailableFormateurs = async (search = '') => {
+    setFormateurLoading(true)
+    try {
+      const params = new URLSearchParams({ page_size: 50 })
+      if (search) params.set('search', search)
+      const res = await api.get(`/formations/formateurs/list/?${params}`)
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const assigned = new Set((module.formateurs || []).map(f => f.id))
+      setAllFormateurs(data.filter(f => !assigned.has(f.id)))
+    } catch {} finally { setFormateurLoading(false) }
+  }
+
+  const openAddFormateur = () => {
+    setFormateurSearch('')
+    loadAvailableFormateurs('')
+    setShowAddFormateur(true)
+  }
+
+  useEffect(() => {
+    if (!showAddFormateur) return
+    const t = setTimeout(() => loadAvailableFormateurs(formateurSearch), 300)
+    return () => clearTimeout(t)
+  }, [formateurSearch, showAddFormateur])
+
+  const handleAddFormateur = async (fid) => {
+    try {
+      await api.post(`/formations/${formationId}/modules/${moduleId}/formateurs/add/`, { formateur_id: fid })
+      loadModule()
+      loadAvailableFormateurs(formateurSearch)
+      showToast('Formateur assigné')
+    } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+  }
+
+  const handleRemoveFormateur = (fid, nom) => {
+    setConfirmDialog({
+      message: `Retirer ${nom} de ce module ?`,
+      onConfirm: async () => {
+        try {
+          await api.delete(`/formations/${formationId}/modules/${moduleId}/formateurs/${fid}/remove/`)
+          loadModule()
+          showToast('Formateur retiré')
+        } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+      }
+    })
+  }
+
+  const handleCreateSession = async (e) => {
+    e.preventDefault()
+    setSavingNewSession(true)
+    try {
+      await api.post(`/formations/${formationId}/modules/${moduleId}/sessions/new/`, newSessionForm)
+      setShowNewSession(false)
+      setNewSessionForm({ intitule: '', date_journee: '', heure_debut_prevue: '', heure_fin_prevue: '' })
+      loadModule()
+      showToast('Séance créée')
+    } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+    finally { setSavingNewSession(false) }
+  }
+
+  const openEditModule = () => {
+    setEditModuleForm({
+      intitule: module.intitule || '',
+      grade: module.grade || '',
+      groupe: module.groupe || '',
+      vague: module.vague || '',
+      statut: module.statut || 'PLANIFIEE',
+      site: module.site || '',
+      batiment: module.batiment || '',
+      salle: module.salle || '',
+      date_debut: module.date_debut ? module.date_debut.slice(0, 10) : '',
+      date_fin: module.date_fin ? module.date_fin.slice(0, 10) : '',
+      duree_prevue_heures: module.duree_prevue_heures || '',
+    })
+    setEditModuleOpen(true)
+  }
+
+  const _downloadBlob = (blob, type, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportSession = async (sessionId, sessionLabel, type) => {
+    try {
+      const blob = await api.getBlob(`/exports/session/${sessionId}/${type}/`)
+      const safeName = (sessionLabel || `session_${sessionId}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      _downloadBlob(blob, type, `rapport_${safeName}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || `Erreur export ${type.toUpperCase()} séance.`, 'error')
+    }
+  }
+
+  const handleExportAllSeances = async (type) => {
+    try {
+      const blob = await api.getBlob(`/exports/formation/${formationId}/${type}/`)
+      _downloadBlob(blob, type, `rapport_formation_${formationId}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || `Erreur export ${type.toUpperCase()} (toutes séances).`, 'error')
+    }
+  }
+
+  const openForceModal = (personneId = '', action = 'ENTREE', typePersonne = 'participant') => {
+    setForceForm({ personne_id: String(personneId), type_personne: typePersonne, action, motif: '' })
+    setForceModal(true)
+  }
+
+  const handleForcePointage = async (e) => {
+    e.preventDefault()
+    setForceSaving(true)
+    try {
+      await api.post(`/formations/${formationId}/force-pointage/`, {
+        ...forceForm,
+        personne_id: parseInt(forceForm.personne_id),
+        module_id: moduleId,
+      })
+      showToast(`${forceForm.action === 'ENTREE' ? 'Entrée' : 'Sortie'} forcée enregistrée`)
+      setForceModal(false)
+      setForceForm({ personne_id: '', type_personne: 'participant', action: 'ENTREE', motif: '' })
+      loadModule(true)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors du forçage', 'error')
+    } finally {
+      setForceSaving(false)
+    }
+  }
+
+  const handleSaveModule = async (e) => {
+    e.preventDefault()
+    setSavingModule(true)
+    try {
+      await api.patch(`/formations/${formationId}/modules/${moduleId}/`, editModuleForm)
+      setEditModuleOpen(false)
+      loadModule()
+      showToast('Module modifié')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur', 'error')
+    } finally {
+      setSavingModule(false)
+    }
+  }
+
+  const loadEncadrants = async () => {
+    try {
+      const res = await api.get('/auth/users/?role=ENCADRANT')
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      setEncadrants(data)
+    } catch {}
+  }
+
+  const openAssignSuperviseur = () => {
+    setSelectedSup(module?.superviseur_id || '')
+    setAssignSupError('')
+    loadEncadrants()
+    setShowAssignSup(true)
+  }
+
+  const handleAssignSuperviseur = async () => {
+    setAssignSupSaving(true)
+    setAssignSupError('')
+    try {
+      await api.post(
+        `/formations/${formationId}/modules/${moduleId}/assign-superviseur/`,
+        { superviseur_id: selectedSup || null },
+      )
+      setShowAssignSup(false)
+      loadModule()
+      showToast(selectedSup ? 'Encadrant assigné' : 'Encadrant retiré')
+    } catch (err) {
+      setAssignSupError(err.response?.data?.detail || "Erreur lors de l'assignation")
+    } finally {
+      setAssignSupSaving(false)
+    }
+  }
+
+  const tabStyle = (tab) => ({
+    padding: '0.6rem 0.9rem', cursor: 'pointer', fontWeight: 500,
+    color: activeTab === tab ? 'var(--ci-green)' : 'var(--text-muted)',
+    background: 'none', border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+    borderBottom: `3px solid ${activeTab === tab ? 'var(--ci-green)' : 'transparent'}`,
+  })
+
+  if (loading) return <div className="loading"><div className="spinner"></div></div>
+  if (error || !module) return (
+    <div className="card"><div className="card-body">
+      <div className="error-message">{error || 'Module non trouvé'}</div>
+      <Link to={`/formations/${formationId}`} className="btn btn-secondary mt-2">
+        <i className="bi bi-arrow-left me-1"></i>Retour
+      </Link>
+    </div></div>
+  )
+
+  const sessions = module.sessions || []
+  const participants = module.participants || []
+  const presences = module.presences || []
+  const formateurs = module.formateurs || []
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ fontWeight: 600, fontSize: '1.05rem' }}>
+                <i className="bi bi-book me-2"></i>{module.intitule}
+              </span>
+              <span style={{ marginLeft: '0.6rem', fontSize: '0.85rem', color: '#64748b' }}>
+                {module.grade} / {module.groupe}
+              </span>
+            </div>
+            <span className={`badge ${getStatutBadge(module.statut)}`}>{getStatutLabel(module.statut)}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => handleExportAllSeances('pdf')}
+              className="btn btn-outline-danger btn-sm"
+              title="Exporter PDF (toutes les séances)"
+            >
+              <i className="bi bi-file-earmark-pdf me-1"></i>PDF — Toutes séances
+            </button>
+            <button
+              onClick={() => handleExportAllSeances('excel')}
+              className="btn btn-outline-success btn-sm"
+              title="Exporter Excel (toutes les séances)"
+            >
+              <i className="bi bi-file-earmark-excel me-1"></i>Excel — Toutes séances
+            </button>
+            <div style={{ fontSize: '0.82rem', color: '#94a3b8', width: '100%', textAlign: 'right' }}>
+              <i className="bi bi-mortarboard me-1"></i>{module.formation}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', paddingLeft: '1rem', overflowX: 'auto' }}>
+          {[
+            { key: 'seances',      label: `Séances (${sessions.length})`,       icon: 'bi-calendar3' },
+            { key: 'info',         label: 'Informations',                        icon: 'bi-info-circle' },
+            { key: 'participants', label: `Auditeurs (${participants.length})`,  icon: 'bi-people' },
+            { key: 'presences',   label: `Présences (${presences.length})`,    icon: 'bi-check2-circle' },
+            { key: 'formateurs',  label: `Formateurs (${formateurs.length})`,   icon: 'bi-person-video3' },
+          ].map(t => (
+            <button key={t.key} style={tabStyle(t.key)} onClick={() => setActiveTab(t.key)}>
+              <i className={`bi ${t.icon} me-1`}></i>{t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── TAB: SÉANCES ── */}
+      {activeTab === 'seances' && (
+        <div className="card">
+          <div className="card-header-bar" style={{ background: '#f0fdf4' }}>
+            <span style={{ fontWeight: 600, color: 'var(--ci-green-dark)' }}>
+              <i className="bi bi-calendar3 me-2"></i>Séances — {module.intitule}
+              <span className="badge ms-2" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+                {sessions.length} séance{sessions.length > 1 ? 's' : ''}
+              </span>
+            </span>
+            {canManageSessions && (
+              <button onClick={() => setShowNewSession(true)} className="btn btn-dfrc btn-sm">
+                <i className="bi bi-plus-lg me-1"></i>Nouvelle séance
+              </button>
+            )}
+          </div>
+          <div className="card-body-flush">
+            {sessions.length > 0 ? (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr><th>Date</th><th>Horaire</th><th>Statut</th><th>Présences</th><th>Exports</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {sessions.map(s => (
+                      <tr key={s.id}>
+                        <td>{s.date ? formatDate(s.date) : '—'}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{s.heure_debut || '—'} — {s.heure_fin || '—'}</td>
+                        <td>
+                          <span className={`badge ${s.en_cours ? 'badge-en-cours' : s.terminee ? 'badge-terminee' : 'badge-planifiee'}`}>
+                            {s.en_cours ? 'En cours' : s.terminee ? 'Terminée' : 'Planifiée'}
+                          </span>
+                        </td>
+                        <td><span className="badge-bg-success">{s.nb_presences || 0}</span> / {s.nb_attendus || 0}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button onClick={() => handleExportSession(s.id, s.intitule || `seance_${s.numero}`, 'pdf')} className="btn btn-outline-danger btn-sm" title="Exporter PDF">
+                              <i className="bi bi-file-earmark-pdf"></i>
+                            </button>
+                            <button onClick={() => handleExportSession(s.id, s.intitule || `seance_${s.numero}`, 'excel')} className="btn btn-outline-success btn-sm" title="Exporter Excel">
+                              <i className="bi bi-file-earmark-excel"></i>
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="btn-group">
+                            {canSupervise && !s.en_cours && !s.terminee && (
+                              <button onClick={() => handleStartSession(s.id, s.intitule || `Séance ${s.numero}`)} className="btn btn-outline-success btn-sm" disabled={startingSession === s.id}>
+                                {startingSession === s.id ? <span className="spinner" style={{ width: '0.8rem', height: '0.8rem', display: 'inline-block' }}></span> : <><i className="bi bi-play-fill me-1"></i>Démarrer</>}
+                              </button>
+                            )}
+                            {s.en_cours && canSupervise && (
+                              <button onClick={() => handleStopSession(s.id, s.intitule || `Séance ${s.numero}`)} className="btn btn-warning btn-sm" disabled={stoppingSession === s.id}>
+                                {stoppingSession === s.id ? <span className="spinner" style={{ width: '0.8rem', height: '0.8rem', display: 'inline-block' }}></span> : <><i className="bi bi-stop-fill me-1"></i>Terminer</>}
+                              </button>
+                            )}
+                            {!s.terminee && (
+                              <button onClick={() => { setSelectedSessionId(s.id); setQrModalOpen(true) }} className="btn btn-outline-primary btn-sm" title="QR Code">
+                                <i className="bi bi-qr-code"></i>
+                              </button>
+                            )}
+                            {s.terminee && (
+                              <span className="badge badge-terminee">Terminé</span>
+                            )}
+                            {canManageSessions && !s.terminee && (
+                              <button onClick={() => openEditSession(s)} className="btn btn-outline-secondary btn-sm" title="Modifier">
+                                <i className="bi bi-pencil"></i>
+                              </button>
+                            )}
+                            {canManageSessions && !s.en_cours && !s.terminee && (
+                              <button onClick={() => handleDeleteSession(s.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted">
+                <i className="bi bi-calendar-x" style={{ fontSize: '2rem' }}></i>
+                <p className="mt-2">Aucune séance planifiée pour ce module</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: INFO ── */}
+      {activeTab === 'info' && (() => {
+        const nbTerminees = sessions.filter(s => s.statut === 'TERMINEE' || s.statut === 'TERMINÉE').length
+        const infoRow = (icon, label, value, iconColor = 'var(--ci-orange)') => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid #f1f5f9', gap: '0.75rem' }}>
+            <i className={`bi ${icon}`} style={{ width: 18, color: iconColor, flexShrink: 0, fontSize: '1rem' }}></i>
+            <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.86rem', color: '#64748b' }}>{label}</span>
+            <span style={{ fontSize: '0.92rem', color: '#1e293b' }}>{value || <span style={{ color: '#cbd5e1' }}>—</span>}</span>
+          </div>
+        )
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', alignItems: 'start' }}>
+
+            {/* ── Colonne gauche ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+              {/* Lieu & Calendrier */}
+              <div className="card">
+                <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="bi bi-geo-alt" style={{ color: 'var(--ci-orange)' }}></i>Lieu &amp; Calendrier
+                  </span>
+                </div>
+                <div style={{ padding: '0.5rem 1.2rem 0.75rem' }}>
+                  {infoRow('bi-building',        'Site',    module.site)}
+                  {infoRow('bi-buildings',        'Bâtiment', module.batiment)}
+                  {infoRow('bi-layout-text-window-reverse', 'Salle', module.salle)}
+                  {infoRow('bi-calendar',         'Début',   formatDate(module.date_debut))}
+                  {infoRow('bi-calendar-check',   'Fin',     formatDate(module.date_fin))}
+                  {infoRow('bi-clock',            'Durée',   module.duree_prevue_heures ? `${module.duree_prevue_heures}h` : null)}
+                </div>
+              </div>
+
+              {/* Classification & Intervenants */}
+              <div className="card">
+                <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="bi bi-people" style={{ color: 'var(--ci-orange)' }}></i>Classification &amp; Intervenants
+                  </span>
+                  {canManageModule && (
+                    <button onClick={openAssignSuperviseur} className="btn btn-outline-primary btn-sm" title="Assigner un encadrant">
+                      <i className="bi bi-person-gear me-1"></i>
+                      {module.superviseur_id ? 'Changer encadrant' : 'Assigner encadrant'}
+                    </button>
+                  )}
+                </div>
+                <div style={{ padding: '0.5rem 1.2rem 0.75rem' }}>
+                  {infoRow('bi-tag',          'Catégorie', module.categorie)}
+                  {infoRow('bi-award',        'Grade',     module.grade)}
+                  {infoRow('bi-book',         'Module',    module.intitule)}
+                  {infoRow('bi-mortarboard',  'Formation', module.formation)}
+                  {infoRow('bi-people',       'Groupe',    module.groupe)}
+                  {infoRow('bi-flag',         'Vague',     module.vague)}
+                  {infoRow('bi-person-video3','Formateur', formateurs.length > 0
+                    ? formateurs.map(f => `${f.prenom} ${f.nom}`).join(', ')
+                    : null)}
+                  {infoRow('bi-person-gear',  'Encadrant', module.superviseur_nom)}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Colonne droite ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+              {/* Résumé stats */}
+              <div className="card" style={{ borderTop: '3px solid var(--ci-green)' }}>
+                <div style={{ padding: '0.75rem 1rem', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#94a3b8', fontWeight: 600 }}>RÉSUMÉ</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #f1f5f9' }}>
+                  {[
+                    { icon: 'bi-calendar3',   value: sessions.length,      label: 'SÉANCES',    color: '#16a34a' },
+                    { icon: 'bi-people',      value: participants.length,   label: 'AUDITEURS',  color: '#1d4ed8' },
+                    { icon: 'bi-check-circle',value: nbTerminees,           label: 'TERMINÉES',  color: '#7c3aed' },
+                    { icon: 'bi-person-video3',value: formateurs.length,    label: 'FORMATEURS', color: 'var(--ci-orange)' },
+                  ].map((c, i) => (
+                    <div key={c.label} style={{
+                      padding: '1.1rem 0.5rem', textAlign: 'center',
+                      borderRight: i % 2 === 0 ? '1px solid #f1f5f9' : 'none',
+                      borderTop: i >= 2 ? '1px solid #f1f5f9' : 'none',
+                    }}>
+                      <i className={`bi ${c.icon}`} style={{ fontSize: '1.3rem', color: c.color, display: 'block', marginBottom: '0.3rem' }}></i>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 700, color: c.color, lineHeight: 1 }}>{c.value}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8', letterSpacing: '0.08em', marginTop: '0.3rem' }}>{c.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Statut */}
+              <div className="card" style={{ borderTop: '3px solid var(--ci-orange)' }}>
+                <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#94a3b8', fontWeight: 600 }}>STATUT</span>
+                </div>
+                <div style={{ padding: '0.9rem 1rem' }}>
+                  <span className={`badge ${getStatutBadge(module.statut)}`} style={{ fontSize: '0.85rem', padding: '0.4rem 0.9rem' }}>
+                    {getStatutLabel(module.statut)}
+                  </span>
+                  {module.secretariat_nom && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.88rem', color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <i className="bi bi-building" style={{ color: '#94a3b8' }}></i>
+                      <strong>Secrétariat :</strong> {module.secretariat_nom}
+                    </div>
+                  )}
+                  {canManageModule && (
+                    <button onClick={openEditModule} className="btn btn-outline-secondary btn-sm" style={{ marginTop: '0.85rem', width: '100%' }}>
+                      <i className="bi bi-pencil me-1"></i>Modifier
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )
+      })()}
+
+      {/* ── TAB: PARTICIPANTS ── */}
+      {activeTab === 'participants' && (
+        <div className="card">
+          <div className="card-header-bar">
+            <span><i className="bi bi-people me-2"></i>Auditeurs inscrits ({participants.length})</span>
+            {canManageModule && (
+              <button onClick={openAddParticipant} className="btn btn-dfrc btn-sm">
+                <i className="bi bi-person-plus me-1"></i>Inscrire
+              </button>
+            )}
+          </div>
+          <div className="card-body-flush">
+            {participants.length > 0 ? (
+              <div className="table-container">
+                <table className="table">
+                  <thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Grade</th><th>Groupe</th>{canManageModule && <th></th>}</tr></thead>
+                  <tbody>
+                    {participants.map(p => (
+                      <tr key={p.id}>
+                        <td><span className="badge-bg-info">{p.numero_matricule || p.matricule || '—'}</span></td>
+                        <td><strong>{p.nom}</strong></td>
+                        <td>{p.prenom}</td>
+                        <td>{p.grade || '—'}</td>
+                        <td>{p.groupe || '—'}</td>
+                        {canManageModule && (
+                          <td>
+                            <button onClick={() => handleRemoveParticipant(p.id, `${p.nom} ${p.prenom}`)} className="btn btn-outline-danger btn-sm" title="Retirer">
+                              <i className="bi bi-person-dash"></i>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted">
+                <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
+                <p className="mt-2">Aucun auditeur inscrit</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: FORMATEURS ── */}
+      {activeTab === 'formateurs' && (
+        <div className="card">
+          <div className="card-header-bar" style={{ background: '#fdf4ff' }}>
+            <span style={{ fontWeight: 600, color: '#7e22ce' }}>
+              <i className="bi bi-person-video3 me-2"></i>Formateurs assignés
+              <span className="badge ms-2" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.78rem' }}>
+                {formateurs.length} formateur{formateurs.length > 1 ? 's' : ''}
+              </span>
+            </span>
+            {canManageModule && (
+              <button onClick={openAddFormateur} className="btn btn-dfrc btn-sm">
+                <i className="bi bi-person-plus me-1"></i>Assigner
+              </button>
+            )}
+          </div>
+          <div className="card-body-flush">
+            {formateurs.length > 0 ? (
+              <div className="table-container">
+                <table className="table">
+                  <thead><tr><th>N° Badge</th><th>Nom</th><th>Prénom</th><th>Spécialité</th><th>Email</th>{canManageModule && <th></th>}</tr></thead>
+                  <tbody>
+                    {formateurs.map(f => (
+                      <tr key={f.id}>
+                        <td>
+                          <span className="badge-bg-info" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{f.numerobadge || '—'}</span>
+                          {f.numerobadge && (
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                              <i className="bi bi-qr-code me-1"></i>N° de badgeage
+                            </div>
+                          )}
+                        </td>
+                        <td><strong>{f.nom}</strong></td>
+                        <td>{f.prenom}</td>
+                        <td>{f.specialite || '—'}</td>
+                        <td>{f.email || '—'}</td>
+                        {canManageModule && (
+                          <td>
+                            <button onClick={() => handleRemoveFormateur(f.id, `${f.nom} ${f.prenom}`)} className="btn btn-outline-danger btn-sm" title="Retirer">
+                              <i className="bi bi-person-dash"></i>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted">
+                <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
+                <p className="mt-2">Aucun formateur assigné à ce module</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: PRÉSENCES ── */}
+      {activeTab === 'presences' && (() => {
+        const sessionsOfDay = sessions.filter(s => s.date === selectedPresenceDate)
+        const ptDateAll = presences.filter(pt => (pt.date_journee || pt.session_date) === selectedPresenceDate)
+        const ptDate = selectedPresenceSessionId === 'ALL'
+          ? ptDateAll
+          : ptDateAll.filter(pt => String(pt.session_id) === String(selectedPresenceSessionId))
+        const q = presenceSearch.toLowerCase().trim()
+        const ptFiltered = q
+          ? ptDate.filter(pt => `${pt.nom} ${pt.prenom} ${pt.matricule || ''} ${pt.numerobadge || ''}`.toLowerCase().includes(q))
+          : ptDate
+
+        // Séparer participants et formateurs
+        const ptPart = ptDate.filter(pt => pt.type_personne !== 'formateur')
+        const ptFmt  = ptDate.filter(pt => pt.type_personne === 'formateur')
+
+        const presentPartIds = new Set(ptPart.map(pt => pt.participant_id))
+        const presentFmtIds  = new Set(ptFmt.map(pt => pt.formateur_id))
+
+        const nbAttendus = participants.length + formateurs.length
+        const nbPresents = (
+          [...new Set(ptPart.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').map(pt => pt.participant_id))].length
+          + [...new Set(ptFmt.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').map(pt => pt.formateur_id))].length
+        )
+        const nbEnSalle = (
+          [...new Set(ptPart.filter(pt => pt.timestamp_entree && !pt.timestamp_sortie).map(pt => pt.participant_id))].length
+          + [...new Set(ptFmt.filter(pt => pt.timestamp_entree && !pt.timestamp_sortie).map(pt => pt.formateur_id))].length
+        )
+        const presentOuSallePartIds = new Set(ptPart.filter(pt => !pt.timestamp_sortie || ((pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE')).map(pt => pt.participant_id))
+        const presentOuSalleFmtIds  = new Set(ptFmt.filter(pt => !pt.timestamp_sortie || ((pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE')).map(pt => pt.formateur_id))
+        const nbAbsents = (
+          participants.filter(p => !presentOuSallePartIds.has(p.id)).length
+          + formateurs.filter(f => !presentOuSalleFmtIds.has(f.id)).length
+        )
+        const taux = nbAttendus > 0 ? Math.round(((nbPresents + nbEnSalle) / nbAttendus) * 100) : 0
+
+        const seanceIds = [...new Set(ptFiltered.map(pt => pt.session_id))]
+        const seancesDuJour = seanceIds.map(sid => {
+          const pts = ptFiltered.filter(pt => pt.session_id === sid)
+          return {
+            session_id: sid,
+            session_intitule: pts[0].session_intitule || `Séance ${pts[0].session_numero || ''}`,
+            pointages: pts,
+          }
+        })
+
+        // Absents : participants + formateurs qui n'ont pas encore badgé
+        const absentsParticipants = participants
+          .filter(p => !presentPartIds.has(p.id))
+          .map(p => ({ ...p, type_personne: 'participant' }))
+        const absentsFormateurs = formateurs
+          .filter(f => !presentFmtIds.has(f.id))
+          .map(f => ({ ...f, type_personne: 'formateur' }))
+        const absentsAll = [...absentsParticipants, ...absentsFormateurs]
+        const absentsFiltered = q
+          ? absentsAll.filter(p =>
+              `${p.nom} ${p.prenom} ${p.matricule || p.numero_matricule || ''} ${p.numerobadge || ''}`.toLowerCase().includes(q)
+            )
+          : absentsAll
+
+        return (
+          <div>
+            {/* ── Barre filtre ── */}
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <div style={{ padding: '0.85rem 1.2rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <i className="bi bi-calendar3" style={{ color: '#64748b' }}></i>
+                  <span style={{ fontWeight: 500, color: '#374151' }}>Présences du :</span>
+                  <input type="date" className="form-control" style={{ width: 'auto' }}
+                    value={selectedPresenceDate}
+                    onChange={e => { setSelectedPresenceDate(e.target.value); setSelectedPresenceSessionId('ALL') }} />
+                  {sessionsOfDay.length > 0 && (
+                    <select className="form-control" style={{ width: 'auto' }}
+                      value={selectedPresenceSessionId}
+                      onChange={e => setSelectedPresenceSessionId(e.target.value)}>
+                      <option value="ALL">Toutes les séances{sessionsOfDay.length > 1 ? ` (${sessionsOfDay.length})` : ''}</option>
+                      {sessionsOfDay.map(s => {
+                        const label = s.intitule || `Séance ${s.numero}`
+                        const horaire = (s.heure_debut || s.heure_fin) ? ` — ${s.heure_debut || '?'}${s.heure_fin ? ` → ${s.heure_fin}` : ''}` : ''
+                        return <option key={s.id} value={s.id}>{label}{horaire}</option>
+                      })}
+                    </select>
+                  )}
+                  <button className="btn btn-warning btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    onClick={() => { setSelectedPresenceDate(new Date().toISOString().slice(0, 10)); setSelectedPresenceSessionId('ALL'); loadModule() }}>
+                    <i className="bi bi-arrow-clockwise"></i> Actualiser
+                  </button>
+                </div>
+                <div style={{ marginLeft: 'auto', minWidth: '220px' }}>
+                  <div className="input-group">
+                    <span className="input-group-text" style={{ background: '#f8fafc' }}><i className="bi bi-search"></i></span>
+                    <input type="text" className="form-control" placeholder="Rechercher par nom, matricule, N° badge…"
+                      value={presenceSearch} onChange={e => setPresenceSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Stats cards ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+              {[
+                { label: 'ATTENDUS',      value: nbAttendus, icon: 'bi-people',             bg: '#f8fafc', border: '#cbd5e1', color: '#475569' },
+                { label: 'EN SALLE',      value: nbEnSalle,  icon: 'bi-person-check',        bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8' },
+                { label: 'PRÉSENTS',      value: nbPresents, icon: 'bi-check-circle',         bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
+                { label: 'ABSENTS',       value: nbAbsents,  icon: 'bi-person-x',             bg: '#fef2f2', border: '#fca5a5', color: '#dc2626' },
+                { label: 'TAUX PRÉSENCE', value: `${taux}%`, icon: 'bi-graph-up',             bg: '#fefce8', border: '#fcd34d', color: taux < 50 ? '#dc2626' : '#d97706' },
+              ].map(c => (
+                <div key={c.label} style={{ background: c.bg, border: `1.5px solid ${c.border}`, borderRadius: '12px', padding: '1rem', textAlign: 'center' }}>
+                  <i className={`bi ${c.icon}`} style={{ fontSize: '1.4rem', color: c.color, display: 'block', marginBottom: '0.3rem' }}></i>
+                  <div style={{ fontSize: '1.7rem', fontWeight: 700, color: c.color, lineHeight: 1 }}>{c.value}</div>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', letterSpacing: '0.05em', marginTop: '0.35rem' }}>{c.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Contenu ── */}
+            {ptDate.length === 0 && (
+              <div className="card" style={{ marginBottom: '1rem' }}>
+                <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <i className="bi bi-calendar-x" style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}></i>
+                  Aucun pointage enregistré pour cette date.
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
+                    Les auditeurs/formateurs attendus restent visibles dans la liste des absents ci-dessous.
+                  </div>
+                </div>
+              </div>
+            )}
+            <>
+                {/* Présents par séance */}
+                {seancesDuJour.map(seance => (
+                  <div className="card" key={seance.session_id} style={{ marginBottom: '1rem' }}>
+                    <div className="card-header-bar" style={{ background: '#f0fdf4', borderBottom: '2px solid #bbf7d0' }}>
+                      <span style={{ fontWeight: 600 }}>
+                        <i className="bi bi-calendar3 me-2" style={{ color: '#16a34a' }}></i>
+                        {seance.session_intitule}
+                      </span>
+                      <span className="badge" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+                        {seance.pointages.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').length} présence{seance.pointages.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="card-body-flush">
+                      <table className="table">
+                        <thead>
+                          <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Type</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Statut</th>{canSupervise && <th></th>}</tr>
+                        </thead>
+                        <tbody>
+                          {seance.pointages.map((pt, i) => (
+                            <tr key={i}>
+                              <td>
+                                <span className="badge-bg-info" style={{ fontFamily: pt.type_personne === 'formateur' ? 'monospace' : undefined }}>
+                                  {pt.type_personne === 'formateur' ? (pt.numerobadge || '—') : (pt.matricule || '—')}
+                                </span>
+                              </td>
+                              <td><strong>{pt.nom}</strong></td>
+                              <td>{pt.prenom}</td>
+                              <td>
+                                {pt.type_personne === 'formateur'
+                                  ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.7rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
+                                  : <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem' }}><i className="bi bi-person me-1"></i>Auditeur</span>
+                                }
+                              </td>
+                              <td><small>{pt.timestamp_entree ? new Date(pt.timestamp_entree).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'}</small></td>
+                              <td><small>{pt.timestamp_sortie ? new Date(pt.timestamp_sortie).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : <span className="text-warning">En cours</span>}</small></td>
+                              <td><small>{pt.duree_minutes > 0 ? `${Math.round(pt.duree_minutes)} min` : '—'}</small></td>
+                              <td>
+                                <span className={`badge ${
+                                  pt.statut === 'ABSENT_NON_BADGE' ? 'badge-danger'
+                                  : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'badge-danger'
+                                  : pt.statut === 'FORCE_DFRC' ? 'badge-info'
+                                  : pt.timestamp_sortie ? 'badge-terminee'
+                                  : 'badge-en-cours'
+                                }`} style={{ fontSize: '0.72rem' }}>
+                                  {pt.statut === 'ABSENT_NON_BADGE' ? 'Absent'
+                                  : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'Absent'
+                                  : pt.statut === 'FORCE_DFRC' ? 'Forcé'
+                                  : pt.timestamp_sortie ? 'Terminé'
+                                  : 'En cours'}
+                                </span>
+                              </td>
+                              {canSupervise && (
+                                <td>
+                                  {!pt.timestamp_sortie && (
+                                    <button className="btn btn-outline-warning btn-sm" title="Forcer la sortie"
+                                      onClick={() => openForceModal(pt.participant_id || pt.formateur_id, 'SORTIE', pt.type_personne || 'participant')}>
+                                      <i className="bi bi-box-arrow-right"></i>
+                                    </button>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Absents du jour */}
+                {absentsFiltered.length > 0 && (
+                  <div className="card" style={{ marginBottom: '1rem' }}>
+                    <div className="card-header-bar" style={{ background: '#fef2f2', borderBottom: '2px solid #fecaca' }}>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>
+                        <i className="bi bi-person-x me-2"></i>Absents
+                      </span>
+                      <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.78rem' }}>
+                        {absentsFiltered.length} absent{absentsFiltered.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="card-body-flush">
+                      <table className="table">
+                        <thead>
+                          <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Type / Grade</th>{canSupervise && <th></th>}</tr>
+                        </thead>
+                        <tbody>
+                          {absentsFiltered.map((p, idx) => (
+                            <tr key={`${p.type_personne}_${p.id}_${idx}`}>
+                              <td>
+                                <span className="badge-bg-info" style={{ fontFamily: p.type_personne === 'formateur' ? 'monospace' : undefined }}>
+                                  {p.type_personne === 'formateur' ? (p.numerobadge || '—') : (p.matricule || p.numero_matricule || '—')}
+                                </span>
+                              </td>
+                              <td><strong>{p.nom}</strong></td>
+                              <td>{p.prenom}</td>
+                              <td>
+                                {p.type_personne === 'formateur'
+                                  ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
+                                  : (p.grade || '—')
+                                }
+                              </td>
+                              {canSupervise && (
+                                <td>
+                                  <button className="btn btn-outline-success btn-sm" title="Forcer l'entrée"
+                                    onClick={() => openForceModal(p.id, 'ENTREE', p.type_personne || 'participant')}>
+                                    <i className="bi bi-box-arrow-in-right"></i>
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+          </div>
+        )
+      })()}
+
+      {/* ── MODAL: FORÇAGE BADGEAGE ── */}
+      {forceModal && (
+        <div className="modal-overlay" onClick={() => setForceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-check me-2"></i>Forcer un badgeage</h5>
+              <button className="btn-close" onClick={() => setForceModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleForcePointage}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label fw-semibold">
+                    {forceForm.type_personne === 'formateur' ? 'Formateur' : 'Auditeur'}
+                  </label>
+                  {(() => {
+                    const source = forceForm.type_personne === 'formateur' ? formateurs : participants
+                    const p = source.find(x => String(x.id) === String(forceForm.personne_id))
+                    return p ? (
+                      <div style={{ padding: '0.5rem 0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500 }}>
+                        {p.nom} {p.prenom}
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+                <div className="form-group">
+                  <label className="form-label fw-semibold">Motif *</label>
+                  <textarea className="form-control" rows={2} placeholder="Ex: téléphone en panne, problème réseau…"
+                    required value={forceForm.motif} onChange={e => setForceForm({ ...forceForm, motif: e.target.value })} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setForceModal(false)}>Annuler</button>
+                <button type="submit" className="btn btn-danger" disabled={forceSaving || !forceForm.personne_id || !forceForm.motif.trim()}>
+                  {forceSaving ? 'Enregistrement…' : `Forcer ${forceForm.action === 'ENTREE' ? "l'entrée" : 'la sortie'}`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: NOUVELLE SÉANCE ── */}
+      {showNewSession && (
+        <div className="modal-overlay" onClick={() => setShowNewSession(false)}>
+          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-calendar-plus me-2"></i>Nouvelle séance</h5>
+              <button className="btn-close" onClick={() => setShowNewSession(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleCreateSession}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Intitulé</label>
+                  <input type="text" className="form-control" value={newSessionForm.intitule}
+                    onChange={e => setNewSessionForm({ ...newSessionForm, intitule: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date *</label>
+                  <input type="date" className="form-control" required value={newSessionForm.date_journee}
+                    onChange={e => setNewSessionForm({ ...newSessionForm, date_journee: e.target.value })} />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Heure début</label>
+                    <input type="time" className="form-control" value={newSessionForm.heure_debut_prevue}
+                      onChange={e => setNewSessionForm({ ...newSessionForm, heure_debut_prevue: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Heure fin</label>
+                    <input type="time" className="form-control" value={newSessionForm.heure_fin_prevue}
+                      onChange={e => setNewSessionForm({ ...newSessionForm, heure_fin_prevue: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowNewSession(false)}>Annuler</button>
+                <button type="submit" className="btn btn-dfrc" disabled={savingNewSession}>
+                  {savingNewSession ? 'Création...' : 'Créer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: INSCRIRE AUDITEUR ── */}
+      {showAddParticipant && (
+        <div className="modal-overlay" onClick={() => setShowAddParticipant(false)}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-plus me-2"></i>Inscrire un auditeur</h5>
+              <button className="btn-close" onClick={() => setShowAddParticipant(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input type="text" className="form-control" placeholder="Rechercher par nom, prénom, matricule…"
+                  value={participantSearch} onChange={e => setParticipantSearch(e.target.value)} autoFocus />
+              </div>
+              {participantLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
+              {!participantLoading && allParticipants.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun auditeur disponible</p>
+              )}
+              {!participantLoading && allParticipants.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th></th></tr></thead>
+                    <tbody>
+                      {allParticipants.map(p => (
+                        <tr key={p.id}>
+                          <td><span className="badge-bg-info">{p.numero_matricule || p.matricule || '—'}</span></td>
+                          <td>{p.nom}</td>
+                          <td>{p.prenom}</td>
+                          <td>
+                            <button onClick={() => handleAddParticipant(p.id)} className="btn btn-outline-success btn-sm">
+                              <i className="bi bi-plus"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowAddParticipant(false)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: ASSIGNER FORMATEUR ── */}
+      {showAddFormateur && (
+        <div className="modal-overlay" onClick={() => setShowAddFormateur(false)}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-video3 me-2"></i>Assigner un formateur</h5>
+              <button className="btn-close" onClick={() => setShowAddFormateur(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input type="text" className="form-control" placeholder="Rechercher par nom, prénom…"
+                  value={formateurSearch} onChange={e => setFormateurSearch(e.target.value)} autoFocus />
+              </div>
+              {formateurLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
+              {!formateurLoading && allFormateurs.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun formateur disponible</p>
+              )}
+              {!formateurLoading && allFormateurs.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead><tr><th>Nom</th><th>Prénom</th><th>Spécialité</th><th></th></tr></thead>
+                    <tbody>
+                      {allFormateurs.map(f => (
+                        <tr key={f.id}>
+                          <td>{f.nom}</td>
+                          <td>{f.prenom}</td>
+                          <td>{f.specialite || '—'}</td>
+                          <td>
+                            <button onClick={() => handleAddFormateur(f.id)} className="btn btn-outline-success btn-sm">
+                              <i className="bi bi-plus"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowAddFormateur(false)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: ÉDITION MODULE ── */}
+      {editModuleOpen && (
+        <div className="modal-overlay" onClick={() => setEditModuleOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-pencil me-2"></i>Modifier le module</h5>
+              <button className="btn-close" onClick={() => setEditModuleOpen(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleSaveModule}>
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <div className="form-group">
+                  <label className="form-label">Intitulé *</label>
+                  <input type="text" className="form-control" required value={editModuleForm.intitule}
+                    onChange={e => setEditModuleForm({ ...editModuleForm, intitule: e.target.value })} />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Grade</label>
+                    <input type="text" className="form-control" value={editModuleForm.grade}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, grade: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Groupe</label>
+                    <input type="text" className="form-control" value={editModuleForm.groupe}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, groupe: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Vague</label>
+                    <input type="text" className="form-control" value={editModuleForm.vague}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, vague: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Statut</label>
+                    <select className="form-control" value={editModuleForm.statut}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, statut: e.target.value })}>
+                      <option value="PLANIFIEE">Planifiée</option>
+                      <option value="EN_COURS">En cours</option>
+                      <option value="SUSPENDUE">Suspendue</option>
+                      <option value="TERMINEE">Terminée</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Date début</label>
+                    <input type="date" className="form-control" value={editModuleForm.date_debut}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, date_debut: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Date fin</label>
+                    <input type="date" className="form-control" value={editModuleForm.date_fin}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, date_fin: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Site</label>
+                    {refs.sites?.length > 0 ? (
+                      <select className="form-control" value={editModuleForm.site}
+                        onChange={e => setEditModuleForm({ ...editModuleForm, site: e.target.value, batiment: '', salle: '' })}>
+                        <option value="">-- Site --</option>
+                        {refs.sites.map(s => <option key={s.id} value={s.nom}>{s.nom}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className="form-control" value={editModuleForm.site}
+                        onChange={e => setEditModuleForm({ ...editModuleForm, site: e.target.value })} />
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Bâtiment</label>
+                    {refs.batiments?.length > 0 ? (() => {
+                      const siteObj = refs.sites?.find(s => s.nom === editModuleForm.site)
+                      const filteredBatiments = siteObj ? refs.batiments.filter(b => b.site_id === siteObj.id) : refs.batiments
+                      return (
+                        <select className="form-control" value={editModuleForm.batiment}
+                          onChange={e => setEditModuleForm({ ...editModuleForm, batiment: e.target.value, salle: '' })}>
+                          <option value="">-- Bâtiment --</option>
+                          {filteredBatiments.map(b => <option key={b.id} value={b.nom}>{b.nom}</option>)}
+                        </select>
+                      )
+                    })() : (
+                      <input type="text" className="form-control" value={editModuleForm.batiment}
+                        onChange={e => setEditModuleForm({ ...editModuleForm, batiment: e.target.value })} />
+                    )}
+                  </div>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Salle</label>
+                    {refs.salles?.length > 0 ? (() => {
+                      const batObj = refs.batiments?.find(b => b.nom === editModuleForm.batiment)
+                      const siteObj = refs.sites?.find(s => s.nom === editModuleForm.site)
+                      const filteredSalles = batObj
+                        ? refs.salles.filter(s => s.batiment_id === batObj.id)
+                        : siteObj ? refs.salles.filter(s => s.site_id === siteObj.id) : refs.salles
+                      return (
+                        <select className="form-control" value={editModuleForm.salle}
+                          onChange={e => setEditModuleForm({ ...editModuleForm, salle: e.target.value })}>
+                          <option value="">-- Salle --</option>
+                          {filteredSalles.map(s => <option key={s.id} value={s.nom}>{s.nom}</option>)}
+                        </select>
+                      )
+                    })() : (
+                      <input type="text" className="form-control" value={editModuleForm.salle}
+                        onChange={e => setEditModuleForm({ ...editModuleForm, salle: e.target.value })} />
+                    )}
+                  </div>
+                  <div className="form-group" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Volume horaire (h)</label>
+                  <input type="number" className="form-control" min="0" step="0.5" value={editModuleForm.duree_prevue_heures}
+                    onChange={e => setEditModuleForm({ ...editModuleForm, duree_prevue_heures: e.target.value })} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditModuleOpen(false)}>Annuler</button>
+                <button type="submit" className="btn btn-dfrc" disabled={savingModule}>
+                  {savingModule ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <QRCodeModal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} formationId={formationId} sessionId={selectedSessionId} />
+
+      {editSession && (
+        <div className="modal-overlay" onClick={() => setEditSession(null)}>
+          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-pencil me-2"></i>Modifier la séance</h5>
+              <button className="btn-close" onClick={() => setEditSession(null)}>&times;</button>
+            </div>
+            <form onSubmit={handleUpdateSession}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Intitulé *</label>
+                  <input type="text" className="form-control" required value={editSessionForm.intitule}
+                    onChange={e => setEditSessionForm({ ...editSessionForm, intitule: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date *</label>
+                  <input type="date" className="form-control" required value={editSessionForm.date_journee}
+                    onChange={e => setEditSessionForm({ ...editSessionForm, date_journee: e.target.value })} />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Heure début</label>
+                    <input type="time" className="form-control" value={editSessionForm.heure_debut_prevue}
+                      onChange={e => setEditSessionForm({ ...editSessionForm, heure_debut_prevue: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Heure fin</label>
+                    <input type="time" className="form-control" value={editSessionForm.heure_fin_prevue}
+                      onChange={e => setEditSessionForm({ ...editSessionForm, heure_fin_prevue: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setEditSession(null)}>Annuler</button>
+                <button type="submit" className="btn btn-dfrc" disabled={savingSession}>
+                  {savingSession ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmModal
+          message={confirmDialog.message}
+          detail={confirmDialog.detail}
+          onConfirm={() => { setConfirmDialog(null); confirmDialog.onConfirm() }}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* ── MODAL: ASSIGNER ENCADRANT ── */}
+      {showAssignSup && (
+        <div className="modal-overlay" onClick={() => setShowAssignSup(false)}>
+          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-person-gear me-2"></i>Assigner un encadrant</h5>
+              <button className="btn-close" onClick={() => setShowAssignSup(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted" style={{ fontSize: '0.88rem' }}>
+                Choisir l'encadrant superviseur pour le module « <strong>{module.intitule}</strong> ».
+              </p>
+              <div className="form-group">
+                <label className="form-label">Encadrant</label>
+                <select
+                  className="form-control"
+                  value={selectedSup}
+                  onChange={e => setSelectedSup(e.target.value)}
+                >
+                  <option value="">-- Aucun (retirer l'encadrant) --</option>
+                  {encadrants.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} {u.last_name} {u.username ? `(${u.username})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {assignSupError && <div className="error-message">{assignSupError}</div>}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowAssignSup(false)}>Annuler</button>
+              <button
+                className="btn btn-dfrc"
+                onClick={handleAssignSuperviseur}
+                disabled={assignSupSaving}
+              >
+                {assignSupSaving ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
