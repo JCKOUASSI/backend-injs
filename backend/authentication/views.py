@@ -105,7 +105,8 @@ class UserListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(
                 Q(first_name__icontains=search) |
                 Q(last_name__icontains=search) |
-                Q(username__icontains=search)
+                Q(username__icontains=search) |
+                Q(matricule__icontains=search)
             )
         role = self.request.query_params.get('role')
         if role:

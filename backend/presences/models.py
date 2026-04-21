@@ -25,6 +25,14 @@ class Pointage(models.Model):
         null=True,
         blank=True,
     )
+    encadrant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pointages_encadrant',
+        null=True,
+        blank=True,
+        limit_choices_to={'role': 'ENCADRANT'},
+    )
     session = models.ForeignKey(
         SessionModule,
         on_delete=models.CASCADE,
@@ -53,12 +61,16 @@ class Pointage(models.Model):
 
     @property
     def personne(self):
-        """Retourne le participant ou le formateur lié."""
-        return self.participant or self.formateur
+        """Retourne la personne liée (participant, formateur ou encadrant)."""
+        return self.participant or self.formateur or self.encadrant
 
     @property
     def type_personne(self):
-        return 'formateur' if self.formateur_id else 'participant'
+        if self.formateur_id:
+            return 'formateur'
+        if self.encadrant_id:
+            return 'encadrant'
+        return 'participant'
 
     @property
     def formation(self):
@@ -143,7 +155,7 @@ class AuditLog(models.Model):
     # Sur qui porte l'action
     cible_type = models.CharField(
         max_length=20, blank=True, default='',
-        help_text="'participant' ou 'formateur'",
+        help_text="'participant', 'formateur' ou 'encadrant'",
     )
     cible_numero = models.CharField(max_length=50, blank=True, default='')
     cible_nom = models.CharField(max_length=255, blank=True, default='')

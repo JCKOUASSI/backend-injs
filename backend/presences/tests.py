@@ -4,7 +4,16 @@ from datetime import timedelta
 from rest_framework.test import APIClient
 from rest_framework import status
 from authentication.models import User
-from formations.models import Formation, Module, Participant, SessionModule, ModuleParticipant, QRToken
+from formations.models import (
+    Formation,
+    Module,
+    Participant,
+    Formateur,
+    SessionModule,
+    ModuleParticipant,
+    ModuleFormateur,
+    QRToken,
+)
 from .models import Pointage
 
 
@@ -194,6 +203,23 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res.data.get('code'), 'SESSION_ALREADY_OPEN')
 
+    def test_public_scan_accepts_participant_identifier_with_spaces(self):
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token_seance_2.token),
+                'numero_participant': 'P 1001',
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'participant')
+        self.assertEqual(
+            res.data.get('participant', {}).get('numero'),
+            self.participant.matricule,
+        )
+
     def test_force_pointage_blocks_entry_when_other_session_open_same_module_same_day(self):
         user = make_user('secretariat_for_force', role='SECRETARIAT')
         self.client.force_authenticate(user)
@@ -243,4 +269,64 @@ class ScanModuleExclusivityTest(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res.data.get('code'), 'SESSION_ALREADY_OPEN')
+
+
+class ScanFormateurBadgeNormalizationTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.today = timezone.localdate()
+
+        self.formation = Formation.objects.create(formation='Formation formateur')
+        self.module = Module.objects.create(
+            formation=self.formation,
+            intitule='Module formateur',
+            statut='EN_COURS',
+        )
+        self.seance = SessionModule.objects.create(
+            module=self.module,
+            date_journee=self.today,
+            numero=1,
+            demarree_le=timezone.now(),
+        )
+        self.token = QRToken.objects.create(
+            session=self.seance,
+            expire_at=timezone.now() + timedelta(hours=1),
+            actif=True,
+        )
+        self.formateur = Formateur.objects.create(
+            numerobadge='F0042',
+            nom='Kouadio',
+            prenom='Jean',
+        )
+        ModuleFormateur.objects.create(module=self.module, formateur=self.formateur)
+
+    def test_scan_formateur_accepts_lowercase_badge(self):
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token.token),
+                'numero_participant': 'f0042',
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'formateur')
+        self.assertEqual(
+            res.data.get('formateur', {}).get('numero'),
+            self.formateur.numerobadge,
+        )
+
+    def test_scan_formateur_accepts_numeric_short_badge(self):
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token.token),
+                'numero_participant': '42',
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'formateur')
 

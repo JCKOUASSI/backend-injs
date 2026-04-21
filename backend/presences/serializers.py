@@ -6,15 +6,27 @@ from formations.serializers import ParticipantSerializer, FormateurSerializer
 class PointageSerializer(serializers.ModelSerializer):
     participant_detail = ParticipantSerializer(source='participant', read_only=True)
     formateur_detail = FormateurSerializer(source='formateur', read_only=True)
+    encadrant_detail = serializers.SerializerMethodField()
     formation_id = serializers.IntegerField(source='session.module.formation_id', read_only=True)
     formation_titre = serializers.CharField(source='session.module.formation.formation', read_only=True)
     type_personne = serializers.CharField(read_only=True)
+
+    def get_encadrant_detail(self, obj):
+        if not obj.encadrant:
+            return None
+        return {
+            'id': obj.encadrant.id,
+            'username': obj.encadrant.username,
+            'nom_complet': obj.encadrant.get_full_name() or obj.encadrant.username,
+            'matricule': obj.encadrant.matricule,
+        }
 
     class Meta:
         model = Pointage
         fields = [
             'id', 'participant', 'participant_detail',
             'formateur', 'formateur_detail',
+            'encadrant', 'encadrant_detail',
             'type_personne',
             'session', 'formation_id', 'formation_titre',
             'date_journee', 'device_id', 'timestamp_entree', 'timestamp_sortie',
@@ -37,6 +49,7 @@ class ScanResponseSerializer(serializers.Serializer):
     # Endpoint public: ne renvoie que des champs minimaux (numero/nom/prenom)
     participant = serializers.DictField(required=False, allow_null=True)
     formateur = serializers.DictField(required=False, allow_null=True)
+    encadrant = serializers.DictField(required=False, allow_null=True)
     timestamp = serializers.DateTimeField()
     duree_presence_minutes = serializers.DecimalField(
         max_digits=8, decimal_places=2, allow_null=True,
@@ -53,7 +66,7 @@ class SecureScanSerializer(serializers.Serializer):
 class ForcePointageSerializer(serializers.Serializer):
     personne_id = serializers.IntegerField()
     type_personne = serializers.ChoiceField(
-        choices=['participant', 'formateur'], default='participant'
+        choices=['participant', 'formateur', 'encadrant'], default='participant'
     )
     action = serializers.ChoiceField(choices=['ENTREE', 'SORTIE'])
     motif = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')

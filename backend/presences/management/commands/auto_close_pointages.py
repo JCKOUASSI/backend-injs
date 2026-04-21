@@ -55,6 +55,7 @@ class Command(BaseCommand):
                 'session__module__formation',
                 'participant',
                 'formateur',
+                'encadrant',
             )
         )
 
@@ -67,10 +68,21 @@ class Command(BaseCommand):
             if fin_seance + timedelta(minutes=delai) > now:
                 continue
 
-            personne = pt.participant or pt.formateur
-            nom = f"{personne.nom} {personne.prenom}" if personne else "?"
-            numero = getattr(personne, 'matricule', None) or getattr(personne, 'numero', '?')
-            type_str = 'formateur' if pt.formateur_id else 'participant'
+            personne = pt.participant or pt.formateur or pt.encadrant
+            if personne:
+                nom = (
+                    f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+                    or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+                    or getattr(personne, 'username', '?')
+                )
+            else:
+                nom = "?"
+            numero = (
+                getattr(personne, 'numerobadge', None)
+                or getattr(personne, 'matricule', None)
+                or getattr(personne, 'numero', '?')
+            ) if personne else '?'
+            type_str = 'formateur' if pt.formateur_id else 'encadrant' if pt.encadrant_id else 'participant'
 
             if dry_run:
                 self.stdout.write(

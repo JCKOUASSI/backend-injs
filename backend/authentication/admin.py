@@ -5,15 +5,15 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['username', 'email', 'first_name', 'last_name', 'role', 'grade', 'is_active']
+    list_display = ['username', 'email', 'first_name', 'last_name', 'matricule', 'role', 'grade', 'is_active']
     list_filter = ['role', 'is_active']
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Informations supplémentaires', {
-            'fields': ('role', 'grade', 'telephone', 'organisation'),
+            'fields': ('role', 'matricule', 'grade', 'telephone', 'organisation'),
         }),
     )
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
         ('Informations supplémentaires', {
-            'fields': ('first_name', 'last_name', 'email', 'role', 'grade', 'telephone', 'organisation'),
+            'fields': ('first_name', 'last_name', 'email', 'role', 'matricule', 'grade', 'telephone', 'organisation'),
         }),
     )

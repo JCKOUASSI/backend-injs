@@ -4,7 +4,7 @@ These views complement the existing DRF views with additional endpoints
 needed for the frontend dashboard.
 """
 from io import BytesIO
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
 from django.db.models import Count, Q, F
 from django.db import transaction
 from django.utils import timezone
@@ -228,11 +228,43 @@ def dashboard_stats(request):
         })
 
     prochaines_seances = []
-    prochaines_qs = PresenceSessionModule.objects.filter(
-        module__in=modules_qs,
-        date_journee__gte=today,
-        demarree_le__isnull=True,
-    ).select_related('module', 'module__formation').order_by('date_journee', 'heure_debut_prevue', 'numero')[:5]
+    now_local = timezone.localtime(timezone.now())
+    midi = time(12, 0)
+    tomorrow = today + timedelta(days=1)
+
+    # Règle dashboard:
+    # - Le matin: montrer les séances d'après-midi/soir du jour.
+    # - La veille (après-midi/soir): montrer les séances du matin du lendemain.
+    if now_local.time() < midi:
+        prochaines_qs = PresenceSessionModule.objects.filter(
+            module__in=modules_qs,
+            date_journee=today,
+            demarree_le__isnull=True,
+        ).filter(
+            Q(heure_debut_prevue__gte=midi) | Q(heure_debut_prevue__isnull=True)
+        )
+    else:
+        prochaines_qs = PresenceSessionModule.objects.filter(
+            module__in=modules_qs,
+            date_journee=tomorrow,
+            demarree_le__isnull=True,
+        ).filter(
+            Q(heure_debut_prevue__lt=midi) | Q(heure_debut_prevue__isnull=True)
+        )
+
+    prochaines_qs = prochaines_qs.select_related(
+        'module', 'module__formation'
+    ).order_by('date_journee', 'heure_debut_prevue', 'numero')
+
+    # Fallback: si aucune séance ne correspond à la règle, prendre les plus proches.
+    if not prochaines_qs.exists():
+        prochaines_qs = PresenceSessionModule.objects.filter(
+            module__in=modules_qs,
+            date_journee__gte=today,
+            demarree_le__isnull=True,
+        ).select_related('module', 'module__formation').order_by(
+            'date_journee', 'heure_debut_prevue', 'numero'
+        )[:10]
     for sess in prochaines_qs:
         label = sess.intitule or f"Séance {sess.numero}"
         prochaines_seances.append({
@@ -1142,6 +1174,11 @@ def module_full_detail_api(request, formation_pk, module_pk):
         session__module=module, formateur__isnull=False
     ).select_related('formateur', 'session').order_by('date_journee', 'timestamp_entree')
 
+    # Présences encadrants
+    pointages_enc_qs = Pointage.objects.filter(
+        session__module=module, encadrant__isnull=False
+    ).select_related('encadrant', 'session').order_by('date_journee', 'timestamp_entree')
+
     presences = []
     for pt in pointages_part_qs:
         p = pt.participant
@@ -1187,12 +1224,49 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'statut': pt.statut,
         })
 
+    for pt in pointages_enc_qs:
+        enc = pt.encadrant
+        s = pt.session
+        presences.append({
+            'type_personne': 'encadrant',
+            'participant_id': None,
+            'formateur_id': None,
+            'encadrant_id': enc.id if enc else None,
+            'nom': (enc.last_name or '') if enc else '',
+            'prenom': (enc.first_name or '') if enc else '',
+            'matricule': enc.matricule if enc else '',
+            'numerobadge': None,
+            'date_journee': str(pt.date_journee),
+            'session_id': pt.session_id,
+            'session_date': str(s.date_journee) if s and s.date_journee else None,
+            'session_intitule': s.intitule if s and s.intitule else (f'Séance {s.numero}' if s else ''),
+            'session_numero': s.numero if s else None,
+            'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
+            'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
+            'duree_minutes': float(pt.duree_presence_minutes or 0),
+            'statut': pt.statut,
+        })
+
     presences.sort(key=lambda x: (x['date_journee'] or '', x['timestamp_entree'] or ''))
 
     nb_presents = (
         Pointage.objects.filter(session__module=module, participant__isnull=False).values('participant').distinct().count()
         + Pointage.objects.filter(session__module=module, formateur__isnull=False).values('formateur').distinct().count()
+        + Pointage.objects.filter(session__module=module, encadrant__isnull=False).values('encadrant').distinct().count()
     )
+
+    encadrants = []
+    if module.superviseur_id:
+        sup = module.superviseur
+        encadrants.append({
+            'id': sup.id,
+            'nom': sup.last_name or '',
+            'prenom': sup.first_name or '',
+            'matricule': sup.matricule or '',
+            'email': sup.email or '',
+            'telephone': sup.telephone or '',
+            'username': sup.username,
+        })
 
     return Response({
         'id': module.id,
@@ -1230,6 +1304,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
             [fp.participant for fp in participants], many=True
         ).data,
         'presences': presences,
+        'encadrants': encadrants,
         'formateurs': [
             {
                 'id': mf.formateur.id,
