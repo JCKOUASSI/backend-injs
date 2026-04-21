@@ -1,5 +1,7 @@
 from django.db import transaction
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -23,22 +25,45 @@ from .serializers import (
     ForcePointageSerializer,
 )
 
+User = get_user_model()
+
 
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
 
+def _normalize_scan_identifier(value):
+    """Normalise un identifiant saisi pour comparer les variantes de format."""
+    return ''.join(ch for ch in (value or '').strip().upper() if ch.isalnum())
+
+
 def _resolve_personne(numero, formation):
     """
-    Résout un numéro (P0001 ou F0001) vers la personne et vérifie l'inscription.
+    Résout un numéro (auditeur, formateur, encadrant) vers la personne et vérifie l'inscription.
     Retourne (personne, type_str, personne_data, error_response).
     Note: `personne_data` est volontairement "minimal" pour limiter la fuite de PII sur l'endpoint public.
     """
-    numero_upper = numero.strip().upper()
+    numero_upper = (numero or '').strip().upper()
+    numero_compact = _normalize_scan_identifier(numero)
+
+    # Variantes acceptées pour un badge formateur:
+    # - casse indifférente (f0042 == F0042)
+    # - espaces/ponctuation ignorés (F 00-42)
+    # - saisie numérique seule (42 -> F0042)
+    formateur_candidates = {numero_upper}
+    if numero_compact:
+        formateur_candidates.add(numero_compact)
+    if numero_compact.isdigit():
+        formateur_candidates.add(f"F{int(numero_compact):04d}")
+    elif numero_compact.startswith('F') and numero_compact[1:].isdigit():
+        formateur_candidates.add(f"F{int(numero_compact[1:]):04d}")
 
     # Chercher d'abord comme formateur (numéros courts: F0001, F0002…)
     # puis comme participant (numéros FNCE24-xxx, matricule, etc.)
-    formateur = Formateur.objects.filter(numerobadge=numero_upper).first()
+    formateur_filters = Q()
+    for candidate in formateur_candidates:
+        formateur_filters |= Q(numerobadge__iexact=candidate)
+    formateur = Formateur.objects.filter(formateur_filters).first()
     if formateur is not None:
         if not ModuleFormateur.objects.filter(
             module__formation=formation, formateur=formateur
@@ -54,8 +79,50 @@ def _resolve_personne(numero, formation):
             'prenom': formateur.prenom,
         }, None
 
+    # Chercher comme encadrant via son matricule utilisateur
+    encadrant = User.objects.filter(
+        role='ENCADRANT',
+        matricule=numero_upper,
+    ).first()
+    if encadrant is not None:
+        if not Formation.objects.filter(
+            pk=formation.pk,
+            modules__superviseur=encadrant,
+        ).exists():
+            return None, None, None, Response(
+                {'code': 'ENCADRANT_NOT_IN_LIST',
+                 'detail': 'Encadrant non autorisé pour cette formation.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return encadrant, 'encadrant', {
+            'numero': encadrant.matricule,
+            'nom': encadrant.last_name or '',
+            'prenom': encadrant.first_name or '',
+            'username': encadrant.username,
+        }, None
+
     # Chercher comme participant par matricule
-    participant = Participant.objects.filter(matricule=numero_upper).first()
+    participant = Participant.objects.filter(matricule__iexact=numero_upper).first()
+    if participant is None and numero_compact and numero_compact != numero_upper:
+        participant = Participant.objects.filter(matricule__iexact=numero_compact).first()
+    if participant is None and numero_compact:
+        # Fallback tolérant: comparer la version normalisée des matricules
+        # uniquement sur les participants attendus de la formation.
+        for insc in (
+            ModuleParticipant.objects
+            .filter(module__formation=formation)
+            .select_related('participant')
+            .only(
+                'participant__id',
+                'participant__matricule',
+                'participant__nom',
+                'participant__prenom',
+            )
+        ):
+            p = insc.participant
+            if p and _normalize_scan_identifier(p.matricule) == numero_compact:
+                participant = p
+                break
     if participant is None:
         return None, None, None, Response(
             {'code': 'PARTICIPANT_NOT_FOUND',
@@ -82,6 +149,8 @@ def _pointage_filter(personne, type_personne, formation, **extra):
     base = {'session__module__formation': formation}
     if type_personne == 'formateur':
         base['formateur'] = personne
+    elif type_personne == 'encadrant':
+        base['encadrant'] = personne
     else:
         base['participant'] = personne
     base.update(extra)
@@ -93,6 +162,8 @@ def _create_pointage_kwargs(personne, type_personne, session, **extra):
     base = {'session': session}
     if type_personne == 'formateur':
         base['formateur'] = personne
+    elif type_personne == 'encadrant':
+        base['encadrant'] = personne
     else:
         base['participant'] = personne
     base.update(extra)
@@ -110,6 +181,8 @@ def _find_open_pointage_same_module_day(
     filt = (
         {'formateur': personne}
         if type_personne == 'formateur'
+        else {'encadrant': personne}
+        if type_personne == 'encadrant'
         else {'participant': personne}
     )
     qs = Pointage.objects.select_for_update().filter(
@@ -255,7 +328,12 @@ def scan_view(request):
     if err:
         return err
 
-    role_label = 'Formateur' if type_str == 'formateur' else 'Participant'
+    role_map = {
+        'participant': 'Participant',
+        'formateur': 'Formateur',
+        'encadrant': 'Encadrant',
+    }
+    role_label = role_map.get(type_str, 'Participant')
 
     # 3. Chercher une session ouverte aujourd'hui (transaction + verrou)
     today = timezone.localdate()
@@ -264,6 +342,8 @@ def scan_view(request):
     with transaction.atomic():
         if type_str == 'formateur':
             Formateur.objects.select_for_update().get(pk=personne.pk)
+        elif type_str == 'encadrant':
+            User.objects.select_for_update().get(pk=personne.pk)
         else:
             Participant.objects.select_for_update().get(pk=personne.pk)
 
@@ -321,6 +401,7 @@ def scan_view(request):
                 'type_personne': type_str,
                 'participant': personne_data if type_str == 'participant' else None,
                 'formateur': personne_data if type_str == 'formateur' else None,
+                'encadrant': personne_data if type_str == 'encadrant' else None,
                 'date': str(today),
                 'timestamp': pointage_ouvert.timestamp_sortie,
                 'duree_session_minutes': pointage_ouvert.duree_presence_minutes,
@@ -403,6 +484,7 @@ def scan_view(request):
             'type_personne': type_str,
             'participant': personne_data if type_str == 'participant' else None,
             'formateur': personne_data if type_str == 'formateur' else None,
+            'encadrant': personne_data if type_str == 'encadrant' else None,
             'date': str(today),
             'timestamp': pointage.timestamp_entree,
             'duree_presence_minutes': None,
@@ -452,14 +534,23 @@ def secure_scan_view(request):
         except (Formateur.DoesNotExist, AttributeError):
             pass
 
+    # Vérifier si c'est un encadrant (profil User)
+    if personne is None and user.role == 'ENCADRANT':
+        if not user.matricule:
+            return Response(
+                {'code': 'NO_MATRICULE',
+                 'detail': 'Aucun matricule renseigné sur votre compte encadrant.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        personne = user
+        type_str = 'encadrant'
+
     if personne is None:
         return Response(
             {'code': 'NO_PROFILE',
-             'detail': 'Aucun profil auditeur ou formateur lié à ce compte.'},
+             'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.'},
             status=status.HTTP_403_FORBIDDEN,
         )
-
-    numero = getattr(personne, 'matricule', None) or getattr(personne, 'numero', '')
 
     # 1b. Vérifier que l'appareil est bien lié à ce user
     device_id = data.get('device_id', '')
@@ -526,6 +617,16 @@ def secure_scan_view(request):
                  'detail': 'Vous n\'êtes pas assigné(e) à cette formation.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+    elif type_str == 'encadrant':
+        if not Formation.objects.filter(
+            pk=formation.pk,
+            modules__superviseur=personne,
+        ).exists():
+            return Response(
+                {'code': 'NOT_IN_LIST',
+                 'detail': 'Vous n\'êtes pas encadrant de cette formation.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
     else:
         if not ModuleParticipant.objects.filter(
             module__formation=formation, participant=personne
@@ -537,11 +638,20 @@ def secure_scan_view(request):
             )
 
     personne_data = {
-        'numero': getattr(personne, 'matricule', None) or getattr(personne, 'numero', ''),
-        'nom': personne.nom,
-        'prenom': personne.prenom,
+        'numero': (
+            getattr(personne, 'matricule', None)
+            or getattr(personne, 'numerobadge', None)
+            or getattr(personne, 'numero', '')
+        ),
+        'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+        'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
     }
-    role_label = 'Formateur' if type_str == 'formateur' else 'Participant'
+    role_map = {
+        'participant': 'Participant',
+        'formateur': 'Formateur',
+        'encadrant': 'Encadrant',
+    }
+    role_label = role_map.get(type_str, 'Participant')
 
     # 4. Logique entrée/sortie — 1 entrée + 1 sortie par séance
     today = timezone.localdate()
@@ -549,6 +659,8 @@ def secure_scan_view(request):
     with transaction.atomic():
         if type_str == 'formateur':
             Formateur.objects.select_for_update().get(pk=personne.pk)
+        elif type_str == 'encadrant':
+            User.objects.select_for_update().get(pk=personne.pk)
         else:
             Participant.objects.select_for_update().get(pk=personne.pk)
 
@@ -607,6 +719,7 @@ def secure_scan_view(request):
                 'type_personne': type_str,
                 'participant': personne_data if type_str == 'participant' else None,
                 'formateur': personne_data if type_str == 'formateur' else None,
+                'encadrant': personne_data if type_str == 'encadrant' else None,
                 'formation': {'id': formation.id, 'titre': formation.formation},
                 'date': str(today),
                 'timestamp': pointage_ouvert.timestamp_sortie,
@@ -690,6 +803,7 @@ def secure_scan_view(request):
             'type_personne': type_str,
             'participant': personne_data if type_str == 'participant' else None,
             'formateur': personne_data if type_str == 'formateur' else None,
+            'encadrant': personne_data if type_str == 'encadrant' else None,
             'formation': {'id': formation.id, 'titre': formation.formation},
             'date': str(today),
             'timestamp': pointage.timestamp_entree,
@@ -706,7 +820,7 @@ def secure_scan_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_historique(request):
-    """Historique des pointages du user connecté (participant ou formateur)."""
+    """Historique des pointages du user connecté (participant, formateur ou encadrant)."""
     user = request.user
     personne = None
     type_str = None
@@ -724,13 +838,22 @@ def my_historique(request):
         except (Formateur.DoesNotExist, AttributeError):
             pass
 
+    if personne is None and user.role == 'ENCADRANT':
+        personne = user
+        type_str = 'encadrant'
+
     if personne is None:
         return Response(
             {'detail': 'Aucun profil lié à ce compte.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    filt = {'formateur': personne} if type_str == 'formateur' else {'participant': personne}
+    if type_str == 'formateur':
+        filt = {'formateur': personne}
+    elif type_str == 'encadrant':
+        filt = {'encadrant': personne}
+    else:
+        filt = {'participant': personne}
     pointages = Pointage.objects.filter(**filt).select_related('session__module__formation')
 
     data = []
@@ -748,9 +871,13 @@ def my_historique(request):
 
     return Response({
         'type_personne': type_str,
-        'numero': getattr(personne, 'matricule', None) or getattr(personne, 'numero', ''),
-        'nom': personne.nom,
-        'prenom': personne.prenom,
+        'numero': (
+            getattr(personne, 'matricule', None)
+            or getattr(personne, 'numerobadge', None)
+            or getattr(personne, 'numero', '')
+        ),
+        'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+        'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
         'pointages': data,
     })
 
@@ -805,7 +932,7 @@ def list_device_bindings(request):
 @api_view(['GET'])
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def formation_dashboard(request, pk):
-    """Dashboard de suivi d'une formation (présents / absents / en salle) — participants + formateurs."""
+    """Dashboard de suivi d'une formation (présents / absents / en salle) — participants + formateurs + encadrants."""
     formation = _get_accessible_formation(request.user, pk)
     if not formation:
         return Response(
@@ -841,7 +968,18 @@ def formation_dashboard(request, pk):
 
     pointages_qs = Pointage.objects.filter(
         session__module__formation=formation, date_journee=jour
-    ).select_related('participant', 'formateur', 'session')
+    ).select_related('participant', 'formateur', 'encadrant', 'session')
+
+    # Séances du jour (sert aussi à déterminer le périmètre module du dashboard)
+    seances_jour = SF.objects.filter(
+        module__formation=formation,
+        date_journee=jour,
+    ).order_by('heure_debut_prevue', 'numero')
+
+    if seance_selectionnee:
+        module_ids_scope = {seance_selectionnee.module_id}
+    else:
+        module_ids_scope = set(seances_jour.values_list('module_id', flat=True))
 
     if seance_selectionnee:
         from django.db.models import Q
@@ -870,6 +1008,8 @@ def formation_dashboard(request, pk):
     for pt in pointages:
         if pt.formateur_id:
             sessions_map[('formateur', pt.formateur_id)].append(pt)
+        elif pt.encadrant_id:
+            sessions_map[('encadrant', pt.encadrant_id)].append(pt)
         else:
             sessions_map[('participant', pt.participant_id)].append(pt)
 
@@ -914,26 +1054,67 @@ def formation_dashboard(request, pk):
 
     presents, en_salle, absents = [], [], []
 
-    # Participants
+    def _encadrant_data(enc):
+        nom = (enc.last_name or '').strip()
+        prenom = (enc.first_name or '').strip()
+        if not nom and not prenom:
+            nom = enc.username or ''
+        return {
+            'id': enc.id,
+            'nom': nom,
+            'prenom': prenom,
+            'matricule': enc.matricule or '',
+            'email': enc.email or '',
+            'telephone': enc.telephone or '',
+            'site': '',
+            'grade': enc.grade or '',
+        }
+
+    class _InlineEncadrantSerializer:
+        def __init__(self, obj):
+            self.data = _encadrant_data(obj)
+
+    # Participants (périmètre: modules du dashboard, pas toute la formation)
     seen_p = set()
-    for insc in ModuleParticipant.objects.filter(module__formation=formation).select_related('participant'):
+    for insc in ModuleParticipant.objects.filter(module_id__in=module_ids_scope).select_related('participant'):
         if insc.participant_id in seen_p:
             continue
         seen_p.add(insc.participant_id)
         cat, data = _classify(insc.participant, 'participant', ParticipantSerializer)
         {'present': presents, 'en_salle': en_salle, 'absent': absents}[cat].append(data)
 
-    # Formateurs
+    # Formateurs (périmètre: modules du dashboard)
     seen_fmt = set()
-    for insc in ModuleFormateur.objects.filter(module__formation=formation).select_related('formateur'):
+    for insc in ModuleFormateur.objects.filter(module_id__in=module_ids_scope).select_related('formateur'):
         if insc.formateur_id in seen_fmt:
             continue
         seen_fmt.add(insc.formateur_id)
         cat, data = _classify(insc.formateur, 'formateur', FormateurSerializer)
         {'present': presents, 'en_salle': en_salle, 'absent': absents}[cat].append(data)
 
+    # Encadrants (superviseurs de modules de la formation)
+    seen_enc = set()
+    # Inclure:
+    # 1) les encadrants actuellement assignés à au moins un module de la formation
+    # 2) les encadrants ayant déjà pointé sur la formation à la date demandée
+    encadrants_qs = User.objects.filter(
+        role='ENCADRANT',
+    ).filter(
+        Q(modules_supervises__id__in=module_ids_scope)
+        | Q(
+            pointages_encadrant__session__module_id__in=module_ids_scope,
+            pointages_encadrant__date_journee=jour,
+        )
+    ).distinct()
+
+    for enc in encadrants_qs:
+        if enc.id in seen_enc:
+            continue
+        seen_enc.add(enc.id)
+        cat, data = _classify(enc, 'encadrant', _InlineEncadrantSerializer)
+        {'present': presents, 'en_salle': en_salle, 'absent': absents}[cat].append(data)
+
     # Séances du jour (pour le sélecteur frontend)
-    seances_jour = SF.objects.filter(module__formation=formation, date_journee=jour).order_by('heure_debut_prevue', 'numero')
     seances_jour_data = [
         {
             'id': s.id,
@@ -949,9 +1130,10 @@ def formation_dashboard(request, pk):
 
     nb_seances_jour = len(seances_jour_data) if seances_jour_data else 1
 
-    nb_inscrits_participants = ModuleParticipant.objects.filter(module__formation=formation).values('participant').distinct().count()
-    nb_inscrits_formateurs = ModuleFormateur.objects.filter(module__formation=formation).values('formateur').distinct().count()
-    nb_inscrits = nb_inscrits_participants + nb_inscrits_formateurs
+    nb_inscrits_participants = ModuleParticipant.objects.filter(module_id__in=module_ids_scope).values('participant').distinct().count()
+    nb_inscrits_formateurs = ModuleFormateur.objects.filter(module_id__in=module_ids_scope).values('formateur').distinct().count()
+    nb_inscrits_encadrants = encadrants_qs.count()
+    nb_inscrits = nb_inscrits_participants + nb_inscrits_formateurs + nb_inscrits_encadrants
 
     # Si filtre séance : total attendus = inscrits, sinon inscrits × nb séances
     total = nb_inscrits if seance_selectionnee else nb_inscrits * nb_seances_jour
@@ -967,10 +1149,21 @@ def formation_dashboard(request, pk):
     # Historique chronologique
     historique = []
     for pt in sorted(pointages, key=lambda p: p.timestamp_entree):
-        personne = pt.formateur or pt.participant
-        nom = f"{personne.nom} {personne.prenom}" if personne else '—'
-        numero = getattr(personne, 'numero', None) or getattr(personne, 'matricule', '—')
-        type_p = 'formateur' if pt.formateur_id else 'participant'
+        personne = pt.formateur or pt.participant or pt.encadrant
+        if personne:
+            nom = (
+                f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+                or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+                or getattr(personne, 'username', '—')
+            )
+        else:
+            nom = '—'
+        numero = (
+            getattr(personne, 'numerobadge', None)
+            or getattr(personne, 'matricule', None)
+            or getattr(personne, 'numero', '—')
+        ) if personne else '—'
+        type_p = 'formateur' if pt.formateur_id else 'encadrant' if pt.encadrant_id else 'participant'
         historique.append({
             'nom': nom,
             'numero': numero,
@@ -1024,11 +1217,11 @@ def formation_presences(request, pk):
         pointages = Pointage.objects.filter(
             session__module__formation_id=pk,
             session__module__superviseur=request.user,
-        ).select_related('participant', 'formateur', 'session__module__formation')
+        ).select_related('participant', 'formateur', 'encadrant', 'session__module__formation')
     else:
         pointages = Pointage.objects.filter(
             session__module__formation_id=pk,
-        ).select_related('participant', 'formateur', 'session__module__formation')
+        ).select_related('participant', 'formateur', 'encadrant', 'session__module__formation')
     serializer = PointageSerializer(pointages, many=True)
     return Response(serializer.data)
 
@@ -1041,7 +1234,7 @@ def formation_presences(request, pk):
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def close_session(request, pk):
     """
-    Secrétariat / Superviseur / DFRC : fermer la session ouverte d'un participant/formateur
+    Secrétariat / Superviseur / DFRC : fermer la session ouverte d'un participant/formateur/encadrant
     qui a oublié de scanner sa sortie.
     body: { personne_id, type_personne }  (type_personne default: 'participant')
     """
@@ -1062,6 +1255,12 @@ def close_session(request, pk):
         except Formateur.DoesNotExist:
             return Response({'detail': 'Formateur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
         filt = {'session__module__formation': formation, 'formateur': personne, 'timestamp_sortie__isnull': True}
+    elif type_personne == 'encadrant':
+        try:
+            personne = User.objects.get(pk=personne_id, role='ENCADRANT')
+        except User.DoesNotExist:
+            return Response({'detail': 'Encadrant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        filt = {'session__module__formation': formation, 'encadrant': personne, 'timestamp_sortie__isnull': True}
     else:
         try:
             personne = Participant.objects.get(pk=personne_id)
@@ -1078,20 +1277,25 @@ def close_session(request, pk):
     pointage.statut = Pointage.Statut.FORCE_DFRC
     pointage.calculer_duree()
     pointage.save()
+    personne_label = (
+        f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+        or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+        or getattr(personne, 'username', '—')
+    )
 
     _log_audit(
         action=AuditLog.Action.CLOSE_SESSION,
         request=request,
         cible_type=type_personne,
-        cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'matricule', ''),
-        cible_nom=f'{personne.nom} {personne.prenom}',
+        cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'numerobadge', None) or getattr(personne, 'matricule', ''),
+        cible_nom=personne_label,
         formation=formation,
         pointage=pointage,
         extra={'duree_minutes': float(pointage.duree_presence_minutes or 0)},
     )
 
     return Response({
-        'detail': f'Session fermée pour {personne.nom} {personne.prenom} ({round(float(pointage.duree_presence_minutes or 0))} min).',
+        'detail': f'Session fermée pour {personne_label} ({round(float(pointage.duree_presence_minutes or 0))} min).',
         'pointage_id': pointage.id,
         'duree_minutes': float(pointage.duree_presence_minutes or 0),
     })
@@ -1104,7 +1308,7 @@ def close_session(request, pk):
 @api_view(['POST'])
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def force_pointage(request, pk):
-    """Secrétariat / Superviseur / DFRC : forcer un pointage entrée ou sortie pour participant ou formateur (R6)."""
+    """Secrétariat / Superviseur / DFRC : forcer un pointage entrée ou sortie pour participant, formateur ou encadrant (R6)."""
     serializer = ForcePointageSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -1125,6 +1329,11 @@ def force_pointage(request, pk):
             personne = Formateur.objects.get(pk=data['personne_id'])
         except Formateur.DoesNotExist:
             return Response({'detail': 'Formateur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    elif type_str == 'encadrant':
+        try:
+            personne = User.objects.get(pk=data['personne_id'], role='ENCADRANT')
+        except User.DoesNotExist:
+            return Response({'detail': 'Encadrant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
     else:
         try:
             personne = Participant.objects.get(pk=data['personne_id'])
@@ -1141,6 +1350,8 @@ def force_pointage(request, pk):
         module_id = data.get('module_id')
         if module_id:
             seance_qs = seance_qs.filter(module_id=module_id)
+        if type_str == 'encadrant':
+            seance_qs = seance_qs.filter(module__superviseur=personne)
         seance_active = seance_qs.first()
         if not seance_active:
             return Response({'detail': 'Aucune séance active pour ce module ce jour.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1171,8 +1382,12 @@ def force_pointage(request, pk):
             action=AuditLog.Action.FORCE_ENTREE,
             request=request,
             cible_type=type_str,
-            cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'matricule', ''),
-            cible_nom=f'{personne.nom} {personne.prenom}',
+            cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'numerobadge', None) or getattr(personne, 'matricule', ''),
+            cible_nom=(
+                f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+                or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+                or getattr(personne, 'username', '—')
+            ),
             formation=formation,
             pointage=pointage,
             extra={'acteur_role': request.user.role, 'motif': data.get('motif', '')},
@@ -1202,8 +1417,12 @@ def force_pointage(request, pk):
             action=AuditLog.Action.FORCE_SORTIE,
             request=request,
             cible_type=type_str,
-            cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'matricule', ''),
-            cible_nom=f'{personne.nom} {personne.prenom}',
+            cible_numero=getattr(personne, 'numero', None) or getattr(personne, 'numerobadge', None) or getattr(personne, 'matricule', ''),
+            cible_nom=(
+                f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+                or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+                or getattr(personne, 'username', '—')
+            ),
             formation=formation,
             pointage=pointage,
             extra={'duree_minutes': float(pointage.duree_presence_minutes or 0), 'acteur_role': request.user.role, 'motif': data.get('motif', '')},
@@ -1299,6 +1518,22 @@ def formation_offline_data(request, token):
         f = ff.formateur
         formateurs.append({'numero': f.numerobadge, 'nom': f.nom, 'prenom': f.prenom})
 
+    encadrants = []
+    seen_enc = set()
+    for enc in User.objects.filter(
+        role='ENCADRANT',
+        modules_supervises__formation=formation,
+    ).distinct():
+        if enc.id in seen_enc:
+            continue
+        seen_enc.add(enc.id)
+        encadrants.append({
+            'numero': enc.matricule or '',
+            'nom': enc.last_name or '',
+            'prenom': enc.first_name or '',
+            'username': enc.username,
+        })
+
     module = getattr(qr_token.session, 'module', None) if qr_token.session else None
     site     = (module.site     if module else '')
     batiment = (module.batiment if module else '')
@@ -1315,6 +1550,7 @@ def formation_offline_data(request, token):
         'token': str(qr_token.token),
         'participants': participants,
         'formateurs': formateurs,
+        'encadrants': encadrants,
     })
 
 
@@ -1426,7 +1662,7 @@ def audit_log_list(request):
 @permission_classes([AllowAny])
 def check_badge_status(request):
     """
-    Vérifie l'état actuel du badgeage pour un participant/formateur sur un token QR.
+    Vérifie l'état actuel du badgeage pour un participant/formateur/encadrant sur un token QR.
     GET ?token_qr=<uuid>&numero=<matricule>
     Retourne : { statut: 'ABSENT'|'EN_SALLE'|'TERMINE', action_suivante: 'ENTREE'|'SORTIE'|null,
                  nom, prenom, timestamp_entree, heure_entree }
@@ -1469,8 +1705,8 @@ def check_badge_status(request):
             'statut': 'EN_SALLE',
             'action_suivante': 'SORTIE',
             'type_personne': type_str,
-            'nom': personne.nom,
-            'prenom': personne.prenom,
+            'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+            'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
             'heure_entree': heure,
         })
 
@@ -1483,14 +1719,14 @@ def check_badge_status(request):
             'statut': 'TERMINE',
             'action_suivante': None,
             'type_personne': type_str,
-            'nom': personne.nom,
-            'prenom': personne.prenom,
+            'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+            'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
         })
 
     return Response({
         'statut': 'ABSENT',
         'action_suivante': 'ENTREE',
         'type_personne': type_str,
-        'nom': personne.nom,
-        'prenom': personne.prenom,
+        'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+        'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
     })

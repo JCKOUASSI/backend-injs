@@ -20,6 +20,13 @@ class User(AbstractUser):
         choices=Role.choices,
         default=Role.AUDITEUR,
     )
+    matricule = models.CharField(
+        max_length=50,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="N° matricule utilisé comme numéro de badgeage",
+    )
     telephone = models.CharField(max_length=20, blank=True, default='')
     organisation = models.CharField(max_length=255, blank=True, default='')
     grade = models.CharField(max_length=20, blank=True, default='', help_text="Grade (A4, A3…)")

@@ -12,6 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
+            'matricule',
             'role', 'grade', 'telephone', 'organisation', 'is_active',
             'secretariat', 'secretariat_nom',
         ]
@@ -30,6 +31,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
+            'matricule',
             'password', 'role', 'grade', 'telephone', 'organisation', 'secretariat',
         ]
 
@@ -88,6 +90,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
+            'matricule',
             'password', 'role', 'grade', 'telephone', 'organisation', 'is_active',
             'secretariat',
         ]
