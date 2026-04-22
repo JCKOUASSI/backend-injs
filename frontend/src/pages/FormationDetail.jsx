@@ -734,6 +734,13 @@ export default function FormationDetail() {
             const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
             const fmtMin = (m) => m != null ? `${Math.round(m)} min` : '—'
             const matricule = (p) => p.matricule || p.numero_matricule || p.numero || '—'
+            const personLabel = (p) => (p.type_personne === 'formateur' ? 'Formateur' : p.type_personne === 'encadrant' ? 'Encadrant' : 'Auditeur')
+            const personIcon = (p) => (p.type_personne === 'formateur' ? 'bi-person-video3' : p.type_personne === 'encadrant' ? 'bi-person-badge' : 'bi-person')
+            const personBadgeStyle = (p) => {
+              if (p.type_personne === 'formateur') return { background: '#ebf8ff', color: '#2b6cb0', border: '1px solid #bee3f8' }
+              if (p.type_personne === 'encadrant') return { background: '#fff7e6', color: '#9c4221', border: '1px solid #fbd38d' }
+              return { background: '#f7fafc', color: '#4a5568', border: '1px solid #e2e8f0' }
+            }
             const searchFilter = (p) => {
               if (!presenceSearch.trim()) return true
               const q = presenceSearch.toLowerCase()
@@ -809,9 +816,11 @@ export default function FormationDetail() {
                               <tr key={p.id != null ? `ensalle_${p.id}` : i}>
                                 <td>
                                   <div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div>
-                                  <small style={{ color: p.type_personne === 'formateur' ? '#2b6cb0' : '#718096' }}>
-                                    <i className={`bi ${p.type_personne === 'formateur' ? 'bi-person-video3' : 'bi-person'} me-1`}></i>
-                                    {p.type_personne === 'formateur' ? 'Formateur' : 'Auditeur'}
+                                  <small style={{ color: '#718096' }}>
+                                    <span style={{ ...personBadgeStyle(p), borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }}>
+                                      <i className={`bi ${personIcon(p)} me-1`}></i>
+                                      {personLabel(p)}
+                                    </span>
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>
@@ -863,9 +872,11 @@ export default function FormationDetail() {
                               <tr key={p.id != null ? `present_${p.id}` : i}>
                                 <td>
                                   <div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div>
-                                  <small style={{ color: p.type_personne === 'formateur' ? '#2b6cb0' : '#718096' }}>
-                                    <i className={`bi ${p.type_personne === 'formateur' ? 'bi-person-video3' : 'bi-person'} me-1`}></i>
-                                    {p.type_personne === 'formateur' ? 'Formateur' : 'Auditeur'}
+                                  <small style={{ color: '#718096' }}>
+                                    <span style={{ ...personBadgeStyle(p), borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }}>
+                                      <i className={`bi ${personIcon(p)} me-1`}></i>
+                                      {personLabel(p)}
+                                    </span>
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>
@@ -908,9 +919,11 @@ export default function FormationDetail() {
                               <tr key={p.id != null ? `absent_${p.id}` : i}>
                                 <td>
                                   <div style={{ fontWeight: 600 }}>{p.nom} {p.prenom}</div>
-                                  <small style={{ color: p.type_personne === 'formateur' ? '#2b6cb0' : '#718096' }}>
-                                    <i className={`bi ${p.type_personne === 'formateur' ? 'bi-person-video3' : 'bi-person'} me-1`}></i>
-                                    {p.type_personne === 'formateur' ? 'Formateur' : 'Auditeur'}
+                                  <small style={{ color: '#718096' }}>
+                                    <span style={{ ...personBadgeStyle(p), borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }}>
+                                      <i className={`bi ${personIcon(p)} me-1`}></i>
+                                      {personLabel(p)}
+                                    </span>
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>

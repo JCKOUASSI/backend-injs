@@ -35,6 +35,8 @@ def dashboard_stats(request):
     """Return dashboard statistics, scoped by secretariat for SECRETARIAT role."""
     modules_qs = Module.objects.all()
     participants_qs = Participant.objects.all()
+    secretariat_filter = request.query_params.get('secretariat')
+    reference_date_raw = request.query_params.get('reference_date')
 
     if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         sec = request.user.secretariat
@@ -44,8 +46,19 @@ def dashboard_stats(request):
         modules_qs = modules_qs.filter(superviseur=request.user)
         fp_ids = ModuleParticipant.objects.filter(module__superviseur=request.user).values_list('participant_id', flat=True)
         participants_qs = participants_qs.filter(id__in=fp_ids).distinct()
+    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION') and secretariat_filter:
+        modules_qs = modules_qs.filter(secretariat_id=secretariat_filter)
+        participants_qs = participants_qs.filter(secretariat_id=secretariat_filter)
 
     today = timezone.localdate()
+    if reference_date_raw:
+        try:
+            today = datetime.strptime(reference_date_raw, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'detail': 'Format de date invalide. Utilisez YYYY-MM-DD pour reference_date.'},
+                status=400,
+            )
 
     total_formations = modules_qs.count()
     formations_actives = modules_qs.filter(statut='EN_COURS').count()
@@ -67,7 +80,7 @@ def dashboard_stats(request):
     ).count()
     seances_planifiees_aujourd_hui = PresenceSessionModule.objects.filter(
         module__in=modules_qs,
-        module__statut='EN_COURS',
+        module__statut__in=['PLANIFIEE', 'EN_COURS'],
         date_journee=today,
         demarree_le__isnull=True,
     ).count()
@@ -215,12 +228,34 @@ def dashboard_stats(request):
     for pt in Pointage.objects.filter(
         session__module__in=modules_qs,
         timestamp_entree__isnull=False,
-    ).select_related('participant', 'formateur', 'session__module').order_by('-timestamp_entree')[:8]:
-        personne = pt.formateur or pt.participant
+    ).select_related('participant', 'formateur', 'encadrant', 'session__module').order_by('-timestamp_entree')[:8]:
+        if pt.formateur_id:
+            personne = pt.formateur
+            type_personne = 'formateur'
+        elif pt.encadrant_id:
+            personne = pt.encadrant
+            type_personne = 'encadrant'
+        else:
+            personne = pt.participant
+            type_personne = 'participant'
+
+        nom = '—'
+        if personne:
+            nom = (
+                f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+                or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+                or getattr(personne, 'username', '')
+                or '—'
+            )
         derniers_pointages.append({
-            'nom': f"{personne.nom} {personne.prenom}" if personne else '—',
-            'matricule': getattr(personne, 'matricule', None) or getattr(personne, 'numero', '—'),
-            'type': 'formateur' if pt.formateur_id else 'participant',
+            'nom': nom,
+            'matricule': (
+                getattr(personne, 'numerobadge', None)
+                or getattr(personne, 'matricule', None)
+                or getattr(personne, 'numero', None)
+                or '—'
+            ),
+            'type': type_personne,
             'module': pt.session.module.intitule or '',
             'date': pt.date_journee,
             'heure_entree': pt.timestamp_entree,
@@ -290,6 +325,10 @@ def dashboard_stats(request):
         'seances_planifiees_aujourd_hui': seances_planifiees_aujourd_hui,
         'pointages_aujourd_hui': pointages_aujourd_hui,
         'en_salle_now': en_salle_now,
+        'auditeurs_attendus_jour': participants_attendus_jour,
+        'auditeurs_presents_jour': participants_pointes,
+        'formateurs_attendus_jour': formateurs_attendus_jour,
+        'formateurs_presents_jour': formateurs_pointes,
         'total_attendus_jour': total_attendus_jour,
         'presents_aujourd_hui': presents_aujourd_hui,
         'absents_aujourd_hui': absents_aujourd_hui,
@@ -356,6 +395,10 @@ def formation_list_api(request):
     secretariat_type = request.query_params.get('secretariat_type')
     if secretariat_type:
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
+
+    secretariat_id = request.query_params.get('secretariat')
+    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
+        queryset = queryset.filter(secretariat_id=secretariat_id)
 
     actives_only = request.query_params.get('actives')
     if actives_only == 'true':

@@ -11,7 +11,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from formations.models import Formation, Module, Participant, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade
+from formations.models import Formation, Module, Participant, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, Secretariat
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from presences.models import Pointage, AuditLog, _log_audit
@@ -72,6 +72,28 @@ def _paginate(request, queryset, per_page=ITEMS_PER_PAGE):
     params.pop('page', None)
     query_params = params.urlencode()
     return page_obj, query_params
+
+
+def _secretariat_hint_from_matricule(matricule):
+    """Retourne le code secrétariat prioritaire selon le matricule."""
+    m = (matricule or '').strip().upper()
+    if m.startswith('FNCE'):
+        return 'FAB'
+    if m.startswith('FNCP'):
+        return 'FAC'
+    return ''
+
+
+def _resolve_secretariat_from_matricule(matricule):
+    """Résout le secrétariat prioritaire depuis le matricule si applicable."""
+    hint = _secretariat_hint_from_matricule(matricule)
+    if not hint:
+        return None
+    return (
+        Secretariat.objects.filter(nom__iexact=hint).first()
+        or Secretariat.objects.filter(type__libelle__iexact=hint).first()
+        or Secretariat.objects.filter(nom__istartswith=f'{hint} ').first()
+    )
 
 
 # ──────────────────────────────────────────────
@@ -1206,7 +1228,11 @@ def participant_create(request):
         sec = None
         if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             sec = request.user.secretariat
+        matricule = request.POST.get('matricule', '').strip()
+        if sec is None and matricule:
+            sec = _resolve_secretariat_from_matricule(matricule)
         p = Participant.objects.create(
+            matricule=matricule,
             nom=request.POST['nom'],
             prenom=request.POST['prenom'],
             email=request.POST.get('email', ''),
@@ -1229,11 +1255,16 @@ def participant_create(request):
 def participant_edit(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
     if request.method == 'POST':
+        participant.matricule = request.POST.get('matricule', participant.matricule).strip() or participant.matricule
         participant.nom = request.POST['nom']
         participant.prenom = request.POST['prenom']
         participant.email = request.POST.get('email', '')
         participant.telephone = request.POST.get('telephone', '')
         participant.organisation = request.POST.get('organisation', '')
+        if request.user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+            secretariat = _resolve_secretariat_from_matricule(participant.matricule)
+            if secretariat is not None:
+                participant.secretariat = secretariat
         participant.save()
         messages.success(request, "Participant modifié.")
         _log_audit(

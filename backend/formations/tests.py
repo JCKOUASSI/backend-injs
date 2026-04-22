@@ -323,3 +323,51 @@ class ReferentielsAPITest(TestCase):
         for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades'):
             self.assertIn(key, res.data)
 
+
+# ──────────────────────────────────────────
+# API — dispatch secrétariat par matricule
+# ──────────────────────────────────────────
+
+class ParticipantSecretariatDispatchByMatriculeAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = make_user('admin_dispatch_matricule', role='CPFAE_ADMIN')
+        self.client.force_authenticate(self.admin)
+        self.sec_fab = Secretariat.objects.create(nom='FAB')
+        self.sec_fac = Secretariat.objects.create(nom='FAC')
+
+    def test_create_participant_fnce_sets_fab_secretariat(self):
+        res = self.client.post('/api/formations/participants/', {
+            'matricule': 'FNCE26-001',
+            'nom': 'KOUAME',
+            'prenom': 'Jean',
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        participant = Participant.objects.get(matricule='FNCE26-001')
+        self.assertEqual(participant.secretariat_id, self.sec_fab.id)
+
+    def test_create_participant_fncp_sets_fac_secretariat(self):
+        res = self.client.post('/api/formations/participants/', {
+            'matricule': 'FNCP26-001',
+            'nom': 'DIALLO',
+            'prenom': 'Mariam',
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        participant = Participant.objects.get(matricule='FNCP26-001')
+        self.assertEqual(participant.secretariat_id, self.sec_fac.id)
+
+    def test_update_participant_matricule_fncp_reassigns_to_fac(self):
+        participant = Participant.objects.create(
+            matricule='M0001',
+            nom='TRAORE',
+            prenom='Fatou',
+            secretariat=self.sec_fab,
+        )
+        res = self.client.patch(f'/api/formations/participants/{participant.pk}/', {
+            'matricule': 'FNCP26-777',
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        participant.refresh_from_db()
+        self.assertEqual(participant.secretariat_id, self.sec_fac.id)
+

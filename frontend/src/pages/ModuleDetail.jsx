@@ -388,6 +388,7 @@ export default function ModuleDetail() {
   const participants = module.participants || []
   const presences = module.presences || []
   const formateurs = module.formateurs || []
+  const encadrantsAttendus = module.encadrants || []
 
   return (
     <div>
@@ -766,27 +767,33 @@ export default function ModuleDetail() {
           ? ptDate.filter(pt => `${pt.nom} ${pt.prenom} ${pt.matricule || ''} ${pt.numerobadge || ''}`.toLowerCase().includes(q))
           : ptDate
 
-        // Séparer participants et formateurs
-        const ptPart = ptDate.filter(pt => pt.type_personne !== 'formateur')
+        // Séparer participants, formateurs, encadrants
+        const ptPart = ptDate.filter(pt => pt.type_personne === 'participant')
         const ptFmt  = ptDate.filter(pt => pt.type_personne === 'formateur')
+        const ptEnc  = ptDate.filter(pt => pt.type_personne === 'encadrant')
 
         const presentPartIds = new Set(ptPart.map(pt => pt.participant_id))
         const presentFmtIds  = new Set(ptFmt.map(pt => pt.formateur_id))
+        const presentEncIds  = new Set(ptEnc.map(pt => pt.encadrant_id))
 
-        const nbAttendus = participants.length + formateurs.length
+        const nbAttendus = participants.length + formateurs.length + encadrantsAttendus.length
         const nbPresents = (
           [...new Set(ptPart.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').map(pt => pt.participant_id))].length
           + [...new Set(ptFmt.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').map(pt => pt.formateur_id))].length
+          + [...new Set(ptEnc.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').map(pt => pt.encadrant_id))].length
         )
         const nbEnSalle = (
           [...new Set(ptPart.filter(pt => pt.timestamp_entree && !pt.timestamp_sortie).map(pt => pt.participant_id))].length
           + [...new Set(ptFmt.filter(pt => pt.timestamp_entree && !pt.timestamp_sortie).map(pt => pt.formateur_id))].length
+          + [...new Set(ptEnc.filter(pt => pt.timestamp_entree && !pt.timestamp_sortie).map(pt => pt.encadrant_id))].length
         )
         const presentOuSallePartIds = new Set(ptPart.filter(pt => !pt.timestamp_sortie || ((pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE')).map(pt => pt.participant_id))
         const presentOuSalleFmtIds  = new Set(ptFmt.filter(pt => !pt.timestamp_sortie || ((pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE')).map(pt => pt.formateur_id))
+        const presentOuSalleEncIds  = new Set(ptEnc.filter(pt => !pt.timestamp_sortie || ((pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE')).map(pt => pt.encadrant_id))
         const nbAbsents = (
           participants.filter(p => !presentOuSallePartIds.has(p.id)).length
           + formateurs.filter(f => !presentOuSalleFmtIds.has(f.id)).length
+          + encadrantsAttendus.filter(e => !presentOuSalleEncIds.has(e.id)).length
         )
         const taux = nbAttendus > 0 ? Math.round(((nbPresents + nbEnSalle) / nbAttendus) * 100) : 0
 
@@ -800,14 +807,17 @@ export default function ModuleDetail() {
           }
         })
 
-        // Absents : participants + formateurs qui n'ont pas encore badgé
+        // Absents : participants + formateurs + encadrants qui n'ont pas encore badgé
         const absentsParticipants = participants
           .filter(p => !presentPartIds.has(p.id))
           .map(p => ({ ...p, type_personne: 'participant' }))
         const absentsFormateurs = formateurs
           .filter(f => !presentFmtIds.has(f.id))
           .map(f => ({ ...f, type_personne: 'formateur' }))
-        const absentsAll = [...absentsParticipants, ...absentsFormateurs]
+        const absentsEncadrants = encadrantsAttendus
+          .filter(e => !presentEncIds.has(e.id))
+          .map(e => ({ ...e, type_personne: 'encadrant' }))
+        const absentsAll = [...absentsParticipants, ...absentsFormateurs, ...absentsEncadrants]
         const absentsFiltered = q
           ? absentsAll.filter(p =>
               `${p.nom} ${p.prenom} ${p.matricule || p.numero_matricule || ''} ${p.numerobadge || ''}`.toLowerCase().includes(q)
@@ -876,7 +886,7 @@ export default function ModuleDetail() {
                   <i className="bi bi-calendar-x" style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}></i>
                   Aucun pointage enregistré pour cette date.
                   <div style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
-                    Les auditeurs/formateurs attendus restent visibles dans la liste des absents ci-dessous.
+                    Les auditeurs/formateurs/encadrants attendus restent visibles dans la liste des absents ci-dessous.
                   </div>
                 </div>
               </div>
@@ -912,7 +922,9 @@ export default function ModuleDetail() {
                               <td>
                                 {pt.type_personne === 'formateur'
                                   ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.7rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
-                                  : <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem' }}><i className="bi bi-person me-1"></i>Auditeur</span>
+                                  : pt.type_personne === 'encadrant'
+                                    ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.7rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
+                                    : <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem' }}><i className="bi bi-person me-1"></i>Auditeur</span>
                                 }
                               </td>
                               <td><small>{pt.timestamp_entree ? new Date(pt.timestamp_entree).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'}</small></td>
@@ -937,7 +949,7 @@ export default function ModuleDetail() {
                                 <td>
                                   {!pt.timestamp_sortie && (
                                     <button className="btn btn-outline-warning btn-sm" title="Forcer la sortie"
-                                      onClick={() => openForceModal(pt.participant_id || pt.formateur_id, 'SORTIE', pt.type_personne || 'participant')}>
+                                      onClick={() => openForceModal(pt.participant_id || pt.formateur_id || pt.encadrant_id, 'SORTIE', pt.type_personne || 'participant')}>
                                       <i className="bi bi-box-arrow-right"></i>
                                     </button>
                                   )}
@@ -980,7 +992,9 @@ export default function ModuleDetail() {
                               <td>
                                 {p.type_personne === 'formateur'
                                   ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
-                                  : (p.grade || '—')
+                                  : p.type_personne === 'encadrant'
+                                    ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.72rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
+                                    : (p.grade || '—')
                                 }
                               </td>
                               {canSupervise && (
@@ -1015,10 +1029,10 @@ export default function ModuleDetail() {
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label fw-semibold">
-                    {forceForm.type_personne === 'formateur' ? 'Formateur' : 'Auditeur'}
+                    {forceForm.type_personne === 'formateur' ? 'Formateur' : forceForm.type_personne === 'encadrant' ? 'Encadrant' : 'Auditeur'}
                   </label>
                   {(() => {
-                    const source = forceForm.type_personne === 'formateur' ? formateurs : participants
+                    const source = forceForm.type_personne === 'formateur' ? formateurs : forceForm.type_personne === 'encadrant' ? encadrantsAttendus : participants
                     const p = source.find(x => String(x.id) === String(forceForm.personne_id))
                     return p ? (
                       <div style={{ padding: '0.5rem 0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontWeight: 500 }}>

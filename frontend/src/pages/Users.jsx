@@ -22,8 +22,8 @@ function getCreatableRoles(role) {
   return subordinates
 }
 const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
-const emptyForm = { username: '', first_name: '', last_name: '', email: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
-const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
+const emptyForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
+const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
 
 export default function Users() {
   const { user: currentUser } = useAuth()
@@ -126,6 +126,7 @@ export default function Users() {
       first_name: u.first_name || '',
       last_name: u.last_name || '',
       email: u.email || '',
+      matricule: u.matricule || '',
       role: u.role || '',
       telephone: u.telephone || '',
       is_active: u.is_active !== false,
@@ -175,7 +176,7 @@ export default function Users() {
             <div style={{ flex: '1 1 250px' }}>
               <div className="input-group">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder="Rechercher par nom, username..."
+                <input type="text" className="form-control" placeholder="Rechercher par nom, username, matricule..."
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
             </div>
@@ -211,6 +212,7 @@ export default function Users() {
                     <tr>
                       <th>Nom complet</th>
                       <th>Identifiant</th>
+                      <th>N° matricule</th>
                       <th>Adresse e-mail</th>
                       <th>Rôle / Secrétariat</th>
                       <th>Téléphone</th>
@@ -230,6 +232,7 @@ export default function Users() {
                           </div>
                         </td>
                         <td>{u.username}</td>
+                        <td>{u.matricule || '-'}</td>
                         <td>{u.email || '-'}</td>
                         <td>
                           <span className={`badge ${getRoleBadge(u.role)}`}>{ROLE_LABELS[u.role] || u.role}</span>
@@ -257,7 +260,7 @@ export default function Users() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="7" className="text-center py-4 text-muted">Aucun utilisateur trouvé</td></tr>
+                      <tr><td colSpan="8" className="text-center py-4 text-muted">Aucun utilisateur trouvé</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -322,6 +325,10 @@ export default function Users() {
                       <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
                     )}
                   </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">N° Matricule (badge)</label>
+                  <input type="text" className="form-control" value={form.matricule} onChange={e => setForm({...form, matricule: e.target.value})} />
                 </div>
                 <div className="grid-2">
                   <div className="form-group">
@@ -435,6 +442,10 @@ export default function Users() {
                 <div className="form-group">
                   <label className="form-label">Nom d'utilisateur *</label>
                   <input type="text" className="form-control" required value={editForm.username} onChange={e => setEditForm({...editForm, username: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">N° Matricule (badge)</label>
+                  <input type="text" className="form-control" value={editForm.matricule} onChange={e => setEditForm({...editForm, matricule: e.target.value})} />
                 </div>
                 <div className="grid-2">
                   <div className="form-group">

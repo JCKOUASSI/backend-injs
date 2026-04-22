@@ -12,6 +12,19 @@ from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
 
 
+def _has_unfinished_previous_session(session):
+    """
+    Retourne True si une séance précédente (même module, même date) n'est pas terminée.
+    La précédence est définie par le numéro de séance.
+    """
+    return SessionModule.objects.filter(
+        module=session.module,
+        date_journee=session.date_journee,
+        numero__lt=session.numero,
+        terminee_le__isnull=True,
+    ).exists()
+
+
 def _auto_manage_sessions(formation):
     """
     Auto-start sessions with auto_demarrage=True when heure_debut_prevue is reached.
@@ -37,6 +50,7 @@ def _auto_manage_sessions(formation):
             and session.heure_debut_prevue is not None
             and session.date_journee == today
             and session.heure_debut_prevue <= current_time
+            and not _has_unfinished_previous_session(session)
         ):
             session.demarree_le = now
             session.save(update_fields=['demarree_le'])
@@ -88,6 +102,12 @@ def session_start(request, formation_pk, session_pk):
     
     if session.demarree_le:
         return Response({'detail': 'Cette séance est déjà démarrée.'}, status=400)
+
+    if _has_unfinished_previous_session(session):
+        return Response(
+            {'detail': 'Impossible de démarrer cette séance tant que la précédente du même jour n’est pas terminée.'},
+            status=400,
+        )
     
     session.demarree_le = timezone.now()
     session.demarree_par = user
