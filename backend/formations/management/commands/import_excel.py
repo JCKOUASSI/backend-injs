@@ -269,6 +269,28 @@ class Command(BaseCommand):
             return 'FAB C'
         return c
 
+    def _secretariat_hint_from_matricule(self, matricule):
+        """Retourne le code secrétariat prioritaire selon le matricule.
+        FNCE* -> FAB, FNCP* -> FAC.
+        """
+        m = (matricule or '').strip().upper()
+        if m.startswith('FNCE'):
+            return 'FAB'
+        if m.startswith('FNCP'):
+            return 'FAC'
+        return ''
+
+    def _resolve_secretariat(self, SecretariatModel, hint):
+        """Résout un secrétariat depuis un hint (nom ou type libellé)."""
+        if not hint:
+            return None
+        h = hint.strip()
+        return (
+            SecretariatModel.objects.filter(nom__iexact=h).first()
+            or SecretariatModel.objects.filter(type__libelle__iexact=h).first()
+            or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
+        )
+
     def _int(self, val, default=None):
         if val is None:
             return default
@@ -501,30 +523,52 @@ class Command(BaseCommand):
                 # Secretariat explicitement fourni (import via API avec user SECRETARIAT)
                 fields['secretariat'] = secretariat
             else:
-                # Auto-affectation par catégorie : ex 'A'/'FAB A' → Secretariat dont type.libelle='FAB A'
-                # Fallback : si categorie vide, déduire depuis le grade (A4 → A, B2 → B, C1 → C)
-                raw_cat = fields['categorie']
-                if not raw_cat and fields['grade']:
-                    first_letter = fields['grade'].strip()[:1].upper()
-                    if first_letter in ('A', 'B', 'C'):
-                        raw_cat = first_letter
-                cat = self._normalize_categorie(raw_cat) if raw_cat else ''
-                if cat:
-                    if cat not in _secretariat_cache:
-                        sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
-                        _secretariat_cache[cat] = sec
+                # Règle prioritaire par matricule:
+                # FNCE* -> secrétariat FAB ; FNCP* -> secrétariat FAC.
+                # Si aucun match, on conserve la règle historique par catégorie/grade.
+                forced_hint = self._secretariat_hint_from_matricule(matricule)
+                if forced_hint:
+                    cache_key = f'prefix:{forced_hint}'
+                    if cache_key not in _secretariat_cache:
+                        sec = self._resolve_secretariat(SecretariatModel, forced_hint)
+                        _secretariat_cache[cache_key] = sec
                         if sec:
                             self.stdout.write(
-                                f'  🗂  Catégorie {cat} → Secrétariat : {sec.nom}'
+                                f'  🗂  Matricule {forced_hint}* → Secrétariat : {sec.nom}'
                             )
                         else:
                             errors.append(
                                 f'Participants ligne {row_idx}: aucun secrétariat '
-                                f'de type "{cat}" trouvé pour {nom} {prenom}'
+                                f'"{forced_hint}" trouvé pour {nom} {prenom}'
                             )
-                    sec = _secretariat_cache.get(cat)
+                    sec = _secretariat_cache.get(cache_key)
                     if sec:
                         fields['secretariat'] = sec
+                else:
+                    # Auto-affectation par catégorie : ex 'A'/'FAB A' -> secrétariat type='FAB A'
+                    # Fallback : si categorie vide, déduire depuis le grade (A4 -> A, B2 -> B, C1 -> C)
+                    raw_cat = fields['categorie']
+                    if not raw_cat and fields['grade']:
+                        first_letter = fields['grade'].strip()[:1].upper()
+                        if first_letter in ('A', 'B', 'C'):
+                            raw_cat = first_letter
+                    cat = self._normalize_categorie(raw_cat) if raw_cat else ''
+                    if cat:
+                        if cat not in _secretariat_cache:
+                            sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
+                            _secretariat_cache[cat] = sec
+                            if sec:
+                                self.stdout.write(
+                                    f'  🗂  Catégorie {cat} → Secrétariat : {sec.nom}'
+                                )
+                            else:
+                                errors.append(
+                                    f'Participants ligne {row_idx}: aucun secrétariat '
+                                    f'de type "{cat}" trouvé pour {nom} {prenom}'
+                                )
+                        sec = _secretariat_cache.get(cat)
+                        if sec:
+                            fields['secretariat'] = sec
 
             if matricule:
                 obj, created = Participant.objects.update_or_create(

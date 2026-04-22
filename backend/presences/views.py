@@ -37,7 +37,7 @@ def _normalize_scan_identifier(value):
     return ''.join(ch for ch in (value or '').strip().upper() if ch.isalnum())
 
 
-def _resolve_personne(numero, formation):
+def _resolve_personne(numero, formation, module=None):
     """
     Résout un numéro (auditeur, formateur, encadrant) vers la personne et vérifie l'inscription.
     Retourne (personne, type_str, personne_data, error_response).
@@ -58,6 +58,10 @@ def _resolve_personne(numero, formation):
     elif numero_compact.startswith('F') and numero_compact[1:].isdigit():
         formateur_candidates.add(f"F{int(numero_compact[1:]):04d}")
 
+    # Portée du contrôle: module (si fourni) sinon formation.
+    # Cela permet d'imposer strictement la liste autorisée de la séance scannée.
+    module_scope = module
+
     # Chercher d'abord comme formateur (numéros courts: F0001, F0002…)
     # puis comme participant (numéros FNCE24-xxx, matricule, etc.)
     formateur_filters = Q()
@@ -65,12 +69,15 @@ def _resolve_personne(numero, formation):
         formateur_filters |= Q(numerobadge__iexact=candidate)
     formateur = Formateur.objects.filter(formateur_filters).first()
     if formateur is not None:
-        if not ModuleFormateur.objects.filter(
-            module__formation=formation, formateur=formateur
-        ).exists():
+        formateur_in_scope = (
+            ModuleFormateur.objects.filter(module=module_scope, formateur=formateur).exists()
+            if module_scope is not None
+            else ModuleFormateur.objects.filter(module__formation=formation, formateur=formateur).exists()
+        )
+        if not formateur_in_scope:
             return None, None, None, Response(
                 {'code': 'FORMATEUR_NOT_IN_LIST',
-                 'detail': 'Formateur non autorisé pour cette formation.'},
+                 'detail': 'Formateur non autorisé pour ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return formateur, 'formateur', {
@@ -85,13 +92,15 @@ def _resolve_personne(numero, formation):
         matricule=numero_upper,
     ).first()
     if encadrant is not None:
-        if not Formation.objects.filter(
-            pk=formation.pk,
-            modules__superviseur=encadrant,
-        ).exists():
+        encadrant_in_scope = (
+            bool(module_scope and module_scope.superviseur_id == encadrant.id)
+            if module_scope is not None
+            else Formation.objects.filter(pk=formation.pk, modules__superviseur=encadrant).exists()
+        )
+        if not encadrant_in_scope:
             return None, None, None, Response(
                 {'code': 'ENCADRANT_NOT_IN_LIST',
-                 'detail': 'Encadrant non autorisé pour cette formation.'},
+                 'detail': 'Encadrant non autorisé pour ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return encadrant, 'encadrant', {
@@ -129,12 +138,15 @@ def _resolve_personne(numero, formation):
              'detail': 'Auditeur introuvable.'},
             status=status.HTTP_404_NOT_FOUND,
         )
-    if not ModuleParticipant.objects.filter(
-        module__formation=formation, participant=participant
-    ).exists():
+    participant_in_scope = (
+        ModuleParticipant.objects.filter(module=module_scope, participant=participant).exists()
+        if module_scope is not None
+        else ModuleParticipant.objects.filter(module__formation=formation, participant=participant).exists()
+    )
+    if not participant_in_scope:
         return None, None, None, Response(
             {'code': 'PARTICIPANT_NOT_IN_LIST',
-             'detail': 'Auditeur non autorisé pour cette formation.'},
+             'detail': 'Auditeur non autorisé pour ce module.'},
             status=status.HTTP_403_FORBIDDEN,
         )
     return participant, 'participant', {
@@ -194,6 +206,19 @@ def _find_open_pointage_same_module_day(
     if exclude_session_id is not None:
         qs = qs.exclude(session_id=exclude_session_id)
     return qs.order_by('-timestamp_entree').first()
+
+
+def _has_unfinished_previous_session(seance):
+    """
+    Retourne True si une séance précédente du même module et du même jour
+    n'est pas encore terminée.
+    """
+    return SessionModule.objects.filter(
+        module=seance.module,
+        date_journee=seance.date_journee,
+        numero__lt=seance.numero,
+        terminee_le__isnull=True,
+    ).exists()
 
 
 def _get_accessible_formation(user, pk):
@@ -323,7 +348,7 @@ def scan_view(request):
 
     # 2. Résoudre la personne (participant ou formateur)
     personne, type_str, personne_data, err = _resolve_personne(
-        data['numero_participant'], formation
+        data['numero_participant'], formation, seance.module
     )
     if err:
         return err
@@ -432,6 +457,18 @@ def scan_view(request):
                     'detail': (
                         f'Une autre session est déjà en cours sur ce module '
                         f'({seance_label}). Terminez-la d’abord.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if _has_unfinished_previous_session(seance):
+            return Response(
+                {
+                    'code': 'PREVIOUS_SESSION_NOT_TERMINATED',
+                    'detail': (
+                        'Impossible de badger cette séance tant que la '
+                        'séance précédente du même jour n’est pas terminée.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -610,30 +647,27 @@ def secure_scan_view(request):
     # 3. Vérifier inscription à la formation
     if type_str == 'formateur':
         if not ModuleFormateur.objects.filter(
-            module__formation=formation, formateur=personne
+            module=seance.module, formateur=personne
         ).exists():
             return Response(
                 {'code': 'NOT_IN_LIST',
-                 'detail': 'Vous n\'êtes pas assigné(e) à cette formation.'},
+                 'detail': 'Vous n\'êtes pas assigné(e) à ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
     elif type_str == 'encadrant':
-        if not Formation.objects.filter(
-            pk=formation.pk,
-            modules__superviseur=personne,
-        ).exists():
+        if seance.module.superviseur_id != personne.id:
             return Response(
                 {'code': 'NOT_IN_LIST',
-                 'detail': 'Vous n\'êtes pas encadrant de cette formation.'},
+                 'detail': 'Vous n\'êtes pas encadrant de ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
     else:
         if not ModuleParticipant.objects.filter(
-            module__formation=formation, participant=personne
+            module=seance.module, participant=personne
         ).exists():
             return Response(
                 {'code': 'NOT_IN_LIST',
-                 'detail': 'Vous n\'êtes pas inscrit(e) à cette formation.'},
+                 'detail': 'Vous n\'êtes pas inscrit(e) à ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -751,6 +785,18 @@ def secure_scan_view(request):
                     'detail': (
                         f'Une autre session est déjà en cours sur ce module '
                         f'({seance_label}). Terminez-la d’abord.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if _has_unfinished_previous_session(seance):
+            return Response(
+                {
+                    'code': 'PREVIOUS_SESSION_NOT_TERMINATED',
+                    'detail': (
+                        'Impossible de badger cette séance tant que la '
+                        'séance précédente du même jour n’est pas terminée.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1355,6 +1401,16 @@ def force_pointage(request, pk):
         seance_active = seance_qs.first()
         if not seance_active:
             return Response({'detail': 'Aucune séance active pour ce module ce jour.'}, status=status.HTTP_400_BAD_REQUEST)
+        if _has_unfinished_previous_session(seance_active):
+            return Response(
+                {
+                    'detail': (
+                        'Impossible de forcer un badgeage sur cette séance tant que '
+                        'la séance précédente du même jour n’est pas terminée.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         pointage_ouvert = _find_open_pointage_same_module_day(
             personne=personne,
             type_personne=type_str,
@@ -1687,7 +1743,7 @@ def check_badge_status(request):
     formation = qr_token.session.module.formation
     today = timezone.localdate()
 
-    personne, type_str, _, err = _resolve_personne(numero, formation)
+    personne, type_str, _, err = _resolve_personne(numero, formation, qr_token.session.module)
     if err:
         return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
 

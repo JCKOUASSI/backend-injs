@@ -50,6 +50,28 @@ def _secretariat_scope(user):
     return None
 
 
+def _secretariat_hint_from_matricule(matricule):
+    """Retourne le code secrétariat prioritaire selon le matricule."""
+    m = (matricule or '').strip().upper()
+    if m.startswith('FNCE'):
+        return 'FAB'
+    if m.startswith('FNCP'):
+        return 'FAC'
+    return ''
+
+
+def _resolve_secretariat_from_matricule(matricule):
+    """Résout le secrétariat prioritaire depuis le matricule si applicable."""
+    hint = _secretariat_hint_from_matricule(matricule)
+    if not hint:
+        return None
+    return (
+        Secretariat.objects.filter(nom__iexact=hint).first()
+        or Secretariat.objects.filter(type__libelle__iexact=hint).first()
+        or Secretariat.objects.filter(nom__istartswith=f'{hint} ').first()
+    )
+
+
 # ──────────────────────────────────────────────
 # SECRETARIAT — Formations CRUD
 # ──────────────────────────────────────────────
@@ -168,6 +190,9 @@ class ParticipantListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         secretariat = user.secretariat if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') else None
+        if secretariat is None:
+            matricule = serializer.validated_data.get('matricule')
+            secretariat = _resolve_secretariat_from_matricule(matricule)
         instance = serializer.save(secretariat=secretariat)
         _log_audit(
             action=AuditLog.Action.PARTICIPANT_CREATE,
@@ -210,7 +235,15 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Participant.objects.all()
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        user = self.request.user
+        instance = None
+        if user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+            matricule = serializer.validated_data.get('matricule', serializer.instance.matricule)
+            secretariat = _resolve_secretariat_from_matricule(matricule)
+            if secretariat is not None:
+                instance = serializer.save(secretariat=secretariat)
+        if instance is None:
+            instance = serializer.save()
         _log_audit(
             action=AuditLog.Action.PARTICIPANT_UPDATE,
             request=self.request,

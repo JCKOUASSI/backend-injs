@@ -6,23 +6,50 @@ import { formatDate } from '../utils/dates'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
+  const canFilterBySecretariat = ['CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'].includes(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])
+  const [secretariats, setSecretariats] = useState([])
+  const [selectedSecretariatId, setSelectedSecretariatId] = useState('')
   const [presencePeriod, setPresencePeriod] = useState('jour')
+  const [referenceDate, setReferenceDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadingSecretariats, setLoadingSecretariats] = useState(false)
 
   useEffect(() => {
     loadDashboardData()
     // Rafraîchissement périodique des indicateurs "live"
     const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
     return () => clearInterval(intervalId)
-  }, [])
+  }, [selectedSecretariatId, referenceDate, presencePeriod])
+
+  useEffect(() => {
+    if (!canFilterBySecretariat) return
+    loadSecretariats()
+  }, [canFilterBySecretariat])
 
   const loadDashboardData = async ({ silent = false } = {}) => {
+    const statsParams = new URLSearchParams()
+    if (selectedSecretariatId) statsParams.set('secretariat', selectedSecretariatId)
+    if (referenceDate) statsParams.set('reference_date', referenceDate)
+    const statsQuery = statsParams.toString()
+    const listParams = new URLSearchParams()
+    listParams.set('statut', 'EN_COURS')
+    listParams.set('page_size', '10')
+    if (selectedSecretariatId) listParams.set('secretariat', selectedSecretariatId)
+    const todayStr = new Date().toISOString().slice(0, 10)
+    if (presencePeriod === 'jour' && referenceDate && referenceDate !== todayStr) {
+      listParams.set('date_mode', 'date')
+      listParams.set('date', referenceDate)
+    } else {
+      listParams.set('seance_en_cours', 'true')
+    }
+    const listQuery = listParams.toString()
     const [statsRes, enCoursRes] = await Promise.allSettled([
-      api.get('/formations/stats/'),
-      api.get('/formations/list/?statut=EN_COURS&seance_en_cours=true&page_size=10'),
+      api.get(`/formations/stats/${statsQuery ? `?${statsQuery}` : ''}`),
+      api.get(`/formations/list/?${listQuery}`),
     ])
 
     const unwrap = (res, fallback) => {
@@ -47,14 +74,145 @@ export default function Dashboard() {
     }
   }
 
+  const loadSecretariats = async () => {
+    setLoadingSecretariats(true)
+    try {
+      const res = await api.get('/formations/secretariats/')
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      setSecretariats(data)
+    } catch {
+      setSecretariats([])
+    } finally {
+      setLoadingSecretariats(false)
+    }
+  }
+
   const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
   const prochainesSeances = stats?.prochaines_seances || []
+  const selectedSecretariat = secretariats.find((s) => String(s.id) === String(selectedSecretariatId))
+  const periodLabels = {
+    jour: 'Jour',
+    semaine: 'Semaine',
+    mois: 'Mois',
+    annee: 'Année',
+  }
+  const periodStats = {
+    jour: {
+      attendus: stats?.total_attendus_jour || 0,
+      presents: stats?.presents_aujourd_hui || 0,
+      taux: stats?.taux_presence || 0,
+      auditeursPresents: stats?.auditeurs_presents_jour || 0,
+      auditeursAttendus: stats?.auditeurs_attendus_jour || 0,
+      formateursPresents: stats?.formateurs_presents_jour || 0,
+      formateursAttendus: stats?.formateurs_attendus_jour || 0,
+    },
+    semaine: {
+      attendus: stats?.total_attendus_semaine || 0,
+      presents: stats?.presents_semaine || 0,
+      taux: stats?.taux_presence_semaine || 0,
+    },
+    mois: {
+      attendus: stats?.total_attendus_mois || 0,
+      presents: stats?.presents_mois || 0,
+      taux: stats?.taux_presence_mois || 0,
+    },
+    annee: {
+      attendus: stats?.total_attendus_annee || 0,
+      presents: stats?.presents_annee || 0,
+      taux: stats?.taux_presence_annee || 0,
+    },
+  }
+  const selectedPeriodStats = periodStats[presencePeriod] || periodStats.jour
+  const selectedPeriodAbsence = Math.max(selectedPeriodStats.attendus - selectedPeriodStats.presents, 0)
+  const selectedPeriodAbsenceRate = selectedPeriodStats.attendus > 0
+    ? Number((100 - (selectedPeriodStats.taux || 0)).toFixed(1))
+    : 0
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
 
   return (
     <div>
       {error && <div className="error-message">{error}</div>}
+      {canFilterBySecretariat && (
+        <div style={{ float: 'right', width: 250, marginLeft: '0.9rem', marginBottom: '0.9rem' }}>
+          <div style={{ position: 'sticky', top: '1rem' }}>
+            <div className="card">
+              <div className="card-header-bar">
+                <span><i className="bi bi-building me-2"></i><strong>Secrétariats</strong></span>
+              </div>
+              <div className="card-body-flush" style={{ maxHeight: '56vh', overflowY: 'auto' }}>
+                {loadingSecretariats ? (
+                  <div className="text-center py-3 text-muted" style={{ fontSize: '0.88rem' }}>
+                    Chargement...
+                  </div>
+                ) : (
+                  <div style={{ padding: '0.6rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSecretariatId('')}
+                      className={`btn btn-sm w-100 mb-2 ${selectedSecretariatId ? 'btn-outline-secondary' : 'btn-dfrc'}`}
+                      style={{ textAlign: 'left' }}
+                    >
+                      <i className="bi bi-grid-3x3-gap me-2"></i>Tous les secrétariats
+                    </button>
+                    {secretariats.map((sec) => (
+                      <button
+                        key={sec.id}
+                        type="button"
+                        onClick={() => setSelectedSecretariatId(String(sec.id))}
+                        className={`btn btn-sm w-100 mb-2 ${String(selectedSecretariatId) === String(sec.id) ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                        style={{ textAlign: 'left' }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{sec.nom}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="card" style={{ marginTop: '0.75rem' }}>
+              <div className="card-header-bar">
+                <span><i className="bi bi-funnel-fill me-2"></i><strong>Filtre période</strong></span>
+              </div>
+              <div className="card-body-flush" style={{ padding: '0.65rem' }}>
+                <label htmlFor="dashboard-reference-date" className="form-label" style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  Jour spécifique
+                </label>
+                <input
+                  id="dashboard-reference-date"
+                  type="date"
+                  className="form-control form-control-sm"
+                  value={referenceDate}
+                  onChange={(e) => setReferenceDate(e.target.value)}
+                  style={{ marginBottom: '0.65rem' }}
+                />
+                <div
+                  role="group"
+                  aria-label="Filtre de période dashboard"
+                  style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}
+                >
+                  {[
+                    { id: 'jour', label: 'Jour spécifique', icon: 'bi-calendar-day' },
+                    { id: 'semaine', label: 'Semaine', icon: 'bi-calendar-week' },
+                    { id: 'mois', label: 'Mois', icon: 'bi-calendar-month' },
+                    { id: 'annee', label: 'Année', icon: 'bi-calendar3' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPresencePeriod(opt.id)}
+                      className={`btn btn-sm text-start ${presencePeriod === opt.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                      style={{ width: '100%' }}
+                    >
+                      <i className={`bi ${opt.icon} me-2`}></i>{opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Bienvenue ── */}
       <div style={{ marginBottom: '1.25rem' }}>
@@ -63,6 +221,14 @@ export default function Dashboard() {
         </h4>
         <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>
           {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          {canFilterBySecretariat && (
+            <span style={{ marginLeft: '0.45rem' }}>
+              • {selectedSecretariat ? `Vue: ${selectedSecretariat.nom}` : 'Vue: Tous les secrétariats'}
+            </span>
+          )}
+          <span style={{ marginLeft: '0.45rem' }}>
+            • Référence: {new Date(`${referenceDate}T00:00:00`).toLocaleDateString('fr-FR')}
+          </span>
         </p>
       </div>
 
@@ -77,7 +243,7 @@ export default function Dashboard() {
               <span className="headline-kpi-label">COURS</span>
             </div>
             <div className="headline-kpi-subline">
-              <span><i className="bi bi-play-circle-fill"></i> {stats?.modules_en_cours || 0} en cours</span>
+              <span><i className="bi bi-play-circle-fill"></i> {stats?.modules_en_cours || 0} démarrés</span>
               <span><i className="bi bi-calendar2-check"></i> {stats?.modules_planifies || 0} planifiés</span>
               <span><i className="bi bi-check-circle-fill"></i> {stats?.modules_termines || 0} terminés</span>
             </div>
@@ -96,14 +262,50 @@ export default function Dashboard() {
 
       {/* ── Capacité du jour ── */}
       <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
-        CAPACITE DU JOUR
+        CAPACITE - {periodLabels[presencePeriod].toUpperCase()}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
-        {[
-          { label: 'Personnes attendues', value: stats?.total_attendus_jour || 0, icon: 'bi-people-fill', color: '#2b6cb0', bg: 'rgba(43,108,178,0.1)' },
-          { label: 'Cours actifs', value: stats?.modules_en_cours || 0, icon: 'bi-play-circle-fill', color: '#276749', bg: 'rgba(39,103,73,0.1)' },
-          { label: "Séances planifiées aujourd'hui", value: stats?.seances_planifiees_aujourd_hui || 0, icon: 'bi-calendar-event', color: '#c05621', bg: 'rgba(245,124,0,0.1)' },
-        ].map(({ label, value, icon, color, bg }) => (
+        {(presencePeriod === 'jour'
+          ? [
+              {
+                label: 'Nombre Auditeurs Présents/Attendus',
+                value: `${selectedPeriodStats.auditeursPresents || 0}/${selectedPeriodStats.auditeursAttendus || 0}`,
+                icon: 'bi-people-fill',
+                color: '#2b6cb0',
+                bg: 'rgba(43,108,178,0.1)',
+              },
+              {
+                label: 'Nombre Formateurs Présents/Attendus',
+                value: `${selectedPeriodStats.formateursPresents || 0}/${selectedPeriodStats.formateursAttendus || 0}`,
+                icon: 'bi-person-badge-fill',
+                color: '#276749',
+                bg: 'rgba(39,103,73,0.1)',
+              },
+              { label: 'Séances planifiées', value: stats?.seances_planifiees_aujourd_hui || 0, icon: 'bi-calendar-event', color: '#c05621', bg: 'rgba(245,124,0,0.1)' },
+            ]
+          : [
+              {
+                label: `Présents / Attendus (${periodLabels[presencePeriod].toLowerCase()})`,
+                value: `${selectedPeriodStats.presents || 0}/${selectedPeriodStats.attendus || 0}`,
+                icon: 'bi-people-fill',
+                color: '#2b6cb0',
+                bg: 'rgba(43,108,178,0.1)',
+              },
+              {
+                label: `Taux de présence (${periodLabels[presencePeriod].toLowerCase()})`,
+                value: `${(selectedPeriodStats.taux || 0).toFixed(1)}%`,
+                icon: 'bi-graph-up-arrow',
+                color: '#276749',
+                bg: 'rgba(39,103,73,0.1)',
+              },
+              {
+                label: `Absents (${periodLabels[presencePeriod].toLowerCase()})`,
+                value: `${selectedPeriodAbsence} (${selectedPeriodAbsenceRate.toFixed(1)}%)`,
+                icon: 'bi-person-x-fill',
+                color: '#c05621',
+                bg: 'rgba(245,124,0,0.1)',
+              },
+            ]).map(({ label, value, icon, color, bg }) => (
           <div key={label} className="stat-card">
             <div className="stat-body">
               <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
@@ -120,10 +322,12 @@ export default function Dashboard() {
       <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
         EXECUTION LIVE
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
         {[
           { label: 'Séances actives', value: stats?.seances_actives || 0, icon: 'bi-broadcast', color: '#805ad5', bg: 'rgba(128,90,213,0.1)' },
-          { label: 'Pointages du jour', value: stats?.pointages_aujourd_hui || 0, icon: 'bi-qr-code-scan', color: '#276749', bg: 'rgba(39,103,73,0.1)' },
+          ...(isDirection
+            ? []
+            : [{ label: 'Pointages du jour', value: stats?.pointages_aujourd_hui || 0, icon: 'bi-qr-code-scan', color: '#276749', bg: 'rgba(39,103,73,0.1)' }]),
           { label: 'En salle maintenant', value: stats?.en_salle_now || 0, icon: 'bi-person-check-fill', color: '#2b6cb0', bg: 'rgba(43,108,178,0.1)' },
         ].map(({ label, value, icon, color, bg }) => (
           <div key={label} className="stat-card">
@@ -142,13 +346,9 @@ export default function Dashboard() {
       <div style={{ marginBottom: '0.35rem', color: '#64748b', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.06em' }}>
         QUALITE OPERATIONNELLE
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.9rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginBottom: '0.9rem' }}>
         {[
-          { label: 'Taux présence (jour)', value: `${(stats?.taux_presence || 0).toFixed(1)}%`, icon: 'bi-graph-up-arrow', color: '#15803d', bg: 'rgba(22,163,74,0.1)' },
-          { label: 'Taux présence (semaine)', value: `${(stats?.taux_presence_semaine || 0).toFixed(1)}%`, icon: 'bi-calendar-week', color: '#1d4ed8', bg: 'rgba(29,78,216,0.1)' },
-          { label: 'Taux présence (mois)', value: `${(stats?.taux_presence_mois || 0).toFixed(1)}%`, icon: 'bi-calendar-month', color: '#0f766e', bg: 'rgba(15,118,110,0.1)' },
-          { label: 'Taux présence (année)', value: `${(stats?.taux_presence_annee || 0).toFixed(1)}%`, icon: 'bi-calendar3', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)' },
-          { label: 'Retard moyen', value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`, icon: 'bi-alarm', color: '#d97706', bg: 'rgba(217,119,6,0.1)' },
+          { label: 'Retard moyen (jour)', value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`, icon: 'bi-alarm', color: '#d97706', bg: 'rgba(217,119,6,0.1)' },
         ].map(({ label, value, icon, color, bg }) => (
           <div key={label} className="stat-card">
             <div className="stat-body">
@@ -164,8 +364,14 @@ export default function Dashboard() {
 
       {/* ── Taux d'absence du jour ── */}
       {(() => {
-        const periodLabels = {
-          jour: "du jour",
+        const specificDayLabel = (() => {
+          if (!referenceDate) return 'du jour'
+          const parsed = new Date(`${referenceDate}T00:00:00`)
+          if (Number.isNaN(parsed.getTime())) return 'du jour'
+          return `du ${parsed.toLocaleDateString('fr-FR')}`
+        })()
+        const periodTextLabels = {
+          jour: specificDayLabel,
           semaine: "de la semaine",
           mois: "du mois",
           annee: "de l'année",
@@ -204,28 +410,30 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>
                 <i className="bi bi-person-x-fill me-2" style={{ color: absColor }}></i>
-                Présences {periodLabels[presencePeriod]} — personnes (auditeurs + formateurs)
+                Présences {periodTextLabels[presencePeriod]} — personnes (auditeurs + formateurs)
               </span>
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div className="btn-group btn-group-sm" role="group" aria-label="Période présence">
-                  {[
-                    { id: 'jour', label: 'Jour' },
-                    { id: 'semaine', label: 'Semaine' },
-                    { id: 'mois', label: 'Mois' },
-                    { id: 'annee', label: 'Année' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setPresencePeriod(opt.id)}
-                      className={`btn ${presencePeriod === opt.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
-                      style={{ fontSize: '0.78rem' }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+              {!canFilterBySecretariat && (
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="btn-group btn-group-sm" role="group" aria-label="Période présence">
+                    {[
+                      { id: 'jour', label: 'Jour' },
+                      { id: 'semaine', label: 'Semaine' },
+                      { id: 'mois', label: 'Mois' },
+                      { id: 'annee', label: 'Année' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setPresencePeriod(opt.id)}
+                        className={`btn ${presencePeriod === opt.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                        style={{ fontSize: '0.78rem' }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem', width: '100%', justifyContent: 'flex-end' }}>
                 <span><span style={{ fontWeight: 700, color: '#276749' }}>{presents}</span> <span className="text-muted">présents</span></span>
                 <span><span style={{ fontWeight: 700, color: absColor }}>{absents}</span> <span className="text-muted">absents</span></span>
@@ -263,7 +471,7 @@ export default function Dashboard() {
               <table className="table">
                 <thead><tr>
                   <th>Module</th><th>Site </th><th>Catégorie</th>
-                  <th>Superviseur</th><th>Présents / Attendus (auditeurs)</th><th>Absents</th><th>Taux présence</th><th></th>
+                  <th>Encadrant</th><th>Présents / Attendus (auditeurs)</th><th>Absents</th><th>Taux présence</th><th></th>
                 </tr></thead>
                 <tbody>
                   {formationsEnCours.map((f) => {
@@ -377,15 +585,15 @@ export default function Dashboard() {
                     <tbody>
                       {stats.derniers_pointages.map((pt, i) => (
                         <tr key={i}>
-                          <td style={{ fontWeight: 600, fontSize: '0.88rem' }}>{pt.nom}</td>
-                          <td><code style={{ fontSize: '0.78rem' }}>{pt.matricule}</code></td>
+                          <td style={{ fontWeight: 600, fontSize: '0.88rem' }}>{pt.nom || '—'}</td>
+                          <td><code style={{ fontSize: '0.78rem' }}>{pt.matricule || '—'}</code></td>
                           <td>
                             <span style={{
-                              background: pt.type === 'formateur' ? '#ebf4ff' : '#f0f4ff',
-                              color: pt.type === 'formateur' ? '#2b6cb0' : '#4a5568',
+                              background: pt.type === 'formateur' ? '#ebf4ff' : pt.type === 'encadrant' ? '#fffaf0' : '#f0f4ff',
+                              color: pt.type === 'formateur' ? '#2b6cb0' : pt.type === 'encadrant' ? '#9c4221' : '#4a5568',
                               borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem'
                             }}>
-                              {pt.type === 'formateur' ? 'Formateur' : 'Auditeur'}
+                              {pt.type === 'formateur' ? 'Formateur' : pt.type === 'encadrant' ? 'Encadrant' : 'Auditeur'}
                             </span>
                           </td>
                           <td style={{ fontSize: '0.82rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pt.module || '—'}</td>
@@ -409,6 +617,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <div style={{ clear: 'both' }}></div>
     </div>
   )
 }
