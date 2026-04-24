@@ -30,7 +30,17 @@ function Layout({ children, breadcrumb }) {
   const location = useLocation()
   const path = location.pathname
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showChangePwd, setShowChangePwd] = useState(false)
+
+  const isMobileViewport = () => window.matchMedia('(max-width: 768px)').matches
+  const toggleSidebar = () => {
+    if (isMobileViewport()) {
+      setSidebarOpen((o) => !o)
+      return
+    }
+    setSidebarCollapsed((c) => !c)
+  }
 
   const isActive = (route) => {
     if (route === '/') return path === '/'
@@ -50,7 +60,7 @@ function Layout({ children, breadcrumb }) {
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
   return (
-    <div className="app-container">
+    <div className={`app-container${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -124,14 +134,18 @@ function Layout({ children, breadcrumb }) {
           <button onClick={logout} className="nav-item" style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
             <span><i className="bi bi-box-arrow-left"></i> <span className="nav-label">Déconnexion</span></span>
           </button>
+          <div className="nav-label" style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', fontSize: '0.68rem', color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.4 }}>
+            Developpé par<br/>
+            <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>Ophir Technologies</span>
+          </div>
         </div>
       </aside>
 
       <main className="main-content">
         <div className="top-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button className="btn btn-sm btn-outline-secondary sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
-              <i className="bi bi-list"></i>
+            <button className="btn btn-sm btn-outline-secondary sidebar-toggle" onClick={toggleSidebar}>
+              <i className={`bi ${isMobileViewport() ? 'bi-list' : (sidebarCollapsed ? 'bi-layout-sidebar-inset' : 'bi-layout-sidebar')}`}></i>
             </button>
             <nav>
               <ol className="breadcrumb">

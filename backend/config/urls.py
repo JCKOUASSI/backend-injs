@@ -23,6 +23,6 @@ urlpatterns = [
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),
 
-    # Formations web (for QR code images, etc.)
-    path('formations/', include('formations.urls')),
+    # QR code images publiques (hors préfixe /api/) — routes minimales uniquement
+    path('formations/', include('formations.qr_urls')),
 ]

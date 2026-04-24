@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -14,6 +16,15 @@ from presences.models import DeviceBinding
 
 User = get_user_model()
 
+logger = logging.getLogger(__name__)
+
+
+def _login_client_ip(request) -> str:
+    xff = (request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
+    if xff:
+        return xff.split(',')[0].strip()
+    return (request.META.get('REMOTE_ADDR') or '').strip()
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -21,13 +32,31 @@ User = get_user_model()
 def login_view(request):
     """Connexion — retourne access + refresh tokens.
     Si device_id est fourni (app mobile), vérifie le verrouillage appareil."""
+    client_ip = _login_client_ip(request)
+    user_agent = (request.META.get('HTTP_USER_AGENT') or '')[:200]
+
     serializer = LoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+    if not serializer.is_valid():
+        logger.warning(
+            'login_payload_invalid ip=%s ua=%r errors=%s',
+            client_ip,
+            user_agent,
+            serializer.errors,
+        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    username_try = serializer.validated_data['username']
     user = authenticate(
-        username=serializer.validated_data['username'],
+        username=username_try,
         password=serializer.validated_data['password'],
     )
     if user is None:
+        logger.warning(
+            'login_failed_bad_credentials username=%r ip=%s ua=%r',
+            username_try,
+            client_ip,
+            user_agent,
+        )
         return Response(
             {'detail': 'Identifiants invalides.'},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -42,6 +71,13 @@ def login_view(request):
         ).select_related('user').first()
 
         if existing and existing.user_id != user.id:
+            logger.warning(
+                'login_device_locked device_id=%r attempted_user_id=%s bound_user_id=%s ip=%s',
+                device_id,
+                user.pk,
+                existing.user_id,
+                client_ip,
+            )
             return Response({
                 'code': 'DEVICE_LOCKED',
                 'detail': (
@@ -62,12 +98,23 @@ def login_view(request):
                 },
             )
 
+    logger.info(
+        'login_ok user_id=%s username=%r role=%s ip=%s device_id=%r',
+        user.pk,
+        user.username,
+        user.role,
+        client_ip,
+        device_id[:16] + '…' if len(device_id) > 16 else device_id,
+    )
+
     refresh = RefreshToken.for_user(user)
     refresh['role'] = user.role
     refresh['full_name'] = user.get_full_name()
+    refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
     return Response({
         'access': str(refresh.access_token),
         'refresh': str(refresh),
+        'must_change_password': bool(getattr(user, 'must_change_password', False)),
         'user': UserSerializer(user).data,
     })
 
@@ -86,6 +133,8 @@ def change_password_view(request):
     serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     request.user.set_password(serializer.validated_data['new_password'])
+    if getattr(request.user, 'must_change_password', False):
+        request.user.must_change_password = False
     request.user.save()
     return Response({'detail': 'Mot de passe modifié avec succès.'})
 

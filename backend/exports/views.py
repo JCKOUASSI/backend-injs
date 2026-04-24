@@ -74,9 +74,63 @@ CI_LIGHT_GREEN = '#E8F5E9'
 CI_LIGHT_ORANGE = '#FFF3E0'
 
 
+def _formation_meta(formation):
+    """
+    Agrège grade / groupe / vague / superviseurs depuis les modules de la formation.
+    Ces champs ont été déplacés de Formation vers Module ; cette fonction reconstruit
+    une vue unifiée pour les en-têtes des exports.
+    """
+    modules = list(formation.modules.select_related('superviseur').all())
+    grades = sorted({m.grade for m in modules if m.grade})
+    groupes = sorted({m.groupe for m in modules if m.groupe})
+    vagues = sorted({m.vague for m in modules if m.vague})
+    superviseurs = [m.superviseur for m in modules if m.superviseur]
+    # Dédoublonner tout en préservant l'ordre d'apparition
+    seen, unique_superviseurs = set(), []
+    for s in superviseurs:
+        if s.pk not in seen:
+            seen.add(s.pk)
+            unique_superviseurs.append(s)
+    return {
+        'grade': ', '.join(grades) or '-',
+        'groupe': ', '.join(groupes) or '-',
+        'vague': ', '.join(vagues) or '-',
+        'superviseurs': unique_superviseurs,
+    }
+
+
 def _check_export_access(request, formation):
-    """Vérifie que l'utilisateur peut exporter cette formation."""
-    return request.user.is_authenticated
+    """
+    Vérifie que l'utilisateur peut exporter les données de cette formation.
+
+    - DFRC (CPFAE_ADMIN / CHEF_CPFAE_ADMIN) : accès complet.
+    - DIRECTION / ADMIN                      : accès complet (lecture).
+    - SECRETARIAT / CHEF_SECRETARIAT         : uniquement si au moins un module
+                                               de la formation appartient au secrétariat
+                                               de l'utilisateur.
+    - ENCADRANT                              : uniquement si au moins un module
+                                               est supervisé par cet utilisateur.
+    - AUDITEUR et autres                     : accès refusé.
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return False
+    if user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ADMIN', 'DIRECTION'):
+        return True
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        secretariat = getattr(user, 'secretariat', None)
+        if not secretariat:
+            return False
+        return Formation.objects.filter(
+            pk=formation.pk,
+            modules__secretariat=secretariat,
+        ).exists()
+    if user.role == 'ENCADRANT':
+        return Formation.objects.filter(
+            pk=formation.pk,
+            modules__superviseur=user,
+        ).exists()
+    return False
 
 
 def _get_motif_force(pointage):
@@ -287,7 +341,13 @@ def export_pdf(request, pk):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
     formation = get_object_or_404(Formation, pk=pk)
+    if not _check_export_access(request, formation):
+        return Response(
+            {'detail': 'Accès non autorisé à cette formation.'},
+            status=403,
+        )
 
+    meta = _formation_meta(formation)
     _, rows, stats = _get_formation_data(pk)
 
     buffer = io.BytesIO()
@@ -345,14 +405,14 @@ def export_pdf(request, pk):
     ))
 
     elements.append(Paragraph(
-        f"Grade : {formation.grade or '-'} &nbsp;|&nbsp; "
-        f"Groupe : {formation.groupe or '-'} &nbsp;|&nbsp; "
-        f"Vague : {formation.vague or '-'}",
+        f"Grade : {meta['grade']} &nbsp;|&nbsp; "
+        f"Groupe : {meta['groupe']} &nbsp;|&nbsp; "
+        f"Vague : {meta['vague']}",
         style_subtitle,
     ))
-    if formation.superviseur:
+    for sup in meta['superviseurs']:
         elements.append(Paragraph(
-            f"Superviseur : {formation.superviseur.get_full_name()}",
+            f"Superviseur : {sup.get_full_name()}",
             style_subtitle,
         ))
     # Tableau des sessions superviseur (par journée)
@@ -494,7 +554,13 @@ def export_excel(request, pk):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     formation = get_object_or_404(Formation, pk=pk)
+    if not _check_export_access(request, formation):
+        return Response(
+            {'detail': 'Accès non autorisé à cette formation.'},
+            status=403,
+        )
 
+    meta = _formation_meta(formation)
     _, rows, stats = _get_formation_data(pk)
 
     wb = Workbook()
@@ -532,14 +598,14 @@ def export_excel(request, pk):
     ws['A3'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A4:J4')
-    ws['A4'] = f"Grade : {formation.grade or '-'} | Groupe : {formation.groupe or '-'} | Vague : {formation.vague or '-'}"
+    ws['A4'] = f"Grade : {meta['grade']} | Groupe : {meta['groupe']} | Vague : {meta['vague']}"
     ws['A4'].font = Font(size=10, color='444444')
     ws['A4'].alignment = Alignment(horizontal='center')
 
     next_row = 5
-    if formation.superviseur:
+    for sup in meta['superviseurs']:
         ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=10)
-        ws.cell(row=next_row, column=1, value=f"Superviseur : {formation.superviseur.get_full_name()}")
+        ws.cell(row=next_row, column=1, value=f"Superviseur : {sup.get_full_name()}")
         ws.cell(row=next_row, column=1).font = Font(size=10, color='444444')
         ws.cell(row=next_row, column=1).alignment = Alignment(horizontal='center')
         next_row += 1
@@ -880,6 +946,11 @@ def export_pdf_session(request, session_pk):
 
     session = get_object_or_404(SessionModule.objects.select_related('module__formation'), pk=session_pk)
     formation = session.module.formation
+    if not _check_export_access(request, formation):
+        return Response(
+            {'detail': 'Accès non autorisé à cette formation.'},
+            status=403,
+        )
 
     _, _, rows, stats = _get_session_data(session_pk)
 
@@ -1079,6 +1150,11 @@ def export_excel_session(request, session_pk):
 
     session = get_object_or_404(SessionModule.objects.select_related('module__formation'), pk=session_pk)
     formation = session.module.formation
+    if not _check_export_access(request, formation):
+        return Response(
+            {'detail': 'Accès non autorisé à cette formation.'},
+            status=403,
+        )
 
     _, _, rows, stats = _get_session_data(session_pk)
 

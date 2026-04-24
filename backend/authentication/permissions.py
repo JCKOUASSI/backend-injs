@@ -22,11 +22,11 @@ def get_creatable_roles(role):
 
 
 class IsDFRC(BasePermission):
-    """CHEF_CPFAE_ADMIN/CPFAE_ADMIN : accès complet. Direction : lecture seule."""
+    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if request.user.role in ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
         if request.user.role == 'DIRECTION' and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
@@ -34,11 +34,11 @@ class IsDFRC(BasePermission):
 
 
 class IsDFRCOrEncadrant(BasePermission):
-    """CHEF_CPFAE_ADMIN/CPFAE_ADMIN/Encadrant : accès complet. Direction : lecture seule."""
+    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN/Encadrant : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
+        if request.user.role in ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
             return True
         if request.user.role == 'DIRECTION' and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
@@ -82,11 +82,11 @@ class IsSecretariatOrEncadrant(BasePermission):
 
 
 class IsSecretariatOrDFRC(BasePermission):
-    """Secrétariat/DFRC : accès complet. Direction : lecture seule."""
+    """ADMIN/Secrétariat/DFRC : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if request.user.role in ('ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
         if request.user.role == 'DIRECTION' and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
@@ -94,11 +94,11 @@ class IsSecretariatOrDFRC(BasePermission):
 
 
 class IsSecretariatOrEncadrantOrDFRC(BasePermission):
-    """Secrétariat, Chef Secrétariat, Encadrant, CPFAE_ADMIN, Chef CPFAE_ADMIN : accès complet. Direction : lecture seule."""
+    """ADMIN, Secrétariat, Chef Secrétariat, Encadrant, CPFAE_ADMIN, Chef CPFAE_ADMIN : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if request.user.role in ('ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
         if request.user.role == 'DIRECTION' and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True

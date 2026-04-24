@@ -14,9 +14,10 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'matricule',
             'role', 'grade', 'telephone', 'organisation', 'is_active',
+            'must_change_password',
             'secretariat', 'secretariat_nom',
         ]
-        read_only_fields = ['id', 'secretariat_nom']
+        read_only_fields = ['id', 'secretariat_nom', 'must_change_password']
 
     def get_secretariat_nom(self, obj):
         if obj.secretariat:

@@ -310,9 +310,13 @@ class RefSalleInline(admin.TabularInline):
 
 @admin.register(RefSite)
 class RefSiteAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'actif']
+    list_display = ['nom', 'actif', 'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m']
     search_fields = ['nom']
     list_filter = ['actif']
+    fields = [
+        'nom', 'actif',
+        'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
+    ]
     inlines = [RefBatimentInline, RefSalleInline]
 
 

@@ -1,7 +1,9 @@
 from django.db import transaction
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db.models import Q
+from math import radians, sin, cos, sqrt, atan2
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,7 +13,7 @@ from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatO
 from authentication.throttles import ScanRateThrottle
 from formations.models import (
     Formation, Participant, ModuleParticipant, ModuleFormateur,
-    Formateur, QRToken, SessionModule,
+    Formateur, QRToken, SessionModule, RefSite,
 )
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -22,10 +24,21 @@ from .serializers import (
     PointageSerializer,
     ScanSerializer,
     SecureScanSerializer,
+    SecureHeartbeatSerializer,
     ForcePointageSerializer,
 )
 
 User = get_user_model()
+
+
+def _password_change_required_response():
+    return Response(
+        {
+            'code': 'PASSWORD_CHANGE_REQUIRED',
+            'detail': 'Vous devez changer votre mot de passe avant de continuer.',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 # ──────────────────────────────────────────────
@@ -224,15 +237,10 @@ def _has_unfinished_previous_session(seance):
 def _get_accessible_formation(user, pk):
     """
     Récupère une formation accessible par l'utilisateur.
-    - ENCADRANT: la formation doit avoir au moins un module supervisé par lui.
-    - Autres rôles autorisés: accès direct par PK.
+    Délègue à formations.access.formation_accessible pour une logique centralisée.
     """
-    if user.role == 'ENCADRANT':
-        return Formation.objects.filter(
-            pk=pk,
-            modules__superviseur=user,
-        ).distinct().first()
-    return Formation.objects.filter(pk=pk).first()
+    from formations.access import formation_accessible
+    return formation_accessible(user, pk)
 
 
 def _check_fenetre_entree(seance):
@@ -285,6 +293,102 @@ def _clamp_to_seance(ts, seance):
     if seance.heure_fin_prevue and local_ts.time() > seance.heure_fin_prevue:
         return timezone.make_aware(datetime.combine(date, seance.heure_fin_prevue), tz)
     return ts
+
+
+def _resolve_authenticated_personne(user):
+    """Retourne (personne, type_str, error_response)."""
+    try:
+        return user.participant_profile, 'participant', None
+    except (Participant.DoesNotExist, AttributeError):
+        pass
+
+    try:
+        return user.formateur_profile, 'formateur', None
+    except (Formateur.DoesNotExist, AttributeError):
+        pass
+
+    if user.role == 'ENCADRANT':
+        if not user.matricule:
+            return None, None, Response(
+                {
+                    'code': 'NO_MATRICULE',
+                    'detail': 'Aucun matricule renseigné sur votre compte encadrant.',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return user, 'encadrant', None
+
+    return None, None, Response(
+        {
+            'code': 'NO_PROFILE',
+            'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _distance_meters(lat1, lon1, lat2, lon2):
+    """Distance approximative en mètres (haversine)."""
+    earth_radius_m = 6371000
+    phi1 = radians(float(lat1))
+    phi2 = radians(float(lat2))
+    d_phi = radians(float(lat2) - float(lat1))
+    d_lambda = radians(float(lon2) - float(lon1))
+    a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lambda / 2) ** 2
+    return 2 * earth_radius_m * atan2(sqrt(a), sqrt(1 - a))
+
+
+def _resolve_site_geofence(module):
+    """
+    Retourne (lat, lon, rayon_m) pour le site du module, ou (None, None, None)
+    si aucun RefSite correspondant ne possède de geofence configurée.
+    Le lien se fait par nom (Module.site → RefSite.nom, case-insensitive).
+    """
+    site_name = (getattr(module, 'site', '') or '').strip()
+    if not site_name:
+        return None, None, None
+    site = RefSite.objects.filter(nom__iexact=site_name).first()
+    if site is None or site.geofence_latitude is None or site.geofence_longitude is None:
+        return None, None, None
+    rayon = site.geofence_rayon_m or getattr(settings, 'MOBILE_GEOFENCE_DEFAULT_RADIUS_M', 200)
+    return site.geofence_latitude, site.geofence_longitude, rayon
+
+
+def _check_geofence(module, latitude, longitude, accuracy_m=None):
+    """
+    Vérifie si la position est dans la zone autorisée du site du module.
+    Retourne (ok, code, detail, distance_m, rayon_m).
+    """
+    site_lat, site_lon, rayon_m = _resolve_site_geofence(module)
+    if site_lat is None or site_lon is None:
+        return True, None, None, None, None
+
+    max_accuracy = getattr(settings, 'MOBILE_GEOFENCE_MAX_ACCURACY_M', 80)
+    if accuracy_m is not None and float(accuracy_m) > float(max_accuracy):
+        return (
+            False,
+            'LOCATION_INACCURATE',
+            f"Précision GPS insuffisante ({round(float(accuracy_m), 1)}m). "
+            f"Seuil maximum autorisé: {max_accuracy}m.",
+            None,
+            None,
+        )
+
+    rayon_m = float(rayon_m)
+    distance_m = _distance_meters(latitude, longitude, site_lat, site_lon)
+    if distance_m > rayon_m:
+        return (
+            False,
+            'OUT_OF_GEOFENCE',
+            (
+                f"Hors périmètre autorisé ({round(distance_m, 1)}m du site, "
+                f"rayon max {round(rayon_m, 1)}m)."
+            ),
+            distance_m,
+            rayon_m,
+        )
+
+    return True, None, None, distance_m, rayon_m
 
 
 # ──────────────────────────────────────────────
@@ -551,43 +655,13 @@ def secure_scan_view(request):
     data = serializer.validated_data
 
     user = request.user
+    if getattr(user, 'must_change_password', False):
+        return _password_change_required_response()
 
-    # 1. Résoudre le profil participant ou formateur lié au user
-    personne = None
-    type_str = None
-
-    # Vérifier si c'est un participant
-    try:
-        personne = user.participant_profile
-        type_str = 'participant'
-    except (Participant.DoesNotExist, AttributeError):
-        pass
-
-    # Vérifier si c'est un formateur (via email ou lien direct)
-    if personne is None:
-        try:
-            personne = user.formateur_profile
-            type_str = 'formateur'
-        except (Formateur.DoesNotExist, AttributeError):
-            pass
-
-    # Vérifier si c'est un encadrant (profil User)
-    if personne is None and user.role == 'ENCADRANT':
-        if not user.matricule:
-            return Response(
-                {'code': 'NO_MATRICULE',
-                 'detail': 'Aucun matricule renseigné sur votre compte encadrant.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        personne = user
-        type_str = 'encadrant'
-
-    if personne is None:
-        return Response(
-            {'code': 'NO_PROFILE',
-             'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    # 1. Résoudre le profil participant/formateur/encadrant lié au user
+    personne, type_str, err = _resolve_authenticated_personne(user)
+    if err:
+        return err
 
     # 1b. Vérifier que l'appareil est bien lié à ce user
     device_id = data.get('device_id', '')
@@ -822,11 +896,51 @@ def secure_scan_view(request):
         if fenetre_err:
             return fenetre_err
 
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        accuracy_m = data.get('accuracy_m')
+        battery_level = data.get('battery_level')
+        is_charging = data.get('is_charging')
+
+        if (latitude is None) ^ (longitude is None):
+            return Response(
+                {
+                    'code': 'LOCATION_INVALID',
+                    'detail': 'latitude et longitude doivent être fournis ensemble.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        site_lat_cfg, site_lon_cfg, _site_rayon = _resolve_site_geofence(seance.module)
+        if site_lat_cfg is not None and latitude is None:
+            return Response(
+                {
+                    'code': 'LOCATION_REQUIRED',
+                    'detail': 'La géolocalisation est obligatoire pour badger cette séance.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        distance_m = None
+        rayon_m = None
+        if latitude is not None and longitude is not None:
+            geo_ok, geo_code, geo_detail, distance_m, rayon_m = _check_geofence(
+                seance.module, latitude, longitude, accuracy_m
+            )
+            if not geo_ok:
+                return Response({'code': geo_code, 'detail': geo_detail}, status=status.HTTP_400_BAD_REQUEST)
+
         timestamp_entree = _clamp_to_seance(timezone.now(), seance)
         create_kwargs = _create_pointage_kwargs(
             personne, type_str, seance,
             date_journee=today,
             device_id=device_id,
+            last_heartbeat_at=timezone.now(),
+            last_latitude=latitude,
+            last_longitude=longitude,
+            last_accuracy_m=accuracy_m,
+            last_battery_level=battery_level,
+            last_is_charging=is_charging,
             timestamp_entree=timestamp_entree,
             statut=Pointage.Statut.EN_COURS,
         )
@@ -842,6 +956,13 @@ def secure_scan_view(request):
             formation=formation,
             pointage=pointage,
             device_id=device_id,
+            extra={
+                'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+                'accuracy_m': accuracy_m,
+                'battery_level': battery_level,
+                'is_charging': is_charging,
+            },
         )
 
         return Response({
@@ -859,6 +980,277 @@ def secure_scan_view(request):
         }, status=status.HTTP_201_CREATED)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([ScanRateThrottle])
+def secure_scan_heartbeat(request):
+    """
+    Heartbeat mobile sécurisé pendant une session ouverte.
+    body: { token_qr, device_id, latitude, longitude, accuracy_m?, battery_level?, is_charging? }
+    """
+    serializer = SecureHeartbeatSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    user = request.user
+    if getattr(user, 'must_change_password', False):
+        return _password_change_required_response()
+    personne, type_str, err = _resolve_authenticated_personne(user)
+    if err:
+        return err
+
+    device_id = data.get('device_id', '')
+    if device_id and type_str == 'participant':
+        binding = DeviceBinding.objects.filter(
+            device_id=device_id, is_active=True
+        ).first()
+        if binding and binding.user_id != user.id:
+            return Response(
+                {
+                    'code': 'DEVICE_MISMATCH',
+                    'detail': 'Cet appareil est lié à un autre compte. Contactez votre superviseur.',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    try:
+        qr_token = QRToken.objects.select_related('session__module__formation').get(
+            token=data['token_qr']
+        )
+    except QRToken.DoesNotExist:
+        return Response(
+            {'code': 'INVALID_TOKEN', 'detail': 'QR code invalide.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if qr_token.is_expired:
+        return Response(
+            {'code': 'TOKEN_EXPIRED', 'detail': 'QR code expiré.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not qr_token.actif:
+        replacement = QRToken.objects.filter(
+            session=qr_token.session,
+            actif=True,
+        ).order_by('-created_at').first()
+        if replacement and replacement.is_valid:
+            qr_token = replacement
+        else:
+            return Response(
+                {'code': 'TOKEN_EXPIRED', 'detail': 'QR code désactivé. Aucun QR actif pour cette séance.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    seance = qr_token.session
+    if not seance:
+        return Response({'code': 'NO_SESSION', 'detail': "Ce QR code n'est pas lié à une séance."}, status=status.HTTP_400_BAD_REQUEST)
+    if seance.est_terminee:
+        return Response(
+            {'code': 'SESSION_TERMINATED', 'detail': 'La séance est terminée.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    formation = seance.module.formation
+
+    if type_str == 'formateur':
+        if not ModuleFormateur.objects.filter(module=seance.module, formateur=personne).exists():
+            return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas assigné(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
+    elif type_str == 'encadrant':
+        if seance.module.superviseur_id != personne.id:
+            return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas encadrant de ce module."}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        if not ModuleParticipant.objects.filter(module=seance.module, participant=personne).exists():
+            return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas inscrit(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
+
+    today = timezone.localdate()
+    session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
+    session_filter['session'] = seance
+    pointage = Pointage.objects.filter(
+        **session_filter, timestamp_sortie__isnull=True
+    ).order_by('-timestamp_entree').first()
+    if not pointage:
+        return Response(
+            {
+                'code': 'NO_OPEN_SESSION',
+                'detail': 'Aucune session ouverte à mettre à jour pour ce QR.',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    latitude = data['latitude']
+    longitude = data['longitude']
+    accuracy_m = data.get('accuracy_m')
+    battery_level = data.get('battery_level')
+    is_charging = data.get('is_charging')
+
+    geo_ok, geo_code, geo_detail, distance_m, rayon_m = _check_geofence(
+        seance.module, latitude, longitude, accuracy_m
+    )
+    outside_limit = max(1, int(getattr(settings, 'MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)))
+
+    pointage.last_heartbeat_at = timezone.now()
+    pointage.last_latitude = latitude
+    pointage.last_longitude = longitude
+    pointage.last_accuracy_m = accuracy_m
+    pointage.last_battery_level = battery_level
+    pointage.last_is_charging = is_charging
+    if geo_ok:
+        pointage.outside_geofence_count = 0
+        if pointage.statut == Pointage.Statut.HORS_LIGNE_SUSPECT:
+            pointage.statut = Pointage.Statut.EN_COURS
+        pointage.save(
+            update_fields=[
+                'last_heartbeat_at',
+                'last_latitude',
+                'last_longitude',
+                'last_accuracy_m',
+                'last_battery_level',
+                'last_is_charging',
+                'outside_geofence_count',
+                'statut',
+                'updated_at',
+            ]
+        )
+        _log_audit(
+            action=AuditLog.Action.SCAN_HEARTBEAT,
+            request=request,
+            cible_type=type_str,
+            cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+            cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+            formation=formation,
+            pointage=pointage,
+            device_id=device_id,
+            extra={
+                'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+                'accuracy_m': accuracy_m,
+                'battery_level': battery_level,
+                'is_charging': is_charging,
+            },
+        )
+        return Response(
+            {
+                'detail': 'Heartbeat enregistré.',
+                'statut': pointage.statut,
+                'outside_geofence_count': pointage.outside_geofence_count,
+                'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+            }
+        )
+
+    pointage.outside_geofence_count = (pointage.outside_geofence_count or 0) + 1
+    if pointage.outside_geofence_count >= outside_limit:
+        pointage.timestamp_sortie = _clamp_to_seance(timezone.now(), seance)
+        pointage.statut = Pointage.Statut.SORTIE_AUTO
+        pointage.calculer_duree()
+        pointage.save(
+            update_fields=[
+                'timestamp_sortie',
+                'statut',
+                'duree_presence_minutes',
+                'last_heartbeat_at',
+                'last_latitude',
+                'last_longitude',
+                'last_accuracy_m',
+                'last_battery_level',
+                'last_is_charging',
+                'outside_geofence_count',
+                'updated_at',
+            ]
+        )
+        extra = {
+            'motif': 'OUT_OF_GEOFENCE',
+            'distance_m': round(distance_m, 1) if distance_m is not None else None,
+            'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+            'accuracy_m': accuracy_m,
+            'battery_level': battery_level,
+            'is_charging': is_charging,
+            'outside_geofence_count': pointage.outside_geofence_count,
+            'outside_geofence_limit': outside_limit,
+        }
+        _log_audit(
+            action=AuditLog.Action.OUT_OF_GEOFENCE,
+            request=request,
+            cible_type=type_str,
+            cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+            cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+            formation=formation,
+            pointage=pointage,
+            device_id=device_id,
+            extra=extra,
+        )
+        _log_audit(
+            action=AuditLog.Action.AUTO_EXIT,
+            request=request,
+            cible_type=type_str,
+            cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+            cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+            formation=formation,
+            pointage=pointage,
+            device_id=device_id,
+            extra=extra,
+        )
+        return Response(
+            {
+                'detail': 'Sortie automatique déclenchée (hors périmètre).',
+                'action': 'SORTIE_AUTO',
+                'statut': pointage.statut,
+                'timestamp_sortie': pointage.timestamp_sortie,
+                'duree_session_minutes': pointage.duree_presence_minutes,
+                'motif': 'OUT_OF_GEOFENCE',
+            }
+        )
+
+    pointage.statut = Pointage.Statut.HORS_LIGNE_SUSPECT
+    pointage.save(
+        update_fields=[
+            'last_heartbeat_at',
+            'last_latitude',
+            'last_longitude',
+            'last_accuracy_m',
+            'last_battery_level',
+            'last_is_charging',
+            'outside_geofence_count',
+            'statut',
+            'updated_at',
+        ]
+    )
+
+    _log_audit(
+        action=AuditLog.Action.SCAN_HEARTBEAT,
+        request=request,
+        cible_type=type_str,
+        cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+        cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+        formation=formation,
+        pointage=pointage,
+        device_id=device_id,
+        extra={
+            'geofence_code': geo_code,
+            'geofence_detail': geo_detail,
+            'distance_m': round(distance_m, 1) if distance_m is not None else None,
+            'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+            'accuracy_m': accuracy_m,
+            'battery_level': battery_level,
+            'is_charging': is_charging,
+            'outside_geofence_count': pointage.outside_geofence_count,
+            'outside_geofence_limit': outside_limit,
+        },
+    )
+
+    return Response(
+        {
+            'detail': geo_detail,
+            'statut': pointage.statut,
+            'outside_geofence_count': pointage.outside_geofence_count,
+            'outside_geofence_limit': outside_limit,
+            'distance_m': round(distance_m, 1) if distance_m is not None else None,
+            'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+        },
+        status=status.HTTP_202_ACCEPTED,
+    )
+
+
 # ──────────────────────────────────────────────
 # Historique personnel (app mobile)
 # ──────────────────────────────────────────────
@@ -868,6 +1260,8 @@ def secure_scan_view(request):
 def my_historique(request):
     """Historique des pointages du user connecté (participant, formateur ou encadrant)."""
     user = request.user
+    if getattr(user, 'must_change_password', False):
+        return _password_change_required_response()
     personne = None
     type_str = None
 
@@ -1254,20 +1648,25 @@ def formation_dashboard(request, pk):
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def formation_presences(request, pk):
     """Liste des pointages d'une formation."""
-    if request.user.role == 'ENCADRANT':
-        if not Formation.objects.filter(pk=pk, modules__superviseur=request.user).exists():
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        pointages = Pointage.objects.filter(
-            session__module__formation_id=pk,
-            session__module__superviseur=request.user,
-        ).select_related('participant', 'formateur', 'encadrant', 'session__module__formation')
+    user = request.user
+    formation = _get_accessible_formation(user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable ou non autorisée.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    base_qs = Pointage.objects.filter(
+        session__module__formation=formation,
+    ).select_related('participant', 'formateur', 'encadrant', 'session__module__formation')
+
+    if user.role == 'ENCADRANT':
+        pointages = base_qs.filter(session__module__superviseur=user)
+    elif user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and user.secretariat:
+        pointages = base_qs.filter(session__module__secretariat=user.secretariat)
     else:
-        pointages = Pointage.objects.filter(
-            session__module__formation_id=pk,
-        ).select_related('participant', 'formateur', 'encadrant', 'session__module__formation')
+        pointages = base_qs
+
     serializer = PointageSerializer(pointages, many=True)
     return Response(serializer.data)
 
@@ -1498,7 +1897,7 @@ def force_pointage(request, pk):
 @permission_classes([IsAuthenticated])
 def participant_historique(request, pk):
     """Historique des présences d'un participant."""
-    if request.user.role != 'PARTICIPANT':
+    if request.user.role not in ('AUDITEUR', 'PARTICIPANT'):
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -1621,7 +2020,7 @@ def participant_lookup(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if request.user.role != 'PARTICIPANT':
+    if request.user.role not in ('AUDITEUR', 'PARTICIPANT'):
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -1707,6 +2106,136 @@ def audit_log_list(request):
         })
 
     return Response({'count': len(data), 'results': data})
+
+
+# ──────────────────────────────────────────────
+# Vérification statut badgeage sécurisé (app mobile, authentifié)
+# ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def secure_check_badge_status(request):
+    """
+    Indique si le prochain scan de l'utilisateur authentifié sera une ENTREE ou
+    une SORTIE pour le QR donné (ou s'il a déjà terminé cette séance).
+
+    GET ?token_qr=<uuid>
+    Retour : { statut: 'ABSENT'|'EN_SALLE'|'TERMINE'|'INCONNU',
+               action_suivante: 'ENTREE'|'SORTIE'|null,
+               heure_entree: 'HH:MM'|null,
+               seance_intitule: str|null }
+    """
+    token_qr = request.GET.get('token_qr', '').strip()
+    if not token_qr:
+        return Response(
+            {'code': 'MISSING_TOKEN', 'detail': 'token_qr requis.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = request.user
+    if getattr(user, 'must_change_password', False):
+        return _password_change_required_response()
+
+    personne, type_str, err = _resolve_authenticated_personne(user)
+    if err:
+        return err
+
+    try:
+        qr_token = QRToken.objects.select_related('session__module__formation').get(
+            token=token_qr,
+        )
+    except (QRToken.DoesNotExist, ValueError):
+        return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+
+    if not qr_token.is_valid and qr_token.actif:
+        return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+
+    # QR remplacé mais valide : suivre le remplaçant
+    if not qr_token.actif:
+        replacement = QRToken.objects.filter(
+            session=qr_token.session, actif=True,
+        ).order_by('-created_at').first()
+        if replacement and replacement.is_valid:
+            qr_token = replacement
+        else:
+            return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+
+    seance = qr_token.session
+    if not seance:
+        return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+
+    formation = seance.module.formation
+    today = timezone.localdate()
+    session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
+    session_filter['session'] = seance
+
+    seance_label = seance.intitule or f'Séance {seance.numero}'
+
+    # Informations de géofence pour permettre au client d'afficher la position.
+    module = seance.module
+    site_lat, site_lon, site_rayon = _resolve_site_geofence(module)
+    geofence_info = {
+        'geofence_configured': site_lat is not None and site_lon is not None,
+        'geofence_latitude': float(site_lat) if site_lat is not None else None,
+        'geofence_longitude': float(site_lon) if site_lon is not None else None,
+        'geofence_rayon_m': float(site_rayon) if site_rayon is not None else None,
+        'distance_m': None,
+        'in_geofence': None,
+        'accuracy_ok': None,
+        'accuracy_max_m': float(getattr(settings, 'MOBILE_GEOFENCE_MAX_ACCURACY_M', 80)),
+    }
+
+    # Si le client envoie sa position, calculer la distance et l'état geofence.
+    lat_raw = request.GET.get('latitude')
+    lon_raw = request.GET.get('longitude')
+    acc_raw = request.GET.get('accuracy_m')
+    try:
+        lat = float(lat_raw) if lat_raw not in (None, '') else None
+        lon = float(lon_raw) if lon_raw not in (None, '') else None
+        acc = float(acc_raw) if acc_raw not in (None, '') else None
+    except (TypeError, ValueError):
+        lat = lon = acc = None
+
+    if lat is not None and lon is not None and geofence_info['geofence_configured']:
+        distance = _distance_meters(lat, lon, site_lat, site_lon)
+        geofence_info['distance_m'] = round(distance, 1)
+        geofence_info['in_geofence'] = distance <= geofence_info['geofence_rayon_m']
+
+    if acc is not None:
+        geofence_info['accuracy_ok'] = acc <= geofence_info['accuracy_max_m']
+
+    pointage_ouvert = Pointage.objects.filter(
+        **session_filter, timestamp_sortie__isnull=True,
+    ).order_by('-timestamp_entree').first()
+    if pointage_ouvert:
+        heure = timezone.localtime(pointage_ouvert.timestamp_entree).strftime('%H:%M')
+        return Response({
+            'statut': 'EN_SALLE',
+            'action_suivante': 'SORTIE',
+            'heure_entree': heure,
+            'seance_intitule': seance_label,
+            **geofence_info,
+        })
+
+    pointage_termine = Pointage.objects.filter(
+        **session_filter, timestamp_sortie__isnull=False,
+    ).exists()
+    if pointage_termine:
+        return Response({
+            'statut': 'TERMINE',
+            'action_suivante': None,
+            'heure_entree': None,
+            'seance_intitule': seance_label,
+            **geofence_info,
+        })
+
+    return Response({
+        'statut': 'ABSENT',
+        'action_suivante': 'ENTREE',
+        'heure_entree': None,
+        'seance_intitule': seance_label,
+        **geofence_info,
+    })
 
 
 # ──────────────────────────────────────────────

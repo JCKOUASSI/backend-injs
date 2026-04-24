@@ -208,6 +208,23 @@ QR_TOKEN_LIFETIME_HOURS = 24
 # Délai avant marquage ABSENT_NON_BADGE (commande auto_close_pointages)
 AUTO_ABSENT_DELAI_MINUTES = int(os.environ.get('AUTO_ABSENT_DELAI_MINUTES', 60))
 
+# Paramètres anti-fraude mobile (heartbeat + geofence)
+MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES = int(
+    os.environ.get('MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
+)
+MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES = int(
+    os.environ.get('MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES', 120)
+)
+MOBILE_GEOFENCE_DEFAULT_RADIUS_M = int(
+    os.environ.get('MOBILE_GEOFENCE_DEFAULT_RADIUS_M', 200)
+)
+MOBILE_GEOFENCE_MAX_ACCURACY_M = int(
+    os.environ.get('MOBILE_GEOFENCE_MAX_ACCURACY_M', 80)
+)
+MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS = int(
+    os.environ.get('MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)
+)
+
 # CORS — liste stricte d'origines (ou vide = rien)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [

@@ -5,6 +5,7 @@ needed for the frontend dashboard.
 """
 from io import BytesIO
 from datetime import timedelta, datetime, time
+import re
 from django.db.models import Count, Q, F
 from django.db import transaction
 from django.utils import timezone
@@ -27,6 +28,25 @@ from .serializers import (
     FormateurSerializer,
     ModuleSerializer,
 )
+
+
+def _normalize_groupe_value(value):
+    """Normalise les variantes de groupe (1, 01, GROUPE 1) vers GROUPE N."""
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    compact = re.sub(r'\s+', ' ', raw).strip()
+    match = re.fullmatch(r'(?:GROUPE\s*)?0*(\d+)', compact, flags=re.IGNORECASE)
+    if match:
+        return f"GROUPE {int(match.group(1))}"
+    return compact.upper()
+
+
+def _groupe_sort_key(value):
+    match = re.fullmatch(r'GROUPE (\d+)', value)
+    if match:
+        return (0, int(match.group(1)))
+    return (1, value)
 
 
 @api_view(['GET'])
@@ -66,6 +86,25 @@ def dashboard_stats(request):
     formations_planifiees = modules_qs.filter(statut='PLANIFIEE').count()
     groupes_en_cours = modules_qs.filter(statut='EN_COURS', groupe__isnull=False).exclude(groupe='').values('groupe').distinct().count()
     total_participants = participants_qs.count()
+
+    volume_horaire_total_heures = int(
+        sum(float(v or 0) for v in modules_qs.values_list('duree_prevue_heures', flat=True))
+    )
+    volume_horaire_effectue_minutes = 0.0
+    for session in (
+        SessionModule.objects.filter(module__in=modules_qs)
+        .exclude(demarree_le__isnull=True)
+        .exclude(terminee_le__isnull=True)
+        .only('demarree_le', 'terminee_le')
+    ):
+        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+        if elapsed > 0:
+            volume_horaire_effectue_minutes += elapsed
+    volume_horaire_effectue_heures = int(volume_horaire_effectue_minutes / 60)
+    volume_horaire_effectue_taux = (
+        int((volume_horaire_effectue_heures / volume_horaire_total_heures) * 100)
+        if volume_horaire_total_heures > 0 else 0
+    )
 
     formateurs_qs = Formateur.objects.all()
     if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
@@ -320,6 +359,9 @@ def dashboard_stats(request):
         'modules_planifies': formations_planifiees,
         'groupes_en_cours': groupes_en_cours,
         'total_participants': total_participants,
+        'volume_horaire_total_heures': volume_horaire_total_heures,
+        'volume_horaire_effectue_heures': volume_horaire_effectue_heures,
+        'volume_horaire_effectue_taux': volume_horaire_effectue_taux,
         'total_formateurs': total_formateurs,
         'seances_actives': seances_actives,
         'seances_planifiees_aujourd_hui': seances_planifiees_aujourd_hui,
@@ -496,7 +538,11 @@ def participant_list_api(request):
     """
     List participants with optional search.
     Query params:
-    - search: search in name
+    - search: recherche textuelle (nom, prenom, matricule, email, concours, grade, groupe, secretariat)
+    - secretariat: filtre par nom/type de secretariat
+    - grade: filtre sur le grade
+    - groupe: filtre sur le groupe
+    - type_concours: filtre sur le type de concours
     - page: pagination
     """
     page = int(request.query_params.get('page', 1))
@@ -512,7 +558,42 @@ def participant_list_api(request):
         queryset = queryset.filter(
             modules_inscrits__module__superviseur=request.user
         ).distinct()
-    
+
+    scoped_queryset = queryset
+    raw_groupes = (
+        scoped_queryset.exclude(groupe__isnull=True)
+        .exclude(groupe='')
+        .values_list('groupe', flat=True)
+    )
+    groupes_normalises = sorted(
+        {g for g in (_normalize_groupe_value(v) for v in raw_groupes) if g},
+        key=_groupe_sort_key,
+    )
+    filter_options = {
+        'secretariats': list(
+            scoped_queryset.exclude(secretariat__nom__isnull=True)
+            .exclude(secretariat__nom='')
+            .values_list('secretariat__nom', flat=True)
+            .distinct()
+            .order_by('secretariat__nom')
+        ),
+        'grades': list(
+            scoped_queryset.exclude(grade__isnull=True)
+            .exclude(grade='')
+            .values_list('grade', flat=True)
+            .distinct()
+            .order_by('grade')
+        ),
+        'groupes': groupes_normalises,
+        'types_concours': list(
+            scoped_queryset.exclude(type_concours__isnull=True)
+            .exclude(type_concours='')
+            .values_list('type_concours', flat=True)
+            .distinct()
+            .order_by('type_concours')
+        ),
+    }
+
     # Apply search
     search = request.query_params.get('search')
     if search:
@@ -522,8 +603,37 @@ def participant_list_api(request):
             Q(matricule__icontains=search) |
             Q(email__icontains=search) |
             Q(type_concours__icontains=search) |
-            Q(libelle_concours__icontains=search)
+            Q(libelle_concours__icontains=search) |
+            Q(grade__icontains=search) |
+            Q(groupe__icontains=search) |
+            Q(secretariat__nom__icontains=search) |
+            Q(secretariat__type__libelle__icontains=search)
         )
+
+    secretariat = request.query_params.get('secretariat')
+    if secretariat:
+        queryset = queryset.filter(
+            Q(secretariat__nom__icontains=secretariat) |
+            Q(secretariat__type__libelle__icontains=secretariat)
+        )
+
+    grade = request.query_params.get('grade')
+    if grade:
+        queryset = queryset.filter(grade__icontains=grade)
+
+    groupe = request.query_params.get('groupe')
+    if groupe:
+        groupe_normalise = _normalize_groupe_value(groupe)
+        matching_ids = [
+            participant_id
+            for participant_id, participant_groupe in queryset.values_list('id', 'groupe')
+            if _normalize_groupe_value(participant_groupe) == groupe_normalise
+        ]
+        queryset = queryset.filter(id__in=matching_ids)
+
+    type_concours = request.query_params.get('type_concours')
+    if type_concours:
+        queryset = queryset.filter(type_concours__icontains=type_concours)
 
     sexe = request.query_params.get('sexe')
     if sexe:
@@ -544,6 +654,7 @@ def participant_list_api(request):
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
+        'filter_options': filter_options,
     })
 
 
@@ -898,14 +1009,50 @@ def ref_module_detail(request, pk):
     return Response(status=204)
 
 
+SITE_FIELDS = (
+    'id', 'nom', 'actif',
+    'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
+)
+
+
+def _serialize_site(obj):
+    return {
+        'id': obj.id,
+        'nom': obj.nom,
+        'actif': obj.actif,
+        'geofence_latitude': (
+            float(obj.geofence_latitude) if obj.geofence_latitude is not None else None
+        ),
+        'geofence_longitude': (
+            float(obj.geofence_longitude) if obj.geofence_longitude is not None else None
+        ),
+        'geofence_rayon_m': obj.geofence_rayon_m,
+    }
+
+
+def _coerce_decimal(value):
+    if value in (None, ''):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def ref_site_list(request):
     if request.method == 'GET':
-        data = list(RefSite.objects.values('id', 'nom', 'actif'))
+        data = [_serialize_site(s) for s in RefSite.objects.all()]
         return Response(data)
-    obj = RefSite.objects.create(nom=request.data.get('nom', ''), actif=request.data.get('actif', True))
-    return Response({'id': obj.id, 'nom': obj.nom, 'actif': obj.actif}, status=201)
+    obj = RefSite.objects.create(
+        nom=request.data.get('nom', ''),
+        actif=request.data.get('actif', True),
+        geofence_latitude=_coerce_decimal(request.data.get('geofence_latitude')),
+        geofence_longitude=_coerce_decimal(request.data.get('geofence_longitude')),
+        geofence_rayon_m=request.data.get('geofence_rayon_m', 200) or 200,
+    )
+    return Response(_serialize_site(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -917,8 +1064,15 @@ def ref_site_detail(request, pk):
     if request.method == 'PUT':
         obj.nom = request.data.get('nom', obj.nom)
         obj.actif = request.data.get('actif', obj.actif)
+        if 'geofence_latitude' in request.data:
+            obj.geofence_latitude = _coerce_decimal(request.data.get('geofence_latitude'))
+        if 'geofence_longitude' in request.data:
+            obj.geofence_longitude = _coerce_decimal(request.data.get('geofence_longitude'))
+        if 'geofence_rayon_m' in request.data:
+            rayon = request.data.get('geofence_rayon_m')
+            obj.geofence_rayon_m = int(rayon) if rayon not in (None, '') else 200
         obj.save()
-        return Response({'id': obj.id, 'nom': obj.nom, 'actif': obj.actif})
+        return Response(_serialize_site(obj))
     obj.delete()
     return Response(status=204)
 

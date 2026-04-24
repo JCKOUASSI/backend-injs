@@ -7,6 +7,8 @@ urlpatterns = [
 
     # Scan sécurisé (app mobile — anti-fraude, auth requise)
     path('scan/secure/', views.secure_scan_view, name='secure-scan'),
+    path('scan/secure/heartbeat/', views.secure_scan_heartbeat, name='secure-scan-heartbeat'),
+    path('scan/secure/check-status/', views.secure_check_badge_status, name='secure-check-badge-status'),
 
     # Historique personnel (app mobile)
     path('me/historique/', views.my_historique, name='my-historique'),

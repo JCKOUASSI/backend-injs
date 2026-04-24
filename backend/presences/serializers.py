@@ -30,6 +30,8 @@ class PointageSerializer(serializers.ModelSerializer):
             'type_personne',
             'session', 'formation_id', 'formation_titre',
             'date_journee', 'device_id', 'timestamp_entree', 'timestamp_sortie',
+            'last_heartbeat_at', 'last_latitude', 'last_longitude', 'last_accuracy_m',
+            'last_battery_level', 'last_is_charging', 'outside_geofence_count',
             'duree_presence_minutes', 'statut',
             'created_at', 'updated_at',
         ]
@@ -61,6 +63,22 @@ class SecureScanSerializer(serializers.Serializer):
     """Scan sécurisé — seul le token QR est requis, le numéro est déduit du user connecté."""
     token_qr = serializers.UUIDField()
     device_id = serializers.CharField(max_length=255, required=False, default='')
+    latitude = serializers.FloatField(required=False)
+    longitude = serializers.FloatField(required=False)
+    accuracy_m = serializers.FloatField(required=False)
+    battery_level = serializers.IntegerField(required=False, min_value=0, max_value=100)
+    is_charging = serializers.BooleanField(required=False)
+
+
+class SecureHeartbeatSerializer(serializers.Serializer):
+    """Ping de présence mobile géolocalisé pour une session en cours."""
+    token_qr = serializers.UUIDField()
+    device_id = serializers.CharField(max_length=255, required=False, default='')
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+    accuracy_m = serializers.FloatField(required=False, default=9999)
+    battery_level = serializers.IntegerField(required=False, min_value=0, max_value=100)
+    is_charging = serializers.BooleanField(required=False)
 
 
 class ForcePointageSerializer(serializers.Serializer):

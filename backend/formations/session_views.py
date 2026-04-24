@@ -267,10 +267,10 @@ def session_update(request, formation_pk, session_pk):
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def session_list(request, formation_pk):
     """List all sessions for a formation, grouped by module."""
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
+    from .access import formation_accessible
+    formation = formation_accessible(request.user, formation_pk)
+    if not formation:
+        return Response({'detail': 'Formation introuvable ou non autorisée.'}, status=404)
 
     _auto_manage_sessions(formation)
 
@@ -280,6 +280,13 @@ def session_list(request, formation_pk):
         sessions = SessionModule.objects.filter(module_id=module_id).select_related('module')
         return Response(SessionSerializer(sessions, many=True).data)
 
-    # Otherwise return modules with their sessions
-    modules = formation.modules.prefetch_related('sessions').all()
+    # Otherwise return modules with their sessions (filtered by secretariat scope if applicable)
+    user = request.user
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and user.secretariat:
+        modules = formation.modules.filter(secretariat=user.secretariat).prefetch_related('sessions')
+    elif user.role == 'ENCADRANT':
+        modules = formation.modules.filter(superviseur=user).prefetch_related('sessions')
+    else:
+        modules = formation.modules.prefetch_related('sessions').all()
+
     return Response(ModuleSerializer(modules, many=True).data)
