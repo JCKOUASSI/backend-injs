@@ -5,13 +5,10 @@ Usage typique:
   python manage.py create_auditeur_accounts --dry-run
   python manage.py create_auditeur_accounts --password OPHIR2025
 
-Par défaut, le username est dérivé de « premier_prenom.nom » (ASCII, minuscules, sans accents),
-avec suffixes si collision. Le mot de passe est réinitialisé pour les comptes ciblés
-(sauf si --skip-existing est passé).
+Le username est le numéro d'inscription (matricule) de l'auditeur.
+Le mot de passe par défaut est OPHIR2025. L'auditeur devra le changer à la première connexion.
+Le mot de passe est réinitialisé pour les comptes ciblés (sauf si --skip-existing est passé).
 """
-
-import re
-import unicodedata
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -21,28 +18,7 @@ from formations.models import ModuleParticipant, Participant
 
 User = get_user_model()
 
-
-def _strip_accents(text: str) -> str:
-    normalized = unicodedata.normalize('NFKD', text or '')
-    return ''.join(ch for ch in normalized if not unicodedata.combining(ch))
-
-
-def _premier_prenom(prenom: str) -> str:
-    """Retourne uniquement le premier mot du prénom (ex: 'Jean Pierre' → 'Jean')."""
-    return (prenom or '').split()[0] if prenom and prenom.strip() else prenom
-
-
-def _slug_username(prenom: str, nom: str) -> str:
-    base = _premier_prenom(prenom) or nom
-    base = _strip_accents(base)
-    base = base.lower()
-    base = re.sub(r'[^a-z0-9._-]+', '_', base)
-    base = re.sub(r'_+', '_', base).strip('_-')
-    if not base:
-        base = 'auditeur'
-    if len(base) > 150:
-        base = base[:150].rstrip('._')
-    return base
+DEFAULT_PASSWORD = 'OPHIR2025'
 
 
 class Command(BaseCommand):
@@ -51,8 +27,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '--password',
-            default='OPHIR2025',
-            help='Mot de passe à appliquer (défaut: OPHIR2025).',
+            default=DEFAULT_PASSWORD,
+            help=f'Mot de passe à appliquer (défaut: {DEFAULT_PASSWORD}).',
         )
         parser.add_argument(
             '--dry-run',
@@ -96,10 +72,6 @@ class Command(BaseCommand):
         skipped = 0
         errors = 0
 
-        taken_usernames = set(
-            User.objects.exclude(username='').values_list('username', flat=True)
-        )
-
         for participant in participants:
             try:
                 action = self._process_participant(
@@ -107,7 +79,6 @@ class Command(BaseCommand):
                     password=password,
                     dry_run=dry_run,
                     skip_existing=skip_existing,
-                    taken_usernames=taken_usernames,
                 )
                 if action == 'created':
                     created += 1
@@ -137,24 +108,18 @@ class Command(BaseCommand):
         password: str,
         dry_run: bool,
         skip_existing: bool,
-        taken_usernames: set[str],
     ) -> str:
+        username = participant.matricule
+
         if participant.user_id and skip_existing:
             self.stdout.write(
-                f"[SKIP] {participant.matricule} — compte déjà lié (user_id={participant.user_id})"
+                f"[SKIP] {username} — compte déjà lié (user_id={participant.user_id})"
             )
             return 'skipped'
 
-        username = self._allocate_username(
-            participant,
-            taken_usernames,
-            exclude_user_pk=participant.user_id,
-        )
-
         if dry_run:
             self.stdout.write(
-                f"[DRY-RUN] {participant.matricule} → username={username} "
-                f"({participant.prenom} {participant.nom})"
+                f"[DRY-RUN] {username} → {participant.prenom} {participant.nom}"
             )
             return 'skipped'
 
@@ -178,12 +143,12 @@ class Command(BaseCommand):
                 participant.save(update_fields=['user'])
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"[CREATE] {participant.matricule} → {username}"
+                        f"[CREATE] {username} ({participant.prenom} {participant.nom})"
                     )
                 )
                 return 'created'
 
-            # Compte existant lié: aligner champs + mot de passe
+            # Compte existant lié : aligner les champs et réinitialiser le mot de passe
             changed_fields = []
             if user.username != username:
                 user.username = username
@@ -216,30 +181,8 @@ class Command(BaseCommand):
             user.save()
             self.stdout.write(
                 self.style.WARNING(
-                    f"[UPDATE] {participant.matricule} → {username} "
+                    f"[UPDATE] {username} ({participant.prenom} {participant.nom}) "
                     f"(champs: {', '.join(sorted(set(changed_fields)))})"
                 )
             )
             return 'updated'
-
-    def _allocate_username(
-        self,
-        participant: Participant,
-        taken_usernames: set[str],
-        *,
-        exclude_user_pk: int | None,
-    ) -> str:
-        base = _slug_username(participant.prenom, participant.nom)
-        candidate = base
-        suffix = 0
-        while True:
-            qs = User.objects.filter(username=candidate)
-            if exclude_user_pk:
-                qs = qs.exclude(pk=exclude_user_pk)
-            exists = qs.exists()
-            if candidate not in taken_usernames and not exists:
-                taken_usernames.add(candidate)
-                return candidate
-            suffix += 1
-            tail = f"_{participant.matricule}"[-20:]
-            candidate = f"{base[:120]}_{suffix}{tail}"

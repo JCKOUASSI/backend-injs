@@ -83,6 +83,8 @@ urlpatterns = [
     path('ref/grades/<int:pk>/', api_views.ref_grade_detail, name='api-ref-grade-detail'),
     path('ref/types-secretariat/', ref_type_secretariat_list, name='api-ref-type-secretariat-list'),
     path('ref/types-secretariat/<int:pk>/', ref_type_secretariat_detail, name='api-ref-type-secretariat-detail'),
+    path('ref/vagues/', api_views.refvague_list_api, name='api-ref-vague-list'),
+    path('ref/vagues/<int:pk>/', api_views.refvague_detail_api, name='api-ref-vague-detail'),
 
     # Excel import (JWT-authenticated API endpoint)
     path('import-excel/', api_views.api_import_excel, name='api-import-excel'),

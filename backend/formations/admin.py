@@ -4,7 +4,49 @@ from django.shortcuts import render
 from django.urls import path, reverse
 from django.utils.html import format_html
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, Module, SessionModule
+from presences.models import AuditLog, _log_audit
 FormationFormateur = ModuleFormateur
+
+
+class AuditLogAdminMixin:
+    """Mixin à ajouter à tout ModelAdmin pour tracer les actions dans l'AuditLog."""
+    audit_action_create = None
+    audit_action_update = None
+    audit_action_delete = None
+
+    def _audit_cible(self, obj):
+        """Retourne (cible_type, cible_numero, cible_nom) selon le modèle."""
+        return ('', str(obj.pk), str(obj))
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        action = self.audit_action_update if change else self.audit_action_create
+        if action:
+            cible_type, cible_numero, cible_nom = self._audit_cible(obj)
+            extra = {'via_admin': True}
+            if change and form and hasattr(form, 'changed_data'):
+                extra['champs_modifies'] = form.changed_data
+            _log_audit(
+                action=action,
+                request=request,
+                cible_type=cible_type,
+                cible_numero=cible_numero,
+                cible_nom=cible_nom,
+                extra=extra,
+            )
+
+    def delete_model(self, request, obj):
+        if self.audit_action_delete:
+            cible_type, cible_numero, cible_nom = self._audit_cible(obj)
+            _log_audit(
+                action=self.audit_action_delete,
+                request=request,
+                cible_type=cible_type,
+                cible_numero=cible_numero,
+                cible_nom=cible_nom,
+                extra={'via_admin': True},
+            )
+        super().delete_model(request, obj)
 
 
 def _reactiver_session_et_qr(session):
@@ -50,11 +92,17 @@ class FormationAdmin(admin.ModelAdmin):
 
 
 @admin.register(Participant)
-class ParticipantAdmin(admin.ModelAdmin):
+class ParticipantAdmin(AuditLogAdminMixin, admin.ModelAdmin):
+    audit_action_create = AuditLog.Action.PARTICIPANT_CREATE
+    audit_action_update = AuditLog.Action.PARTICIPANT_UPDATE
+    audit_action_delete = AuditLog.Action.PARTICIPANT_DELETE
     list_display = ['matricule', 'nom', 'prenom', 'email', 'categorie', 'grade', 'secretariat']
     search_fields = ['matricule', 'nom', 'prenom', 'email']
     list_filter = ['categorie', 'secretariat']
     autocomplete_fields = ['secretariat']
+
+    def _audit_cible(self, obj):
+        return ('participant', obj.matricule or str(obj.pk), f"{obj.nom} {obj.prenom}".strip())
 
 
 @admin.register(ModuleParticipant)
@@ -64,7 +112,10 @@ class ModuleParticipantAdmin(admin.ModelAdmin):
 
 
 @admin.register(Module)
-class ModuleAdmin(admin.ModelAdmin):
+class ModuleAdmin(AuditLogAdminMixin, admin.ModelAdmin):
+    audit_action_create = AuditLog.Action.FORMATION_CREATE
+    audit_action_update = AuditLog.Action.FORMATION_UPDATE
+    audit_action_delete = AuditLog.Action.FORMATION_DELETE
     list_display = ['intitule', 'formation', 'grade', 'groupe', 'statut', 'formateur', 'secretariat', 'date_debut', 'date_fin', 'sessions_button', 'reactiver_derniere_seance_button']
     search_fields = ['intitule', 'formation__formation', 'grade', 'groupe']
     list_filter = ['statut', 'secretariat', 'formation']
@@ -171,7 +222,10 @@ class ModuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(SessionModule)
-class SessionModuleAdmin(admin.ModelAdmin):
+class SessionModuleAdmin(AuditLogAdminMixin, admin.ModelAdmin):
+    audit_action_create = AuditLog.Action.SEANCE_CREATE
+    audit_action_update = AuditLog.Action.SEANCE_CREATE  # pas d'action UPDATE spécifique
+    audit_action_delete = AuditLog.Action.SEANCE_DELETE
     list_display = ['date_journee', 'numero', 'intitule', 'module', 'formation', 'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'reactiver_button']
     list_filter = ['date_journee', 'module__formation', 'module']
     search_fields = ['intitule', 'module__intitule', 'module__formation__formation']
@@ -249,11 +303,17 @@ class SessionModuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Formateur)
-class FormateurAdmin(admin.ModelAdmin):
+class FormateurAdmin(AuditLogAdminMixin, admin.ModelAdmin):
+    audit_action_create = AuditLog.Action.FORMATEUR_CREATE
+    audit_action_update = AuditLog.Action.FORMATEUR_UPDATE
+    audit_action_delete = AuditLog.Action.FORMATEUR_DELETE
     list_display = ['numerobadge', 'nom', 'prenom', 'specialite', 'email', 'organisation']
     search_fields = ['numerobadge', 'nom', 'prenom', 'email']
     list_filter = ['organisation', 'secretariats']
     filter_horizontal = ['secretariats']
+
+    def _audit_cible(self, obj):
+        return ('formateur', obj.numerobadge or str(obj.pk), f"{obj.nom} {obj.prenom}".strip())
 
 
 @admin.register(ModuleFormateur)

@@ -10,6 +10,7 @@ def formation_accessible(user, pk):
     Retourne la Formation si l'utilisateur est autorisé à y accéder, None sinon.
 
     Règles :
+    - AUDITEUR               : au moins un module de la formation doit contenir le participant lié à cet utilisateur.
     - ENCADRANT              : au moins un module de la formation doit être supervisé par cet utilisateur.
     - SECRETARIAT /
       CHEF_SECRETARIAT       : au moins un module de la formation doit appartenir au secrétariat de l'utilisateur.
@@ -36,6 +37,15 @@ def formation_accessible(user, pk):
         return (
             Formation.objects
             .filter(pk=pk, modules__secretariat=secretariat)
+            .distinct()
+            .first()
+        )
+
+    if user.role == 'AUDITEUR':
+        # Un auditeur accède uniquement aux formations dont il est inscrit à au moins un module.
+        return (
+            Formation.objects
+            .filter(pk=pk, modules__module_participants__participant__user=user)
             .distinct()
             .first()
         )

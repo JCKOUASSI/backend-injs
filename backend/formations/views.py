@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
-from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC
+from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC, CanManageParticipant, CanManageModuleParticipant
 from presences.models import AuditLog, _log_audit
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 FormationParticipant = ModuleParticipant
@@ -172,7 +172,8 @@ class ParticipantListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method == 'POST':
-            return [IsSecretariatOrDFRC()]
+            # Vérifie la permission Django formations.add_participant — respecte le ROLE_POLICY.
+            return [CanManageParticipant()]
         if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
             return [IsEncadrant()]
         return [IsDFRC()]
@@ -219,7 +220,8 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
-            return [IsSecretariatOrDFRC()]
+            # Vérifie la permission Django formations.change_participant / delete_participant.
+            return [CanManageParticipant()]
         if self.request.user.is_authenticated and self.request.user.role == 'ENCADRANT':
             return [IsEncadrant()]
         return [IsDFRC()]
@@ -268,9 +270,9 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
 # ──────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsSecretariatOrDFRC])
+@permission_classes([CanManageModuleParticipant])
 def add_participant_to_formation(request, pk):
-    """DFRC/Secrétariat : inscrire un participant à une formation."""
+    """Inscrire un participant à une formation — respecte les permissions du groupe (add_moduleparticipant)."""
     try:
         formation = Formation.objects.get(pk=pk)
     except Formation.DoesNotExist:

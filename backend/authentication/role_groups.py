@@ -37,11 +37,15 @@ ROLE_POLICY = {
     },
     User.Role.CHEF_SECRETARIAT: {
         "apps": ("formations", "presences"),
-        "actions": ("view", "add", "change"),
+        "actions": ("view", "add", "change", "delete"),
+        # Interdit uniquement la création de nouvelles fiches auditeur.
+        # Toutes les autres actions (y compris suppression) restent autorisées.
+        "exclude_codenames": ("add_participant",),
     },
     User.Role.SECRETARIAT: {
         "apps": ("formations", "presences"),
-        "actions": ("view", "add", "change"),
+        "actions": ("view", "add", "change", "delete"),
+        "exclude_codenames": ("add_participant",),
     },
     User.Role.ENCADRANT: {
         "apps": ("formations", "presences"),
@@ -59,24 +63,41 @@ def _permission_codenames(actions, model_name):
 
 
 def _permissions_for_policy(policy):
+    exclude = set(policy.get("exclude_codenames", ()))
     permissions = Permission.objects.none()
     for app_label in policy["apps"]:
         for model in apps.get_app_config(app_label).get_models():
-            codenames = _permission_codenames(policy["actions"], model._meta.model_name)
-            permissions = permissions | Permission.objects.filter(
-                content_type__app_label=app_label,
-                codename__in=codenames,
-            )
+            codenames = [
+                c for c in _permission_codenames(policy["actions"], model._meta.model_name)
+                if c not in exclude
+            ]
+            if codenames:
+                permissions = permissions | Permission.objects.filter(
+                    content_type__app_label=app_label,
+                    codename__in=codenames,
+                )
     return permissions.distinct()
 
 
-def ensure_role_groups():
-    """Crée/met à jour les groupes de rôles et leurs permissions."""
+def ensure_role_groups(force_reset=False):
+    """Crée les groupes de rôles et initialise leurs permissions.
+
+    Par défaut (force_reset=False) :
+        - Si le groupe n'existe pas encore → le crée et lui applique le ROLE_POLICY.
+        - Si le groupe existe déjà → ses permissions ne sont PAS modifiées.
+          Les changements effectués dans l'admin Django sont donc préservés.
+
+    Avec force_reset=True :
+        - Remet les permissions de TOUS les groupes à l'état défini dans ROLE_POLICY,
+          écrasant les modifications manuelles éventuelles.
+          Utile pour revenir aux valeurs par défaut.
+    """
     for role, group_name in ROLE_GROUP_NAMES.items():
-        group, _ = Group.objects.get_or_create(name=group_name)
-        policy = ROLE_POLICY[role]
-        permissions = _permissions_for_policy(policy)
-        group.permissions.set(permissions)
+        group, created = Group.objects.get_or_create(name=group_name)
+        if created or force_reset:
+            policy = ROLE_POLICY[role]
+            permissions = _permissions_for_policy(policy)
+            group.permissions.set(permissions)
 
 
 def sync_user_role_group(user):

@@ -110,6 +110,21 @@ class RefGrade(models.Model):
         return self.libelle
 
 
+class RefVague(models.Model):
+    """Vagues prédéfinies (ex: PREMIERE VAGUE, DEUXIEME VAGUE…)."""
+    libelle = models.CharField(max_length=100, unique=True)
+    ordre = models.PositiveSmallIntegerField(default=1, help_text="Ordre d'affichage")
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['ordre', 'libelle']
+        verbose_name = 'Référentiel – Vague'
+        verbose_name_plural = 'Référentiel – Vagues'
+
+    def __str__(self):
+        return self.libelle
+
+
 class RefFormation(models.Model):
     """Cycles de formation prédéfinis (ex: FORMATION EN ADMINISTRATION DE BASE)."""
     intitule = models.CharField(max_length=255, unique=True)

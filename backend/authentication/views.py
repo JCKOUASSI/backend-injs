@@ -12,7 +12,7 @@ from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSeriali
 from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
-from presences.models import DeviceBinding
+from presences.models import DeviceBinding, AuditLog, _log_audit
 
 User = get_user_model()
 
@@ -175,6 +175,14 @@ class UserListCreateView(generics.ListCreateAPIView):
         else:
             new_user = serializer.save()
         send_welcome_email(new_user, plain_password)
+        _log_audit(
+            action=AuditLog.Action.USER_CREATE,
+            request=self.request,
+            cible_type='user',
+            cible_numero=new_user.username,
+            cible_nom=new_user.get_full_name() or new_user.username,
+            extra={'role': new_user.role, 'secretariat': str(new_user.secretariat) if new_user.secretariat else None},
+        )
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -194,6 +202,17 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             return UserUpdateSerializer
         return UserSerializer
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.USER_UPDATE,
+            request=self.request,
+            cible_type='user',
+            cible_numero=instance.username,
+            cible_nom=instance.get_full_name() or instance.username,
+            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+        )
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.pk == request.user.pk:
@@ -201,4 +220,12 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'detail': 'Impossible de supprimer votre propre compte.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        _log_audit(
+            action=AuditLog.Action.USER_DELETE,
+            request=request,
+            cible_type='user',
+            cible_numero=instance.username,
+            cible_nom=instance.get_full_name() or instance.username,
+            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+        )
         return super().destroy(request, *args, **kwargs)

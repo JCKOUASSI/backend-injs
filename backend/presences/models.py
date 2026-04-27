@@ -145,6 +145,7 @@ class AuditLog(models.Model):
         FORMATEUR_IMPORT = 'FORMATEUR_IMPORT', 'Import formateurs (Excel)'
         # ── Utilisateurs ──
         USER_CREATE = 'USER_CREATE', 'Création d\'utilisateur'
+        USER_UPDATE = 'USER_UPDATE', 'Modification d\'utilisateur'
         USER_DELETE = 'USER_DELETE', 'Suppression d\'utilisateur'
         # ── Imports globaux ──
         IMPORT_EXCEL = 'IMPORT_EXCEL', 'Import Excel global'

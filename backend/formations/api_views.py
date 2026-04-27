@@ -12,13 +12,13 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC
+from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, Module
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .serializers import (
@@ -137,9 +137,10 @@ def dashboard_stats(request):
         + pointages_ouverts.filter(formateur__isnull=False).values('formateur').distinct().count()
     )
 
-    # Les indicateurs présence/absence du jour sont calculés sur les modules EN_COURS uniquement.
+    # Les indicateurs présence/absence du jour sont calculés sur les modules ayant
+    # une séance aujourd'hui, qu'ils soient EN_COURS ou PLANIFIEE (première séance du jour).
     modules_avec_seance_aujourd_hui = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee=today,
     ).distinct()
     participants_attendus_jour = ModuleParticipant.objects.filter(
@@ -173,7 +174,7 @@ def dashboard_stats(request):
     year_start = today.replace(month=1, day=1)
 
     modules_avec_seance_semaine = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(week_start, week_end),
     ).distinct()
     participants_attendus_semaine = ModuleParticipant.objects.filter(
@@ -197,7 +198,7 @@ def dashboard_stats(request):
     taux_presence_semaine = round((presents_semaine / total_attendus_semaine * 100), 1) if total_attendus_semaine > 0 else 0
 
     modules_avec_seance_mois = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(month_start, today),
     ).distinct()
     participants_attendus_mois = ModuleParticipant.objects.filter(
@@ -221,7 +222,7 @@ def dashboard_stats(request):
     taux_presence_mois = round((presents_mois / total_attendus_mois * 100), 1) if total_attendus_mois > 0 else 0
 
     modules_avec_seance_annee = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(year_start, today),
     ).distinct()
     participants_attendus_annee = ModuleParticipant.objects.filter(
@@ -442,6 +443,10 @@ def formation_list_api(request):
     if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
         queryset = queryset.filter(secretariat_id=secretariat_id)
 
+    vague_filter = request.query_params.get('vague')
+    if vague_filter:
+        queryset = queryset.filter(vague__iexact=vague_filter)
+
     actives_only = request.query_params.get('actives')
     if actives_only == 'true':
         queryset = queryset.filter(statut__in=['PLANIFIEE', 'EN_COURS'])
@@ -639,6 +644,10 @@ def participant_list_api(request):
     if sexe:
         queryset = queryset.filter(sexe=sexe)
 
+    vague = request.query_params.get('vague')
+    if vague:
+        queryset = queryset.filter(vague__iexact=vague)
+
     queryset = queryset.order_by('nom', 'prenom')
     
     # Pagination
@@ -820,6 +829,21 @@ def api_import_excel(request):
         return Response({'error': 'Veuillez fournir un fichier.'}, status=400)
     if import_type not in ('formations', 'participants', 'formateurs', 'seances', 'emploi_du_temps'):
         return Response({'error': 'Type invalide. Utilisez: formations, participants, formateurs, seances, emploi_du_temps.'}, status=400)
+
+    # Vérification fine par type d'import — respecte les permissions réelles du groupe.
+    _import_perm_map = {
+        'formations':     'formations.add_formation',
+        'participants':   'formations.add_participant',
+        'formateurs':     'formations.add_formateur',
+        'seances':        'formations.add_sessionmodule',
+        'emploi_du_temps': 'formations.add_module',
+    }
+    required_perm = _import_perm_map.get(import_type)
+    if required_perm and not request.user.has_perm(required_perm):
+        return Response(
+            {'error': f"Vous n'avez pas le droit d'importer des \"{import_type}\"."},
+            status=403,
+        )
 
     from .management.commands.import_excel import Command as ImportCommand
 
@@ -1293,8 +1317,10 @@ def module_detail_api(request, formation_pk, module_pk):
         old_date_debut = module.date_debut  # avant modification
         # Champs dont une valeur vide doit être convertie en NULL
         nullable_fields = {'formateur', 'secretariat', 'superviseur', 'duree_prevue_heures',
-                           'date_debut', 'date_fin', 'grade', 'groupe', 'vague',
-                           'site', 'batiment', 'salle'}
+                           'date_debut', 'date_fin', 'grade', 'groupe', 'vague'}
+
+        # Champs texte qui stockent '' plutôt que NULL
+        str_fields = {'site', 'batiment', 'salle', 'intitule', 'statut'}
 
         with transaction.atomic():
             for f in fields:
@@ -1302,6 +1328,8 @@ def module_detail_api(request, formation_pk, module_pk):
                     val = request.data[f]
                     if f in nullable_fields and val in (None, '', ''):
                         val = None
+                    elif f in str_fields and val is None:
+                        val = ''
                     setattr(module, f, val)
             module.save()
             module.refresh_from_db()
@@ -1517,9 +1545,9 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanManageModuleParticipant])
 def module_add_participant(request, formation_pk, module_pk):
-    """Inscrire un participant à un module."""
+    """Inscrire un participant à un module — respecte les permissions du groupe (add_moduleparticipant)."""
     try:
         module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
     except Module.DoesNotExist:
@@ -1538,9 +1566,9 @@ def module_add_participant(request, formation_pk, module_pk):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanManageModuleParticipant])
 def module_remove_participant(request, formation_pk, module_pk, participant_id):
-    """Retirer un participant d'un module."""
+    """Retirer un participant d'un module — respecte les permissions du groupe (delete_moduleparticipant)."""
     try:
         module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mp = ModuleParticipant.objects.get(module=module, participant_id=participant_id)
@@ -1666,6 +1694,7 @@ def referentiels_api(request):
     categories = list(RefCategorie.objects.filter(actif=True).values('id', 'libelle'))
     grades = list(RefGrade.objects.filter(actif=True).values('id', 'libelle', 'categorie_id'))
     types_secretariat = list(RefTypeSecretariat.objects.filter(actif=True).values('id', 'libelle'))
+    vagues = list(RefVague.objects.filter(actif=True).order_by('ordre', 'libelle').values('id', 'libelle', 'ordre'))
     return Response({
         'formations': formations,
         'formations_reelles': formations_reelles,
@@ -1677,4 +1706,38 @@ def referentiels_api(request):
         'categories': categories,
         'grades': grades,
         'types_secretariat': types_secretariat,
+        'vagues': vagues,
     })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def refvague_list_api(request):
+    """Lister ou créer une vague dans le référentiel."""
+    if request.method == 'GET':
+        data = list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif'))
+        return Response(data)
+    obj = RefVague.objects.create(
+        libelle=request.data.get('libelle', ''),
+        ordre=request.data.get('ordre', 1),
+        actif=request.data.get('actif', True),
+    )
+    return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif}, status=201)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def refvague_detail_api(request, pk):
+    """Modifier ou supprimer une vague du référentiel."""
+    try:
+        obj = RefVague.objects.get(pk=pk)
+    except RefVague.DoesNotExist:
+        return Response({'detail': 'Vague introuvable.'}, status=404)
+    if request.method == 'DELETE':
+        obj.delete()
+        return Response(status=204)
+    obj.libelle = request.data.get('libelle', obj.libelle)
+    obj.ordre = request.data.get('ordre', obj.ordre)
+    obj.actif = request.data.get('actif', obj.actif)
+    obj.save()
+    return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif})
