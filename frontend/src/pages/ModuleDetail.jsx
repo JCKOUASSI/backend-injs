@@ -61,7 +61,7 @@ export default function ModuleDetail() {
   const [forceModal, setForceModal] = useState(false)
   const [forceForm, setForceForm] = useState({ personne_id: '', type_personne: 'participant', action: 'ENTREE', motif: '' })
   const [forceSaving, setForceSaving] = useState(false)
-  const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [] })
+  const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
 
   const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
@@ -287,8 +287,8 @@ export default function ModuleDetail() {
 
   const handleExportAllSeances = async (type) => {
     try {
-      const blob = await api.getBlob(`/exports/formation/${formationId}/${type}/`)
-      _downloadBlob(blob, type, `rapport_formation_${formationId}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
+      const blob = await api.getBlob(`/exports/module/${moduleId}/${type}/`)
+      _downloadBlob(blob, type, `rapport_module_${moduleId}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
     } catch (err) {
       showToast(err.response?.data?.detail || `Erreur export ${type.toUpperCase()} (toutes séances).`, 'error')
     }
@@ -1226,8 +1226,13 @@ export default function ModuleDetail() {
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Vague</label>
-                    <input type="text" className="form-control" value={editModuleForm.vague}
-                      onChange={e => setEditModuleForm({ ...editModuleForm, vague: e.target.value })} />
+                    <select className="form-control" value={editModuleForm.vague}
+                      onChange={e => setEditModuleForm({ ...editModuleForm, vague: e.target.value })}>
+                      <option value="">-- Sélectionner --</option>
+                      {(refs.vagues || []).map(v => (
+                        <option key={v.id} value={v.libelle}>{v.libelle}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Statut</label>

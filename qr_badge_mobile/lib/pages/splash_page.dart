@@ -17,7 +17,7 @@ class SplashPage extends StatefulWidget {
 class _SplashPageState extends State<SplashPage> {
   bool _locationAsked = false;
 
-  Future<void> _maybeAskLocation() async {
+  Future<void> _maybeAskLocation(SessionProvider session) async {
     if (_locationAsked) {
       return;
     }
@@ -27,7 +27,10 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) {
       return;
     }
-    await ensureLocationPermission(context);
+    final granted = await ensureLocationPermission(context);
+    if (mounted) {
+      session.setGpsGranted(granted);
+    }
   }
 
   @override
@@ -40,7 +43,9 @@ class _SplashPageState extends State<SplashPage> {
           );
         }
         // Déclenche la demande GPS une seule fois, après le bootstrap.
-        WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskLocation());
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _maybeAskLocation(session),
+        );
         if (session.isAuthenticated) {
           if (session.mustChangePassword) {
             return const ChangePasswordPage();

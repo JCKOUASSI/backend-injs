@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
+import '../services/api_client.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/server_url.dart';
 import 'change_password_page.dart';
@@ -53,16 +54,24 @@ class _LoginPageState extends State<LoginPage> {
         MaterialPageRoute(builder: (_) => next),
       );
     } catch (e) {
-      final raw = e.toString().replaceFirst('Exception: ', '');
       final session = context.read<SessionProvider>();
-      String msg = raw;
-      if (isLoopbackServerUrl(session.baseUrl) &&
-          looksLikeNetworkUnreachableToHost(raw)) {
-        msg =
-            'Impossible de joindre le serveur : avec 127.0.0.1 (ou localhost), '
-            'le téléphone tente de se connecter à lui-même, pas à votre Mac.\n\n'
-            'Utilisez « Configurer le serveur » et mettez l’IP locale du Mac, '
-            'par ex. http://192.168.1.12:8001.';
+      String msg;
+      if (e is NetworkTimeoutException) {
+        msg = 'Le serveur ne r\u00e9pond pas (${e.host}:${e.port}).\n\n'
+            'V\u00e9rifiez que Django est d\u00e9marr\u00e9 et que '
+            'API_BASE_URL dans app.env est correcte.';
+      } else {
+        final raw = e.toString().replaceFirst('Exception: ', '');
+        if (isLoopbackServerUrl(session.baseUrl) &&
+            looksLikeNetworkUnreachableToHost(raw)) {
+          msg = 'Impossible de joindre le serveur\u00a0: avec 127.0.0.1 '
+              '(ou localhost), le t\u00e9l\u00e9phone se connecte \u00e0 '
+              'lui-m\u00eame, pas \u00e0 votre Mac.\n\n'
+              'Mettez l\u2019IP LAN du Mac dans API_BASE_URL (app.env), '
+              'ex. http://192.168.x.x:8001.';
+        } else {
+          msg = raw;
+        }
       }
       setState(() => _error = msg);
     } finally {
@@ -123,43 +132,35 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 16),
                           Text(
                             'QR Badge',
-                            style: Theme.of(context).textTheme.headlineSmall
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
                                 ?.copyWith(
-                              color: AppColors.ciGreenDark,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Badgeage sécurisé par QR code',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textMuted,
+                                  color: AppColors.ciGreenDark,
+                                  fontWeight: FontWeight.bold,
                                 ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Serveur : ${session.baseUrl}',
+                            'Badgeage s\u00e9curis\u00e9 par QR code',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppColors.textMuted),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Serveur\u00a0: ${session.baseUrl}',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
                                   color: AppColors.textMuted,
                                   fontSize: 11,
                                 ),
                           ),
-                          if (isLoopbackServerUrl(session.baseUrl)) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.badgeOrangeBg,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'Sur un téléphone réel, remplacez 127.0.0.1 par l’IP du Mac dans « Configurer le serveur ».',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 20),
                           TextFormField(
                             controller: _usernameCtrl,
@@ -168,8 +169,9 @@ class _LoginPageState extends State<LoginPage> {
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                             textInputAction: TextInputAction.next,
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Champ requis'
+                                : null,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -179,7 +181,9 @@ class _LoginPageState extends State<LoginPage> {
                               labelText: 'Mot de passe',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
-                                tooltip: _obscurePassword ? 'Afficher' : 'Masquer',
+                                tooltip: _obscurePassword
+                                    ? 'Afficher'
+                                    : 'Masquer',
                                 icon: Icon(
                                   _obscurePassword
                                       ? Icons.visibility_off_outlined

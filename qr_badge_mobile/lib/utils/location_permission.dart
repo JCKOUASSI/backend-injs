@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -106,6 +108,74 @@ Future<bool> ensureLocationPermission(BuildContext context) async {
   }
 
   perm = await Geolocator.requestPermission();
-  return perm == LocationPermission.always ||
+  final granted = perm == LocationPermission.always ||
       perm == LocationPermission.whileInUse;
+  if (granted && context.mounted) {
+    // Demande complémentaire : notifications (Android 13+) + localisation
+    // en arrière-plan ("Toujours") pour permettre le suivi pendant la séance.
+    await _requestBackgroundExtras(context);
+  }
+  return granted;
+}
+
+/// Demande les permissions complémentaires nécessaires au suivi en arrière-plan.
+/// Best-effort : on ne bloque pas le flux si l'utilisateur refuse, le badgeage
+/// reste possible (le suivi sera juste dégradé en arrière-plan).
+Future<void> _requestBackgroundExtras(BuildContext context) async {
+  try {
+    if (Platform.isAndroid) {
+      // POST_NOTIFICATIONS sur Android 13+ : indispensable pour la
+      // notification persistante du foreground service.
+      final notif = await Permission.notification.status;
+      if (notif.isDenied) {
+        await Permission.notification.request();
+      }
+
+      // ACCESS_BACKGROUND_LOCATION : doit être demandé séparément après
+      // que la permission "While in use" a été accordée.
+      final bg = await Permission.locationAlways.status;
+      if (bg.isGranted) {
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
+      final proceed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Suivi en arrière-plan'),
+          content: const Text(
+            'Pour valider votre présence pendant toute la séance (même écran '
+            'verrouillé), QR Badge a besoin de l\u2019autorisation '
+            '« Toujours autoriser » pour la position.\n\n'
+            'Sur l\u2019écran suivant, choisissez « Toujours autoriser ».',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Plus tard'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continuer'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) {
+        return;
+      }
+      await Permission.locationAlways.request();
+    } else if (Platform.isIOS) {
+      // iOS : la permission "always" se demande aussi via Geolocator,
+      // mais permission_handler offre une API explicite.
+      final bg = await Permission.locationAlways.status;
+      if (bg.isDenied) {
+        await Permission.locationAlways.request();
+      }
+    }
+  } catch (_) {
+    // Best-effort : ignorer les erreurs natives (Android < 10 par ex.).
+  }
 }

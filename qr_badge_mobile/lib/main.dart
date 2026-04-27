@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/session_provider.dart';
 import 'pages/splash_page.dart';
+import 'services/background_keepalive.dart';
 import 'theme/qr_badge_theme.dart';
 
 Future<void> main() async {
@@ -18,6 +19,12 @@ Future<void> main() async {
     await dotenv.load(fileName: 'assets/app.env');
   } catch (e, st) {
     debugPrint('app.env introuvable ou invalide: $e\n$st');
+  }
+  // Initialise le foreground task Android (no-op sur les autres plateformes).
+  try {
+    await BackgroundKeepalive.instance.initialize();
+  } catch (e, st) {
+    debugPrint('background keepalive init: $e\n$st');
   }
   runApp(const QRBadgeApp());
 }

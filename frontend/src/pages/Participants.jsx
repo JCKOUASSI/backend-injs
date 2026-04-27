@@ -16,7 +16,7 @@ const emptyForm = {
   vague: '',
   site: '', salle: '',
 }
-const emptyRefs = { categories: [], grades: [], sites: [], salles: [] }
+const emptyRefs = { categories: [], grades: [], sites: [], salles: [], vagues: [] }
 
 export default function Participants() {
   const { user } = useAuth()
@@ -33,6 +33,7 @@ export default function Participants() {
   const [gradeFilter, setGradeFilter] = useState('')
   const [groupeFilter, setGroupeFilter] = useState('')
   const [typeConcoursFilter, setTypeConcoursFilter] = useState('')
+  const [vagueFilter, setVagueFilter] = useState('')
   const [filterOptions, setFilterOptions] = useState({ secretariats: [], grades: [], groupes: [], types_concours: [] })
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -60,6 +61,7 @@ export default function Participants() {
     gradeFilter,
     groupeFilter,
     typeConcoursFilter,
+    vagueFilter,
   ])
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function Participants() {
       if (gradeFilter) params.set('grade', gradeFilter)
       if (groupeFilter) params.set('groupe', groupeFilter)
       if (typeConcoursFilter) params.set('type_concours', typeConcoursFilter)
+      if (vagueFilter) params.set('vague', vagueFilter)
       const response = await api.get(`/formations/participants/list/?${params}`)
       const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
       setParticipants(data)
@@ -227,6 +230,17 @@ export default function Participants() {
                 <option value="FEMININ">Féminin</option>
               </select>
             </div>
+            {refs.vagues && refs.vagues.length > 0 && (
+              <div>
+                <select className="form-control" value={vagueFilter}
+                  onChange={(e) => { setVagueFilter(e.target.value); setPage(1) }}>
+                  <option value="">Toutes les vagues</option>
+                  {refs.vagues.map(v => (
+                    <option key={v.id} value={v.libelle}>{v.libelle}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {canManage && (
               <button onClick={openCreate} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
@@ -531,7 +545,14 @@ export default function Participants() {
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Vague</label>
-                    <input type="text" className="form-control" value={form.vague} onChange={f('vague')} />
+                    {refs.vagues && refs.vagues.length > 0 ? (
+                      <select className="form-control" value={form.vague} onChange={f('vague')}>
+                        <option value="">-- Choisir --</option>
+                        {refs.vagues.map(v => <option key={v.id} value={v.libelle}>{v.libelle}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className="form-control" value={form.vague} onChange={f('vague')} />
+                    )}
                   </div>
                 </div>
                 <div className="grid-2">

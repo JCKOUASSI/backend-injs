@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config/app_env.dart';
 import '../services/auth_service.dart';
+import '../services/background_keepalive.dart';
 import '../services/device_telemetry_service.dart';
 import '../services/scan_service.dart';
 import '../services/storage_service.dart';
@@ -18,6 +19,8 @@ class SessionProvider extends ChangeNotifier {
   Timer? _heartbeatTimer;
   String? _heartbeatTokenQr;
   bool _heartbeatBusy = false;
+  int _heartbeatGpsMisses = 0;
+  static const _kGpsMissThreshold = 3;
 
   bool isBootstrapping = true;
   bool isAuthenticated = false;
@@ -29,10 +32,26 @@ class SessionProvider extends ChangeNotifier {
   Map<String, dynamic>? user;
   bool mustChangePassword = false;
 
-  /// Heartbeat automatique actif (après une entrée, jusqu’à sortie ou fin de session).
+  /// Résultat de la demande de permission GPS au démarrage.
+  /// Initialisé à `true` pour éviter un flash d'avertissement avant
+  /// que la permission ait été vérifiée.
+  bool gpsGranted = true;
+
+  /// Vrai quand le heartbeat échoue ≥ [_kGpsMissThreshold] fois de suite
+  /// faute de position GPS disponible.
+  bool heartbeatGpsBlocked = false;
+
+  /// Heartbeat automatique actif (après une entrée, jusqu'à sortie ou fin de session).
   bool get isSecureHeartbeatRunning => _heartbeatTimer != null;
 
-  /// Démarre l’envoi périodique de `/api/scan/secure/heartbeat/` pour le QR courant.
+  /// Notifie l'app du résultat de la demande de permission GPS.
+  void setGpsGranted(bool granted) {
+    if (gpsGranted == granted) return;
+    gpsGranted = granted;
+    notifyListeners();
+  }
+
+  /// Démarre l'envoi périodique de `/api/scan/secure/heartbeat/` pour le QR courant.
   void startSecureSessionHeartbeat(String tokenQr) {
     stopSecureSessionHeartbeat();
     final t = tokenQr.trim();
@@ -47,7 +66,19 @@ class SessionProvider extends ChangeNotifier {
 
     schedulePulse();
     _heartbeatTimer = Timer.periodic(every, (_) => schedulePulse());
+    // Garde l'app vivante en arrière-plan (foreground service Android,
+    // background location iOS) tant que la session est ouverte.
+    unawaited(BackgroundKeepalive.instance.start());
     notifyListeners();
+  }
+
+  /// Déclenche immédiatement un pulse de heartbeat (sans attendre le timer).
+  /// Utile au retour d'arrière-plan pour rattraper un éventuel délai Doze.
+  void pulseHeartbeatNow() {
+    if (_heartbeatTimer == null) {
+      return;
+    }
+    scheduleMicrotask(_heartbeatPulse);
   }
 
   void stopSecureSessionHeartbeat({bool notify = true}) {
@@ -55,6 +86,9 @@ class SessionProvider extends ChangeNotifier {
     _heartbeatTimer = null;
     _heartbeatTokenQr = null;
     _heartbeatBusy = false;
+    _heartbeatGpsMisses = 0;
+    heartbeatGpsBlocked = false;
+    unawaited(BackgroundKeepalive.instance.stop());
     if (notify) {
       notifyListeners();
     }
@@ -80,7 +114,18 @@ class SessionProvider extends ChangeNotifier {
     try {
       final tel = await _heartbeatTelemetry.capture();
       if (!tel.hasPosition) {
+        _heartbeatGpsMisses++;
+        if (_heartbeatGpsMisses >= _kGpsMissThreshold && !heartbeatGpsBlocked) {
+          heartbeatGpsBlocked = true;
+          notifyListeners();
+        }
         return;
+      }
+      // GPS OK : réinitialise le compteur de ratés.
+      if (_heartbeatGpsMisses > 0 || heartbeatGpsBlocked) {
+        _heartbeatGpsMisses = 0;
+        heartbeatGpsBlocked = false;
+        notifyListeners();
       }
       final res = await _heartbeatScan.heartbeat(
         baseUrl: baseUrl,
@@ -146,6 +191,7 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Priorité : dart-define > app.env > fallback.
   Future<String> _resolveBaseUrlFromEnv() async {
     final explicit = AppEnv.explicitApiBaseUrl;
     if (explicit != null && explicit.isNotEmpty) {

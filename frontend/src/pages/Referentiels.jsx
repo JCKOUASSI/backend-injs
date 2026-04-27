@@ -8,6 +8,7 @@ const TABS = [
   { key: 'modules', label: 'Modules', icon: 'bi-journal-bookmark' },
   { key: 'categories', label: 'Catégories', icon: 'bi-tags' },
   { key: 'grades', label: 'Grades', icon: 'bi-award' },
+  { key: 'vagues', label: 'Vagues', icon: 'bi-layers' },
   { key: 'sites', label: 'Sites', icon: 'bi-geo-alt' },
   { key: 'batiments', label: 'Bâtiments', icon: 'bi-building' },
   { key: 'salles', label: 'Salles', icon: 'bi-door-open' },
@@ -92,7 +93,7 @@ export default function Referentiels() {
 
   // Data for all tabs
   const [data, setData] = useState({
-    formations: [], modules: [], categories: [], grades: [], sites: [], batiments: [], salles: [], types_secretariat: []
+    formations: [], modules: [], categories: [], grades: [], vagues: [], sites: [], batiments: [], salles: [], types_secretariat: []
   })
   const [loading, setLoading] = useState(true)
 
@@ -107,6 +108,7 @@ export default function Referentiels() {
     modules: '/formations/ref/modules/',
     categories: '/formations/ref/categories/',
     grades: '/formations/ref/grades/',
+    vagues: '/formations/ref/vagues/',
     sites: '/formations/ref/sites/',
     batiments: '/formations/ref/batiments/',
     salles: '/formations/ref/salles/',
@@ -190,6 +192,7 @@ export default function Referentiels() {
     if (t === 'sites') return { nom: '', actif: true }
     if (t === 'batiments') return { nom: '', site_id: '', actif: true }
     if (t === 'salles') return { nom: '', site_id: '', batiment_id: '', actif: true }
+    if (t === 'vagues') return { libelle: '', ordre: 1, actif: true }
     if (t === 'types_secretariat') return { libelle: '', actif: true }
     return {}
   }
@@ -209,6 +212,10 @@ export default function Referentiels() {
         const cat = data.categories.find(c => c.id === r.categorie_id)
         return cat ? cat.libelle : '—'
       }},
+    ],
+    vagues: [
+      { key: 'libelle', label: 'Libellé' },
+      { key: 'ordre', label: 'Ordre', render: r => r.ordre ?? '—' },
     ],
     types_secretariat: [
       { key: 'libelle', label: 'Libellé' },
@@ -274,6 +281,17 @@ export default function Referentiels() {
           <option value="">— Aucune —</option>
           {data.categories.map(c => <option key={c.id} value={c.id}>{c.libelle}</option>)}
         </select>
+      </div>
+    </>)
+
+    if (tab === 'vagues') return (<>
+      <div className="form-group">
+        <label className="form-label">Libellé *</label>
+        <input className="form-control" required value={form.libelle || ''} onChange={f('libelle')} placeholder="Ex: PREMIERE VAGUE" />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Ordre d'affichage</label>
+        <input type="number" className="form-control" min="1" value={form.ordre || 1} onChange={f('ordre')} placeholder="Ex: 1" />
       </div>
     </>)
 

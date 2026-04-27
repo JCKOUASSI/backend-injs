@@ -127,10 +127,15 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     String? heureEntree;
     String? seanceLabel;
     try {
+      // Capture la position avant checkSecureStatus pour cohérence avec _refreshStatus.
+      final telPre = await _telemetry.capture();
       final statut = await _scanService.checkSecureStatus(
         baseUrl: session.baseUrl,
         accessToken: session.accessToken!,
         tokenQr: token,
+        latitude: telPre.latitude,
+        longitude: telPre.longitude,
+        accuracyM: telPre.accuracyM,
       );
       actionSuivante = statut['action_suivante']?.toString();
       heureEntree = statut['heure_entree']?.toString();
@@ -391,26 +396,50 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
             ],
             if (session.isSecureHeartbeatRunning) ...[
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.sensors, color: AppColors.ciBlue, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Présence envoyée automatiquement en arrière-plan (GPS requis).',
-                      style: Theme.of(context).textTheme.bodySmall,
+              // Bandeau GPS bloqué : 3 heartbeats consécutifs sans position.
+              if (session.heartbeatGpsBlocked)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_off,
+                          color: Colors.orange.shade800, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'GPS indisponible — le suivi de présence ne peut pas envoyer votre position. '
+                          'Activez la localisation pour que le heartbeat fonctionne.',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.orange.shade900,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    const Icon(Icons.sensors,
+                        color: AppColors.ciBlue, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Suivi de présence actif (GPS requis). '
+                        'Gardez l\u2019application au premier plan pour que le suivi continue.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
-            const SizedBox(height: 10),
-            Text(
-              'Position, précision GPS et batterie sont lues automatiquement au badgeage et pendant le suivi.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -503,7 +532,6 @@ class _GeofenceBanner extends StatelessWidget {
     }
 
     final num? distance = info!['distance_m'] as num?;
-    final num? rayon = info!['geofence_rayon_m'] as num?;
     final bool? inside = info!['in_geofence'] as bool?;
     final bool? accuracyOk = info!['accuracy_ok'] as bool?;
 
@@ -530,7 +558,6 @@ class _GeofenceBanner extends StatelessWidget {
         iconColor: Colors.orange.shade800,
         title: 'Signal GPS imprécis.',
         subtitle:
-            'Distance estimée ${distance.toStringAsFixed(0)} m du site (rayon ${rayon?.toStringAsFixed(0) ?? '?'} m). '
             'Sortez à l\u2019extérieur pour améliorer la précision.',
         trailing: _refreshBtn(),
       );
@@ -544,8 +571,7 @@ class _GeofenceBanner extends StatelessWidget {
         icon: Icons.gps_fixed,
         iconColor: AppColors.ciGreenDark,
         title: 'Vous êtes dans la zone de badgeage.',
-        subtitle:
-            'À ${distance.toStringAsFixed(0)} m du centre (rayon ${rayon?.toStringAsFixed(0) ?? '?'} m).',
+        subtitle: null,
         trailing: _refreshBtn(),
       );
     }
@@ -557,8 +583,7 @@ class _GeofenceBanner extends StatelessWidget {
       icon: Icons.wrong_location,
       iconColor: Colors.red.shade700,
       title: 'Hors zone — rapprochez-vous du site.',
-      subtitle:
-          'À ${distance.toStringAsFixed(0)} m du centre (rayon autorisé ${rayon?.toStringAsFixed(0) ?? '?'} m).',
+      subtitle: null,
       trailing: _refreshBtn(),
     );
   }

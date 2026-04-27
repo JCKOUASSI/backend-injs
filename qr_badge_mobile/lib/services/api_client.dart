@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+/// Timeout appliqué à chaque requête réseau.
+/// 10 s est suffisant sur un LAN ; au-delà le serveur est considéré injoignable.
+const _kTimeout = Duration(seconds: 10);
 
 class ApiClient {
   ApiClient({
@@ -47,31 +52,38 @@ class ApiClient {
   }) async {
     final uri = _uri(path);
     try {
-      final res = await http.post(
-        uri,
-        headers: _headers(withAuth: withAuth),
-        body: jsonEncode(data ?? <String, dynamic>{}),
-      );
+      final res = await http
+          .post(
+            uri,
+            headers: _headers(withAuth: withAuth),
+            body: jsonEncode(data ?? <String, dynamic>{}),
+          )
+          .timeout(_kTimeout);
       if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
-        debugPrint('[qr_badge.api] POST $path → 401, tentative de refresh...');
+        debugPrint('[qr_badge.api] POST $path \u2192 401, tentative de refresh...');
         final newToken = await onRefreshToken!();
         if (newToken != null) {
-          debugPrint('[qr_badge.api] POST $path → refresh OK, retry...');
-          final retryRes = await http.post(
-            uri,
-            headers: _headersWithToken(newToken),
-            body: jsonEncode(data ?? <String, dynamic>{}),
-          );
+          debugPrint('[qr_badge.api] POST $path \u2192 refresh OK, retry...');
+          final retryRes = await http
+              .post(
+                uri,
+                headers: _headersWithToken(newToken),
+                body: jsonEncode(data ?? <String, dynamic>{}),
+              )
+              .timeout(_kTimeout);
           return _parse(retryRes, method: 'POST', path: path, uri: uri);
         }
-        debugPrint('[qr_badge.api] POST $path → refresh échoué, session expirée.');
+        debugPrint('[qr_badge.api] POST $path \u2192 refresh \u00e9chou\u00e9, session expir\u00e9e.');
         throw const SessionExpiredException();
       }
       return _parse(res, method: 'POST', path: path, uri: uri);
     } on SessionExpiredException {
       rethrow;
+    } on TimeoutException {
+      debugPrint('[qr_badge.api] POST $path \u2192 timeout (${_kTimeout.inSeconds}s)');
+      throw NetworkTimeoutException(uri.host, uri.port);
     } catch (e, st) {
-      debugPrint('[qr_badge.api] POST $path → erreur réseau: $e');
+      debugPrint('[qr_badge.api] POST $path \u2192 erreur r\u00e9seau: $e');
       debugPrint('$st');
       rethrow;
     }
@@ -83,29 +95,36 @@ class ApiClient {
   }) async {
     final uri = _uri(path);
     try {
-      final res = await http.get(
-        uri,
-        headers: _headers(withAuth: withAuth),
-      );
+      final res = await http
+          .get(
+            uri,
+            headers: _headers(withAuth: withAuth),
+          )
+          .timeout(_kTimeout);
       if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
-        debugPrint('[qr_badge.api] GET $path → 401, tentative de refresh...');
+        debugPrint('[qr_badge.api] GET $path \u2192 401, tentative de refresh...');
         final newToken = await onRefreshToken!();
         if (newToken != null) {
-          debugPrint('[qr_badge.api] GET $path → refresh OK, retry...');
-          final retryRes = await http.get(
-            uri,
-            headers: _headersWithToken(newToken),
-          );
+          debugPrint('[qr_badge.api] GET $path \u2192 refresh OK, retry...');
+          final retryRes = await http
+              .get(
+                uri,
+                headers: _headersWithToken(newToken),
+              )
+              .timeout(_kTimeout);
           return _parse(retryRes, method: 'GET', path: path, uri: uri);
         }
-        debugPrint('[qr_badge.api] GET $path → refresh échoué, session expirée.');
+        debugPrint('[qr_badge.api] GET $path \u2192 refresh \u00e9chou\u00e9, session expir\u00e9e.');
         throw const SessionExpiredException();
       }
       return _parse(res, method: 'GET', path: path, uri: uri);
     } on SessionExpiredException {
       rethrow;
+    } on TimeoutException {
+      debugPrint('[qr_badge.api] GET $path \u2192 timeout (${_kTimeout.inSeconds}s)');
+      throw NetworkTimeoutException(uri.host, uri.port);
     } catch (e, st) {
-      debugPrint('[qr_badge.api] GET $path → erreur réseau: $e');
+      debugPrint('[qr_badge.api] GET $path \u2192 erreur r\u00e9seau: $e');
       debugPrint('$st');
       rethrow;
     }
@@ -130,10 +149,10 @@ class ApiClient {
       return json;
     }
     final bodyPreview = res.body.length > 800
-        ? '${res.body.substring(0, 800)}…'
+        ? '${res.body.substring(0, 800)}\u2026'
         : res.body;
     debugPrint(
-      '[qr_badge.api] $method $path → HTTP ${res.statusCode} uri=$uri body=$bodyPreview',
+      '[qr_badge.api] $method $path \u2192 HTTP ${res.statusCode} uri=$uri body=$bodyPreview',
     );
     if (json['code']?.toString() == 'PASSWORD_CHANGE_REQUIRED') {
       throw Exception(
@@ -162,9 +181,23 @@ class ApiClient {
   }
 }
 
-/// Exception publique pour que les appelants puissent capturer la session expirée.
+/// Exception levée quand une requête d\u00e9passe [_kTimeout].
+class NetworkTimeoutException implements Exception {
+  const NetworkTimeoutException(this.host, this.port);
+  final String host;
+  final int port;
+
+  @override
+  String toString() =>
+      'Serveur injoignable \u2014 aucune r\u00e9ponse de $host:$port '
+      'apr\u00e8s ${_kTimeout.inSeconds}\u00a0s.\n'
+      'V\u00e9rifiez que le serveur est d\u00e9marr\u00e9 et que l\u2019URL '
+      'dans \u00ab\u00a0Configurer le serveur\u00a0\u00bb est correcte.';
+}
+
+/// Exception publique pour que les appelants puissent capturer la session expir\u00e9e.
 class SessionExpiredException implements Exception {
   const SessionExpiredException();
   @override
-  String toString() => 'Session expirée. Veuillez vous reconnecter.';
+  String toString() => 'Session expir\u00e9e. Veuillez vous reconnecter.';
 }

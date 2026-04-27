@@ -1,37 +1,45 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Persistance locale.
+///
+/// • Tokens JWT (access + refresh) → [FlutterSecureStorage] (Keystore Android /
+///   Keychain iOS) : chiffrés au repos, inaccessibles sans déverrouillage de l'appareil.
+/// • Données non sensibles (device_id, username, flags) → [SharedPreferences].
 class StorageService {
-  static const _kAccessToken = 'access_token';
-  static const _kRefreshToken = 'refresh_token';
   static const _kDeviceId = 'device_id';
   static const _kUsername = 'username';
   static const _kMustChangePassword = 'must_change_password';
 
-  Future<String?> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kAccessToken);
-  }
+  static const _kAccessToken = 'access_token';
+  static const _kRefreshToken = 'refresh_token';
 
-  Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kRefreshToken);
-  }
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
+  // ── Tokens (stockage sécurisé) ──────────────────────────────────────────
+
+  Future<String?> getAccessToken() => _secure.read(key: _kAccessToken);
+
+  Future<String?> getRefreshToken() => _secure.read(key: _kRefreshToken);
 
   Future<void> saveTokens({
     required String access,
     required String refresh,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kAccessToken, access);
-    await prefs.setString(_kRefreshToken, refresh);
+    await _secure.write(key: _kAccessToken, value: access);
+    await _secure.write(key: _kRefreshToken, value: refresh);
   }
 
   Future<void> clearTokens() async {
+    await _secure.delete(key: _kAccessToken);
+    await _secure.delete(key: _kRefreshToken);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kAccessToken);
-    await prefs.remove(_kRefreshToken);
     await prefs.remove(_kMustChangePassword);
   }
+
+  // ── Données non sensibles (SharedPreferences) ───────────────────────────
 
   Future<bool> getMustChangePassword() async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,4 +71,5 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kUsername, username);
   }
+
 }

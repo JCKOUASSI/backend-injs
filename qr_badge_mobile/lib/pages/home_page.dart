@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
@@ -17,7 +19,7 @@ String _rolePillLabel(Map<String, dynamic>? user) {
       return 'Encadrant';
     case 'SECRETARIAT':
     case 'CHEF_SECRETARIAT':
-      return 'Secrétariat';
+      return 'Secretariat';
     case 'CPFAE_ADMIN':
       return 'CPFAE';
     case 'CHEF_CPFAE_ADMIN':
@@ -41,7 +43,7 @@ String _displayName(SessionProvider session) {
       return full;
     }
   }
-  return session.user?['username']?.toString() ?? session.username ?? '—';
+  return session.user?['username']?.toString() ?? session.username ?? '\u2014';
 }
 
 class HomePage extends StatefulWidget {
@@ -51,8 +53,52 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Le heartbeat continue de tourner via Timer.periodic tant que le process
+    // est vivant (best-effort en arrière-plan). Au retour, on déclenche un
+    // pulse immédiat pour rattraper un éventuel délai (Doze, throttling).
+    if (state == AppLifecycleState.resumed) {
+      context.read<SessionProvider>().pulseHeartbeatNow();
+    }
+  }
+
+  Future<void> _requestGps(SessionProvider session) async {
+    final serviceOn = await Geolocator.isLocationServiceEnabled();
+    if (!serviceOn) {
+      if (mounted) Geolocator.openLocationSettings();
+      return;
+    }
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.deniedForever) {
+      if (mounted) openAppSettings();
+      return;
+    }
+    if (perm != LocationPermission.always &&
+        perm != LocationPermission.whileInUse) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (mounted) {
+      final granted = perm == LocationPermission.always ||
+          perm == LocationPermission.whileInUse;
+      session.setGpsGranted(granted);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,24 +124,34 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'logout', child: Text('Déconnexion')),
+              PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('D\u00e9connexion'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
             ],
           ),
         ],
       ),
       body: Column(
         children: [
+          // ── Bandeau utilisateur / role ─────────────────────────────────
           Material(
             color: AppColors.cardCream,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
-                  const Icon(Icons.person_outline, size: 22, color: AppColors.ciGreenDark),
+                  const Icon(Icons.person_outline,
+                      size: 22, color: AppColors.ciGreenDark),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Connecté : ${_displayName(session)}',
+                      'Connecte : ${_displayName(session)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary,
@@ -103,14 +159,15 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.navIndicator,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       _rolePillLabel(session.user),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.ciGreenDark,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
@@ -121,6 +178,44 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+
+          // ── Bandeau GPS refuse ────────────────────────────────────────
+          if (!session.gpsGranted)
+            Material(
+              color: Colors.orange.shade50,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_off,
+                        color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'GPS non autoris\u00e9 \u2014 le scan et le suivi de '
+                        'pr\u00e9sence ne fonctionneront pas.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: Colors.orange.shade800,
+                      ),
+                      onPressed: () => _requestGps(session),
+                      child: const Text('Activer',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // ── Pages ─────────────────────────────────────────────────────
           Expanded(
             child: IndexedStack(
               index: _index,
