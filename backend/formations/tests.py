@@ -27,7 +27,7 @@ def make_participant(matricule='M001', nom='Dupont', prenom='Jean'):
 
 
 def make_formateur(numero='F001', nom='Martin', prenom='Paul'):
-    return Formateur.objects.create(numero=numero, nom=nom, prenom=prenom)
+    return Formateur.objects.create(numerobadge=numero, nom=nom, prenom=prenom)
 
 
 # ──────────────────────────────────────────
@@ -292,17 +292,17 @@ class DashboardStatsAPITest(TestCase):
     def test_stats_keys(self):
         res = self.client.get('/api/formations/stats/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        for key in ('total_formations', 'formations_actives', 'formations_terminees',
-                    'formations_planifiees', 'groupes_en_cours',
+        for key in ('total_modules', 'modules_en_cours', 'modules_termines',
+                    'modules_planifies', 'groupes_en_cours',
                     'total_participants', 'total_formateurs'):
             self.assertIn(key, res.data)
 
     def test_stats_counts(self):
         res = self.client.get('/api/formations/stats/')
-        self.assertEqual(res.data['total_formations'], 4)
-        self.assertEqual(res.data['formations_actives'], 2)
-        self.assertEqual(res.data['formations_planifiees'], 1)
-        self.assertEqual(res.data['formations_terminees'], 1)
+        self.assertEqual(res.data['total_modules'], 4)
+        self.assertEqual(res.data['modules_en_cours'], 2)
+        self.assertEqual(res.data['modules_planifies'], 1)
+        self.assertEqual(res.data['modules_termines'], 1)
         self.assertEqual(res.data['groupes_en_cours'], 2)
 
 
@@ -320,7 +320,7 @@ class ReferentielsAPITest(TestCase):
     def test_referentiels(self):
         res = self.client.get('/api/formations/referentiels/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades'):
+        for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
 
 

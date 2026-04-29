@@ -110,6 +110,21 @@ class RefGrade(models.Model):
         return self.libelle
 
 
+class RefVague(models.Model):
+    """Vagues prédéfinies (ex: PREMIERE VAGUE, DEUXIEME VAGUE…)."""
+    libelle = models.CharField(max_length=100, unique=True)
+    ordre = models.PositiveSmallIntegerField(default=1, help_text="Ordre d'affichage")
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['ordre', 'libelle']
+        verbose_name = 'Référentiel – Vague'
+        verbose_name_plural = 'Référentiel – Vagues'
+
+    def __str__(self):
+        return self.libelle
+
+
 class RefFormation(models.Model):
     """Cycles de formation prédéfinis (ex: FORMATION EN ADMINISTRATION DE BASE)."""
     intitule = models.CharField(max_length=255, unique=True)
@@ -151,6 +166,24 @@ class RefSite(models.Model):
     """Sites/centres de formation prédéfinis."""
     nom = models.CharField(max_length=255, unique=True)
     actif = models.BooleanField(default=True)
+    geofence_latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Latitude du centre de formation (contrôle de présence mobile)",
+    )
+    geofence_longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Longitude du centre de formation",
+    )
+    geofence_rayon_m = models.PositiveIntegerField(
+        default=200,
+        help_text="Rayon autorisé en mètres pour le badgeage mobile",
+    )
 
     class Meta:
         ordering = ['nom']
@@ -400,7 +433,7 @@ class Module(models.Model):
         related_name='modules_secretariat',
         help_text="Secrétariat responsable de ce module",
     )
-    site     = models.CharField(max_length=255, blank=True, default='', help_text="Centre de formation")
+    site     = models.CharField(max_length=255, blank=True, default='', help_text="Centre de formation (doit correspondre à un RefSite pour que le contrôle de présence mobile soit actif)")
     batiment = models.CharField(max_length=255, blank=True, default='', help_text="Bâtiment")
     salle    = models.CharField(max_length=100, blank=True, default='', help_text="Salle")
     date_debut = models.DateField(null=True, blank=True, help_text="Date de début du module")

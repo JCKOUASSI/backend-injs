@@ -20,6 +20,21 @@ services:
       - .env
     depends_on:
       - db
+
+  cron:
+    image: qrcodetest9:test
+    container_name: qr-badge-cron
+    env_file:
+      - .env
+    depends_on:
+      - db
+    # Toutes les 10 minutes via watch + sleep
+    entrypoint: >
+      sh -c "while true; do
+        python manage.py auto_close_pointages;
+        sleep 600;
+      done"
+    restart: unless-stopped
   
 volumes:
 

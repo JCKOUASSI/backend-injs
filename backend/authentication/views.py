@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -6,13 +8,29 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from django.db.models import Q
 
-from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer, LoginSerializer, ChangePasswordSerializer
+from .serializers import (
+    UserSerializer,
+    UserCreateSerializer,
+    UserUpdateSerializer,
+    UserSelfProfileSerializer,
+    LoginSerializer,
+    ChangePasswordSerializer,
+)
 from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
-from presences.models import DeviceBinding
+from presences.models import DeviceBinding, AuditLog, _log_audit
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
+
+
+def _login_client_ip(request) -> str:
+    xff = (request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
+    if xff:
+        return xff.split(',')[0].strip()
+    return (request.META.get('REMOTE_ADDR') or '').strip()
 
 
 @api_view(['POST'])
@@ -21,13 +39,31 @@ User = get_user_model()
 def login_view(request):
     """Connexion — retourne access + refresh tokens.
     Si device_id est fourni (app mobile), vérifie le verrouillage appareil."""
+    client_ip = _login_client_ip(request)
+    user_agent = (request.META.get('HTTP_USER_AGENT') or '')[:200]
+
     serializer = LoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+    if not serializer.is_valid():
+        logger.warning(
+            'login_payload_invalid ip=%s ua=%r errors=%s',
+            client_ip,
+            user_agent,
+            serializer.errors,
+        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    username_try = serializer.validated_data['username']
     user = authenticate(
-        username=serializer.validated_data['username'],
+        username=username_try,
         password=serializer.validated_data['password'],
     )
     if user is None:
+        logger.warning(
+            'login_failed_bad_credentials username=%r ip=%s ua=%r',
+            username_try,
+            client_ip,
+            user_agent,
+        )
         return Response(
             {'detail': 'Identifiants invalides.'},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -42,6 +78,13 @@ def login_view(request):
         ).select_related('user').first()
 
         if existing and existing.user_id != user.id:
+            logger.warning(
+                'login_device_locked device_id=%r attempted_user_id=%s bound_user_id=%s ip=%s',
+                device_id,
+                user.pk,
+                existing.user_id,
+                client_ip,
+            )
             return Response({
                 'code': 'DEVICE_LOCKED',
                 'detail': (
@@ -62,21 +105,38 @@ def login_view(request):
                 },
             )
 
+    logger.info(
+        'login_ok user_id=%s username=%r role=%s ip=%s device_id=%r',
+        user.pk,
+        user.username,
+        user.role,
+        client_ip,
+        device_id[:16] + '…' if len(device_id) > 16 else device_id,
+    )
+
     refresh = RefreshToken.for_user(user)
     refresh['role'] = user.role
     refresh['full_name'] = user.get_full_name()
+    refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
     return Response({
         'access': str(refresh.access_token),
         'refresh': str(refresh),
+        'must_change_password': bool(getattr(user, 'must_change_password', False)),
         'user': UserSerializer(user).data,
     })
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def me_view(request):
-    """Retourne le profil de l'utilisateur connecté."""
-    return Response(UserSerializer(request.user).data)
+    """Profil de l'utilisateur connecté : lecture ou mise à jour partielle des données personnelles."""
+    user = request.user
+    if request.method == 'GET':
+        return Response(UserSerializer(user).data)
+    serializer = UserSelfProfileSerializer(user, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(UserSerializer(user).data)
 
 
 @api_view(['POST'])
@@ -86,6 +146,8 @@ def change_password_view(request):
     serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     request.user.set_password(serializer.validated_data['new_password'])
+    if getattr(request.user, 'must_change_password', False):
+        request.user.must_change_password = False
     request.user.save()
     return Response({'detail': 'Mot de passe modifié avec succès.'})
 
@@ -111,6 +173,11 @@ class UserListCreateView(generics.ListCreateAPIView):
         role = self.request.query_params.get('role')
         if role:
             qs = qs.filter(role=role)
+        exclude_role = self.request.query_params.get('exclude_role')
+        if exclude_role and exclude_role in ROLE_HIERARCHY:
+            qs = qs.exclude(role=exclude_role)
+        if user.role == 'DIRECTION':
+            qs = qs.exclude(role='AUDITEUR')
         return qs
 
     def get_serializer_class(self):
@@ -126,6 +193,14 @@ class UserListCreateView(generics.ListCreateAPIView):
         else:
             new_user = serializer.save()
         send_welcome_email(new_user, plain_password)
+        _log_audit(
+            action=AuditLog.Action.USER_CREATE,
+            request=self.request,
+            cible_type='user',
+            cible_numero=new_user.username,
+            cible_nom=new_user.get_full_name() or new_user.username,
+            extra={'role': new_user.role, 'secretariat': str(new_user.secretariat) if new_user.secretariat else None},
+        )
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -138,12 +213,25 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         qs = User.objects.filter(role__in=subordinates)
         if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             qs = qs.filter(secretariat=user.secretariat)
+        if user.role == 'DIRECTION':
+            qs = qs.exclude(role='AUDITEUR')
         return qs
 
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):
             return UserUpdateSerializer
         return UserSerializer
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.USER_UPDATE,
+            request=self.request,
+            cible_type='user',
+            cible_numero=instance.username,
+            cible_nom=instance.get_full_name() or instance.username,
+            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+        )
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -152,4 +240,12 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'detail': 'Impossible de supprimer votre propre compte.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        _log_audit(
+            action=AuditLog.Action.USER_DELETE,
+            request=request,
+            cible_type='user',
+            cible_numero=instance.username,
+            cible_nom=instance.get_full_name() or instance.username,
+            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+        )
         return super().destroy(request, *args, **kwargs)

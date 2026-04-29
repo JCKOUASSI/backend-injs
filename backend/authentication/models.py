@@ -38,6 +38,10 @@ class User(AbstractUser):
         related_name='membres',
         help_text="Secrétariat auquel appartient cet utilisateur",
     )
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="Si vrai, l'utilisateur doit changer son mot de passe avant d'utiliser les fonctions sensibles.",
+    )
 
     class Meta:
         verbose_name = 'Utilisateur'

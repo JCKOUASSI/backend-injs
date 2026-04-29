@@ -16,7 +16,7 @@ const emptyForm = {
   vague: '',
   site: '', salle: '',
 }
-const emptyRefs = { categories: [], grades: [], sites: [], salles: [] }
+const emptyRefs = { categories: [], grades: [], sites: [], salles: [], vagues: [] }
 
 export default function Participants() {
   const { user } = useAuth()
@@ -29,6 +29,12 @@ export default function Participants() {
   const [totalCount, setTotalCount] = useState(0)
   const [search, setSearch] = useState('')
   const [sexeFilter, setSexeFilter] = useState('')
+  const [secretariatFilter, setSecretariatFilter] = useState('')
+  const [gradeFilter, setGradeFilter] = useState('')
+  const [groupeFilter, setGroupeFilter] = useState('')
+  const [typeConcoursFilter, setTypeConcoursFilter] = useState('')
+  const [vagueFilter, setVagueFilter] = useState('')
+  const [filterOptions, setFilterOptions] = useState({ secretariats: [], grades: [], groupes: [], types_concours: [] })
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ ...emptyForm })
@@ -44,7 +50,19 @@ export default function Participants() {
   const [detailFormationsLoading, setDetailFormationsLoading] = useState(false)
 
   const debouncedSearch = useDebounce(search)
-  useEffect(() => { loadParticipants() }, [page, debouncedSearch, sexeFilter])
+
+  useEffect(() => {
+    loadParticipants()
+  }, [
+    page,
+    debouncedSearch,
+    sexeFilter,
+    secretariatFilter,
+    gradeFilter,
+    groupeFilter,
+    typeConcoursFilter,
+    vagueFilter,
+  ])
 
   useEffect(() => {
     if (!showDetail) { setDetailFormations([]); return }
@@ -61,11 +79,17 @@ export default function Participants() {
       const params = new URLSearchParams({ page })
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (sexeFilter) params.set('sexe', sexeFilter)
+      if (secretariatFilter) params.set('secretariat', secretariatFilter)
+      if (gradeFilter) params.set('grade', gradeFilter)
+      if (groupeFilter) params.set('groupe', groupeFilter)
+      if (typeConcoursFilter) params.set('type_concours', typeConcoursFilter)
+      if (vagueFilter) params.set('vague', vagueFilter)
       const response = await api.get(`/formations/participants/list/?${params}`)
       const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
       setParticipants(data)
       setTotalPages(response.data.total_pages || 1)
       setTotalCount(response.data.count || data.length)
+      setFilterOptions(response.data.filter_options || { secretariats: [], grades: [], groupes: [], types_concours: [] })
     } catch (err) {
       setError('Erreur lors du chargement des auditeurs')
       console.error(err)
@@ -158,9 +182,45 @@ export default function Participants() {
             <div style={{ flex: '1 1 250px' }}>
               <div className="input-group">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder="Nom, prénom, matricule, corps…"
+                <input type="text" className="form-control" placeholder="Nom, prénom, matricule, e-mail, concours…"
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
+            </div>
+            <div>
+              <select className="form-control" value={secretariatFilter}
+                onChange={(e) => { setSecretariatFilter(e.target.value); setPage(1) }}>
+                <option value="">Tous (secrétariat)</option>
+                {filterOptions.secretariats.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select className="form-control" value={gradeFilter}
+                onChange={(e) => { setGradeFilter(e.target.value); setPage(1) }}>
+                <option value="">Tous (grade)</option>
+                {filterOptions.grades.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select className="form-control" value={groupeFilter}
+                onChange={(e) => { setGroupeFilter(e.target.value); setPage(1) }}>
+                <option value="">Tous (groupe)</option>
+                {filterOptions.groupes.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select className="form-control" value={typeConcoursFilter}
+                onChange={(e) => { setTypeConcoursFilter(e.target.value); setPage(1) }}>
+                <option value="">Tous (type concours)</option>
+                {filterOptions.types_concours.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div>
               <select className="form-control" value={sexeFilter}
@@ -170,6 +230,17 @@ export default function Participants() {
                 <option value="FEMININ">Féminin</option>
               </select>
             </div>
+            {refs.vagues && refs.vagues.length > 0 && (
+              <div>
+                <select className="form-control" value={vagueFilter}
+                  onChange={(e) => { setVagueFilter(e.target.value); setPage(1) }}>
+                  <option value="">Toutes les vagues</option>
+                  {refs.vagues.map(v => (
+                    <option key={v.id} value={v.libelle}>{v.libelle}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {canManage && (
               <button onClick={openCreate} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
@@ -474,7 +545,14 @@ export default function Participants() {
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Vague</label>
-                    <input type="text" className="form-control" value={form.vague} onChange={f('vague')} />
+                    {refs.vagues && refs.vagues.length > 0 ? (
+                      <select className="form-control" value={form.vague} onChange={f('vague')}>
+                        <option value="">-- Choisir --</option>
+                        {refs.vagues.map(v => <option key={v.id} value={v.libelle}>{v.libelle}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className="form-control" value={form.vague} onChange={f('vague')} />
+                    )}
                   </div>
                 </div>
                 <div className="grid-2">

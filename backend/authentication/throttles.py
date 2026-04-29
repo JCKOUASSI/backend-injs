@@ -1,4 +1,8 @@
+import logging
+
 from rest_framework.throttling import SimpleRateThrottle
+
+logger = logging.getLogger(__name__)
 
 
 def _client_ip(request) -> str:
@@ -10,6 +14,15 @@ class LoginRateThrottle(SimpleRateThrottle):
     """Throttling anti bruteforce sur l'endpoint login."""
 
     scope = 'login'
+
+    def allow_request(self, request, view):
+        allowed = super().allow_request(request, view)
+        if not allowed:
+            logger.warning(
+                'login_throttled ip=%s',
+                _client_ip(request),
+            )
+        return allowed
 
     def get_cache_key(self, request, view):
         ip = _client_ip(request)

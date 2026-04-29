@@ -20,10 +20,13 @@ from django.utils import timezone
 from django.conf import settings
 
 from presences.models import AuditLog, Pointage
+from authentication.emails import send_suspect_heartbeat_email
 
 
 MOTIF = "N'a pas badgé à la sortie de la séance"
 DELAI_MINUTES = getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
+SUSPECT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
+AUTO_EXIT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES', 120)
 
 
 class Command(BaseCommand):
@@ -50,9 +53,13 @@ class Command(BaseCommand):
 
         pointages_ouverts = (
             Pointage.objects
-            .filter(statut=Pointage.Statut.EN_COURS, timestamp_sortie__isnull=True)
+            .filter(
+                statut__in=[Pointage.Statut.EN_COURS, Pointage.Statut.HORS_LIGNE_SUSPECT],
+                timestamp_sortie__isnull=True,
+            )
             .select_related(
                 'session__module__formation',
+                'session__module__superviseur',
                 'participant',
                 'formateur',
                 'encadrant',
@@ -63,10 +70,6 @@ class Command(BaseCommand):
         for pt in pointages_ouverts:
             seance = pt.session
             fin_seance = self._fin_seance(seance)
-            if fin_seance is None:
-                continue
-            if fin_seance + timedelta(minutes=delai) > now:
-                continue
 
             personne = pt.participant or pt.formateur or pt.encadrant
             if personne:
@@ -91,36 +94,128 @@ class Command(BaseCommand):
                 traites += 1
                 continue
 
-            pt.timestamp_sortie = pt.timestamp_entree
-            pt.duree_presence_minutes = 0
-            pt.statut = Pointage.Statut.ABSENT_NON_BADGE
-            pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
+            # 1) Règle historique : absent non badgé après fin de séance + délai
+            if fin_seance and fin_seance + timedelta(minutes=delai) <= now:
+                pt.timestamp_sortie = pt.timestamp_entree
+                pt.duree_presence_minutes = 0
+                pt.statut = Pointage.Statut.ABSENT_NON_BADGE
+                pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
 
-            AuditLog.objects.create(
-                action=AuditLog.Action.AUTO_ABSENT,
-                acteur=None,
-                acteur_label='Système',
-                cible_type=type_str,
-                cible_numero=numero,
-                cible_nom=nom,
-                formation=seance.module.formation,
-                formation_titre=seance.module.formation.formation,
-                pointage=pt,
-                ip_address=None,
-                device_id='SYSTEM',
-                extra={
-                    'motif': MOTIF,
-                    'delai_minutes': delai,
-                    'fin_seance': fin_seance.isoformat(),
-                },
-            )
-
-            traites += 1
-            self.stdout.write(
-                self.style.WARNING(
-                    f"ABSENT_NON_BADGE : {numero} {nom} — {seance.module.formation.formation}"
+                AuditLog.objects.create(
+                    action=AuditLog.Action.AUTO_ABSENT,
+                    acteur=None,
+                    acteur_label='Système',
+                    cible_type=type_str,
+                    cible_numero=numero,
+                    cible_nom=nom,
+                    formation=seance.module.formation,
+                    formation_titre=seance.module.formation.formation,
+                    pointage=pt,
+                    ip_address=None,
+                    device_id='SYSTEM',
+                    extra={
+                        'motif': MOTIF,
+                        'delai_minutes': delai,
+                        'fin_seance': fin_seance.isoformat(),
+                    },
                 )
-            )
+
+                traites += 1
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"ABSENT_NON_BADGE : {numero} {nom} — {seance.module.formation.formation}"
+                    )
+                )
+                continue
+
+            # 2) Règle anti-fraude mobile : gestion du timeout heartbeat
+            last_seen_at = pt.last_heartbeat_at or pt.timestamp_entree
+            silence_minutes = int((now - last_seen_at).total_seconds() // 60)
+
+            if silence_minutes >= AUTO_EXIT_TIMEOUT_MINUTES:
+                pt.timestamp_sortie = now
+                pt.statut = Pointage.Statut.SORTIE_AUTO
+                pt.calculer_duree()
+                pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
+
+                AuditLog.objects.create(
+                    action=AuditLog.Action.AUTO_EXIT,
+                    acteur=None,
+                    acteur_label='Système',
+                    cible_type=type_str,
+                    cible_numero=numero,
+                    cible_nom=nom,
+                    formation=seance.module.formation,
+                    formation_titre=seance.module.formation.formation,
+                    pointage=pt,
+                    ip_address=None,
+                    device_id='SYSTEM',
+                    extra={
+                        'motif': 'NO_HEARTBEAT_TIMEOUT',
+                        'silence_minutes': silence_minutes,
+                        'last_heartbeat_at': last_seen_at.isoformat() if last_seen_at else None,
+                        'auto_exit_timeout_minutes': AUTO_EXIT_TIMEOUT_MINUTES,
+                        'battery_level': pt.last_battery_level,
+                        'is_charging': pt.last_is_charging,
+                    },
+                )
+
+                traites += 1
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"SORTIE_AUTO : {numero} {nom} — {seance.module.formation.formation}"
+                    )
+                )
+                continue
+
+            if (
+                silence_minutes >= SUSPECT_TIMEOUT_MINUTES
+                and pt.statut == Pointage.Statut.EN_COURS
+            ):
+                pt.statut = Pointage.Statut.HORS_LIGNE_SUSPECT
+                pt.save(update_fields=['statut', 'updated_at'])
+
+                AuditLog.objects.create(
+                    action=AuditLog.Action.NO_HEARTBEAT,
+                    acteur=None,
+                    acteur_label='Système',
+                    cible_type=type_str,
+                    cible_numero=numero,
+                    cible_nom=nom,
+                    formation=seance.module.formation,
+                    formation_titre=seance.module.formation.formation,
+                    pointage=pt,
+                    ip_address=None,
+                    device_id='SYSTEM',
+                    extra={
+                        'motif': 'NO_HEARTBEAT',
+                        'silence_minutes': silence_minutes,
+                        'last_heartbeat_at': last_seen_at.isoformat() if last_seen_at else None,
+                        'suspect_timeout_minutes': SUSPECT_TIMEOUT_MINUTES,
+                        'battery_level': pt.last_battery_level,
+                        'is_charging': pt.last_is_charging,
+                    },
+                )
+
+                traites += 1
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"HORS_LIGNE_SUSPECT : {numero} {nom} — {seance.module.formation.formation}"
+                    )
+                )
+
+                encadrant = seance.module.superviseur
+                seance_label = seance.intitule or f'Séance {seance.numero}'
+                send_suspect_heartbeat_email(
+                    encadrant=encadrant,
+                    personne_nom=nom,
+                    personne_numero=numero,
+                    formation_titre=seance.module.formation.formation,
+                    module_intitule=seance.module.intitule,
+                    seance_label=seance_label,
+                    silence_minutes=silence_minutes,
+                )
+                continue
 
         label = "simulés" if dry_run else "traités"
         self.stdout.write(self.style.SUCCESS(f"{traites} pointage(s) {label}."))

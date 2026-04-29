@@ -4,7 +4,7 @@ from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html
-from .models import Pointage, AuditLog
+from .models import Pointage, AuditLog, _log_audit
 
 
 class TypePersonneFilter(admin.SimpleListFilter):
@@ -172,6 +172,15 @@ class PointageAdmin(admin.ModelAdmin):
             pointage.duree_presence_minutes = None
             pointage.statut = Pointage.Statut.EN_COURS
             pointage.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
+            _log_audit(
+                action=AuditLog.Action.FORCE_ENTREE,
+                request=request,
+                cible_type='participant' if pointage.participant_id else ('formateur' if pointage.formateur_id else 'encadrant'),
+                cible_numero=getattr(pointage.participant, 'matricule', None) or getattr(pointage.formateur, 'numerobadge', None) or str(pointage.pk),
+                cible_nom=self.personne_nom(pointage),
+                pointage=pointage,
+                extra={'via_admin': True, 'action': 'remettre_en_cours_bulk'},
+            )
             count += 1
 
         if count == 0:
@@ -207,6 +216,15 @@ class PointageAdmin(admin.ModelAdmin):
             pointage.duree_presence_minutes = None
             pointage.statut = Pointage.Statut.EN_COURS
             pointage.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
+            _log_audit(
+                action=AuditLog.Action.FORCE_ENTREE,
+                request=request,
+                cible_type='participant' if pointage.participant_id else ('formateur' if pointage.formateur_id else 'encadrant'),
+                cible_numero=getattr(pointage.participant, 'matricule', None) or getattr(pointage.formateur, 'numerobadge', None) or str(pointage.pk),
+                cible_nom=self.personne_nom(pointage),
+                pointage=pointage,
+                extra={'via_admin': True, 'action': 'remettre_en_cours'},
+            )
 
         self.message_user(
             request,

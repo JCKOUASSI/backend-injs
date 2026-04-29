@@ -105,10 +105,14 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-3">
-          <small className="text-muted">MEMFPMA — DFRC -CPFAE 2026</small>
+          <small className="text-muted">MEMFPMA — DFRC - SYGEPCPFAE</small>
         </div>
 
-        
+        <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
+          <small style={{ fontSize: '0.7rem', color: '#94a3b8', letterSpacing: '0.01em' }}>
+            Developpé par <span style={{ fontWeight: 600, color: '#64748b' }}>Ophir Technologies </span>
+          </small>
+        </div>
       </div>
     </div>
   )

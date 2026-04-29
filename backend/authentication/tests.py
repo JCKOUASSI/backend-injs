@@ -9,6 +9,7 @@ from .role_groups import ROLE_GROUP_NAMES, ensure_role_groups
 User = get_user_model()
 
 URL = '/api/auth/me/change-password/'
+ME_URL = '/api/auth/me/'
 USERS_URL = '/api/auth/users/'
 
 
@@ -115,6 +116,45 @@ class ChangePasswordTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         u.refresh_from_db()
         self.assertTrue(u.check_password('newpass789'))
+
+
+class MeProfilePatchTests(TestCase):
+    """PATCH /api/auth/me/ — mise à jour du profil par l'utilisateur connecté."""
+
+    def setUp(self):
+        self.user = make_user(username='profil_user', password='pass12345', role='SECRETARIAT')
+        self.user.first_name = 'Jean'
+        self.user.last_name = 'Test'
+        self.user.email = 'jean@test.example'
+        self.user.telephone = '0102030405'
+        self.user.save()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_patch_profile_updates_fields(self):
+        resp = self.client.patch(ME_URL, {
+            'first_name': 'Jeanne',
+            'last_name': 'Durand',
+            'email': 'jeanne@example.com',
+            'telephone': '0605040302',
+            'organisation': 'CPFAE',
+            'grade': 'A3',
+        }, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['first_name'], 'Jeanne')
+        self.assertEqual(resp.data['last_name'], 'Durand')
+        self.assertEqual(resp.data['email'], 'jeanne@example.com')
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Jeanne')
+        self.assertEqual(self.user.organisation, 'CPFAE')
+
+    def test_patch_matricule_unique_conflict(self):
+        other = make_user(username='other_mat', password='pass12345', role='ENCADRANT')
+        other.matricule = 'MAT-UNIQUE-1'
+        other.save()
+        resp = self.client.patch(ME_URL, {'matricule': 'MAT-UNIQUE-1'}, format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('matricule', resp.data)
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')

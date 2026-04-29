@@ -5,19 +5,20 @@ needed for the frontend dashboard.
 """
 from io import BytesIO
 from datetime import timedelta, datetime, time
+import re
 from django.db.models import Count, Q, F
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC
+from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, Module
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .serializers import (
@@ -27,6 +28,25 @@ from .serializers import (
     FormateurSerializer,
     ModuleSerializer,
 )
+
+
+def _normalize_groupe_value(value):
+    """Normalise les variantes de groupe (1, 01, GROUPE 1) vers GROUPE N."""
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    compact = re.sub(r'\s+', ' ', raw).strip()
+    match = re.fullmatch(r'(?:GROUPE\s*)?0*(\d+)', compact, flags=re.IGNORECASE)
+    if match:
+        return f"GROUPE {int(match.group(1))}"
+    return compact.upper()
+
+
+def _groupe_sort_key(value):
+    match = re.fullmatch(r'GROUPE (\d+)', value)
+    if match:
+        return (0, int(match.group(1)))
+    return (1, value)
 
 
 @api_view(['GET'])
@@ -67,6 +87,25 @@ def dashboard_stats(request):
     groupes_en_cours = modules_qs.filter(statut='EN_COURS', groupe__isnull=False).exclude(groupe='').values('groupe').distinct().count()
     total_participants = participants_qs.count()
 
+    volume_horaire_total_heures = int(
+        sum(float(v or 0) for v in modules_qs.values_list('duree_prevue_heures', flat=True))
+    )
+    volume_horaire_effectue_minutes = 0.0
+    for session in (
+        SessionModule.objects.filter(module__in=modules_qs)
+        .exclude(demarree_le__isnull=True)
+        .exclude(terminee_le__isnull=True)
+        .only('demarree_le', 'terminee_le')
+    ):
+        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+        if elapsed > 0:
+            volume_horaire_effectue_minutes += elapsed
+    volume_horaire_effectue_heures = int(volume_horaire_effectue_minutes / 60)
+    volume_horaire_effectue_taux = (
+        int((volume_horaire_effectue_heures / volume_horaire_total_heures) * 100)
+        if volume_horaire_total_heures > 0 else 0
+    )
+
     formateurs_qs = Formateur.objects.all()
     if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         sec = request.user.secretariat
@@ -98,9 +137,10 @@ def dashboard_stats(request):
         + pointages_ouverts.filter(formateur__isnull=False).values('formateur').distinct().count()
     )
 
-    # Les indicateurs présence/absence du jour sont calculés sur les modules EN_COURS uniquement.
+    # Les indicateurs présence/absence du jour sont calculés sur les modules ayant
+    # une séance aujourd'hui, qu'ils soient EN_COURS ou PLANIFIEE (première séance du jour).
     modules_avec_seance_aujourd_hui = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee=today,
     ).distinct()
     participants_attendus_jour = ModuleParticipant.objects.filter(
@@ -134,7 +174,7 @@ def dashboard_stats(request):
     year_start = today.replace(month=1, day=1)
 
     modules_avec_seance_semaine = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(week_start, week_end),
     ).distinct()
     participants_attendus_semaine = ModuleParticipant.objects.filter(
@@ -158,7 +198,7 @@ def dashboard_stats(request):
     taux_presence_semaine = round((presents_semaine / total_attendus_semaine * 100), 1) if total_attendus_semaine > 0 else 0
 
     modules_avec_seance_mois = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(month_start, today),
     ).distinct()
     participants_attendus_mois = ModuleParticipant.objects.filter(
@@ -182,7 +222,7 @@ def dashboard_stats(request):
     taux_presence_mois = round((presents_mois / total_attendus_mois * 100), 1) if total_attendus_mois > 0 else 0
 
     modules_avec_seance_annee = modules_qs.filter(
-        statut='EN_COURS',
+        statut__in=['EN_COURS', 'PLANIFIEE'],
         sessions__date_journee__range=(year_start, today),
     ).distinct()
     participants_attendus_annee = ModuleParticipant.objects.filter(
@@ -320,6 +360,9 @@ def dashboard_stats(request):
         'modules_planifies': formations_planifiees,
         'groupes_en_cours': groupes_en_cours,
         'total_participants': total_participants,
+        'volume_horaire_total_heures': volume_horaire_total_heures,
+        'volume_horaire_effectue_heures': volume_horaire_effectue_heures,
+        'volume_horaire_effectue_taux': volume_horaire_effectue_taux,
         'total_formateurs': total_formateurs,
         'seances_actives': seances_actives,
         'seances_planifiees_aujourd_hui': seances_planifiees_aujourd_hui,
@@ -354,7 +397,7 @@ def dashboard_stats(request):
 def formation_list_api(request):
     """
     List modules (une ligne par module) with optional filtering.
-    Query params: statut, search, module, categorie, secretariat_type, actives, page, page_size
+    Query params: statut, search, module, categorie, grade, secretariat_type, vague, groupe, actives, page, page_size, date_mode, date
     """
     from presences.models import Pointage
     page = int(request.query_params.get('page', 1))
@@ -392,6 +435,10 @@ def formation_list_api(request):
     if categorie:
         queryset = queryset.filter(grade__istartswith=categorie)
 
+    grade_param = (request.query_params.get('grade') or '').strip()
+    if grade_param:
+        queryset = queryset.filter(grade__iexact=grade_param)
+
     secretariat_type = request.query_params.get('secretariat_type')
     if secretariat_type:
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
@@ -399,6 +446,21 @@ def formation_list_api(request):
     secretariat_id = request.query_params.get('secretariat')
     if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
         queryset = queryset.filter(secretariat_id=secretariat_id)
+
+    vague_filter = request.query_params.get('vague')
+    if vague_filter:
+        queryset = queryset.filter(vague__iexact=vague_filter)
+
+    groupe_param = request.query_params.get('groupe')
+    if groupe_param:
+        groupe_normalise = _normalize_groupe_value(groupe_param)
+        if groupe_normalise:
+            matching_ids = [
+                mid
+                for mid, g in queryset.values_list('id', 'groupe')
+                if _normalize_groupe_value(g) == groupe_normalise
+            ]
+            queryset = queryset.filter(id__in=matching_ids)
 
     actives_only = request.query_params.get('actives')
     if actives_only == 'true':
@@ -496,7 +558,11 @@ def participant_list_api(request):
     """
     List participants with optional search.
     Query params:
-    - search: search in name
+    - search: recherche textuelle (nom, prenom, matricule, email, concours, grade, groupe, secretariat)
+    - secretariat: filtre par nom/type de secretariat
+    - grade: filtre sur le grade
+    - groupe: filtre sur le groupe
+    - type_concours: filtre sur le type de concours
     - page: pagination
     """
     page = int(request.query_params.get('page', 1))
@@ -512,7 +578,42 @@ def participant_list_api(request):
         queryset = queryset.filter(
             modules_inscrits__module__superviseur=request.user
         ).distinct()
-    
+
+    scoped_queryset = queryset
+    raw_groupes = (
+        scoped_queryset.exclude(groupe__isnull=True)
+        .exclude(groupe='')
+        .values_list('groupe', flat=True)
+    )
+    groupes_normalises = sorted(
+        {g for g in (_normalize_groupe_value(v) for v in raw_groupes) if g},
+        key=_groupe_sort_key,
+    )
+    filter_options = {
+        'secretariats': list(
+            scoped_queryset.exclude(secretariat__nom__isnull=True)
+            .exclude(secretariat__nom='')
+            .values_list('secretariat__nom', flat=True)
+            .distinct()
+            .order_by('secretariat__nom')
+        ),
+        'grades': list(
+            scoped_queryset.exclude(grade__isnull=True)
+            .exclude(grade='')
+            .values_list('grade', flat=True)
+            .distinct()
+            .order_by('grade')
+        ),
+        'groupes': groupes_normalises,
+        'types_concours': list(
+            scoped_queryset.exclude(type_concours__isnull=True)
+            .exclude(type_concours='')
+            .values_list('type_concours', flat=True)
+            .distinct()
+            .order_by('type_concours')
+        ),
+    }
+
     # Apply search
     search = request.query_params.get('search')
     if search:
@@ -522,12 +623,45 @@ def participant_list_api(request):
             Q(matricule__icontains=search) |
             Q(email__icontains=search) |
             Q(type_concours__icontains=search) |
-            Q(libelle_concours__icontains=search)
+            Q(libelle_concours__icontains=search) |
+            Q(grade__icontains=search) |
+            Q(groupe__icontains=search) |
+            Q(secretariat__nom__icontains=search) |
+            Q(secretariat__type__libelle__icontains=search)
         )
+
+    secretariat = request.query_params.get('secretariat')
+    if secretariat:
+        queryset = queryset.filter(
+            Q(secretariat__nom__icontains=secretariat) |
+            Q(secretariat__type__libelle__icontains=secretariat)
+        )
+
+    grade = request.query_params.get('grade')
+    if grade:
+        queryset = queryset.filter(grade__icontains=grade)
+
+    groupe = request.query_params.get('groupe')
+    if groupe:
+        groupe_normalise = _normalize_groupe_value(groupe)
+        matching_ids = [
+            participant_id
+            for participant_id, participant_groupe in queryset.values_list('id', 'groupe')
+            if _normalize_groupe_value(participant_groupe) == groupe_normalise
+        ]
+        queryset = queryset.filter(id__in=matching_ids)
+
+    type_concours = request.query_params.get('type_concours')
+    if type_concours:
+        queryset = queryset.filter(type_concours__icontains=type_concours)
 
     sexe = request.query_params.get('sexe')
     if sexe:
         queryset = queryset.filter(sexe=sexe)
+
+    vague = request.query_params.get('vague')
+    if vague:
+        queryset = queryset.filter(vague__iexact=vague)
 
     queryset = queryset.order_by('nom', 'prenom')
     
@@ -544,6 +678,7 @@ def participant_list_api(request):
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
+        'filter_options': filter_options,
     })
 
 
@@ -709,6 +844,21 @@ def api_import_excel(request):
         return Response({'error': 'Veuillez fournir un fichier.'}, status=400)
     if import_type not in ('formations', 'participants', 'formateurs', 'seances', 'emploi_du_temps'):
         return Response({'error': 'Type invalide. Utilisez: formations, participants, formateurs, seances, emploi_du_temps.'}, status=400)
+
+    # Vérification fine par type d'import — respecte les permissions réelles du groupe.
+    _import_perm_map = {
+        'formations':     'formations.add_formation',
+        'participants':   'formations.add_participant',
+        'formateurs':     'formations.add_formateur',
+        'seances':        'formations.add_sessionmodule',
+        'emploi_du_temps': 'formations.add_module',
+    }
+    required_perm = _import_perm_map.get(import_type)
+    if required_perm and not request.user.has_perm(required_perm):
+        return Response(
+            {'error': f"Vous n'avez pas le droit d'importer des \"{import_type}\"."},
+            status=403,
+        )
 
     from .management.commands.import_excel import Command as ImportCommand
 
@@ -898,14 +1048,50 @@ def ref_module_detail(request, pk):
     return Response(status=204)
 
 
+SITE_FIELDS = (
+    'id', 'nom', 'actif',
+    'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
+)
+
+
+def _serialize_site(obj):
+    return {
+        'id': obj.id,
+        'nom': obj.nom,
+        'actif': obj.actif,
+        'geofence_latitude': (
+            float(obj.geofence_latitude) if obj.geofence_latitude is not None else None
+        ),
+        'geofence_longitude': (
+            float(obj.geofence_longitude) if obj.geofence_longitude is not None else None
+        ),
+        'geofence_rayon_m': obj.geofence_rayon_m,
+    }
+
+
+def _coerce_decimal(value):
+    if value in (None, ''):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def ref_site_list(request):
     if request.method == 'GET':
-        data = list(RefSite.objects.values('id', 'nom', 'actif'))
+        data = [_serialize_site(s) for s in RefSite.objects.all()]
         return Response(data)
-    obj = RefSite.objects.create(nom=request.data.get('nom', ''), actif=request.data.get('actif', True))
-    return Response({'id': obj.id, 'nom': obj.nom, 'actif': obj.actif}, status=201)
+    obj = RefSite.objects.create(
+        nom=request.data.get('nom', ''),
+        actif=request.data.get('actif', True),
+        geofence_latitude=_coerce_decimal(request.data.get('geofence_latitude')),
+        geofence_longitude=_coerce_decimal(request.data.get('geofence_longitude')),
+        geofence_rayon_m=request.data.get('geofence_rayon_m', 200) or 200,
+    )
+    return Response(_serialize_site(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -917,8 +1103,15 @@ def ref_site_detail(request, pk):
     if request.method == 'PUT':
         obj.nom = request.data.get('nom', obj.nom)
         obj.actif = request.data.get('actif', obj.actif)
+        if 'geofence_latitude' in request.data:
+            obj.geofence_latitude = _coerce_decimal(request.data.get('geofence_latitude'))
+        if 'geofence_longitude' in request.data:
+            obj.geofence_longitude = _coerce_decimal(request.data.get('geofence_longitude'))
+        if 'geofence_rayon_m' in request.data:
+            rayon = request.data.get('geofence_rayon_m')
+            obj.geofence_rayon_m = int(rayon) if rayon not in (None, '') else 200
         obj.save()
-        return Response({'id': obj.id, 'nom': obj.nom, 'actif': obj.actif})
+        return Response(_serialize_site(obj))
     obj.delete()
     return Response(status=204)
 
@@ -1139,8 +1332,10 @@ def module_detail_api(request, formation_pk, module_pk):
         old_date_debut = module.date_debut  # avant modification
         # Champs dont une valeur vide doit être convertie en NULL
         nullable_fields = {'formateur', 'secretariat', 'superviseur', 'duree_prevue_heures',
-                           'date_debut', 'date_fin', 'grade', 'groupe', 'vague',
-                           'site', 'batiment', 'salle'}
+                           'date_debut', 'date_fin', 'grade', 'groupe', 'vague'}
+
+        # Champs texte qui stockent '' plutôt que NULL
+        str_fields = {'site', 'batiment', 'salle', 'intitule', 'statut'}
 
         with transaction.atomic():
             for f in fields:
@@ -1148,6 +1343,8 @@ def module_detail_api(request, formation_pk, module_pk):
                     val = request.data[f]
                     if f in nullable_fields and val in (None, '', ''):
                         val = None
+                    elif f in str_fields and val is None:
+                        val = ''
                     setattr(module, f, val)
             module.save()
             module.refresh_from_db()
@@ -1363,9 +1560,9 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanManageModuleParticipant])
 def module_add_participant(request, formation_pk, module_pk):
-    """Inscrire un participant à un module."""
+    """Inscrire un participant à un module — respecte les permissions du groupe (add_moduleparticipant)."""
     try:
         module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
     except Module.DoesNotExist:
@@ -1384,9 +1581,9 @@ def module_add_participant(request, formation_pk, module_pk):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanManageModuleParticipant])
 def module_remove_participant(request, formation_pk, module_pk, participant_id):
-    """Retirer un participant d'un module."""
+    """Retirer un participant d'un module — respecte les permissions du groupe (delete_moduleparticipant)."""
     try:
         module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mp = ModuleParticipant.objects.get(module=module, participant_id=participant_id)
@@ -1512,15 +1709,81 @@ def referentiels_api(request):
     categories = list(RefCategorie.objects.filter(actif=True).values('id', 'libelle'))
     grades = list(RefGrade.objects.filter(actif=True).values('id', 'libelle', 'categorie_id'))
     types_secretariat = list(RefTypeSecretariat.objects.filter(actif=True).values('id', 'libelle'))
+    vagues = list(RefVague.objects.filter(actif=True).order_by('ordre', 'libelle').values('id', 'libelle', 'ordre'))
+
+    mods_groupes_qs = Module.objects.all()
+    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.secretariat:
+            mods_groupes_qs = mods_groupes_qs.filter(secretariat=request.user.secretariat)
+        else:
+            mods_groupes_qs = mods_groupes_qs.none()
+    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
+        mods_groupes_qs = mods_groupes_qs.filter(superviseur=request.user)
+    raw_module_groupes = (
+        mods_groupes_qs.exclude(groupe__isnull=True)
+        .exclude(groupe='')
+        .values_list('groupe', flat=True)
+    )
+    groupes_modules = sorted(
+        {g for g in (_normalize_groupe_value(v) for v in raw_module_groupes) if g},
+        key=_groupe_sort_key,
+    )
+
+    raw_module_grades = (
+        mods_groupes_qs.exclude(grade__isnull=True)
+        .exclude(grade='')
+        .values_list('grade', flat=True)
+    )
+    grades_modules = sorted(
+        {str(v).strip() for v in raw_module_grades if str(v).strip()},
+        key=lambda x: (x.lower(), x),
+    )
+
     return Response({
         'formations': formations,
         'formations_reelles': formations_reelles,
         'modules': modules,
         'modules_actifs': modules_actifs,
+        'groupes': groupes_modules,
+        'grades_modules': grades_modules,
         'sites': sites,
         'batiments': batiments,
         'salles': salles,
         'categories': categories,
         'grades': grades,
         'types_secretariat': types_secretariat,
+        'vagues': vagues,
     })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def refvague_list_api(request):
+    """Lister ou créer une vague dans le référentiel."""
+    if request.method == 'GET':
+        data = list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif'))
+        return Response(data)
+    obj = RefVague.objects.create(
+        libelle=request.data.get('libelle', ''),
+        ordre=request.data.get('ordre', 1),
+        actif=request.data.get('actif', True),
+    )
+    return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif}, status=201)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def refvague_detail_api(request, pk):
+    """Modifier ou supprimer une vague du référentiel."""
+    try:
+        obj = RefVague.objects.get(pk=pk)
+    except RefVague.DoesNotExist:
+        return Response({'detail': 'Vague introuvable.'}, status=404)
+    if request.method == 'DELETE':
+        obj.delete()
+        return Response(status=204)
+    obj.libelle = request.data.get('libelle', obj.libelle)
+    obj.ordre = request.data.get('ordre', obj.ordre)
+    obj.actif = request.data.get('actif', obj.actif)
+    obj.save()
+    return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif})

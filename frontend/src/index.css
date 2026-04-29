@@ -102,7 +102,11 @@ body {
   margin-left: var(--sidebar-width);
   padding: 0;
   min-height: 100vh;
+  transition: margin-left 0.3s ease;
 }
+
+.app-container.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+.app-container.sidebar-collapsed .main-content { margin-left: 0; }
 
 /* Top bar */
 .top-bar {
@@ -197,7 +201,7 @@ body {
 /* Dashboard headline cards */
 .headline-kpis {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.7fr 1.3fr 0.9fr;
   gap: 0.9rem;
   margin-bottom: 1.1rem;
 }
@@ -235,18 +239,25 @@ body {
   font-weight: 800;
   color: #00b4f0;
 }
+.headline-kpi-value-compact {
+  font-size: clamp(1.25rem, 2vw, 1.9rem);
+  line-height: 1.1;
+}
 .headline-kpi-label {
   color: #64748b;
   font-size: 1.15rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.headline-kpi-label-compact {
+  font-size: 1.02rem;
+}
 .headline-kpi-subline {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #475569;
   font-weight: 600;
 }
@@ -256,8 +267,12 @@ body {
 .headline-kpi-subline i.bi-play-circle-fill { color: var(--ci-green); }
 .headline-kpi-subline i.bi-calendar2-check { color: var(--ci-orange); }
 .headline-kpi-subline i.bi-check-circle-fill { color: #64748b; }
+.headline-kpi-subline i.bi-graph-up-arrow { color: #0284c7; }
 .headline-kpi-card-side .headline-kpi-value {
   margin-bottom: 0.2rem;
+}
+.headline-kpi-card-volume {
+  min-width: 0;
 }
 
 /* ═══ Buttons ═══ */
@@ -508,11 +523,12 @@ body {
 }
 
 /* ═══ Responsive ═══ */
-.sidebar-toggle { display: none; }
+.sidebar-toggle { display: inline-flex; }
 
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
   .sidebar.show { transform: translateX(0); }
+  .app-container.sidebar-collapsed .sidebar.show { transform: translateX(0); }
   .main-content { margin-left: 0; }
   .sidebar-toggle { display: inline-flex !important; }
   .headline-kpis { grid-template-columns: 1fr; }

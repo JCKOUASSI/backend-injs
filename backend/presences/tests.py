@@ -204,6 +204,10 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertEqual(res.data.get('code'), 'SESSION_ALREADY_OPEN')
 
     def test_public_scan_accepts_participant_identifier_with_spaces(self):
+        # seance_1 doit être terminée pour que seance_2 soit accessible
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
         res = self.client.post(
             '/api/scan/',
             {

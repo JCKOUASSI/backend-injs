@@ -249,6 +249,23 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        <div className="headline-kpi-card headline-kpi-card-side headline-kpi-card-volume">
+          <div className="headline-kpi-icon">
+            <i className="bi bi-clock-history"></i>
+          </div>
+          <div>
+            <div className="headline-kpi-value headline-kpi-value-compact">
+              {stats?.volume_horaire_effectue_heures || 0}h / {stats?.volume_horaire_total_heures || 0}h
+            </div>
+            <div className="text-muted" style={{ fontWeight: 600, marginTop: '0.1rem' }}>
+              effectué / prévu
+            </div>
+            <div className="headline-kpi-label headline-kpi-label-compact">VOLUME HORAIRE</div>
+            <div className="headline-kpi-subline">
+              <span><i className="bi bi-graph-up-arrow"></i> {stats?.volume_horaire_effectue_taux || 0}% effectué</span>
+            </div>
+          </div>
+        </div>
         <div className="headline-kpi-card headline-kpi-card-side">
           <div className="headline-kpi-icon">
             <i className="bi bi-people-fill"></i>
@@ -457,11 +474,11 @@ export default function Dashboard() {
         )
       })()}
 
-      {/* ── Cours en cours ── */}
+      {/* ── Cours débutés ── */}
       <div className="card">
         <div className="card-header-bar">
           <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-green)' }}></i>
-            <strong>{user?.role === 'ENCADRANT' ? 'Mes cours en cours' : 'Cours en cours'}</strong>
+            <strong>{user?.role === 'ENCADRANT' ? 'Mes cours débutés' : 'Cours débutés'}</strong>
           </span>
           <Link to="/formations?statut=EN_COURS" className="btn btn-dfrc btn-sm">Voir tout</Link>
         </div>

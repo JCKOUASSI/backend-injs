@@ -1,4 +1,4 @@
-# Manuel Utilisateur — QR Badge
+# Manuel Utilisateur Institutionnel — QR Badge (Plateforme Web)
 **MEMFPMA — DFRC / CPFAE**  
 *Système de gestion des présences par QR Code*  
 *Version 2026*
@@ -23,7 +23,7 @@
 9. [Secrétariats](#9-secrétariats)
 10. [Import Excel](#10-import-excel)
 11. [Référentiels](#11-référentiels)
-12. [Badgeage QR Code (téléphone)](#12-badgeage-qr-code-téléphone)
+12. [Badgeage QR Code (web)](#12-badgeage-qr-code-web)
 13. [Rôles et permissions](#13-rôles-et-permissions)
 
 ---
@@ -39,7 +39,7 @@ Elle permet de :
 - Exporter les listes de présence
 - Importer en masse des données depuis Excel
 
-La plateforme est accessible depuis un **navigateur web** (interface de gestion) et depuis un **téléphone mobile** (scan du QR Code pour le badgeage).
+Ce manuel couvre **l’ensemble de la plateforme web** (interface de gestion et page de badgeage web), **hors application mobile**.
 
 ---
 
@@ -285,8 +285,14 @@ Tableau paginé affichant pour chaque auditeur :
 - Actions
 
 ### Filtres disponibles
-- **Recherche** libre : nom, prénom, matricule, N° d'inscription
-- **Secrétariat** : filtrer par secrétariat *(visible selon rôle)*
+- **Recherche** libre : nom, prénom, matricule, e-mail, type concours, libellé concours, grade, groupe, secrétariat
+- **Secrétariat** : choix en liste (menu déroulant)
+- **Grade** : choix en liste (menu déroulant)
+- **Groupe** : choix en liste (menu déroulant)
+- **Type concours** : choix en liste (menu déroulant)
+- **Sexe** : Masculin / Féminin
+
+> Note : le secrétariat reste aussi appliqué automatiquement selon le rôle utilisateur (un compte Secrétariat voit uniquement les auditeurs de son secrétariat).
 
 ### Consulter la fiche détail d'un auditeur
 Cliquez sur l'icône **œil** pour afficher la fiche complète :
@@ -506,25 +512,31 @@ Cliquez sur l'icône **corbeille** puis confirmez. Un élément utilisé par des
 
 ---
 
-## 12. Badgeage QR Code (téléphone)
+## 12. Badgeage QR Code (web)
 
 ### Accès
-Le téléphone scanne le QR Code généré depuis l'onglet **Séances** d'une formation.
+Le badgeage web s'effectue depuis la page publique :
+
+`/dashboard/badge/`
+
+Le QR Code généré depuis l'onglet **Séances** d'une formation contient le token de badgeage.
 
 ### Procédure de badgeage
 
-1. Ouvrez l'application caméra ou un lecteur QR sur votre téléphone.
-2. Scannez le QR Code affiché en salle.
-3. La page de badgeage s'ouvre automatiquement dans le navigateur.
-4. Saisissez votre **numéro matricule** dans le champ prévu.
-5. Cliquez sur **Badger**.
-6. Une confirmation s'affiche :
+1. Ouvrez la page de badgeage web dans un navigateur.
+2. Chargez le token QR :
+   - soit en scannant le QR via la caméra web ;
+   - soit en saisissant manuellement le token QR.
+3. Saisissez le **numéro matricule** dans le champ prévu.
+4. Cliquez sur **Badger**.
+5. Confirmez l'opération dans la fenêtre de confirmation.
+6. Un résultat s'affiche :
    - **Entrée enregistrée** → vous êtes maintenant "En salle"
    - **Sortie enregistrée** → votre durée de présence est calculée
 
 ### Badgeage hors ligne
-Si votre téléphone n'a pas de connexion internet au moment du scan :
-1. Le badgeage est **sauvegardé localement** sur votre téléphone.
+Si le navigateur n'a pas de connexion internet au moment du badgeage :
+1. Le badgeage est **sauvegardé localement** sur l'appareil.
 2. Dès que la connexion est rétablie, la synchronisation s'effectue **automatiquement**.
 
 ### Vérification du statut avant badgeage
@@ -538,13 +550,13 @@ Avant d'enregistrer, la plateforme affiche votre statut actuel :
 ## 13. Rôles et permissions
 
 ### Hiérarchie des rôles (du plus élevé au plus bas)
-1. **Chef CPFAE Admin** — administrateur principal *(unique)*
-2. **CPFAE Admin** — administrateur CPFAE
-3. **Chef Secrétariat** — responsable d'un secrétariat
-4. **Secrétariat** — agent de secrétariat
-5. **Encadrant** — superviseur de formation
-6. **Direction** — lecture seule globale
-7. **Auditeur** — badgeage uniquement (pas d'accès à l'interface web)
+1. **Direction** — lecture seule globale
+2. **Chef CPFAE Admin** — administrateur principal
+3. **CPFAE Admin** — administrateur CPFAE
+4. **Chef Secrétariat** — responsable d'un secrétariat
+5. **Secrétariat** — agent de secrétariat
+6. **Encadrant** — superviseur de formation
+7. **Auditeur** — badgeage uniquement (page publique de badgeage)
 
 ### Tableau des accès par module
 
@@ -566,7 +578,7 @@ Avant d'enregistrer, la plateforme affiche votre statut actuel :
 | Utilisateurs (créer/modif/suppr) | — | ✓ | ✓ | ✓ | ✓ | — |
 | Secrétariats | — | ✓ | ✓ | — | — | — |
 | Import Excel | — | ✓ | ✓ | ✓ | ✓ | — |
-| Référentiels | — | ✓ | ✓ | ✓ | ✓ | — |
+| Référentiels | — | ✓ | ✓ | — | — | — |
 
 ### Règle de création d'utilisateurs
 Chaque rôle ne peut créer que des utilisateurs dont le rôle est **strictement inférieur** dans la hiérarchie.
@@ -577,8 +589,7 @@ Chaque rôle ne peut créer que des utilisateurs dont le rôle est **strictement
 | CPFAE Admin | Chef Secrétariat, Secrétariat, Encadrant, Auditeur |
 | Chef Secrétariat | Secrétariat, Encadrant, Auditeur |
 | Secrétariat | Encadrant, Auditeur |
-| Encadrant | Auditeur uniquement |
 
 ---
 
-*Document généré pour MEMFPMA — DFRC/CPFAE — QR Badge 2026*
+*Document institutionnel plateforme web (hors app mobile) — MEMFPMA — DFRC/CPFAE — QR Badge 2026*

@@ -18,3 +18,24 @@ services:
         value: "3.12.3"
       - key: SQLITE_DIR
         value: "/opt/render/project/src/data"
+
+  - type: cron
+    name: qr-badge-auto-close
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    # Toutes les 10 minutes
+    schedule: "*/10 * * * *"
+    startCommand: "python manage.py auto_close_pointages"
+    envVars:
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: qr-badge
+          envVarKey: SECRET_KEY
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: SQLITE_DIR
+        value: "/opt/render/project/src/data"

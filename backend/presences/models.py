@@ -10,6 +10,8 @@ class Pointage(models.Model):
         TERMINE = 'TERMINE', 'Terminé'
         FORCE_DFRC = 'FORCE_DFRC', 'Forcé par DFRC'
         ABSENT_NON_BADGE = 'ABSENT_NON_BADGE', 'Absent (non badgé à la sortie)'
+        HORS_LIGNE_SUSPECT = 'HORS_LIGNE_SUSPECT', 'Hors ligne suspect'
+        SORTIE_AUTO = 'SORTIE_AUTO', 'Sortie automatique (anti-fraude)'
 
     participant = models.ForeignKey(
         Participant,
@@ -41,6 +43,13 @@ class Pointage(models.Model):
     )
     date_journee = models.DateField(default=timezone.localdate)
     device_id = models.CharField(max_length=255, blank=True, default='')
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    last_latitude = models.FloatField(null=True, blank=True)
+    last_longitude = models.FloatField(null=True, blank=True)
+    last_accuracy_m = models.FloatField(null=True, blank=True)
+    last_battery_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_is_charging = models.BooleanField(null=True, blank=True)
+    outside_geofence_count = models.PositiveSmallIntegerField(default=0)
     timestamp_entree = models.DateTimeField()
     timestamp_sortie = models.DateTimeField(null=True, blank=True)
     duree_presence_minutes = models.DecimalField(
@@ -101,6 +110,10 @@ class AuditLog(models.Model):
         FORCE_SORTIE = 'FORCE_SORTIE', 'Sortie forcée (encadrant/DFRC)'
         CLOSE_SESSION = 'CLOSE_SESSION', 'Fermeture de session (encadrant/DFRC)'
         AUTO_ABSENT = 'AUTO_ABSENT', 'Absent automatique (délai badge sortie dépassé)'
+        SCAN_HEARTBEAT = 'SCAN_HEARTBEAT', 'Heartbeat mobile géolocalisé'
+        NO_HEARTBEAT = 'NO_HEARTBEAT', 'Alerte absence heartbeat mobile'
+        OUT_OF_GEOFENCE = 'OUT_OF_GEOFENCE', 'Sortie du périmètre géographique'
+        AUTO_EXIT = 'AUTO_EXIT', 'Sortie automatique (heartbeat/geofence)'
         DEVICE_UNBIND = 'DEVICE_UNBIND', 'Déliaison appareil'
         # ── Formations ──
         FORMATION_CREATE = 'FORMATION_CREATE', 'Création de formation'
@@ -132,6 +145,7 @@ class AuditLog(models.Model):
         FORMATEUR_IMPORT = 'FORMATEUR_IMPORT', 'Import formateurs (Excel)'
         # ── Utilisateurs ──
         USER_CREATE = 'USER_CREATE', 'Création d\'utilisateur'
+        USER_UPDATE = 'USER_UPDATE', 'Modification d\'utilisateur'
         USER_DELETE = 'USER_DELETE', 'Suppression d\'utilisateur'
         # ── Imports globaux ──
         IMPORT_EXCEL = 'IMPORT_EXCEL', 'Import Excel global'
