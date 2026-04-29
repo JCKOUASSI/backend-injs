@@ -1,0 +1,93 @@
+# Branche test `channel1` — build & push linux/amd64 vers Docker Hub.
+#
+# Cible d’exécution des conteneurs : AlmaLinux x86_64 (images --platform linux/amd64).
+# Le job GitHub reste sur ubuntu-latest (buildx) ; pour builder sur un runner
+# self-hosted AlmaLinux, remplace runs-on ci-dessous par tes labels.
+#
+# Équivalent local :
+#   backend  : docker buildx build --platform linux/amd64 -t ophirdesire/qrcode-badge:<tag> --push ./backend
+#   frontend : docker buildx build --platform linux/amd64 --build-arg VITE_API_URL=... --push ./frontend
+#
+# Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (compte ophirdesire)
+#
+# Variables optionnelles (Actions → Variables) pour surcharger les tags / URLs :
+#   DOCKER_BACKEND_TAG        défaut v1.1.40-amd64
+#   DOCKER_FRONTEND_TAG       défaut 1.0.11-amd64
+#   DOCKER_VITE_API_URL       défaut https://api.badge-qr-code.pro/api
+#   DOCKER_VITE_BADGE_BASE_URL (optionnel, passé au Dockerfile si défini)
+
+name: Docker Hub (channel1)
+
+on:
+  push:
+    branches: [channel1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-hub-channel1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build & push (linux/amd64)
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_IMAGE: ophirdesire/qrcode-badge
+      FRONTEND_IMAGE: ophirdesire/qr-badge-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Tags et build-args
+        id: cfg
+        run: |
+          BT="${DOCKER_BACKEND_TAG:-v1.1.40-amd64}"
+          FT="${DOCKER_FRONTEND_TAG:-1.0.43-amd64}"
+          API="${DOCKER_VITE_API_URL:-https://api.badge-qr-code.pro/api}"
+          BADGE="${DOCKER_VITE_BADGE_BASE_URL:-}"
+          echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
+          echo "vite_api=${API}" >> "$GITHUB_OUTPUT"
+          echo "vite_badge=${BADGE}" >> "$GITHUB_OUTPUT"
+        env:
+          DOCKER_BACKEND_TAG: ${{ vars.DOCKER_BACKEND_TAG }}
+          DOCKER_FRONTEND_TAG: ${{ vars.DOCKER_FRONTEND_TAG }}
+          DOCKER_VITE_API_URL: ${{ vars.DOCKER_VITE_API_URL }}
+          DOCKER_VITE_BADGE_BASE_URL: ${{ vars.DOCKER_VITE_BADGE_BASE_URL }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.cfg.outputs.backend_ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.cfg.outputs.frontend_ref }}
+          build-args: |
+            VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
+            VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
