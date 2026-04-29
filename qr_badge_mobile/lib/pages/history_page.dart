@@ -56,6 +56,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       // Refresh token expiré — déconnecter et renvoyer vers le login.
       if (mounted) {
         await context.read<SessionProvider>().logout();
+        if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginPage()),
           (_) => false,

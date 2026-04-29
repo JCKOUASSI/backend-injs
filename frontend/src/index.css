@@ -131,6 +131,8 @@ body {
 .top-bar-user {
   display: flex; align-items: center; gap: 0.5rem;
 }
+a.top-bar-user { cursor: pointer; }
+a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .top-bar-user .user-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   background: var(--ci-green); color: #fff;

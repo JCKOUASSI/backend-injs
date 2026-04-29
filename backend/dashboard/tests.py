@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from formations.models import Secretariat
-from .views import _resolve_secretariat_from_matricule
+from formations.views import _resolve_secretariat_from_matricule
 
 
 class DashboardParticipantDispatchByMatriculeTest(TestCase):

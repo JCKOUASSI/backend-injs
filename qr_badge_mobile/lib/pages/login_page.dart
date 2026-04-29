@@ -83,7 +83,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionProvider>();
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -148,18 +147,6 @@ class _LoginPageState extends State<LoginPage> {
                                 .textTheme
                                 .bodyMedium
                                 ?.copyWith(color: AppColors.textMuted),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Serveur\u00a0: ${session.baseUrl}',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: AppColors.textMuted,
-                                  fontSize: 11,
-                                ),
                           ),
                           const SizedBox(height: 20),
                           TextFormField(

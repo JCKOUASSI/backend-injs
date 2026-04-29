@@ -6,6 +6,11 @@ import { useAuth } from '../context/AuthContext'
 
 const emptyForm = { nom: '', type: '', description: '' }
 
+/** Utilisateurs rattachés au secrétariat hors comptes rôle Auditeur (badgeage). */
+function membresEquipe(membres) {
+  return (membres || []).filter((m) => m.role !== 'AUDITEUR')
+}
+
 export default function Secretariats() {
   const { user: currentUser } = useAuth()
   const isDFRC = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(currentUser?.role)
@@ -150,7 +155,9 @@ export default function Secretariats() {
                   </tr>
                 </thead>
                 <tbody>
-                  {secretariats.map(s => (
+                  {secretariats.map(s => {
+                    const equipe = membresEquipe(s.membres)
+                    return (
                     <React.Fragment key={s.id}>
                       <tr>
                         <td><code>{s.numero}</code></td>
@@ -168,10 +175,10 @@ export default function Secretariats() {
                           <button
                             className="btn btn-outline-secondary btn-sm"
                             onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-                            title="Voir les membres"
+                            title="Membres de l'équipe (secrétariat, encadrants…) — hors comptes auditeurs"
                           >
                             <i className={`bi bi-${expanded === s.id ? 'chevron-up' : 'people'} me-1`}></i>
-                            {s.membres?.length || 0}
+                            {equipe.length}
                           </button>
                         </td>
                         <td>
@@ -198,9 +205,9 @@ export default function Secretariats() {
                       {expanded === s.id && (
                         <tr key={`${s.id}-membres`}>
                           <td colSpan="7" style={{ background: '#f8f9fa', padding: '0.5rem 1.5rem' }}>
-                            {s.membres?.length > 0 ? (
+                            {equipe.length > 0 ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', padding: '0.4rem 0' }}>
-                                {s.membres.map(m => (
+                                {equipe.map(m => (
                                   <span key={m.id} style={{
                                     background: m.is_active ? '#e8f5e9' : '#fce4ec',
                                     border: `1px solid ${m.is_active ? '#a5d6a7' : '#f48fb1'}`,
@@ -215,14 +222,15 @@ export default function Secretariats() {
                             ) : (
                               <small className="text-muted">
                                 <i className="bi bi-info-circle me-1"></i>
-                                Aucun utilisateur assigné. Allez dans <strong>Utilisateurs</strong> pour assigner des utilisateurs à ce secrétariat.
+                                Aucun membre d&apos;équipe (secrétariat, encadrants…). Rattachez-les depuis <strong>Utilisateurs</strong>. Les comptes badge <strong>Auditeur</strong> sont listés dans <strong>Utilisateurs</strong> — onglet <strong>Comptes auditeurs</strong>.
                               </small>
                             )}
                           </td>
                         </tr>
                       )}
                     </React.Fragment>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import logo from './assets/logo.png'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
-import ChangePasswordModal from './components/ChangePasswordModal'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Formations from './pages/Formations'
@@ -16,6 +15,7 @@ import ImportExcel from './pages/ImportExcel'
 import Secretariats from './pages/Secretariats'
 import Referentiels from './pages/Referentiels'
 import Modules from './pages/Modules'
+import Profile from './pages/Profile'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -26,12 +26,11 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 function Layout({ children, breadcrumb }) {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const location = useLocation()
   const path = location.pathname
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [showChangePwd, setShowChangePwd] = useState(false)
 
   const isMobileViewport = () => window.matchMedia('(max-width: 768px)').matches
   const toggleSidebar = () => {
@@ -128,12 +127,9 @@ function Layout({ children, breadcrumb }) {
         </nav>
 
         <div className="sidebar-footer">
-          <button onClick={() => { setShowChangePwd(true); setSidebarOpen(false) }} className="nav-item" style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <span><i className="bi bi-shield-lock"></i> <span className="nav-label">Changer mon mot de passe</span></span>
-          </button>
-          <button onClick={logout} className="nav-item" style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-            <span><i className="bi bi-box-arrow-left"></i> <span className="nav-label">Déconnexion</span></span>
-          </button>
+          <Link to="/profile" className={`nav-item ${path === '/profile' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <span><i className="bi bi-person-circle"></i> <span className="nav-label">Mon profil</span></span>
+          </Link>
           <div className="nav-label" style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', fontSize: '0.68rem', color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.4 }}>
             Developpé par<br/>
             <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>Ophir Technologies</span>
@@ -153,16 +149,15 @@ function Layout({ children, breadcrumb }) {
               </ol>
             </nav>
           </div>
-          <div className="top-bar-user">
+          <Link to="/profile" className="top-bar-user" title="Mon profil" style={{ textDecoration: 'none', color: 'inherit' }}>
             <span className="text-muted small">{fullName}</span>
             <div className="user-avatar">{userInitials}</div>
-          </div>
+          </Link>
         </div>
         <div className="page-content">
           {children}
         </div>
       </main>
-      {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
     </div>
   )
 }
@@ -178,6 +173,13 @@ function App() {
             <ProtectedRoute>
               <Layout breadcrumb={<li>Tableau de bord</li>}>
                 <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Mon profil</li></>}>
+                <Profile />
               </Layout>
             </ProtectedRoute>
           } />

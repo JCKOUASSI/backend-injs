@@ -21,6 +21,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   final _confirmCtrl = TextEditingController();
   bool _loading = false;
   String? _error;
+  bool _oldVisible = false;
+  bool _newVisible = false;
+  bool _confirmVisible = false;
 
   @override
   void dispose() {
@@ -126,10 +129,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   const SizedBox(height: 20),
                   TextFormField(
                     controller: _oldCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_oldVisible,
+                    decoration: InputDecoration(
                       labelText: 'Mot de passe actuel',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip:
+                            _oldVisible ? 'Masquer' : 'Afficher',
+                        icon: Icon(_oldVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        onPressed: () =>
+                            setState(() => _oldVisible = !_oldVisible),
+                      ),
                     ),
                     validator: (v) =>
                         (v == null || v.isEmpty) ? 'Champ requis' : null,
@@ -137,10 +149,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _newCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_newVisible,
+                    decoration: InputDecoration(
                       labelText: 'Nouveau mot de passe (min. 8 caractères)',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip:
+                            _newVisible ? 'Masquer' : 'Afficher',
+                        icon: Icon(_newVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        onPressed: () =>
+                            setState(() => _newVisible = !_newVisible),
+                      ),
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) {
@@ -155,10 +176,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _confirmCtrl,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_confirmVisible,
+                    decoration: InputDecoration(
                       labelText: 'Confirmer le nouveau mot de passe',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip:
+                            _confirmVisible ? 'Masquer' : 'Afficher',
+                        icon: Icon(_confirmVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        onPressed: () => setState(
+                            () => _confirmVisible = !_confirmVisible),
+                      ),
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) {

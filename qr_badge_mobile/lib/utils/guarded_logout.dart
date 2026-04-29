@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../config/app_env.dart';
 import '../providers/session_provider.dart';
 
-/// Demande le code superviseur puis déconnecte si le code est correct.
+/// Demande le code encadrant puis déconnecte si le code est correct.
 /// Retourne `true` si la déconnexion a eu lieu.
 Future<bool> performGuardedLogout(BuildContext context) async {
   final entered = await _promptSupervisorCode(context);
@@ -65,7 +65,7 @@ class _SupervisorCodeDialogState extends State<_SupervisorCodeDialog> {
           TextField(
             controller: _controller,
             decoration: const InputDecoration(
-              labelText: 'Code superviseur',
+              labelText: 'Code encadrant',
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.visiblePassword,

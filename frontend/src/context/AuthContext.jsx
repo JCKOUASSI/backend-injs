@@ -65,10 +65,19 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const refreshUser = useCallback(async () => {
+    const res = await api.get('/auth/me/')
+    const userData = {
+      ...res.data,
+      get_full_name: () => `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim() || res.data.username,
+    }
+    setUser(userData)
+  }, [])
+
   const isAuthenticated = !!user
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAuthenticated, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )
