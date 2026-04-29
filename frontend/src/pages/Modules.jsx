@@ -24,14 +24,14 @@ export default function Modules() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [modules, setModules] = useState([])
-  const [refs, setRefs] = useState({ formations: [], formations_reelles: [], grades: [], categories: [], sites: [], batiments: [], salles: [], types_secretariat: [], vagues: [] })
+  const [refs, setRefs] = useState({ formations: [], formations_reelles: [], grades: [], grades_modules: [], categories: [], sites: [], batiments: [], salles: [], types_secretariat: [], vagues: [], groupes: [] })
   const [allFormations, setAllFormations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [filters, setFilters] = useState({ statut: '', search: '', secretariat_type: '', vague: '', date_mode: 'today', date: getTodayIso() })
+  const [filters, setFilters] = useState({ statut: '', search: '', secretariat_type: '', vague: '', grade: '', groupe: '', date_mode: 'today', date: getTodayIso() })
   const debouncedSearch = useDebounce(filters.search)
 
   const [showModal, setShowModal] = useState(false)
@@ -62,7 +62,7 @@ export default function Modules() {
       setRefs(data)
     }).catch(() => {})
   }, [])
-  useEffect(() => { loadModules() }, [page, filters.statut, filters.secretariat_type, filters.vague, filters.date_mode, filters.date, debouncedSearch])
+  useEffect(() => { loadModules() }, [page, filters.statut, filters.secretariat_type, filters.vague, filters.grade, filters.groupe, filters.date_mode, filters.date, debouncedSearch])
 
   const loadModules = async () => {
     setLoading(true)
@@ -72,6 +72,8 @@ export default function Modules() {
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (filters.secretariat_type) params.set('secretariat_type', filters.secretariat_type)
       if (filters.vague) params.set('vague', filters.vague)
+      if (filters.grade) params.set('grade', filters.grade)
+      if (filters.groupe) params.set('groupe', filters.groupe)
       if (filters.date_mode) params.set('date_mode', filters.date_mode)
       if (filters.date_mode === 'date' && filters.date) params.set('date', filters.date)
       const res = await api.get(`/formations/list/?${params}`)
@@ -250,6 +252,28 @@ export default function Modules() {
                   <option value="">Toutes les vagues</option>
                   {refs.vagues.map(v => (
                     <option key={v.id} value={v.libelle}>{v.libelle}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {refs.grades_modules?.length > 0 && (
+              <div>
+                <select className="form-control" value={filters.grade}
+                  onChange={e => { setFilters({ ...filters, grade: e.target.value }); setPage(1) }}>
+                  <option value="">Tous les grades</option>
+                  {refs.grades_modules.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {refs.groupes?.length > 0 && (
+              <div>
+                <select className="form-control" value={filters.groupe}
+                  onChange={e => { setFilters({ ...filters, groupe: e.target.value }); setPage(1) }}>
+                  <option value="">Tous les groupes</option>
+                  {refs.groupes.map(g => (
+                    <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
               </div>

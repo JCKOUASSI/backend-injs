@@ -121,7 +121,7 @@ export default function ImportExcel() {
     try {
       const response = await api.post('/formations/import-excel/', formData)
       const data = response.data
-      const typeLabels = { formations: 'Formations', participants: 'Auditeurs', formateurs: 'Formateurs', seances: 'Séances', emploi_du_temps: 'Emploi du temps' }
+      const typeLabels = { formations: 'Cours', participants: 'Auditeurs', formateurs: 'Formateurs', seances: 'Séances', emploi_du_temps: 'Emploi du temps' }
       const label = typeLabels[type] || type
 
       if (data.errors?.length > 0) {
@@ -156,7 +156,7 @@ export default function ImportExcel() {
       </div>
 
       <div className="grid-2">
-        <ImportCard type="formations" title="Formations" icon="bi-mortarboard" color="var(--ci-green-dark)"
+        <ImportCard type="formations" title="Cours" icon="bi-mortarboard" color="var(--ci-green-dark)"
           columns={['N°', 'Formation', 'Module (titre)', 'Site', 'Date début', 'Date fin', 'Volume horaire (h)', 'Catégorie', 'Grade', 'Groupe', 'Vague']}
           onImport={handleImport} loading={loading} />
         <ImportCard type="participants" title="Auditeurs" icon="bi-people" color="var(--ci-blue)"

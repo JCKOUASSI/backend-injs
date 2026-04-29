@@ -893,125 +893,236 @@ export default function ModuleDetail() {
             )}
             <>
                 {/* Présents par séance */}
-                {seancesDuJour.map(seance => (
-                  <div className="card" key={seance.session_id} style={{ marginBottom: '1rem' }}>
-                    <div className="card-header-bar" style={{ background: '#f0fdf4', borderBottom: '2px solid #bbf7d0' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        <i className="bi bi-calendar3 me-2" style={{ color: '#16a34a' }}></i>
-                        {seance.session_intitule}
-                      </span>
-                      <span className="badge" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
-                        {seance.pointages.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').length} présence{seance.pointages.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').length > 1 ? 's' : ''}
-                      </span>
+                {seancesDuJour.map(seance => {
+                  const countPresencesTerminees = (pts) =>
+                    pts.filter(pt => pt.timestamp_sortie && (pt.duree_minutes || 0) > 0 && pt.statut !== 'ABSENT_NON_BADGE').length
+                  const nPresSeance = countPresencesTerminees(seance.pointages)
+                  const ptsAud = seance.pointages.filter(pt => pt.type_personne !== 'formateur' && pt.type_personne !== 'encadrant')
+                  const ptsFmt = seance.pointages.filter(pt => pt.type_personne === 'formateur')
+                  const ptsEnc = seance.pointages.filter(pt => pt.type_personne === 'encadrant')
+
+                  const presenceRow = (pt, i) => (
+                    <tr key={`${pt.type_personne || 'participant'}_${pt.participant_id ?? pt.formateur_id ?? pt.encadrant_id}_${i}`}>
+                      <td>
+                        <span className="badge-bg-info" style={{ fontFamily: pt.type_personne === 'formateur' ? 'monospace' : undefined }}>
+                          {pt.type_personne === 'formateur' ? (pt.numerobadge || '—') : (pt.matricule || '—')}
+                        </span>
+                      </td>
+                      <td><strong>{pt.nom}</strong></td>
+                      <td>{pt.prenom}</td>
+                      <td><small>{pt.timestamp_entree ? new Date(pt.timestamp_entree).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}</small></td>
+                      <td><small>{pt.timestamp_sortie ? new Date(pt.timestamp_sortie).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : <span className="text-warning">En cours</span>}</small></td>
+                      <td><small>{pt.duree_minutes > 0 ? `${Math.round(pt.duree_minutes)} min` : '—'}</small></td>
+                      <td>
+                        <span className={`badge ${
+                          pt.statut === 'ABSENT_NON_BADGE' ? 'badge-danger'
+                          : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'badge-danger'
+                          : pt.statut === 'FORCE_DFRC' ? 'badge-info'
+                          : pt.timestamp_sortie ? 'badge-terminee'
+                          : 'badge-en-cours'
+                        }`} style={{ fontSize: '0.72rem' }}>
+                          {pt.statut === 'ABSENT_NON_BADGE' ? 'Absent'
+                          : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'Absent'
+                          : pt.statut === 'FORCE_DFRC' ? 'Forcé'
+                          : pt.timestamp_sortie ? 'Terminé'
+                          : 'En cours'}
+                        </span>
+                      </td>
+                      {canSupervise && (
+                        <td>
+                          {!pt.timestamp_sortie && (
+                            <button className="btn btn-outline-warning btn-sm" title="Forcer la sortie"
+                              onClick={() => openForceModal(pt.participant_id || pt.formateur_id || pt.encadrant_id, 'SORTIE', pt.type_personne || 'participant')}>
+                              <i className="bi bi-box-arrow-right"></i>
+                            </button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+
+                  const theadPresence = (
+                    <thead>
+                      <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Statut</th>{canSupervise && <th></th>}</tr>
+                    </thead>
+                  )
+
+                  const subBar = (icon, label, bg, border, color, count) => (
+                    <div style={{
+                      padding: '0.45rem 1rem',
+                      background: bg,
+                      borderTop: border ? `1px solid ${border}` : undefined,
+                      borderBottom: `1px solid ${border || '#e2e8f0'}`,
+                      fontWeight: 600,
+                      fontSize: '0.82rem',
+                      color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}>
+                      <i className={`bi ${icon}`}></i>
+                      {label}
+                      <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 600, background: '#fff', color, border: `1px solid ${border || '#e2e8f0'}` }}>{count}</span>
                     </div>
-                    <div className="card-body-flush">
-                      <table className="table">
-                        <thead>
-                          <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Type</th><th>Entrée</th><th>Sortie</th><th>Durée</th><th>Statut</th>{canSupervise && <th></th>}</tr>
-                        </thead>
-                        <tbody>
-                          {seance.pointages.map((pt, i) => (
-                            <tr key={i}>
-                              <td>
-                                <span className="badge-bg-info" style={{ fontFamily: pt.type_personne === 'formateur' ? 'monospace' : undefined }}>
-                                  {pt.type_personne === 'formateur' ? (pt.numerobadge || '—') : (pt.matricule || '—')}
-                                </span>
-                              </td>
-                              <td><strong>{pt.nom}</strong></td>
-                              <td>{pt.prenom}</td>
-                              <td>
-                                {pt.type_personne === 'formateur'
-                                  ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.7rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
-                                  : pt.type_personne === 'encadrant'
-                                    ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.7rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
-                                    : <span className="badge" style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem' }}><i className="bi bi-person me-1"></i>Auditeur</span>
-                                }
-                              </td>
-                              <td><small>{pt.timestamp_entree ? new Date(pt.timestamp_entree).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '—'}</small></td>
-                              <td><small>{pt.timestamp_sortie ? new Date(pt.timestamp_sortie).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : <span className="text-warning">En cours</span>}</small></td>
-                              <td><small>{pt.duree_minutes > 0 ? `${Math.round(pt.duree_minutes)} min` : '—'}</small></td>
-                              <td>
-                                <span className={`badge ${
-                                  pt.statut === 'ABSENT_NON_BADGE' ? 'badge-danger'
-                                  : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'badge-danger'
-                                  : pt.statut === 'FORCE_DFRC' ? 'badge-info'
-                                  : pt.timestamp_sortie ? 'badge-terminee'
-                                  : 'badge-en-cours'
-                                }`} style={{ fontSize: '0.72rem' }}>
-                                  {pt.statut === 'ABSENT_NON_BADGE' ? 'Absent'
-                                  : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'Absent'
-                                  : pt.statut === 'FORCE_DFRC' ? 'Forcé'
-                                  : pt.timestamp_sortie ? 'Terminé'
-                                  : 'En cours'}
-                                </span>
-                              </td>
-                              {canSupervise && (
-                                <td>
-                                  {!pt.timestamp_sortie && (
-                                    <button className="btn btn-outline-warning btn-sm" title="Forcer la sortie"
-                                      onClick={() => openForceModal(pt.participant_id || pt.formateur_id || pt.encadrant_id, 'SORTIE', pt.type_personne || 'participant')}>
-                                      <i className="bi bi-box-arrow-right"></i>
-                                    </button>
-                                  )}
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  )
+
+                  return (
+                    <div className="card" key={seance.session_id} style={{ marginBottom: '1rem' }}>
+                      <div className="card-header-bar" style={{ background: '#f0fdf4', borderBottom: '2px solid #bbf7d0' }}>
+                        <span style={{ fontWeight: 600 }}>
+                          <i className="bi bi-calendar3 me-2" style={{ color: '#16a34a' }}></i>
+                          {seance.session_intitule}
+                        </span>
+                        <span className="badge" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+                          {nPresSeance} présence{nPresSeance > 1 ? 's' : ''}
+                          {(ptsAud.length > 0 || ptsFmt.length > 0 || ptsEnc.length > 0) && (
+                            <span style={{ fontWeight: 400, marginLeft: '0.35rem', opacity: 0.95 }}>
+                              ({countPresencesTerminees(ptsAud)} aud.{ptsFmt.length > 0 ? ` · ${countPresencesTerminees(ptsFmt)} form.` : ''}{ptsEnc.length > 0 ? ` · ${countPresencesTerminees(ptsEnc)} enc.` : ''})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="card-body-flush">
+                        {ptsAud.length === 0 && ptsFmt.length === 0 && ptsEnc.length === 0 && (
+                          <div className="p-3 text-muted text-center" style={{ fontSize: '0.9rem' }}>Aucune ligne pour cette séance.</div>
+                        )}
+                        {ptsAud.length > 0 && (
+                          <>
+                            {subBar('bi-people', 'Auditeurs', '#eff6ff', '#bfdbfe', '#1d4ed8', ptsAud.length)}
+                            <table className="table mb-0">
+                              {theadPresence}
+                              <tbody>{ptsAud.map(presenceRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                        {ptsFmt.length > 0 && (
+                          <>
+                            {subBar('bi-person-video3', 'Formateurs', '#faf5ff', '#e9d5ff', '#6b21a8', ptsFmt.length)}
+                            <table className="table mb-0">
+                              {theadPresence}
+                              <tbody>{ptsFmt.map(presenceRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                        {ptsEnc.length > 0 && (
+                          <>
+                            {subBar('bi-person-badge', 'Encadrants', '#fffbeb', '#fde68a', '#9c4221', ptsEnc.length)}
+                            <table className="table mb-0">
+                              {theadPresence}
+                              <tbody>{ptsEnc.map(presenceRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
 
                 {/* Absents du jour */}
-                {absentsFiltered.length > 0 && (
-                  <div className="card" style={{ marginBottom: '1rem' }}>
-                    <div className="card-header-bar" style={{ background: '#fef2f2', borderBottom: '2px solid #fecaca' }}>
-                      <span style={{ fontWeight: 600, color: '#dc2626' }}>
-                        <i className="bi bi-person-x me-2"></i>Absents
-                      </span>
-                      <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.78rem' }}>
-                        {absentsFiltered.length} absent{absentsFiltered.length > 1 ? 's' : ''}
-                      </span>
+                {absentsFiltered.length > 0 && (() => {
+                  const absAud = absentsFiltered.filter(p => p.type_personne !== 'formateur' && p.type_personne !== 'encadrant')
+                  const absFmt = absentsFiltered.filter(p => p.type_personne === 'formateur')
+                  const absEnc = absentsFiltered.filter(p => p.type_personne === 'encadrant')
+
+                  const absentSubBar = (icon, label, bg, border, color, count) => (
+                    <div style={{
+                      padding: '0.45rem 1rem',
+                      background: bg,
+                      borderTop: border ? `1px solid ${border}` : undefined,
+                      borderBottom: `1px solid ${border || '#e2e8f0'}`,
+                      fontWeight: 600,
+                      fontSize: '0.82rem',
+                      color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}>
+                      <i className={`bi ${icon}`}></i>
+                      {label}
+                      <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 600, background: '#fff', color, border: `1px solid ${border || '#e2e8f0'}` }}>{count}</span>
                     </div>
-                    <div className="card-body-flush">
-                      <table className="table">
-                        <thead>
-                          <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Type / Grade</th>{canSupervise && <th></th>}</tr>
-                        </thead>
-                        <tbody>
-                          {absentsFiltered.map((p, idx) => (
-                            <tr key={`${p.type_personne}_${p.id}_${idx}`}>
-                              <td>
-                                <span className="badge-bg-info" style={{ fontFamily: p.type_personne === 'formateur' ? 'monospace' : undefined }}>
-                                  {p.type_personne === 'formateur' ? (p.numerobadge || '—') : (p.matricule || p.numero_matricule || '—')}
-                                </span>
-                              </td>
-                              <td><strong>{p.nom}</strong></td>
-                              <td>{p.prenom}</td>
-                              <td>
-                                {p.type_personne === 'formateur'
-                                  ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
-                                  : p.type_personne === 'encadrant'
-                                    ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.72rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
-                                    : (p.grade || '—')
-                                }
-                              </td>
-                              {canSupervise && (
-                                <td>
-                                  <button className="btn btn-outline-success btn-sm" title="Forcer l'entrée"
-                                    onClick={() => openForceModal(p.id, 'ENTREE', p.type_personne || 'participant')}>
-                                    <i className="bi bi-box-arrow-in-right"></i>
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  )
+
+                  const absentRow = (p, idx) => (
+                    <tr key={`${p.type_personne}_${p.id}_${idx}`}>
+                      <td>
+                        <span className="badge-bg-info" style={{ fontFamily: p.type_personne === 'formateur' ? 'monospace' : undefined }}>
+                          {p.type_personne === 'formateur' ? (p.numerobadge || '—') : (p.matricule || p.numero_matricule || '—')}
+                        </span>
+                      </td>
+                      <td><strong>{p.nom}</strong></td>
+                      <td>{p.prenom}</td>
+                      <td>
+                        {p.type_personne === 'formateur'
+                          ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
+                          : p.type_personne === 'encadrant'
+                            ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.72rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
+                            : (p.grade || '—')}
+                      </td>
+                      {canSupervise && (
+                        <td>
+                          <button className="btn btn-outline-success btn-sm" title="Forcer l'entrée"
+                            onClick={() => openForceModal(p.id, 'ENTREE', p.type_personne || 'participant')}>
+                            <i className="bi bi-box-arrow-in-right"></i>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+
+                  const theadAbsent = (
+                    <thead>
+                      <tr><th>N° / Matricule</th><th>Nom</th><th>Prénom</th><th>Type / Grade</th>{canSupervise && <th></th>}</tr>
+                    </thead>
+                  )
+
+                  return (
+                    <div className="card" style={{ marginBottom: '1rem' }}>
+                      <div className="card-header-bar" style={{ background: '#fef2f2', borderBottom: '2px solid #fecaca' }}>
+                        <span style={{ fontWeight: 600, color: '#dc2626' }}>
+                          <i className="bi bi-person-x me-2"></i>Absents
+                        </span>
+                        <span className="badge" style={{ background: '#fee2e2', color: '#991b1b', fontSize: '0.78rem' }}>
+                          {absentsFiltered.length} absent{absentsFiltered.length > 1 ? 's' : ''}
+                          {(absAud.length > 0 || absFmt.length > 0 || absEnc.length > 0) && (
+                            <span style={{ fontWeight: 400, marginLeft: '0.35rem', opacity: 0.95 }}>
+                              ({absAud.length} aud.{absFmt.length > 0 ? ` · ${absFmt.length} form.` : ''}{absEnc.length > 0 ? ` · ${absEnc.length} enc.` : ''})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="card-body-flush">
+                        {absAud.length > 0 && (
+                          <>
+                            {absentSubBar('bi-people', 'Auditeurs absents', '#eff6ff', '#bfdbfe', '#1d4ed8', absAud.length)}
+                            <table className="table mb-0">
+                              {theadAbsent}
+                              <tbody>{absAud.map(absentRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                        {absFmt.length > 0 && (
+                          <>
+                            {absentSubBar('bi-person-video3', 'Formateurs absents', '#faf5ff', '#e9d5ff', '#6b21a8', absFmt.length)}
+                            <table className="table mb-0">
+                              {theadAbsent}
+                              <tbody>{absFmt.map(absentRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                        {absEnc.length > 0 && (
+                          <>
+                            {absentSubBar('bi-person-badge', 'Encadrants absents', '#fffbeb', '#fde68a', '#9c4221', absEnc.length)}
+                            <table className="table mb-0">
+                              {theadAbsent}
+                              <tbody>{absEnc.map(absentRow)}</tbody>
+                            </table>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </>
           </div>
         )

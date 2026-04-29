@@ -136,7 +136,10 @@ export default function Dashboard() {
       {canFilterBySecretariat && (
         <div style={{ float: 'right', width: 250, marginLeft: '0.9rem', marginBottom: '0.9rem' }}>
           <div style={{ position: 'sticky', top: '1rem' }}>
-            <div className="card">
+            <div
+              className="card"
+              title="Restreindre les indicateurs du tableau de bord à un secrétariat, ou afficher la synthèse de tous les secrétariats."
+            >
               <div className="card-header-bar">
                 <span><i className="bi bi-building me-2"></i><strong>Secrétariats</strong></span>
               </div>
@@ -170,7 +173,11 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-            <div className="card" style={{ marginTop: '0.75rem' }}>
+            <div
+              className="card"
+              style={{ marginTop: '0.75rem' }}
+              title="Choisir le jour de référence et la période (jour, semaine, mois, année) pour les blocs « Capacité » et le graphique de présences ci-dessous."
+            >
               <div className="card-header-bar">
                 <span><i className="bi bi-funnel-fill me-2"></i><strong>Filtre période</strong></span>
               </div>
@@ -233,7 +240,10 @@ export default function Dashboard() {
       </div>
 
       <div className="headline-kpis">
-        <div className="headline-kpi-card headline-kpi-card-main">
+        <div
+          className="headline-kpi-card headline-kpi-card-main"
+          title="Nombre total de modules (cours) dans le périmètre actuel. Les sous-totaux indiquent combien sont démarrés, planifiés ou terminés."
+        >
           <div className="headline-kpi-icon">
             <i className="bi bi-mortarboard-fill"></i>
           </div>
@@ -249,7 +259,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <div className="headline-kpi-card headline-kpi-card-side headline-kpi-card-volume">
+        <div
+          className="headline-kpi-card headline-kpi-card-side headline-kpi-card-volume"
+          title="Heures de cours déjà réalisées par rapport aux heures prévues sur les modules concernés, et pourcentage d’avancement du volume horaire."
+        >
           <div className="headline-kpi-icon">
             <i className="bi bi-clock-history"></i>
           </div>
@@ -266,7 +279,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <div className="headline-kpi-card headline-kpi-card-side">
+        <div
+          className="headline-kpi-card headline-kpi-card-side"
+          title="Nombre total d’auditeurs (fiches participants) pris en compte dans les statistiques pour le filtre actuel (secrétariat et période le cas échéant)."
+        >
           <div className="headline-kpi-icon">
             <i className="bi bi-people-fill"></i>
           </div>
@@ -290,6 +306,7 @@ export default function Dashboard() {
                 icon: 'bi-people-fill',
                 color: '#2b6cb0',
                 bg: 'rgba(43,108,178,0.1)',
+                tooltip: 'Auditeurs déjà pointés présents ce jour (ou jour de référence), par rapport au nombre attendu aux séances concernées.',
               },
               {
                 label: 'Nombre Formateurs Présents/Attendus',
@@ -297,8 +314,16 @@ export default function Dashboard() {
                 icon: 'bi-person-badge-fill',
                 color: '#276749',
                 bg: 'rgba(39,103,73,0.1)',
+                tooltip: 'Formateurs pointés présents ce jour par rapport au nombre attendu sur les séances du jour.',
               },
-              { label: 'Séances planifiées', value: stats?.seances_planifiees_aujourd_hui || 0, icon: 'bi-calendar-event', color: '#c05621', bg: 'rgba(245,124,0,0.1)' },
+              {
+                label: 'Séances planifiées',
+                value: stats?.seances_planifiees_aujourd_hui || 0,
+                icon: 'bi-calendar-event',
+                color: '#c05621',
+                bg: 'rgba(245,124,0,0.1)',
+                tooltip: 'Nombre de séances prévues à la date affichée dans le filtre « Jour spécifique ».',
+              },
             ]
           : [
               {
@@ -307,6 +332,7 @@ export default function Dashboard() {
                 icon: 'bi-people-fill',
                 color: '#2b6cb0',
                 bg: 'rgba(43,108,178,0.1)',
+                tooltip: 'Personnes (auditeurs et formateurs) pointées présentes sur la période choisie, par rapport au nombre attendu.',
               },
               {
                 label: `Taux de présence (${periodLabels[presencePeriod].toLowerCase()})`,
@@ -314,6 +340,7 @@ export default function Dashboard() {
                 icon: 'bi-graph-up-arrow',
                 color: '#276749',
                 bg: 'rgba(39,103,73,0.1)',
+                tooltip: 'Pourcentage de présence calculé sur la période sélectionnée (présents / attendus).',
               },
               {
                 label: `Absents (${periodLabels[presencePeriod].toLowerCase()})`,
@@ -321,9 +348,10 @@ export default function Dashboard() {
                 icon: 'bi-person-x-fill',
                 color: '#c05621',
                 bg: 'rgba(245,124,0,0.1)',
+                tooltip: 'Nombre de personnes absentes et part d’absents sur la période (attendus − présents).',
               },
-            ]).map(({ label, value, icon, color, bg }) => (
-          <div key={label} className="stat-card">
+            ]).map(({ label, value, icon, color, bg, tooltip }) => (
+          <div key={label} className="stat-card" title={tooltip}>
             <div className="stat-body">
               <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
               <div>
@@ -341,13 +369,34 @@ export default function Dashboard() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
         {[
-          { label: 'Séances actives', value: stats?.seances_actives || 0, icon: 'bi-broadcast', color: '#805ad5', bg: 'rgba(128,90,213,0.1)' },
+          {
+            label: 'Séances actives',
+            value: stats?.seances_actives || 0,
+            icon: 'bi-broadcast',
+            color: '#805ad5',
+            bg: 'rgba(128,90,213,0.1)',
+            tooltip: 'Séances dont l’horaire est en cours ou qui ont été ouvertes pour badgeage sur la plage considérée.',
+          },
           ...(isDirection
             ? []
-            : [{ label: 'Pointages du jour', value: stats?.pointages_aujourd_hui || 0, icon: 'bi-qr-code-scan', color: '#276749', bg: 'rgba(39,103,73,0.1)' }]),
-          { label: 'En salle maintenant', value: stats?.en_salle_now || 0, icon: 'bi-person-check-fill', color: '#2b6cb0', bg: 'rgba(43,108,178,0.1)' },
-        ].map(({ label, value, icon, color, bg }) => (
-          <div key={label} className="stat-card">
+            : [{
+                label: 'Pointages du jour',
+                value: stats?.pointages_aujourd_hui || 0,
+                icon: 'bi-qr-code-scan',
+                color: '#276749',
+                bg: 'rgba(39,103,73,0.1)',
+                tooltip: 'Nombre total d’entrées ou sorties enregistrées par badgeage QR ce jour (tous rôles confondus).',
+              }]),
+          {
+            label: 'En salle maintenant',
+            value: stats?.en_salle_now || 0,
+            icon: 'bi-person-check-fill',
+            color: '#2b6cb0',
+            bg: 'rgba(43,108,178,0.1)',
+            tooltip: 'Personnes actuellement considérées comme présentes en salle (entrée pointée, sortie non encore enregistrée).',
+          },
+        ].map(({ label, value, icon, color, bg, tooltip }) => (
+          <div key={label} className="stat-card" title={tooltip}>
             <div className="stat-body">
               <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
               <div>
@@ -365,9 +414,16 @@ export default function Dashboard() {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.9rem', marginBottom: '0.9rem' }}>
         {[
-          { label: 'Retard moyen (jour)', value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`, icon: 'bi-alarm', color: '#d97706', bg: 'rgba(217,119,6,0.1)' },
-        ].map(({ label, value, icon, color, bg }) => (
-          <div key={label} className="stat-card">
+          {
+            label: 'Retard moyen (jour)',
+            value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`,
+            icon: 'bi-alarm',
+            color: '#d97706',
+            bg: 'rgba(217,119,6,0.1)',
+            tooltip: 'Retard moyen (en minutes) entre l’heure prévue de début de séance et le premier pointage d’entrée, sur la journée de référence.',
+          },
+        ].map(({ label, value, icon, color, bg, tooltip }) => (
+          <div key={label} className="stat-card" title={tooltip}>
             <div className="stat-body">
               <div className="stat-icon" style={{ background: bg, color }}><i className={`bi ${icon}`}></i></div>
               <div>
@@ -423,7 +479,11 @@ export default function Dashboard() {
         const tauxAbsence = attendus > 0 ? Number((100 - tauxPresence).toFixed(1)) : 0
         const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F57C00' : '#276749'
         return (
-          <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
+          <div
+            className="card"
+            style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}
+            title="Vue d’ensemble des présences et absences (auditeurs + formateurs) pour la période sélectionnée. La barre compare présents (vert) et absents (couleur variable)."
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>
                 <i className="bi bi-person-x-fill me-2" style={{ color: absColor }}></i>
@@ -475,7 +535,10 @@ export default function Dashboard() {
       })()}
 
       {/* ── Cours débutés ── */}
-      <div className="card">
+      <div
+        className="card"
+        title="Modules au statut « en cours » : site, encadrant, effectifs présents / attendus et taux de présence par cours. Cliquez sur l’œil pour ouvrir le détail du module."
+      >
         <div className="card-header-bar">
           <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-green)' }}></i>
             <strong>{user?.role === 'ENCADRANT' ? 'Mes cours débutés' : 'Cours débutés'}</strong>
@@ -550,7 +613,10 @@ export default function Dashboard() {
       <div className="row">
         {/* Prochaines séances */}
         <div className="col-lg-4">
-          <div className="card">
+          <div
+            className="card"
+            title="Liste des prochaines séances planifiées (module, date et heure). Le chevron mène au détail du module."
+          >
             <div className="card-header-bar">
               <span><i className="bi bi-calendar-event me-2" style={{ color: 'var(--ci-orange)' }}></i><strong>Prochaines séances</strong></span>
             </div>
@@ -588,7 +654,10 @@ export default function Dashboard() {
 
         {/* Derniers pointages */}
         <div className="col-lg-8">
-          <div className="card">
+          <div
+            className="card"
+            title="Derniers badgeages enregistrés : nom, matricule, rôle, module concerné, horaires d’entrée et de sortie."
+          >
             <div className="card-header-bar">
               <span><i className="bi bi-clock-history me-2" style={{ color: '#805ad5' }}></i><strong>Derniers pointages</strong></span>
             </div>

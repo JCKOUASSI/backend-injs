@@ -28,7 +28,11 @@ const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', 
 export default function Users() {
   const { user: currentUser } = useAuth()
   const creatableRoles = getCreatableRoles(currentUser?.role).filter(r => ALL_ROLES.includes(r))
-  const visibleRoles = creatableRoles
+  const staffRoleOptions = creatableRoles.filter(r => r !== 'AUDITEUR')
+  const canManageAuditeurAccounts = creatableRoles.includes('AUDITEUR') && currentUser?.role !== 'DIRECTION'
+  const showStaffSection = staffRoleOptions.length > 0
+  const showAuditeursSection = canManageAuditeurAccounts
+  const [userTab, setUserTab] = useState('personnel')
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -50,19 +54,34 @@ export default function Users() {
   const { showToast } = useToast()
 
   const debouncedSearch = useDebounce(search)
-  useEffect(() => { loadUsers() }, [page, debouncedSearch, roleFilter])
+  useEffect(() => {
+    if (!showStaffSection && showAuditeursSection) setUserTab('auditeurs')
+    if (!showAuditeursSection && showStaffSection) setUserTab('personnel')
+  }, [showStaffSection, showAuditeursSection])
+  useEffect(() => { loadUsers() }, [page, debouncedSearch, roleFilter, userTab])
   useEffect(() => {
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
       .catch(() => {})
   }, [])
 
+  const setUserTabAndReset = (tab) => {
+    setUserTab(tab)
+    setPage(1)
+    if (tab === 'auditeurs') setRoleFilter('')
+  }
+
   const loadUsers = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ page })
       if (debouncedSearch) params.set('search', debouncedSearch)
-      if (roleFilter) params.set('role', roleFilter)
+      if (userTab === 'personnel') {
+        params.set('exclude_role', 'AUDITEUR')
+        if (roleFilter) params.set('role', roleFilter)
+      } else {
+        params.set('role', 'AUDITEUR')
+      }
       const response = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
       setUsers(Array.isArray(data) ? data : [])
@@ -96,7 +115,7 @@ export default function Users() {
       setShowModal(false)
       setForm({ ...emptyForm })
       loadUsers()
-      showToast('Utilisateur créé')
+      showToast(form.role === 'AUDITEUR' ? 'Compte auditeur créé' : 'Utilisateur créé')
     } catch (err) {
       const data = err.response?.data
       if (data && typeof data === 'object') {
@@ -165,10 +184,38 @@ export default function Users() {
   const getFullName = (u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
   const getInitials = (u) => `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || u.username[0]?.toUpperCase()
 
-  const filteredUsers = users
+  const listTitle = userTab === 'personnel' ? 'Liste des utilisateurs' : 'Comptes auditeurs'
+  const listIcon = userTab === 'personnel' ? 'bi-person-gear' : 'bi-person-badge'
 
   return (
     <div>
+      {showStaffSection && showAuditeursSection && (
+        <div className="card mb-3">
+          <div className="card-body py-2">
+            <div className="d-flex gap-2 flex-wrap" role="tablist" style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', marginBottom: '-0.5rem', paddingBottom: '0.5rem' }}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={userTab === 'personnel'}
+                className={`btn btn-sm ${userTab === 'personnel' ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                onClick={() => setUserTabAndReset('personnel')}
+              >
+                <i className="bi bi-person-gear me-1"></i>Utilisateurs
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={userTab === 'auditeurs'}
+                className={`btn btn-sm ${userTab === 'auditeurs' ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                onClick={() => setUserTabAndReset('auditeurs')}
+              >
+                <i className="bi bi-person-badge me-1"></i>Comptes auditeurs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search + filter bar */}
       <div className="card">
         <div className="card-body">
@@ -180,15 +227,22 @@ export default function Users() {
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
             </div>
-            <div>
-              <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
-                <option value="">Tous les rôles</option>
-                {visibleRoles.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
-              </select>
-            </div>
-            {creatableRoles.length > 0 && (
-              <button onClick={() => { setForm({ ...emptyForm, role: creatableRoles[0] }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
+            {userTab === 'personnel' && staffRoleOptions.length > 0 && (
+              <div>
+                <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
+                  <option value="">Tous les rôles</option>
+                  {staffRoleOptions.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                </select>
+              </div>
+            )}
+            {userTab === 'personnel' && staffRoleOptions.length > 0 && (
+              <button type="button" onClick={() => { setForm({ ...emptyForm, role: staffRoleOptions[0] }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel utilisateur
+              </button>
+            )}
+            {userTab === 'auditeurs' && canManageAuditeurAccounts && (
+              <button type="button" onClick={() => { setForm({ ...emptyForm, role: 'AUDITEUR' }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
+                <i className="bi bi-plus-lg me-1"></i>Nouveau compte auditeur
               </button>
             )}
           </div>
@@ -200,8 +254,8 @@ export default function Users() {
       {/* Table */}
       <div className="card">
         <div className="card-header-bar">
-          <span><i className="bi bi-person-gear me-2"></i>Liste des utilisateurs</span>
-          <span className="badge-bg-secondary">{filteredUsers.length} résultat(s)</span>
+          <span><i className={`bi ${listIcon} me-2`}></i>{listTitle}</span>
+          <span className="badge-bg-secondary">{users.length} résultat(s)</span>
         </div>
         <div className="card-body-flush">
           {loading ? <div className="loading"><div className="spinner"></div></div> : (
@@ -221,7 +275,7 @@ export default function Users() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.length > 0 ? filteredUsers.map((u) => (
+                    {users.length > 0 ? users.map((u) => (
                       <tr key={u.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -295,7 +349,7 @@ export default function Users() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" style={{ maxHeight: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>Nouvel utilisateur</h5>
+              <h5>{userTab === 'auditeurs' ? 'Nouveau compte auditeur' : 'Nouvel utilisateur'}</h5>
               <button className="btn-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -319,7 +373,7 @@ export default function Users() {
                   <div className="form-group">
                     <label className="form-label">Rôle *</label>
                     <select className="form-control" required value={form.role} onChange={e => setForm({...form, role: e.target.value, new_secretariat_nom: '', new_secretariat_type: ''})}>
-                      {creatableRoles.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
                     </select>
                     {form.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN') && (
                       <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>

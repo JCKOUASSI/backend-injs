@@ -30,6 +30,10 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   String? _result;
   String? _error;
 
+  /// Vrai après un badgeage réussi : la caméra est arrêtée jusqu'à ce que
+  /// l'utilisateur tape sur « Scanner à nouveau ».
+  bool _cameraPaused = false;
+
   // Informations de position issues de /api/scan/secure/check-status/
   Map<String, dynamic>? _statusInfo;
   bool _loadingStatus = false;
@@ -56,9 +60,9 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     if (!mounted) {
       return;
     }
-    if (widget.isActive) {
+    if (widget.isActive && !_cameraPaused) {
       final allowed = await ensureCameraPermission(context);
-      if (!mounted || !widget.isActive) {
+      if (!mounted || !widget.isActive || _cameraPaused) {
         return;
       }
       if (allowed) {
@@ -67,6 +71,55 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     } else {
       await _camera.stop();
     }
+  }
+
+  Widget _buildPausedPlaceholder() {
+    return Container(
+      color: Colors.grey.shade100,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle,
+                  size: 56, color: AppColors.ciGreenDark),
+              const SizedBox(height: 12),
+              Text(
+                'Scan effectué',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Caméra mise en pause.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _resumeScan,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scanner à nouveau'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _resumeScan() async {
+    setState(() {
+      _cameraPaused = false;
+      _tokenQr = null;
+      _statusInfo = null;
+      _result = null;
+      _error = null;
+    });
+    await _syncCameraWithTab();
   }
 
   Future<void> _refreshStatus() async {
@@ -189,10 +242,8 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         ? 'Vous êtes actuellement en salle'
             '${heureEntree != null && heureEntree.isNotEmpty ? ' depuis $heureEntree' : ''}'
             '$contexteSeance.\n'
-            'Voulez-vous enregistrer votre sortie ?\n'
-            'Votre position GPS et l\u2019état de la batterie seront envoyés.'
-        : 'Voulez-vous enregistrer votre entrée$contexteSeance ?\n'
-            'Votre position GPS et l\u2019état de la batterie seront envoyés.';
+            'Voulez-vous enregistrer votre sortie ?'
+        : 'Voulez-vous enregistrer votre entrée$contexteSeance ?';
     final ok = await confirm(
       context,
       title: titre,
@@ -228,10 +279,48 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         session.stopSecureSessionHeartbeat();
       }
       final confirmation = _confirmationMessage(action);
-      setState(() => _result = confirmation);
+      // Caméra arrêtée tant que l'utilisateur n'a pas demandé un nouveau scan.
+      await _camera.stop();
+      if (!mounted) return;
+      setState(() {
+        _result = confirmation;
+        _cameraPaused = true;
+      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(confirmation)),
+        final isExit = action == 'SORTIE' || action == 'SORTIE_AUTO';
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(
+              Icons.check_circle,
+              color: isExit ? Colors.red.shade700 : AppColors.ciGreenDark,
+              size: 48,
+            ),
+            title: const Text('Scan effectué'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Action enregistrée :',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  confirmation,
+                  style: Theme.of(ctx).textTheme.bodyLarge,
+                ),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
       }
     } catch (e) {
@@ -286,7 +375,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
             ),
             const SizedBox(height: 6),
             Text(
-              'Pointez votre caméra vers le QR code affiché par le superviseur',
+              'Pointez votre caméra vers le QR code affiché par l\u2019encadrant',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
@@ -303,7 +392,9 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: MobileScanner(
+                  child: _cameraPaused
+                      ? _buildPausedPlaceholder()
+                      : MobileScanner(
                     controller: _camera,
                     onDetect: (capture) {
                       final code = capture.barcodes.first.rawValue;
