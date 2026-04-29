@@ -84,8 +84,11 @@ def ensure_role_groups(force_reset=False):
 
     Par défaut (force_reset=False) :
         - Si le groupe n'existe pas encore → le crée et lui applique le ROLE_POLICY.
-        - Si le groupe existe déjà → ses permissions ne sont PAS modifiées.
-          Les changements effectués dans l'admin Django sont donc préservés.
+        - Si le groupe existe déjà → on ajoute les permissions de la politique
+          encore absentes (nouveaux modèles après la création du groupe).
+          Les permissions retirées manuellement dans l'admin ne sont pas ré‑ajoutées
+          si elles ne figurent plus dans la politique ; pour un réalignement complet,
+          utiliser force_reset=True.
 
     Avec force_reset=True :
         - Remet les permissions de TOUS les groupes à l'état défini dans ROLE_POLICY,

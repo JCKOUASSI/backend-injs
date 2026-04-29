@@ -41,10 +41,29 @@ class AuthenticationConfig(AppConfig):
     name = 'authentication'
 
     def ready(self):
+        from django.apps import apps
         from django.contrib.auth import get_user_model
         from django.db.models.signals import post_migrate, post_save
 
-        post_migrate.connect(_on_post_migrate, sender=self)
+        # Après authentication : crée les groupes (souvent avant les permissions
+        # des apps métier). Il faut ré‑exécuter ensure_role_groups après formations
+        # / presences / … pour compléter les codenames créés plus tard (voir
+        # role_groups.ensure_role_groups branche « merge »).
+        post_migrate.connect(
+            _on_post_migrate,
+            sender=self,
+            dispatch_uid='authentication_post_migrate',
+        )
+        for label in ('formations', 'presences', 'exports', 'dashboard'):
+            try:
+                app_config = apps.get_app_config(label)
+            except LookupError:
+                continue
+            post_migrate.connect(
+                _on_post_migrate,
+                sender=app_config,
+                dispatch_uid=f'authentication_ensure_roles_{label}',
+            )
         post_save.connect(_on_user_saved, sender=get_user_model(), dispatch_uid='authentication_sync_role_group')
 
 
