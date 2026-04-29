@@ -94,10 +94,19 @@ def ensure_role_groups(force_reset=False):
     """
     for role, group_name in ROLE_GROUP_NAMES.items():
         group, created = Group.objects.get_or_create(name=group_name)
+        policy = ROLE_POLICY[role]
+        permissions = _permissions_for_policy(policy)
         if created or force_reset:
-            policy = ROLE_POLICY[role]
-            permissions = _permissions_for_policy(policy)
             group.permissions.set(permissions)
+        else:
+            # Nouvelles permissions (nouveaux modèles / migrations après création du groupe).
+            have = set(group.permissions.values_list("id", flat=True))
+            want_ids = set(permissions.values_list("id", flat=True))
+            missing = want_ids - have
+            if missing:
+                group.permissions.add(
+                    *Permission.objects.filter(pk__in=missing)
+                )
 
 
 def sync_user_role_group(user):

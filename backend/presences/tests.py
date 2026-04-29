@@ -9,6 +9,7 @@ from formations.models import (
     Module,
     Participant,
     Formateur,
+    Secretariat,
     SessionModule,
     ModuleParticipant,
     ModuleFormateur,
@@ -151,11 +152,13 @@ class ScanModuleExclusivityTest(TestCase):
         self.client = APIClient()
         self.today = timezone.localdate()
 
+        self.secretariat = Secretariat.objects.create(nom='Sec scan test')
         self.formation = Formation.objects.create(formation='Formation scan')
         self.module = Module.objects.create(
             formation=self.formation,
             intitule='Module scan',
             statut='EN_COURS',
+            secretariat=self.secretariat,
         )
         self.participant = Participant.objects.create(
             matricule='P1001',
@@ -226,6 +229,8 @@ class ScanModuleExclusivityTest(TestCase):
 
     def test_force_pointage_blocks_entry_when_other_session_open_same_module_same_day(self):
         user = make_user('secretariat_for_force', role='SECRETARIAT')
+        user.secretariat = self.secretariat
+        user.save(update_fields=['secretariat'])
         self.client.force_authenticate(user)
 
         Pointage.objects.create(
