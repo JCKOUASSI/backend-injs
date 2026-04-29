@@ -320,7 +320,7 @@ class ReferentielsAPITest(TestCase):
     def test_referentiels(self):
         res = self.client.get('/api/formations/referentiels/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades'):
+        for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
 
 

@@ -5,6 +5,31 @@ from .permissions import get_subordinate_roles, get_creatable_roles
 User = get_user_model()
 
 
+class UserSelfProfileSerializer(serializers.ModelSerializer):
+    """Champs modifiables par l'utilisateur sur son propre profil (sans rôle / secrétariat / statut)."""
+
+    matricule = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'telephone', 'organisation', 'grade', 'matricule']
+
+    def validate_matricule(self, value):
+        if value in (None, ''):
+            return None
+        qs = User.objects.filter(matricule=value)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('Ce numéro de matricule est déjà utilisé.')
+        return value
+
+
 class UserSerializer(serializers.ModelSerializer):
     secretariat_nom = serializers.SerializerMethodField()
 

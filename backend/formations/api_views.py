@@ -397,7 +397,7 @@ def dashboard_stats(request):
 def formation_list_api(request):
     """
     List modules (une ligne par module) with optional filtering.
-    Query params: statut, search, module, categorie, secretariat_type, actives, page, page_size
+    Query params: statut, search, module, categorie, grade, secretariat_type, vague, groupe, actives, page, page_size, date_mode, date
     """
     from presences.models import Pointage
     page = int(request.query_params.get('page', 1))
@@ -435,6 +435,10 @@ def formation_list_api(request):
     if categorie:
         queryset = queryset.filter(grade__istartswith=categorie)
 
+    grade_param = (request.query_params.get('grade') or '').strip()
+    if grade_param:
+        queryset = queryset.filter(grade__iexact=grade_param)
+
     secretariat_type = request.query_params.get('secretariat_type')
     if secretariat_type:
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
@@ -446,6 +450,17 @@ def formation_list_api(request):
     vague_filter = request.query_params.get('vague')
     if vague_filter:
         queryset = queryset.filter(vague__iexact=vague_filter)
+
+    groupe_param = request.query_params.get('groupe')
+    if groupe_param:
+        groupe_normalise = _normalize_groupe_value(groupe_param)
+        if groupe_normalise:
+            matching_ids = [
+                mid
+                for mid, g in queryset.values_list('id', 'groupe')
+                if _normalize_groupe_value(g) == groupe_normalise
+            ]
+            queryset = queryset.filter(id__in=matching_ids)
 
     actives_only = request.query_params.get('actives')
     if actives_only == 'true':
@@ -1695,11 +1710,42 @@ def referentiels_api(request):
     grades = list(RefGrade.objects.filter(actif=True).values('id', 'libelle', 'categorie_id'))
     types_secretariat = list(RefTypeSecretariat.objects.filter(actif=True).values('id', 'libelle'))
     vagues = list(RefVague.objects.filter(actif=True).order_by('ordre', 'libelle').values('id', 'libelle', 'ordre'))
+
+    mods_groupes_qs = Module.objects.all()
+    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.secretariat:
+            mods_groupes_qs = mods_groupes_qs.filter(secretariat=request.user.secretariat)
+        else:
+            mods_groupes_qs = mods_groupes_qs.none()
+    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
+        mods_groupes_qs = mods_groupes_qs.filter(superviseur=request.user)
+    raw_module_groupes = (
+        mods_groupes_qs.exclude(groupe__isnull=True)
+        .exclude(groupe='')
+        .values_list('groupe', flat=True)
+    )
+    groupes_modules = sorted(
+        {g for g in (_normalize_groupe_value(v) for v in raw_module_groupes) if g},
+        key=_groupe_sort_key,
+    )
+
+    raw_module_grades = (
+        mods_groupes_qs.exclude(grade__isnull=True)
+        .exclude(grade='')
+        .values_list('grade', flat=True)
+    )
+    grades_modules = sorted(
+        {str(v).strip() for v in raw_module_grades if str(v).strip()},
+        key=lambda x: (x.lower(), x),
+    )
+
     return Response({
         'formations': formations,
         'formations_reelles': formations_reelles,
         'modules': modules,
         'modules_actifs': modules_actifs,
+        'groupes': groupes_modules,
+        'grades_modules': grades_modules,
         'sites': sites,
         'batiments': batiments,
         'salles': salles,

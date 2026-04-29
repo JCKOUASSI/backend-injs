@@ -8,7 +8,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from django.db.models import Q
 
-from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer, LoginSerializer, ChangePasswordSerializer
+from .serializers import (
+    UserSerializer,
+    UserCreateSerializer,
+    UserUpdateSerializer,
+    UserSelfProfileSerializer,
+    LoginSerializer,
+    ChangePasswordSerializer,
+)
 from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
@@ -119,11 +126,17 @@ def login_view(request):
     })
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def me_view(request):
-    """Retourne le profil de l'utilisateur connecté."""
-    return Response(UserSerializer(request.user).data)
+    """Profil de l'utilisateur connecté : lecture ou mise à jour partielle des données personnelles."""
+    user = request.user
+    if request.method == 'GET':
+        return Response(UserSerializer(user).data)
+    serializer = UserSelfProfileSerializer(user, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(UserSerializer(user).data)
 
 
 @api_view(['POST'])
@@ -160,6 +173,11 @@ class UserListCreateView(generics.ListCreateAPIView):
         role = self.request.query_params.get('role')
         if role:
             qs = qs.filter(role=role)
+        exclude_role = self.request.query_params.get('exclude_role')
+        if exclude_role and exclude_role in ROLE_HIERARCHY:
+            qs = qs.exclude(role=exclude_role)
+        if user.role == 'DIRECTION':
+            qs = qs.exclude(role='AUDITEUR')
         return qs
 
     def get_serializer_class(self):
@@ -195,6 +213,8 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         qs = User.objects.filter(role__in=subordinates)
         if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             qs = qs.filter(secretariat=user.secretariat)
+        if user.role == 'DIRECTION':
+            qs = qs.exclude(role='AUDITEUR')
         return qs
 
     def get_serializer_class(self):
