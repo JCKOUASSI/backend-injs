@@ -16,8 +16,9 @@
 #   DOCKER_MAIN_VITE_API_URL, DOCKER_MAIN_VITE_BADGE_BASE_URL
 #
 # Tags poussés à chaque run (prod) :
-#   - tag versionné (auto ou manuel)
-#   - latest-amd64 + latest (même image que le tag versionné)
+#   - tag versionné (auto ou manuel), ex: v1.1.123-amd64
+#   - main-<tag_versionné>, ex: main-v1.1.123-amd64 (même image, nom explicite branche prod)
+#   - latest-amd64 + latest (rolling, même image que le tag versionné)
 
 name: Docker Hub (main / prod)
 
@@ -88,6 +89,8 @@ jobs:
           BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://api.sygepcpfae.org}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
+          echo "backend_main_ref=${BACKEND_IMAGE}:main-${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_main_ref=${FRONTEND_IMAGE}:main-${FT}" >> "$GITHUB_OUTPUT"
           echo "vite_api=${API}" >> "$GITHUB_OUTPUT"
           echo "vite_badge=${BADGE}" >> "$GITHUB_OUTPUT"
         env:
@@ -106,6 +109,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.cfg.outputs.backend_ref }}
+            ${{ steps.cfg.outputs.backend_main_ref }}
             ${{ env.BACKEND_IMAGE }}:latest-amd64
             ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
@@ -120,6 +124,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.cfg.outputs.frontend_ref }}
+            ${{ steps.cfg.outputs.frontend_main_ref }}
             ${{ env.FRONTEND_IMAGE }}:latest-amd64
             ${{ env.FRONTEND_IMAGE }}:latest
           build-args: |

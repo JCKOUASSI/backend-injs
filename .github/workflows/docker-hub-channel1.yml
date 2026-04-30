@@ -72,12 +72,16 @@ jobs:
           # Stratégie tags :
           # - si backend_tag/frontend_tag fournis (workflow_dispatch) => utilisés tels quels
           # - sinon si Variables GitHub DOCKER_*_TAG => utilisées
-          # - sinon => auto: v<MAJOR>.<MINOR>.<run_number>-channel1-amd64
+          # - sinon => auto: v<MAJOR>.<MINOR>.<run_number>-amd64
+          #
+          # En plus du tag versionné “standard”, on pousse aussi :
+          #   - channel1-<tag_versionné> (ex: channel1-v1.1.123-amd64)
+          #   - channel1-latest-amd64
           PREFIX="${DOCKER_VERSION_PREFIX:-1.1}"
-          AUTO="v${PREFIX}.${GITHUB_RUN_NUMBER}-channel1-amd64"
+          AUTO="v${PREFIX}.${GITHUB_RUN_NUMBER}-amd64"
           REQ_VERSION="${{ inputs.version }}"
           if [ -n "${REQ_VERSION}" ]; then
-            AUTO="v${REQ_VERSION}-channel1-amd64"
+            AUTO="v${REQ_VERSION}-amd64"
           fi
 
           BT="${{ inputs.backend_tag }}"
@@ -88,6 +92,8 @@ jobs:
           BADGE="${DOCKER_VITE_BADGE_BASE_URL:-}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
+          echo "backend_channel_ref=${BACKEND_IMAGE}:channel1-${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_channel_ref=${FRONTEND_IMAGE}:channel1-${FT}" >> "$GITHUB_OUTPUT"
           echo "vite_api=${API}" >> "$GITHUB_OUTPUT"
           echo "vite_badge=${BADGE}" >> "$GITHUB_OUTPUT"
         env:
@@ -106,6 +112,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.cfg.outputs.backend_ref }}
+            ${{ steps.cfg.outputs.backend_channel_ref }}
             ${{ env.BACKEND_IMAGE }}:channel1-latest-amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -119,6 +126,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.cfg.outputs.frontend_ref }}
+            ${{ steps.cfg.outputs.frontend_channel_ref }}
             ${{ env.FRONTEND_IMAGE }}:channel1-latest-amd64
           build-args: |
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
