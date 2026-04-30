@@ -52,8 +52,8 @@ jobs:
       - name: Tags et build-args (prod)
         id: cfg
         run: |
-          BT="${DOCKER_MAIN_BACKEND_TAG:-v1.1.40-amd64}"
-          FT="${DOCKER_MAIN_FRONTEND_TAG:-1.1.44-amd64}"
+          BT="${DOCKER_MAIN_BACKEND_TAG:-v1.1.44-amd64}"
+          FT="${DOCKER_MAIN_FRONTEND_TAG:-v1.1.44-amd64}"
           API="${DOCKER_MAIN_VITE_API_URL:-https://api.sygepcpfae.org/api}"
           BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://api.sygepcpfae.org}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"

@@ -53,8 +53,8 @@ jobs:
       - name: Tags et build-args
         id: cfg
         run: |
-          BT="${DOCKER_BACKEND_TAG:-v1.1.40-amd64}"
-          FT="${DOCKER_FRONTEND_TAG:-1.0.43-amd64}"
+          BT="${DOCKER_BACKEND_TAG:-v1.1.44-amd64}"
+          FT="${DOCKER_FRONTEND_TAG:-1.1.44-amd64}"
           API="${DOCKER_VITE_API_URL:-https://api.badge-qr-code.pro/api}"
           BADGE="${DOCKER_VITE_BADGE_BASE_URL:-}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
