@@ -257,7 +257,7 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertIn('déjà en cours sur ce module', res.data.get('detail', ''))
 
     def test_secure_scan_blocks_new_entry_when_other_session_open_same_module_same_day(self):
-        user = make_user('participant_scan_secure', role='PARTICIPANT')
+        user = make_user('participant_scan_secure', role='AUDITEUR')
         self.participant.user = user
         self.participant.save(update_fields=['user'])
         self.client.force_authenticate(user)

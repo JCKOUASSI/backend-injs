@@ -590,7 +590,7 @@ def qr_image(request, pk):
     from django.http import HttpResponse
 
     user_role = getattr(request.user, 'role', None)
-    if user_role == 'SUPERVISEUR':
+    if user_role == User.Role.ENCADRANT:
         try:
             formation = Formation.objects.get(pk=pk, superviseur=request.user)
         except Formation.DoesNotExist:
@@ -653,7 +653,7 @@ def session_qr_image(request, pk, session_pk):
     from django.http import HttpResponse
 
     user_role = getattr(request.user, 'role', None)
-    if user_role == 'SUPERVISEUR':
+    if user_role == User.Role.ENCADRANT:
         try:
             formation = Formation.objects.get(pk=pk, superviseur=request.user)
         except Formation.DoesNotExist:

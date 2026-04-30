@@ -5,7 +5,7 @@
 ## Architecture
 
 Ce projet est séparé en deux parties :
-- **Backend** : Django 6.x + Django REST Framework (API)
+- **Backend** : Django 5.x + Django REST Framework (API), base **PostgreSQL**
 - **Frontend** : React 18 + Vite (Dashboard web)
 
 ```
@@ -28,7 +28,7 @@ qr-badge/
 
 ## Stack technique
 
-- **Backend** : Django 6.x + Django REST Framework + SQLite
+- **Backend** : Django 5.1 + Django REST Framework + PostgreSQL (`POSTGRES_*` dans `.env`)
 - **Frontend** : React 18 + Vite + React Router
 - **Auth** : JWT (djangorestframework-simplejwt)
 - **Exports** : reportlab (PDF) + openpyxl (Excel)
@@ -56,10 +56,10 @@ Le frontend sera disponible sur `http://localhost:3000` et communiquera avec le 
 
 | Rôle | Username | Mot de passe |
 |------|----------|-------------|
-| DFRC Admin | `admin` | `admin123` |
-| DFRC Standard | `dfrc` | `dfrc123` |
-| Superviseur 1 | `superviseur1` | `sup123` |
-| Superviseur 2 | `superviseur2` | `sup123` |
+| Administrateur | `admin` | `admin123` |
+| CPFAE Admin | `dfrc` | `dfrc123` |
+| Encadrant 1 | `superviseur1` | `sup123` |
+| Encadrant 2 | `superviseur2` | `sup123` |
 
 Participants : numéros `P001` à `P010` (pas besoin de compte pour scanner)
 
