@@ -41,9 +41,11 @@ cd frontend
 npm install
 ```
 
-2. Create a `.env` file (optional):
+2. Copier `.env.example` vers `.env` (ou `.env.local`) pour le développement :
 ```bash
-VITE_API_URL=/api
+cp .env.example .env
+# Adapter si besoin — URL racine de l’API Django (suffixe /api obligatoire)
+# VITE_API_URL=http://127.0.0.1:8000/api
 ```
 
 3. Start the development server:
@@ -62,10 +64,9 @@ The frontend will be available at `http://localhost:3000`
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 
-### API Proxy
+### API
 
-The Vite dev server is configured to proxy API requests to `http://localhost:8000`.
-This means you can call `/api/*` in your React code and it will be forwarded to the Django backend.
+There is no dev-server proxy: set `VITE_API_URL` to your Django API root (for example `http://127.0.0.1:8000/api`). Ensure `CORS_ALLOWED_ORIGINS` on the backend includes your frontend origin (for example `http://localhost:3000`).
 
 ## Features
 

@@ -1897,7 +1897,7 @@ def force_pointage(request, pk):
 @permission_classes([IsAuthenticated])
 def participant_historique(request, pk):
     """Historique des présences d'un participant."""
-    if request.user.role not in ('AUDITEUR', 'PARTICIPANT'):
+    if request.user.role != User.Role.AUDITEUR:
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
@@ -2020,7 +2020,7 @@ def participant_lookup(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if request.user.role not in ('AUDITEUR', 'PARTICIPANT'):
+    if request.user.role != User.Role.AUDITEUR:
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:

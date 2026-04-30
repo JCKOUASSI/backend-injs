@@ -45,7 +45,7 @@ for p in Participant.objects.all():
             'first_name': p.prenom,
             'last_name': p.nom,
             'email': p.email or '',
-            'role': 'PARTICIPANT',
+            'role': User.Role.AUDITEUR,
         }
     )
 
@@ -77,7 +77,7 @@ for f in Formateur.objects.all():
             'first_name': f.prenom,
             'last_name': f.nom,
             'email': f.email or '',
-            'role': 'PARTICIPANT',
+            'role': User.Role.AUDITEUR,
         }
     )
 

@@ -12,8 +12,13 @@
 # Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #
 # Variables optionnelles (préfixe DOCKER_MAIN_* pour ne pas chevaucher channel1) :
-#   DOCKER_MAIN_BACKEND_TAG, DOCKER_MAIN_FRONTEND_TAG
+#   DOCKER_MAIN_VERSION_PREFIX (défaut 1.1), DOCKER_MAIN_BACKEND_TAG, DOCKER_MAIN_FRONTEND_TAG
 #   DOCKER_MAIN_VITE_API_URL, DOCKER_MAIN_VITE_BADGE_BASE_URL
+#
+# Tags poussés à chaque run (prod) :
+#   - tag versionné (auto ou manuel), ex: v1.1.123-amd64
+#   - main-<tag_versionné>, ex: main-v1.1.123-amd64 (même image, nom explicite branche prod)
+#   - latest-amd64 + latest (rolling, même image que le tag versionné)
 
 name: Docker Hub (main / prod)
 
@@ -21,6 +26,19 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (ex: 1.1.44). Vide => auto via run_number"
+        required: false
+        type: string
+      backend_tag:
+        description: "Tag backend (override total). Vide => calculé"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Tag frontend (override total). Vide => calculé"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -52,15 +70,31 @@ jobs:
       - name: Tags et build-args (prod)
         id: cfg
         run: |
-          BT="${DOCKER_MAIN_BACKEND_TAG:-v1.1.40-amd64}"
-          FT="${DOCKER_MAIN_FRONTEND_TAG:-1.0.44-amd64}"
+          # Stratégie tags :
+          # - si backend_tag/frontend_tag fournis (workflow_dispatch) => utilisés tels quels
+          # - sinon si Variables GitHub DOCKER_MAIN_*_TAG => utilisées
+          # - sinon => auto: v<MAJOR>.<MINOR>.<run_number>-amd64
+          PREFIX="${DOCKER_MAIN_VERSION_PREFIX:-1.1}"
+          AUTO="v${PREFIX}.${GITHUB_RUN_NUMBER}-amd64"
+          REQ_VERSION="${{ inputs.version }}"
+          if [ -n "${REQ_VERSION}" ]; then
+            AUTO="v${REQ_VERSION}-amd64"
+          fi
+
+          BT="${{ inputs.backend_tag }}"
+          FT="${{ inputs.frontend_tag }}"
+          if [ -z "${BT}" ]; then BT="${DOCKER_MAIN_BACKEND_TAG:-$AUTO}"; fi
+          if [ -z "${FT}" ]; then FT="${DOCKER_MAIN_FRONTEND_TAG:-$AUTO}"; fi
           API="${DOCKER_MAIN_VITE_API_URL:-https://api.sygepcpfae.org/api}"
           BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://api.sygepcpfae.org}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
+          echo "backend_main_ref=${BACKEND_IMAGE}:main-${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_main_ref=${FRONTEND_IMAGE}:main-${FT}" >> "$GITHUB_OUTPUT"
           echo "vite_api=${API}" >> "$GITHUB_OUTPUT"
           echo "vite_badge=${BADGE}" >> "$GITHUB_OUTPUT"
         env:
+          DOCKER_MAIN_VERSION_PREFIX: ${{ vars.DOCKER_MAIN_VERSION_PREFIX }}
           DOCKER_MAIN_BACKEND_TAG: ${{ vars.DOCKER_MAIN_BACKEND_TAG }}
           DOCKER_MAIN_FRONTEND_TAG: ${{ vars.DOCKER_MAIN_FRONTEND_TAG }}
           DOCKER_MAIN_VITE_API_URL: ${{ vars.DOCKER_MAIN_VITE_API_URL }}
@@ -73,7 +107,11 @@ jobs:
           file: ./backend/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.cfg.outputs.backend_ref }}
+          tags: |
+            ${{ steps.cfg.outputs.backend_ref }}
+            ${{ steps.cfg.outputs.backend_main_ref }}
+            ${{ env.BACKEND_IMAGE }}:latest-amd64
+            ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -84,7 +122,11 @@ jobs:
           file: ./frontend/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.cfg.outputs.frontend_ref }}
+          tags: |
+            ${{ steps.cfg.outputs.frontend_ref }}
+            ${{ steps.cfg.outputs.frontend_main_ref }}
+            ${{ env.FRONTEND_IMAGE }}:latest-amd64
+            ${{ env.FRONTEND_IMAGE }}:latest
           build-args: |
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
             VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}

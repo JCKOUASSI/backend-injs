@@ -31,7 +31,7 @@ admin_user, created = User.objects.get_or_create(
         'email': 'admin@dfrc.gouv.fr',
         'first_name': 'Admin',
         'last_name': 'DFRC',
-        'role': 'DFRC',
+        'role': User.Role.ADMIN,
         'is_staff': True,
         'is_superuser': True,
     }
@@ -50,7 +50,7 @@ dfrc_user, created = User.objects.get_or_create(
         'email': 'direction@dfrc.gouv.fr',
         'first_name': 'Marie',
         'last_name': 'DUPONT',
-        'role': 'DFRC',
+        'role': User.Role.CPFAE_ADMIN,
         'is_staff': True,
     }
 )
@@ -75,7 +75,7 @@ for s_data in superviseurs_data:
         username=s_data['username'],
         defaults={
             **s_data,
-            'role': 'SUPERVISEUR',
+            'role': User.Role.ENCADRANT,
         }
     )
     if created:

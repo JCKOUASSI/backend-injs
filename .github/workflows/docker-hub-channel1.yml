@@ -11,10 +11,13 @@
 # Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (compte ophirdesire)
 #
 # Variables optionnelles (Actions → Variables) pour surcharger les tags / URLs :
-#   DOCKER_BACKEND_TAG        défaut v1.1.40-amd64
-#   DOCKER_FRONTEND_TAG       défaut 1.0.11-amd64
+#   DOCKER_VERSION_PREFIX (défaut 1.1), DOCKER_BACKEND_TAG, DOCKER_FRONTEND_TAG
 #   DOCKER_VITE_API_URL       défaut https://api.badge-qr-code.pro/api
 #   DOCKER_VITE_BADGE_BASE_URL (optionnel, passé au Dockerfile si défini)
+#
+# Tags poussés à chaque run (channel1) :
+#   - tag versionné (auto ou manuel)
+#   - channel1-latest-amd64 (même image que le tag versionné)
 
 name: Docker Hub (channel1)
 
@@ -22,6 +25,19 @@ on:
   push:
     branches: [channel1]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (ex: 1.1.44). Vide => auto via run_number"
+        required: false
+        type: string
+      backend_tag:
+        description: "Tag backend (override total). Vide => calculé"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Tag frontend (override total). Vide => calculé"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -53,15 +69,35 @@ jobs:
       - name: Tags et build-args
         id: cfg
         run: |
-          BT="${DOCKER_BACKEND_TAG:-v1.1.40-amd64}"
-          FT="${DOCKER_FRONTEND_TAG:-1.0.43-amd64}"
+          # Stratégie tags :
+          # - si backend_tag/frontend_tag fournis (workflow_dispatch) => utilisés tels quels
+          # - sinon si Variables GitHub DOCKER_*_TAG => utilisées
+          # - sinon => auto: v<MAJOR>.<MINOR>.<run_number>-amd64
+          #
+          # En plus du tag versionné “standard”, on pousse aussi :
+          #   - channel1-<tag_versionné> (ex: channel1-v1.1.123-amd64)
+          #   - channel1-latest-amd64
+          PREFIX="${DOCKER_VERSION_PREFIX:-1.1}"
+          AUTO="v${PREFIX}.${GITHUB_RUN_NUMBER}-amd64"
+          REQ_VERSION="${{ inputs.version }}"
+          if [ -n "${REQ_VERSION}" ]; then
+            AUTO="v${REQ_VERSION}-amd64"
+          fi
+
+          BT="${{ inputs.backend_tag }}"
+          FT="${{ inputs.frontend_tag }}"
+          if [ -z "${BT}" ]; then BT="${DOCKER_BACKEND_TAG:-$AUTO}"; fi
+          if [ -z "${FT}" ]; then FT="${DOCKER_FRONTEND_TAG:-$AUTO}"; fi
           API="${DOCKER_VITE_API_URL:-https://api.badge-qr-code.pro/api}"
           BADGE="${DOCKER_VITE_BADGE_BASE_URL:-}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
+          echo "backend_channel_ref=${BACKEND_IMAGE}:channel1-${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_channel_ref=${FRONTEND_IMAGE}:channel1-${FT}" >> "$GITHUB_OUTPUT"
           echo "vite_api=${API}" >> "$GITHUB_OUTPUT"
           echo "vite_badge=${BADGE}" >> "$GITHUB_OUTPUT"
         env:
+          DOCKER_VERSION_PREFIX: ${{ vars.DOCKER_VERSION_PREFIX }}
           DOCKER_BACKEND_TAG: ${{ vars.DOCKER_BACKEND_TAG }}
           DOCKER_FRONTEND_TAG: ${{ vars.DOCKER_FRONTEND_TAG }}
           DOCKER_VITE_API_URL: ${{ vars.DOCKER_VITE_API_URL }}
@@ -74,7 +110,10 @@ jobs:
           file: ./backend/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.cfg.outputs.backend_ref }}
+          tags: |
+            ${{ steps.cfg.outputs.backend_ref }}
+            ${{ steps.cfg.outputs.backend_channel_ref }}
+            ${{ env.BACKEND_IMAGE }}:channel1-latest-amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -85,7 +124,10 @@ jobs:
           file: ./frontend/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.cfg.outputs.frontend_ref }}
+          tags: |
+            ${{ steps.cfg.outputs.frontend_ref }}
+            ${{ steps.cfg.outputs.frontend_channel_ref }}
+            ${{ env.FRONTEND_IMAGE }}:channel1-latest-amd64
           build-args: |
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
             VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}

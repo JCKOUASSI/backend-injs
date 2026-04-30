@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Render build script
+# Script de build / déploiement (collectstatic + migrations + seeds optionnels).
 set -o errexit
 
 pip install -r requirements.txt
 
-# Créer le répertoire SQLite si nécessaire
-mkdir -p /opt/render/project/src/data
+# Cache fichier Django en prod (FileBasedCache, throttling multi-workers).
+mkdir -p "${CACHE_DIR:-$PWD/cache}"
 
 python manage.py collectstatic --no-input
 python manage.py migrate
