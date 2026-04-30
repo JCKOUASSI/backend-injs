@@ -415,6 +415,13 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
+    # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
+    cycle = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Libellé du cycle de formation (ex. même valeur que Formation.formation)",
+    )
     duree_prevue_heures = models.DecimalField(
         max_digits=6, decimal_places=2, default=0,
         null=True, blank=True,

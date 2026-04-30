@@ -913,6 +913,9 @@ def api_import_excel(request):
                     'emploi_du_temps': 'Emploi du temps',
                 }
                 sheet_name = sheet_map[import_type]
+                # Comme manage.py import_excel : feuille « Séances » ou « Seances » (sans accent).
+                if import_type == 'seances' and sheet_name not in wb.sheetnames and 'Seances' in wb.sheetnames:
+                    sheet_name = 'Seances'
 
                 def _looks_like_participant_sheet(ws):
                     """Return True if the first row contains an inscription number column."""
