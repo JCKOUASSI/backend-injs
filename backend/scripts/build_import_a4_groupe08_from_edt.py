@@ -7,7 +7,7 @@ Usage :
   python backend/scripts/build_import_a4_groupe08_from_edt.py \\
     "/chemin/vers/Emploi du Temps A4 GROUPE 8MAJ.xlsx"
 
-Sortie (backend/) — A4 groupe 8, deux jeux de noms :
+Sortie (backend/) — A4 groupe 8, deux jeux de noms (Formations avec Site, Bâtiment, Salle) :
   import_formations_A4_GROUPE_08_MAJ.xlsx  (+ copie import_formations_A4_GROUPE_08.xlsx)
   import_seances_A4_GROUPE_08_MAJ.xlsx     (+ copie import_seances_A4_GROUPE_08.xlsx)
   import_A4_GROUPE_08_MAJ_complet.xlsx     (+ copie import_A4_GROUPE_08_complet.xlsx)
@@ -138,9 +138,12 @@ def parse_schedule(rows: list[tuple[int, list[str]]]):
     Retourne :
       sessions : liste (module_canon, date, heure_debut, heure_fin, intitule_creneau)
       volumes : module -> volume h (float) depuis ligne '16 H' en col6 après entête module
+      module_batiment, module_salle : premiers libellés non vides (colonnes EDT bâtiment / salle)
     """
     sessions: list[tuple[str, date, time, time, str]] = []
     module_volumes: dict[str, float] = {}
+    module_batiment: dict[str, str] = {}
+    module_salle: dict[str, str] = {}
     current_module: str | None = None
 
     i = 0
@@ -186,10 +189,17 @@ def parse_schedule(rows: list[tuple[int, list[str]]]):
         if dt and t0 and t1 and current_module:
             label = f"{t0.strftime('%H:%M')}-{t1.strftime('%H:%M')}"
             sessions.append((current_module, dt, t0, t1, label))
+            # Colonnes 7–8 de l’EDT (bâtiment / salle) — une valeur par module (première renseignée)
+            bat = cells[2].strip() if len(cells) > 2 else ""
+            sal = cells[3].strip() if len(cells) > 3 else ""
+            if bat and current_module not in module_batiment:
+                module_batiment[current_module] = bat
+            if sal and current_module not in module_salle:
+                module_salle[current_module] = sal
 
         i += 1
 
-    return sessions, module_volumes
+    return sessions, module_volumes, module_batiment, module_salle
 
 
 def module_date_ranges(sessions):
@@ -202,14 +212,21 @@ def module_date_ranges(sessions):
     return ranges
 
 
-def write_formations(wb: Workbook, ranges: dict[str, tuple[date, date]], volumes: dict[str, float]):
+def write_formations(
+    wb: Workbook,
+    ranges: dict[str, tuple[date, date]],
+    volumes: dict[str, float],
+    module_batiment: dict[str, str],
+    module_salle: dict[str, str],
+):
     ws = wb.create_sheet("Formations")
-    # Même jeu de colonnes que le template métier (capture d’écran import cours).
     headers = (
         "N°",
         "Formation",
         "Module (titre)",
         "Site",
+        "Bâtiment",
+        "Salle",
         "Date début",
         "Date fin",
         "Volume horaire (h)",
@@ -232,6 +249,8 @@ def write_formations(wb: Workbook, ranges: dict[str, tuple[date, date]], volumes
                 FORMATION_CYCLE,
                 mod,
                 SITE,
+                module_batiment.get(mod, ""),
+                module_salle.get(mod, ""),
                 datetime.combine(d0, time(8, 0)),
                 datetime.combine(d1, time(17, 0)),
                 vol,
@@ -291,7 +310,7 @@ def main():
     rows = extract_rows(ws_in)
     wb_in.close()
 
-    sessions, volumes = parse_schedule(rows)
+    sessions, volumes, module_batiment, module_salle = parse_schedule(rows)
     if not sessions:
         print("Aucune séance extraite — vérifier le fichier source.", file=sys.stderr)
         sys.exit(2)
@@ -301,7 +320,7 @@ def main():
     # --- Fichier formations seul ---
     wf = Workbook()
     wf.remove(wf.active)
-    write_formations(wf, ranges, volumes)
+    write_formations(wf, ranges, volumes, module_batiment, module_salle)
     out_f = BACKEND / "import_formations_A4_GROUPE_08_MAJ.xlsx"
     wf.save(out_f)
     print("Écrit:", out_f)
@@ -321,7 +340,7 @@ def main():
     # --- Complet ---
     wc = Workbook()
     wc.remove(wc.active)
-    write_formations(wc, ranges, volumes)
+    write_formations(wc, ranges, volumes, module_batiment, module_salle)
     write_seances(wc, sessions)
     out_c = BACKEND / "import_A4_GROUPE_08_MAJ_complet.xlsx"
     wc.save(out_c)
