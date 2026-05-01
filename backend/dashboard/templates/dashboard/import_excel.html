@@ -64,9 +64,9 @@
             <div class="card-body">
                 <p class="text-muted small">Importer les modules de formation depuis un fichier Excel.</p>
                 <ul class="small text-muted mb-3">
-                    <li>N°, Module (titre), Objectif, Lieu</li>
-                    <li>Date début, Date fin, Volume horaire</li>
-                    <li>Catégorie, Grade, Programme</li>
+                    <li>N°, Formation, Module (titre), Site, Bâtiment, Salle</li>
+                    <li>Date début, Date fin, Volume horaire (h)</li>
+                    <li>Catégorie, Grade, Groupe, Vague</li>
                 </ul>
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}

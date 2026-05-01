@@ -3,6 +3,12 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
+/** Colonnes feuille « Formations » / import type cours (aligné import_excel + modèle Excel). */
+const FORMATIONS_IMPORT_COLUMNS = [
+  'N°', 'Formation', 'Module (titre)', 'Site', 'Bâtiment', 'Salle',
+  'Date début', 'Date fin', 'Volume horaire (h)', 'Catégorie', 'Grade', 'Groupe', 'Vague',
+]
+
 function downloadTemplate(filename, columns) {
   const csv = columns.join(';') + '\n'
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -157,7 +163,7 @@ export default function ImportExcel() {
 
       <div className="grid-2">
         <ImportCard type="formations" title="Cours" icon="bi-mortarboard" color="var(--ci-green-dark)"
-          columns={['N°', 'Formation', 'Module (titre)', 'Site', 'Date début', 'Date fin', 'Volume horaire (h)', 'Catégorie', 'Grade', 'Groupe', 'Vague']}
+          columns={FORMATIONS_IMPORT_COLUMNS}
           onImport={handleImport} loading={loading} />
         <ImportCard type="participants" title="Auditeurs" icon="bi-people" color="var(--ci-blue)"
           columns={["N° d'inscription", 'Nom', 'Prénoms', 'Genre', 'Date de naissance', 'Lieu de naissance', 'E-mail', 'Téléphone 1', 'Téléphone 2', 'Type concours', 'Libellé concours', 'Catégorie', 'Grade', 'Groupe', 'Grade-Groupe', 'Vague', 'Site', 'Salle', 'Formation(s)']}

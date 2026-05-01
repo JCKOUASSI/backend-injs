@@ -415,6 +415,13 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
+    # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
+    cycle = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Libellé du cycle de formation (ex. même valeur que Formation.formation)",
+    )
     duree_prevue_heures = models.DecimalField(
         max_digits=6, decimal_places=2, default=0,
         null=True, blank=True,
@@ -433,9 +440,27 @@ class Module(models.Model):
         related_name='modules_secretariat',
         help_text="Secrétariat responsable de ce module",
     )
-    site     = models.CharField(max_length=255, blank=True, default='', help_text="Centre de formation (doit correspondre à un RefSite pour que le contrôle de présence mobile soit actif)")
-    batiment = models.CharField(max_length=255, blank=True, default='', help_text="Bâtiment")
-    salle    = models.CharField(max_length=100, blank=True, default='', help_text="Salle")
+    site = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Site',
+        help_text="Centre de formation (import : colonne « Site » ; aligné RefSite pour la géolocalisation mobile).",
+    )
+    batiment = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Bâtiment',
+        help_text="Bâtiment ou zone (import Excel : colonne « Bâtiment »).",
+    )
+    salle = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Salle',
+        help_text="Salle ou lieu précis (import Excel : colonne « Salle »).",
+    )
     date_debut = models.DateField(null=True, blank=True, help_text="Date de début du module")
     date_fin   = models.DateField(null=True, blank=True, help_text="Date de fin du module")
     statut = models.CharField(

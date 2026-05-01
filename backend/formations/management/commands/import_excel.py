@@ -174,7 +174,10 @@ class Command(BaseCommand):
                         if clean in ('module_titre', 'module titre', 'formation_titre', 'formation titre'):
                             headers.append('module_titre')
                             continue
-                        if clean in ('formation (cycle)', 'formation(cycle)', 'cycle de formation', 'cycle'):
+                        if clean in (
+                            'formation (cycle)', 'formation(cycle)', 'cycle de formation', 'cycle',
+                            'formation',
+                        ):
                             headers.append('formation')
                             continue
                         if clean in ('intitule', 'intitulé', 'libelle', 'libellé') and sheet_type != 'formation':
@@ -417,6 +420,8 @@ class Command(BaseCommand):
                 'date_debut': date_debut.date() if hasattr(date_debut, 'date') else date_debut,
                 'date_fin': date_fin.date() if hasattr(date_fin, 'date') else date_fin,
                 'statut': self._str(data.get('statut')) or 'PLANIFIEE',
+                # Champ `cycle` (NOT NULL sur certaines bases) : libellé du cycle = formation parente.
+                'cycle': titre,
             }
             _site = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
@@ -1045,6 +1050,7 @@ class Command(BaseCommand):
                                  'duree_prevue_heures': 0,
                                  'ordre': (formation.modules.aggregate(m=models.Max('ordre'))['m'] or 0) + 1,
                                  'grade': grade, 'groupe': groupe, 'vague': vague,
+                                 'cycle': formation.formation,
                             },
                         )
                         modules_matched.append(module_obj)
