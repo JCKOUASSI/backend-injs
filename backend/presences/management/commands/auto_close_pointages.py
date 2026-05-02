@@ -10,6 +10,9 @@ Pour chaque pointage EN_COURS dont la séance est terminée depuis plus d'1 heur
 
 À planifier via cron toutes les 5-15 minutes :
   */10 * * * * /path/to/venv/bin/python /path/to/manage.py auto_close_pointages
+
+Les pointages issus du badgeage web (device_id WEB_BADGE / OFFLINE_WEB) ne sont pas
+soumis aux règles MOBILE_HEARTBEAT_* (pas de heartbeat navigateur).
 """
 
 from datetime import timedelta
@@ -27,6 +30,9 @@ MOTIF = "N'a pas badgé à la sortie de la séance"
 DELAI_MINUTES = getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
 SUSPECT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
 AUTO_EXIT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES', 120)
+
+# Badgeage web : pas d’endpoint heartbeat → ne pas appliquer les timeouts mobile.
+NO_MOBILE_HEARTBEAT_DEVICE_IDS = frozenset({'WEB_BADGE', 'OFFLINE_WEB'})
 
 
 class Command(BaseCommand):
@@ -129,6 +135,9 @@ class Command(BaseCommand):
                 continue
 
             # 2) Règle anti-fraude mobile : gestion du timeout heartbeat
+            if (pt.device_id or '') in NO_MOBILE_HEARTBEAT_DEVICE_IDS:
+                continue
+
             last_seen_at = pt.last_heartbeat_at or pt.timestamp_entree
             silence_minutes = int((now - last_seen_at).total_seconds() // 60)
 
