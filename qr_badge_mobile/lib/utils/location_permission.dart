@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -122,8 +121,11 @@ Future<bool> ensureLocationPermission(BuildContext context) async {
 /// Best-effort : on ne bloque pas le flux si l'utilisateur refuse, le badgeage
 /// reste possible (le suivi sera juste dégradé en arrière-plan).
 Future<void> _requestBackgroundExtras(BuildContext context) async {
+  if (kIsWeb) {
+    return;
+  }
   try {
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       // POST_NOTIFICATIONS sur Android 13+ : indispensable pour la
       // notification persistante du foreground service.
       final notif = await Permission.notification.status;
@@ -167,7 +169,7 @@ Future<void> _requestBackgroundExtras(BuildContext context) async {
         return;
       }
       await Permission.locationAlways.request();
-    } else if (Platform.isIOS) {
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       // iOS : la permission "always" se demande aussi via Geolocator,
       // mais permission_handler offre une API explicite.
       final bg = await Permission.locationAlways.status;

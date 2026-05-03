@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -53,7 +54,25 @@ class StorageService {
 
   Future<String> getOrCreateDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getString(_kDeviceId);
+    var existing = prefs.getString(_kDeviceId);
+    if (kIsWeb) {
+      // Préfixe dédié : le backend n’applique pas les sanctions MOBILE_HEARTBEAT_* (pas de heartbeat fiable en arrière-plan navigateur).
+      if (existing != null &&
+          existing.isNotEmpty &&
+          existing.startsWith('MOBILE_')) {
+        final migrated =
+            'FLUTTER_PWA_${DateTime.now().millisecondsSinceEpoch}';
+        await prefs.setString(_kDeviceId, migrated);
+        return migrated;
+      }
+      if (existing != null && existing.isNotEmpty) {
+        return existing;
+      }
+      final generated =
+          'FLUTTER_PWA_${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString(_kDeviceId, generated);
+      return generated;
+    }
     if (existing != null && existing.isNotEmpty) {
       return existing;
     }

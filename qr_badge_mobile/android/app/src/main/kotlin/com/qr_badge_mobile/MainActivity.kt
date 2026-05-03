@@ -1,4 +1,4 @@
-package com.dfrc.qr_badge_mobile
+package com.qr_badge_mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

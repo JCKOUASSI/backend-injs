@@ -1,10 +1,8 @@
 """
 Vues actives du dashboard Django.
 
-Seules trois vues sont montées dans dashboard/urls.py :
-  - login_view  → dashboard/login/
-  - logout_view → dashboard/logout/
-  - badge_view  → dashboard/badge/
+Vues publiques / auth dans dashboard/urls.py :
+  - login_view, logout_view, badge_view, qr_badge_privacy_view
 
 Toutes les autres vues HTML (formations, participants, sessions…) ont été
 remplacées par le frontend React. Elles sont archivées dans views_legacy.py.
@@ -61,3 +59,8 @@ def logout_view(request):
 def badge_view(request):
     """Page publique de badgeage — pas de login requis."""
     return render(request, 'dashboard/badge.html')
+
+
+def qr_badge_privacy_view(request):
+    """Politique de confidentialité (app mobile QR Badge) — publique, pour URL Play Console / App Store."""
+    return render(request, 'dashboard/qr_badge_privacy.html')

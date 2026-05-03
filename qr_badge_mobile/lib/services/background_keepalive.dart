@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -52,7 +51,8 @@ class BackgroundKeepalive {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-    if (!Platform.isAndroid) return;
+    if (kIsWeb) return;
+    if (defaultTargetPlatform != TargetPlatform.android) return;
 
     FlutterForegroundTask.initCommunicationPort();
     FlutterForegroundTask.init(
@@ -80,10 +80,11 @@ class BackgroundKeepalive {
 
   /// Démarre le mécanisme de keepalive.
   Future<void> start() async {
+    if (kIsWeb) return;
     if (_running) return;
     _running = true;
     try {
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         await initialize();
         final running = await FlutterForegroundTask.isRunningService;
         if (!running) {
@@ -94,7 +95,7 @@ class BackgroundKeepalive {
             callback: backgroundKeepaliveEntry,
           );
         }
-      } else if (Platform.isIOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         await _startIosLocationStream();
       }
     } catch (e, st) {
@@ -107,11 +108,11 @@ class BackgroundKeepalive {
     if (!_running) return;
     _running = false;
     try {
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         if (await FlutterForegroundTask.isRunningService) {
           await FlutterForegroundTask.stopService();
         }
-      } else if (Platform.isIOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         await _iosPosSub?.cancel();
         _iosPosSub = null;
       }
