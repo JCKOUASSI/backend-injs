@@ -523,7 +523,8 @@ def formation_list_api(request):
             'categorie': m.grade,
             'groupe': m.groupe,
             'vague': m.vague,
-            'site': m.site,
+            'site': (m.site.nom if m.site else (m.site_legacy or '')),
+            'site_id': m.site_id,
             'batiment': m.batiment,
             'salle': m.salle,
             'date_debut': m.date_debut,
@@ -709,7 +710,8 @@ def participant_formations_api(request, pk):
             'grade': m.grade,
             'groupe': m.groupe,
             'vague': m.vague,
-            'site': m.site,
+            'site': (m.site.nom if m.site else (m.site_legacy or '')),
+            'site_id': m.site_id,
             'batiment': m.batiment,
             'salle': m.salle,
             'date_debut': m.date_debut,
@@ -1289,6 +1291,18 @@ def module_list_api(request, formation_pk):
     ordre = request.data.get('ordre', formation.modules.count() + 1)
     from django.db import IntegrityError
     try:
+        site_id = request.data.get('site_id')
+        site_name = (request.data.get('site', '') or '').strip()
+        site_obj = None
+        if site_id not in (None, '', 0, '0'):
+            try:
+                site_obj = RefSite.objects.get(pk=int(site_id))
+            except (RefSite.DoesNotExist, ValueError, TypeError):
+                site_obj = None
+        elif site_name:
+            # On crée au besoin pour éviter un FK null qui casserait la géofence.
+            site_obj, _ = RefSite.objects.get_or_create(nom=site_name, defaults={'actif': True})
+
         module = Module.objects.create(
             formation=formation,
             intitule=intitule,
@@ -1300,7 +1314,8 @@ def module_list_api(request, formation_pk):
             statut=request.data.get('statut', 'PLANIFIEE'),
             date_debut=request.data.get('date_debut') or None,
             date_fin=request.data.get('date_fin') or None,
-            site=request.data.get('site', ''),
+            site=site_obj,
+            site_legacy=site_name,
             batiment=request.data.get('batiment', ''),
             salle=request.data.get('salle', ''),
         )
@@ -1328,7 +1343,7 @@ def module_detail_api(request, formation_pk, module_pk):
         fields = [
             'intitule', 'duree_prevue_heures', 'ordre', 'statut',
             'grade', 'groupe', 'vague',
-            'site', 'batiment', 'salle',
+            'site', 'site_id', 'batiment', 'salle',
             'date_debut', 'date_fin',
             'formateur', 'secretariat', 'superviseur',
         ]
@@ -1338,12 +1353,33 @@ def module_detail_api(request, formation_pk, module_pk):
                            'date_debut', 'date_fin', 'grade', 'groupe', 'vague'}
 
         # Champs texte qui stockent '' plutôt que NULL
-        str_fields = {'site', 'batiment', 'salle', 'intitule', 'statut'}
+        str_fields = {'batiment', 'salle', 'intitule', 'statut'}
 
         with transaction.atomic():
             for f in fields:
                 if f in request.data:
                     val = request.data[f]
+                    if f in ('site', 'site_id'):
+                        # Normalisation: on accepte soit site_id, soit site (nom).
+                        new_site = None
+                        if 'site_id' in request.data:
+                            raw_id = request.data.get('site_id')
+                            if raw_id not in (None, '', 0, '0'):
+                                try:
+                                    new_site = RefSite.objects.get(pk=int(raw_id))
+                                except (RefSite.DoesNotExist, ValueError, TypeError):
+                                    new_site = None
+                        if new_site is None and 'site' in request.data:
+                            raw_name = (request.data.get('site') or '').strip()
+                            if raw_name:
+                                new_site, _ = RefSite.objects.get_or_create(
+                                    nom=raw_name, defaults={'actif': True}
+                                )
+                                module.site_legacy = raw_name
+                            else:
+                                module.site_legacy = ''
+                        module.site = new_site
+                        continue
                     if f in nullable_fields and val in (None, '', ''):
                         val = None
                     elif f in str_fields and val is None:
@@ -1518,7 +1554,8 @@ def module_full_detail_api(request, formation_pk, module_pk):
         'ordre': module.ordre,
         'statut': module.statut,
         'statut_label': module.get_statut_display(),
-        'site':     module.site,
+        'site':     (module.site.nom if module.site else (module.site_legacy or '')),
+        'site_id':  module.site_id,
         'batiment': module.batiment,
         'salle':    module.salle,
         'date_debut': module.date_debut,

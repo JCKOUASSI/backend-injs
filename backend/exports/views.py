@@ -1613,7 +1613,10 @@ def export_excel_session(request, session_pk):
     heure_debut = session.heure_debut_prevue.strftime('%H:%M') if session.heure_debut_prevue else '-'
     heure_fin = session.heure_fin_prevue.strftime('%H:%M') if session.heure_fin_prevue else '-'
     _sm = session.module if session.module else None
-    _xs = (_sm.site     if _sm and _sm.site     else '') or ''
+    _xs = (
+        (_sm.site.nom if getattr(_sm, 'site', None) else getattr(_sm, 'site_legacy', ''))
+        if _sm else ''
+    ) or ''
     _xb = (_sm.batiment if _sm and _sm.batiment else '') or ''
     _xl = (_sm.salle    if _sm and _sm.salle    else '') or ''
     _xml = (_sm.intitule if _sm else '') or ''

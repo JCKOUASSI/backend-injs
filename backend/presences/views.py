@@ -342,12 +342,33 @@ def _resolve_site_geofence(module):
     """
     Retourne (lat, lon, rayon_m) pour le site du module, ou (None, None, None)
     si aucun RefSite correspondant ne possède de geofence configurée.
-    Le lien se fait par nom (Module.site → RefSite.nom, case-insensitive).
+    Le lien se fait préférentiellement par FK (Module.site → RefSite),
+    avec fallback legacy par nom si nécessaire.
     """
-    site_name = (getattr(module, 'site', '') or '').strip()
-    if not site_name:
-        return None, None, None
-    site = RefSite.objects.filter(nom__iexact=site_name).first()
+    # Nouveau modèle: module.site est une FK.
+    site_obj = getattr(module, 'site', None)
+    if site_obj is not None:
+        # Peut être un objet RefSite déjà chargé, ou juste un id.
+        try:
+            site_id = getattr(module, 'site_id', None)
+        except Exception:
+            site_id = None
+        if site_id:
+            site = RefSite.objects.filter(pk=site_id).first()
+        elif getattr(site_obj, 'pk', None):
+            site = site_obj
+        else:
+            site = None
+    else:
+        site = None
+
+    # Fallback legacy: match par texte
+    if site is None:
+        site_name = (getattr(module, 'site_legacy', '') or '').strip()
+        if not site_name:
+            return None, None, None
+        site = RefSite.objects.filter(nom__iexact=site_name).first()
+
     if site is None or site.geofence_latitude is None or site.geofence_longitude is None:
         return None, None, None
     rayon = site.geofence_rayon_m or getattr(settings, 'MOBILE_GEOFENCE_DEFAULT_RADIUS_M', 200)
@@ -1990,7 +2011,7 @@ def formation_offline_data(request, token):
         })
 
     module = getattr(qr_token.session, 'module', None) if qr_token.session else None
-    site     = (module.site     if module else '')
+    site     = ((module.site.nom if getattr(module, 'site', None) else getattr(module, 'site_legacy', '')) if module else '')
     batiment = (module.batiment if module else '')
     salle    = (module.salle    if module else '')
 

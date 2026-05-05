@@ -64,3 +64,8 @@ def badge_view(request):
 def qr_badge_privacy_view(request):
     """Politique de confidentialité (app mobile QR Badge) — publique, pour URL Play Console / App Store."""
     return render(request, 'dashboard/qr_badge_privacy.html')
+
+
+def qr_badge_support_view(request):
+    """Page support (app mobile QR Badge) — publique, pour URL "Support" App Store Connect."""
+    return render(request, 'dashboard/qr_badge_support.html')

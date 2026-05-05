@@ -1137,6 +1137,13 @@ def force_pointage_view(request, pk):
         formation = get_object_or_404(Formation, pk=pk)
         action = request.POST.get('action')
         type_personne = request.POST.get('type_personne', 'participant')
+        motif = (request.POST.get('motif') or '').strip()
+        if not motif:
+            messages.error(request, "Le motif est obligatoire pour forcer un badgeage.")
+            referer = request.META.get('HTTP_REFERER', '')
+            if 'live' in referer:
+                return redirect('web-formation-live', pk=pk)
+            return redirect('web-formation-detail', pk=pk)
 
         session_active = SessionModule.objects.filter(
             module__formation=formation, demarree_le__isnull=False, terminee_le__isnull=True,
@@ -1177,7 +1184,7 @@ def force_pointage_view(request, pk):
                     cible_nom=f'{personne.nom} {personne.prenom}',
                     formation=formation,
                     pointage=pt,
-                    extra={'source': 'web', 'acteur_role': request.user.role, 'motif': request.POST.get('motif', '')},
+                    extra={'source': 'web', 'acteur_role': request.user.role, 'motif': motif},
                 )
 
         elif action == 'SORTIE':
@@ -1201,7 +1208,7 @@ def force_pointage_view(request, pk):
                     cible_nom=f'{personne.nom} {personne.prenom}',
                     formation=formation,
                     pointage=pointage,
-                    extra={'source': 'web', 'acteur_role': request.user.role, 'duree_minutes': float(pointage.duree_presence_minutes or 0), 'motif': request.POST.get('motif', '')},
+                    extra={'source': 'web', 'acteur_role': request.user.role, 'duree_minutes': float(pointage.duree_presence_minutes or 0), 'motif': motif},
                 )
             except Pointage.DoesNotExist:
                 messages.warning(request, "Aucune session en cours aujourd'hui.")

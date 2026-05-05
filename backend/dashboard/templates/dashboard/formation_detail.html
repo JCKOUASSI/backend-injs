@@ -510,35 +510,44 @@
                         {% if user.role != 'DIRECTION' %}
                         <div class="btn-group btn-group-sm">
                             {% if not f.has_pointage %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ f.formateur.id }}">
-                                <input type="hidden" name="type_personne" value="formateur">
-                                <input type="hidden" name="action" value="ENTREE">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Forcer entrée">
-                                    <i class="bi bi-box-arrow-in-right"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-success js-force-pointage"
+                                title="Forcer entrée"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ f.formateur.id }}"
+                                data-type-personne="formateur"
+                                data-action="ENTREE"
+                            >
+                                <i class="bi bi-box-arrow-in-right"></i>
+                            </button>
                             {% elif f.session_ouverte %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ f.formateur.id }}">
-                                <input type="hidden" name="type_personne" value="formateur">
-                                <input type="hidden" name="action" value="SORTIE">
-                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Forcer sortie">
-                                    <i class="bi bi-box-arrow-right"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-warning js-force-pointage"
+                                title="Forcer sortie"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ f.formateur.id }}"
+                                data-type-personne="formateur"
+                                data-action="SORTIE"
+                            >
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
                             {% else %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ f.formateur.id }}">
-                                <input type="hidden" name="type_personne" value="formateur">
-                                <input type="hidden" name="action" value="ENTREE">
-                                <button type="submit" class="btn btn-sm btn-outline-info" title="Forcer retour">
-                                    <i class="bi bi-arrow-return-left"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-info js-force-pointage"
+                                title="Forcer retour"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ f.formateur.id }}"
+                                data-type-personne="formateur"
+                                data-action="ENTREE"
+                            >
+                                <i class="bi bi-arrow-return-left"></i>
+                            </button>
                             {% endif %}
                             {% if user|can_remove_formateur %}
                             <form method="post" action="{% url 'web-formation-remove-formateur' formation.id f.formateur.id %}" class="d-inline">
@@ -623,35 +632,44 @@
                         {% if user|can_force_pointage %}
                         <div class="btn-group btn-group-sm">
                             {% if not p.has_pointage %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ p.participant.id }}">
-                                <input type="hidden" name="type_personne" value="participant">
-                                <input type="hidden" name="action" value="ENTREE">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Forcer entrée">
-                                    <i class="bi bi-box-arrow-in-right"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-success js-force-pointage"
+                                title="Forcer entrée"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ p.participant.id }}"
+                                data-type-personne="participant"
+                                data-action="ENTREE"
+                            >
+                                <i class="bi bi-box-arrow-in-right"></i>
+                            </button>
                             {% elif p.session_ouverte %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ p.participant.id }}">
-                                <input type="hidden" name="type_personne" value="participant">
-                                <input type="hidden" name="action" value="SORTIE">
-                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Forcer sortie">
-                                    <i class="bi bi-box-arrow-right"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-warning js-force-pointage"
+                                title="Forcer sortie"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ p.participant.id }}"
+                                data-type-personne="participant"
+                                data-action="SORTIE"
+                            >
+                                <i class="bi bi-box-arrow-right"></i>
+                            </button>
                             {% else %}
-                            <form method="post" action="{% url 'web-force-pointage' formation.id %}" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="personne_id" value="{{ p.participant.id }}">
-                                <input type="hidden" name="type_personne" value="participant">
-                                <input type="hidden" name="action" value="ENTREE">
-                                <button type="submit" class="btn btn-sm btn-outline-info" title="Forcer retour">
-                                    <i class="bi bi-arrow-return-left"></i>
-                                </button>
-                            </form>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-info js-force-pointage"
+                                title="Forcer retour"
+                                data-bs-toggle="modal"
+                                data-bs-target="#forcePointageModal"
+                                data-personne-id="{{ p.participant.id }}"
+                                data-type-personne="participant"
+                                data-action="ENTREE"
+                            >
+                                <i class="bi bi-arrow-return-left"></i>
+                            </button>
                             {% endif %}
                             {% if user|can_remove_participant %}
                             <form method="post" action="{% url 'web-formation-remove-participant' formation.id p.participant.id %}" class="d-inline">
@@ -733,4 +751,60 @@
         </div>
     </div>
 </div>
+
+<!-- Modal : Forcer un pointage (motif obligatoire) -->
+<div class="modal fade" id="forcePointageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'web-force-pointage' formation.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="personne_id" id="forcePersonneId">
+                <input type="hidden" name="type_personne" id="forceTypePersonne">
+                <input type="hidden" name="action" id="forceAction">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Forcer un badgeage</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label" for="forceMotif">Motif <span class="text-danger">*</span></label>
+                    <textarea
+                        class="form-control"
+                        name="motif"
+                        id="forceMotif"
+                        rows="3"
+                        maxlength="500"
+                        required
+                        placeholder="Ex: Badge perdu, panne lecteur, correction..."
+                    ></textarea>
+                    <small class="text-muted">Ce motif sera tracé dans le journal d’audit.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-dfrc">Confirmer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+  (function () {
+    const buttons = document.querySelectorAll('.js-force-pointage');
+    const personneId = document.getElementById('forcePersonneId');
+    const typePersonne = document.getElementById('forceTypePersonne');
+    const action = document.getElementById('forceAction');
+    const motif = document.getElementById('forceMotif');
+
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        personneId.value = btn.getAttribute('data-personne-id') || '';
+        typePersonne.value = btn.getAttribute('data-type-personne') || 'participant';
+        action.value = btn.getAttribute('data-action') || 'ENTREE';
+        motif.value = '';
+        setTimeout(() => motif.focus(), 150);
+      });
+    });
+  })();
+</script>
 {% endblock %}

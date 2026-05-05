@@ -13,6 +13,12 @@ urlpatterns = [
         views.qr_badge_privacy_view,
         name='qr-badge-privacy',
     ),
+    # Support — URL à renseigner dans App Store Connect (Support URL)
+    path(
+        'legal/support-qr-badge/',
+        views.qr_badge_support_view,
+        name='qr-badge-support',
+    ),
 
     # Auth (conservées pour compatibilité QR badge)
     path('login/', views.login_view, name='web-login'),
