@@ -69,9 +69,11 @@ flutter build appbundle --release
 flutter build appbundle --release --obfuscate --split-debug-info=build/debug-info
 ```
 
-Conserve **`build/debug-info/`** (hors store) pour symboliser les crashs.
+Conserve **`build/debug-info/`** (hors store) pour symboliser les crashs **Dart** (distinct du mapping Java ci‑dessous).
 
-- **Android R8** : désactivé en release dans ce projet (`minifyEnabled false`). Activer R8 avec l’ancien `play:core` déclenche un **avertissement Play** (incompatibilité targetSdk 34) ; les bibliothèques Play v2 ne satisfont pas encore toutes les références de l’embedding Flutter (`play.core.tasks.*`).
+- **Android R8** : activé en release (`minifyEnabled` / `shrinkResources`). Dépendances Play **v2** (`feature-delivery`, `core-common`) — pas le monolithe `com.google.android.play:core:1.x` (déconseillé / rejet Play). Les règles ProGuard incluent `-dontwarn` sur `com.google.android.play.core.tasks.*` (références résiduelles de l’embedding Flutter aux composants différés ; sans effet si vous n’utilisez pas les modules dynamiques Play).
+
+- **Play Console — fichier de désobscurcissement** : après `flutter build appbundle --release`, importez **`build/app/outputs/mapping/release/mapping.txt`** (même version que l’AAB publié) dans la fiche de la version (ANR / plantages Java/Kotlin). Cela supprime l’avertissement « aucun fichier de désobscurcissement » pour la couche Android.
 
 - **Analyser** : `flutter build apk --release --analyze-size`
 
@@ -82,6 +84,8 @@ Le backend Django du projet expose une page prête à l’emploi (à adapter si 
 `https://<TON_DOMAINE>/dashboard/legal/confidentialite-qr-badge/`
 
 Remplace `<TON_DOMAINE>` par l’URL publique du serveur (ex. `sygep.example.ci`). Copie cette URL exacte dans la Play Console.
+
+**Dans l’app** : un lien discret « Confidentialité » (souligné, petit texte) sous le formulaire de connexion, et la même entrée dans le menu **⋮** de l’écran principal. Ouverture dans le **navigateur externe**. URL = `PRIVACY_POLICY_URL` (app.env / dart-define) ou `{API_BASE_URL}/dashboard/legal/confidentialite-qr-badge/`.
 
 Fichier : `build/app/outputs/bundle/release/app-release.aab` — à importer dans Play Console (tests internes, etc.).
 

@@ -52,11 +52,13 @@ android {
 
     buildTypes {
         release {
-            // R8 + dépendance play:core → rejet Play (targetSdk 34). Les artefacts Play v2 ne
-            // couvrent pas toutes les refs de l’embedding Flutter (play.core.tasks.*).
-            // Pas de minify Android : utiliser `flutter build appbundle --obfuscate --split-debug-info=...` pour le Dart.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // R8 + Play v2 (pas play:core 1.x — rejet targetSdk 34). mapping.txt → Play Console « fichier de désobscurcissement ».
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig =
                 if (keystorePropertiesFile.exists()) {
                     signingConfigs.getByName("release")
@@ -70,4 +72,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.android.play:feature-delivery:2.1.0")
+    implementation("com.google.android.play:core-common:2.0.3")
 }

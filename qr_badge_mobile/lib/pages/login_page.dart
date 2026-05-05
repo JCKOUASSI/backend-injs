@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../theme/qr_badge_theme.dart';
+import '../utils/open_privacy_policy.dart';
 import '../utils/server_url.dart';
 import 'change_password_page.dart';
 import 'home_page.dart';
@@ -101,7 +102,10 @@ class _LoginPageState extends State<LoginPage> {
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: ConstrainedBox(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Material(
                   elevation: 8,
@@ -217,6 +221,30 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => openPrivacyPolicy(
+                      context,
+                      context.read<SessionProvider>().baseUrl,
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white.withOpacity(0.45),
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Confidentialit\u00e9',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 0.2,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white.withOpacity(0.35),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

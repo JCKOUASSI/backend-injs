@@ -38,6 +38,27 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   Map<String, dynamic>? _statusInfo;
   bool _loadingStatus = false;
 
+  bool _geofenceBlocksBadge() {
+    final info = _statusInfo;
+    if (info == null) {
+      return false;
+    }
+    final configured = info['geofence_configured'] == true;
+    if (!configured) {
+      return false;
+    }
+    final bool? inside = info['in_geofence'] as bool?;
+    final bool? accuracyOk = info['accuracy_ok'] as bool?;
+    final num? distance = info['distance_m'] as num?;
+    if (accuracyOk == false) {
+      return true;
+    }
+    if (distance == null || inside == null) {
+      return true;
+    }
+    return inside != true;
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -535,7 +556,10 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: (_loadingScan || _tokenQr == null || _tokenQr!.isEmpty)
+                onPressed: (_loadingScan ||
+                        _tokenQr == null ||
+                        _tokenQr!.isEmpty ||
+                        _geofenceBlocksBadge())
                     ? null
                     : _doScan,
                 icon: _loadingScan
@@ -553,6 +577,8 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                 label: Text(
                   _loadingScan
                       ? 'Vérification…'
+                      : _geofenceBlocksBadge()
+                          ? 'Zone GPS non conforme'
                       : (_tokenQr != null && _tokenQr!.isNotEmpty)
                           ? 'Badger entrée / sortie'
                           : 'En attente du QR code…',

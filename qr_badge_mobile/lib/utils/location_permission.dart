@@ -77,33 +77,50 @@ Future<bool> ensureLocationPermission(BuildContext context) async {
     return false;
   }
 
-  // Explication avant le prompt natif
+  // Explication avant le prompt natif.
+  //
+  // iOS (App Review 5.1.1) : ne pas proposer un bouton de sortie sur l'écran
+  // explicatif qui précède la demande système — on affiche l'info, puis on
+  // enchaîne sur le prompt.
   if (!context.mounted) {
     return false;
   }
-  final proceed = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Autoriser la localisation'),
-      content: const Text(
-        'QR Badge a besoin de votre position GPS pour valider votre présence '
-        'sur le site de formation lors du badgeage et du suivi de session.',
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Autoriser la localisation'),
+        content: const Text(
+          'QR Badge a besoin de votre position GPS pour valider votre présence '
+          'sur le site de formation lors du badgeage et du suivi de session.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Continuer'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Plus tard'),
+    );
+  } else {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Autoriser la localisation'),
+        content: const Text(
+          'QR Badge a besoin de votre position GPS pour valider votre présence '
+          'sur le site de formation lors du badgeage et du suivi de session.',
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Continuer'),
-        ),
-      ],
-    ),
-  );
-  if (proceed != true) {
-    return false;
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Continuer'),
+          ),
+        ],
+      ),
+    );
   }
 
   perm = await Geolocator.requestPermission();
@@ -142,7 +159,7 @@ Future<void> _requestBackgroundExtras(BuildContext context) async {
       if (!context.mounted) {
         return;
       }
-      final proceed = await showDialog<bool>(
+      await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -154,20 +171,13 @@ Future<void> _requestBackgroundExtras(BuildContext context) async {
             'Sur l\u2019écran suivant, choisissez « Toujours autoriser ».',
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Plus tard'),
-            ),
             FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text('Continuer'),
             ),
           ],
         ),
       );
-      if (proceed != true) {
-        return;
-      }
       await Permission.locationAlways.request();
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       // iOS : la permission "always" se demande aussi via Geolocator,
