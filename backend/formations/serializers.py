@@ -16,7 +16,7 @@ class ModuleSerializer(serializers.ModelSerializer):
     secretariat_type = serializers.CharField(source='secretariat.type.libelle', read_only=True, allow_null=True)
     nb_participants = serializers.SerializerMethodField()
     site = serializers.SerializerMethodField()
-    site_id = serializers.IntegerField(source='site_id', read_only=True, allow_null=True)
+    site_id = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = Module

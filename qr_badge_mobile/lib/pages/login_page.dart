@@ -229,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                       context.read<SessionProvider>().baseUrl,
                     ),
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withOpacity(0.45),
+                      foregroundColor: Colors.white.withValues(alpha: 0.45),
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -240,7 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                         fontSize: 11,
                         letterSpacing: 0.2,
                         decoration: TextDecoration.underline,
-                        decorationColor: Colors.white.withOpacity(0.35),
+                        decorationColor: Colors.white.withValues(alpha: 0.35),
                       ),
                     ),
                   ),
