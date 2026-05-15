@@ -10,6 +10,10 @@ Pour chaque pointage EN_COURS dont la séance est terminée depuis plus d'1 heur
 
 À planifier via cron toutes les 5-15 minutes :
   */10 * * * * /path/to/venv/bin/python /path/to/manage.py auto_close_pointages
+
+Ne sont pas soumis aux règles MOBILE_HEARTBEAT_* (suspect / sortie auto / mail) :
+  - badgeage web Django : device_id WEB_BADGE / OFFLINE_WEB ;
+  - PWA Flutter (navigateur) : device_id préfixé FLUTTER_PWA_ (heartbeat non fiable en arrière-plan).
 """
 
 from datetime import timedelta
@@ -27,6 +31,19 @@ MOTIF = "N'a pas badgé à la sortie de la séance"
 DELAI_MINUTES = getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
 SUSPECT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
 AUTO_EXIT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES', 120)
+
+# Canaux sans heartbeat « mobile » fiable → ne pas appliquer les timeouts MOBILE_HEARTBEAT_*.
+NO_MOBILE_HEARTBEAT_DEVICE_IDS = frozenset({'WEB_BADGE', 'OFFLINE_WEB'})
+FLUTTER_PWA_DEVICE_PREFIX = 'FLUTTER_PWA_'
+
+
+def _skip_mobile_heartbeat_sanctions(pointage):
+    did = (pointage.device_id or '').strip()
+    if did in NO_MOBILE_HEARTBEAT_DEVICE_IDS:
+        return True
+    if did.startswith(FLUTTER_PWA_DEVICE_PREFIX):
+        return True
+    return False
 
 
 class Command(BaseCommand):
@@ -129,6 +146,9 @@ class Command(BaseCommand):
                 continue
 
             # 2) Règle anti-fraude mobile : gestion du timeout heartbeat
+            if _skip_mobile_heartbeat_sanctions(pt):
+                continue
+
             last_seen_at = pt.last_heartbeat_at or pt.timestamp_entree
             silence_minutes = int((now - last_seen_at).total_seconds() // 60)
 

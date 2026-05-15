@@ -20,7 +20,7 @@ Future<void> main() async {
   } catch (e, st) {
     debugPrint('app.env introuvable ou invalide: $e\n$st');
   }
-  // Initialise le foreground task Android (no-op sur les autres plateformes).
+  // Foreground task Android / flux iOS (no-op Web : pas de heartbeat arrière-plan natif).
   try {
     await BackgroundKeepalive.instance.initialize();
   } catch (e, st) {

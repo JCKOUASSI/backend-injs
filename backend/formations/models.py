@@ -440,12 +440,22 @@ class Module(models.Model):
         related_name='modules_secretariat',
         help_text="Secrétariat responsable de ce module",
     )
-    site = models.CharField(
+    # NOTE: historiquement un champ texte. On le garde temporairement pour compat/migration.
+    site_legacy = models.CharField(
         max_length=255,
         blank=True,
         default='',
+        verbose_name='Site (legacy)',
+        help_text="Ancien champ texte. Utiliser le champ FK « site » (RefSite) à la place.",
+    )
+    site = models.ForeignKey(
+        RefSite,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modules',
         verbose_name='Site',
-        help_text="Centre de formation (import : colonne « Site » ; aligné RefSite pour la géolocalisation mobile).",
+        help_text="Centre de formation (référentiel). Sert à la géolocalisation mobile.",
     )
     batiment = models.CharField(
         max_length=255,

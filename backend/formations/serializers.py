@@ -15,6 +15,8 @@ class ModuleSerializer(serializers.ModelSerializer):
     secretariat_nom = serializers.CharField(source='secretariat.nom', read_only=True, allow_null=True)
     secretariat_type = serializers.CharField(source='secretariat.type.libelle', read_only=True, allow_null=True)
     nb_participants = serializers.SerializerMethodField()
+    site = serializers.SerializerMethodField()
+    site_id = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = Module
@@ -23,7 +25,7 @@ class ModuleSerializer(serializers.ModelSerializer):
             'grade', 'groupe', 'vague',
             'secretariat', 'secretariat_nom', 'secretariat_type',
             'duree_prevue_heures', 'ordre', 'statut', 'statut_label',
-            'site', 'batiment', 'salle',
+            'site', 'site_id', 'batiment', 'salle',
             'date_debut', 'date_fin',
             'formateur', 'formateur_nom',
             'nb_participants',
@@ -41,6 +43,12 @@ class ModuleSerializer(serializers.ModelSerializer):
         if obj.formateur:
             return f"{obj.formateur.prenom} {obj.formateur.nom}".strip()
         return None
+
+    def get_site(self, obj):
+        # Compat API: renvoyer un libellé (string) comme avant.
+        if getattr(obj, 'site', None) is not None and getattr(obj.site, 'nom', None):
+            return obj.site.nom
+        return (getattr(obj, 'site_legacy', '') or '').strip()
 
 
 class SecretariatSerializer(serializers.ModelSerializer):

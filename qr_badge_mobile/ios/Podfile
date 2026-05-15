@@ -1,4 +1,4 @@
-# mobile_scanner requires iOS 15.5+
+# mobile_scanner 7+ (Vision) : iOS 12+ côté plugin ; on garde 15.5+ pour cohérence projet.
 platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.

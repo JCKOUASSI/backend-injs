@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Demande l’autorisation caméra (runtime Android / iOS). Retourne false si refus définitif.
 Future<bool> ensureCameraPermission(BuildContext context) async {
+  if (kIsWeb) {
+    // Le navigateur déclenche getUserMedia à l’ouverture du scanner.
+    return true;
+  }
   var status = await Permission.camera.status;
   if (status.isGranted || status.isLimited) {
     return true;

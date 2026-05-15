@@ -7,6 +7,18 @@ _frontend = RedirectView.as_view(url='/', permanent=False)
 urlpatterns = [
     # Public badge page (conservée)
     path('badge/', views.badge_view, name='web-badge'),
+    # Politique de confidentialité — URL à renseigner dans Google Play (permission CAMÉRA, etc.)
+    path(
+        'legal/confidentialite-qr-badge/',
+        views.qr_badge_privacy_view,
+        name='qr-badge-privacy',
+    ),
+    # Support — URL à renseigner dans App Store Connect (Support URL)
+    path(
+        'legal/support-qr-badge/',
+        views.qr_badge_support_view,
+        name='qr-badge-support',
+    ),
 
     # Auth (conservées pour compatibilité QR badge)
     path('login/', views.login_view, name='web-login'),

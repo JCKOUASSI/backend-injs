@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
@@ -55,12 +53,15 @@ class DevApiDefaults {
   }
 
   static Future<bool> _computeEmulatorOrSimulator() async {
+    if (kIsWeb) {
+      return false;
+    }
     try {
-      if (Platform.isIOS) {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
         final ios = await _deviceInfo.iosInfo;
         return !ios.isPhysicalDevice;
       }
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final a = await _deviceInfo.androidInfo;
         if (!a.isPhysicalDevice) {
           return true;
@@ -87,13 +88,13 @@ class DevApiDefaults {
     if (kIsWeb) {
       return _url('127.0.0.1', _portFromEnv);
     }
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       if (await _isEmulatorOrSimulator()) {
         return _url('10.0.2.2', _portFromEnv);
       }
       return _url('127.0.0.1', _portFromEnv);
     }
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       if (await _isEmulatorOrSimulator()) {
         return _url('127.0.0.1', _portFromEnv);
       }

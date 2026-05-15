@@ -62,6 +62,8 @@ urlpatterns = [
     
     # Formateurs list
     path('formateurs/list/', api_views.formateur_list_api, name='api-formateur-list'),
+    path('formateurs/finance-report/', api_views.formateur_finance_report_api, name='api-formateur-finance-report'),
+    path('finance/dashboard/', api_views.finance_dashboard_api, name='api-finance-dashboard'),
     
     # Référentiels (listes déroulantes)
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),

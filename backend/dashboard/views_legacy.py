@@ -342,7 +342,13 @@ def formation_detail(request, pk):
             module.save(update_fields=['statut'])
 
     # ── Auto-arrêt : séances en cours dont l'heure de fin prévue est dépassée ──
+    # On pose ``terminee_le`` à la combinaison ``date_journee + heure_fin_prevue``
+    # (et non ``now``) afin que la durée effective de la séance reste bornée
+    # par la fenêtre planifiée, y compris en cas de clôture paresseuse tardive.
     auto_stopped = False
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo as _ZI
+    _tz_auto = _ZI('Africa/Abidjan')
     for sess in SessionModule.objects.filter(
         module__formation=formation,
         date_journee=today,
@@ -352,7 +358,9 @@ def formation_detail(request, pk):
         heure_fin_prevue__isnull=False,
         heure_fin_prevue__lte=current_time,
     ):
-        sess.terminee_le = now
+        sess.terminee_le = _dt.combine(
+            sess.date_journee, sess.heure_fin_prevue, tzinfo=_tz_auto,
+        )
         sess.save(update_fields=['terminee_le'])
         auto_stopped = True
     # Si plus aucune session ouverte après auto-arrêt, passer en SUSPENDUE
@@ -1137,6 +1145,13 @@ def force_pointage_view(request, pk):
         formation = get_object_or_404(Formation, pk=pk)
         action = request.POST.get('action')
         type_personne = request.POST.get('type_personne', 'participant')
+        motif = (request.POST.get('motif') or '').strip()
+        if not motif:
+            messages.error(request, "Le motif est obligatoire pour forcer un badgeage.")
+            referer = request.META.get('HTTP_REFERER', '')
+            if 'live' in referer:
+                return redirect('web-formation-live', pk=pk)
+            return redirect('web-formation-detail', pk=pk)
 
         session_active = SessionModule.objects.filter(
             module__formation=formation, demarree_le__isnull=False, terminee_le__isnull=True,
@@ -1177,7 +1192,7 @@ def force_pointage_view(request, pk):
                     cible_nom=f'{personne.nom} {personne.prenom}',
                     formation=formation,
                     pointage=pt,
-                    extra={'source': 'web', 'acteur_role': request.user.role, 'motif': request.POST.get('motif', '')},
+                    extra={'source': 'web', 'acteur_role': request.user.role, 'motif': motif},
                 )
 
         elif action == 'SORTIE':
@@ -1201,7 +1216,7 @@ def force_pointage_view(request, pk):
                     cible_nom=f'{personne.nom} {personne.prenom}',
                     formation=formation,
                     pointage=pointage,
-                    extra={'source': 'web', 'acteur_role': request.user.role, 'duree_minutes': float(pointage.duree_presence_minutes or 0), 'motif': request.POST.get('motif', '')},
+                    extra={'source': 'web', 'acteur_role': request.user.role, 'duree_minutes': float(pointage.duree_presence_minutes or 0), 'motif': motif},
                 )
             except Pointage.DoesNotExist:
                 messages.warning(request, "Aucune session en cours aujourd'hui.")

@@ -249,12 +249,64 @@ class ScanModuleExclusivityTest(TestCase):
                 'action': 'ENTREE',
                 'module_id': self.module.pk,
                 'date_journee': str(self.today),
+                'motif': 'Test: ouverture déjà existante',
             },
             format='json',
         )
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('déjà en cours sur ce module', res.data.get('detail', ''))
+
+    def test_force_pointage_requires_motif(self):
+        user = make_user('secretariat_for_force_motif', role='SECRETARIAT')
+        user.secretariat = self.secretariat
+        user.save(update_fields=['secretariat'])
+        self.client.force_authenticate(user)
+
+        res = self.client.post(
+            f'/api/formations/{self.formation.pk}/force-pointage/',
+            {
+                'personne_id': self.participant.pk,
+                'type_personne': 'participant',
+                'action': 'ENTREE',
+                'module_id': self.module.pk,
+                'date_journee': str(self.today),
+                # motif manquant
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('motif', res.data)
+
+    def test_force_pointage_entry_creates_pointage_and_logs_motif(self):
+        from presences.models import AuditLog, Pointage
+
+        user = make_user('secretariat_for_force_ok', role='SECRETARIAT')
+        user.secretariat = self.secretariat
+        user.save(update_fields=['secretariat'])
+        self.client.force_authenticate(user)
+
+        motif = 'Rattrapage — badge cassé'
+        res = self.client.post(
+            f'/api/formations/{self.formation.pk}/force-pointage/',
+            {
+                'personne_id': self.participant.pk,
+                'type_personne': 'participant',
+                'action': 'ENTREE',
+                'module_id': self.module.pk,
+                'date_journee': str(self.today),
+                'motif': motif,
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        pointage_id = res.data.get('pointage', {}).get('id')
+        self.assertTrue(Pointage.objects.filter(pk=pointage_id, statut=Pointage.Statut.FORCE_DFRC).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(action=AuditLog.Action.FORCE_ENTREE, pointage_id=pointage_id, extra__motif=motif).exists()
+        )
 
     def test_secure_scan_blocks_new_entry_when_other_session_open_same_module_same_day(self):
         user = make_user('participant_scan_secure', role='AUDITEUR')

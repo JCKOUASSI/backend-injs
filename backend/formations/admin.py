@@ -119,7 +119,7 @@ class ModuleAdmin(AuditLogAdminMixin, admin.ModelAdmin):
     list_display = ['intitule', 'formation', 'grade', 'groupe', 'statut', 'formateur', 'secretariat', 'date_debut', 'date_fin', 'sessions_button', 'reactiver_derniere_seance_button']
     search_fields = ['intitule', 'formation__formation', 'grade', 'groupe']
     list_filter = ['statut', 'secretariat', 'formation']
-    autocomplete_fields = ['formateur', 'secretariat']
+    autocomplete_fields = ['formateur', 'secretariat', 'site']
     inlines = [ModuleParticipantInline, ModuleFormateurInline]
 
     def get_urls(self):

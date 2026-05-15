@@ -90,16 +90,34 @@ def dashboard_stats(request):
     volume_horaire_total_heures = int(
         sum(float(v or 0) for v in modules_qs.values_list('duree_prevue_heures', flat=True))
     )
+    # Volume effectué : pour éviter qu'une session démarrée puis clôturée le
+    # lendemain (oubli, batch de clôture, etc.) ne fasse exploser le total,
+    # on plafonne la durée réelle par la durée *prévue* de la session
+    # (heure_fin_prevue - heure_debut_prevue). Repli : 8 h si non renseignées.
+    _MAX_DUREE_SESSION_MIN_DEFAUT = 8 * 60
     volume_horaire_effectue_minutes = 0.0
     for session in (
         SessionModule.objects.filter(module__in=modules_qs)
         .exclude(demarree_le__isnull=True)
         .exclude(terminee_le__isnull=True)
-        .only('demarree_le', 'terminee_le')
+        .only('demarree_le', 'terminee_le', 'heure_debut_prevue', 'heure_fin_prevue')
     ):
         elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
-        if elapsed > 0:
-            volume_horaire_effectue_minutes += elapsed
+        if elapsed <= 0:
+            continue
+        # Plafond = durée prévue de la session, sinon 8 h.
+        if session.heure_debut_prevue and session.heure_fin_prevue:
+            _hd = session.heure_debut_prevue
+            _hf = session.heure_fin_prevue
+            plafond = (
+                (_hf.hour * 60 + _hf.minute + _hf.second / 60)
+                - (_hd.hour * 60 + _hd.minute + _hd.second / 60)
+            )
+            if plafond <= 0:
+                plafond = _MAX_DUREE_SESSION_MIN_DEFAUT
+        else:
+            plafond = _MAX_DUREE_SESSION_MIN_DEFAUT
+        volume_horaire_effectue_minutes += min(elapsed, plafond)
     volume_horaire_effectue_heures = int(volume_horaire_effectue_minutes / 60)
     volume_horaire_effectue_taux = (
         int((volume_horaire_effectue_heures / volume_horaire_total_heures) * 100)
@@ -523,7 +541,8 @@ def formation_list_api(request):
             'categorie': m.grade,
             'groupe': m.groupe,
             'vague': m.vague,
-            'site': m.site,
+            'site': (m.site.nom if m.site else (m.site_legacy or '')),
+            'site_id': m.site_id,
             'batiment': m.batiment,
             'salle': m.salle,
             'date_debut': m.date_debut,
@@ -709,7 +728,8 @@ def participant_formations_api(request, pk):
             'grade': m.grade,
             'groupe': m.groupe,
             'vague': m.vague,
-            'site': m.site,
+            'site': (m.site.nom if m.site else (m.site_legacy or '')),
+            'site_id': m.site_id,
             'batiment': m.batiment,
             'salle': m.salle,
             'date_debut': m.date_debut,
@@ -758,6 +778,215 @@ def formateur_list_api(request):
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
+    })
+
+
+def _session_duration_minutes(session):
+    """Durée d'une séance en minutes (réelle si terminée, sinon prévue)."""
+    if session.demarree_le and session.terminee_le:
+        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    if session.heure_debut_prevue and session.heure_fin_prevue:
+        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
+        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
+        elapsed = (end_dt - start_dt).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    return 0
+
+
+def _finance_report_rows(formateurs, *, include_sessions):
+    """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus)."""
+    formateur_ids = [f.id for f in formateurs]
+    if not formateur_ids:
+        return []
+
+    module_formateur_map = {}
+    for module_id, formateur_id in ModuleFormateur.objects.filter(
+        formateur_id__in=formateur_ids
+    ).values_list('module_id', 'formateur_id'):
+        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+
+    for module_id, formateur_id in Module.objects.filter(
+        formateur_id__in=formateur_ids
+    ).values_list('id', 'formateur_id'):
+        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+
+    all_module_ids = sorted({
+        mid
+        for module_ids in module_formateur_map.values()
+        for mid in module_ids
+    })
+    sessions_by_module = {}
+    if all_module_ids:
+        for session in SessionModule.objects.filter(module_id__in=all_module_ids).select_related(
+            'module',
+            'module__formation',
+        ).order_by('date_journee', 'numero'):
+            sessions_by_module.setdefault(session.module_id, []).append(session)
+
+    realized_by_formateur_session = {}
+    if formateur_ids:
+        now = timezone.now()
+        pointages = Pointage.objects.filter(
+            formateur_id__in=formateur_ids,
+            session__module_id__in=all_module_ids,
+            session_id__isnull=False,
+        ).only('formateur_id', 'session_id', 'duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
+        for pt in pointages:
+            minutes = 0.0
+            if pt.duree_presence_minutes is not None:
+                minutes = float(pt.duree_presence_minutes)
+            elif pt.timestamp_entree and pt.timestamp_sortie:
+                minutes = max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
+            elif pt.timestamp_entree and not pt.timestamp_sortie:
+                # Pointage encore ouvert: compter le temps écoulé jusqu'à maintenant.
+                minutes = max((now - pt.timestamp_entree).total_seconds() / 60, 0)
+            key = (pt.formateur_id, pt.session_id)
+            realized_by_formateur_session[key] = realized_by_formateur_session.get(key, 0.0) + minutes
+
+    results = []
+    for formateur in formateurs:
+        module_ids = sorted(module_formateur_map.get(formateur.id, set()))
+        sessions_data = []
+        total_minutes = 0.0
+        total_realized_minutes = 0.0
+        session_count = 0
+        for module_id in module_ids:
+            module_sessions = sessions_by_module.get(module_id, [])
+            for session in module_sessions:
+                session_count += 1
+                duration_minutes = _session_duration_minutes(session)
+                realized_minutes = round(realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1)
+                total_minutes += duration_minutes
+                total_realized_minutes += realized_minutes
+                if include_sessions:
+                    sessions_data.append({
+                        'session_id': session.id,
+                        'date_journee': session.date_journee,
+                        'numero': session.numero,
+                        'intitule': session.intitule or f"Session {session.numero}",
+                        'module_id': session.module_id,
+                        'module_intitule': session.module.intitule,
+                        'formation_id': session.module.formation_id,
+                        'formation_intitule': (
+                            session.module.formation.formation if session.module.formation else ''
+                        ),
+                        'duree_minutes': duration_minutes,
+                        'duree_realisee_minutes': realized_minutes,
+                    })
+        row = {
+            'id': formateur.id,
+            'numerobadge': formateur.numerobadge,
+            'nom': formateur.nom,
+            'prenom': formateur.prenom,
+            'specialite': formateur.specialite,
+            'total_duree_minutes': round(total_minutes, 1),
+            'total_duree_heures': round(total_minutes / 60, 2),
+            'total_duree_realisee_minutes': round(total_realized_minutes, 1),
+            'total_duree_realisee_heures': round(total_realized_minutes / 60, 2),
+            'sessions_count': session_count,
+        }
+        if include_sessions:
+            row['sessions'] = sessions_data
+        results.append(row)
+    return results
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def formateur_finance_report_api(request):
+    """Rapport finance : temps de cours par formateur, par séance, + total.
+
+    Query params:
+    - ``formateur_id`` : si fourni, retourne une seule ligne avec le détail des séances (pagination ignorée).
+    - ``include_sessions`` : pour la liste paginée, ``1`` / ``true`` inclut les séances (lourd). Par défaut ``0`` :
+      totaux et ``sessions_count`` seulement.
+    """
+    allowed_roles = {'FINANCE', 'DIRECTION'}
+    if request.user.role not in allowed_roles:
+        return Response({'detail': 'Accès réservé au service finance.'}, status=403)
+
+    formateur_id_raw = (request.query_params.get('formateur_id') or '').strip()
+    if formateur_id_raw:
+        try:
+            fid = int(formateur_id_raw)
+        except ValueError:
+            return Response({'detail': 'formateur_id invalide.'}, status=400)
+        try:
+            formateur = Formateur.objects.get(pk=fid)
+        except Formateur.DoesNotExist:
+            return Response({'detail': 'Formateur introuvable.'}, status=404)
+        results = _finance_report_rows([formateur], include_sessions=True)
+        return Response({
+            'results': results,
+            'count': 1,
+            'total_pages': 1,
+            'current_page': 1,
+        })
+
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 25))
+    include_sessions = request.query_params.get('include_sessions', '0').lower() in ('1', 'true', 'yes')
+
+    queryset = Formateur.objects.all().order_by('nom', 'prenom')
+    search = (request.query_params.get('search') or '').strip()
+    if search:
+        queryset = queryset.filter(
+            Q(nom__icontains=search) |
+            Q(prenom__icontains=search) |
+            Q(specialite__icontains=search)
+        )
+
+    total_count = queryset.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    formateurs = list(queryset[start:end])
+    results = _finance_report_rows(formateurs, include_sessions=include_sessions)
+
+    return Response({
+        'results': results,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size,
+        'current_page': page,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def finance_dashboard_api(request):
+    """Dashboard finance: agrégats globaux + top formateurs."""
+    if request.user.role not in {'FINANCE', 'DIRECTION'}:
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    formateurs = list(Formateur.objects.all().order_by('nom', 'prenom'))
+    rows = _finance_report_rows(formateurs, include_sessions=False)
+
+    total_formateurs = len(rows)
+    formateurs_actifs = sum(1 for r in rows if (r.get('total_duree_minutes') or 0) > 0)
+    total_sessions = sum(int(r.get('sessions_count') or 0) for r in rows)
+    total_duree_minutes = round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1)
+    total_duree_heures = round(total_duree_minutes / 60, 2)
+    moyenne_heures_par_formateur = round(
+        (total_duree_heures / formateurs_actifs), 2
+    ) if formateurs_actifs > 0 else 0
+
+    top_formateurs = sorted(
+        rows,
+        key=lambda r: float(r.get('total_duree_minutes') or 0),
+        reverse=True,
+    )[:10]
+
+    return Response({
+        'kpis': {
+            'total_formateurs': total_formateurs,
+            'formateurs_actifs': formateurs_actifs,
+            'total_sessions': total_sessions,
+            'total_duree_minutes': total_duree_minutes,
+            'total_duree_heures': total_duree_heures,
+            'moyenne_heures_par_formateur': moyenne_heures_par_formateur,
+        },
+        'top_formateurs': top_formateurs,
+        'generated_at': timezone.now(),
     })
 
 
@@ -1289,6 +1518,18 @@ def module_list_api(request, formation_pk):
     ordre = request.data.get('ordre', formation.modules.count() + 1)
     from django.db import IntegrityError
     try:
+        site_id = request.data.get('site_id')
+        site_name = (request.data.get('site', '') or '').strip()
+        site_obj = None
+        if site_id not in (None, '', 0, '0'):
+            try:
+                site_obj = RefSite.objects.get(pk=int(site_id))
+            except (RefSite.DoesNotExist, ValueError, TypeError):
+                site_obj = None
+        elif site_name:
+            # On crée au besoin pour éviter un FK null qui casserait la géofence.
+            site_obj, _ = RefSite.objects.get_or_create(nom=site_name, defaults={'actif': True})
+
         module = Module.objects.create(
             formation=formation,
             intitule=intitule,
@@ -1300,7 +1541,8 @@ def module_list_api(request, formation_pk):
             statut=request.data.get('statut', 'PLANIFIEE'),
             date_debut=request.data.get('date_debut') or None,
             date_fin=request.data.get('date_fin') or None,
-            site=request.data.get('site', ''),
+            site=site_obj,
+            site_legacy=site_name,
             batiment=request.data.get('batiment', ''),
             salle=request.data.get('salle', ''),
         )
@@ -1328,7 +1570,7 @@ def module_detail_api(request, formation_pk, module_pk):
         fields = [
             'intitule', 'duree_prevue_heures', 'ordre', 'statut',
             'grade', 'groupe', 'vague',
-            'site', 'batiment', 'salle',
+            'site', 'site_id', 'batiment', 'salle',
             'date_debut', 'date_fin',
             'formateur', 'secretariat', 'superviseur',
         ]
@@ -1338,12 +1580,33 @@ def module_detail_api(request, formation_pk, module_pk):
                            'date_debut', 'date_fin', 'grade', 'groupe', 'vague'}
 
         # Champs texte qui stockent '' plutôt que NULL
-        str_fields = {'site', 'batiment', 'salle', 'intitule', 'statut'}
+        str_fields = {'batiment', 'salle', 'intitule', 'statut'}
 
         with transaction.atomic():
             for f in fields:
                 if f in request.data:
                     val = request.data[f]
+                    if f in ('site', 'site_id'):
+                        # Normalisation: on accepte soit site_id, soit site (nom).
+                        new_site = None
+                        if 'site_id' in request.data:
+                            raw_id = request.data.get('site_id')
+                            if raw_id not in (None, '', 0, '0'):
+                                try:
+                                    new_site = RefSite.objects.get(pk=int(raw_id))
+                                except (RefSite.DoesNotExist, ValueError, TypeError):
+                                    new_site = None
+                        if new_site is None and 'site' in request.data:
+                            raw_name = (request.data.get('site') or '').strip()
+                            if raw_name:
+                                new_site, _ = RefSite.objects.get_or_create(
+                                    nom=raw_name, defaults={'actif': True}
+                                )
+                                module.site_legacy = raw_name
+                            else:
+                                module.site_legacy = ''
+                        module.site = new_site
+                        continue
                     if f in nullable_fields and val in (None, '', ''):
                         val = None
                     elif f in str_fields and val is None:
@@ -1518,7 +1781,8 @@ def module_full_detail_api(request, formation_pk, module_pk):
         'ordre': module.ordre,
         'statut': module.statut,
         'statut_label': module.get_statut_display(),
-        'site':     module.site,
+        'site':     (module.site.nom if module.site else (module.site_legacy or '')),
+        'site_id':  module.site_id,
         'batiment': module.batiment,
         'salle':    module.salle,
         'date_debut': module.date_debut,

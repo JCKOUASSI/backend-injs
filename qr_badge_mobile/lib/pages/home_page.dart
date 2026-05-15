@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/guarded_logout.dart';
+import '../utils/open_privacy_policy.dart';
 import 'history_page.dart';
 import 'login_page.dart';
 import 'scan_page.dart';
@@ -110,6 +111,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (value) async {
+              if (value == 'privacy') {
+                if (!context.mounted) {
+                  return;
+                }
+                await openPrivacyPolicy(context, session.baseUrl);
+                return;
+              }
               if (value == 'logout') {
                 final ok = await performGuardedLogout(context);
                 if (!ok || !context.mounted) {
@@ -123,8 +131,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 }
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
+                value: 'privacy',
+                height: 38,
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  leading: Icon(
+                    Icons.policy_outlined,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+                  title: Text(
+                    'Confidentialit\u00e9',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                          fontSize: 13,
+                        ),
+                  ),
+                ),
+              ),
+              const PopupMenuDivider(height: 4),
+              const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
                   leading: Icon(Icons.logout),

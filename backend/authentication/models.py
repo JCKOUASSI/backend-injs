@@ -12,6 +12,7 @@ class User(AbstractUser):
         CPFAE_ADMIN = 'CPFAE_ADMIN', 'CPFAE Admin'
         CHEF_SECRETARIAT = 'CHEF_SECRETARIAT', 'Chef Secrétariat'
         SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
+        FINANCE = 'FINANCE', 'Finance'
         ENCADRANT = 'ENCADRANT', 'Encadrant'
         AUDITEUR = 'AUDITEUR', 'Auditeur'
 
@@ -65,6 +66,10 @@ class User(AbstractUser):
     @property
     def is_secretariat(self):
         return self.role == self.Role.SECRETARIAT
+
+    @property
+    def is_finance(self):
+        return self.role == self.Role.FINANCE
 
     @property
     def is_encadrant(self):

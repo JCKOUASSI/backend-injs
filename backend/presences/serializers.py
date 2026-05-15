@@ -87,7 +87,15 @@ class ForcePointageSerializer(serializers.Serializer):
         choices=['participant', 'formateur', 'encadrant'], default='participant'
     )
     action = serializers.ChoiceField(choices=['ENTREE', 'SORTIE'])
-    motif = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+    motif = serializers.CharField(
+        max_length=500,
+        required=True,
+        allow_blank=False,
+        error_messages={
+            'blank': 'Le motif est obligatoire pour forcer un badgeage.',
+            'required': 'Le motif est obligatoire pour forcer un badgeage.',
+        },
+    )
     date_journee = serializers.DateField(required=False, allow_null=True, default=None)
     timestamp_entree = serializers.DateTimeField(required=False, allow_null=True, default=None)
     timestamp_sortie = serializers.DateTimeField(required=False, allow_null=True, default=None)
