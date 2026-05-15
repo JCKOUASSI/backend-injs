@@ -22,6 +22,7 @@ ALLOWED_WEB_ROLES = (
     'CPFAE_ADMIN',
     'CHEF_SECRETARIAT',
     'SECRETARIAT',
+    'FINANCE',
     'ENCADRANT',
 )
 
@@ -42,7 +43,7 @@ def login_view(request):
             return redirect('web-dashboard')
         elif user:
             return render(request, 'dashboard/login.html', {
-                'error': 'Accès réservé à la Direction, CPFAE, Secrétariat et Encadrants.'
+                'error': 'Accès réservé à la Direction, CPFAE, Secrétariat, Finance et Encadrants.'
             })
         else:
             return render(request, 'dashboard/login.html', {

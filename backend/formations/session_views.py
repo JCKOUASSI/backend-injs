@@ -59,7 +59,10 @@ def _auto_manage_sessions(formation):
                 module.save(update_fields=['statut'])
                 modules_updated.add(module.pk)
 
-        # Auto-close
+        # Auto-close. ``terminee_le`` est borné à la fin prévue de la séance
+        # (combinaison ``date_journee`` + ``heure_fin_prevue``) pour éviter qu'une
+        # clôture tardive (chargement plusieurs heures après la fin) ne gonfle
+        # la durée effective utilisée par les statistiques de volume horaire.
         if (
             session.demarree_le is not None
             and session.terminee_le is None
@@ -69,7 +72,13 @@ def _auto_manage_sessions(formation):
                 or (session.date_journee == today and session.heure_fin_prevue <= current_time)
             )
         ):
-            session.terminee_le = now
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo as _ZI
+            _tz = _ZI('Africa/Abidjan')
+            fin_prevue_local = _dt.combine(
+                session.date_journee, session.heure_fin_prevue, tzinfo=_tz,
+            )
+            session.terminee_le = fin_prevue_local
             session.save(update_fields=['terminee_le'])
             QRToken.objects.filter(session=session, actif=True).update(actif=False)
 

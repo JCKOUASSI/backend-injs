@@ -69,6 +69,9 @@ class Command(BaseCommand):
                         stats['formateurs'] = self._import_formateurs(wb['Formateurs'], errors)
                     if 'Participants' in wb.sheetnames:
                         stats['participants'] = self._import_participants(wb['Participants'], errors)
+                    elif 'Auditeurs' in wb.sheetnames:
+                        # Alias d'export epdtcpfae : l'onglet « Auditeurs » correspond aux participants.
+                        stats['participants'] = self._import_participants(wb['Auditeurs'], errors)
                     if 'Inscriptions' in wb.sheetnames:
                         stats['inscriptions'] = self._import_inscriptions(wb['Inscriptions'], errors)
                     if 'Formateurs_Formations' in wb.sheetnames:
@@ -261,15 +264,20 @@ class Command(BaseCommand):
 
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
-        Accepte 'A', 'B', 'C', 'FAB A', 'FAB B', 'FAB C', etc.
+        - Compacte les variantes collées (ex. 'FABA' -> 'FAB A', 'FACB' -> 'FAC B').
+        - Préserve les autres codes pour permettre une résolution dynamique
+          (ex. 'FAC A', 'FAR B'… seront cherchés tels quels dans RefTypeSecretariat).
+        - Une lettre seule ('A'/'B'/'C') est laissée telle quelle ; la résolution
+          du secrétariat tentera alors un match par suffixe (voir _import_formations).
         """
         c = cat.strip().upper()
-        if c in ('A', 'FAB A', 'FABA'):
-            return 'FAB A'
-        if c in ('B', 'FAB B', 'FABB'):
-            return 'FAB B'
-        if c in ('C', 'FAB C', 'FABC'):
-            return 'FAB C'
+        if not c:
+            return c
+        # Variantes collées : "FABA" -> "FAB A", "FAC B" reste "FAC B".
+        import re as _re
+        m = _re.fullmatch(r'([A-Z]{2,4})\s*([A-C])', c)
+        if m:
+            return f'{m.group(1)} {m.group(2)}'
         return c
 
     def _secretariat_hint_from_matricule(self, matricule):
@@ -380,6 +388,17 @@ class Command(BaseCommand):
                 if cat_val:
                     if cat_val not in _secretariat_cache:
                         sec = SecretariatModel.objects.filter(type__libelle__iexact=cat_val).first()
+                        # Lettre seule (A/B/C) : tenter un match par suffixe sur le libellé
+                        # du type secrétariat (ex. 'FAB A', 'FAC A'). On ne sélectionne que
+                        # si un seul candidat correspond, pour éviter l'ambiguïté.
+                        if sec is None and len(cat_val) == 1 and cat_val in ('A', 'B', 'C'):
+                            candidates = list(
+                                SecretariatModel.objects.filter(
+                                    type__libelle__iendswith=f' {cat_val}'
+                                )[:2]
+                            )
+                            if len(candidates) == 1:
+                                sec = candidates[0]
                         _secretariat_cache[cat_val] = sec
                         if sec:
                             self.stdout.write(f'  🗂  Catégorie {cat_val} → Secrétariat : {sec.nom}')

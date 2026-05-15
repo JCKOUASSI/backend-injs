@@ -342,7 +342,13 @@ def formation_detail(request, pk):
             module.save(update_fields=['statut'])
 
     # ── Auto-arrêt : séances en cours dont l'heure de fin prévue est dépassée ──
+    # On pose ``terminee_le`` à la combinaison ``date_journee + heure_fin_prevue``
+    # (et non ``now``) afin que la durée effective de la séance reste bornée
+    # par la fenêtre planifiée, y compris en cas de clôture paresseuse tardive.
     auto_stopped = False
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo as _ZI
+    _tz_auto = _ZI('Africa/Abidjan')
     for sess in SessionModule.objects.filter(
         module__formation=formation,
         date_journee=today,
@@ -352,7 +358,9 @@ def formation_detail(request, pk):
         heure_fin_prevue__isnull=False,
         heure_fin_prevue__lte=current_time,
     ):
-        sess.terminee_le = now
+        sess.terminee_le = _dt.combine(
+            sess.date_journee, sess.heure_fin_prevue, tzinfo=_tz_auto,
+        )
         sess.save(update_fields=['terminee_le'])
         auto_stopped = True
     # Si plus aucune session ouverte après auto-arrêt, passer en SUSPENDUE

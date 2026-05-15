@@ -84,7 +84,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role')
         secretariat = attrs.get('secretariat')
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'):
+        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE'):
             attrs['secretariat'] = None
         if role == 'CHEF_CPFAE_ADMIN':
             if User.objects.filter(role='CHEF_CPFAE_ADMIN').exists():
@@ -145,7 +145,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role', self.instance.role if self.instance else None)
         secretariat = attrs.get('secretariat', self.instance.secretariat if self.instance else None)
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'):
+        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE'):
             attrs['secretariat'] = None
         if role == 'CHEF_CPFAE_ADMIN':
             already_exists = User.objects.filter(role='CHEF_CPFAE_ADMIN').exclude(

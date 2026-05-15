@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from formations.models import Formation, ModuleParticipant, ModuleFormateur, SessionModule
+from formations.models import Formation, ModuleParticipant, ModuleFormateur, SessionModule, Formateur, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from presences.models import Pointage, AuditLog
@@ -72,6 +72,73 @@ CI_GREEN = '#43A047'
 CI_ORANGE = '#F57C00'
 CI_LIGHT_GREEN = '#E8F5E9'
 CI_LIGHT_ORANGE = '#FFF3E0'
+
+
+def _check_finance_export_access(request):
+    user = request.user
+    return bool(user and user.is_authenticated and user.role in ('FINANCE', 'DIRECTION'))
+
+
+def _session_planned_minutes(session):
+    if session.demarree_le and session.terminee_le:
+        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    if session.heure_debut_prevue and session.heure_fin_prevue:
+        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
+        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
+        elapsed = (end_dt - start_dt).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    return 0
+
+
+def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
+    now = now or timezone.now()
+    total = 0.0
+    qset = Pointage.objects.filter(
+        formateur_id=formateur_id,
+        session_id=session.id,
+    ).only('duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
+    for pt in qset:
+        if pt.duree_presence_minutes is not None:
+            total += float(pt.duree_presence_minutes)
+        elif pt.timestamp_entree and pt.timestamp_sortie:
+            total += max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
+        elif pt.timestamp_entree and not pt.timestamp_sortie:
+            total += max((now - pt.timestamp_entree).total_seconds() / 60, 0)
+    return round(total, 1)
+
+
+def _finance_formateur_summary_rows(formateur):
+    """Lignes détail + totaux pour la fiche résumé finance d'un formateur."""
+    module_ids = set(
+        ModuleFormateur.objects.filter(formateur_id=formateur.pk).values_list('module_id', flat=True)
+    )
+    module_ids.update(
+        Module.objects.filter(formateur_id=formateur.pk).values_list('id', flat=True)
+    )
+    sessions = list(
+        SessionModule.objects.filter(module_id__in=module_ids)
+        .select_related('module', 'module__formation')
+        .order_by('date_journee', 'numero')
+    )
+    now = timezone.now()
+    rows = []
+    total_planned = 0.0
+    total_realized = 0.0
+    for s in sessions:
+        planned = _session_planned_minutes(s)
+        realized = _session_realized_minutes_for_formateur(formateur.pk, s, now=now)
+        total_planned += planned
+        total_realized += realized
+        rows.append({
+            'date': s.date_journee.strftime('%d/%m/%Y') if s.date_journee else '-',
+            'session': s.intitule or f'Séance {s.numero}',
+            'module': s.module.intitule if s.module else '-',
+            'formation': s.module.formation.formation if s.module and s.module.formation else '-',
+            'duree_seance': planned,
+            'temps_realise': realized,
+        })
+    return rows, total_planned, total_realized
 
 
 def _formation_meta(formation):
@@ -1727,6 +1794,207 @@ def export_excel_session(request, session_pk):
     buffer.seek(0)
 
     filename = f"rapport_session_{session.id}.xlsx"
+    response = HttpResponse(
+        buffer,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_formateur_pdf(request, formateur_pk):
+    """Export PDF de la fiche résumé d'un formateur (finance/direction)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    formateur = get_object_or_404(Formateur, pk=formateur_pk)
+    rows, total_planned, total_realized = _finance_formateur_summary_rows(formateur)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
+    )
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle(
+        'FinFmtTitle', parent=styles['Title'],
+        fontSize=16, textColor=colors.HexColor(CI_GREEN_DARK),
+        alignment=TA_CENTER, spaceAfter=4,
+    )
+    style_subtitle = ParagraphStyle(
+        'FinFmtSub', parent=styles['Normal'],
+        fontSize=10, textColor=colors.HexColor('#444444'),
+        alignment=TA_CENTER, spaceAfter=2,
+    )
+    style_stats = ParagraphStyle(
+        'FinFmtStats', parent=styles['Normal'],
+        fontSize=10, textColor=colors.HexColor(CI_GREEN_DARK),
+        spaceAfter=8,
+    )
+    cell_normal = ParagraphStyle('FinFmtCell', parent=styles['Normal'], fontSize=8, leading=10)
+    cell_center = ParagraphStyle('FinFmtCellC', parent=styles['Normal'], fontSize=8, leading=10, alignment=TA_CENTER)
+    cell_header = ParagraphStyle(
+        'FinFmtHdr', parent=styles['Normal'],
+        fontSize=9, leading=11, alignment=TA_CENTER,
+        textColor=colors.white, fontName='Helvetica-Bold',
+    )
+
+    def _p(text, center=False, hdr=False):
+        s = cell_header if hdr else (cell_center if center else cell_normal)
+        return Paragraph(str(text), s)
+
+    elements = []
+    elements.append(Paragraph('FICHE RÉSUMÉ FORMATEUR — FINANCE', style_title))
+    elements.append(Paragraph(
+        f"<b>{formateur.nom} {formateur.prenom}</b> — {formateur.numerobadge or '-'}",
+        style_subtitle,
+    ))
+    elements.append(Paragraph(
+        f"Temps séance total : <b>{round(total_planned, 1)}</b> min &nbsp;|&nbsp; "
+        f"Temps réalisé total : <b>{round(total_realized, 1)}</b> min",
+        style_stats,
+    ))
+    elements.append(Spacer(1, 0.3 * cm))
+
+    header = ['Date', 'Séance', 'Module', 'Formation', 'Durée séance (min)', 'Temps réalisé (min)']
+    data = [[_p(h, hdr=True) for h in header]]
+    for r in rows:
+        data.append([
+            _p(r['date'], center=True),
+            _p(r['session']),
+            _p(r['module']),
+            _p(r['formation']),
+            _p(r['duree_seance'], center=True),
+            _p(r['temps_realise'], center=True),
+        ])
+
+    col_widths = [2.4 * cm, 3.6 * cm, 6.0 * cm, 6.8 * cm, 2.8 * cm, 2.8 * cm]
+    table = Table(data, repeatRows=1, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(Paragraph(
+        f"<i>Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}</i>",
+        ParagraphStyle('FinFmtFoot', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999999')),
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    filename = f"fiche_resume_formateur_{formateur.numerobadge or formateur.pk}.pdf"
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_formateur_excel(request, formateur_pk):
+    """Export Excel de la fiche résumé d'un formateur (finance/direction)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    formateur = get_object_or_404(Formateur, pk=formateur_pk)
+    rows, total_planned, total_realized = _finance_formateur_summary_rows(formateur)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Résumé formateur"
+
+    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=10)
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+
+    ws.merge_cells('A1:F1')
+    ws['A1'] = "FICHE RÉSUMÉ FORMATEUR — FINANCE"
+    ws['A1'].font = Font(bold=True, size=13, color='388E3C')
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    ws.merge_cells('A2:F2')
+    ws['A2'] = f"{formateur.nom} {formateur.prenom} ({formateur.numerobadge})"
+    ws['A2'].font = Font(size=11, color='444444')
+    ws['A2'].alignment = Alignment(horizontal='center')
+
+    ws['A4'] = "Temps séance total"
+    ws['B4'] = round(total_planned, 1)
+    ws['C4'] = "min"
+    ws['D4'] = "Temps réalisé total"
+    ws['E4'] = round(total_realized, 1)
+    ws['F4'] = "min"
+    for c in ('A4', 'B4', 'C4', 'D4', 'E4', 'F4'):
+        ws[c].fill = orange_fill
+        ws[c].font = Font(bold=True, color='FFFFFF', size=10)
+        ws[c].alignment = Alignment(horizontal='center')
+        ws[c].border = thin_border
+
+    headers = ['Date', 'Séance', 'Module', 'Formation', 'Durée séance (min)', 'Temps réalisé (min)']
+    start_row = 6
+    for idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=start_row, column=idx, value=h)
+        cell.font = header_font
+        cell.fill = green_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+
+    for i, r in enumerate(rows, start=1):
+        row_num = start_row + i
+        values = [r['date'], r['session'], r['module'], r['formation'], r['duree_seance'], r['temps_realise']]
+        for col, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_num, column=col, value=val)
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical='center')
+            if col >= 5:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            if i % 2 == 0:
+                cell.fill = light_green_fill
+
+    ws.column_dimensions['A'].width = 14
+    ws.column_dimensions['B'].width = 22
+    ws.column_dimensions['C'].width = 28
+    ws.column_dimensions['D'].width = 30
+    ws.column_dimensions['E'].width = 18
+    ws.column_dimensions['F'].width = 20
+
+    footer_row = start_row + len(rows) + 2
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=6)
+    ws.cell(row=footer_row, column=1, value=f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+    ws.cell(row=footer_row, column=1).font = Font(size=8, color='999999', italic=True)
+    ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right')
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    filename = f"fiche_resume_formateur_{formateur.numerobadge or formateur.pk}.xlsx"
     response = HttpResponse(
         buffer,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

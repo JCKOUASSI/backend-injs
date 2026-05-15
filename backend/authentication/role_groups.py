@@ -12,6 +12,7 @@ ROLE_GROUP_NAMES = {
     User.Role.CPFAE_ADMIN: "ROLE_CPFAE_ADMIN",
     User.Role.CHEF_SECRETARIAT: "ROLE_CHEF_SECRETARIAT",
     User.Role.SECRETARIAT: "ROLE_SECRETARIAT",
+    User.Role.FINANCE: "ROLE_FINANCE",
     User.Role.ENCADRANT: "ROLE_ENCADRANT",
     User.Role.AUDITEUR: "ROLE_AUDITEUR",
 }
@@ -46,6 +47,10 @@ ROLE_POLICY = {
         "apps": ("formations", "presences"),
         "actions": ("view", "add", "change", "delete"),
         "exclude_codenames": ("add_participant",),
+    },
+    User.Role.FINANCE: {
+        "apps": ("formations", "presences", "exports"),
+        "actions": ("view",),
     },
     User.Role.ENCADRANT: {
         "apps": ("formations", "presences"),
