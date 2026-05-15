@@ -12,7 +12,7 @@ la clôture intervient bien après la fin réelle de la séance.
   */10 * * * * /path/to/venv/bin/python /path/to/manage.py auto_close_sessions
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
@@ -77,7 +77,7 @@ class Command(BaseCommand):
                 continue
 
             # ``terminee_le`` borné à la fin prévue (UTC).
-            terminee_le_utc = fin_prevue_dt_local.astimezone(timezone.utc)
+            terminee_le_utc = fin_prevue_dt_local.astimezone(dt_timezone.utc)
 
             label = f"#{sess.pk} {sess.module.intitule} — {sess.date_journee} {sess.heure_fin_prevue}"
             if dry_run:

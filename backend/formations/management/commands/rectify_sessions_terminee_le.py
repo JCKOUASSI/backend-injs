@@ -21,7 +21,7 @@ Sécurité : on ne rectifie **jamais** ``demarree_le``. On ne descend pas
 inférieurement par ``demarree_le`` pour préserver une durée >= 0).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.core.management.base import BaseCommand
@@ -86,7 +86,7 @@ class Command(BaseCommand):
             fin_prevue_local = datetime.combine(
                 sess.date_journee, sess.heure_fin_prevue, tzinfo=TZ_LOCALE,
             )
-            fin_prevue_utc = fin_prevue_local.astimezone(timezone.utc)
+            fin_prevue_utc = fin_prevue_local.astimezone(dt_timezone.utc)
 
             if sess.terminee_le <= fin_prevue_utc:
                 ignorees += 1
