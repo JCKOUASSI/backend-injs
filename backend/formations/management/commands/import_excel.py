@@ -360,7 +360,13 @@ class Command(BaseCommand):
                 errors.append(f'Formations ligne {row_idx}: date_debut ou date_fin invalide')
                 continue
 
-            duree = data.get('duree_prevue_heures') or 0
+            # ``duree_prevue_heures`` est facultative dans le fichier source.
+            # Si la cellule est vide pour cette ligne, on **ne touche pas** au
+            # ``duree_prevue_heures`` du module existant (évite d'écraser à 0
+            # une valeur déjà saisie lors d'un import précédent).
+            duree_raw = data.get('duree_prevue_heures')
+            duree_renseignee = duree_raw not in (None, '', 0, '0')
+            duree = duree_raw or 0
             try:
                 duree = float(duree)
             except (ValueError, TypeError):
@@ -431,7 +437,6 @@ class Command(BaseCommand):
             _module_order[obj.id] += 1
 
             module_defaults = {
-                'duree_prevue_heures': duree,
                 'ordre': _module_order[obj.id],
                 'grade': self._str(data.get('grade')),
                 'groupe': self._str(data.get('groupe')),
@@ -449,6 +454,11 @@ class Command(BaseCommand):
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
             if _secretariat: module_defaults['secretariat'] = _secretariat
+            # On n'inscrit la durée prévue que si elle est explicitement
+            # renseignée dans le fichier source, afin de ne pas écraser une
+            # valeur déjà saisie par une cellule vide ou nulle.
+            if duree_renseignee and duree > 0:
+                module_defaults['duree_prevue_heures'] = duree
 
             # Lookup Module : formation + intitule + grade + groupe (unicité)
             module_lookup = {'formation': obj, 'intitule': module_val}
