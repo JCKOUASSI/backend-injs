@@ -16,6 +16,7 @@ import Secretariats from './pages/Secretariats'
 import Referentiels from './pages/Referentiels'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
+import FinanceDashboard from './pages/FinanceDashboard'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -47,14 +48,16 @@ function Layout({ children, breadcrumb }) {
     return path.startsWith(route)
   }
 
+  const isFinanceRole = user?.role === 'FINANCE'
+  const canViewFinanceDashboard = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canViewParticipants = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
-  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT'].includes(user?.role)
   const canViewUsers = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewSecretariats = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
   const canViewImport = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewReferentiels = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
 
-  const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
+  const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
@@ -88,12 +91,21 @@ function Layout({ children, breadcrumb }) {
         )}
 
         <nav className="sidebar-nav">
-          <Link to="/" className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-            <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
-          </Link>
-          <Link to="/modules" className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-            <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
-          </Link>
+          {canViewFinanceDashboard && (
+            <Link to="/finance-dashboard" className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard Finance</span></span>
+            </Link>
+          )}
+          {!isFinanceRole && (
+            <Link to="/" className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
+            </Link>
+          )}
+          {!isFinanceRole && (
+            <Link to="/modules" className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
+            </Link>
+          )}
           {canViewParticipants && (
             <Link to="/participants" className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-people"></i> <span className="nav-label">Auditeurs</span></span>
@@ -101,7 +113,7 @@ function Layout({ children, breadcrumb }) {
           )}
           {canViewFormateurs && (
             <Link to="/formateurs" className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-person-video3"></i> <span className="nav-label">Formateurs</span></span>
+              <span><i className={`bi ${isFinanceRole ? 'bi-cash-stack' : 'bi-person-video3'}`}></i> <span className="nav-label">{isFinanceRole ? 'Suivi Finance' : 'Formateurs'}</span></span>
             </Link>
           )}
           {canViewUsers && (
@@ -163,6 +175,16 @@ function Layout({ children, breadcrumb }) {
 }
 
 function App() {
+  function HomeRoute() {
+    const { user } = useAuth()
+    if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
+    return (
+      <Layout breadcrumb={<li>Tableau de bord</li>}>
+        <Dashboard />
+      </Layout>
+    )
+  }
+
   return (
     <AuthProvider>
       <ToastProvider>
@@ -171,9 +193,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={
             <ProtectedRoute>
-              <Layout breadcrumb={<li>Tableau de bord</li>}>
-                <Dashboard />
-              </Layout>
+              <HomeRoute />
             </ProtectedRoute>
           } />
           <Route path="/profile" element={
@@ -184,35 +204,35 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/modules">Cours</Link></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/modules">Cours</Link></li><li className="separator">/</li><li>Détail</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/modules" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Cours</li></>}>
                 <Modules />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/participants" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
               </Layout>
@@ -222,6 +242,13 @@ function App() {
             <ProtectedRoute>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance-dashboard" element={
+            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Dashboard Finance</li></>}>
+                <FinanceDashboard />
               </Layout>
             </ProtectedRoute>
           } />

@@ -9,6 +9,7 @@ const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: 
 
 export default function Formateurs() {
   const { user } = useAuth()
+  const canViewFinanceData = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const [formateurs, setFormateurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -24,21 +25,28 @@ export default function Formateurs() {
   const { showToast } = useToast()
 
   const [secretariats, setSecretariats] = useState([])
+  const [financeDetail, setFinanceDetail] = useState(null)
+  const [financeDetailLoading, setFinanceDetailLoading] = useState(false)
 
   const debouncedSearch = useDebounce(search)
   useEffect(() => { loadFormateurs() }, [page, debouncedSearch])
   useEffect(() => {
+    if (canViewFinanceData) return
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
       .catch(() => {})
-  }, [])
+  }, [canViewFinanceData])
 
   const loadFormateurs = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ page })
       if (debouncedSearch) params.set('search', debouncedSearch)
-      const response = await api.get(`/formations/formateurs/list/?${params}`)
+      const endpoint = canViewFinanceData
+        ? '/formations/formateurs/finance-report/'
+        : '/formations/formateurs/list/'
+      if (canViewFinanceData) params.set('include_sessions', '0')
+      const response = await api.get(`${endpoint}?${params}`)
       const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
       setFormateurs(data)
       setTotalPages(response.data.total_pages || 1)
@@ -100,8 +108,54 @@ export default function Formateurs() {
     })
   }
 
-  const canEdit = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canDelete = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canEdit = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canDelete = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const formatDuration = (minutes) => {
+    const value = Number(minutes || 0)
+    const hours = Math.floor(value / 60)
+    const remaining = Math.round(value % 60)
+    return `${hours}h ${remaining}min`
+  }
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportFinanceSummary = async (f, format) => {
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
+    const path = format === 'pdf' ? `/exports/formateur/${f.id}/pdf/` : `/exports/formateur/${f.id}/excel/`
+    try {
+      const blob = await api.getBlob(path)
+      const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
+      downloadBlob(blob, `fiche_resume_${safeName || f.id}.${ext}`)
+      showToast(`Fiche résumé exportée (${ext.toUpperCase()})`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur export fiche résumé', 'error')
+    }
+  }
+
+  const openFinanceDetail = async (f) => {
+    setFinanceDetail({ id: f.id, nom: f.nom, prenom: f.prenom, numerobadge: f.numerobadge, sessions: [], total_duree_minutes: f.total_duree_minutes })
+    setFinanceDetailLoading(true)
+    try {
+      const res = await api.get(`/formations/formateurs/finance-report/?formateur_id=${f.id}`)
+      const rows = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const row = rows[0]
+      if (row) setFinanceDetail(row)
+    } catch {
+      showToast('Impossible de charger le détail', 'error')
+      setFinanceDetail(null)
+    } finally {
+      setFinanceDetailLoading(false)
+    }
+  }
 
   return (
     <div>
@@ -112,7 +166,7 @@ export default function Formateurs() {
             <div style={{ flex: '1 1 250px' }}>
               <div className="input-group">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder="Rechercher par nom, prénom ou spécialité..."
+                <input type="text" className="form-control" placeholder={canViewFinanceData ? 'Rechercher un formateur...' : 'Rechercher par nom, prénom ou spécialité...'}
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
             </div>
@@ -130,7 +184,10 @@ export default function Formateurs() {
       {/* Table */}
       <div className="card">
         <div className="card-header-bar">
-          <span><i className="bi bi-person-video3 me-2"></i>Liste des formateurs</span>
+          <span>
+            <i className={`bi ${canViewFinanceData ? 'bi-calculator' : 'bi-person-video3'} me-2`}></i>
+            {canViewFinanceData ? 'Suivi des temps de cours formateurs' : 'Liste des formateurs'}
+          </span>
           <span className="badge-bg-secondary">{formateurs.length} résultat(s)</span>
         </div>
         <div className="card-body-flush">
@@ -144,10 +201,12 @@ export default function Formateurs() {
                       <th>Nom</th>
                       <th>Prénom</th>
                       <th>Spécialité</th>
-                      <th>Adresse e-mail</th>
-                      <th>Téléphone</th>
-                      <th>Modules</th>
-                      {canEdit && <th>Actions</th>}
+                      {!canViewFinanceData && <th>Adresse e-mail</th>}
+                      {!canViewFinanceData && <th>Téléphone</th>}
+                      {!canViewFinanceData && <th>Modules</th>}
+                      {canViewFinanceData && <th>Nombre de séances</th>}
+                      {canViewFinanceData && <th>Temps total</th>}
+                      {(canEdit || canViewFinanceData) && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -157,9 +216,32 @@ export default function Formateurs() {
                         <td><strong>{f.nom}</strong></td>
                         <td>{f.prenom}</td>
                         <td>{f.specialite || '-'}</td>
-                        <td>{f.email || '-'}</td>
-                        <td>{f.telephone || '-'}</td>
-                        <td><span className="badge-bg-success">{f.nb_formations || 0}</span></td>
+                        {!canViewFinanceData && <td>{f.email || '-'}</td>}
+                        {!canViewFinanceData && <td>{f.telephone || '-'}</td>}
+                        {!canViewFinanceData && <td><span className="badge-bg-success">{f.nb_formations || 0}</span></td>}
+                        {canViewFinanceData && (
+                          <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
+                        )}
+                        {canViewFinanceData && (
+                          <td>
+                            <span className="badge-bg-success">{formatDuration(f.total_duree_minutes)}</span>
+                          </td>
+                        )}
+                        {canViewFinanceData && (
+                          <td>
+                            <div className="btn-group" role="group">
+                              <button type="button" onClick={() => openFinanceDetail(f)} className="btn btn-outline-primary btn-sm" title="Voir le détail par séance">
+                                <i className="bi bi-eye me-1"></i>Détail
+                              </button>
+                              <button type="button" onClick={() => exportFinanceSummary(f, 'excel')} className="btn btn-outline-success btn-sm" title="Exporter en Excel">
+                                <i className="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+                              </button>
+                              <button type="button" onClick={() => exportFinanceSummary(f, 'pdf')} className="btn btn-outline-danger btn-sm" title="Exporter en PDF">
+                                <i className="bi bi-file-earmark-pdf me-1"></i>PDF
+                              </button>
+                            </div>
+                          </td>
+                        )}
                         {canEdit && (
                           <td>
                             <div className="btn-group">
@@ -176,7 +258,7 @@ export default function Formateurs() {
                         )}
                       </tr>
                     )) : (
-                      <tr><td colSpan={canEdit ? 10 : 9} className="text-center py-4 text-muted">Aucun formateur trouvé</td></tr>
+                      <tr><td colSpan={canViewFinanceData ? 7 : (canEdit ? 8 : 7)} className="text-center py-4 text-muted">Aucun formateur trouvé</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -196,6 +278,97 @@ export default function Formateurs() {
           )}
         </div>
       </div>
+
+      {financeDetail && (
+        <div className="modal-overlay" onClick={() => !financeDetailLoading && setFinanceDetail(null)}>
+          <div className="modal-content" style={{ width: 'min(96vw, 1100px)', maxWidth: '1100px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5>
+                <i className="bi bi-clock-history me-2"></i>
+                Détail — {financeDetail.prenom} {financeDetail.nom}
+                {financeDetail.numerobadge ? <small className="text-muted ms-2">({financeDetail.numerobadge})</small> : null}
+              </h5>
+              <button type="button" className="btn-close" disabled={financeDetailLoading} onClick={() => setFinanceDetail(null)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+              {financeDetailLoading ? (
+                <div className="loading py-4"><div className="spinner"></div></div>
+              ) : (
+                <>
+                  <p className="text-muted small mb-3">Temps de cours par séance pour ce formateur.</p>
+                  <div className="mb-3 p-2 rounded" style={{ background: 'var(--bs-light, #f8f9fa)', border: '1px solid #e2e8f0' }}>
+                    <strong>Temps total séance :</strong>{' '}
+                    <span className="badge-bg-success">{formatDuration(financeDetail.total_duree_minutes)}</span>
+                    <span className="ms-2"><strong>Temps réalisé :</strong>{' '}
+                      <span className="badge-bg-info" style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        {formatDuration(financeDetail.total_duree_realisee_minutes)}
+                      </span>
+                    </span>
+                    <span className="text-muted ms-2">({financeDetail.sessions_count ?? (financeDetail.sessions?.length || 0)} séance(s))</span>
+                  </div>
+                  {Array.isArray(financeDetail.sessions) && financeDetail.sessions.length > 0 ? (
+                    <div className="table-container" style={{ overflowX: 'auto' }}>
+                      <table className="table table-sm mb-0">
+                        <thead>
+                          <tr>
+                            <th style={{ whiteSpace: 'nowrap' }}>Date</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Séance</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Module</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Durée séance</th>
+                            <th style={{ whiteSpace: 'nowrap' }}>Temps réalisé</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeDetail.sessions.map((s) => (
+                            <tr key={s.session_id}>
+                              <td style={{ whiteSpace: 'nowrap' }}>{s.date_journee || '—'}</td>
+                              <td style={{ whiteSpace: 'nowrap' }}>{s.intitule || `Session ${s.numero ?? ''}`}</td>
+                              <td style={{ whiteSpace: 'nowrap' }}>{s.module_intitule || '—'}</td>
+                              <td style={{ whiteSpace: 'nowrap' }}>
+                                <span className="badge-bg-info" style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                  {formatDuration(s.duree_minutes)}
+                                </span>
+                              </td>
+                              <td style={{ whiteSpace: 'nowrap' }}>
+                                <span className="badge-bg-success" style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+                                  {formatDuration(s.duree_realisee_minutes)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-muted text-center py-3 mb-0">Aucune séance enregistrée pour ce formateur.</p>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              {!financeDetailLoading && (
+                <div className="btn-group me-auto" role="group">
+                  <button
+                    type="button"
+                    className="btn btn-outline-success"
+                    onClick={() => exportFinanceSummary(financeDetail, 'excel')}
+                  >
+                    <i className="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger"
+                    onClick={() => exportFinanceSummary(financeDetail, 'pdf')}
+                  >
+                    <i className="bi bi-file-earmark-pdf me-1"></i>PDF
+                  </button>
+                </div>
+              )}
+              <button type="button" className="btn btn-secondary" disabled={financeDetailLoading} onClick={() => setFinanceDetail(null)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDialog && (
         <ConfirmModal
