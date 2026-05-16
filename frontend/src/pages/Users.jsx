@@ -5,8 +5,8 @@ import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { useAuth } from '../context/AuthContext'
 
-const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'AUDITEUR']
-const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'AUDITEUR']
+const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'AUDITEUR']
+const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'AUDITEUR']
 
 function getSubordinateRoles(role) {
   const idx = ROLE_HIERARCHY.indexOf(role)
@@ -21,7 +21,7 @@ function getCreatableRoles(role) {
   }
   return subordinates
 }
-const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
+const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
 const emptyForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
 const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
 
@@ -179,7 +179,7 @@ export default function Users() {
     } finally { setSaving(false) }
   }
 
-  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'ENCADRANT': 'badge-encadrant', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
+  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
 
   const getFullName = (u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
   const getInitials = (u) => `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || u.username[0]?.toUpperCase()

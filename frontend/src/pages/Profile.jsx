@@ -10,6 +10,7 @@ const ROLE_LABELS = {
   CPFAE_ADMIN: 'CPFAE Admin',
   CHEF_SECRETARIAT: 'Chef Secrétariat',
   SECRETARIAT: 'Secrétariat',
+  FINANCE: 'Finance',
   ENCADRANT: 'Encadrant',
   AUDITEUR: 'Auditeur',
 }
