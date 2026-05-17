@@ -1332,6 +1332,8 @@ def my_historique(request):
 
     modules_data = _modules_for_personne(personne, type_str)
     pointages_qs = _pointages_queryset_for_personne(personne, type_str)
+    stats = _compute_fiche_stats(pointages_qs)
+    stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
 
     return Response({
         'type_personne': type_str,
@@ -1345,7 +1347,7 @@ def my_historique(request):
         'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
         'pointages': data,
         'modules': modules_data,
-        'stats': _compute_fiche_stats(pointages_qs),
+        'stats': stats,
     })
 
 
@@ -1365,6 +1367,7 @@ def _module_fiche_payload(module, inscrit_le=None):
         'statut': module.statut,
         'secretariat_nom': module.secretariat.nom if module.secretariat_id else None,
         'inscrit_le': inscrit_le.isoformat() if inscrit_le else None,
+        'duree_prevue_heures': float(module.duree_prevue_heures or 0),
     }
 
 
@@ -1446,6 +1449,50 @@ def _compute_fiche_stats(pointages_qs):
     }
 
 
+def _compute_volume_horaire_stats(modules_data, pointages_qs):
+    """Volume horaire effectué (présence badgeée) / total prévu (modules inscrits)."""
+    module_cap_minutes = {}
+    total_heures = 0.0
+    for m in modules_data:
+        mid = m.get('id')
+        heures = float(m.get('duree_prevue_heures') or 0)
+        total_heures += heures
+        if mid is not None:
+            module_cap_minutes[mid] = heures * 60
+
+    module_accum = {mid: 0.0 for mid in module_cap_minutes}
+    effectue_minutes = 0.0
+
+    for pt in pointages_qs.select_related('session__module'):
+        mins = float(pt.duree_presence_minutes or 0)
+        if mins <= 0:
+            continue
+        mid = pt.session.module_id if pt.session_id else None
+        if mid in module_cap_minutes:
+            remaining = module_cap_minutes[mid] - module_accum[mid]
+            if remaining <= 0:
+                continue
+            counted = min(mins, remaining)
+            module_accum[mid] += counted
+            effectue_minutes += counted
+        else:
+            effectue_minutes += mins
+
+    effectue_heures = round(effectue_minutes / 60, 1)
+    total_heures_r = round(total_heures, 1)
+    taux = (
+        round((effectue_heures / total_heures_r) * 100, 1)
+        if total_heures_r > 0
+        else 0.0
+    )
+
+    return {
+        'volume_horaire_total_heures': total_heures_r,
+        'volume_horaire_effectue_heures': effectue_heures,
+        'volume_horaire_effectue_taux': taux,
+    }
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_fiche(request):
@@ -1463,6 +1510,7 @@ def my_fiche(request):
     modules_data = _modules_for_personne(personne, type_str)
     pointages_qs = _pointages_queryset_for_personne(personne, type_str)
     stats = _compute_fiche_stats(pointages_qs)
+    stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
     stats['nb_modules_inscrits'] = len(modules_data)
 
     profil = {

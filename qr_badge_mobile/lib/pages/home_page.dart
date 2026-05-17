@@ -8,44 +8,10 @@ import '../theme/qr_badge_theme.dart';
 import '../utils/guarded_logout.dart';
 import '../utils/open_privacy_policy.dart';
 import 'history_page.dart';
+import 'home_dashboard_page.dart';
 import 'login_page.dart';
+import 'profile_fiche_page.dart';
 import 'scan_page.dart';
-
-String _rolePillLabel(Map<String, dynamic>? user) {
-  final r = user?['role']?.toString() ?? '';
-  switch (r) {
-    case 'AUDITEUR':
-      return 'Participant';
-    case 'ENCADRANT':
-      return 'Encadrant';
-    case 'SECRETARIAT':
-    case 'CHEF_SECRETARIAT':
-      return 'Secretariat';
-    case 'CPFAE_ADMIN':
-      return 'CPFAE';
-    case 'CHEF_CPFAE_ADMIN':
-      return 'Chef CPFAE';
-    case 'DIRECTION':
-      return 'Direction';
-    case 'ADMIN':
-      return 'Administrateur';
-    default:
-      return r.isEmpty ? 'Utilisateur' : r;
-  }
-}
-
-String _displayName(SessionProvider session) {
-  final u = session.user;
-  if (u != null) {
-    final fn = (u['first_name'] ?? '').toString().trim();
-    final ln = (u['last_name'] ?? '').toString().trim();
-    final full = '$fn $ln'.trim();
-    if (full.isNotEmpty) {
-      return full;
-    }
-  }
-  return session.user?['username']?.toString() ?? session.username ?? '\u2014';
-}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -55,7 +21,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  int _index = 0;
+  int _index = 1;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -71,9 +38,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Le heartbeat continue de tourner via Timer.periodic tant que le process
-    // est vivant (best-effort en arrière-plan). Au retour, on déclenche un
-    // pulse immédiat pour rattraper un éventuel délai (Doze, throttling).
     if (state == AppLifecycleState.resumed) {
       context.read<SessionProvider>().pulseHeartbeatNow();
     }
@@ -101,116 +65,65 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  String get _title {
+    switch (_index) {
+      case 0:
+        return 'Scanner';
+      case 1:
+        return 'Accueil';
+      case 2:
+        return 'Historique';
+      default:
+        return 'QR Badge';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionProvider>();
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('QR Badge'),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) async {
-              if (value == 'privacy') {
-                if (!context.mounted) {
-                  return;
-                }
-                await openPrivacyPolicy(context, session.baseUrl);
-                return;
-              }
-              if (value == 'logout') {
-                final ok = await performGuardedLogout(context);
-                if (!ok || !context.mounted) {
-                  return;
-                }
-                if (!context.read<SessionProvider>().isAuthenticated) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (_) => false,
-                  );
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'privacy',
-                height: 38,
-                child: ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  leading: Icon(
-                    Icons.policy_outlined,
-                    size: 18,
-                    color: AppColors.textMuted,
-                  ),
-                  title: Text(
-                    'Confidentialit\u00e9',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                          fontSize: 13,
-                        ),
-                  ),
-                ),
-              ),
-              const PopupMenuDivider(height: 4),
-              const PopupMenuItem(
-                value: 'logout',
-                child: ListTile(
-                  leading: Icon(Icons.logout),
-                  title: Text('D\u00e9connexion'),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Bandeau utilisateur / role ─────────────────────────────────
-          Material(
-            color: AppColors.cardCream,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                children: [
-                  const Icon(Icons.person_outline,
-                      size: 22, color: AppColors.ciGreenDark),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Connecte : ${_displayName(session)}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                          ),
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.navIndicator,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _rolePillLabel(session.user),
-                      style: const TextStyle(
-                        color: AppColors.ciGreenDark,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
+      key: _scaffoldKey,
+      backgroundColor: AppColors.ciLight,
+      drawer: _AppDrawer(
+        onRequestGps: () => _requestGps(session),
+        onOpenFiche: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProfileFichePage(
+                onOpenHistory: () => setState(() => _index = 2),
               ),
             ),
-          ),
-
-          // ── Bandeau GPS refuse ────────────────────────────────────────
-          if (!session.gpsGranted)
+          );
+        },
+      ),
+      appBar: _index == 0
+          ? null
+          : AppBar(
+              centerTitle: _index == 2,
+              title: Text(_title),
+              leading: IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
+              automaticallyImplyLeading: false,
+              actions: [
+                if (_index == 1)
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Aucune notification pour le moment.'),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+      body: Column(
+        children: [
+          if (!session.gpsGranted && _index != 0)
             Material(
               color: Colors.orange.shade50,
               child: Padding(
@@ -223,8 +136,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'GPS non autoris\u00e9 \u2014 le scan et le suivi de '
-                        'pr\u00e9sence ne fonctionneront pas.',
+                        'GPS non autoris\u00e9 \u2014 le scan ne fonctionnera pas correctement.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange.shade900,
@@ -244,13 +156,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             ),
-
-          // ── Pages ─────────────────────────────────────────────────────
           Expanded(
             child: IndexedStack(
               index: _index,
               children: [
-                ScanPage(isActive: _index == 0),
+                ScanPage(
+                  isActive: _index == 0,
+                  onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+                HomeDashboardPage(
+                  onOpenHistory: () => setState(() => _index = 2),
+                ),
                 const HistoryPage(),
               ],
             ),
@@ -267,11 +183,96 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             label: 'Scanner',
           ),
           NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'Historique',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AppDrawer extends StatelessWidget {
+  const _AppDrawer({
+    required this.onRequestGps,
+    required this.onOpenFiche,
+  });
+
+  final VoidCallback onRequestGps;
+  final VoidCallback onOpenFiche;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionProvider>();
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: AppColors.ciGreenDark),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  'QR Badge',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Fiche'),
+              onTap: () {
+                Navigator.pop(context);
+                onOpenFiche();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.location_on_outlined),
+              title: const Text('Autoriser le GPS'),
+              onTap: () {
+                Navigator.pop(context);
+                onRequestGps();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.policy_outlined),
+              title: const Text('Confidentialité'),
+              onTap: () async {
+                Navigator.pop(context);
+                await openPrivacyPolicy(context, session.baseUrl);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.ciDanger),
+              title: const Text('Déconnexion'),
+              onTap: () async {
+                Navigator.pop(context);
+                final ok = await performGuardedLogout(context);
+                if (!ok || !context.mounted) {
+                  return;
+                }
+                if (!context.read<SessionProvider>().isAuthenticated) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                    (_) => false,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

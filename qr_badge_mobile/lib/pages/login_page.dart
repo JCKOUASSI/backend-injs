@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/open_privacy_policy.dart';
 import '../utils/server_url.dart';
+import '../widgets/qr_badge_logo.dart';
 import 'change_password_page.dart';
 import 'home_page.dart';
 
@@ -85,167 +86,209 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.ciGreenDark,
-              AppColors.ciOrange,
-            ],
-          ),
+      backgroundColor: AppColors.ciLight,
+      appBar: AppBar(
+        centerTitle: false,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const QrBadgeLogo(size: 28, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              'QR Badge',
+              style: Theme.of(context).appBarTheme.titleTextStyle,
+            ),
+          ],
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Material(
-                  elevation: 8,
-                  shadowColor: Colors.black38,
-                  borderRadius: BorderRadius.circular(24),
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: AppColors.iconQrBg,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.qr_code_2,
-                              color: AppColors.ciGreenDark,
-                              size: 34,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'QR Badge',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                  color: AppColors.ciGreenDark,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Badgeage s\u00e9curis\u00e9 par QR code',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: AppColors.textMuted),
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _usernameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Identifiant',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                            textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Champ requis'
-                                : null,
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _passwordCtrl,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Mot de passe',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                tooltip: _obscurePassword
-                                    ? 'Afficher'
-                                    : 'Masquer',
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
+      ),
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            8,
+            20,
+            24 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Material(
+                      elevation: 2,
+                      shadowColor: Colors.black12,
+                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.cardBg,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const QrBadgeLogo(
+                                size: 72,
+                                color: AppColors.ciGreenDark,
+                                backgroundColor: AppColors.iconQrBg,
                               ),
-                            ),
-                            validator: (v) =>
-                                (v == null || v.isEmpty) ? 'Champ requis' : null,
-                            onFieldSubmitted: (_) => _submit(),
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              _error!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontSize: 13,
+                              const SizedBox(height: 20),
+                              Text(
+                                'Bienvenue',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _loading ? null : _submit,
-                              child: _loading
-                                  ? const SizedBox(
-                                      height: 22,
-                                      width: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
+                              const SizedBox(height: 8),
+                              Text(
+                                'Connectez-vous à votre compte',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 24),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Nom d\u2019utilisateur',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
                                       ),
-                                    )
-                                  : const Text('Se connecter'),
-                            ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _usernameCtrl,
+                                decoration: const InputDecoration(
+                                  hintText: 'Identifiant',
+                                ),
+                                textInputAction: TextInputAction.next,
+                                validator: (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                        ? 'Champ requis'
+                                        : null,
+                              ),
+                              const SizedBox(height: 16),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Mot de passe',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _passwordCtrl,
+                                obscureText: _obscurePassword,
+                                decoration: InputDecoration(
+                                  hintText: 'Mot de passe',
+                                  suffixIcon: IconButton(
+                                    tooltip: _obscurePassword
+                                        ? 'Afficher'
+                                        : 'Masquer',
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    onPressed: () => setState(
+                                      () => _obscurePassword = !_obscurePassword,
+                                    ),
+                                  ),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? 'Champ requis'
+                                    : null,
+                                onFieldSubmitted: (_) => _submit(),
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () {},
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.ciGreenDark,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 0,
+                                      vertical: 4,
+                                    ),
+                                  ),
+                                  child: const Text('Mot de passe oublié ?'),
+                                ),
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: _loading ? null : _submit,
+                                  child: _loading
+                                      ? const SizedBox(
+                                          height: 22,
+                                          width: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text('Connexion'),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                TextButton.icon(
+                  onPressed: () => openPrivacyPolicy(
+                    context,
+                    context.read<SessionProvider>().baseUrl,
+                  ),
+                  icon: const Icon(
+                    Icons.verified_user_outlined,
+                    size: 18,
+                    color: AppColors.ciGreenDark,
+                  ),
+                  label: const Text(
+                    'Confidentialité',
+                    style: TextStyle(
+                      color: AppColors.ciGreenDark,
+                      decoration: TextDecoration.underline,
+                      decorationColor: AppColors.ciGreenDark,
                     ),
                   ),
                 ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => openPrivacyPolicy(
-                      context,
-                      context.read<SessionProvider>().baseUrl,
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.45),
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'Confidentialit\u00e9',
-                      style: TextStyle(
-                        fontSize: 11,
-                        letterSpacing: 0.2,
-                        decoration: TextDecoration.underline,
-                        decorationColor: Colors.white.withValues(alpha: 0.35),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ),

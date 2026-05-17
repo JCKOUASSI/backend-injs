@@ -79,6 +79,8 @@ class ApiClient {
       return _parse(res, method: 'POST', path: path, uri: uri);
     } on SessionExpiredException {
       rethrow;
+    } on ApiResponseException {
+      rethrow;
     } on TimeoutException {
       debugPrint('[qr_badge.api] POST $path \u2192 timeout (${_kTimeout.inSeconds}s)');
       throw NetworkTimeoutException(uri.host, uri.port);
@@ -120,6 +122,8 @@ class ApiClient {
       return _parse(res, method: 'GET', path: path, uri: uri);
     } on SessionExpiredException {
       rethrow;
+    } on ApiResponseException {
+      rethrow;
     } on TimeoutException {
       debugPrint('[qr_badge.api] GET $path \u2192 timeout (${_kTimeout.inSeconds}s)');
       throw NetworkTimeoutException(uri.host, uri.port);
@@ -138,11 +142,28 @@ class ApiClient {
   }) {
     Map<String, dynamic> json = <String, dynamic>{};
     if (res.body.isNotEmpty) {
-      final decoded = jsonDecode(res.body);
-      if (decoded is Map<String, dynamic>) {
-        json = decoded;
-      } else {
-        json = {'data': decoded};
+      try {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) {
+          json = decoded;
+        } else {
+          json = {'data': decoded};
+        }
+      } catch (_) {
+        final trimmed = res.body.trimLeft();
+        if (trimmed.startsWith('<!DOCTYPE') ||
+            trimmed.startsWith('<html') ||
+            trimmed.startsWith('<')) {
+          throw ApiResponseException(
+            statusCode: res.statusCode,
+            path: path,
+            message: res.statusCode == 404
+                ? 'Ressource introuvable ($path). '
+                    'Vérifiez que le serveur Django est à jour et redémarré.'
+                : 'Réponse HTML inattendue du serveur (HTTP ${res.statusCode}).',
+          );
+        }
+        rethrow;
       }
     }
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -200,4 +221,20 @@ class SessionExpiredException implements Exception {
   const SessionExpiredException();
   @override
   String toString() => 'Session expir\u00e9e. Veuillez vous reconnecter.';
+}
+
+/// Réponse HTTP non JSON (souvent une page 404 HTML Django).
+class ApiResponseException implements Exception {
+  const ApiResponseException({
+    required this.statusCode,
+    required this.path,
+    required this.message,
+  });
+
+  final int statusCode;
+  final String path;
+  final String message;
+
+  @override
+  String toString() => message;
 }
