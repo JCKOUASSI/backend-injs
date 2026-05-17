@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
 from authentication.throttles import ScanRateThrottle
 from formations.models import (
-    Formation, Participant, ModuleParticipant, ModuleFormateur,
+    Formation, Participant, Module, ModuleParticipant, ModuleFormateur,
     Formateur, QRToken, SessionModule, RefSite,
 )
 FormationParticipant = ModuleParticipant
@@ -1330,8 +1330,12 @@ def my_historique(request):
             'statut': pt.statut,
         })
 
+    modules_data = _modules_for_personne(personne, type_str)
+    pointages_qs = _pointages_queryset_for_personne(personne, type_str)
+
     return Response({
         'type_personne': type_str,
+        'personne_id': personne.pk,
         'numero': (
             getattr(personne, 'matricule', None)
             or getattr(personne, 'numerobadge', None)
@@ -1340,6 +1344,146 @@ def my_historique(request):
         'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
         'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
         'pointages': data,
+        'modules': modules_data,
+        'stats': _compute_fiche_stats(pointages_qs),
+    })
+
+
+def _module_fiche_payload(module, inscrit_le=None):
+    site_label = module.site.nom if module.site_id else (module.site_legacy or '')
+    return {
+        'id': module.id,
+        'formation_id': module.formation_id,
+        'formation': module.formation.formation if module.formation_id else '',
+        'module': module.intitule,
+        'grade': module.grade or '',
+        'groupe': module.groupe or '',
+        'vague': module.vague or '',
+        'site': site_label,
+        'date_debut': str(module.date_debut) if module.date_debut else None,
+        'date_fin': str(module.date_fin) if module.date_fin else None,
+        'statut': module.statut,
+        'secretariat_nom': module.secretariat.nom if module.secretariat_id else None,
+        'inscrit_le': inscrit_le.isoformat() if inscrit_le else None,
+    }
+
+
+def _modules_for_personne(personne, type_str):
+    modules_data = []
+    if type_str == 'participant':
+        inscriptions = (
+            ModuleParticipant.objects.filter(participant=personne)
+            .select_related('module__formation', 'module__secretariat', 'module__site')
+            .order_by('-inscrit_le')
+        )
+        for ins in inscriptions:
+            modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le))
+    elif type_str == 'formateur':
+        inscriptions = (
+            ModuleFormateur.objects.filter(formateur=personne)
+            .select_related('module__formation', 'module__secretariat', 'module__site')
+            .order_by('-inscrit_le')
+        )
+        for ins in inscriptions:
+            modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le))
+    return modules_data
+
+
+def _pointages_queryset_for_personne(personne, type_str):
+    if type_str == 'formateur':
+        return Pointage.objects.filter(formateur=personne)
+    if type_str == 'encadrant':
+        return Pointage.objects.filter(encadrant=personne)
+    return Pointage.objects.filter(participant=personne)
+
+
+def _compute_fiche_stats(pointages_qs):
+    pointages = list(
+        pointages_qs.select_related('session__module__formation').order_by('-timestamp_entree')
+    )
+    total_minutes = 0.0
+    terminees = 0
+    en_cours = 0
+    a_verifier = 0
+    dernier = None
+    formations_ids = set()
+    modules_ids = set()
+
+    alert_statuts = {
+        Pointage.Statut.HORS_LIGNE_SUSPECT,
+        Pointage.Statut.ABSENT_NON_BADGE,
+        Pointage.Statut.SORTIE_AUTO,
+    }
+
+    for pt in pointages:
+        if pt.duree_presence_minutes is not None:
+            total_minutes += float(pt.duree_presence_minutes)
+        if pt.timestamp_sortie:
+            terminees += 1
+        elif pt.statut == Pointage.Statut.EN_COURS:
+            en_cours += 1
+        if pt.statut in alert_statuts or (
+            pt.statut == Pointage.Statut.EN_COURS and not pt.timestamp_sortie
+        ):
+            a_verifier += 1
+        if dernier is None or pt.timestamp_entree > dernier:
+            dernier = pt.timestamp_entree
+        if pt.session_id and pt.session.module_id:
+            modules_ids.add(pt.session.module_id)
+            if pt.session.module.formation_id:
+                formations_ids.add(pt.session.module.formation_id)
+
+    return {
+        'nb_badgeages': len(pointages),
+        'nb_seances_terminees': terminees,
+        'nb_seances_en_cours': en_cours,
+        'nb_a_verifier': a_verifier,
+        'nb_sans_probleme': max(0, len(pointages) - a_verifier),
+        'total_minutes_presence': round(total_minutes, 1),
+        'nb_formations': len(formations_ids),
+        'nb_modules_badges': len(modules_ids),
+        'dernier_badgeage': dernier.isoformat() if dernier else None,
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_fiche(request):
+    """Fiche personnelle mobile : profil, modules inscrits et statistiques de badgeage."""
+    from authentication.serializers import UserSerializer
+
+    user = request.user
+    if getattr(user, 'must_change_password', False):
+        return _password_change_required_response()
+
+    personne, type_str, err = _resolve_authenticated_personne(user)
+    if err:
+        return err
+
+    modules_data = _modules_for_personne(personne, type_str)
+    pointages_qs = _pointages_queryset_for_personne(personne, type_str)
+    stats = _compute_fiche_stats(pointages_qs)
+    stats['nb_modules_inscrits'] = len(modules_data)
+
+    profil = {
+        'type_personne': type_str,
+        'numero': (
+            getattr(personne, 'matricule', None)
+            or getattr(personne, 'numerobadge', None)
+            or getattr(user, 'matricule', None)
+            or ''
+        ),
+        'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
+        'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
+    }
+    if type_str == 'formateur':
+        profil['specialite'] = getattr(personne, 'specialite', '') or ''
+
+    return Response({
+        'utilisateur': UserSerializer(user).data,
+        'profil': profil,
+        'modules': modules_data,
+        'stats': stats,
     })
 
 
