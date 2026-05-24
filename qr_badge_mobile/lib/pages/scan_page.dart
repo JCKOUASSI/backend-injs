@@ -9,12 +9,14 @@ import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/camera_permission.dart';
 import '../utils/confirm_dialog.dart';
+import '../widgets/scan_frame_overlay.dart';
 
 class ScanPage extends StatefulWidget {
-  const ScanPage({super.key, this.isActive = true});
+  const ScanPage({super.key, this.isActive = true, this.onOpenMenu});
 
   /// Quand l’onglet Scanner n’est pas sélectionné, la caméra est arrêtée pour économiser batterie / éviter un aperçu actif en arrière-plan.
   final bool isActive;
+  final VoidCallback? onOpenMenu;
 
   @override
   State<ScanPage> createState() => _ScanPageState();
@@ -27,7 +29,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
 
   String? _tokenQr;
   bool _loadingScan = false;
-  String? _result;
   String? _error;
 
   /// Vrai après un badgeage réussi : la caméra est arrêtée jusqu'à ce que
@@ -95,38 +96,195 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildPausedPlaceholder() {
-    return Container(
-      color: Colors.grey.shade100,
+    return ColoredBox(
+      color: Colors.black87,
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, size: 56, color: AppColors.ciGreen),
+            const SizedBox(height: 12),
+            Text(
+              'Scan effectué',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _resumeScan,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scanner à nouveau'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScannerHeader() {
+    return Material(
+      color: AppColors.ciGreenDark,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: kToolbarHeight,
+          child: Row(
             children: [
-              Icon(Icons.check_circle,
-                  size: 56, color: AppColors.ciGreenDark),
-              const SizedBox(height: 12),
+              if (widget.onOpenMenu != null)
+                IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.white),
+                  onPressed: widget.onOpenMenu,
+                )
+              else
+                const SizedBox(width: 8),
               Text(
-                'Scan effectué',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                'Scanner',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
                     ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Caméra mise en pause.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMuted,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _resumeScan,
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scanner à nouveau'),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomSheet(SessionProvider session) {
+    final hasToken = _tokenQr != null && _tokenQr!.isNotEmpty;
+    return Material(
+      color: AppColors.cardBg,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      elevation: 8,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.iconQrBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner,
+                    color: AppColors.ciGreenDark,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Scanner',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hasToken
+                            ? 'QR code détecté. Confirmez le badgeage ci-dessous.'
+                            : 'Positionnez le QR code dans le cadre pour enregistrer une présence.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                              height: 1.35,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (hasToken) ...[
+              const SizedBox(height: 12),
+              _GeofenceBanner(
+                info: _statusInfo,
+                loading: _loadingStatus,
+                onRefresh: _refreshStatus,
+              ),
+            ],
+            if (session.isSecureHeartbeatRunning) ...[
+              const SizedBox(height: 8),
+              if (session.heartbeatGpsBlocked)
+                _InfoStrip(
+                  icon: Icons.location_off,
+                  color: Colors.orange,
+                  text:
+                      'GPS indisponible — activez la localisation pour le suivi.',
+                )
+              else
+                _InfoStrip(
+                  icon: Icons.sensors,
+                  color: AppColors.ciBlue,
+                  text:
+                      'Suivi de présence actif. Gardez l\u2019application au premier plan.',
+                ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: (_loadingScan ||
+                        !hasToken ||
+                        _geofenceBlocksBadge())
+                    ? null
+                    : _doScan,
+                icon: _loadingScan
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(hasToken ? Icons.login : Icons.hourglass_empty),
+                label: Text(
+                  _loadingScan
+                      ? 'Vérification…'
+                      : _geofenceBlocksBadge()
+                          ? 'Zone GPS non conforme'
+                          : hasToken
+                              ? 'Badger entrée / sortie'
+                              : 'En attente du QR code…',
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -137,7 +295,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       _cameraPaused = false;
       _tokenQr = null;
       _statusInfo = null;
-      _result = null;
       _error = null;
     });
     await _syncCameraWithTab();
@@ -195,7 +352,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     setState(() {
       _loadingScan = true;
       _error = null;
-      _result = null;
     });
     String? actionSuivante;
     String? heureEntree;
@@ -278,7 +434,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     setState(() {
       _loadingScan = true;
       _error = null;
-      _result = null;
     });
     try {
       final tel = await _telemetry.capture();
@@ -303,10 +458,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       // Caméra arrêtée tant que l'utilisateur n'a pas demandé un nouveau scan.
       await _camera.stop();
       if (!mounted) return;
-      setState(() {
-        _result = confirmation;
-        _cameraPaused = true;
-      });
+      setState(() => _cameraPaused = true);
       if (mounted) {
         final isExit = action == 'SORTIE' || action == 'SORTIE_AUTO';
         await showDialog<void>(
@@ -372,236 +524,109 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     super.dispose();
   }
 
+  void _onQrDetected(String code) {
+    final t = _extractToken(code);
+    if (t.isEmpty || t == _tokenQr) {
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _tokenQr = t;
+      _error = null;
+      _statusInfo = null;
+    });
+    _refreshStatus();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          duration: Duration(seconds: 2),
+          backgroundColor: AppColors.ciGreenDark,
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'QR code détecté — confirmez le badgeage.',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final session = context.watch<SessionProvider>();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final previewHeight = (constraints.maxHeight * 0.42).clamp(220.0, 360.0);
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            Center(
-              child: Icon(Icons.qr_code_2, size: 44, color: AppColors.accentOrange),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Scannez le QR code',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Pointez votre caméra vers le QR code affiché par l\u2019encadrant',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-            ),
-            const SizedBox(height: 18),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                height: previewHeight,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.ciGreenDark, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _cameraPaused
-                      ? _buildPausedPlaceholder()
-                      : MobileScanner(
-                    controller: _camera,
-                    onDetect: (capture) {
-                      final code = capture.barcodes.first.rawValue;
-                      if (code == null || code.isEmpty) {
-                        return;
-                      }
-                      final t = _extractToken(code);
-                      if (t.isEmpty || t == _tokenQr) {
-                        return;
-                      }
-                      HapticFeedback.mediumImpact();
-                      setState(() {
-                        _tokenQr = t;
-                        _error = null;
-                        _statusInfo = null;
-                      });
-                      _refreshStatus();
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            duration: Duration(seconds: 2),
-                            backgroundColor: AppColors.ciGreenDark,
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'QR code détecté — appuyez sur « Badger » pour confirmer.',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                    },
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: (_tokenQr != null && _tokenQr!.isNotEmpty)
-                    ? AppColors.ciGreen.withValues(alpha: 0.15)
-                    : Colors.grey.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: (_tokenQr != null && _tokenQr!.isNotEmpty)
-                      ? AppColors.ciGreenDark
-                      : Colors.grey.shade400,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    (_tokenQr != null && _tokenQr!.isNotEmpty)
-                        ? Icons.check_circle
-                        : Icons.qr_code_scanner,
-                    color: (_tokenQr != null && _tokenQr!.isNotEmpty)
-                        ? AppColors.ciGreenDark
-                        : AppColors.textMuted,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      (_tokenQr != null && _tokenQr!.isNotEmpty)
-                          ? 'QR code détecté. Appuyez sur « Badger » pour confirmer.'
-                          : 'En attente — pointez la caméra vers le QR code.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_tokenQr != null && _tokenQr!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _GeofenceBanner(
-                info: _statusInfo,
-                loading: _loadingStatus,
-                onRefresh: _refreshStatus,
-              ),
-            ],
-            if (session.isSecureHeartbeatRunning) ...[
-              const SizedBox(height: 8),
-              // Bandeau GPS bloqué : 3 heartbeats consécutifs sans position.
-              if (session.heartbeatGpsBlocked)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.orange),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.location_off,
-                          color: Colors.orange.shade800, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'GPS indisponible — le suivi de présence ne peut pas envoyer votre position. '
-                          'Activez la localisation pour que le heartbeat fonctionne.',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.orange.shade900,
-                                  ),
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildScannerHeader(),
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                color: Colors.black,
+                child: _cameraPaused
+                    ? _buildPausedPlaceholder()
+                    : MobileScanner(
+                        controller: _camera,
+                        onDetect: (capture) {
+                          final code = capture.barcodes.first.rawValue;
+                          if (code == null || code.isEmpty) {
+                            return;
+                          }
+                          _onQrDetected(code);
+                        },
                       ),
-                    ],
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    const Icon(Icons.sensors,
-                        color: AppColors.ciBlue, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Suivi de présence actif (GPS requis). '
-                        'Gardez l\u2019application au premier plan pour que le suivi continue.',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: (_loadingScan ||
-                        _tokenQr == null ||
-                        _tokenQr!.isEmpty ||
-                        _geofenceBlocksBadge())
-                    ? null
-                    : _doScan,
-                icon: _loadingScan
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Icon(
-                        (_tokenQr != null && _tokenQr!.isNotEmpty)
-                            ? Icons.login
-                            : Icons.hourglass_empty,
-                      ),
-                label: Text(
-                  _loadingScan
-                      ? 'Vérification…'
-                      : _geofenceBlocksBadge()
-                          ? 'Zone GPS non conforme'
-                      : (_tokenQr != null && _tokenQr!.isNotEmpty)
-                          ? 'Badger entrée / sortie'
-                          : 'En attente du QR code…',
-                ),
               ),
+              if (!_cameraPaused) const ScanFrameOverlay(),
+            ],
+          ),
+        ),
+        _buildBottomSheet(session),
+      ],
+    );
+  }
+}
+
+class _InfoStrip extends StatelessWidget {
+  const _InfoStrip({
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13),
-              ),
-            ],
-            if (_result != null) ...[
-              const SizedBox(height: 8),
-              SelectableText(
-                _result!,
-                style: const TextStyle(color: AppColors.ciGreenDark, fontSize: 13),
-              ),
-            ],
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }

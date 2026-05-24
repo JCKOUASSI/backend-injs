@@ -75,7 +75,7 @@ function Layout({ children, breadcrumb }) {
       <aside className={`sidebar${sidebarOpen ? ' show' : ''}`} id="sidebar">
         <div className="sidebar-brand">
           <img src={logo} alt="MEMFPMA" style={{ width: '80px', marginBottom: '0.5rem' }} />
-          <h5 style={{ marginBottom: '0.1rem' }}>QR Badge</h5>
+          <h5 style={{ marginBottom: '0.1rem' }}>SYGEP-CPFAE</h5>
           <small>DFRC — Gestion des présences</small>
         </div>
 

@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Historique personnel (app mobile)
     path('me/historique/', views.my_historique, name='my-historique'),
+    path('me/fiche/', views.my_fiche, name='my-fiche'),
 
     # Dashboard & présences (DFRC / Superviseur)
     path('formations/<int:pk>/dashboard/', views.formation_dashboard, name='formation-dashboard'),

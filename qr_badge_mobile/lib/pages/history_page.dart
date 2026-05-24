@@ -8,6 +8,18 @@ import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import 'login_page.dart';
 
+class _HistoryEvent {
+  _HistoryEvent({
+    required this.at,
+    required this.label,
+    required this.success,
+  });
+
+  final DateTime at;
+  final String label;
+  final bool success;
+}
+
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -19,7 +31,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   final _service = ScanService();
   bool _loading = true;
   String? _error;
-  Map<String, dynamic>? _payload;
+  List<_HistoryEvent> _events = [];
 
   @override
   bool get wantKeepAlive => true;
@@ -28,6 +40,35 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   void initState() {
     super.initState();
     _load();
+  }
+
+  List<_HistoryEvent> _eventsFromPayload(Map<String, dynamic>? p) {
+    final rawList = p?['pointages'];
+    final items = rawList is List ? rawList.cast<dynamic>() : <dynamic>[];
+    final events = <_HistoryEvent>[];
+    for (final raw in items) {
+      final m = Map<String, dynamic>.from(raw as Map);
+      final entree = DateTime.tryParse((m['timestamp_entree'] ?? '').toString());
+      final sortie = DateTime.tryParse((m['timestamp_sortie'] ?? '').toString());
+      final statut = (m['statut'] ?? '').toString();
+      final ok = statut.isEmpty || statut == 'PRESENT' || statut == 'VALIDE';
+      if (entree != null) {
+        events.add(_HistoryEvent(
+          at: entree.toLocal(),
+          label: 'Pointage réussi',
+          success: ok,
+        ));
+      }
+      if (sortie != null) {
+        events.add(_HistoryEvent(
+          at: sortie.toLocal(),
+          label: 'Pointage réussi',
+          success: ok,
+        ));
+      }
+    }
+    events.sort((a, b) => b.at.compareTo(a.at));
+    return events;
   }
 
   Future<void> _load() async {
@@ -51,9 +92,8 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
               (ok) => ok ? session.accessToken : null,
             ),
       );
-      setState(() => _payload = res);
+      setState(() => _events = _eventsFromPayload(res));
     } on SessionExpiredException {
-      // Refresh token expiré — déconnecter et renvoyer vers le login.
       if (mounted) {
         await context.read<SessionProvider>().logout();
         if (!mounted) return;
@@ -70,59 +110,6 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
         setState(() => _loading = false);
       }
     }
-  }
-
-  String _fullName(Map<String, dynamic>? p, SessionProvider session) {
-    if (p != null) {
-      final prenom = (p['prenom'] ?? '').toString().trim();
-      final nom = (p['nom'] ?? '').toString().trim();
-      final s = '$prenom $nom'.trim();
-      if (s.isNotEmpty) {
-        return s;
-      }
-    }
-    final u = session.user;
-    if (u != null) {
-      final fn = (u['first_name'] ?? '').toString().trim();
-      final ln = (u['last_name'] ?? '').toString().trim();
-      final full = '$fn $ln'.trim();
-      if (full.isNotEmpty) {
-        return full;
-      }
-    }
-    return session.username ?? '—';
-  }
-
-  String? _numeroMatricule(Map<String, dynamic>? p) {
-    if (p == null) {
-      return null;
-    }
-    final n = p['numero']?.toString().trim();
-    if (n != null && n.isNotEmpty) {
-      return n;
-    }
-    return null;
-  }
-
-  int _minutes(dynamic v) {
-    if (v == null) {
-      return 0;
-    }
-    if (v is num) {
-      return v.round();
-    }
-    return double.tryParse(v.toString())?.round() ?? 0;
-  }
-
-  String _hm(dynamic raw) {
-    if (raw == null) {
-      return '—';
-    }
-    final dt = DateTime.tryParse(raw.toString());
-    if (dt == null) {
-      return '—';
-    }
-    return DateFormat.Hm('fr_FR').format(dt.toLocal());
   }
 
   @override
@@ -150,11 +137,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       );
     }
 
-    final p = _payload;
-    final rawList = p?['pointages'];
-    final items = rawList is List ? rawList.cast<dynamic>() : <dynamic>[];
-
-    if (items.isEmpty) {
+    if (_events.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -167,199 +150,92 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       );
     }
 
-    final session = context.watch<SessionProvider>();
-    final rows = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final byDay = <String, List<Map<String, dynamic>>>{};
-    for (final m in rows) {
-      final k = (m['date_journee'] ?? '').toString();
-      if (k.isEmpty) {
-        continue;
-      }
-      byDay.putIfAbsent(k, () => []).add(m);
-    }
-    final dayKeys = byDay.keys.toList()..sort((a, b) => b.compareTo(a));
-
-    final nb = items.length;
-    final displayName = _fullName(p, session);
-    final numero = _numeroMatricule(p);
-
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
+      child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.cardCream,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.person, color: AppColors.ciGreenDark, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      if (numero != null)
-                        Text(
-                          numero,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textMuted,
-                              ),
-                        ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.badgeOrangeBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$nb badgeage${nb > 1 ? 's' : ''}',
-                    style: const TextStyle(
-                      color: AppColors.badgeOrangeFg,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...dayKeys.expand((dayKey) {
-            final dayItems = byDay[dayKey] ?? [];
-            final dateLabel = _dayHeaderLabel(dayKey);
-            final totalMin = dayItems.fold<int>(0, (s, m) => s + _minutes(m['duree_presence_minutes']));
-            return [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        dateLabel,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ),
-                    Text(
-                      '$totalMin min',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: AppColors.badgeOrangeFg,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              ...dayItems.map((m) => _SessionCard(
-                    titre: m['formation_titre']?.toString() ?? 'Formation',
-                    entree: _hm(m['timestamp_entree']),
-                    sortie: _hm(m['timestamp_sortie']),
-                    minutes: _minutes(m['duree_presence_minutes']),
-                  )),
-              const SizedBox(height: 12),
-            ];
-          }),
-        ],
+        itemCount: _events.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
+        itemBuilder: (context, i) => _HistoryEntryCard(event: _events[i]),
       ),
     );
   }
-
-  String _dayHeaderLabel(String dayKey) {
-    final d = DateTime.tryParse(dayKey.length >= 10 ? dayKey.substring(0, 10) : dayKey);
-    if (d == null) {
-      return dayKey;
-    }
-    return DateFormat.yMMMMEEEEd('fr_FR').format(d);
-  }
 }
 
-class _SessionCard extends StatelessWidget {
-  const _SessionCard({
-    required this.titre,
-    required this.entree,
-    required this.sortie,
-    required this.minutes,
-  });
+class _HistoryEntryCard extends StatelessWidget {
+  const _HistoryEntryCard({required this.event});
 
-  final String titre;
-  final String entree;
-  final String sortie;
-  final int minutes;
+  final _HistoryEvent event;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: AppColors.cardGrey,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.iconQrBg,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle, color: AppColors.ciGreen, size: 22),
+    final dateFmt = DateFormat('d MMMM yyyy', 'fr_FR');
+    final timeFmt = DateFormat.Hm('fr_FR');
+    return Material(
+      color: AppColors.cardBg,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderColor.withValues(alpha: 0.7)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: AppColors.iconQrBg,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titre,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '-> $entree    <- $sortie',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                event.success ? Icons.check : Icons.info_outline,
+                color: event.success ? AppColors.ciGreenDark : AppColors.ciOrange,
+                size: 24,
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.badgeOrangeBg,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$minutes min',
-                  style: const TextStyle(
-                    color: AppColors.badgeOrangeFg,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateFmt.format(event.at),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    timeFmt.format(event.at),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    event.label,
+                    style: TextStyle(
+                      color: event.success
+                          ? AppColors.ciGreenDark
+                          : AppColors.ciOrangeDark,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

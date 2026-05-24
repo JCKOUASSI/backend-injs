@@ -1,6 +1,6 @@
 {
-    "name": "QR Badge MFPMA",
-    "short_name": "QR Badge",
+    "name": "SYGEP-CPFAE",
+    "short_name": "SYGEP-CPFAE",
     "description": "Système de badgeage par QR code — MFPMA",
     "start_url": "/dashboard/badge/",
     "display": "standalone",
