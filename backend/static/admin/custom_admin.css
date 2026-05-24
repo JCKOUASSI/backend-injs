@@ -18,29 +18,151 @@
     --darkened-bg: #f8fafc;
 }
 
-#header {
+/* ── En-tête admin (surcharge après responsive.css) ─────────────────────── */
+
+html,
+body {
+    height: auto;
+    min-height: 100%;
+}
+
+#container {
+    height: auto;
+    min-height: 100%;
+}
+
+#container > #header,
+#container > header#header {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 16px 40px;
     background: linear-gradient(90deg, #0f4c81 0%, #13624e 100%);
     color: #ffffff;
 }
 
-#branding h1,
-#branding h1 a:link,
-#branding h1 a:visited {
-    color: #ffffff;
-    font-weight: 700;
-    letter-spacing: 0.2px;
+#branding {
+    display: block;
+    flex: 1 1 280px;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+    margin: 0;
 }
 
 .dfrc-branding {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+}
+
+#branding h1,
+#branding #site-name {
+    margin: 0 !important;
+    padding: 0;
+    line-height: 1.35;
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+#branding #site-name a,
+#branding #site-name a:link,
+#branding #site-name a:visited {
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
+#branding #site-name a:hover,
+#branding #site-name a:focus {
+    color: #ffffff !important;
+    text-decoration: underline;
 }
 
 .dfrc-branding-subtitle {
+    margin: 0 !important;
+    padding: 0;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+#user-tools {
+    float: none;
+    flex: 0 0 auto;
+    align-self: center;
     margin: 0;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 12px;
+    padding: 0;
+    line-height: 1.5;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: right;
+    white-space: normal;
+}
+
+#header a:link,
+#header a:visited,
+#logout-form button {
+    color: #ffffff;
+}
+
+#user-tools a,
+#logout-form button {
+    border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+
+#user-tools .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-inline-start: 6px;
+    margin-top: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Libellés accessibilité du thème : ne pas les afficher visuellement */
+#user-tools .theme-toggle .visually-hidden,
+#user-tools .theme-toggle .theme-label-when-auto,
+#user-tools .theme-toggle .theme-label-when-light,
+#user-tools .theme-toggle .theme-label-when-dark {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    display: none !important;
+}
+
+#user-tools .theme-toggle svg {
+    display: none;
+    width: 1rem;
+    height: 1rem;
+    fill: #ffffff;
+}
+
+html[data-theme="auto"] #user-tools .theme-toggle svg.theme-icon-when-auto,
+html[data-theme="light"] #user-tools .theme-toggle svg.theme-icon-when-light,
+html[data-theme="dark"] #user-tools .theme-toggle svg.theme-icon-when-dark {
+    display: block;
 }
 
 div.breadcrumbs {
@@ -111,6 +233,18 @@ select,
 @media (max-width: 1024px) {
     #content h1 {
         font-size: 20px;
+    }
+
+    #container > #header,
+    #container > header#header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 16px 30px;
+    }
+
+    #user-tools {
+        width: 100%;
+        text-align: left;
     }
 }
 
@@ -219,4 +353,10 @@ select,
 .dfrc-model-actions a:hover {
     border-color: #0f4c81;
     background: #f0f7ff;
+}
+
+/* Boutons « + Ajouter » relationnels (inlines, formulaires) */
+.related-widget-wrapper-link.add-related,
+.related-widget-wrapper-link.delete-related {
+    display: none !important;
 }

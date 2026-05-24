@@ -37,7 +37,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-brand">
           <img src={logo} alt="MEMFPMA" style={{ width: '120px', marginBottom: '1rem' }} />
-          <h3>QR Badge</h3>
+          <h3>SYGEP-CPFAE</h3>
           <p className="subtitle">Ministère d'Etat, Ministère de la Fonction Publique et de la Modernisation de l'Administration</p>
           <p>DFRC - CPFAE — Gestion des présences</p>
         </div>
@@ -105,7 +105,7 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-3">
-          <small className="text-muted">MEMFPMA — DFRC - SYGEPCPFAE</small>
+          <small className="text-muted">MEMFPMA — DFRC — SYGEP-CPFAE</small>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>

@@ -267,7 +267,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 
 # drf-spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'QR Badge API',
+    'TITLE': 'SYGEP-CPFAE API',
     'DESCRIPTION': 'API de gestion des formations, participants et badgeage QR.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,

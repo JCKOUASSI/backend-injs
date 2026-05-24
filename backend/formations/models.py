@@ -556,12 +556,21 @@ class SessionModule(models.Model):
 
     def __str__(self):
         label = self.intitule or f"Session {self.numero}"
-        module_label = self.module.intitule
+        module = self.module
+        formation_label = module.formation.formation if module and module.formation_id else ''
+        contexte_parts = [p for p in (module.grade, module.groupe, module.vague) if p]
+        contexte = " / ".join(contexte_parts)
+        prefixe_parts = [p for p in (formation_label, contexte) if p]
+        prefixe = " | ".join(prefixe_parts)
+        module_label = module.intitule if module else ''
         if self.demarree_le and not self.terminee_le:
-            return f"{module_label} — {self.date_journee} {label} (en cours)"
+            etat = "en cours"
         elif self.terminee_le:
-            return f"{module_label} — {self.date_journee} {label} (terminée)"
-        return f"{module_label} — {self.date_journee} {label} (planifiée)"
+            etat = "terminée"
+        else:
+            etat = "planifiée"
+        core = f"{module_label} — {self.date_journee} {label} ({etat})"
+        return f"{prefixe} • {core}" if prefixe else core
 
     @property
     def formation(self):

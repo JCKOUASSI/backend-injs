@@ -1,18 +1,52 @@
-{% extends "admin/base_site.html" %}
-{% load static %}
+{% extends "admin/base.html" %}
+{% load static i18n %}
 
-{% block extrastyle %}
+{% block header %}
+<header id="header">
+    <div id="branding">
+        {% block branding %}
+        <div class="dfrc-branding">
+            <h1 id="site-name">
+                <a href="{% url 'admin:index' %}">SYGEP-CPFAE</a>
+            </h1>
+            <p class="dfrc-branding-subtitle">Administration — Gestion des formations et présences</p>
+        </div>
+        {% endblock %}
+    </div>
+    {% block usertools %}
+    {% if has_permission %}
+    <div id="user-tools">
+        {% block welcome-msg %}
+        {% translate 'Welcome,' %}
+        <strong>{% firstof user.get_short_name user.get_username %}</strong>.
+        {% endblock %}
+        {% block userlinks %}
+        {% if site_url %}
+        <a href="{{ site_url }}">{% translate 'View site' %}</a> /
+        {% endif %}
+        {% if user.is_active and user.is_staff %}
+        {% url 'django-admindocs-docroot' as docsroot %}
+        {% if docsroot %}
+        <a href="{{ docsroot %}">{% translate 'Documentation' %}</a> /
+        {% endif %}
+        {% endif %}
+        {% if user.has_usable_password %}
+        <a href="{% url 'admin:password_change' %}">{% translate 'Change password' %}</a> /
+        {% endif %}
+        <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+            {% csrf_token %}
+            <button type="submit">{% translate 'Log out' %}</button>
+        </form>
+        {% include "admin/color_theme_toggle.html" %}
+        {% endblock %}
+    </div>
+    {% endif %}
+    {% endblock %}
+    {% block nav-global %}{% endblock %}
+</header>
+{% endblock %}
+
+{% block responsive %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'admin/custom_admin.css' %}">
+<link rel="stylesheet" href="{% static 'admin/custom_admin.css' %}?v=4">
 {% endblock %}
-
-{% block branding %}
-<div class="dfrc-branding">
-    <h1 id="site-name">
-        <a href="{% url 'admin:index' %}">CPFAE Admin</a>
-    </h1>
-    <p class="dfrc-branding-subtitle">Plateforme de gestion des formations</p>
-</div>
-{% endblock %}
-
-{% block nav-global %}{% endblock %}

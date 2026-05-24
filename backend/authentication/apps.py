@@ -41,6 +41,10 @@ class AuthenticationConfig(AppConfig):
     name = 'authentication'
 
     def ready(self):
+        from admin_mixins import patch_admin_related_widgets
+
+        patch_admin_related_widgets()
+
         from django.apps import apps
         from django.contrib.auth import get_user_model
         from django.db.models.signals import post_migrate, post_save

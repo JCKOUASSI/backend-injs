@@ -3,7 +3,7 @@
 {% block content %}
 <div class="dfrc-admin-home">
     <section class="dfrc-quick-links module">
-        <h2>Acces rapides</h2>
+        <h2>Accès rapides</h2>
         <div class="dfrc-quick-links-grid">
             <a class="dfrc-quick-link" href="{% url 'admin:formations_formation_changelist' %}">
                 <span class="dfrc-quick-link-title">Formations</span>
@@ -15,7 +15,7 @@
             </a>
             <a class="dfrc-quick-link" href="{% url 'admin:formations_participant_changelist' %}">
                 <span class="dfrc-quick-link-title">Participants</span>
-                <span class="dfrc-quick-link-subtitle">Gerer les inscrits et profils</span>
+                <span class="dfrc-quick-link-subtitle">Gérer les inscrits et profils</span>
             </a>
             <a class="dfrc-quick-link" href="{% url 'admin:presences_pointage_changelist' %}">
                 <span class="dfrc-quick-link-title">Pointages</span>
@@ -23,7 +23,7 @@
             </a>
             <a class="dfrc-quick-link" href="{% url 'admin:authentication_user_changelist' %}">
                 <span class="dfrc-quick-link-title">Utilisateurs</span>
-                <span class="dfrc-quick-link-subtitle">Gerer les comptes et roles</span>
+                <span class="dfrc-quick-link-subtitle">Gérer les comptes et rôles</span>
             </a>
         </div>
     </section>
@@ -39,14 +39,11 @@
                 {% for model in app.models %}
                 <li class="dfrc-model-item">
                     <span class="dfrc-model-name">{{ model.name }}</span>
+                    {% if model.admin_url %}
                     <span class="dfrc-model-actions">
-                        {% if model.admin_url %}
                         <a href="{{ model.admin_url }}">Voir</a>
-                        {% endif %}
-                        {% if model.add_url %}
-                        <a href="{{ model.add_url }}">Ajouter</a>
-                        {% endif %}
                     </span>
+                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>

@@ -30,7 +30,7 @@ ROLE_LABELS = {
 
 
 def _html_email_shell(*, title: str, subtitle: str, inner: str) -> str:
-    """Enveloppe HTML commune (charte QR Badge / frontend)."""
+    """Enveloppe HTML commune (charte SYGEP-CPFAE / frontend)."""
     return f"""
 <!DOCTYPE html>
 <html lang="fr">
@@ -69,11 +69,11 @@ def send_welcome_email(user, plain_password):
     role_label = ROLE_LABELS.get(user.role, user.role)
     frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else ''
 
-    subject = "Bienvenue sur QR Badge — Vos identifiants de connexion"
+    subject = "Bienvenue sur SYGEP-CPFAE — Vos identifiants de connexion"
 
     message = f"""Bonjour {full_name},
 
-Votre compte sur la plateforme QR Badge a été créé.
+Votre compte sur la plateforme SYGEP-CPFAE a été créé.
 
 Voici vos identifiants de connexion :
 
@@ -87,14 +87,14 @@ Pour des raisons de sécurité, veuillez changer votre mot de passe dès votre p
 (Menu → Changer mon mot de passe).
 
 Cordialement,
-L'équipe DFRC — QR Badge
+L'équipe DFRC — SYGEP-CPFAE
 """
 
     cta = _html_cta_button(frontend_url + '/login', 'Se connecter') if frontend_url else ''
 
     inner = f"""
     <p style="margin:0 0 12px; line-height:1.6;">Bonjour <strong>{full_name}</strong>,</p>
-    <p style="margin:0 0 20px; color:{_TEXT_SECONDARY}; line-height:1.6;">Votre compte sur la plateforme <strong style="color:{_TEXT_PRIMARY};">QR Badge</strong> a été créé avec succès.</p>
+    <p style="margin:0 0 20px; color:{_TEXT_SECONDARY}; line-height:1.6;">Votre compte sur la plateforme <strong style="color:{_TEXT_PRIMARY};">SYGEP-CPFAE</strong> a été créé avec succès.</p>
 
     <div style="background:{_CI_LIGHT}; border:1px solid {_BORDER}; border-radius:10px; padding:20px; margin:20px 0;">
       <h3 style="margin:0 0 16px; color:{_CI_GREEN_DARK}; font-size:1.05rem;">Vos identifiants</h3>
@@ -123,12 +123,12 @@ L'équipe DFRC — QR Badge
 
     <p style="margin-top:28px; color:{_TEXT_SECONDARY}; font-size:0.9rem; line-height:1.5;">
       Cordialement,<br>
-      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — QR Badge</strong>
+      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — SYGEP-CPFAE</strong>
     </p>
     """
 
     html_message = _html_email_shell(
-        title='QR Badge — DFRC',
+        title='SYGEP-CPFAE — DFRC',
         subtitle='Gestion des présences',
         inner=inner,
     )
@@ -156,7 +156,7 @@ def send_suspect_heartbeat_email(encadrant, personne_nom, personne_numero, forma
     encadrant_nom = encadrant.get_full_name() or encadrant.username
     frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else ''
 
-    subject = f"[QR Badge] Alerte présence — {personne_nom} hors ligne ({silence_minutes} min)"
+    subject = f"[SYGEP-CPFAE] Alerte présence — {personne_nom} hors ligne ({silence_minutes} min)"
 
     message = f"""Bonjour {encadrant_nom},
 
@@ -174,7 +174,7 @@ Son statut est passé à « Hors ligne — suspect ». Veuillez vérifier sa pr�
 {"Tableau de bord : " + frontend_url if frontend_url else ""}
 
 Cordialement,
-L'équipe DFRC — QR Badge
+L'équipe DFRC — SYGEP-CPFAE
 """
 
     cta = _html_cta_button(frontend_url, 'Accéder au tableau de bord') if frontend_url else ''
@@ -218,12 +218,12 @@ L'équipe DFRC — QR Badge
 
     <p style="margin-top:28px; color:{_TEXT_SECONDARY}; font-size:0.9rem; line-height:1.5;">
       Cordialement,<br>
-      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — QR Badge</strong>
+      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — SYGEP-CPFAE</strong>
     </p>
     """
 
     html_message = _html_email_shell(
-        title='QR Badge — DFRC',
+        title='SYGEP-CPFAE — DFRC',
         subtitle='Alerte de présence',
         inner=inner,
     )
