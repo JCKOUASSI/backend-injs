@@ -71,14 +71,18 @@ QR Badge permet le badgeage sécurisé des participants et encadrants lors des s
 Lorsqu’un pointage sécurisé est actif après un scan de QR, l’app envoie périodiquement un heartbeat au serveur Sygep avec la position GPS pour attester une présence continue sur le lieu, même si l’utilisateur met l’app en arrière-plan. Android affiche une notification de service de localisation en premier plan ; l’utilisateur voit aussi les invites système et les messages si le GPS est désactivé.
 
 --- Instructions vidéo (YouTube, ≤ 30 s, obligatoire pour l’examen) ---
-Google exige une courte vidéo montrant : (1) le texte / dialogue visible par l’utilisateur AVANT la demande d’autorisation « toujours » ou arrière-plan ; (2) la fonctionnalité ; (3) pourquoi la localisation en arrière-plan est nécessaire.
+Storyboard détaillé (plans, voix off, texte Play Console) :
+  → app_review/VIDEO_LOCALISATION_ARriere_PLAN.md
 
-À enregistrer sur un téléphone de test (démo) :
-1. Ouvrir QR Badge, se connecter, aller au scan, lancer un pointage sécurisé si votre parcours le permet.
-2. Montrer à l’écran les invites Android (position précise, puis « Autoriser tout le temps » si affiché) et la notification persistante du service de localisation.
-3. Voix off ou sous-titres : expliquer que le heartbeat envoie la position au serveur pour prouver la présence sur le lieu pendant la session, même si l’app n’est pas au premier plan.
+Texte court à coller dans le champ « Instructions vidéo » :
+La vidéo montre : (1) les dialogues in-app « Autoriser la localisation » puis « Suivi en arrière-plan » affichés AVANT les invites système ; (2) l’acceptation des autorisations Android (position pendant l’utilisation, puis Toujours autoriser) ; (3) un badgeage QR avec validation géolocalisée ; (4) la notification persistante « Suivi de présence actif » pendant que l’app est en arrière-plan, illustrant l’envoi périodique de la position GPS au serveur pour le heartbeat de présence.
 
-Publier la vidéo sur YouTube (publique ou non répertoriée), sans limite d’âge ni annonces, puis coller l’URL dans le champ « Instructions vidéo ».
+Résumé du tournage :
+1. Reset des autorisations localisation → montrer les deux dialogues in-app puis les invites système.
+2. Connexion, scan QR, badgeage entrée, bandeau « Suivi de présence actif ».
+3. Notification persistante Android + app en arrière-plan ou écran verrouillé.
+
+Publier sur YouTube (publique ou non répertoriée), sans limite d’âge ni annonces, puis coller l’URL dans Play Console.
 
 --------------------------------------------------------------------------------
 NOTES INTERNES (ne pas coller dans la fiche)
