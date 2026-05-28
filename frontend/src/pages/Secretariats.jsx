@@ -6,9 +6,9 @@ import { useAuth } from '../context/AuthContext'
 
 const emptyForm = { nom: '', type: '', description: '' }
 
-/** Utilisateurs rattachés au secrétariat hors comptes rôle Auditeur (badgeage). */
+/** Utilisateurs rattachés au secrétariat hors comptes badgeage (auditeurs, formateurs). */
 function membresEquipe(membres) {
-  return (membres || []).filter((m) => m.role !== 'AUDITEUR')
+  return (membres || []).filter((m) => !['AUDITEUR', 'FORMATEUR'].includes(m.role))
 }
 
 export default function Secretariats() {
@@ -222,7 +222,7 @@ export default function Secretariats() {
                             ) : (
                               <small className="text-muted">
                                 <i className="bi bi-info-circle me-1"></i>
-                                Aucun membre d&apos;équipe (secrétariat, encadrants…). Rattachez-les depuis <strong>Utilisateurs</strong>. Les comptes badge <strong>Auditeur</strong> sont listés dans <strong>Utilisateurs</strong> — onglet <strong>Comptes auditeurs</strong>.
+                                Aucun membre d&apos;équipe (secrétariat, encadrants…). Rattachez-les depuis <strong>Utilisateurs</strong>. Les comptes badge <strong>Auditeur</strong> et <strong>Formateur</strong> sont listés dans <strong>Utilisateurs</strong> — onglets dédiés.
                               </small>
                             )}
                           </td>

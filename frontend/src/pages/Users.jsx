@@ -5,8 +5,9 @@ import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { useAuth } from '../context/AuthContext'
 
-const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'AUDITEUR']
-const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'AUDITEUR']
+const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
+const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
+const BADGE_ACCOUNT_ROLES = ['AUDITEUR', 'FORMATEUR']
 
 function getSubordinateRoles(role) {
   const idx = ROLE_HIERARCHY.indexOf(role)
@@ -21,17 +22,30 @@ function getCreatableRoles(role) {
   }
   return subordinates
 }
-const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', AUDITEUR: 'Auditeur' }
+const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
+const TAB_CONFIG = {
+  personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
+  auditeurs: { title: 'Comptes auditeurs', icon: 'bi-person-badge', createLabel: 'Nouveau compte auditeur', modalTitle: 'Nouveau compte auditeur' },
+  formateurs: { title: 'Comptes formateurs', icon: 'bi-person-video3', createLabel: 'Nouveau compte formateur', modalTitle: 'Nouveau compte formateur' },
+}
 const emptyForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
 const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
 
 export default function Users() {
   const { user: currentUser } = useAuth()
   const creatableRoles = getCreatableRoles(currentUser?.role).filter(r => ALL_ROLES.includes(r))
-  const staffRoleOptions = creatableRoles.filter(r => r !== 'AUDITEUR')
+  const staffRoleOptions = creatableRoles.filter(r => !BADGE_ACCOUNT_ROLES.includes(r))
   const canManageAuditeurAccounts = creatableRoles.includes('AUDITEUR') && currentUser?.role !== 'DIRECTION'
+  const canManageFormateurAccounts = creatableRoles.includes('FORMATEUR') && currentUser?.role !== 'DIRECTION'
   const showStaffSection = staffRoleOptions.length > 0
   const showAuditeursSection = canManageAuditeurAccounts
+  const showFormateursSection = canManageFormateurAccounts
+  const availableTabs = [
+    showStaffSection && { id: 'personnel', label: 'Utilisateurs', icon: 'bi-person-gear' },
+    showAuditeursSection && { id: 'auditeurs', label: 'Comptes auditeurs', icon: 'bi-person-badge' },
+    showFormateursSection && { id: 'formateurs', label: 'Comptes formateurs', icon: 'bi-person-video3' },
+  ].filter(Boolean)
+  const showTabBar = availableTabs.length > 1
   const [userTab, setUserTab] = useState('personnel')
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -55,9 +69,10 @@ export default function Users() {
 
   const debouncedSearch = useDebounce(search)
   useEffect(() => {
-    if (!showStaffSection && showAuditeursSection) setUserTab('auditeurs')
-    if (!showAuditeursSection && showStaffSection) setUserTab('personnel')
-  }, [showStaffSection, showAuditeursSection])
+    if (!availableTabs.some(t => t.id === userTab)) {
+      setUserTab(availableTabs[0]?.id || 'personnel')
+    }
+  }, [showStaffSection, showAuditeursSection, showFormateursSection])
   useEffect(() => { loadUsers() }, [page, debouncedSearch, roleFilter, userTab])
   useEffect(() => {
     api.get('/formations/secretariats/')
@@ -68,7 +83,7 @@ export default function Users() {
   const setUserTabAndReset = (tab) => {
     setUserTab(tab)
     setPage(1)
-    if (tab === 'auditeurs') setRoleFilter('')
+    if (tab !== 'personnel') setRoleFilter('')
   }
 
   const loadUsers = async () => {
@@ -77,10 +92,12 @@ export default function Users() {
       const params = new URLSearchParams({ page })
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (userTab === 'personnel') {
-        params.set('exclude_role', 'AUDITEUR')
+        params.set('exclude_role', BADGE_ACCOUNT_ROLES.join(','))
         if (roleFilter) params.set('role', roleFilter)
-      } else {
+      } else if (userTab === 'auditeurs') {
         params.set('role', 'AUDITEUR')
+      } else if (userTab === 'formateurs') {
+        params.set('role', 'FORMATEUR')
       }
       const response = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
@@ -115,7 +132,11 @@ export default function Users() {
       setShowModal(false)
       setForm({ ...emptyForm })
       loadUsers()
-      showToast(form.role === 'AUDITEUR' ? 'Compte auditeur créé' : 'Utilisateur créé')
+      showToast(
+        form.role === 'AUDITEUR' ? 'Compte auditeur créé'
+          : form.role === 'FORMATEUR' ? 'Compte formateur créé'
+          : 'Utilisateur créé'
+      )
     } catch (err) {
       const data = err.response?.data
       if (data && typeof data === 'object') {
@@ -179,38 +200,42 @@ export default function Users() {
     } finally { setSaving(false) }
   }
 
-  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
+  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'FORMATEUR': 'badge-formateur', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
 
   const getFullName = (u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
   const getInitials = (u) => `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || u.username[0]?.toUpperCase()
 
-  const listTitle = userTab === 'personnel' ? 'Liste des utilisateurs' : 'Comptes auditeurs'
-  const listIcon = userTab === 'personnel' ? 'bi-person-gear' : 'bi-person-badge'
+  const tabMeta = TAB_CONFIG[userTab] || TAB_CONFIG.personnel
+  const listTitle = tabMeta.title
+  const listIcon = tabMeta.icon
+  const canCreateOnTab = userTab === 'personnel'
+    ? staffRoleOptions.length > 0
+    : userTab === 'auditeurs'
+      ? canManageAuditeurAccounts
+      : canManageFormateurAccounts
+  const createRoleForTab = userTab === 'auditeurs' ? 'AUDITEUR' : userTab === 'formateurs' ? 'FORMATEUR' : staffRoleOptions[0]
+  const matriculeLabel = userTab === 'formateurs'
+    ? 'N° badge formateur'
+    : 'N° Matricule (badge)'
 
   return (
     <div>
-      {showStaffSection && showAuditeursSection && (
+      {showTabBar && (
         <div className="card mb-3">
           <div className="card-body py-2">
             <div className="d-flex gap-2 flex-wrap" role="tablist" style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', marginBottom: '-0.5rem', paddingBottom: '0.5rem' }}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={userTab === 'personnel'}
-                className={`btn btn-sm ${userTab === 'personnel' ? 'btn-dfrc' : 'btn-outline-secondary'}`}
-                onClick={() => setUserTabAndReset('personnel')}
-              >
-                <i className="bi bi-person-gear me-1"></i>Utilisateurs
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={userTab === 'auditeurs'}
-                className={`btn btn-sm ${userTab === 'auditeurs' ? 'btn-dfrc' : 'btn-outline-secondary'}`}
-                onClick={() => setUserTabAndReset('auditeurs')}
-              >
-                <i className="bi bi-person-badge me-1"></i>Comptes auditeurs
-              </button>
+              {availableTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={userTab === tab.id}
+                  className={`btn btn-sm ${userTab === tab.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
+                  onClick={() => setUserTabAndReset(tab.id)}
+                >
+                  <i className={`bi ${tab.icon} me-1`}></i>{tab.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -235,14 +260,9 @@ export default function Users() {
                 </select>
               </div>
             )}
-            {userTab === 'personnel' && staffRoleOptions.length > 0 && (
-              <button type="button" onClick={() => { setForm({ ...emptyForm, role: staffRoleOptions[0] }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
-                <i className="bi bi-plus-lg me-1"></i>Nouvel utilisateur
-              </button>
-            )}
-            {userTab === 'auditeurs' && canManageAuditeurAccounts && (
-              <button type="button" onClick={() => { setForm({ ...emptyForm, role: 'AUDITEUR' }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
-                <i className="bi bi-plus-lg me-1"></i>Nouveau compte auditeur
+            {canCreateOnTab && (
+              <button type="button" onClick={() => { setForm({ ...emptyForm, role: createRoleForTab }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
+                <i className="bi bi-plus-lg me-1"></i>{tabMeta.createLabel}
               </button>
             )}
           </div>
@@ -349,7 +369,7 @@ export default function Users() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" style={{ maxHeight: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>{userTab === 'auditeurs' ? 'Nouveau compte auditeur' : 'Nouvel utilisateur'}</h5>
+              <h5>{tabMeta.modalTitle}</h5>
               <button className="btn-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -373,7 +393,7 @@ export default function Users() {
                   <div className="form-group">
                     <label className="form-label">Rôle *</label>
                     <select className="form-control" required value={form.role} onChange={e => setForm({...form, role: e.target.value, new_secretariat_nom: '', new_secretariat_type: ''})}>
-                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
                     </select>
                     {form.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN') && (
                       <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
@@ -381,8 +401,11 @@ export default function Users() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">N° Matricule (badge)</label>
-                  <input type="text" className="form-control" value={form.matricule} onChange={e => setForm({...form, matricule: e.target.value})} />
+                  <label className="form-label">{matriculeLabel}</label>
+                  <input type="text" className="form-control" value={form.matricule} onChange={e => setForm({...form, matricule: e.target.value})} placeholder={userTab === 'formateurs' ? 'Ex. F0042' : undefined} />
+                  {userTab === 'formateurs' && (
+                    <small className="text-muted">Doit correspondre au N° badge du formateur dans le référentiel.</small>
+                  )}
                 </div>
                 <div className="grid-2">
                   <div className="form-group">

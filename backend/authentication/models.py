@@ -14,6 +14,7 @@ class User(AbstractUser):
         SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
         FINANCE = 'FINANCE', 'Finance'
         ENCADRANT = 'ENCADRANT', 'Encadrant'
+        FORMATEUR = 'FORMATEUR', 'Formateur'
         AUDITEUR = 'AUDITEUR', 'Auditeur'
 
     role = models.CharField(
@@ -74,6 +75,10 @@ class User(AbstractUser):
     @property
     def is_encadrant(self):
         return self.role == self.Role.ENCADRANT
+
+    @property
+    def is_formateur(self):
+        return self.role == self.Role.FORMATEUR
 
     @property
     def is_direction(self):

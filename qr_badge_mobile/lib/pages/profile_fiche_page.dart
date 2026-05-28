@@ -97,6 +97,8 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         return 'Participant';
       case 'ENCADRANT':
         return 'Encadrant';
+      case 'FORMATEUR':
+        return 'Formateur';
       case 'SECRETARIAT':
       case 'CHEF_SECRETARIAT':
         return 'Secrétariat';

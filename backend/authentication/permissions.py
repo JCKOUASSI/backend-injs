@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission
 from authentication.role_groups import ROLE_GROUP_NAMES
 
 # Hiérarchie stricte : index bas = rang élevé
-ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'AUDITEUR']
+ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
 
 
 def _cached_user_groups(user):
