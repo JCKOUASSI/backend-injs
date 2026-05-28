@@ -391,3 +391,101 @@ class ScanFormateurBadgeNormalizationTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data.get('type_personne'), 'formateur')
 
+
+class SecureScanFormateurEncadrantTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.today = timezone.localdate()
+
+        self.formation = Formation.objects.create(formation='Formation mobile')
+        self.module = Module.objects.create(
+            formation=self.formation,
+            intitule='Module mobile',
+            statut='EN_COURS',
+        )
+        self.seance = SessionModule.objects.create(
+            module=self.module,
+            date_journee=self.today,
+            numero=1,
+            demarree_le=timezone.now(),
+        )
+        self.token = QRToken.objects.create(
+            session=self.seance,
+            expire_at=timezone.now() + timedelta(hours=1),
+            actif=True,
+        )
+
+        self.formateur = Formateur.objects.create(
+            numerobadge='F0099',
+            nom='Traoré',
+            prenom='Awa',
+        )
+        ModuleFormateur.objects.create(module=self.module, formateur=self.formateur)
+        self.formateur_user = make_user('F0099', role='FORMATEUR')
+        self.formateur_user.matricule = 'F0099'
+        self.formateur_user.save(update_fields=['matricule'])
+        self.formateur.user = self.formateur_user
+        self.formateur.save(update_fields=['user'])
+
+        self.encadrant = make_user('encadrant_mobile', role='ENCADRANT')
+        self.encadrant.matricule = 'ENC001'
+        self.encadrant.first_name = 'Paul'
+        self.encadrant.last_name = 'Koné'
+        self.encadrant.save(update_fields=['matricule', 'first_name', 'last_name'])
+        self.module.superviseur = self.encadrant
+        self.module.save(update_fields=['superviseur'])
+
+    def test_secure_scan_formateur_entree(self):
+        self.client.force_authenticate(self.formateur_user)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token), 'device_id': 'test-device-fmt'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('action'), 'ENTREE')
+        self.assertEqual(res.data.get('type_personne'), 'formateur')
+        self.assertTrue(
+            Pointage.objects.filter(
+                formateur=self.formateur,
+                session=self.seance,
+                timestamp_sortie__isnull=True,
+            ).exists()
+        )
+
+    def test_secure_scan_encadrant_entree(self):
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token), 'device_id': 'test-device-enc'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('action'), 'ENTREE')
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+        self.assertTrue(
+            Pointage.objects.filter(
+                encadrant=self.encadrant,
+                session=self.seance,
+                timestamp_sortie__isnull=True,
+            ).exists()
+        )
+
+    def test_resolve_personne_prioritizes_encadrant_role_over_participant_profile(self):
+        participant = Participant.objects.create(
+            matricule='P9999',
+            nom='Dupont',
+            prenom='Marie',
+        )
+        participant.user = self.encadrant
+        participant.save(update_fields=['user'])
+
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token), 'device_id': 'test-device-enc2'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+

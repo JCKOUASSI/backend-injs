@@ -25,6 +25,7 @@ ROLE_LABELS = {
     'SECRETARIAT': 'Secrétariat',
     'FINANCE': 'Finance',
     'ENCADRANT': 'Encadrant',
+    'FORMATEUR': 'Formateur',
     'AUDITEUR': 'Auditeur',
 }
 

@@ -14,6 +14,7 @@ ROLE_GROUP_NAMES = {
     User.Role.SECRETARIAT: "ROLE_SECRETARIAT",
     User.Role.FINANCE: "ROLE_FINANCE",
     User.Role.ENCADRANT: "ROLE_ENCADRANT",
+    User.Role.FORMATEUR: "ROLE_FORMATEUR",
     User.Role.AUDITEUR: "ROLE_AUDITEUR",
 }
 
@@ -55,6 +56,10 @@ ROLE_POLICY = {
     User.Role.ENCADRANT: {
         "apps": ("formations", "presences"),
         "actions": ("view", "change"),
+    },
+    User.Role.FORMATEUR: {
+        "apps": ("formations", "presences"),
+        "actions": ("view",),
     },
     User.Role.AUDITEUR: {
         "apps": ("formations", "presences"),

@@ -371,7 +371,8 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .badge-dfrc { background: #ef5ce3; color: white; }
 .badge-secretariat { background: #388E3C; color: white; }
 .badge-superviseur, .badge-encadrant { background: #F57C00; color: white; }
-.badge-participant { background: #43A047; color: white; }
+.badge-participant, .badge-auditeur { background: #43A047; color: white; }
+.badge-formateur { background: #6b21a8; color: white; }
 
 /* ═══ Login ═══ */
 .login-container {

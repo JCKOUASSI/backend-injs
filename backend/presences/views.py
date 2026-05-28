@@ -296,18 +296,14 @@ def _clamp_to_seance(ts, seance):
 
 
 def _resolve_authenticated_personne(user):
-    """Retourne (personne, type_str, error_response)."""
-    try:
-        return user.participant_profile, 'participant', None
-    except (Participant.DoesNotExist, AttributeError):
-        pass
+    """Retourne (personne, type_str, error_response).
 
-    try:
-        return user.formateur_profile, 'formateur', None
-    except (Formateur.DoesNotExist, AttributeError):
-        pass
+    La résolution se fait d'abord par rôle utilisateur pour éviter qu'un encadrant
+    ou formateur avec un profil auditeur résiduel soit traité comme participant.
+    """
+    role = getattr(user, 'role', None)
 
-    if user.role == 'ENCADRANT':
+    if role == 'ENCADRANT':
         if not user.matricule:
             return None, None, Response(
                 {
@@ -317,6 +313,23 @@ def _resolve_authenticated_personne(user):
                 status=status.HTTP_403_FORBIDDEN,
             )
         return user, 'encadrant', None
+
+    if role == 'FORMATEUR':
+        try:
+            return user.formateur_profile, 'formateur', None
+        except (Formateur.DoesNotExist, AttributeError):
+            return None, None, Response(
+                {
+                    'code': 'NO_PROFILE',
+                    'detail': 'Aucun profil formateur lié à ce compte.',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+    try:
+        return user.participant_profile, 'participant', None
+    except (Participant.DoesNotExist, AttributeError):
+        pass
 
     return None, None, Response(
         {
@@ -686,7 +699,7 @@ def secure_scan_view(request):
 
     # 1b. Vérifier que l'appareil est bien lié à ce user
     device_id = data.get('device_id', '')
-    if device_id and type_str == 'participant':
+    if device_id and type_str in ('participant', 'formateur'):
         binding = DeviceBinding.objects.filter(
             device_id=device_id, is_active=True
         ).first()
@@ -1021,7 +1034,7 @@ def secure_scan_heartbeat(request):
         return err
 
     device_id = data.get('device_id', '')
-    if device_id and type_str == 'participant':
+    if device_id and type_str in ('participant', 'formateur'):
         binding = DeviceBinding.objects.filter(
             device_id=device_id, is_active=True
         ).first()
@@ -1283,31 +1296,9 @@ def my_historique(request):
     user = request.user
     if getattr(user, 'must_change_password', False):
         return _password_change_required_response()
-    personne = None
-    type_str = None
-
-    try:
-        personne = user.participant_profile
-        type_str = 'participant'
-    except (Participant.DoesNotExist, AttributeError):
-        pass
-
-    if personne is None:
-        try:
-            personne = user.formateur_profile
-            type_str = 'formateur'
-        except (Formateur.DoesNotExist, AttributeError):
-            pass
-
-    if personne is None and user.role == 'ENCADRANT':
-        personne = user
-        type_str = 'encadrant'
-
-    if personne is None:
-        return Response(
-            {'detail': 'Aucun profil lié à ce compte.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    personne, type_str, err = _resolve_authenticated_personne(user)
+    if err:
+        return err
 
     if type_str == 'formateur':
         filt = {'formateur': personne}
@@ -1389,6 +1380,14 @@ def _modules_for_personne(personne, type_str):
         )
         for ins in inscriptions:
             modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le))
+    elif type_str == 'encadrant':
+        modules = (
+            Module.objects.filter(superviseur=personne)
+            .select_related('formation', 'secretariat', 'site')
+            .order_by('-created_at')
+        )
+        for module in modules:
+            modules_data.append(_module_fiche_payload(module))
     return modules_data
 
 

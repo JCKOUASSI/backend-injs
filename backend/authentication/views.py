@@ -26,6 +26,24 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def _sync_formateur_user_link(user):
+    """Lie le compte FORMATEUR au profil formateur correspondant (numerobadge = matricule)."""
+    from formations.models import Formateur
+
+    if user.role != User.Role.FORMATEUR:
+        return
+    badge = (user.matricule or '').strip()
+    if not badge:
+        Formateur.objects.filter(user=user).update(user=None)
+        return
+    Formateur.objects.filter(user=user).exclude(numerobadge__iexact=badge).update(user=None)
+    formateur = Formateur.objects.filter(numerobadge__iexact=badge).first()
+    if formateur and (formateur.user_id is None or formateur.user_id == user.id):
+        if formateur.user_id != user.id:
+            formateur.user = user
+            formateur.save(update_fields=['user'])
+
+
 def _login_client_ip(request) -> str:
     xff = (request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
     if xff:
@@ -71,8 +89,8 @@ def login_view(request):
 
     device_id = request.data.get('device_id', '').strip()
 
-    # ── Verrouillage appareil (participants / formateurs uniquement) ──
-    if device_id and user.role in ('AUDITEUR',):
+    # ── Verrouillage appareil (auditeurs / formateurs uniquement) ──
+    if device_id and user.role in ('AUDITEUR', 'FORMATEUR'):
         existing = DeviceBinding.objects.filter(
             device_id=device_id, is_active=True
         ).select_related('user').first()
@@ -174,10 +192,13 @@ class UserListCreateView(generics.ListCreateAPIView):
         if role:
             qs = qs.filter(role=role)
         exclude_role = self.request.query_params.get('exclude_role')
-        if exclude_role and exclude_role in ROLE_HIERARCHY:
-            qs = qs.exclude(role=exclude_role)
+        if exclude_role:
+            for role_code in exclude_role.split(','):
+                role_code = role_code.strip()
+                if role_code in ROLE_HIERARCHY:
+                    qs = qs.exclude(role=role_code)
         if user.role == 'DIRECTION':
-            qs = qs.exclude(role='AUDITEUR')
+            qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
         return qs
 
     def get_serializer_class(self):
@@ -193,6 +214,7 @@ class UserListCreateView(generics.ListCreateAPIView):
         else:
             new_user = serializer.save()
         send_welcome_email(new_user, plain_password)
+        _sync_formateur_user_link(new_user)
         _log_audit(
             action=AuditLog.Action.USER_CREATE,
             request=self.request,
@@ -214,7 +236,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             qs = qs.filter(secretariat=user.secretariat)
         if user.role == 'DIRECTION':
-            qs = qs.exclude(role='AUDITEUR')
+            qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
         return qs
 
     def get_serializer_class(self):
@@ -224,6 +246,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         instance = serializer.save()
+        _sync_formateur_user_link(instance)
         _log_audit(
             action=AuditLog.Action.USER_UPDATE,
             request=self.request,
