@@ -887,15 +887,16 @@ def session_start(request, pk, session_id):
 
     now = timezone.now()
 
-    # Fermer toute autre session ouverte pour cette formation
-    open_sessions = SessionModule.objects.filter(
-        module__formation=formation, demarree_le__isnull=False, terminee_le__isnull=True,
-    ).exclude(pk=session_id)
-    for s in open_sessions:
-        s.terminee_le = now
-        s.save(update_fields=['terminee_le'])
-
     if session.demarree_le is None:
+        # Nouveau démarrage : une seule séance ouverte par module.
+        open_sessions = SessionModule.objects.filter(
+            module=session.module,
+            demarree_le__isnull=False,
+            terminee_le__isnull=True,
+        ).exclude(pk=session_id)
+        for s in open_sessions:
+            s.terminee_le = now
+            s.save(update_fields=['terminee_le'])
         session.demarree_le = now
         session.demarree_par = request.user
         session.save(update_fields=['demarree_le', 'demarree_par'])
