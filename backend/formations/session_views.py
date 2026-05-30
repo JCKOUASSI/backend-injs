@@ -1,7 +1,7 @@
 """
 Session management views for the React frontend.
 """
-from datetime import timedelta
+from datetime import time, timedelta
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +10,66 @@ from rest_framework.response import Response
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
 from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
+
+
+REACTIVATION_GRACE_HOURS = 4
+
+
+def reactiver_session_et_qr(session):
+    """
+    Réouvre une séance terminée, prolonge la fin prévue pour éviter une
+    re-clôture immédiate par _auto_manage_sessions / auto_close_sessions,
+    et réactive le QR associé.
+    """
+    formation = session.module.formation
+    now = timezone.now()
+    local_now = timezone.localtime(now)
+    today = local_now.date()
+
+    SessionModule.objects.filter(
+        module__formation=formation,
+        demarree_le__isnull=False,
+        terminee_le__isnull=True,
+    ).exclude(pk=session.pk).update(terminee_le=now)
+
+    update_fields = ['terminee_le']
+    session.terminee_le = None
+
+    if session.date_journee < today:
+        session.date_journee = today
+        update_fields.append('date_journee')
+
+    fin_est_future = (
+        session.heure_fin_prevue is not None
+        and session.date_journee == today
+        and session.heure_fin_prevue > local_now.time()
+    )
+    if not fin_est_future:
+        grace_end = local_now + timedelta(hours=REACTIVATION_GRACE_HOURS)
+        new_fin = grace_end.time()
+        if new_fin > time(23, 59):
+            new_fin = time(23, 59)
+        session.heure_fin_prevue = new_fin
+        update_fields.append('heure_fin_prevue')
+
+    session.save(update_fields=update_fields)
+
+    module = session.module
+    if module.statut in ('TERMINEE', 'SUSPENDUE', 'PLANIFIEE'):
+        module.statut = 'EN_COURS'
+        module.save(update_fields=['statut'])
+
+    qr = QRToken.objects.filter(session=session).order_by('-created_at').first()
+    if qr:
+        qr_updates = []
+        if not qr.actif:
+            qr.actif = True
+            qr_updates.append('actif')
+        if qr.is_expired:
+            qr.expire_at = now + timedelta(hours=24)
+            qr_updates.append('expire_at')
+        if qr_updates:
+            qr.save(update_fields=qr_updates)
 
 
 def _has_unfinished_previous_session(session):
@@ -109,8 +169,16 @@ def session_start(request, formation_pk, session_pk):
     if user.role == 'ENCADRANT' and module.superviseur is not None and module.superviseur != user:
         return Response({'detail': 'Non autorisé.'}, status=403)
     
-    if session.demarree_le:
+    if session.demarree_le and session.terminee_le is None:
         return Response({'detail': 'Cette séance est déjà démarrée.'}, status=400)
+
+    if session.terminee_le is not None:
+        reactiver_session_et_qr(session)
+        session.refresh_from_db()
+        return Response({
+            'detail': 'Séance réactivée.',
+            'session': SessionSerializer(session).data,
+        })
 
     if _has_unfinished_previous_session(session):
         return Response(
