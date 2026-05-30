@@ -633,16 +633,34 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
 
     @admin.action(description='Réactiver les séances sélectionnées')
     def reactiver_sessions(self, request, queryset):
+        from .session_views import reactiver_sessions_en_lot
+
         reactivated = 0
         skipped = 0
+        to_reactivate = []
 
         for session in queryset.select_related('module', 'module__formation'):
             if not session.demarree_le or not session.terminee_le:
                 skipped += 1
                 continue
+            to_reactivate.append(session)
 
-            self._reactiver_une_session(session, request)
-            reactivated += 1
+        if to_reactivate:
+            reactiver_sessions_en_lot(to_reactivate)
+            reactivated = len(to_reactivate)
+            if request is not None:
+                for session in to_reactivate:
+                    label = session.intitule or f'Séance {session.numero}'
+                    log_admin_audit(
+                        AuditLog.Action.SEANCE_START,
+                        request,
+                        formation=session.module.formation,
+                        extra={
+                            'session_id': session.id,
+                            'label': label,
+                            'action': 'reactiver_via_admin',
+                        },
+                    )
 
         if reactivated:
             self.message_user(

@@ -15,22 +15,28 @@ from .serializers import SessionSerializer, ModuleSerializer
 REACTIVATION_GRACE_HOURS = 4
 
 
-def reactiver_session_et_qr(session):
+def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
     """
     Réouvre une séance terminée, prolonge la fin prévue pour éviter une
     re-clôture immédiate par _auto_manage_sessions / auto_close_sessions,
     et réactive le QR associé.
+
+    Ne ferme pas les autres séances ouvertes (autres groupes / modules).
+    La coexistence de plusieurs séances ouvertes est gérée au badgeage
+    (une entrée à la fois par module et par jour). Pour forcer la fermeture
+    des autres séances du même module, passer ``close_other_open_sessions=True``
+    (utilisé par « Démarrer une séance » depuis l'interface, pas par Réactiver).
     """
-    formation = session.module.formation
     now = timezone.now()
     local_now = timezone.localtime(now)
     today = local_now.date()
 
-    SessionModule.objects.filter(
-        module__formation=formation,
-        demarree_le__isnull=False,
-        terminee_le__isnull=True,
-    ).exclude(pk=session.pk).update(terminee_le=now)
+    if close_other_open_sessions:
+        SessionModule.objects.filter(
+            module=session.module,
+            demarree_le__isnull=False,
+            terminee_le__isnull=True,
+        ).exclude(pk=session.pk).update(terminee_le=now)
 
     update_fields = ['terminee_le']
     session.terminee_le = None
@@ -70,6 +76,30 @@ def reactiver_session_et_qr(session):
             qr_updates.append('expire_at')
         if qr_updates:
             qr.save(update_fields=qr_updates)
+
+
+def reactiver_sessions_en_lot(sessions):
+    """
+    Réactive plusieurs séances sans que chaque itération ne referme les
+    précédentes. Ferme uniquement les séances ouvertes qui ne font pas
+    partie du lot, par module.
+    """
+    from collections import defaultdict
+
+    now = timezone.now()
+    par_module = defaultdict(list)
+    for session in sessions:
+        par_module[session.module_id].append(session)
+
+    for module_id, module_sessions in par_module.items():
+        pks = [s.pk for s in module_sessions]
+        SessionModule.objects.filter(
+            module_id=module_id,
+            demarree_le__isnull=False,
+            terminee_le__isnull=True,
+        ).exclude(pk__in=pks).update(terminee_le=now)
+        for session in module_sessions:
+            reactiver_session_et_qr(session, close_other_open_sessions=False)
 
 
 def _has_unfinished_previous_session(session):
@@ -173,7 +203,8 @@ def session_start(request, formation_pk, session_pk):
         return Response({'detail': 'Cette séance est déjà démarrée.'}, status=400)
 
     if session.terminee_le is not None:
-        reactiver_session_et_qr(session)
+        # Réouverture : ne pas fermer les séances des autres modules/groupes.
+        reactiver_session_et_qr(session, close_other_open_sessions=False)
         session.refresh_from_db()
         return Response({
             'detail': 'Séance réactivée.',
