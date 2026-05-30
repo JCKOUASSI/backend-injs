@@ -99,15 +99,16 @@ class SessionReactivationTest(TestCase):
         self.assertIsNone(session_b.terminee_le)
 
     def test_bulk_reactivation_keeps_all_sessions_open(self):
-        sessions = []
-        for numero in (1, 2, 3):
+        past_fin = (self.local_now - timedelta(hours=1)).time().replace(
+            second=0, microsecond=0
+        )
+        sessions = [self.session]
+        for numero in (2, 3):
             s = SessionModule.objects.create(
                 module=self.module,
                 date_journee=self.today,
                 numero=numero,
-                heure_fin_prevue=(self.local_now - timedelta(hours=1)).time().replace(
-                    second=0, microsecond=0
-                ),
+                heure_fin_prevue=past_fin,
                 demarree_le=self.now - timedelta(hours=4),
                 terminee_le=self.now - timedelta(hours=1),
             )
