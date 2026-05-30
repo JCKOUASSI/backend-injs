@@ -900,9 +900,9 @@ def session_start(request, pk, session_id):
         session.demarree_par = request.user
         session.save(update_fields=['demarree_le', 'demarree_par'])
     elif session.terminee_le is not None:
-        # Re-ouvrir une session terminée
-        session.terminee_le = None
-        session.save(update_fields=['terminee_le'])
+        from formations.session_views import reactiver_session_et_qr
+
+        reactiver_session_et_qr(session)
 
     # Passer le module en EN_COURS
     module = session.module

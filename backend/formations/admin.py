@@ -26,34 +26,10 @@ FormationFormateur = ModuleFormateur
 
 def _reactiver_session_et_qr(session, request=None):
     """Réouvre une séance terminée, réactive le QR et journalise l'action."""
+    from .session_views import reactiver_session_et_qr
+
+    reactiver_session_et_qr(session)
     formation = session.module.formation
-    now = timezone.now()
-
-    SessionModule.objects.filter(
-        module__formation=formation,
-        demarree_le__isnull=False,
-        terminee_le__isnull=True,
-    ).exclude(pk=session.pk).update(terminee_le=now)
-
-    session.terminee_le = None
-    session.save(update_fields=['terminee_le'])
-
-    module = session.module
-    if module.statut in ('TERMINEE', 'SUSPENDUE', 'PLANIFIEE'):
-        module.statut = 'EN_COURS'
-        module.save(update_fields=['statut'])
-
-    qr = QRToken.objects.filter(session=session).order_by('-created_at').first()
-    if qr:
-        qr_updates = []
-        if not qr.actif:
-            qr.actif = True
-            qr_updates.append('actif')
-        if qr.is_expired:
-            qr.expire_at = now + timedelta(hours=24)
-            qr_updates.append('expire_at')
-        if qr_updates:
-            qr.save(update_fields=qr_updates)
 
     if request is not None:
         label = session.intitule or f'Séance {session.numero}'
