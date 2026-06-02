@@ -12,6 +12,7 @@ import {
   readUsersFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import Pagination from '../components/Pagination'
 
 const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
 const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
@@ -62,6 +63,7 @@ export default function Users() {
   const [error, setError] = useState('')
   const [page, setPage] = useState(() => parseListPage(searchParams))
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [search, setSearch] = useState(initialUsers.search)
   const [roleFilter, setRoleFilter] = useState(initialUsers.role)
   const [showModal, setShowModal] = useState(false)
@@ -121,6 +123,7 @@ export default function Users() {
       setUsers(Array.isArray(data) ? data : [])
       const count = response.data.count || data.length
       const pageSize = 50
+      setTotalCount(count)
       setTotalPages(response.data.total_pages || Math.ceil(count / pageSize) || 1)
     } catch (err) {
       setError('Erreur lors du chargement des utilisateurs')
@@ -356,17 +359,13 @@ export default function Users() {
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    <i className="bi bi-chevron-left"></i> Précédent
-                  </button>
-                  <span className="small">Page {page} / {totalPages}</span>
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                    Suivant <i className="bi bi-chevron-right"></i>
-                  </button>
-                </div>
-              )}
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={totalCount}
+                pageSize={50}
+              />
             </>
           )}
         </div>

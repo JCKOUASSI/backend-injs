@@ -25,6 +25,7 @@ import {
   readFormateursListExtras,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import Pagination from '../components/Pagination'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
 
@@ -343,17 +344,12 @@ export default function Formateurs() {
                   )}
                 </tbody>
               </table>
-              {totalPages > 1 && (
-                <div className="pagination p-3">
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    <i className="bi bi-chevron-left"></i> Précédent
-                  </button>
-                  <span className="small">Page {page} / {totalPages}</span>
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                    Suivant <i className="bi bi-chevron-right"></i>
-                  </button>
-                </div>
-              )}
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                className="p-3"
+              />
             </>
           )}
         </div>
@@ -518,17 +514,7 @@ export default function Formateurs() {
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    <i className="bi bi-chevron-left"></i> Précédent
-                  </button>
-                  <span className="small">Page {page} / {totalPages}</span>
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                    Suivant <i className="bi bi-chevron-right"></i>
-                  </button>
-                </div>
-              )}
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
             </>
           )}
         </div>
