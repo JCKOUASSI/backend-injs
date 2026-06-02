@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import ConfirmModal from '../components/ConfirmModal'
 import { useDebounce } from '../hooks/useDebounce'
 import { formatDate } from '../utils/dates'
+import {
+  buildModulesSearchParams,
+  LIST_STORAGE_KEYS,
+  parseListPage,
+  readModulesFilters,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { useListNavigationState } from '../hooks/useListReturn'
 
 const emptyForm = {
   formation_id: '', intitule: '', grade: '', groupe: '', vague: '',
@@ -23,15 +31,17 @@ const getTodayIso = () => {
 export default function Modules() {
   const { user } = useAuth()
   const { showToast } = useToast()
+  const listNavState = useListNavigationState()
+  const [searchParams] = useSearchParams()
   const [modules, setModules] = useState([])
   const [refs, setRefs] = useState({ formations: [], formations_reelles: [], grades: [], grades_modules: [], categories: [], sites: [], batiments: [], salles: [], types_secretariat: [], vagues: [], groupes: [] })
   const [allFormations, setAllFormations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => parseListPage(searchParams))
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [filters, setFilters] = useState({ statut: '', search: '', secretariat_type: '', vague: '', grade: '', groupe: '', date_mode: 'today', date: getTodayIso() })
+  const [filters, setFilters] = useState(() => readModulesFilters(searchParams, getTodayIso))
   const debouncedSearch = useDebounce(filters.search)
 
   const [showModal, setShowModal] = useState(false)
@@ -62,6 +72,22 @@ export default function Modules() {
       setRefs(data)
     }).catch(() => {})
   }, [])
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.modules,
+    () => buildModulesSearchParams(filters, page, debouncedSearch),
+    [
+      page,
+      filters.statut,
+      filters.secretariat_type,
+      filters.vague,
+      filters.grade,
+      filters.groupe,
+      filters.date_mode,
+      filters.date,
+      debouncedSearch,
+    ],
+  )
+
   useEffect(() => { loadModules() }, [page, filters.statut, filters.secretariat_type, filters.vague, filters.grade, filters.groupe, filters.date_mode, filters.date, debouncedSearch])
 
   const loadModules = async () => {
@@ -364,7 +390,12 @@ export default function Modules() {
                         </td>
                         <td>
                           <div className="btn-group">
-                            <Link to={`/formations/${m.id}/modules/${m.module_id}`} className="btn btn-outline-primary btn-sm" title="Détail">
+                            <Link
+                              to={`/formations/${m.id}/modules/${m.module_id}`}
+                              state={listNavState}
+                              className="btn btn-outline-primary btn-sm"
+                              title="Détail"
+                            >
                               <i className="bi bi-eye"></i>
                             </Link>
                             {canManage && (

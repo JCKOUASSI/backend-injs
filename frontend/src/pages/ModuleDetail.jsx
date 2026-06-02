@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
+import { LIST_STORAGE_KEYS } from '../utils/listFilters'
+import { useListReturn } from '../hooks/useListReturn'
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
   const { user } = useAuth()
   const { showToast } = useToast()
+  const backToModulesList = useListReturn('/modules', LIST_STORAGE_KEYS.modules)
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -378,9 +381,9 @@ export default function ModuleDetail() {
   if (error || !module) return (
     <div className="card"><div className="card-body">
       <div className="error-message">{error || 'Module non trouvé'}</div>
-      <Link to={`/formations/${formationId}`} className="btn btn-secondary mt-2">
+      <button type="button" onClick={backToModulesList} className="btn btn-secondary mt-2">
         <i className="bi bi-arrow-left me-1"></i>Retour
-      </Link>
+      </button>
     </div></div>
   )
 

@@ -563,3 +563,54 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   .login-container { padding: 0; }
   .login-card { border-radius: 0 0 16px 16px; padding: 2rem 1.25rem; min-height: 100vh; margin: 0; }
 }
+
+/* Onglets modale finance formateur (évite conflit avec .nav-item sidebar) */
+.finance-detail-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0 0 1rem 0;
+  padding: 0 0 0.5rem 0;
+  border-bottom: 2px solid #e2e8f0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.finance-detail-tabs > li {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+.finance-detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  background: #f8fafc;
+  color: #4a5568;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.finance-detail-tab:hover {
+  background: #edf2f7;
+  color: var(--ci-green-dark, #276749);
+}
+.finance-detail-tab.active {
+  background: #fff;
+  color: var(--ci-green-dark, #276749);
+  border-color: var(--ci-green, #276749);
+  border-bottom: 2px solid #fff;
+  margin-bottom: -2px;
+  font-weight: 600;
+}
+.finance-detail-tab i {
+  font-size: 1rem;
+}

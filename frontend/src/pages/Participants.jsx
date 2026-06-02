@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { formatDate } from '../utils/dates'
+import {
+  buildParticipantsSearchParams,
+  LIST_STORAGE_KEYS,
+  parseListPage,
+  readParticipantsFilters,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 
 const emptyForm = {
   matricule: '',
@@ -20,20 +28,22 @@ const emptyRefs = { categories: [], grades: [], sites: [], salles: [], vagues: [
 
 export default function Participants() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const initialFilters = readParticipantsFilters(searchParams)
   const [participants, setParticipants] = useState([])
   const [refs, setRefs] = useState(emptyRefs)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => parseListPage(searchParams))
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [search, setSearch] = useState('')
-  const [sexeFilter, setSexeFilter] = useState('')
-  const [secretariatFilter, setSecretariatFilter] = useState('')
-  const [gradeFilter, setGradeFilter] = useState('')
-  const [groupeFilter, setGroupeFilter] = useState('')
-  const [typeConcoursFilter, setTypeConcoursFilter] = useState('')
-  const [vagueFilter, setVagueFilter] = useState('')
+  const [search, setSearch] = useState(initialFilters.search)
+  const [sexeFilter, setSexeFilter] = useState(initialFilters.sexe)
+  const [secretariatFilter, setSecretariatFilter] = useState(initialFilters.secretariat)
+  const [gradeFilter, setGradeFilter] = useState(initialFilters.grade)
+  const [groupeFilter, setGroupeFilter] = useState(initialFilters.groupe)
+  const [typeConcoursFilter, setTypeConcoursFilter] = useState(initialFilters.type_concours)
+  const [vagueFilter, setVagueFilter] = useState(initialFilters.vague)
   const [filterOptions, setFilterOptions] = useState({ secretariats: [], grades: [], groupes: [], types_concours: [] })
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -50,6 +60,32 @@ export default function Participants() {
   const [detailFormationsLoading, setDetailFormationsLoading] = useState(false)
 
   const debouncedSearch = useDebounce(search)
+
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.participants,
+    () => buildParticipantsSearchParams(
+      {
+        sexe: sexeFilter,
+        secretariat: secretariatFilter,
+        grade: gradeFilter,
+        groupe: groupeFilter,
+        type_concours: typeConcoursFilter,
+        vague: vagueFilter,
+      },
+      page,
+      debouncedSearch,
+    ),
+    [
+      page,
+      debouncedSearch,
+      sexeFilter,
+      secretariatFilter,
+      gradeFilter,
+      groupeFilter,
+      typeConcoursFilter,
+      vagueFilter,
+    ],
+  )
 
   useEffect(() => {
     loadParticipants()

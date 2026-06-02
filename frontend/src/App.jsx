@@ -17,6 +17,10 @@ import Referentiels from './pages/Referentiels'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
+import FinanceParametrage from './pages/FinanceParametrage'
+import ModulesListLink from './components/ModulesListLink'
+import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
+import { financeNavHref } from './utils/financePeriod'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -92,37 +96,42 @@ function Layout({ children, breadcrumb }) {
 
         <nav className="sidebar-nav">
           {canViewFinanceDashboard && (
-            <Link to="/finance-dashboard" className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard Finance</span></span>
             </Link>
           )}
           {!isFinanceRole && (
-            <Link to="/" className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
           )}
           {!isFinanceRole && (
-            <Link to="/modules" className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
           )}
           {canViewParticipants && (
-            <Link to="/participants" className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/participants', LIST_STORAGE_KEYS.participants)} className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-people"></i> <span className="nav-label">Auditeurs</span></span>
             </Link>
           )}
           {canViewFormateurs && (
-            <Link to="/formateurs" className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={isFinanceRole ? financeNavHref('/formateurs') : listHref('/formateurs', LIST_STORAGE_KEYS.formateurs)} className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className={`bi ${isFinanceRole ? 'bi-cash-stack' : 'bi-person-video3'}`}></i> <span className="nav-label">{isFinanceRole ? 'Suivi Finance' : 'Formateurs'}</span></span>
             </Link>
           )}
+          {canViewFinanceDashboard && (
+            <Link to={financeNavHref('/finance-parametrage')} className={`nav-item ${isActive('/finance-parametrage') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-sliders"></i> <span className="nav-label">Paramétrage</span></span>
+            </Link>
+          )}
           {canViewUsers && (
-            <Link to="/users" className={`nav-item ${isActive('/users') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/users', LIST_STORAGE_KEYS.users)} className={`nav-item ${isActive('/users') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-person-gear"></i> <span className="nav-label">Utilisateurs</span></span>
             </Link>
           )}
           {canViewSecretariats && (
-            <Link to="/secretariats" className={`nav-item ${isActive('/secretariats') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/secretariats', LIST_STORAGE_KEYS.secretariats)} className={`nav-item ${isActive('/secretariats') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-building"></i> <span className="nav-label">Secrétariats</span></span>
             </Link>
           )}
@@ -132,7 +141,7 @@ function Layout({ children, breadcrumb }) {
             </Link>
           )}
           {canViewReferentiels && (
-            <Link to="/referentiels" className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/referentiels', LIST_STORAGE_KEYS.referentiels)} className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-sliders"></i> <span className="nav-label">Référentiels</span></span>
             </Link>
           )}
@@ -212,14 +221,14 @@ function App() {
           } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
             <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/modules">Cours</Link></li><li className="separator">/</li><li>Cours</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
             <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/modules">Cours</Link></li><li className="separator">/</li><li>Détail</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Détail</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
@@ -249,6 +258,13 @@ function App() {
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Dashboard Finance</li></>}>
                 <FinanceDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance-parametrage" element={
+            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Paramétrage Finance</li></>}>
+                <FinanceParametrage />
               </Layout>
             </ProtectedRoute>
           } />

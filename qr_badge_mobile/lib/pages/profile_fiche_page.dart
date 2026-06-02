@@ -11,8 +11,10 @@ import '../widgets/qr_badge_logo.dart';
 import 'login_page.dart';
 
 class ProfileFichePage extends StatefulWidget {
-  const ProfileFichePage({super.key, this.onOpenHistory});
+  const ProfileFichePage({super.key, this.onClose, this.onOpenHistory});
 
+  /// Fermeture sans détruire l’état (overlay dans [HomePage]).
+  final VoidCallback? onClose;
   final VoidCallback? onOpenHistory;
 
   @override
@@ -50,7 +52,15 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     _load();
   }
 
-  Future<void> _load() async {
+  void _close() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _load({bool showSpinner = true}) async {
     final session = context.read<SessionProvider>();
     if (session.accessToken == null) {
       setState(() {
@@ -59,8 +69,11 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       });
       return;
     }
+    final firstLoad = _payload == null;
     setState(() {
-      _loading = true;
+      if (showSpinner && firstLoad) {
+        _loading = true;
+      }
       _error = null;
     });
     try {
@@ -147,9 +160,22 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
   Widget build(BuildContext context) {
     final isFallback = _payload?['_fallback'] == true;
 
-    return Scaffold(
+    return PopScope(
+      canPop: widget.onClose == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _close();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.ciLight,
-      appBar: AppBar(title: const Text('Fiche')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _close,
+        ),
+        title: const Text('Fiche'),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -168,6 +194,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
           Expanded(child: _buildBody(context)),
         ],
       ),
+    ),
     );
   }
 
@@ -229,8 +256,9 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     final infoRows = _infoRowsFor(user, profil);
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: () => _load(showSpinner: false),
       child: ListView(
+        key: const PageStorageKey<String>('profile_fiche_scroll'),
         controller: _scrollCtrl,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
@@ -301,10 +329,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                   '${volumeTaux is num && volumeTotal is num && volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
             ),
             onBadgeagesTap: widget.onOpenHistory != null
-                ? () {
-                    Navigator.pop(context);
-                    widget.onOpenHistory!();
-                  }
+                ? widget.onOpenHistory
                 : () => _showStatSheet(
                       context,
                       title: 'Badgeages',

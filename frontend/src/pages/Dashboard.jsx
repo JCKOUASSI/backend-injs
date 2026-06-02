@@ -1,22 +1,42 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../utils/dates'
+import {
+  buildDashboardSearchParams,
+  LIST_STORAGE_KEYS,
+  readDashboardFilters,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { useListNavigationState } from '../hooks/useListReturn'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const listNavState = useListNavigationState()
+  const [searchParams] = useSearchParams()
+  const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
   const canFilterBySecretariat = ['CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'].includes(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])
   const [secretariats, setSecretariats] = useState([])
-  const [selectedSecretariatId, setSelectedSecretariatId] = useState('')
-  const [presencePeriod, setPresencePeriod] = useState('jour')
-  const [referenceDate, setReferenceDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [selectedSecretariatId, setSelectedSecretariatId] = useState(initialDash.secretariat)
+  const [presencePeriod, setPresencePeriod] = useState(initialDash.presence_period)
+  const [referenceDate, setReferenceDate] = useState(initialDash.reference_date)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [loadingSecretariats, setLoadingSecretariats] = useState(false)
+
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.dashboard,
+    () => buildDashboardSearchParams({
+      secretariat: selectedSecretariatId,
+      presence_period: presencePeriod,
+      reference_date: referenceDate,
+    }),
+    [selectedSecretariatId, presencePeriod, referenceDate],
+  )
 
   useEffect(() => {
     loadDashboardData()
@@ -543,7 +563,7 @@ export default function Dashboard() {
           <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-green)' }}></i>
             <strong>{user?.role === 'ENCADRANT' ? 'Mes cours débutés' : 'Cours débutés'}</strong>
           </span>
-          <Link to="/formations?statut=EN_COURS" className="btn btn-dfrc btn-sm">Voir tout</Link>
+          <Link to="/modules?statut=EN_COURS" className="btn btn-dfrc btn-sm">Voir tout</Link>
         </div>
         <div className="card-body-flush">
           {formationsEnCours.length > 0 ? (
@@ -590,7 +610,12 @@ export default function Dashboard() {
                           </div>
                         </td>
                         <td>
-                          <Link to={`/formations/${f.id}/modules/${f.module_id}`} className="btn btn-outline-primary btn-sm" title="Voir détail">
+                          <Link
+                            to={`/formations/${f.id}/modules/${f.module_id}`}
+                            state={listNavState}
+                            className="btn btn-outline-primary btn-sm"
+                            title="Voir détail"
+                          >
                             <i className="bi bi-eye"></i>
                           </Link>
                         </td>
@@ -636,7 +661,11 @@ export default function Dashboard() {
                           {formatDate(s.date_journee)} {s.heure_debut_prevue ? `• ${String(s.heure_debut_prevue).slice(0, 5)}` : ''}
                         </small>
                       </div>
-                      <Link to={`/formations/${s.formation_id}/modules/${s.module_id}`} style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                      <Link
+                        to={`/formations/${s.formation_id}/modules/${s.module_id}`}
+                        state={listNavState}
+                        style={{ color: '#94a3b8', fontSize: '0.85rem' }}
+                      >
                         <i className="bi bi-chevron-right"></i>
                       </Link>
                     </div>
