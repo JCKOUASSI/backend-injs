@@ -14,6 +14,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { useListNavigationState } from '../hooks/useListReturn'
 
 const emptyForm = {
@@ -104,10 +105,10 @@ export default function Modules() {
       if (filters.date_mode) params.set('date_mode', filters.date_mode)
       if (filters.date_mode === 'date' && filters.date) params.set('date', filters.date)
       const res = await api.get(`/formations/list/?${params}`)
-      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
-      setModules(data)
-      setTotalPages(res.data.total_pages || 1)
-      setTotal(res.data.count || data.length)
+      const { results, count, totalPages: pages } = parsePaginatedResponse(res.data, 50)
+      setModules(results)
+      setTotalPages(pages)
+      setTotal(count)
     } catch {
       setError('Erreur lors du chargement des modules')
     } finally {

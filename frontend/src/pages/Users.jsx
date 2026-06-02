@@ -13,6 +13,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
 
 const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
 const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
@@ -119,12 +120,11 @@ export default function Users() {
         params.set('role', 'FORMATEUR')
       }
       const response = await api.get(`/auth/users/?${params}`)
-      const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-      setUsers(Array.isArray(data) ? data : [])
-      const count = response.data.count || data.length
       const pageSize = 50
+      const { results, count, totalPages: pages } = parsePaginatedResponse(response.data, pageSize)
+      setUsers(results)
       setTotalCount(count)
-      setTotalPages(response.data.total_pages || Math.ceil(count / pageSize) || 1)
+      setTotalPages(pages)
     } catch (err) {
       setError('Erreur lors du chargement des utilisateurs')
       console.error(err)

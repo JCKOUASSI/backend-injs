@@ -8,6 +8,9 @@ import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListReturn } from '../hooks/useListReturn'
+import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
+import { usePickerPagination } from '../hooks/usePickerPagination'
+import Pagination from '../components/Pagination'
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
@@ -49,6 +52,13 @@ export default function ModuleDetail() {
   const [allFormateurs, setAllFormateurs] = useState([])
   const [formateurSearch, setFormateurSearch] = useState('')
   const [formateurLoading, setFormateurLoading] = useState(false)
+
+  const participantsList = module?.participants ?? []
+  const formateursList = module?.formateurs ?? []
+  const participantsPager = useClientPagination(participantsList, TABLE_PAGE_SIZE, [moduleId, participantsList.length])
+  const formateursPager = useClientPagination(formateursList, TABLE_PAGE_SIZE, [moduleId, formateursList.length])
+  const participantPicker = usePickerPagination(showAddParticipant)
+  const formateurPicker = usePickerPagination(showAddFormateur)
 
   // Séances
   const [showNewSession, setShowNewSession] = useState(false)
@@ -147,29 +157,34 @@ export default function ModuleDetail() {
     finally { setSavingSession(false) }
   }
 
-  const loadAvailableParticipants = async (search = '') => {
+  const loadAvailableParticipants = async () => {
     setParticipantLoading(true)
     try {
-      const params = new URLSearchParams({ page_size: 50 })
-      if (search) params.set('search', search)
+      const params = new URLSearchParams({ page: participantPicker.page, page_size: PICKER_PAGE_SIZE })
+      if (participantSearch) params.set('search', participantSearch)
       const res = await api.get(`/formations/participants/list/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
-      const enrolled = new Set((module.participants || []).map(p => p.id))
+      const enrolled = new Set((module?.participants || []).map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
+      participantPicker.applyResponse(res.data, data.length)
     } catch {} finally { setParticipantLoading(false) }
   }
 
   const openAddParticipant = () => {
     setParticipantSearch('')
-    loadAvailableParticipants('')
+    loadAvailableParticipants()
     setShowAddParticipant(true)
   }
 
   useEffect(() => {
+    if (showAddParticipant) participantPicker.resetPage()
+  }, [participantSearch])
+
+  useEffect(() => {
     if (!showAddParticipant) return
-    const t = setTimeout(() => loadAvailableParticipants(participantSearch), 300)
+    const t = setTimeout(() => loadAvailableParticipants(), 300)
     return () => clearTimeout(t)
-  }, [participantSearch, showAddParticipant])
+  }, [participantSearch, showAddParticipant, participantPicker.page])
 
   const handleAddParticipant = async (pid) => {
     try {
@@ -193,29 +208,34 @@ export default function ModuleDetail() {
     })
   }
 
-  const loadAvailableFormateurs = async (search = '') => {
+  const loadAvailableFormateurs = async () => {
     setFormateurLoading(true)
     try {
-      const params = new URLSearchParams({ page_size: 50 })
-      if (search) params.set('search', search)
+      const params = new URLSearchParams({ page: formateurPicker.page, page_size: PICKER_PAGE_SIZE })
+      if (formateurSearch) params.set('search', formateurSearch)
       const res = await api.get(`/formations/formateurs/list/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
-      const assigned = new Set((module.formateurs || []).map(f => f.id))
+      const assigned = new Set((module?.formateurs || []).map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
+      formateurPicker.applyResponse(res.data, data.length)
     } catch {} finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
     setFormateurSearch('')
-    loadAvailableFormateurs('')
+    loadAvailableFormateurs()
     setShowAddFormateur(true)
   }
 
   useEffect(() => {
+    if (showAddFormateur) formateurPicker.resetPage()
+  }, [formateurSearch])
+
+  useEffect(() => {
     if (!showAddFormateur) return
-    const t = setTimeout(() => loadAvailableFormateurs(formateurSearch), 300)
+    const t = setTimeout(() => loadAvailableFormateurs(), 300)
     return () => clearTimeout(t)
-  }, [formateurSearch, showAddFormateur])
+  }, [formateurSearch, showAddFormateur, formateurPicker.page])
 
   const handleAddFormateur = async (fid) => {
     try {
@@ -667,11 +687,12 @@ export default function ModuleDetail() {
           </div>
           <div className="card-body-flush">
             {participants.length > 0 ? (
+              <>
               <div className="table-container">
                 <table className="table">
                   <thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Grade</th><th>Groupe</th>{canManageModule && <th></th>}</tr></thead>
                   <tbody>
-                    {participants.map(p => (
+                    {participantsPager.pageItems.map(p => (
                       <tr key={p.id}>
                         <td><span className="badge-bg-info">{p.numero_matricule || p.matricule || '—'}</span></td>
                         <td><strong>{p.nom}</strong></td>
@@ -690,6 +711,14 @@ export default function ModuleDetail() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={participantsPager.page}
+                totalPages={participantsPager.totalPages}
+                onPageChange={participantsPager.setPage}
+                totalItems={participantsPager.totalItems}
+                pageSize={participantsPager.pageSize}
+              />
+              </>
             ) : (
               <div className="text-center py-4 text-muted">
                 <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
@@ -718,11 +747,12 @@ export default function ModuleDetail() {
           </div>
           <div className="card-body-flush">
             {formateurs.length > 0 ? (
+              <>
               <div className="table-container">
                 <table className="table">
                   <thead><tr><th>N° Badge</th><th>Nom</th><th>Prénom</th><th>Spécialité</th><th>Email</th>{canManageModule && <th></th>}</tr></thead>
                   <tbody>
-                    {formateurs.map(f => (
+                    {formateursPager.pageItems.map(f => (
                       <tr key={f.id}>
                         <td>
                           <span className="badge-bg-info" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{f.numerobadge || '—'}</span>
@@ -748,6 +778,14 @@ export default function ModuleDetail() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={formateursPager.page}
+                totalPages={formateursPager.totalPages}
+                onPageChange={formateursPager.setPage}
+                totalItems={formateursPager.totalItems}
+                pageSize={formateursPager.pageSize}
+              />
+              </>
             ) : (
               <div className="text-center py-4 text-muted">
                 <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
@@ -1255,6 +1293,13 @@ export default function ModuleDetail() {
                   </table>
                 </div>
               )}
+              <Pagination
+                page={participantPicker.page}
+                totalPages={participantPicker.totalPages}
+                onPageChange={participantPicker.setPage}
+                totalItems={participantPicker.totalCount}
+                pageSize={participantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddParticipant(false)}>Fermer</button>
@@ -1302,6 +1347,13 @@ export default function ModuleDetail() {
                   </table>
                 </div>
               )}
+              <Pagination
+                page={formateurPicker.page}
+                totalPages={formateurPicker.totalPages}
+                onPageChange={formateurPicker.setPage}
+                totalItems={formateurPicker.totalCount}
+                pageSize={formateurPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddFormateur(false)}>Fermer</button>

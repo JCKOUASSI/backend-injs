@@ -8,10 +8,8 @@ import {
   buildFinanceQuery,
   FINANCE_QUERY_STORAGE_KEY,
   loadFinancePeriod,
-  loadFinanceFilters,
   readFinanceStateFromSearchParams,
   saveFinancePeriod,
-  saveFinanceFilters,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
@@ -100,28 +98,19 @@ export default function FinanceDashboard() {
   const [error, setError] = useState('')
   const [period, setPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
   const [appliedPeriod, setAppliedPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
-  const [filters, setFilters] = useState(() => urlFinance?.filters ?? loadFinanceFilters())
-  const [appliedFilters, setAppliedFilters] = useState(() => urlFinance?.filters ?? loadFinanceFilters())
-  const [secretariats, setSecretariats] = useState([])
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
   const [synthesePage, setSynthesePage] = useState(1)
 
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
-    () => buildFinanceListSearchParams(appliedPeriod, appliedFilters, { rankTab }),
-    [appliedPeriod, appliedFilters, rankTab],
+    () => buildFinanceListSearchParams(appliedPeriod, {}, { rankTab }),
+    [appliedPeriod, rankTab],
   )
 
-  useEffect(() => {
-    api.get('/formations/secretariats/')
-      .then((res) => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch(() => {})
-  }, [])
-
-  const load = useCallback(async (p, f) => {
+  const load = useCallback(async (p) => {
     setLoading(true)
     try {
-      const qs = buildFinanceQuery(p, f).toString()
+      const qs = buildFinanceQuery(p).toString()
       const res = await api.get(`/formations/finance/dashboard/${qs ? `?${qs}` : ''}`)
       setData(res.data || null)
       setError('')
@@ -134,18 +123,16 @@ export default function FinanceDashboard() {
   }, [])
 
   useEffect(() => {
-    load(appliedPeriod, appliedFilters)
-  }, [appliedPeriod, appliedFilters, load])
+    load(appliedPeriod)
+  }, [appliedPeriod, load])
 
   useEffect(() => {
     setSynthesePage(1)
-  }, [appliedPeriod, appliedFilters])
+  }, [appliedPeriod])
 
   const handleApply = () => {
     saveFinancePeriod(period)
-    saveFinanceFilters(filters)
     setAppliedPeriod({ ...period })
-    setAppliedFilters({ ...filters })
     setSynthesePage(1)
   }
 
@@ -185,11 +172,6 @@ export default function FinanceDashboard() {
       onPeriodApply={handleApply}
       periodApplying={loading}
       periodeInfo={periode}
-      filters={filters}
-      onFiltersChange={setFilters}
-      secretariats={secretariats}
-      showCompare
-      secretariatFiltre={data?.secretariat_filtre}
     >
       {error && <div className="error-message">{error}</div>}
 
@@ -197,16 +179,6 @@ export default function FinanceDashboard() {
         <div className="loading py-5"><div className="spinner"></div></div>
       ) : (
         <>
-          {comparaison && (
-            <div className="finance-compare-banner">
-              <i className="bi bi-arrow-left-right"></i>
-              <span>
-                Comparaison avec <strong>{comparaison.periode?.label}</strong>
-                {' '}({comparaison.periode?.periode_label})
-              </span>
-            </div>
-          )}
-
           <div className="finance-hero-kpis">
             <div className="finance-hero-kpi finance-hero-kpi--money">
               <div className="finance-hero-kpi-label">Masse salariale (période)</div>
@@ -436,14 +408,16 @@ export default function FinanceDashboard() {
                 </tbody>
               </table>
             </div>
-            <Pagination
-              page={synthesePageSafe}
-              totalPages={syntheseTotalPages}
-              onPageChange={setSynthesePage}
-              totalItems={synthese.length}
-              pageSize={SYNTHESE_PAGE_SIZE}
-              activeClassName="pagination-num--active pagination-num--finance"
-            />
+            <div className="finance-section-footer">
+              <Pagination
+                page={synthesePageSafe}
+                totalPages={syntheseTotalPages}
+                onPageChange={setSynthesePage}
+                totalItems={synthese.length}
+                pageSize={SYNTHESE_PAGE_SIZE}
+                activeClassName="pagination-num--active pagination-num--finance"
+              />
+            </div>
           </section>
 
           {data?.generated_at && (

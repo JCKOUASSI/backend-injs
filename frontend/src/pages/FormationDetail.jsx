@@ -8,6 +8,9 @@ import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
+import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
+import { usePickerPagination } from '../hooks/usePickerPagination'
+import Pagination from '../components/Pagination'
 
 export default function FormationDetail() {
   const { id } = useParams()
@@ -76,6 +79,11 @@ export default function FormationDetail() {
   const { showToast } = useToast()
   const [confirmDialog, setConfirmDialog] = useState(null)
 
+  const participantsPager = useClientPagination(participants, TABLE_PAGE_SIZE, [id, participants.length])
+  const formateursPager = useClientPagination(formateurs, TABLE_PAGE_SIZE, [id, formateurs.length])
+  const participantPicker = usePickerPagination(showAddParticipant)
+  const formateurPicker = usePickerPagination(showAddFormateur)
+
   // Import séances Excel
   const [importingSeances, setImportingSeances] = useState(false)
   const [importSeancesMsg, setImportSeancesMsg] = useState(null)
@@ -113,36 +121,40 @@ export default function FormationDetail() {
     if (activeTab === 'formateurs') loadFormateurs()
   }, [activeTab])
 
-  const loadAllFormateurs = async (search) => {
+  const loadAllFormateurs = async () => {
     setFormateurLoading(true)
     try {
-      const params = new URLSearchParams({ page_size: 50 })
-      if (search) params.set('search', search)
+      const params = new URLSearchParams({ page: formateurPicker.page, page_size: PICKER_PAGE_SIZE })
+      if (formateurSearch) params.set('search', formateurSearch)
       const res = await api.get(`/formations/formateurs/list/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       const assigned = new Set(formateurs.map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
+      formateurPicker.applyResponse(res.data, data.length)
     } catch {} finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
     setFormateurSearch('')
-    loadAllFormateurs('')
+    loadAllFormateurs()
     setShowAddFormateur(true)
   }
 
   useEffect(() => {
-    if (showAddFormateur) {
-      const t = setTimeout(() => loadAllFormateurs(formateurSearch), 300)
-      return () => clearTimeout(t)
-    }
-  }, [formateurSearch, showAddFormateur])
+    if (showAddFormateur) formateurPicker.resetPage()
+  }, [formateurSearch])
+
+  useEffect(() => {
+    if (!showAddFormateur) return
+    const t = setTimeout(() => loadAllFormateurs(), 300)
+    return () => clearTimeout(t)
+  }, [formateurSearch, showAddFormateur, formateurPicker.page])
 
   const handleAddFormateur = async (formateurId) => {
     try {
       await api.post(`/formations/${id}/formateurs/add/`, { formateur_id: formateurId })
       loadFormateurs()
-      loadAllFormateurs(formateurSearch)
+      loadAllFormateurs()
       showToast('Formateur ajouté')
     } catch (err) {
       showToast(err.response?.data?.detail || "Erreur lors de l'ajout", 'error')
@@ -301,36 +313,40 @@ export default function FormationDetail() {
     }
   }
 
-  const loadAllParticipants = async (search) => {
+  const loadAllParticipants = async () => {
     setAddLoading(true)
     try {
-      const params = new URLSearchParams({ page_size: 50 })
-      if (search) params.set('search', search)
+      const params = new URLSearchParams({ page: participantPicker.page, page_size: PICKER_PAGE_SIZE })
+      if (addSearch) params.set('search', addSearch)
       const res = await api.get(`/formations/participants/list/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       const enrolled = new Set(participants.map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
+      participantPicker.applyResponse(res.data, data.length)
     } catch {} finally { setAddLoading(false) }
   }
 
   const openAddParticipant = () => {
     setAddSearch('')
-    loadAllParticipants('')
+    loadAllParticipants()
     setShowAddParticipant(true)
   }
 
   useEffect(() => {
-    if (showAddParticipant) {
-      const t = setTimeout(() => loadAllParticipants(addSearch), 300)
-      return () => clearTimeout(t)
-    }
-  }, [addSearch, showAddParticipant])
+    if (showAddParticipant) participantPicker.resetPage()
+  }, [addSearch])
+
+  useEffect(() => {
+    if (!showAddParticipant) return
+    const t = setTimeout(() => loadAllParticipants(), 300)
+    return () => clearTimeout(t)
+  }, [addSearch, showAddParticipant, participantPicker.page])
 
   const handleAddParticipant = async (participantId) => {
     try {
       await api.post(`/formations/${id}/participants/add/`, { participant_id: participantId })
       loadFormationData()
-      loadAllParticipants(addSearch)
+      loadAllParticipants()
       showToast('Auditeur ajouté')
     } catch (err) {
       showToast(err.response?.data?.detail || err.response?.data?.participant_id || "Erreur lors de l'ajout", 'error')
@@ -1195,11 +1211,12 @@ export default function FormationDetail() {
             </div>
             <div className="card-body-flush">
               {participants.length > 0 ? (
+                <>
                 <div className="table-container">
                   <table className="table">
                     <thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Adresse e-mail</th><th>Téléphone</th><th>Structure</th>{canEdit && <th>Actions</th>}</tr></thead>
                     <tbody>
-                      {participants.map((p) => (
+                      {participantsPager.pageItems.map((p) => (
                         <tr key={p.id}>
                           <td><span className="badge-bg-info">{p.numero_matricule || p.matricule || p.numero || '-'}</span></td>
                           <td><strong>{p.nom}</strong></td>
@@ -1219,6 +1236,14 @@ export default function FormationDetail() {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  page={participantsPager.page}
+                  totalPages={participantsPager.totalPages}
+                  onPageChange={participantsPager.setPage}
+                  totalItems={participantsPager.totalItems}
+                  pageSize={participantsPager.pageSize}
+                />
+                </>
               ) : (
                 <div className="text-center py-4 text-muted">
                   <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
@@ -1248,11 +1273,12 @@ export default function FormationDetail() {
             </div>
             <div className="card-body-flush">
               {formateurs.length > 0 ? (
+                <>
                 <div className="table-container">
                   <table className="table">
                     <thead><tr><th>Numéro</th><th>Nom</th><th>Prénom</th><th>Spécialité</th><th>Adresse e-mail</th><th>Téléphone</th>{canEdit && <th>Actions</th>}</tr></thead>
                     <tbody>
-                      {formateurs.map((f) => (
+                      {formateursPager.pageItems.map((f) => (
                         <tr key={f.id}>
                           <td><span className="badge-bg-info">{f.numerobadge || '-'}</span></td>
                           <td><strong>{f.nom}</strong></td>
@@ -1272,6 +1298,14 @@ export default function FormationDetail() {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  page={formateursPager.page}
+                  totalPages={formateursPager.totalPages}
+                  onPageChange={formateursPager.setPage}
+                  totalItems={formateursPager.totalItems}
+                  pageSize={formateursPager.pageSize}
+                />
+                </>
               ) : (
                 <div className="text-center py-4 text-muted">
                   <i className="bi bi-person-video3" style={{ fontSize: '2rem' }}></i>
@@ -1412,6 +1446,13 @@ export default function FormationDetail() {
                   </table>
                 </div>
               )}
+              <Pagination
+                page={formateurPicker.page}
+                totalPages={formateurPicker.totalPages}
+                onPageChange={formateurPicker.setPage}
+                totalItems={formateurPicker.totalCount}
+                pageSize={formateurPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddFormateur(false)}>Fermer</button>
@@ -1547,6 +1588,13 @@ export default function FormationDetail() {
                   </table>
                 </div>
               )}
+              <Pagination
+                page={participantPicker.page}
+                totalPages={participantPicker.totalPages}
+                onPageChange={participantPicker.setPage}
+                totalItems={participantPicker.totalCount}
+                pageSize={participantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddParticipant(false)}>Fermer</button>

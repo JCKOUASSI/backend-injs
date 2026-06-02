@@ -13,10 +13,8 @@ import {
   buildFinanceQuery,
   FINANCE_QUERY_STORAGE_KEY,
   loadFinancePeriod,
-  loadFinanceFilters,
   readFinanceStateFromSearchParams,
   saveFinancePeriod,
-  saveFinanceFilters,
 } from '../utils/financePeriod'
 import {
   buildFormateursListSearchParams,
@@ -26,6 +24,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
 
@@ -47,6 +46,7 @@ export default function Formateurs() {
   const [error, setError] = useState('')
   const [page, setPage] = useState(() => parseListPage(searchParams))
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [search, setSearch] = useState(listExtras.search)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -63,25 +63,17 @@ export default function Formateurs() {
   const [financePeriod, setFinancePeriod] = useState(
     () => urlFinance?.period ?? loadFinancePeriod(),
   )
-  const [financeFilters, setFinanceFilters] = useState(
-    () => urlFinance?.filters ?? loadFinanceFilters(),
-  )
   const [financePeriodeInfo, setFinancePeriodeInfo] = useState(null)
-  const [financeSecretariatFiltre, setFinanceSecretariatFiltre] = useState(null)
 
   const debouncedSearch = useDebounce(search)
   const [appliedFinancePeriod, setAppliedFinancePeriod] = useState(
     () => urlFinance?.period ?? loadFinancePeriod(),
   )
-  const [appliedFinanceFilters, setAppliedFinanceFilters] = useState(
-    () => urlFinance?.filters ?? loadFinanceFilters(),
-  )
-
   const syncFormateursQuery = () => buildFormateursListSearchParams(
     page,
     debouncedSearch,
     appliedFinancePeriod,
-    appliedFinanceFilters,
+    {},
     canViewFinanceData,
     buildFinanceListSearchParams,
   )
@@ -89,10 +81,10 @@ export default function Formateurs() {
   usePersistedListQuery(
     canViewFinanceData ? FINANCE_QUERY_STORAGE_KEY : LIST_STORAGE_KEYS.formateurs,
     syncFormateursQuery,
-    [page, debouncedSearch, appliedFinancePeriod, appliedFinanceFilters, canViewFinanceData],
+    [page, debouncedSearch, appliedFinancePeriod, canViewFinanceData],
   )
 
-  useEffect(() => { loadFormateurs() }, [page, debouncedSearch, appliedFinancePeriod, appliedFinanceFilters])
+  useEffect(() => { loadFormateurs() }, [page, debouncedSearch, appliedFinancePeriod])
   useEffect(() => {
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
@@ -109,15 +101,15 @@ export default function Formateurs() {
         : '/formations/formateurs/list/'
       if (canViewFinanceData) {
         params.set('include_sessions', '0')
-        buildFinanceQuery(appliedFinancePeriod, appliedFinanceFilters).forEach((v, k) => params.set(k, v))
+        buildFinanceQuery(appliedFinancePeriod).forEach((v, k) => params.set(k, v))
       }
       const response = await api.get(`${endpoint}?${params}`)
-      const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-      setFormateurs(data)
-      setTotalPages(response.data.total_pages || 1)
-      if (canViewFinanceData) {
-        if (response.data?.periode) setFinancePeriodeInfo(response.data.periode)
-        setFinanceSecretariatFiltre(response.data?.secretariat_filtre || null)
+      const { results, count, totalPages: pages } = parsePaginatedResponse(response.data, 50)
+      setFormateurs(results)
+      setTotalCount(count)
+      setTotalPages(pages)
+      if (canViewFinanceData && response.data?.periode) {
+        setFinancePeriodeInfo(response.data.periode)
       }
     } catch (err) {
       setError('Erreur lors du chargement des formateurs')
@@ -206,7 +198,7 @@ export default function Formateurs() {
 
   const exportFinanceSummary = async (f, format) => {
     const ext = format === 'pdf' ? 'pdf' : 'xlsx'
-    const qs = buildFinanceQuery(appliedFinancePeriod, appliedFinanceFilters).toString()
+    const qs = buildFinanceQuery(appliedFinancePeriod).toString()
     const base = format === 'pdf'
       ? `/exports/formateur/${f.id}/pdf/`
       : `/exports/formateur/${f.id}/excel/`
@@ -239,7 +231,7 @@ export default function Formateurs() {
     })
     setFinanceDetailLoading(true)
     try {
-      const periodQs = buildFinanceQuery(appliedFinancePeriod, appliedFinanceFilters).toString()
+      const periodQs = buildFinanceQuery(appliedFinancePeriod).toString()
       const res = await api.get(
         `/formations/formateurs/finance-report/?formateur_id=${f.id}${periodQs ? `&${periodQs}` : ''}`
       )
@@ -348,6 +340,8 @@ export default function Formateurs() {
                 page={page}
                 totalPages={totalPages}
                 onPageChange={setPage}
+                totalItems={totalCount}
+                pageSize={50}
                 className="p-3"
               />
             </>
@@ -368,17 +362,11 @@ export default function Formateurs() {
         onPeriodChange={setFinancePeriod}
         onPeriodApply={() => {
           saveFinancePeriod(financePeriod)
-          saveFinanceFilters(financeFilters)
           setAppliedFinancePeriod({ ...financePeriod })
-          setAppliedFinanceFilters({ ...financeFilters })
           setPage(1)
         }}
         periodApplying={loading}
         periodeInfo={financePeriodeInfo}
-        filters={financeFilters}
-        onFiltersChange={setFinanceFilters}
-        secretariats={secretariats}
-        secretariatFiltre={financeSecretariatFiltre}
       >
         {financeListContent}
         {financeDetail && (
@@ -514,7 +502,13 @@ export default function Formateurs() {
                   </tbody>
                 </table>
               </div>
-              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={totalCount}
+                pageSize={50}
+              />
             </>
           )}
         </div>

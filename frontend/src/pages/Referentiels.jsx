@@ -9,6 +9,8 @@ import {
   readReferentielsTab,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { useClientPagination, TABLE_PAGE_SIZE } from '../hooks/useClientPagination'
+import Pagination from '../components/Pagination'
 
 const TABS = [
   { key: 'formations', label: 'Formations', icon: 'bi-mortarboard' },
@@ -365,6 +367,14 @@ export default function Referentiels() {
 
   const currentTab = TABS.find(t => t.key === tab)
   const rows = data[tab] || []
+  const {
+    page: refPage,
+    setPage: setRefPage,
+    totalPages: refTotalPages,
+    totalItems: refTotalItems,
+    pageItems: refPageRows,
+    pageSize: refPageSize,
+  } = useClientPagination(rows, TABLE_PAGE_SIZE, [tab])
 
   return (
     <div className="page-container">
@@ -421,13 +431,22 @@ export default function Referentiels() {
           {loading ? (
             <div className="text-center py-5"><div className="spinner"></div></div>
           ) : (
-            <RefTable
-              columns={COLUMNS[tab] || []}
-              rows={rows}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-            />
+            <>
+              <RefTable
+                columns={COLUMNS[tab] || []}
+                rows={refPageRows}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                onToggle={handleToggle}
+              />
+              <Pagination
+                page={refPage}
+                totalPages={refTotalPages}
+                onPageChange={setRefPage}
+                totalItems={refTotalItems}
+                pageSize={refPageSize}
+              />
+            </>
           )}
         </div>
       </div>
