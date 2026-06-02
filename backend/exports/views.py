@@ -108,37 +108,92 @@ def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
     return round(total, 1)
 
 
-def _finance_formateur_summary_rows(formateur):
-    """Lignes détail + totaux pour la fiche résumé finance d'un formateur."""
+def _finance_formateur_summary_rows(formateur, request=None):
+    """Lignes détail + totaux pour la fiche résumé finance (période et secrétariat optionnels)."""
+    from formations.api_views import (
+        _parse_finance_date_range,
+        _finance_session_in_range,
+        _finance_prix_heure,
+        _finance_montant_from_minutes,
+        _finance_secretariat_id_from_request,
+        _finance_periode_payload,
+    )
+
+    period = _parse_finance_date_range(request) if request else {
+        'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'},
+    }
+    if period.get('error'):
+        period = {'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'}}
+    secretariat_id = _finance_secretariat_id_from_request(request) if request else None
+    prix_heure = _finance_prix_heure()
+
     module_ids = set(
         ModuleFormateur.objects.filter(formateur_id=formateur.pk).values_list('module_id', flat=True)
     )
     module_ids.update(
         Module.objects.filter(formateur_id=formateur.pk).values_list('id', flat=True)
     )
+    modules_by_id = {
+        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
+            'formation', 'secretariat',
+        )
+    }
     sessions = list(
         SessionModule.objects.filter(module_id__in=module_ids)
-        .select_related('module', 'module__formation')
+        .select_related('module', 'module__formation', 'module__secretariat')
         .order_by('date_journee', 'numero')
     )
     now = timezone.now()
     rows = []
     total_planned = 0.0
     total_realized = 0.0
+    date_min = None
+    date_max = None
     for s in sessions:
+        mod = modules_by_id.get(s.module_id) if s.module_id else None
+        if secretariat_id and (not mod or mod.secretariat_id != secretariat_id):
+            continue
+        if not _finance_session_in_range(s, period['date_debut'], period['date_fin']):
+            continue
         planned = _session_planned_minutes(s)
         realized = _session_realized_minutes_for_formateur(formateur.pk, s, now=now)
+        montant = _finance_montant_from_minutes(realized, prix_heure)
         total_planned += planned
         total_realized += realized
+        if s.date_journee:
+            if date_min is None or s.date_journee < date_min:
+                date_min = s.date_journee
+            if date_max is None or s.date_journee > date_max:
+                date_max = s.date_journee
+        sec_nom = ''
+        if mod and mod.secretariat_id and mod.secretariat:
+            sec_nom = f"{mod.secretariat.nom} ({mod.secretariat.numero})"
         rows.append({
             'date': s.date_journee.strftime('%d/%m/%Y') if s.date_journee else '-',
             'session': s.intitule or f'Séance {s.numero}',
             'module': s.module.intitule if s.module else '-',
             'formation': s.module.formation.formation if s.module and s.module.formation else '-',
+            'secretariat': sec_nom or '-',
             'duree_seance': planned,
             'temps_realise': realized,
+            'montant': montant,
         })
-    return rows, total_planned, total_realized
+    montant_total = _finance_montant_from_minutes(total_realized, prix_heure)
+    taux = round((total_realized / total_planned) * 100, 1) if total_planned > 0 else 0
+    periode_info = _finance_periode_payload(
+        period['date_debut'], period['date_fin'], period['meta'], date_min, date_max,
+    )
+    meta = {
+        'rows': rows,
+        'total_planned': total_planned,
+        'total_realized': total_realized,
+        'montant_total': montant_total,
+        'prix_heure': prix_heure,
+        'taux_realisation_pct': taux,
+        'periode': periode_info,
+        'sessions_count': len(rows),
+    }
+    return meta
 
 
 def _formation_meta(formation):
@@ -1817,13 +1872,19 @@ def export_finance_formateur_pdf(request, formateur_pk):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
     formateur = get_object_or_404(Formateur, pk=formateur_pk)
-    rows, total_planned, total_realized = _finance_formateur_summary_rows(formateur)
+    summary = _finance_formateur_summary_rows(formateur, request)
+    rows = summary['rows']
+    total_planned = summary['total_planned']
+    total_realized = summary['total_realized']
+    montant_total = summary['montant_total']
+    prix_heure = summary['prix_heure']
+    periode_label = summary['periode'].get('periode_label') or 'Toutes périodes'
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
-        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
+        leftMargin=1.2 * cm, rightMargin=1.2 * cm,
+        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
     )
     styles = getSampleStyleSheet()
     style_title = ParagraphStyle(
@@ -1859,14 +1920,21 @@ def export_finance_formateur_pdf(request, formateur_pk):
         f"<b>{formateur.nom} {formateur.prenom}</b> — {formateur.numerobadge or '-'}",
         style_subtitle,
     ))
+    elements.append(Paragraph(f"Période : <b>{periode_label}</b>", style_subtitle))
     elements.append(Paragraph(
-        f"Temps séance total : <b>{round(total_planned, 1)}</b> min &nbsp;|&nbsp; "
-        f"Temps réalisé total : <b>{round(total_realized, 1)}</b> min",
+        f"Planifié : <b>{round(total_planned, 1)}</b> min &nbsp;|&nbsp; "
+        f"Réalisé : <b>{round(total_realized, 1)}</b> min &nbsp;|&nbsp; "
+        f"Taux : <b>{summary['taux_realisation_pct']}%</b> &nbsp;|&nbsp; "
+        f"Tarif : <b>{prix_heure:,.0f}</b> FCFA/h &nbsp;|&nbsp; "
+        f"À verser : <b>{montant_total:,.0f}</b> FCFA",
         style_stats,
     ))
     elements.append(Spacer(1, 0.3 * cm))
 
-    header = ['Date', 'Séance', 'Module', 'Formation', 'Durée séance (min)', 'Temps réalisé (min)']
+    header = [
+        'Date', 'Séance', 'Module', 'Formation', 'Secrétariat',
+        'Durée (min)', 'Réalisé (min)', 'Montant (FCFA)',
+    ]
     data = [[_p(h, hdr=True) for h in header]]
     for r in rows:
         data.append([
@@ -1874,11 +1942,13 @@ def export_finance_formateur_pdf(request, formateur_pk):
             _p(r['session']),
             _p(r['module']),
             _p(r['formation']),
+            _p(r['secretariat']),
             _p(r['duree_seance'], center=True),
             _p(r['temps_realise'], center=True),
+            _p(f"{r['montant']:,.0f}", center=True),
         ])
 
-    col_widths = [2.4 * cm, 3.6 * cm, 6.0 * cm, 6.8 * cm, 2.8 * cm, 2.8 * cm]
+    col_widths = [2.0 * cm, 2.8 * cm, 4.5 * cm, 4.8 * cm, 3.2 * cm, 1.8 * cm, 1.8 * cm, 2.2 * cm]
     table = Table(data, repeatRows=1, colWidths=col_widths)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
@@ -1918,7 +1988,14 @@ def export_finance_formateur_excel(request, formateur_pk):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
     formateur = get_object_or_404(Formateur, pk=formateur_pk)
-    rows, total_planned, total_realized = _finance_formateur_summary_rows(formateur)
+    summary = _finance_formateur_summary_rows(formateur, request)
+    rows = summary['rows']
+    total_planned = summary['total_planned']
+    total_realized = summary['total_realized']
+    montant_total = summary['montant_total']
+    prix_heure = summary['prix_heure']
+    periode_label = summary['periode'].get('periode_label') or 'Toutes périodes'
+    last_col = 8
 
     wb = Workbook()
     ws = wb.active
@@ -1935,30 +2012,45 @@ def export_finance_formateur_excel(request, formateur_pk):
         bottom=Side(style='thin', color='CCCCCC'),
     )
 
-    ws.merge_cells('A1:F1')
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last_col)
     ws['A1'] = "FICHE RÉSUMÉ FORMATEUR — FINANCE"
     ws['A1'].font = Font(bold=True, size=13, color='388E3C')
     ws['A1'].alignment = Alignment(horizontal='center')
 
-    ws.merge_cells('A2:F2')
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=last_col)
     ws['A2'] = f"{formateur.nom} {formateur.prenom} ({formateur.numerobadge})"
     ws['A2'].font = Font(size=11, color='444444')
     ws['A2'].alignment = Alignment(horizontal='center')
 
-    ws['A4'] = "Temps séance total"
-    ws['B4'] = round(total_planned, 1)
-    ws['C4'] = "min"
-    ws['D4'] = "Temps réalisé total"
-    ws['E4'] = round(total_realized, 1)
-    ws['F4'] = "min"
-    for c in ('A4', 'B4', 'C4', 'D4', 'E4', 'F4'):
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=last_col)
+    ws['A3'] = f"Période : {periode_label}"
+    ws['A3'].font = Font(size=10, color='555555', italic=True)
+    ws['A3'].alignment = Alignment(horizontal='center')
+
+    ws['A5'] = "Planifié (min)"
+    ws['B5'] = round(total_planned, 1)
+    ws['C5'] = "Réalisé (min)"
+    ws['D5'] = round(total_realized, 1)
+    ws['E5'] = "Taux %"
+    ws['F5'] = summary['taux_realisation_pct']
+    ws['G5'] = "À verser (FCFA)"
+    ws['H5'] = montant_total
+    for c in ('A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5'):
         ws[c].fill = orange_fill
-        ws[c].font = Font(bold=True, color='FFFFFF', size=10)
+        ws[c].font = Font(bold=True, color='FFFFFF', size=9)
         ws[c].alignment = Alignment(horizontal='center')
         ws[c].border = thin_border
 
-    headers = ['Date', 'Séance', 'Module', 'Formation', 'Durée séance (min)', 'Temps réalisé (min)']
-    start_row = 6
+    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=last_col)
+    ws['A6'] = f"Tarif horaire appliqué : {prix_heure:,.0f} FCFA / h réalisée"
+    ws['A6'].font = Font(size=9, color='388E3C')
+    ws['A6'].alignment = Alignment(horizontal='center')
+
+    headers = [
+        'Date', 'Séance', 'Module', 'Formation', 'Secrétariat',
+        'Durée séance (min)', 'Temps réalisé (min)', 'Montant (FCFA)',
+    ]
+    start_row = 8
     for idx, h in enumerate(headers, 1):
         cell = ws.cell(row=start_row, column=idx, value=h)
         cell.font = header_font
@@ -1968,25 +2060,30 @@ def export_finance_formateur_excel(request, formateur_pk):
 
     for i, r in enumerate(rows, start=1):
         row_num = start_row + i
-        values = [r['date'], r['session'], r['module'], r['formation'], r['duree_seance'], r['temps_realise']]
+        values = [
+            r['date'], r['session'], r['module'], r['formation'], r['secretariat'],
+            r['duree_seance'], r['temps_realise'], r['montant'],
+        ]
         for col, val in enumerate(values, start=1):
             cell = ws.cell(row=row_num, column=col, value=val)
             cell.border = thin_border
             cell.alignment = Alignment(vertical='center')
-            if col >= 5:
+            if col >= 6:
                 cell.alignment = Alignment(horizontal='center', vertical='center')
             if i % 2 == 0:
                 cell.fill = light_green_fill
 
-    ws.column_dimensions['A'].width = 14
-    ws.column_dimensions['B'].width = 22
-    ws.column_dimensions['C'].width = 28
-    ws.column_dimensions['D'].width = 30
-    ws.column_dimensions['E'].width = 18
-    ws.column_dimensions['F'].width = 20
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 24
+    ws.column_dimensions['D'].width = 26
+    ws.column_dimensions['E'].width = 20
+    ws.column_dimensions['F'].width = 14
+    ws.column_dimensions['G'].width = 14
+    ws.column_dimensions['H'].width = 14
 
     footer_row = start_row + len(rows) + 2
-    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=6)
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
     ws.cell(row=footer_row, column=1, value=f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
     ws.cell(row=footer_row, column=1).font = Font(size=8, color='999999', italic=True)
     ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right')

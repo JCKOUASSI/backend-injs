@@ -4,7 +4,8 @@ These views complement the existing DRF views with additional endpoints
 needed for the frontend dashboard.
 """
 from io import BytesIO
-from datetime import timedelta, datetime, time
+from datetime import timedelta, datetime, time, date
+import calendar
 import re
 from django.db.models import Count, Q, F
 from django.db import transaction
@@ -18,7 +19,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .serializers import (
@@ -794,8 +795,421 @@ def _session_duration_minutes(session):
     return 0
 
 
-def _finance_report_rows(formateurs, *, include_sessions):
+def _finance_allowed_roles():
+    return {'FINANCE', 'DIRECTION'}
+
+
+def _check_finance_access(request):
+    return request.user.is_authenticated and request.user.role in _finance_allowed_roles()
+
+
+def _finance_prix_heure():
+    return float(FinanceSettings.get_solo().prix_heure_realisee or 0)
+
+
+def _finance_montant_from_minutes(minutes, prix_heure):
+    return round((float(minutes or 0) / 60) * float(prix_heure or 0), 2)
+
+
+def _finance_session_in_range(session, date_debut, date_fin):
+    """Filtre une séance par ``date_journee`` (intervalle inclusif)."""
+    if date_debut is None and date_fin is None:
+        return True
+    d = session.date_journee
+    if not d:
+        return False
+    if date_debut and d < date_debut:
+        return False
+    if date_fin and d > date_fin:
+        return False
+    return True
+
+
+def _parse_finance_date_range(request):
+    """
+    Analyse les paramètres de période finance.
+
+    Query params:
+    - ``preset`` : ``tout`` | ``mois`` | ``trimestre`` | ``annee`` | ``custom``
+    - ``mois`` : ``YYYY-MM`` (si preset=mois)
+    - ``annee`` : ``YYYY`` (si preset=annee)
+    - ``trimestre`` : ``YYYY-Q1`` … ``YYYY-Q4`` (si preset=trimestre)
+    - ``date_debut``, ``date_fin`` : ``YYYY-MM-DD`` (si preset=custom ou dates seules)
+
+    Retourne un dict avec ``error``, ``detail``, ``date_debut``, ``date_fin``, ``meta``.
+    """
+    preset = (request.query_params.get('preset') or '').strip().lower()
+    date_debut_s = (request.query_params.get('date_debut') or '').strip()
+    date_fin_s = (request.query_params.get('date_fin') or '').strip()
+    today = timezone.localdate()
+
+    if not preset and not date_debut_s and not date_fin_s:
+        preset = 'tout'
+    elif not preset and date_debut_s and date_fin_s:
+        preset = 'custom'
+
+    def _err(detail):
+        return {'error': True, 'detail': detail, 'date_debut': None, 'date_fin': None, 'meta': {}}
+
+    try:
+        if preset == 'tout':
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': None,
+                'date_fin': None,
+                'meta': {
+                    'preset': 'tout',
+                    'type': 'tout',
+                    'label': 'Toutes les périodes',
+                    'description': (
+                        'Cumul de toutes les séances enregistrées (aucun filtre de dates).'
+                    ),
+                },
+            }
+
+        if preset == 'mois':
+            mois = (request.query_params.get('mois') or today.strftime('%Y-%m')).strip()
+            parts = mois.split('-')
+            if len(parts) != 2:
+                return _err('Paramètre mois invalide (format YYYY-MM attendu).')
+            year, month = int(parts[0]), int(parts[1])
+            last_day = calendar.monthrange(year, month)[1]
+            d0, d1 = date(year, month, 1), date(year, month, last_day)
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'mois',
+                    'mois': mois,
+                    'type': 'intervalle',
+                    'label': f"Mois de {d0.strftime('%m/%Y')}",
+                    'description': 'Séances dont la date est dans le mois sélectionné.',
+                },
+            }
+
+        if preset == 'trimestre':
+            trimestre = (request.query_params.get('trimestre') or '').strip()
+            if trimestre and '-Q' in trimestre.upper():
+                year_s, q_s = trimestre.upper().split('-Q', 1)
+                year, q = int(year_s), int(q_s)
+            else:
+                year = int(request.query_params.get('annee') or today.year)
+                q = (today.month - 1) // 3 + 1
+            if q not in (1, 2, 3, 4):
+                return _err('Trimestre invalide (1 à 4).')
+            start_month = (q - 1) * 3 + 1
+            end_month = start_month + 2
+            last_day = calendar.monthrange(year, end_month)[1]
+            d0 = date(year, start_month, 1)
+            d1 = date(year, end_month, last_day)
+            trimestre_key = f'{year}-Q{q}'
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'trimestre',
+                    'trimestre': trimestre_key,
+                    'type': 'intervalle',
+                    'label': f'Trimestre {q} — {year}',
+                    'description': 'Séances dont la date est dans le trimestre sélectionné.',
+                },
+            }
+
+        if preset == 'annee':
+            year = int(request.query_params.get('annee') or today.year)
+            d0, d1 = date(year, 1, 1), date(year, 12, 31)
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'annee',
+                    'annee': year,
+                    'type': 'intervalle',
+                    'label': f'Année {year}',
+                    'description': 'Séances dont la date est dans l\'année sélectionnée.',
+                },
+            }
+
+        if preset == 'custom':
+            if not date_debut_s or not date_fin_s:
+                return _err('date_debut et date_fin sont requis pour une période personnalisée.')
+            d0 = date.fromisoformat(date_debut_s)
+            d1 = date.fromisoformat(date_fin_s)
+            if d0 > d1:
+                return _err('La date de début doit être antérieure ou égale à la date de fin.')
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'custom',
+                    'type': 'intervalle',
+                    'label': 'Période personnalisée',
+                    'description': 'Séances dont la date est dans l\'intervalle choisi.',
+                },
+            }
+
+        return _err(f'Preset inconnu : {preset}.')
+    except ValueError:
+        return _err('Format de date invalide (attendu : YYYY-MM-DD ou YYYY-MM).')
+
+
+def _finance_periode_payload(date_debut, date_fin, meta, date_min=None, date_max=None):
+    """Construit la réponse ``periode`` pour le frontend."""
+    if date_debut is None and date_fin is None:
+        if date_min and date_max:
+            plabel = f"Du {date_min.strftime('%d/%m/%Y')} au {date_max.strftime('%d/%m/%Y')}"
+        elif date_min:
+            plabel = f"Depuis le {date_min.strftime('%d/%m/%Y')}"
+        else:
+            plabel = 'Aucune séance enregistrée'
+        return {
+            **meta,
+            'date_debut': date_min.isoformat() if date_min else None,
+            'date_fin': date_max.isoformat() if date_max else None,
+            'periode_label': plabel,
+            'filtre_actif': False,
+        }
+    plabel = f"Du {date_debut.strftime('%d/%m/%Y')} au {date_fin.strftime('%d/%m/%Y')}"
+    payload = {
+        **meta,
+        'date_debut': date_debut.isoformat(),
+        'date_fin': date_fin.isoformat(),
+        'periode_label': plabel,
+        'filtre_actif': True,
+    }
+    if date_min and date_max:
+        payload['donnees_effectives_debut'] = date_min.isoformat()
+        payload['donnees_effectives_fin'] = date_max.isoformat()
+    return payload
+
+
+def _finance_secretariat_id_from_request(request):
+    raw = (request.query_params.get('secretariat_id') or request.query_params.get('secretariat') or '').strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _finance_filter_formateur_queryset(queryset, secretariat_id):
+    if not secretariat_id:
+        return queryset
+    return queryset.filter(
+        Q(secretariats__id=secretariat_id) |
+        Q(modules_assignes__module__secretariat_id=secretariat_id) |
+        Q(modules__secretariat_id=secretariat_id),
+    ).distinct()
+
+
+def _finance_previous_period(date_debut, date_fin, meta):
+    """Calcule la période immédiatement précédente (pour comparaison dashboard)."""
+    preset = (meta or {}).get('preset')
+    if preset == 'tout':
+        return None
+    today = timezone.localdate()
+    try:
+        if preset == 'mois':
+            mois = (meta or {}).get('mois') or today.strftime('%Y-%m')
+            year, month = [int(x) for x in mois.split('-')]
+            if month == 1:
+                year, month = year - 1, 12
+            else:
+                month -= 1
+            last_day = calendar.monthrange(year, month)[1]
+            d0, d1 = date(year, month, 1), date(year, month, last_day)
+            prev_mois = f'{year}-{month:02d}'
+            return {
+                'error': False,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'mois',
+                    'mois': prev_mois,
+                    'type': 'intervalle',
+                    'label': f"Mois de {d0.strftime('%m/%Y')}",
+                    'description': 'Période de comparaison (mois précédent).',
+                },
+            }
+        if preset == 'trimestre':
+            trimestre = (meta or {}).get('trimestre') or f'{today.year}-Q{(today.month - 1) // 3 + 1}'
+            year_s, q_s = trimestre.upper().split('-Q', 1)
+            year, q = int(year_s), int(q_s)
+            if q == 1:
+                year, q = year - 1, 4
+            else:
+                q -= 1
+            start_month = (q - 1) * 3 + 1
+            end_month = start_month + 2
+            last_day = calendar.monthrange(year, end_month)[1]
+            d0 = date(year, start_month, 1)
+            d1 = date(year, end_month, last_day)
+            return {
+                'error': False,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'trimestre',
+                    'trimestre': f'{year}-Q{q}',
+                    'type': 'intervalle',
+                    'label': f'Trimestre {q} — {year}',
+                    'description': 'Période de comparaison (trimestre précédent).',
+                },
+            }
+        if preset == 'annee':
+            year = int((meta or {}).get('annee') or today.year) - 1
+            d0, d1 = date(year, 1, 1), date(year, 12, 31)
+            return {
+                'error': False,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'annee',
+                    'annee': year,
+                    'type': 'intervalle',
+                    'label': f'Année {year}',
+                    'description': 'Période de comparaison (année précédente).',
+                },
+            }
+        if preset == 'custom' and date_debut and date_fin:
+            span_days = (date_fin - date_debut).days
+            prev_fin = date_debut - timedelta(days=1)
+            prev_debut = prev_fin - timedelta(days=span_days)
+            return {
+                'error': False,
+                'date_debut': prev_debut,
+                'date_fin': prev_fin,
+                'meta': {
+                    'preset': 'custom',
+                    'type': 'intervalle',
+                    'label': 'Période précédente (même durée)',
+                    'description': 'Intervalle de même longueur, immédiatement avant la période sélectionnée.',
+                },
+            }
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def _finance_kpis_from_rows(rows, prix_heure):
+    """Agrège les KPI dashboard à partir des lignes rapport finance."""
+    total_formateurs = len(rows)
+    formateurs_actifs = sum(1 for r in rows if (r.get('sessions_count') or 0) > 0)
+    formateurs_inactifs = total_formateurs - formateurs_actifs
+    total_sessions = sum(int(r.get('sessions_count') or 0) for r in rows)
+    total_duree_minutes = round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1)
+    total_duree_heures = round(total_duree_minutes / 60, 2)
+    total_duree_realisee_minutes = round(
+        sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1,
+    )
+    total_duree_realisee_heures = round(total_duree_realisee_minutes / 60, 2)
+    total_montant_realise = round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2)
+    taux_realisation_global = round(
+        (total_duree_realisee_minutes / total_duree_minutes) * 100, 1,
+    ) if total_duree_minutes > 0 else 0
+    sessions_avec_pointage = sum(
+        int((r.get('statistiques') or {}).get('sessions_avec_pointage') or 0) for r in rows
+    )
+    return {
+        'total_formateurs': total_formateurs,
+        'formateurs_actifs': formateurs_actifs,
+        'formateurs_inactifs': formateurs_inactifs,
+        'total_sessions': total_sessions,
+        'sessions_avec_pointage': sessions_avec_pointage,
+        'total_duree_minutes': total_duree_minutes,
+        'total_duree_heures': total_duree_heures,
+        'total_duree_realisee_minutes': total_duree_realisee_minutes,
+        'total_duree_realisee_heures': total_duree_realisee_heures,
+        'total_montant_realise': total_montant_realise,
+        'prix_heure_realisee': prix_heure,
+        'taux_realisation_global_pct': taux_realisation_global,
+        'moyenne_heures_par_formateur': round(
+            (total_duree_heures / formateurs_actifs), 2,
+        ) if formateurs_actifs > 0 else 0,
+        'moyenne_heures_realisees_par_formateur': round(
+            (total_duree_realisee_heures / formateurs_actifs), 2,
+        ) if formateurs_actifs > 0 else 0,
+        'moyenne_montant_par_formateur_actif': round(
+            (total_montant_realise / formateurs_actifs), 2,
+        ) if formateurs_actifs > 0 else 0,
+    }
+
+
+def _finance_kpi_evolution(current, previous):
+    """Écarts absolus et relatifs entre deux jeux de KPI."""
+    keys = (
+        'total_montant_realise',
+        'total_duree_realisee_minutes',
+        'total_duree_minutes',
+        'total_sessions',
+        'formateurs_actifs',
+        'taux_realisation_global_pct',
+    )
+    evolution = {}
+    for key in keys:
+        c = float(current.get(key) or 0)
+        p = float(previous.get(key) or 0)
+        delta = round(c - p, 2)
+        evolution[key] = {
+            'delta': delta,
+            'pourcent': round((delta / p) * 100, 1) if p else (100.0 if c else 0.0),
+        }
+    return evolution
+
+
+def _finance_build_statistiques(
+    *,
+    total_minutes,
+    total_realized_minutes,
+    session_count,
+    sessions_with_pointage,
+    session_dates,
+    montant_total,
+    prix_heure,
+):
+    total_minutes = float(total_minutes or 0)
+    total_realized = float(total_realized_minutes or 0)
+    session_count = int(session_count or 0)
+    sessions_with_pointage = int(sessions_with_pointage or 0)
+    taux = round((total_realized / total_minutes) * 100, 1) if total_minutes > 0 else 0
+    dates_sorted = sorted(d for d in session_dates if d)
+    return {
+        'taux_realisation_pct': taux,
+        'sessions_avec_pointage': sessions_with_pointage,
+        'sessions_sans_pointage': max(session_count - sessions_with_pointage, 0),
+        'moyenne_duree_seance_minutes': round(total_minutes / session_count, 1) if session_count else 0,
+        'moyenne_realisee_seance_minutes': round(total_realized / session_count, 1) if session_count else 0,
+        'ecart_planifie_realise_minutes': round(total_minutes - total_realized, 1),
+        'premiere_seance_date': dates_sorted[0].isoformat() if dates_sorted else None,
+        'derniere_seance_date': dates_sorted[-1].isoformat() if dates_sorted else None,
+        'moyenne_montant_par_seance': round(float(montant_total or 0) / session_count, 2) if session_count else 0,
+        'prix_heure_applique': float(prix_heure or 0),
+    }
+
+
+def _finance_report_rows(
+    formateurs,
+    *,
+    include_sessions,
+    prix_heure=None,
+    global_aggregates=None,
+    date_debut=None,
+    date_fin=None,
+    secretariat_id=None,
+):
     """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus)."""
+    if prix_heure is None:
+        prix_heure = _finance_prix_heure()
     formateur_ids = [f.id for f in formateurs]
     if not formateur_ids:
         return []
@@ -816,6 +1230,12 @@ def _finance_report_rows(formateurs, *, include_sessions):
         for module_ids in module_formateur_map.values()
         for mid in module_ids
     })
+    modules_by_id = {}
+    if all_module_ids:
+        for module in Module.objects.filter(id__in=all_module_ids).select_related(
+            'formation', 'secretariat', 'site',
+        ):
+            modules_by_id[module.id] = module
     sessions_by_module = {}
     if all_module_ids:
         for session in SessionModule.objects.filter(module_id__in=all_module_ids).select_related(
@@ -848,18 +1268,74 @@ def _finance_report_rows(formateurs, *, include_sessions):
     for formateur in formateurs:
         module_ids = sorted(module_formateur_map.get(formateur.id, set()))
         sessions_data = []
+        modules_data = {}
         total_minutes = 0.0
         total_realized_minutes = 0.0
         session_count = 0
+        sessions_with_pointage = 0
+        session_dates = []
         for module_id in module_ids:
+            module_obj = modules_by_id.get(module_id)
+            if secretariat_id and (
+                not module_obj or module_obj.secretariat_id != secretariat_id
+            ):
+                continue
             module_sessions = sessions_by_module.get(module_id, [])
             for session in module_sessions:
+                if not _finance_session_in_range(session, date_debut, date_fin):
+                    continue
                 session_count += 1
                 duration_minutes = _session_duration_minutes(session)
                 realized_minutes = round(realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1)
                 total_minutes += duration_minutes
                 total_realized_minutes += realized_minutes
+                if realized_minutes > 0:
+                    sessions_with_pointage += 1
+                if session.date_journee:
+                    session_dates.append(session.date_journee)
+                    if global_aggregates is not None:
+                        d = session.date_journee
+                        month_key = d.strftime('%Y-%m')
+                        global_aggregates['activite_par_mois'][month_key] = (
+                            global_aggregates['activite_par_mois'].get(month_key, 0.0) + realized_minutes
+                        )
+                        cur_min = global_aggregates.get('date_min')
+                        cur_max = global_aggregates.get('date_max')
+                        if cur_min is None or d < cur_min:
+                            global_aggregates['date_min'] = d
+                        if cur_max is None or d > cur_max:
+                            global_aggregates['date_max'] = d
+                mod_entry = modules_data.setdefault(module_id, {
+                    'module_id': module_id,
+                    'module_intitule': session.module.intitule if session.module else '',
+                    'formation_intitule': (
+                        session.module.formation.formation if session.module and session.module.formation else ''
+                    ),
+                    'statut': module_obj.statut if module_obj else '',
+                    'site': (
+                        module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
+                        else (module_obj.site_legacy if module_obj else '')
+                    ),
+                    'salle': module_obj.salle if module_obj else '',
+                    'date_debut': module_obj.date_debut if module_obj else None,
+                    'date_fin': module_obj.date_fin if module_obj else None,
+                    'secretariat_nom': (
+                        f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                        if module_obj and module_obj.secretariat_id else ''
+                    ),
+                    'sessions_count': 0,
+                    'total_duree_minutes': 0.0,
+                    'total_duree_realisee_minutes': 0.0,
+                    'montant_realise': 0.0,
+                })
+                mod_entry['sessions_count'] += 1
+                mod_entry['total_duree_minutes'] += duration_minutes
+                mod_entry['total_duree_realisee_minutes'] += realized_minutes
+                mod_entry['montant_realise'] = _finance_montant_from_minutes(
+                    mod_entry['total_duree_realisee_minutes'], prix_heure,
+                )
                 if include_sessions:
+                    taux_sess = round((realized_minutes / duration_minutes) * 100, 1) if duration_minutes > 0 else 0
                     sessions_data.append({
                         'session_id': session.id,
                         'date_journee': session.date_journee,
@@ -873,18 +1349,61 @@ def _finance_report_rows(formateurs, *, include_sessions):
                         ),
                         'duree_minutes': duration_minutes,
                         'duree_realisee_minutes': realized_minutes,
+                        'montant_realise': _finance_montant_from_minutes(realized_minutes, prix_heure),
+                        'taux_realisation_pct': taux_sess,
+                        'a_pointage': realized_minutes > 0,
                     })
+        modules_list = []
+        for mid in module_ids:
+            entry = modules_data.get(mid)
+            if not entry:
+                continue
+            entry = dict(entry)
+            entry['total_duree_minutes'] = round(entry['total_duree_minutes'], 1)
+            entry['total_duree_realisee_minutes'] = round(entry['total_duree_realisee_minutes'], 1)
+            entry['total_duree_heures'] = round(entry['total_duree_minutes'] / 60, 2)
+            entry['total_duree_realisee_heures'] = round(entry['total_duree_realisee_minutes'] / 60, 2)
+            if entry.get('date_debut'):
+                entry['date_debut'] = entry['date_debut'].isoformat()
+            if entry.get('date_fin'):
+                entry['date_fin'] = entry['date_fin'].isoformat()
+            planned = entry['total_duree_minutes']
+            realized = entry['total_duree_realisee_minutes']
+            entry['taux_realisation_pct'] = round((realized / planned) * 100, 1) if planned > 0 else 0
+            modules_list.append(entry)
+        montant_total = _finance_montant_from_minutes(total_realized_minutes, prix_heure)
+        statistiques = _finance_build_statistiques(
+            total_minutes=total_minutes,
+            total_realized_minutes=total_realized_minutes,
+            session_count=session_count,
+            sessions_with_pointage=sessions_with_pointage,
+            session_dates=session_dates,
+            montant_total=montant_total,
+            prix_heure=prix_heure,
+        )
         row = {
             'id': formateur.id,
             'numerobadge': formateur.numerobadge,
             'nom': formateur.nom,
             'prenom': formateur.prenom,
-            'specialite': formateur.specialite,
+            'email': formateur.email or '',
+            'telephone': formateur.telephone or '',
+            'specialite': formateur.specialite or '',
+            'organisation': formateur.organisation or '',
+            'secretariats_noms': [
+                f"{s.nom} ({s.numero})" for s in formateur.secretariats.all()
+            ],
+            'nb_formations': len(modules_list),
+            'created_at': formateur.created_at,
+            'prix_heure_realisee': prix_heure,
+            'montant_total_realise': montant_total,
             'total_duree_minutes': round(total_minutes, 1),
             'total_duree_heures': round(total_minutes / 60, 2),
             'total_duree_realisee_minutes': round(total_realized_minutes, 1),
             'total_duree_realisee_heures': round(total_realized_minutes / 60, 2),
             'sessions_count': session_count,
+            'statistiques': statistiques,
+            'modules': modules_list,
         }
         if include_sessions:
             row['sessions'] = sessions_data
@@ -902,9 +1421,15 @@ def formateur_finance_report_api(request):
     - ``include_sessions`` : pour la liste paginée, ``1`` / ``true`` inclut les séances (lourd). Par défaut ``0`` :
       totaux et ``sessions_count`` seulement.
     """
-    allowed_roles = {'FINANCE', 'DIRECTION'}
+    allowed_roles = _finance_allowed_roles()
     if request.user.role not in allowed_roles:
         return Response({'detail': 'Accès réservé au service finance.'}, status=403)
+
+    period = _parse_finance_date_range(request)
+    if period['error']:
+        return Response({'detail': period['detail']}, status=400)
+
+    secretariat_id = _finance_secretariat_id_from_request(request)
 
     formateur_id_raw = (request.query_params.get('formateur_id') or '').strip()
     if formateur_id_raw:
@@ -913,22 +1438,45 @@ def formateur_finance_report_api(request):
         except ValueError:
             return Response({'detail': 'formateur_id invalide.'}, status=400)
         try:
-            formateur = Formateur.objects.get(pk=fid)
+            formateur = Formateur.objects.prefetch_related('secretariats').get(pk=fid)
         except Formateur.DoesNotExist:
             return Response({'detail': 'Formateur introuvable.'}, status=404)
-        results = _finance_report_rows([formateur], include_sessions=True)
-        return Response({
+        global_agg = {'activite_par_mois': {}, 'date_min': None, 'date_max': None}
+        results = _finance_report_rows(
+            [formateur],
+            include_sessions=True,
+            date_debut=period['date_debut'],
+            date_fin=period['date_fin'],
+            global_aggregates=global_agg,
+            secretariat_id=secretariat_id,
+        )
+        payload = {
             'results': results,
             'count': 1,
             'total_pages': 1,
             'current_page': 1,
-        })
+            'periode': _finance_periode_payload(
+                period['date_debut'],
+                period['date_fin'],
+                period['meta'],
+                global_agg.get('date_min'),
+                global_agg.get('date_max'),
+            ),
+        }
+        if secretariat_id:
+            try:
+                sec = Secretariat.objects.get(pk=secretariat_id)
+                payload['secretariat_filtre'] = {'id': sec.id, 'nom': sec.nom, 'numero': sec.numero}
+            except Secretariat.DoesNotExist:
+                pass
+        return Response(payload)
 
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 25))
     include_sessions = request.query_params.get('include_sessions', '0').lower() in ('1', 'true', 'yes')
 
-    queryset = Formateur.objects.all().order_by('nom', 'prenom')
+    queryset = Formateur.objects.prefetch_related('secretariats').order_by('nom', 'prenom')
+    queryset = _finance_filter_formateur_queryset(queryset, secretariat_id)
     search = (request.query_params.get('search') or '').strip()
     if search:
         queryset = queryset.filter(
@@ -941,52 +1489,185 @@ def formateur_finance_report_api(request):
     start = (page - 1) * page_size
     end = start + page_size
     formateurs = list(queryset[start:end])
-    results = _finance_report_rows(formateurs, include_sessions=include_sessions)
+    results = _finance_report_rows(
+        formateurs,
+        include_sessions=include_sessions,
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+    )
 
-    return Response({
+    list_payload = {
         'results': results,
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
-    })
+        'periode': _finance_periode_payload(period['date_debut'], period['date_fin'], period['meta']),
+    }
+    if secretariat_id:
+        try:
+            sec = Secretariat.objects.get(pk=secretariat_id)
+            list_payload['secretariat_filtre'] = {'id': sec.id, 'nom': sec.nom, 'numero': sec.numero}
+        except Secretariat.DoesNotExist:
+            pass
+    return Response(list_payload)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def finance_dashboard_api(request):
     """Dashboard finance: agrégats globaux + top formateurs."""
-    if request.user.role not in {'FINANCE', 'DIRECTION'}:
+    if request.user.role not in _finance_allowed_roles():
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
-    formateurs = list(Formateur.objects.all().order_by('nom', 'prenom'))
-    rows = _finance_report_rows(formateurs, include_sessions=False)
+    period = _parse_finance_date_range(request)
+    if period['error']:
+        return Response({'detail': period['detail']}, status=400)
 
-    total_formateurs = len(rows)
-    formateurs_actifs = sum(1 for r in rows if (r.get('total_duree_minutes') or 0) > 0)
-    total_sessions = sum(int(r.get('sessions_count') or 0) for r in rows)
-    total_duree_minutes = round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1)
-    total_duree_heures = round(total_duree_minutes / 60, 2)
-    moyenne_heures_par_formateur = round(
-        (total_duree_heures / formateurs_actifs), 2
-    ) if formateurs_actifs > 0 else 0
+    secretariat_id = _finance_secretariat_id_from_request(request)
+    compare_previous = request.query_params.get('compare', '').lower() in ('1', 'true', 'yes')
 
-    top_formateurs = sorted(
-        rows,
-        key=lambda r: float(r.get('total_duree_minutes') or 0),
-        reverse=True,
+    formateurs_qs = Formateur.objects.prefetch_related('secretariats').order_by('nom', 'prenom')
+    formateurs_qs = _finance_filter_formateur_queryset(formateurs_qs, secretariat_id)
+    formateurs = list(formateurs_qs)
+    global_aggregates = {'activite_par_mois': {}, 'date_min': None, 'date_max': None}
+    rows = _finance_report_rows(
+        formateurs,
+        include_sessions=False,
+        global_aggregates=global_aggregates,
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+    )
+
+    date_min = global_aggregates.get('date_min')
+    date_max = global_aggregates.get('date_max')
+
+    prix_heure = _finance_prix_heure()
+    kpis = _finance_kpis_from_rows(rows, prix_heure)
+
+    activite_par_mois = [
+        {
+            'mois': mois,
+            'label': datetime.strptime(mois, '%Y-%m').strftime('%b %Y'),
+            'minutes_realisees': round(minutes, 1),
+            'heures_realisees': round(minutes / 60, 2),
+            'montant': _finance_montant_from_minutes(minutes, prix_heure),
+        }
+        for mois, minutes in sorted(global_aggregates['activite_par_mois'].items())
+    ]
+
+    repartition_specialites = {}
+    for r in rows:
+        key = (r.get('specialite') or '').strip() or 'Non renseignée'
+        repartition_specialites[key] = repartition_specialites.get(key, 0) + 1
+
+    top_temps_planifie = sorted(rows, key=lambda r: float(r.get('total_duree_minutes') or 0), reverse=True)[:10]
+    top_temps_realise = sorted(
+        rows, key=lambda r: float(r.get('total_duree_realisee_minutes') or 0), reverse=True,
     )[:10]
+    top_montants = sorted(rows, key=lambda r: float(r.get('montant_total_realise') or 0), reverse=True)[:10]
+
+    periode_payload = _finance_periode_payload(
+        period['date_debut'],
+        period['date_fin'],
+        period['meta'],
+        date_min,
+        date_max,
+    )
+    periode_payload['description'] = (
+        period['meta'].get('description')
+        or 'Le temps réalisé provient des pointages (badgeage) enregistrés.'
+    )
+
+    comparaison = None
+    if compare_previous and period['meta'].get('preset') != 'tout':
+        prev_period = _finance_previous_period(
+            period['date_debut'], period['date_fin'], period['meta'],
+        )
+        if prev_period:
+            prev_rows = _finance_report_rows(
+                formateurs,
+                include_sessions=False,
+                date_debut=prev_period['date_debut'],
+                date_fin=prev_period['date_fin'],
+                secretariat_id=secretariat_id,
+            )
+            prev_kpis = _finance_kpis_from_rows(prev_rows, prix_heure)
+            comparaison = {
+                'periode': _finance_periode_payload(
+                    prev_period['date_debut'],
+                    prev_period['date_fin'],
+                    prev_period['meta'],
+                ),
+                'kpis': prev_kpis,
+                'evolution': _finance_kpi_evolution(kpis, prev_kpis),
+            }
+
+    dashboard_payload = {
+        'periode': periode_payload,
+        'kpis': kpis,
+        'top_formateurs': top_temps_planifie,
+        'top_temps_realise': top_temps_realise,
+        'top_montants': top_montants,
+        'activite_par_mois': activite_par_mois,
+        'repartition_specialites': [
+            {'specialite': k, 'count': v} for k, v in sorted(
+                repartition_specialites.items(), key=lambda x: -x[1],
+            )
+        ],
+        'synthese_formateurs': rows,
+        'generated_at': timezone.now(),
+    }
+    if comparaison:
+        dashboard_payload['comparaison'] = comparaison
+    if secretariat_id:
+        try:
+            sec = Secretariat.objects.get(pk=secretariat_id)
+            dashboard_payload['secretariat_filtre'] = {
+                'id': sec.id, 'nom': sec.nom, 'numero': sec.numero,
+            }
+        except Secretariat.DoesNotExist:
+            pass
+    return Response(dashboard_payload)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def finance_settings_api(request):
+    """Paramètres finance : prix horaire pour 1 heure réalisée."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    settings_obj = FinanceSettings.get_solo()
+
+    if request.method == 'GET':
+        return Response({
+            'prix_heure_realisee': float(settings_obj.prix_heure_realisee or 0),
+            'updated_at': settings_obj.updated_at,
+            'updated_by': (
+                settings_obj.updated_by.get_full_name() or settings_obj.updated_by.username
+            ) if settings_obj.updated_by else None,
+        })
+
+    raw = request.data.get('prix_heure_realisee')
+    if raw is None or raw == '':
+        return Response({'detail': 'prix_heure_realisee est requis.'}, status=400)
+    try:
+        prix = float(raw)
+    except (TypeError, ValueError):
+        return Response({'detail': 'prix_heure_realisee invalide.'}, status=400)
+    if prix < 0:
+        return Response({'detail': 'Le prix doit être positif ou nul.'}, status=400)
+
+    settings_obj.prix_heure_realisee = round(prix, 2)
+    settings_obj.updated_by = request.user
+    settings_obj.save(update_fields=['prix_heure_realisee', 'updated_at', 'updated_by'])
 
     return Response({
-        'kpis': {
-            'total_formateurs': total_formateurs,
-            'formateurs_actifs': formateurs_actifs,
-            'total_sessions': total_sessions,
-            'total_duree_minutes': total_duree_minutes,
-            'total_duree_heures': total_duree_heures,
-            'moyenne_heures_par_formateur': moyenne_heures_par_formateur,
-        },
-        'top_formateurs': top_formateurs,
-        'generated_at': timezone.now(),
+        'prix_heure_realisee': float(settings_obj.prix_heure_realisee),
+        'updated_at': settings_obj.updated_at,
+        'updated_by': request.user.get_full_name() or request.user.username,
     })
 
 
