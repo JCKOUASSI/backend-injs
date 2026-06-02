@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { fmtDuration, formatMoney } from '../components/FinanceStatsGrid'
@@ -14,8 +14,11 @@ import {
   saveFinanceFilters,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import Pagination from '../components/Pagination'
 
 const maxActivite = (items) => Math.max(...items.map((i) => Number(i.minutes_realisees || 0)), 1)
+
+const SYNTHESE_PAGE_SIZE = 25
 
 const KPI_GROUPS = [
   {
@@ -101,6 +104,7 @@ export default function FinanceDashboard() {
   const [appliedFilters, setAppliedFilters] = useState(() => urlFinance?.filters ?? loadFinanceFilters())
   const [secretariats, setSecretariats] = useState([])
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
+  const [synthesePage, setSynthesePage] = useState(1)
 
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
@@ -133,11 +137,16 @@ export default function FinanceDashboard() {
     load(appliedPeriod, appliedFilters)
   }, [appliedPeriod, appliedFilters, load])
 
+  useEffect(() => {
+    setSynthesePage(1)
+  }, [appliedPeriod, appliedFilters])
+
   const handleApply = () => {
     saveFinancePeriod(period)
     saveFinanceFilters(filters)
     setAppliedPeriod({ ...period })
     setAppliedFilters({ ...filters })
+    setSynthesePage(1)
   }
 
   const kpis = data?.kpis || {}
@@ -150,6 +159,12 @@ export default function FinanceDashboard() {
   const topMontants = Array.isArray(data?.top_montants) ? data.top_montants : []
   const specialites = Array.isArray(data?.repartition_specialites) ? data.repartition_specialites : []
   const synthese = Array.isArray(data?.synthese_formateurs) ? data.synthese_formateurs : []
+  const syntheseTotalPages = Math.max(1, Math.ceil(synthese.length / SYNTHESE_PAGE_SIZE))
+  const synthesePageSafe = Math.min(synthesePage, syntheseTotalPages)
+  const synthesePageRows = useMemo(() => {
+    const start = (synthesePageSafe - 1) * SYNTHESE_PAGE_SIZE
+    return synthese.slice(start, start + SYNTHESE_PAGE_SIZE)
+  }, [synthese, synthesePageSafe])
   const activiteMax = maxActivite(activite)
 
   const rankConfig = {
@@ -363,7 +378,12 @@ export default function FinanceDashboard() {
           <section className="finance-section">
             <div className="finance-section-header">
               <h2><i className="bi bi-table"></i>Synthèse complète</h2>
-              <span className="badge-bg-secondary">{synthese.length} formateur(s)</span>
+              <span className="badge-bg-secondary">
+                {synthese.length} formateur(s)
+                {syntheseTotalPages > 1 && (
+                  <> — page {synthesePageSafe} / {syntheseTotalPages}</>
+                )}
+              </span>
             </div>
             <div className="finance-table-wrap">
               <table className="finance-table">
@@ -382,7 +402,7 @@ export default function FinanceDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {synthese.length > 0 ? synthese.map((f) => {
+                  {synthesePageRows.length > 0 ? synthesePageRows.map((f) => {
                     const st = f.statistiques || {}
                     const taux = st.taux_realisation_pct ?? 0
                     return (
@@ -416,6 +436,14 @@ export default function FinanceDashboard() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={synthesePageSafe}
+              totalPages={syntheseTotalPages}
+              onPageChange={setSynthesePage}
+              totalItems={synthese.length}
+              pageSize={SYNTHESE_PAGE_SIZE}
+              activeClassName="pagination-num--active pagination-num--finance"
+            />
           </section>
 
           {data?.generated_at && (
