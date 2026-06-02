@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
+import {
+  buildReferentielsSearchParams,
+  LIST_STORAGE_KEYS,
+  readReferentielsTab,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 
 const TABS = [
   { key: 'formations', label: 'Formations', icon: 'bi-mortarboard' },
@@ -87,8 +94,15 @@ function Modal({ title, onClose, onSubmit, saving, children }) {
 }
 
 export default function Referentiels() {
-  const [tab, setTab] = useState('formations')
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState(() => readReferentielsTab(searchParams))
   const { showToast } = useToast()
+
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.referentiels,
+    () => buildReferentielsSearchParams(tab),
+    [tab],
+  )
   const [confirmDialog, setConfirmDialog] = useState(null)
 
   // Data for all tabs

@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import {
+  buildSecretariatsSearchParams,
+  LIST_STORAGE_KEYS,
+  readSecretariatsExpanded,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 
 const emptyForm = { nom: '', type: '', description: '' }
 
@@ -28,7 +35,17 @@ export default function Secretariats() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   const { showToast } = useToast()
 
-  const [expanded, setExpanded] = useState(null)
+  const [searchParams] = useSearchParams()
+  const [expanded, setExpanded] = useState(() => {
+    const id = readSecretariatsExpanded(searchParams)
+    return id ? Number(id) || id : null
+  })
+
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.secretariats,
+    () => buildSecretariatsSearchParams(expanded),
+    [expanded],
+  )
 
   useEffect(() => { loadSecretariats() }, [])
 

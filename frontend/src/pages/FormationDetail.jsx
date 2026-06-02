@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
+import { LIST_STORAGE_KEYS } from '../utils/listFilters'
+import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 
 export default function FormationDetail() {
   const { id } = useParams()
   const { user } = useAuth()
-  const navigate = useNavigate()
+  const listNavState = useListNavigationState()
+  const backToModulesList = useListReturn('/modules', LIST_STORAGE_KEYS.modules)
 
   // Core state
   const [formation, setFormation] = useState(null)
@@ -483,7 +486,7 @@ export default function FormationDetail() {
   if (error || !formation) return (
     <div className="card"><div className="card-body">
       <div className="error-message">{error || 'Formation non trouvée'}</div>
-      <button onClick={() => navigate('/modules')} className="btn btn-secondary mt-2"><i className="bi bi-arrow-left me-1"></i>Retour</button>
+      <button onClick={backToModulesList} className="btn btn-secondary mt-2"><i className="bi bi-arrow-left me-1"></i>Retour</button>
     </div></div>
   )
 
@@ -1086,6 +1089,7 @@ export default function FormationDetail() {
                     <i className="bi bi-book me-2"></i>
                     <Link
                       to={`/formations/${id}/modules/${moduleKey}`}
+                      state={listNavState}
                       style={{ color: 'var(--ci-green-dark)', textDecoration: 'none' }}
                       title="Voir le détail du module"
                     >
@@ -1095,7 +1099,12 @@ export default function FormationDetail() {
                       {moduleSessions.length} séance{moduleSessions.length > 1 ? 's' : ''}
                     </span>
                   </span>
-                  <Link to={`/formations/${id}/modules/${moduleKey}`} className="btn btn-outline-secondary btn-sm" title="Détail du module">
+                  <Link
+                    to={`/formations/${id}/modules/${moduleKey}`}
+                    state={listNavState}
+                    className="btn btn-outline-secondary btn-sm"
+                    title="Détail du module"
+                  >
                     <i className="bi bi-arrow-right"></i>
                   </Link>
                 </div>

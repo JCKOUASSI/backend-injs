@@ -1,0 +1,191 @@
+const STORAGE_KEY = 'finance_period'
+const STORAGE_FILTERS_KEY = 'finance_filters'
+
+export const FINANCE_PERIOD_PRESETS = [
+  { id: 'mois', label: 'Ce mois' },
+  { id: 'trimestre', label: 'Ce trimestre' },
+  { id: 'annee', label: 'Cette année' },
+  { id: 'tout', label: 'Tout' },
+  { id: 'custom', label: 'Personnalisé' },
+]
+
+export const TRIMESTRE_OPTIONS = [
+  { q: 1, label: 'T1' },
+  { q: 2, label: 'T2' },
+  { q: 3, label: 'T3' },
+  { q: 4, label: 'T4' },
+]
+
+export const defaultFinancePeriod = () => {
+  const now = new Date()
+  const mois = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return {
+    preset: 'mois',
+    mois,
+    annee: String(now.getFullYear()),
+    trimestreAnnee: String(now.getFullYear()),
+    trimestreQ: Math.floor(now.getMonth() / 3) + 1,
+    trimestre: currentTrimestreKey(now),
+    dateDebut: '',
+    dateFin: '',
+  }
+}
+
+export const currentTrimestreKey = (d = new Date()) => {
+  const q = Math.floor(d.getMonth() / 3) + 1
+  return `${d.getFullYear()}-Q${q}`
+}
+
+export const trimestreKeyFromParts = (year, q) => `${year}-Q${q}`
+
+export const parseTrimestreKey = (key) => {
+  if (!key || !key.includes('-Q')) return null
+  const [y, q] = key.toUpperCase().split('-Q')
+  return { year: String(y), q: Number(q) }
+}
+
+export const defaultFinanceFilters = () => ({
+  secretariatId: '',
+  comparePrevious: false,
+})
+
+export const loadFinanceFilters = () => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_FILTERS_KEY)
+    if (raw) return { ...defaultFinanceFilters(), ...JSON.parse(raw) }
+  } catch {
+    /* ignore */
+  }
+  return defaultFinanceFilters()
+}
+
+export const saveFinanceFilters = (filters) => {
+  try {
+    sessionStorage.setItem(STORAGE_FILTERS_KEY, JSON.stringify(filters))
+  } catch {
+    /* ignore */
+  }
+}
+
+export const loadFinancePeriod = () => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const merged = { ...defaultFinancePeriod(), ...parsed }
+      if (merged.preset === 'trimestre' && merged.trimestre && !merged.trimestreAnnee) {
+        const parts = parseTrimestreKey(merged.trimestre)
+        if (parts) {
+          merged.trimestreAnnee = parts.year
+          merged.trimestreQ = parts.q
+        }
+      }
+      if (merged.trimestreAnnee && merged.trimestreQ) {
+        merged.trimestre = trimestreKeyFromParts(merged.trimestreAnnee, merged.trimestreQ)
+      }
+      return merged
+    }
+  } catch {
+    /* ignore */
+  }
+  return defaultFinancePeriod()
+}
+
+export const saveFinancePeriod = (period) => {
+  try {
+    const toSave = { ...period }
+    if (toSave.trimestreAnnee && toSave.trimestreQ) {
+      toSave.trimestre = trimestreKeyFromParts(toSave.trimestreAnnee, toSave.trimestreQ)
+    }
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  } catch {
+    /* ignore */
+  }
+}
+
+export const buildFinancePeriodQuery = (period) => {
+  const p = new URLSearchParams()
+  if (!period?.preset) return p
+  p.set('preset', period.preset)
+  if (period.preset === 'mois' && period.mois) p.set('mois', period.mois)
+  if (period.preset === 'annee' && period.annee) p.set('annee', period.annee)
+  if (period.preset === 'trimestre') {
+    const tk = period.trimestre
+      || (period.trimestreAnnee && period.trimestreQ
+        ? trimestreKeyFromParts(period.trimestreAnnee, period.trimestreQ)
+        : '')
+    if (tk) p.set('trimestre', tk)
+  }
+  if (period.preset === 'custom') {
+    if (period.dateDebut) p.set('date_debut', period.dateDebut)
+    if (period.dateFin) p.set('date_fin', period.dateFin)
+  }
+  return p
+}
+
+export const buildFinanceQuery = (period, filters = {}) => {
+  const p = buildFinancePeriodQuery(period)
+  if (filters.secretariatId) p.set('secretariat_id', String(filters.secretariatId))
+  if (filters.comparePrevious) p.set('compare', '1')
+  return p
+}
+
+export const financePeriodQueryString = (period, filters) => {
+  const q = buildFinanceQuery(period, filters)
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
+export const FINANCE_QUERY_STORAGE_KEY = 'finance_list_query'
+
+/** Lit période + filtres finance depuis l’URL (?preset=…). */
+export const readFinanceStateFromSearchParams = (searchParams) => {
+  const preset = searchParams.get('preset')
+  if (!preset) return null
+
+  const period = { ...defaultFinancePeriod(), preset }
+  if (preset === 'mois' && searchParams.get('mois')) period.mois = searchParams.get('mois')
+  if (preset === 'annee' && searchParams.get('annee')) period.annee = searchParams.get('annee')
+  if (preset === 'trimestre') {
+    const tk = searchParams.get('trimestre')
+    if (tk) {
+      period.trimestre = tk
+      const parts = parseTrimestreKey(tk)
+      if (parts) {
+        period.trimestreAnnee = parts.year
+        period.trimestreQ = parts.q
+      }
+    }
+  }
+  if (preset === 'custom') {
+    period.dateDebut = searchParams.get('date_debut') || ''
+    period.dateFin = searchParams.get('date_fin') || ''
+  }
+
+  const filters = { ...defaultFinanceFilters() }
+  const sid = searchParams.get('secretariat_id')
+  if (sid) filters.secretariatId = sid
+  if (searchParams.get('compare') === '1') filters.comparePrevious = true
+
+  return { period, filters }
+}
+
+/** Paramètres URL liste finance (période + filtres + pagination / onglets optionnels). */
+export const buildFinanceListSearchParams = (period, filters, extras = {}) => {
+  const p = buildFinanceQuery(period, filters)
+  if (extras.page > 1) p.set('page', String(extras.page))
+  if (extras.search) p.set('search', extras.search)
+  if (extras.rankTab && extras.rankTab !== 'realise') p.set('rank_tab', extras.rankTab)
+  return p
+}
+
+/** Navigation entre pages finance en gardant la même période / filtres. */
+export const financeNavHref = (pathname) => {
+  let qs = ''
+  try {
+    qs = sessionStorage.getItem(FINANCE_QUERY_STORAGE_KEY) || ''
+  } catch {
+    /* ignore */
+  }
+  return qs ? `${pathname}?${qs}` : pathname
+}
