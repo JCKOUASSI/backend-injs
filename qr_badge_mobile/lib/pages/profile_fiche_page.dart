@@ -328,9 +328,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                   'Heures de présence badgeées sur le volume total prévu de vos modules inscrits.'
                   '${volumeTaux is num && volumeTotal is num && volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
             ),
-            onBadgeagesTap: widget.onOpenHistory != null
-                ? widget.onOpenHistory
-                : () => _showStatSheet(
+            onBadgeagesTap: widget.onOpenHistory ?? () => _showStatSheet(
                       context,
                       title: 'Badgeages',
                       value: stats['nb_badgeages']?.toString() ?? '0',

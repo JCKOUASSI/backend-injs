@@ -82,10 +82,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: "3.41.7"
           cache: true
 
       - name: Pub get et analyse statique
         working-directory: qr_badge_mobile
         run: |
-          flutter pub get
+          flutter pub get --enforce-lockfile
           flutter analyze
