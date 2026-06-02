@@ -10,13 +10,8 @@ export default function FinancePeriodFilter({
   onApply,
   applying,
   embedded,
-  filters,
-  onFiltersChange,
-  secretariats = [],
-  showCompare = false,
 }) {
   const set = (patch) => onChange({ ...period, ...patch })
-  const setFilter = (patch) => onFiltersChange?.({ ...filters, ...patch })
 
   const handlePresetChange = (preset) => {
     const now = new Date()
@@ -142,38 +137,6 @@ export default function FinancePeriodFilter({
               />
             </div>
           </>
-        )}
-
-        {secretariats.length > 0 && filters && (
-          <div className="finance-filter-field">
-            <label>Secrétariat</label>
-            <select
-              className="form-select form-select-sm"
-              value={filters.secretariatId || ''}
-              onChange={(e) => setFilter({ secretariatId: e.target.value })}
-              style={{ minWidth: '180px' }}
-            >
-              <option value="">Tous les secrétariats</option>
-              {secretariats.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nom} ({s.numero})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {showCompare && filters && period.preset !== 'tout' && (
-          <div className="finance-filter-field finance-filter-field--check">
-            <label className="finance-compare-label">
-              <input
-                type="checkbox"
-                checked={!!filters.comparePrevious}
-                onChange={(e) => setFilter({ comparePrevious: e.target.checked })}
-              />
-              <span>Comparer à la période précédente</span>
-            </label>
-          </div>
         )}
 
         <button

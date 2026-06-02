@@ -9,7 +9,6 @@ import {
   buildFinanceListSearchParams,
   FINANCE_QUERY_STORAGE_KEY,
   loadFinancePeriod,
-  loadFinanceFilters,
   readFinanceStateFromSearchParams,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
@@ -31,10 +30,7 @@ export default function FinanceParametrage() {
     FINANCE_QUERY_STORAGE_KEY,
     () => {
       const fromUrl = readFinanceStateFromSearchParams(searchParams)
-      return buildFinanceListSearchParams(
-        fromUrl?.period ?? loadFinancePeriod(),
-        fromUrl?.filters ?? loadFinanceFilters(),
-      )
+      return buildFinanceListSearchParams(fromUrl?.period ?? loadFinancePeriod(), {})
     },
     [searchParams],
   )

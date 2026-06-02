@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { FinanceStatsGrid, FinanceModulesList, formatMoney } from '../FinanceStatsGrid'
+import Pagination from '../Pagination'
+import { useClientPagination, TABLE_PAGE_SIZE } from '../../hooks/useClientPagination'
 
 const FINANCE_DETAIL_TABS = [
   { id: 'statistiques', label: 'Statistiques', icon: 'bi-graph-up' },
@@ -20,7 +22,26 @@ export default function FinanceDetailModal({
   exportFinanceSummary,
   financeStatsForGrid,
 }) {
+  const sessions = financeDetail?.sessions ?? []
+  const {
+    page: sessionsPage,
+    setPage: setSessionsPage,
+    totalPages: sessionsTotalPages,
+    totalItems: sessionsTotalItems,
+    pageItems: sessionsPageRows,
+    pageSize: sessionsPageSize,
+  } = useClientPagination(sessions, TABLE_PAGE_SIZE, [financeDetail?.id, financeDetailTab])
+
   if (!financeDetail) return null
+
+  const financePaginationProps = {
+    page: sessionsPage,
+    totalPages: sessionsTotalPages,
+    onPageChange: setSessionsPage,
+    totalItems: sessionsTotalItems,
+    pageSize: sessionsPageSize,
+    activeClassName: 'pagination-num--active pagination-num--finance',
+  }
 
   return (
     <div className="modal-overlay finance-modal" onClick={onClose}>
@@ -105,40 +126,45 @@ export default function FinanceDetailModal({
               {financeDetailTab === 'seances' && (
                 <>
                   {Array.isArray(financeDetail.sessions) && financeDetail.sessions.length > 0 ? (
-                    <div className="finance-table-wrap">
-                      <table className="finance-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Séance</th>
-                            <th>Module</th>
-                            <th>Formation</th>
-                            <th>Planifié</th>
-                            <th>Réalisé</th>
-                            <th>Taux</th>
-                            <th>Pointage</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {financeDetail.sessions.map((s) => (
-                            <tr key={s.session_id}>
-                              <td>{s.date_journee || '—'}</td>
-                              <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
-                              <td>{s.module_intitule || '—'}</td>
-                              <td>{s.formation_intitule || '—'}</td>
-                              <td>{formatDuration(s.duree_minutes)}</td>
-                              <td>{formatDuration(s.duree_realisee_minutes)}</td>
-                              <td>{s.taux_realisation_pct ?? 0}%</td>
-                              <td>
-                                {s.a_pointage
-                                  ? <span className="badge-bg-success">Oui</span>
-                                  : <span className="badge-bg-secondary">Non</span>}
-                              </td>
+                    <>
+                      <div className="finance-table-wrap">
+                        <table className="finance-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Séance</th>
+                              <th>Module</th>
+                              <th>Formation</th>
+                              <th>Planifié</th>
+                              <th>Réalisé</th>
+                              <th>Taux</th>
+                              <th>Pointage</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {sessionsPageRows.map((s) => (
+                              <tr key={s.session_id}>
+                                <td>{s.date_journee || '—'}</td>
+                                <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
+                                <td>{s.module_intitule || '—'}</td>
+                                <td>{s.formation_intitule || '—'}</td>
+                                <td>{formatDuration(s.duree_minutes)}</td>
+                                <td>{formatDuration(s.duree_realisee_minutes)}</td>
+                                <td>{s.taux_realisation_pct ?? 0}%</td>
+                                <td>
+                                  {s.a_pointage
+                                    ? <span className="badge-bg-success">Oui</span>
+                                    : <span className="badge-bg-secondary">Non</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="finance-section-footer">
+                      <Pagination {...financePaginationProps} />
                     </div>
+                    </>
                   ) : (
                     <div className="finance-empty"><i className="bi bi-calendar-x"></i>Aucune séance sur cette période</div>
                   )}
@@ -177,38 +203,43 @@ export default function FinanceDetailModal({
                   )}
 
                   {Array.isArray(financeDetail.sessions) && financeDetail.sessions.length > 0 ? (
-                    <div className="finance-table-wrap">
-                      <table className="finance-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Séance</th>
-                            <th>Module</th>
-                            <th>Réalisé</th>
-                            <th style={{ textAlign: 'right' }}>Montant</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {financeDetail.sessions.map((s) => (
-                            <tr key={s.session_id}>
-                              <td>{s.date_journee || '—'}</td>
-                              <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
-                              <td>{s.module_intitule || '—'}</td>
-                              <td>{formatDuration(s.duree_realisee_minutes)}</td>
-                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatMoney(s.montant_realise ?? 0)} F</td>
+                    <>
+                      <div className="finance-table-wrap">
+                        <table className="finance-table">
+                          <thead>
+                            <tr>
+                              <th>Date</th>
+                              <th>Séance</th>
+                              <th>Module</th>
+                              <th>Réalisé</th>
+                              <th style={{ textAlign: 'right' }}>Montant</th>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={{ background: '#f0fdf4' }}>
-                            <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>Total</td>
-                            <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--fin-green)' }}>
-                              {formatMoney(financeDetail.montant_total_realise ?? 0)} FCFA
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {sessionsPageRows.map((s) => (
+                              <tr key={s.session_id}>
+                                <td>{s.date_journee || '—'}</td>
+                                <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
+                                <td>{s.module_intitule || '—'}</td>
+                                <td>{formatDuration(s.duree_realisee_minutes)}</td>
+                                <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatMoney(s.montant_realise ?? 0)} F</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ background: '#f0fdf4' }}>
+                              <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>Total</td>
+                              <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--fin-green)' }}>
+                                {formatMoney(financeDetail.montant_total_realise ?? 0)} FCFA
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                      <div className="finance-section-footer">
+                        <Pagination {...financePaginationProps} />
+                      </div>
+                    </>
                   ) : (
                     <div className="finance-empty"><i className="bi bi-cash"></i>Aucune donnée de paie</div>
                   )}

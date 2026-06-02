@@ -259,7 +259,16 @@
   border-radius: var(--fin-radius);
   border: 1px solid var(--border-color);
   box-shadow: var(--fin-shadow);
-  overflow: hidden;
+  overflow: visible;
+}
+.finance-section-footer {
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fafbfc;
+}
+.finance-section-footer .pagination {
+  margin-top: 0;
+  padding: 0;
 }
 .finance-section-header {
   display: flex;

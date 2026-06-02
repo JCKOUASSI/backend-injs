@@ -44,10 +44,7 @@ export const parseTrimestreKey = (key) => {
   return { year: String(y), q: Number(q) }
 }
 
-export const defaultFinanceFilters = () => ({
-  secretariatId: '',
-  comparePrevious: false,
-})
+export const defaultFinanceFilters = () => ({})
 
 export const loadFinanceFilters = () => {
   try {
@@ -123,15 +120,10 @@ export const buildFinancePeriodQuery = (period) => {
   return p
 }
 
-export const buildFinanceQuery = (period, filters = {}) => {
-  const p = buildFinancePeriodQuery(period)
-  if (filters.secretariatId) p.set('secretariat_id', String(filters.secretariatId))
-  if (filters.comparePrevious) p.set('compare', '1')
-  return p
-}
+export const buildFinanceQuery = (period) => buildFinancePeriodQuery(period)
 
-export const financePeriodQueryString = (period, filters) => {
-  const q = buildFinanceQuery(period, filters)
+export const financePeriodQueryString = (period) => {
+  const q = buildFinanceQuery(period)
   const s = q.toString()
   return s ? `?${s}` : ''
 }
@@ -162,17 +154,12 @@ export const readFinanceStateFromSearchParams = (searchParams) => {
     period.dateFin = searchParams.get('date_fin') || ''
   }
 
-  const filters = { ...defaultFinanceFilters() }
-  const sid = searchParams.get('secretariat_id')
-  if (sid) filters.secretariatId = sid
-  if (searchParams.get('compare') === '1') filters.comparePrevious = true
-
-  return { period, filters }
+  return { period, filters: defaultFinanceFilters() }
 }
 
 /** Paramètres URL liste finance (période + filtres + pagination / onglets optionnels). */
-export const buildFinanceListSearchParams = (period, filters, extras = {}) => {
-  const p = buildFinanceQuery(period, filters)
+export const buildFinanceListSearchParams = (period, _filters, extras = {}) => {
+  const p = buildFinanceQuery(period)
   if (extras.page > 1) p.set('page', String(extras.page))
   if (extras.search) p.set('search', extras.search)
   if (extras.rankTab && extras.rankTab !== 'realise') p.set('rank_tab', extras.rankTab)

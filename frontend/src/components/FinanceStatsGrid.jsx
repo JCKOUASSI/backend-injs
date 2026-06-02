@@ -1,3 +1,6 @@
+import Pagination from './Pagination'
+import { useClientPagination, TABLE_PAGE_SIZE } from '../hooks/useClientPagination'
+
 const fmtDuration = (minutes) => {
   const value = Number(minutes || 0)
   const h = Math.floor(value / 60)
@@ -70,7 +73,17 @@ export function FinanceStatsGrid({ stats, montant }) {
 }
 
 export function FinanceModulesList({ modules, formatDuration }) {
-  if (!Array.isArray(modules) || modules.length === 0) {
+  const list = Array.isArray(modules) ? modules : []
+  const {
+    page,
+    setPage,
+    totalPages,
+    totalItems,
+    pageItems,
+    pageSize,
+  } = useClientPagination(list, TABLE_PAGE_SIZE, [list.length])
+
+  if (list.length === 0) {
     return (
       <div className="finance-empty">
         <i className="bi bi-journal-x"></i>
@@ -78,9 +91,11 @@ export function FinanceModulesList({ modules, formatDuration }) {
       </div>
     )
   }
+
   return (
+    <>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-      {modules.map((m) => (
+      {pageItems.map((m) => (
         <div key={m.module_id} className="finance-module-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
             <div>
@@ -113,6 +128,15 @@ export function FinanceModulesList({ modules, formatDuration }) {
         </div>
       ))}
     </div>
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+      totalItems={totalItems}
+      pageSize={pageSize}
+      activeClassName="pagination-num--active pagination-num--finance"
+    />
+    </>
   )
 }
 

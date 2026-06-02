@@ -14,6 +14,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
 
 const emptyForm = {
   matricule: '',
@@ -122,11 +123,12 @@ export default function Participants() {
       if (typeConcoursFilter) params.set('type_concours', typeConcoursFilter)
       if (vagueFilter) params.set('vague', vagueFilter)
       const response = await api.get(`/formations/participants/list/?${params}`)
-      const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-      setParticipants(data)
-      setTotalPages(response.data.total_pages || 1)
-      setTotalCount(response.data.count || data.length)
-      setFilterOptions(response.data.filter_options || { secretariats: [], grades: [], groupes: [], types_concours: [] })
+      const { results, count, totalPages: pages } = parsePaginatedResponse(response.data, 50)
+      setParticipants(results)
+      setTotalPages(pages)
+      setTotalCount(count)
+      const payload = Array.isArray(response.data) ? {} : response.data
+      setFilterOptions(payload.filter_options || { secretariats: [], grades: [], groupes: [], types_concours: [] })
     } catch (err) {
       setError('Erreur lors du chargement des auditeurs')
       console.error(err)

@@ -12,11 +12,6 @@ export default function FinancePageShell({
   onPeriodApply,
   periodApplying,
   periodeInfo,
-  filters,
-  onFiltersChange,
-  secretariats,
-  showCompare,
-  secretariatFiltre,
   children,
   showPeriodFilter = true,
 }) {
@@ -46,32 +41,17 @@ export default function FinancePageShell({
               onApply={onPeriodApply}
               applying={periodApplying}
               embedded
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              secretariats={secretariats}
-              showCompare={showCompare}
             />
           </div>
-          {(secretariatFiltre?.nom || periodeInfo?.periode_label) && (
+          {periodeInfo?.label && (
             <div className="finance-period-badge">
               <i className="bi bi-calendar-check"></i>
               <div>
-                {periodeInfo?.label && (
-                  <>
-                    <strong>{periodeInfo.label}</strong>
-                    {periodeInfo.periode_label && (
-                      <span className="ms-1">— {periodeInfo.periode_label}</span>
-                    )}
-                  </>
+                <strong>{periodeInfo.label}</strong>
+                {periodeInfo.periode_label && (
+                  <span className="ms-1">— {periodeInfo.periode_label}</span>
                 )}
-                {secretariatFiltre?.nom && (
-                  <div style={{ marginTop: periodeInfo?.label ? '0.2rem' : 0 }}>
-                    <i className="bi bi-building me-1"></i>
-                    <strong>Secrétariat :</strong> {secretariatFiltre.nom}
-                    {secretariatFiltre.numero ? ` (${secretariatFiltre.numero})` : ''}
-                  </div>
-                )}
-                {periodeInfo?.description && (
+                {periodeInfo.description && (
                   <div style={{ opacity: 0.85, marginTop: '0.15rem', fontSize: '0.8rem' }}>
                     {periodeInfo.description}
                   </div>
