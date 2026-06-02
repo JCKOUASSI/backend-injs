@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { useAuth } from '../context/AuthContext'
+import {
+  buildUsersSearchParams,
+  LIST_STORAGE_KEYS,
+  parseListPage,
+  readUsersFilters,
+} from '../utils/listFilters'
+import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import Pagination from '../components/Pagination'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
 
 const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
 const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
@@ -46,14 +56,17 @@ export default function Users() {
     showFormateursSection && { id: 'formateurs', label: 'Comptes formateurs', icon: 'bi-person-video3' },
   ].filter(Boolean)
   const showTabBar = availableTabs.length > 1
-  const [userTab, setUserTab] = useState('personnel')
+  const [searchParams] = useSearchParams()
+  const initialUsers = readUsersFilters(searchParams)
+  const [userTab, setUserTab] = useState(initialUsers.tab)
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => parseListPage(searchParams))
   const [totalPages, setTotalPages] = useState(1)
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('')
+  const [totalCount, setTotalCount] = useState(0)
+  const [search, setSearch] = useState(initialUsers.search)
+  const [roleFilter, setRoleFilter] = useState(initialUsers.role)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ ...emptyForm })
   const [formError, setFormError] = useState('')
@@ -73,6 +86,13 @@ export default function Users() {
       setUserTab(availableTabs[0]?.id || 'personnel')
     }
   }, [showStaffSection, showAuditeursSection, showFormateursSection])
+
+  usePersistedListQuery(
+    LIST_STORAGE_KEYS.users,
+    () => buildUsersSearchParams(userTab, roleFilter, page, debouncedSearch),
+    [userTab, roleFilter, page, debouncedSearch],
+  )
+
   useEffect(() => { loadUsers() }, [page, debouncedSearch, roleFilter, userTab])
   useEffect(() => {
     api.get('/formations/secretariats/')
@@ -100,11 +120,11 @@ export default function Users() {
         params.set('role', 'FORMATEUR')
       }
       const response = await api.get(`/auth/users/?${params}`)
-      const data = Array.isArray(response.data) ? response.data : (response.data.results || [])
-      setUsers(Array.isArray(data) ? data : [])
-      const count = response.data.count || data.length
       const pageSize = 50
-      setTotalPages(response.data.total_pages || Math.ceil(count / pageSize) || 1)
+      const { results, count, totalPages: pages } = parsePaginatedResponse(response.data, pageSize)
+      setUsers(results)
+      setTotalCount(count)
+      setTotalPages(pages)
     } catch (err) {
       setError('Erreur lors du chargement des utilisateurs')
       console.error(err)
@@ -339,17 +359,13 @@ export default function Users() {
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                    <i className="bi bi-chevron-left"></i> Précédent
-                  </button>
-                  <span className="small">Page {page} / {totalPages}</span>
-                  <button className="pagination-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                    Suivant <i className="bi bi-chevron-right"></i>
-                  </button>
-                </div>
-              )}
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={totalCount}
+                pageSize={50}
+              />
             </>
           )}
         </div>

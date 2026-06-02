@@ -22,6 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _index = 1;
+  bool _ficheVisible = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
@@ -87,17 +88,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       backgroundColor: AppColors.ciLight,
       drawer: _AppDrawer(
         onRequestGps: () => _requestGps(session),
-        onOpenFiche: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProfileFichePage(
-                onOpenHistory: () => setState(() => _index = 2),
-              ),
-            ),
-          );
-        },
+        onOpenFiche: () => setState(() => _ficheVisible = true),
       ),
-      appBar: _index == 0
+      appBar: _ficheVisible || _index == 0
           ? null
           : AppBar(
               centerTitle: _index == 2,
@@ -121,7 +114,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
               ],
             ),
-      body: Column(
+      body: Stack(
+        children: [
+          Column(
         children: [
           if (!session.gpsGranted && _index != 0)
             Material(
@@ -173,7 +168,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_ficheVisible,
+              child: Offstage(
+                offstage: !_ficheVisible,
+                child: ProfileFichePage(
+                  onClose: () => setState(() => _ficheVisible = false),
+                  onOpenHistory: () => setState(() {
+                    _ficheVisible = false;
+                    _index = 2;
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _ficheVisible
+          ? null
+          : NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (v) => setState(() => _index = v),
         destinations: const [

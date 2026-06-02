@@ -638,3 +638,34 @@ class QRToken(models.Model):
         if self.session.est_terminee:
             return False
         return True
+
+
+class FinanceSettings(models.Model):
+    """Paramètres globaux du module finance (singleton pk=1)."""
+    prix_heure_realisee = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name='Prix pour 1 heure réalisée',
+        help_text='Montant versé par heure de cours effectivement réalisée (badgeage).',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_settings_updates',
+    )
+
+    class Meta:
+        verbose_name = 'Paramètres finance'
+        verbose_name_plural = 'Paramètres finance'
+
+    def __str__(self):
+        return f'Paramètres finance (1 h réalisée = {self.prix_heure_realisee})'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

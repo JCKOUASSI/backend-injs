@@ -52,9 +52,14 @@ def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
     )
     if not fin_est_future:
         grace_end = local_now + timedelta(hours=REACTIVATION_GRACE_HOURS)
-        new_fin = grace_end.time()
-        if new_fin > time(23, 59):
+        # Si la grâce dépasse minuit, garder 23:59 le jour courant pour que
+        # heure_fin_prevue reste > l'heure locale (évite re-clôture immédiate).
+        if grace_end.date() > local_now.date():
             new_fin = time(23, 59)
+        else:
+            new_fin = grace_end.time().replace(second=0, microsecond=0)
+            if new_fin <= local_now.time():
+                new_fin = time(23, 59)
         session.heure_fin_prevue = new_fin
         update_fields.append('heure_fin_prevue')
 

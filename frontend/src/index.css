@@ -407,6 +407,15 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 }
 .pagination-btn:hover:not(:disabled) { background: var(--ci-light); border-color: var(--ci-orange); }
 .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pagination-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+.pagination-num { min-width: 2.25rem; padding: 0.5rem 0.6rem; text-align: center; font-weight: 600; }
+.pagination-num--active { background: var(--ci-orange); color: #fff; border-color: var(--ci-orange); }
+.pagination-num--active:hover:not(:disabled) { background: #E65100; border-color: #E65100; color: #fff; }
+.pagination-num--finance.pagination-num--active { background: var(--fin-green, #1B5E20); border-color: var(--fin-green, #1B5E20); }
+.pagination-num--finance.pagination-num--active:hover:not(:disabled) { background: #2E7D32; border-color: #2E7D32; color: #fff; }
+.pagination-ellipsis { padding: 0.5rem 0.35rem; color: var(--text-muted, #718096); user-select: none; }
+.pagination-summary { font-size: 0.85rem; color: var(--text-muted, #718096); white-space: nowrap; }
+.modal-body .pagination { margin-top: 0.75rem; padding: 0.5rem 0; flex-wrap: wrap; }
 
 /* ═══ Modal ═══ */
 .modal-overlay {
@@ -562,4 +571,55 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   .headline-kpi-subline { font-size: 0.78rem; }
   .login-container { padding: 0; }
   .login-card { border-radius: 0 0 16px 16px; padding: 2rem 1.25rem; min-height: 100vh; margin: 0; }
+}
+
+/* Onglets modale finance formateur (évite conflit avec .nav-item sidebar) */
+.finance-detail-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0 0 1rem 0;
+  padding: 0 0 0.5rem 0;
+  border-bottom: 2px solid #e2e8f0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.finance-detail-tabs > li {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+.finance-detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  background: #f8fafc;
+  color: #4a5568;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.finance-detail-tab:hover {
+  background: #edf2f7;
+  color: var(--ci-green-dark, #276749);
+}
+.finance-detail-tab.active {
+  background: #fff;
+  color: var(--ci-green-dark, #276749);
+  border-color: var(--ci-green, #276749);
+  border-bottom: 2px solid #fff;
+  margin-bottom: -2px;
+  font-weight: 600;
+}
+.finance-detail-tab i {
+  font-size: 1rem;
 }
