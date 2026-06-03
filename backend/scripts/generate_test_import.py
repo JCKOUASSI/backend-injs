@@ -83,36 +83,36 @@ FORMATIONS = [
          "FAB B", "B3", "GROUPE 2", "SESSION 2026", ""),
 ]
 
-# Séances : (module_titre, groupe, date_journee, numero, intitule, heure_debut, heure_fin)
-def _seances_for(module_titre, groupe, debut_date, nb_jours):
+# Séances : (module_titre, grade, groupe, vague, date_journee, numero, intitule, heure_debut, heure_fin)
+def _seances_for(module_titre, grade, groupe, vague, debut_date, nb_jours):
     """Génère des séances matin/après-midi sur nb_jours jours consécutifs."""
     from datetime import timedelta
     rows = []
     d = debut_date
     seq = 1
     for _ in range(nb_jours):
-        rows.append((module_titre, groupe, d, seq,     "Matin",      time(8, 30),  time(12, 0)))
-        rows.append((module_titre, groupe, d, seq + 1, "Après-midi", time(14, 0),  time(17, 30)))
+        rows.append((module_titre, grade, groupe, vague, d, seq,     "Matin",      time(8, 30),  time(12, 0)))
+        rows.append((module_titre, grade, groupe, vague, d, seq + 1, "Après-midi", time(14, 0),  time(17, 30)))
         d += timedelta(days=1)
         seq += 2
     return rows
 
-# (module_titre, groupe, date_debut, nb_jours)
+# (module_titre, grade, groupe, vague, date_debut, nb_jours)
 SEANCE_DEFS = [
-    ("Rédaction Administrative",               "GROUPE 1", date(2026, 5, 5),  3),
-    ("Droit Administratif",                    "GROUPE 1", date(2026, 5, 12), 3),
-    ("Finances Publiques",                     "GROUPE 1", date(2026, 5, 19), 2),
-    ("Rédaction Administrative",               "GROUPE 2", date(2026, 5, 5),  3),
-    ("Droit Administratif",                    "GROUPE 2", date(2026, 5, 12), 3),
-    ("Management des Administrations Publiques","GROUPE 1", date(2026, 6, 2),  3),
-    ("Culture Civique",                         "GROUPE 1", date(2026, 6, 9),  2),
-    ("Commande Publique",                       "GROUPE 1", date(2026, 5, 5),  3),
-    ("Bureautique et Outils Numériques",        "GROUPE 1", date(2026, 5, 12), 2),
-    ("Gestion des Ressources Humaines",         "GROUPE 2", date(2026, 5, 5),  2),
+    ("Rédaction Administrative",                "A4", "GROUPE 1", "SESSION 2026", date(2026, 5, 5),  3),
+    ("Droit Administratif",                     "A4", "GROUPE 1", "SESSION 2026", date(2026, 5, 12), 3),
+    ("Finances Publiques",                      "A4", "GROUPE 1", "SESSION 2026", date(2026, 5, 19), 2),
+    ("Rédaction Administrative",                "A4", "GROUPE 2", "SESSION 2026", date(2026, 5, 5),  3),
+    ("Droit Administratif",                     "A4", "GROUPE 2", "SESSION 2026", date(2026, 5, 12), 3),
+    ("Management des Administrations Publiques","A3", "GROUPE 1", "SESSION 2026", date(2026, 6, 2),  3),
+    ("Culture Civique",                         "A3", "GROUPE 1", "SESSION 2026", date(2026, 6, 9),  2),
+    ("Commande Publique",                       "B3", "GROUPE 1", "SESSION 2026", date(2026, 5, 5),  3),
+    ("Bureautique et Outils Numériques",        "B3", "GROUPE 1", "SESSION 2026", date(2026, 5, 12), 2),
+    ("Gestion des Ressources Humaines",         "B3", "GROUPE 2", "SESSION 2026", date(2026, 5, 5),  2),
 ]
 SEANCES = []
-for mod, grp, debut, nb in SEANCE_DEFS:
-    SEANCES.extend(_seances_for(mod, grp, debut, nb))
+for mod, grade, grp, vague, debut, nb in SEANCE_DEFS:
+    SEANCES.extend(_seances_for(mod, grade, grp, vague, debut, nb))
 
 
 # ─── Styles ──────────────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ def _build_seances(wb):
     ws.row_dimensions[1].height = 28
 
     headers = [
-        "module_titre", "groupe", "date_journee", "numero",
+        "module_titre", "grade", "groupe", "vague", "date_journee", "numero",
         "intitule", "heure_debut", "heure_fin",
     ]
     hs = _header_style()
@@ -200,8 +200,8 @@ def _build_seances(wb):
         "Après-midi":  PatternFill('solid', fgColor='DDEBF7'),
     }
     for row_i, s in enumerate(SEANCES, 2):
-        mod_titre, groupe, d, num, intitule, h_deb, h_fin = s
-        vals = [mod_titre, groupe, d, num, intitule, h_deb, h_fin]
+        mod_titre, grade, groupe, vague, d, num, intitule, h_deb, h_fin = s
+        vals = [mod_titre, grade, groupe, vague, d, num, intitule, h_deb, h_fin]
         fill = grp_fills.get(intitule, PatternFill('solid', fgColor='F2F2F2'))
         for col_i, val in enumerate(vals, 1):
             cell = ws.cell(row=row_i, column=col_i, value=val)
@@ -211,11 +211,11 @@ def _build_seances(wb):
                 left=Side(style='thin'), right=Side(style='thin'),
                 top=Side(style='thin'),  bottom=Side(style='thin'),
             )
-            if col_i == 3:  # date_journee
+            if col_i == 5:  # date_journee
                 if isinstance(val, datetime):
                     cell.value = val.date()
                 cell.number_format = 'DD/MM/YYYY'
-            elif col_i in (6, 7):  # heure_debut, heure_fin
+            elif col_i in (8, 9):  # heure_debut, heure_fin
                 cell.number_format = 'HH:MM'
 
     ws.freeze_panes = 'A2'
@@ -307,7 +307,7 @@ def _build_readme(wb):
         ("Formations",     "Liste des modules (1 ligne = 1 module)",   "Formation (cycle), Module (titre), Date début, Date fin, Catégorie"),
         ("Formateurs",     "Formateurs à créer",                       "Nom, Prénoms"),
         ("Participants",   "Participants + auto-inscription",           "N\u00b0 d'inscription, Nom, Prénom, Catégorie, Grade, Groupe"),
-        ("Séances",        "Séances matin/après-midi par module",       "module_titre, groupe, date_journee, numero"),
+        ("Séances",        "Séances matin/après-midi par module",       "module_titre, grade, groupe, vague, date_journee, numero"),
         ("",  "", ""),
         ("Notes", "", ""),
         ("", "• Catégorie : FAB A, FAB B ou FAB C (détermine le secrétariat)", ""),
