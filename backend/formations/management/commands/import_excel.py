@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 
 from formations.models import (
     Formation, Participant, Formateur, Module,
-    ModuleParticipant, ModuleFormateur, SessionModule,
+    ModuleParticipant, ModuleFormateur, SessionModule, RefSite,
 )
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -302,6 +302,14 @@ class Command(BaseCommand):
             or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
         )
 
+    def _resolve_ref_site(self, site_name):
+        """Résout ou crée un RefSite depuis le libellé importé (colonne « Site »)."""
+        name = (site_name or '').strip()
+        if not name:
+            return None
+        site_obj, _ = RefSite.objects.get_or_create(nom=name, defaults={'actif': True})
+        return site_obj
+
     def _int(self, val, default=None):
         if val is None:
             return default
@@ -447,10 +455,12 @@ class Command(BaseCommand):
                 # Champ `cycle` (NOT NULL sur certaines bases) : libellé du cycle = formation parente.
                 'cycle': titre,
             }
-            _site = self._str(data.get('site'))
+            _site_name = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
-            if _site: module_defaults['site'] = _site
+            if _site_name:
+                module_defaults['site'] = self._resolve_ref_site(_site_name)
+                module_defaults['site_legacy'] = _site_name
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
             if _secretariat: module_defaults['secretariat'] = _secretariat
@@ -1014,9 +1024,8 @@ class Command(BaseCommand):
 
     def _import_seances(self, ws, errors):
         """
-        Dispatch des séances par Module (intitule + formation__grade + groupe + vague).
-        Chaque séance est liée à un Module précis — pas à une Formation générique.
-        unique_together = (formation, module, date_journee, numero)
+        Dispatch des séances par Module (intitule + grade + groupe + vague).
+        grade, groupe et vague sont obligatoires pour identifier le cours cible.
         """
         count = 0
         updated = 0
@@ -1042,63 +1051,40 @@ class Command(BaseCommand):
                 continue
 
             groupe = self._str(data.get('groupe'))
-            grade  = self._str(data.get('grade'))
-            vague  = self._str(data.get('vague'))
+            grade = self._str(data.get('grade'))
+            vague = self._str(data.get('vague'))
 
-            # ── Recherche directe par Module ──────────────────────────────────
-            # grade/groupe/vague sont sur Module directement (pas sur Formation)
-            module_qs = Module.objects.filter(intitule__iexact=titre).select_related('formation')
-            if grade:
-                module_qs = module_qs.filter(grade__iexact=grade)
-            if groupe:
-                module_qs = module_qs.filter(groupe__iexact=groupe)
-            if vague:
-                module_qs = module_qs.filter(vague__iexact=vague)
-
-            modules_matched = list(module_qs)
-
-            if not modules_matched:
-                # Fallback : le titre est peut-être celui de la formation elle-même
-                # Dans ce cas on cherche les modules de formations correspondantes
-                formation_qs = Formation.objects.filter(formation__iexact=titre)
-                for formation in formation_qs:
-                    mod_qs_fb = formation.modules.all()
-                    if grade:
-                        mod_qs_fb = mod_qs_fb.filter(grade__iexact=grade)
-                    if groupe:
-                        mod_qs_fb = mod_qs_fb.filter(groupe__iexact=groupe)
-                    if vague:
-                        mod_qs_fb = mod_qs_fb.filter(vague__iexact=vague)
-                    fb_list = list(mod_qs_fb.order_by('ordre'))
-                    if not fb_list:
-                        # Créer un module minimal si aucun ne correspond
-                        module_obj, _ = Module.objects.get_or_create(
-                            formation=formation,
-                            intitule=titre,
-                            defaults={
-                                 'duree_prevue_heures': 0,
-                                 'ordre': (formation.modules.aggregate(m=models.Max('ordre'))['m'] or 0) + 1,
-                                 'grade': grade, 'groupe': groupe, 'vague': vague,
-                                 'cycle': formation.formation,
-                            },
-                        )
-                        modules_matched.append(module_obj)
-                    else:
-                        modules_matched.extend(fb_list)
-
-            if not modules_matched:
-                crit = f'grade={grade!r} groupe={groupe!r}' + (f' vague={vague!r}' if vague else '')
+            missing = [label for label, val in (
+                ('grade', grade), ('groupe', groupe), ('vague', vague),
+            ) if not val]
+            if missing:
                 errors.append(
-                    f'Séances ligne {row_idx}: module "{titre}" introuvable ({crit})'
+                    f'Séances ligne {row_idx}: {", ".join(missing)} manquant(s) '
+                    f'(obligatoires pour identifier le cours)'
+                )
+                continue
+
+            modules_matched = list(
+                Module.objects.filter(
+                    intitule__iexact=titre,
+                    grade__iexact=grade,
+                    groupe__iexact=groupe,
+                    vague__iexact=vague,
+                ).select_related('formation')
+            )
+
+            if not modules_matched:
+                errors.append(
+                    f'Séances ligne {row_idx}: module "{titre}" introuvable '
+                    f'(grade={grade!r}, groupe={groupe!r}, vague={vague!r})'
                 )
                 continue
 
             heure_debut = self._parse_time(data.get('heure_debut'))
-            heure_fin   = self._parse_time(data.get('heure_fin'))
-            intitule    = self._str(data.get('intitule') or titre)
+            heure_fin = self._parse_time(data.get('heure_fin'))
+            intitule = self._str(data.get('intitule') or titre)
 
             for module_obj in modules_matched:
-                formation = module_obj.formation
                 obj, created = SessionModule.objects.get_or_create(
                     module=module_obj,
                     date_journee=date_journee,

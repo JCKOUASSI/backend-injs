@@ -3,6 +3,12 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
+/** Colonnes feuille « Séances » — grade/groupe/vague requis pour matcher le cours. */
+const SEANCES_IMPORT_COLUMNS = [
+  'module_titre', 'grade', 'groupe', 'vague',
+  'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin',
+]
+
 /** Colonnes feuille « Formations » / import type cours (aligné import_excel + modèle Excel). */
 const FORMATIONS_IMPORT_COLUMNS = [
   'N°', 'Formation', 'Module (titre)', 'Site', 'Bâtiment', 'Salle',
@@ -180,20 +186,18 @@ export default function ImportExcel() {
           <div className="card-body">
             <SeanceFileInput onImport={handleImport} loading={loading} />
             <button type="button" className="btn btn-outline-secondary btn-sm mt-1"
-              onClick={() => downloadTemplate('modele_seances.csv',
-                ['module_titre', 'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin']
-              )}>
+              onClick={() => downloadTemplate('modele_seances.csv', SEANCES_IMPORT_COLUMNS)}>
               <i className="bi bi-download me-1"></i>Modèle CSV
             </button>
             <div className="mt-3">
               <small className="text-muted fw-semibold">Colonnes attendues :</small>
               <div className="mt-1" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                {['module_titre', 'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin'].map(col => (
+                {SEANCES_IMPORT_COLUMNS.map(col => (
                   <span key={col} className="badge-bg-secondary" style={{ fontSize: '0.7rem' }}>{col}</span>
                 ))}
               </div>
               <div className="mt-2" style={{ background: '#f0f4ff', borderRadius: 6, padding: '0.4rem 0.6rem' }}>
-                <small><i className="bi bi-info-circle me-1"></i>date: JJ/MM/AAAA · heure: HH:MM · numero: 1,2,3…</small>
+                <small><i className="bi bi-info-circle me-1"></i>grade, groupe et vague sont obligatoires pour identifier le cours · date: JJ/MM/AAAA · heure: HH:MM</small>
               </div>
             </div>
           </div>
