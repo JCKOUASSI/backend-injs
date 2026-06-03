@@ -259,28 +259,29 @@ def gen_seances():
     # ── Feuille 2 : Séances (par module) ────────────────────────────────────
     ws2 = wb.create_sheet(title='Séances')
 
-    h2 = ['module_titre', 'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin', 'groupe']
-    w2 = [36, 14, 10, 20, 14, 14, 18]
+    h2 = ['module_titre', 'grade', 'groupe', 'vague', 'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin']
+    w2 = [36, 10, 18, 22, 14, 10, 20, 14, 14]
     set_headers(ws2, h2, w2)
 
     rows2 = [
-        ['Droit Administratif', date(2026, 5, 5),  1, 'Matin',      time(8, 30),  time(12, 0),  'GROUPE 1'],
-        ['Droit Administratif', date(2026, 5, 5),  2, 'Après-midi', time(14, 0),  time(17, 30), 'GROUPE 1'],
-        ['Droit Administratif', date(2026, 5, 5),  1, 'Matin',      time(8, 30),  time(12, 0),  'GROUPE 2'],
-        ['Droit Administratif', date(2026, 5, 5),  2, 'Après-midi', time(14, 0),  time(17, 30), 'GROUPE 2'],
-        ['Finances Publiques',  date(2026, 6, 1),  1, 'Matin',      time(8, 30),  time(12, 0),  'GROUPE 1'],
-        ['Finances Publiques',  date(2026, 6, 1),  2, 'Après-midi', time(14, 0),  time(17, 30), 'GROUPE 1'],
-        ['Management Public',   date(2026, 7, 1),  1, 'Matin',      time(8, 30),  time(12, 0),  'GROUPE 1'],
+        ['Droit Administratif', 'A4', 'GROUPE 1', 'PREMIERE VAGUE', date(2026, 5, 5),  1, 'Matin',      time(8, 30),  time(12, 0)],
+        ['Droit Administratif', 'A4', 'GROUPE 1', 'PREMIERE VAGUE', date(2026, 5, 5),  2, 'Après-midi', time(14, 0),  time(17, 30)],
+        ['Droit Administratif', 'A4', 'GROUPE 2', 'PREMIERE VAGUE', date(2026, 5, 5),  1, 'Matin',      time(8, 30),  time(12, 0)],
+        ['Droit Administratif', 'A4', 'GROUPE 2', 'PREMIERE VAGUE', date(2026, 5, 5),  2, 'Après-midi', time(14, 0),  time(17, 30)],
+        ['Finances Publiques',  'B1', 'GROUPE 1', 'DEUXIEME VAGUE', date(2026, 6, 1),  1, 'Matin',      time(8, 30),  time(12, 0)],
+        ['Finances Publiques',  'B1', 'GROUPE 1', 'DEUXIEME VAGUE', date(2026, 6, 1),  2, 'Après-midi', time(14, 0),  time(17, 30)],
+        ['Management Public',   'A3', 'GROUPE 1', 'PREMIERE VAGUE', date(2026, 7, 1),  1, 'Matin',      time(8, 30),  time(12, 0)],
     ]
     for i, row in enumerate(rows2, 2):
         add_row(ws2, i, row)
 
     add_notes(ws2, 11, 1, [
-        "• module_titre  : intitulé exact du Module (ex: Droit Administratif)",
-        "  → Recherche d'abord les formations ayant ce module, puis fallback sur formation.formation",
+        "• module_titre  : intitulé exact du Module (ex: Droit Administratif) — OBLIGATOIRE",
+        "• grade         : grade du cours (ex: A4) — OBLIGATOIRE, doit correspondre à la feuille Formations",
+        "• groupe        : GROUPE 1, GROUPE 2… — OBLIGATOIRE",
+        "• vague         : PREMIERE VAGUE, DEUXIEME VAGUE… — OBLIGATOIRE",
         "• date_journee  : format JJ/MM/AAAA ou AAAA-MM-JJ",
         "• numero        : ordre de la séance dans la journée — OBLIGATOIRE",
-        "• groupe        : filtre optionnel pour cibler un groupe de formation spécifique",
         "• Utiliser type='seances' pour importer cette feuille",
     ])
 
