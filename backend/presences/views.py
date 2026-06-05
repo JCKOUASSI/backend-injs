@@ -301,6 +301,9 @@ def _resolve_authenticated_personne(user):
     La résolution se fait d'abord par rôle utilisateur pour éviter qu'un encadrant
     ou formateur avec un profil auditeur résiduel soit traité comme participant.
     """
+    from authentication.profile_sync import sync_user_profile_links
+
+    sync_user_profile_links(user)
     role = getattr(user, 'role', None)
 
     if role == 'ENCADRANT':
@@ -315,21 +318,20 @@ def _resolve_authenticated_personne(user):
         return user, 'encadrant', None
 
     if role == 'FORMATEUR':
-        try:
-            return user.formateur_profile, 'formateur', None
-        except (Formateur.DoesNotExist, AttributeError):
-            return None, None, Response(
-                {
-                    'code': 'NO_PROFILE',
-                    'detail': 'Aucun profil formateur lié à ce compte.',
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        formateur = Formateur.objects.filter(user_id=user.pk).first()
+        if formateur:
+            return formateur, 'formateur', None
+        return None, None, Response(
+            {
+                'code': 'NO_PROFILE',
+                'detail': 'Aucun profil formateur lié à ce compte.',
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
-    try:
-        return user.participant_profile, 'participant', None
-    except (Participant.DoesNotExist, AttributeError):
-        pass
+    participant = Participant.objects.filter(user_id=user.pk).first()
+    if participant:
+        return participant, 'participant', None
 
     return None, None, Response(
         {

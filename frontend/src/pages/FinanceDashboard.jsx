@@ -13,10 +13,65 @@ import {
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
+import FinanceModuleBreakdownModal from '../components/finance/FinanceModuleBreakdownModal'
 
 const maxActivite = (items) => Math.max(...items.map((i) => Number(i.minutes_realisees || 0)), 1)
 
 const SYNTHESE_PAGE_SIZE = 25
+
+const HERO_KPIS = [
+  {
+    id: 'planifie',
+    label: 'Volume horaire total planifié',
+    icon: 'bi-clock',
+    variant: 'plan',
+    kpiKey: 'total_duree_minutes',
+    format: 'duration',
+    evolutionKey: 'total_duree_minutes',
+    sub: (kpis) => `${kpis.total_duree_heures ?? 0} h · ${kpis.total_sessions ?? 0} séance(s)`,
+  },
+  {
+    id: 'realise',
+    label: 'Volume horaire total réalisé',
+    icon: 'bi-clock-history',
+    variant: 'time',
+    kpiKey: 'total_duree_realisee_minutes',
+    format: 'duration',
+    evolutionKey: 'total_duree_realisee_minutes',
+    sub: (kpis) => `${kpis.total_duree_realisee_heures ?? 0} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
+  },
+  {
+    id: 'taux',
+    label: 'Taux de réalisation global',
+    icon: 'bi-percent',
+    variant: 'rate',
+    kpiKey: 'taux_realisation_global_pct',
+    format: 'pct',
+    evolutionKey: 'taux_realisation_global_pct',
+    sub: (kpis, comparaison) => {
+      const prev = comparaison?.kpis?.taux_realisation_global_pct
+      return prev != null ? `Période précédente : ${prev} %` : 'Hors séances sans horaire planifié'
+    },
+  },
+  {
+    id: 'cout',
+    label: 'Coût global du volume horaire réalisé',
+    icon: 'bi-cash-stack',
+    variant: 'money',
+    kpiKey: 'total_montant_realise',
+    format: 'money',
+    evolutionKey: 'total_montant_realise',
+    sub: (kpis) => {
+      if (kpis.tarifs_variables) {
+        const n = Array.isArray(kpis.tarifs_appliques) ? kpis.tarifs_appliques.length : 0
+        return n > 1
+          ? `Facturation selon le tarif de chaque formation (${n} tarifs appliqués)`
+          : 'Facturation selon le tarif de chaque formation'
+      }
+      return `Tarif unique ${formatMoney(kpis.prix_heure_realisee)} FCFA / h`
+    },
+  },
+]
 
 const KPI_GROUPS = [
   {
@@ -45,14 +100,6 @@ const KPI_GROUPS = [
       { key: 'moyenne_heures_realisees_par_formateur', label: 'Moy. h / actif', format: 'hours', icon: 'bi-graph-up' },
     ],
   },
-  {
-    title: 'Rémunération',
-    iconClass: 'finance-kpi-card-icon--money',
-    items: [
-      { key: 'prix_heure_realisee', label: 'Tarif / h', format: 'money', icon: 'bi-cash-coin' },
-      { key: 'moyenne_montant_par_formateur_actif', label: 'Moy. / actif', format: 'money', icon: 'bi-wallet2' },
-    ],
-  },
 ]
 
 function formatKpiValue(kpis, item) {
@@ -60,6 +107,14 @@ function formatKpiValue(kpis, item) {
   if (item.format === 'duration') return fmtDuration(v)
   if (item.format === 'money') return `${formatMoney(v)} FCFA`
   if (item.format === 'hours') return `${v ?? 0} h`
+  return v ?? 0
+}
+
+function formatHeroKpiValue(kpis, item) {
+  const v = kpis[item.kpiKey]
+  if (item.format === 'duration') return fmtDuration(v)
+  if (item.format === 'money') return `${formatMoney(v)} FCFA`
+  if (item.format === 'pct') return `${v ?? 0} %`
   return v ?? 0
 }
 
@@ -100,6 +155,7 @@ export default function FinanceDashboard() {
   const [appliedPeriod, setAppliedPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
   const [synthesePage, setSynthesePage] = useState(1)
+  const [moduleDrill, setModuleDrill] = useState(null)
 
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
@@ -146,6 +202,7 @@ export default function FinanceDashboard() {
   const topMontants = Array.isArray(data?.top_montants) ? data.top_montants : []
   const specialites = Array.isArray(data?.repartition_specialites) ? data.repartition_specialites : []
   const synthese = Array.isArray(data?.synthese_formateurs) ? data.synthese_formateurs : []
+  const volumesParModule = Array.isArray(data?.volumes_par_module) ? data.volumes_par_module : []
   const syntheseTotalPages = Math.max(1, Math.ceil(synthese.length / SYNTHESE_PAGE_SIZE))
   const synthesePageSafe = Math.min(synthesePage, syntheseTotalPages)
   const synthesePageRows = useMemo(() => {
@@ -179,47 +236,31 @@ export default function FinanceDashboard() {
         <div className="loading py-5"><div className="spinner"></div></div>
       ) : (
         <>
-          <div className="finance-hero-kpis">
-            <div className="finance-hero-kpi finance-hero-kpi--money">
-              <div className="finance-hero-kpi-label">Masse salariale (période)</div>
-              <div className="finance-hero-kpi-value">
-                {formatMoney(kpis.total_montant_realise)} FCFA
-                <EvolutionBadge evolution={evolution} kpiKey="total_montant_realise" format="money" />
-              </div>
-              <div className="finance-hero-kpi-sub">
-                Tarif {formatMoney(kpis.prix_heure_realisee)} FCFA / h réalisée
-                {comparaison && (
-                  <span className="ms-2 opacity-75">
-                    (préc. {formatMoney(comparaison.kpis?.total_montant_realise)} F)
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="finance-hero-kpi finance-hero-kpi--time">
-              <div className="finance-hero-kpi-label">Temps réalisé</div>
-              <div className="finance-hero-kpi-value">
-                {fmtDuration(kpis.total_duree_realisee_minutes)}
-                <EvolutionBadge evolution={evolution} kpiKey="total_duree_realisee_minutes" format="duration" />
-              </div>
-              <div className="finance-hero-kpi-sub">
-                Planifié : {fmtDuration(kpis.total_duree_minutes)}
-              </div>
-            </div>
-            <div className="finance-hero-kpi finance-hero-kpi--rate">
-              <div className="finance-hero-kpi-label">Taux de réalisation</div>
-              <div className="finance-hero-kpi-value">
-                {kpis.taux_realisation_global_pct ?? 0}%
-                <EvolutionBadge evolution={evolution} kpiKey="taux_realisation_global_pct" format="pct" />
-              </div>
-              <div className="finance-hero-kpi-sub">
-                {kpis.formateurs_actifs || 0} formateur(s) actif(s) sur la période
-                {comparaison && (
-                  <span className="ms-1 opacity-75">
-                    (préc. {comparaison.kpis?.formateurs_actifs ?? 0})
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="finance-hero-kpis finance-hero-kpis--4">
+            {HERO_KPIS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`finance-hero-kpi finance-hero-kpi--${item.variant} finance-hero-kpi--clickable`}
+                onClick={() => setModuleDrill(item.id)}
+                title="Cliquer pour le détail par module"
+              >
+                <div className="finance-hero-kpi-label">
+                  <i className={`bi ${item.icon} me-1`}></i>
+                  {item.label}
+                </div>
+                <div className="finance-hero-kpi-value">
+                  {formatHeroKpiValue(kpis, item)}
+                  <EvolutionBadge evolution={evolution} kpiKey={item.evolutionKey} format={item.format} />
+                </div>
+                <div className="finance-hero-kpi-sub">
+                  {item.sub(kpis, comparaison)}
+                </div>
+                <div className="finance-hero-kpi-hint">
+                  <i className="bi bi-box-arrow-up-right"></i> Détail par module
+                </div>
+              </button>
+            ))}
           </div>
 
           <div className="finance-kpi-grid">
@@ -428,6 +469,14 @@ export default function FinanceDashboard() {
             <p className="text-muted small text-end">
               Actualisé le {new Date(data.generated_at).toLocaleString('fr-FR')}
             </p>
+          )}
+
+          {moduleDrill && (
+            <FinanceModuleBreakdownModal
+              drillType={moduleDrill}
+              modules={volumesParModule}
+              onClose={() => setModuleDrill(null)}
+            />
           )}
         </>
       )}
