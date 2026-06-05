@@ -1459,7 +1459,11 @@ def _compute_fiche_stats(pointages_qs):
 
 
 def _compute_volume_horaire_stats(modules_data, pointages_qs):
-    """Volume horaire effectué (présence badgeée) / total prévu (modules inscrits)."""
+    """Volume horaire effectué (présence badgeée) / total prévu (modules inscrits).
+
+    Seuls les badgeages sur les modules inscrits sont comptés, plafonnés à
+    duree_prevue_heures par module — l'effectué ne peut pas dépasser le prévu.
+    """
     module_cap_minutes = {}
     total_heures = 0.0
     for m in modules_data:
@@ -1477,23 +1481,22 @@ def _compute_volume_horaire_stats(modules_data, pointages_qs):
         if mins <= 0:
             continue
         mid = pt.session.module_id if pt.session_id else None
-        if mid in module_cap_minutes:
-            remaining = module_cap_minutes[mid] - module_accum[mid]
-            if remaining <= 0:
-                continue
-            counted = min(mins, remaining)
-            module_accum[mid] += counted
-            effectue_minutes += counted
-        else:
-            effectue_minutes += mins
+        if mid not in module_cap_minutes:
+            continue
+        remaining = module_cap_minutes[mid] - module_accum[mid]
+        if remaining <= 0:
+            continue
+        counted = min(mins, remaining)
+        module_accum[mid] += counted
+        effectue_minutes += counted
 
     effectue_heures = round(effectue_minutes / 60, 1)
     total_heures_r = round(total_heures, 1)
-    taux = (
-        round((effectue_heures / total_heures_r) * 100, 1)
-        if total_heures_r > 0
-        else 0.0
-    )
+    if total_heures_r > 0:
+        effectue_heures = min(effectue_heures, total_heures_r)
+        taux = min(100.0, round((effectue_heures / total_heures_r) * 100, 1))
+    else:
+        taux = 0.0
 
     return {
         'volume_horaire_total_heures': total_heures_r,
