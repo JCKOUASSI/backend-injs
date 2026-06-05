@@ -302,14 +302,6 @@ class Command(BaseCommand):
             or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
         )
 
-    def _resolve_ref_site(self, site_name):
-        """Résout ou crée un RefSite depuis le libellé importé (colonne « Site »)."""
-        name = (site_name or '').strip()
-        if not name:
-            return None
-        site_obj, _ = RefSite.objects.get_or_create(nom=name, defaults={'actif': True})
-        return site_obj
-
     def _int(self, val, default=None):
         if val is None:
             return default
@@ -458,9 +450,7 @@ class Command(BaseCommand):
             _site_name = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
-            if _site_name:
-                module_defaults['site'] = self._resolve_ref_site(_site_name)
-                module_defaults['site_legacy'] = _site_name
+            if _site: module_defaults['site'] = _site
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
             if _secretariat: module_defaults['secretariat'] = _secretariat

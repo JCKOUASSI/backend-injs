@@ -18,6 +18,11 @@ urlpatterns = [
     path('formations/<int:pk>/dashboard/', views.formation_dashboard, name='formation-dashboard'),
     path('formations/<int:pk>/presences/', views.formation_presences, name='formation-presences'),
     path('formations/<int:pk>/force-pointage/', views.force_pointage, name='force-pointage'),
+    path(
+        'formations/<int:pk>/force-badgeage-auditeurs-bulk/',
+        views.force_badgeage_auditeurs_bulk,
+        name='force-badgeage-auditeurs-bulk',
+    ),
     path('formations/<int:pk>/close-session/', views.close_session, name='close-session'),
 
     # Offline badging data
