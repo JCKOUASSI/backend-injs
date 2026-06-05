@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../config/app_env.dart';
 import '../providers/session_provider.dart';
+import 'auth_navigation.dart';
 
 /// Demande le code encadrant puis déconnecte si le code est correct.
 /// Retourne `true` si la déconnexion a eu lieu.
@@ -23,6 +24,9 @@ Future<bool> performGuardedLogout(BuildContext context) async {
     return false;
   }
   await context.read<SessionProvider>().logout();
+  if (context.mounted) {
+    resetToAuthRoot(context);
+  }
   return true;
 }
 

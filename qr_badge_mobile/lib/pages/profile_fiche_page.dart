@@ -6,9 +6,9 @@ import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../services/profile_service.dart';
 import '../theme/qr_badge_theme.dart';
+import '../utils/auth_navigation.dart';
 import '../widgets/home_summary_card.dart';
 import '../widgets/qr_badge_logo.dart';
-import 'login_page.dart';
 
 class ProfileFichePage extends StatefulWidget {
   const ProfileFichePage({super.key, this.onClose, this.onOpenHistory});
@@ -89,10 +89,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       if (mounted) {
         await context.read<SessionProvider>().logout();
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (_) => false,
-        );
+        resetToAuthRoot(context);
       }
       return;
     } catch (e) {

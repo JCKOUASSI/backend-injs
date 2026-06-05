@@ -9,7 +9,6 @@ import '../utils/guarded_logout.dart';
 import '../utils/open_privacy_policy.dart';
 import 'history_page.dart';
 import 'home_dashboard_page.dart';
-import 'login_page.dart';
 import 'profile_fiche_page.dart';
 import 'scan_page.dart';
 
@@ -89,6 +88,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       drawer: _AppDrawer(
         onRequestGps: () => _requestGps(session),
         onOpenFiche: () => setState(() => _ficheVisible = true),
+        onLogout: () => performGuardedLogout(context),
       ),
       appBar: _ficheVisible || _index == 0
           ? null
@@ -216,10 +216,12 @@ class _AppDrawer extends StatelessWidget {
   const _AppDrawer({
     required this.onRequestGps,
     required this.onOpenFiche,
+    required this.onLogout,
   });
 
   final VoidCallback onRequestGps;
   final VoidCallback onOpenFiche;
+  final Future<bool> Function() onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -271,18 +273,11 @@ class _AppDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.ciDanger),
               title: const Text('Déconnexion'),
-              onTap: () async {
+              onTap: () {
                 Navigator.pop(context);
-                final ok = await performGuardedLogout(context);
-                if (!ok || !context.mounted) {
-                  return;
-                }
-                if (!context.read<SessionProvider>().isAuthenticated) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (_) => false,
-                  );
-                }
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  onLogout();
+                });
               },
             ),
           ],

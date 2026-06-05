@@ -6,9 +6,8 @@ import '../services/api_client.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/open_privacy_policy.dart';
 import '../utils/server_url.dart';
+import '../utils/auth_navigation.dart';
 import '../widgets/qr_badge_logo.dart';
-import 'change_password_page.dart';
-import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,12 +48,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) {
         return;
       }
-      final next = session.mustChangePassword
-          ? const ChangePasswordPage()
-          : const HomePage();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => next),
-      );
+      resetToAuthRoot(context);
     } catch (e) {
       final session = context.read<SessionProvider>();
       String msg;
