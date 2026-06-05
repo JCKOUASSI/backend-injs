@@ -23,7 +23,7 @@ const formatDateTime = (value) => {
 export default function FinanceParametrage() {
   const { user } = useAuth()
   const { showToast } = useToast()
-  const canEdit = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canEdit = user?.role === 'FINANCE'
   const [searchParams] = useSearchParams()
 
   usePersistedListQuery(
@@ -41,7 +41,7 @@ export default function FinanceParametrage() {
   const [tarifs, setTarifs] = useState([])
   const [exportSettings, setExportSettings] = useState({
     afficher_montants_exports: true,
-    export_titre_document: 'ÉTAT FINANCIER FORMATEUR',
+    export_titre_document: 'FICHE DE PAIE DÉTAILLÉE',
     export_entete_ligne1: '',
     export_entete_ligne2: '',
     export_organisme: '',
@@ -67,7 +67,7 @@ export default function FinanceParametrage() {
         )
         setExportSettings({
           afficher_montants_exports: res.data?.afficher_montants_exports !== false,
-          export_titre_document: res.data?.export_titre_document || 'ÉTAT FINANCIER FORMATEUR',
+          export_titre_document: res.data?.export_titre_document || 'FICHE DE PAIE DÉTAILLÉE',
           export_entete_ligne1: res.data?.export_entete_ligne1 || '',
           export_entete_ligne2: res.data?.export_entete_ligne2 || '',
           export_organisme: res.data?.export_organisme || '',
@@ -143,7 +143,7 @@ export default function FinanceParametrage() {
       })
       setExportSettings({
         afficher_montants_exports: res.data?.afficher_montants_exports !== false,
-        export_titre_document: res.data?.export_titre_document || 'ÉTAT FINANCIER FORMATEUR',
+        export_titre_document: res.data?.export_titre_document || 'FICHE DE PAIE DÉTAILLÉE',
         export_entete_ligne1: res.data?.export_entete_ligne1 || '',
         export_entete_ligne2: res.data?.export_entete_ligne2 || '',
         export_organisme: res.data?.export_organisme || '',
@@ -206,7 +206,7 @@ export default function FinanceParametrage() {
   return (
     <FinancePageShell
       title="Paramétrage Finance"
-      subtitle="Tarifs horaires appliqués au calcul des fiches de paie"
+      subtitle="Tarifs horaires et exports"
       icon="bi-sliders"
       actions={<FinanceNavActions active="parametrage" />}
       showPeriodFilter={false}
@@ -215,20 +215,16 @@ export default function FinanceParametrage() {
         <div className="loading py-5"><div className="spinner"></div></div>
       ) : (
         <div className="finance-settings-card finance-settings-card-wide">
-          <p className="text-muted mb-4" style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
-            Le montant est calculé à partir du <strong>temps réalisé</strong> (badgeage effectif)
-            multiplié par le tarif horaire du <strong>cycle de formation</strong> concerné.
-            La liste reprend les formations du référentiel et les cycles déjà utilisés dans l&apos;application.
-            Définissez un tarif par formation ci-dessous ; le tarif par défaut ne sert que de repli
-            si une formation n&apos;a pas de tarif propre.
-          </p>
+          {!canEdit && (
+            <div className="alert alert-secondary py-2 small mb-3">
+              <i className="bi bi-eye me-1"></i>
+              Consultation seule.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="form-group mb-4">
-              <label className="form-label fw-semibold">
-                Tarif par défaut (1 heure réalisée)
-                <span className="text-muted fw-normal ms-1">— optionnel</span>
-              </label>
+              <label className="form-label fw-semibold">Tarif par défaut (FCFA / h)</label>
               <div className="input-group input-group-lg" style={{ maxWidth: 420 }}>
                 <input
                   type="number"
@@ -241,21 +237,11 @@ export default function FinanceParametrage() {
                 />
                 <span className="input-group-text fw-semibold">FCFA / h</span>
               </div>
-              <div className="form-text">
-                Repli uniquement pour les formations sans tarif spécifique dans le tableau ci-dessous.
-                Si chaque formation a son propre tarif, vous pouvez laisser 0 ou ignorer ce champ.
-              </div>
-            </div>
-
-            <div className="finance-settings-preview mb-4">
-              <div className="mb-2"><i className="bi bi-calculator me-2"></i><strong>Exemple (tarif par défaut)</strong></div>
-              <div>10 h réalisées × {formatMoney(prixNum)} FCFA = <strong>{formatMoney(prixNum * 10)} FCFA</strong></div>
-              <div className="mt-1 text-muted small">31 min réalisées ≈ {formatMoney((prixNum * 31) / 60)} FCFA</div>
             </div>
 
             <h6 className="fw-semibold mb-3">
               <i className="bi bi-journal-bookmark me-2"></i>
-              Tarifs par formation (référentiel)
+              Tarifs par formation
             </h6>
 
             {tarifs.length === 0 ? (
@@ -282,12 +268,8 @@ export default function FinanceParametrage() {
 
             <h6 className="fw-semibold mb-3">
               <i className="bi bi-file-earmark-text me-2"></i>
-              États financiers (exports PDF / Excel)
+              Exports PDF / Excel
             </h6>
-            <p className="text-muted small mb-3">
-              En-têtes, mentions et signataire affichés sur les états financiers formateurs.
-              L&apos;option montants peut aussi être modifiée à chaque export.
-            </p>
 
             <div className="form-check form-switch mb-3">
               <input

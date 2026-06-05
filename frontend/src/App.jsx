@@ -53,9 +53,11 @@ function Layout({ children, breadcrumb }) {
   }
 
   const isFinanceRole = user?.role === 'FINANCE'
-  const canViewFinanceDashboard = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canViewFinanceDashboard = canViewFinanceModule
   const canViewParticipants = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
-  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT'].includes(user?.role)
+  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+    || canViewFinanceModule
   const canViewUsers = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewSecretariats = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
   const canViewImport = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
@@ -116,8 +118,16 @@ function Layout({ children, breadcrumb }) {
             </Link>
           )}
           {canViewFormateurs && (
-            <Link to={isFinanceRole ? financeNavHref('/formateurs') : listHref('/formateurs', LIST_STORAGE_KEYS.formateurs)} className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className={`bi ${isFinanceRole ? 'bi-cash-stack' : 'bi-person-video3'}`}></i> <span className="nav-label">{isFinanceRole ? 'Suivi Finance' : 'Formateurs'}</span></span>
+            <Link
+              to={canViewFinanceModule ? financeNavHref('/formateurs') : listHref('/formateurs', LIST_STORAGE_KEYS.formateurs)}
+              className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span>
+                <i className={`bi ${canViewFinanceModule ? 'bi-cash-stack' : 'bi-person-video3'}`}></i>
+                {' '}
+                <span className="nav-label">{canViewFinanceModule ? 'Suivi Finance' : 'Formateurs'}</span>
+              </span>
             </Link>
           )}
           {canViewFinanceDashboard && (
@@ -186,7 +196,7 @@ function Layout({ children, breadcrumb }) {
 function App() {
   function HomeRoute() {
     const { user } = useAuth()
-    if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
+    if (user?.role === 'FINANCE' || user?.role === 'DIRECTION') return <Navigate to="/finance-dashboard" replace />
     return (
       <Layout breadcrumb={<li>Tableau de bord</li>}>
         <Dashboard />
@@ -248,7 +258,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formateurs" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'FINANCE', 'DIRECTION']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
               </Layout>
