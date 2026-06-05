@@ -81,5 +81,7 @@ def _on_post_migrate(sender, **kwargs):
 
 def _on_user_saved(sender, instance, **kwargs):
     from .role_groups import sync_user_role_group
+    from .profile_sync import sync_user_profile_links
 
     sync_user_role_group(instance)
+    sync_user_profile_links(instance)

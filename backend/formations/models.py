@@ -129,6 +129,14 @@ class RefFormation(models.Model):
     """Cycles de formation prédéfinis (ex: FORMATION EN ADMINISTRATION DE BASE)."""
     intitule = models.CharField(max_length=255, unique=True)
     actif = models.BooleanField(default=True)
+    prix_heure_realisee = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Prix pour 1 heure réalisée',
+        help_text='Tarif horaire spécifique. Si non renseigné, le tarif par défaut des paramètres finance s\'applique.',
+    )
 
     class Meta:
         ordering = ['intitule']
@@ -331,6 +339,18 @@ class Formateur(models.Model):
     telephone = models.CharField(max_length=20, blank=True, default='')
     specialite = models.CharField(max_length=255, blank=True, default='')
     organisation = models.CharField(max_length=255, blank=True, default='')
+    numero_piece_identite = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name="N° pièce d'identité",
+    )
+    numero_compte_bancaire = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='N° de compte bancaire',
+    )
     secretariats = models.ManyToManyField(
         Secretariat,
         blank=True,
@@ -648,6 +668,66 @@ class FinanceSettings(models.Model):
         default=0,
         verbose_name='Prix pour 1 heure réalisée',
         help_text='Montant versé par heure de cours effectivement réalisée (badgeage).',
+    )
+    afficher_montants_exports = models.BooleanField(
+        default=True,
+        verbose_name='Afficher les montants sur les états financiers',
+        help_text='Valeur par défaut lors de l\'export PDF/Excel (modifiable à chaque export).',
+    )
+    export_titre_document = models.CharField(
+        max_length=255,
+        blank=True,
+        default='ÉTAT FINANCIER FORMATEUR',
+        verbose_name='Titre des états financiers',
+    )
+    export_entete_ligne1 = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='En-tête ligne 1',
+        help_text='Ex. République de Côte d\'Ivoire',
+    )
+    export_entete_ligne2 = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='En-tête ligne 2',
+        help_text='Ex. Ministère / Direction',
+    )
+    export_organisme = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Organisme',
+        help_text='Nom affiché sur les états financiers (ex. CPFAE).',
+    )
+    export_adresse = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Adresse / coordonnées',
+    )
+    export_reference_prefix = models.CharField(
+        max_length=30,
+        blank=True,
+        default='EFI',
+        verbose_name='Préfixe de référence document',
+    )
+    export_mention_legale = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Mention légale / pied de page',
+    )
+    export_signataire_nom = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Nom du signataire',
+    )
+    export_signataire_fonction = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Fonction du signataire',
     )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(

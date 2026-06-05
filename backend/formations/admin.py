@@ -849,7 +849,7 @@ class RefGradeAdmin(admin.ModelAdmin):
 
 @admin.register(RefFormation)
 class RefFormationAdmin(admin.ModelAdmin):
-    list_display = ['intitule', 'actif']
+    list_display = ['intitule', 'prix_heure_realisee', 'actif']
     search_fields = ['intitule']
     list_filter = ['actif']
 

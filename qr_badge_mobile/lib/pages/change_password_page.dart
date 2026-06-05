@@ -3,9 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
 import '../utils/confirm_dialog.dart';
+import '../utils/auth_navigation.dart';
 import '../utils/guarded_logout.dart';
-import 'home_page.dart';
-import 'login_page.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -63,10 +62,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mot de passe mis à jour.')),
       );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (_) => false,
-      );
+      resetToAuthRoot(context);
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -87,14 +83,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             onPressed: _loading
                 ? null
                 : () async {
-                    final ok = await performGuardedLogout(context);
-                    if (!ok || !context.mounted) {
-                      return;
-                    }
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginPage()),
-                      (_) => false,
-                    );
+                    await performGuardedLogout(context);
                   },
             child: const Text('Déconnexion'),
           ),

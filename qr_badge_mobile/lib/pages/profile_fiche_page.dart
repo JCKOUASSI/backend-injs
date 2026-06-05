@@ -6,9 +6,9 @@ import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../services/profile_service.dart';
 import '../theme/qr_badge_theme.dart';
+import '../utils/auth_navigation.dart';
 import '../widgets/home_summary_card.dart';
 import '../widgets/qr_badge_logo.dart';
-import 'login_page.dart';
 
 class ProfileFichePage extends StatefulWidget {
   const ProfileFichePage({super.key, this.onClose, this.onOpenHistory});
@@ -89,10 +89,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       if (mounted) {
         await context.read<SessionProvider>().logout();
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (_) => false,
-        );
+        resetToAuthRoot(context);
       }
       return;
     } catch (e) {
@@ -312,6 +309,14 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
             onTap: () => _showInfoSheet(context, rows: infoRows),
             rows: infoRows,
           ),
+          if (profil['type_personne']?.toString() == 'formateur') ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => _showBankingEditSheet(context, profil),
+              icon: const Icon(Icons.account_balance_outlined, size: 18),
+              label: const Text('Modifier pièce d\'identité / compte bancaire'),
+            ),
+          ],
           const SizedBox(height: 20),
           _SectionTitle(title: 'Statistiques personnelles'),
           _StatsGrid(
@@ -403,6 +408,16 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         if (profil['specialite'] != null &&
             profil['specialite'].toString().isNotEmpty)
           _InfoRow('Spécialité', profil['specialite']?.toString()),
+        if (profil['type_personne']?.toString() == 'formateur') ...[
+          _InfoRow(
+            'N° pièce d\'identité',
+            profil['numero_piece_identite']?.toString(),
+          ),
+          _InfoRow(
+            'N° compte bancaire',
+            profil['numero_compte_bancaire']?.toString(),
+          ),
+        ],
         _InfoRow('Secrétariat', user['secretariat_nom']?.toString()),
       ];
 
@@ -433,6 +448,112 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
           .map((r) => _DetailRow(r.label, r.value))
           .toList(),
     );
+  }
+
+  Future<void> _showBankingEditSheet(
+    BuildContext context,
+    Map<String, dynamic> profil,
+  ) async {
+    final pieceCtrl = TextEditingController(
+      text: profil['numero_piece_identite']?.toString() ?? '',
+    );
+    final compteCtrl = TextEditingController(
+      text: profil['numero_compte_bancaire']?.toString() ?? '',
+    );
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        var saving = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Informations bancaires',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: pieceCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'N° pièce d\'identité',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: compteCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'N° compte bancaire',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            setModalState(() => saving = true);
+                            final session = context.read<SessionProvider>();
+                            try {
+                              await _service.updateMySensitiveData(
+                                baseUrl: session.baseUrl,
+                                accessToken: session.accessToken!,
+                                numeroPieceIdentite: pieceCtrl.text.trim(),
+                                numeroCompteBancaire: compteCtrl.text.trim(),
+                                onRefreshToken: () => session
+                                    .tryRefreshToken()
+                                    .then((ok) => ok ? session.accessToken : null),
+                              );
+                              if (context.mounted) {
+                                Navigator.of(context).pop(true);
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      e.toString().replaceFirst('Exception: ', ''),
+                                    ),
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (context.mounted) {
+                                setModalState(() => saving = false);
+                              }
+                            }
+                          },
+                    child: Text(saving ? 'Enregistrement…' : 'Enregistrer'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    pieceCtrl.dispose();
+    compteCtrl.dispose();
+    if (saved == true && mounted) {
+      await _load(showSpinner: false);
+    }
   }
 
   void _showStatSheet(

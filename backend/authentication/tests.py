@@ -256,3 +256,140 @@ class RoleGroupsTest(TestCase):
         self.assertFalse(user.groups.filter(name=old_group).exists())
         self.assertTrue(user.groups.filter(name=new_group).exists())
 
+    def test_create_superuser_assigns_admin_role(self):
+        user = User.objects.create_superuser(
+            username='superadmin',
+            email='super@example.com',
+            password='superpass123',
+        )
+        self.assertEqual(user.role, User.Role.ADMIN)
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.groups.filter(name=ROLE_GROUP_NAMES[User.Role.ADMIN]).exists())
+
+
+class AuditeurProfileSyncTests(TestCase):
+
+    def test_auditeur_user_creates_participant_profile(self):
+        user = User.objects.create_user(
+            username='FNCE26-999',
+            password='pass12345',
+            first_name='Marie',
+            last_name='Martin',
+            email='marie@example.com',
+            role=User.Role.AUDITEUR,
+        )
+        participant = user.participant_profile
+        self.assertEqual(participant.matricule, 'FNCE26-999')
+        self.assertEqual(participant.prenom, 'Marie')
+        self.assertEqual(participant.nom, 'Martin')
+        self.assertEqual(participant.email, 'marie@example.com')
+
+    def test_auditeur_user_links_existing_participant_by_matricule(self):
+        from formations.models import Participant
+
+        participant = Participant.objects.create(
+            matricule='FNCE26-100',
+            nom='Durand',
+            prenom='Paul',
+            email='paul@example.com',
+        )
+        user = User.objects.create_user(
+            username='auditeur_link',
+            password='pass12345',
+            matricule='FNCE26-100',
+            first_name='Paul',
+            last_name='Durand',
+            role=User.Role.AUDITEUR,
+        )
+        participant.refresh_from_db()
+        self.assertEqual(participant.user_id, user.id)
+        self.assertEqual(user.participant_profile.pk, participant.pk)
+
+    def test_admin_user_does_not_create_participant_profile(self):
+        from formations.models import Participant
+
+        user = User.objects.create_superuser(
+            username='admin_no_profile',
+            email='admin@example.com',
+            password='superpass123',
+        )
+        self.assertFalse(Participant.objects.filter(user=user).exists())
+
+    def test_my_fiche_creates_missing_auditeur_profile(self):
+        from formations.models import Participant
+        from rest_framework.test import APIClient
+
+        user = User.objects.create_user(
+            username='FNCE26-888',
+            password='pass12345',
+            first_name='Luc',
+            last_name='Bernard',
+            role=User.Role.AUDITEUR,
+        )
+        Participant.objects.filter(user=user).delete()
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        resp = client.get('/api/me/fiche/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Participant.objects.filter(user=user).exists())
+
+    def test_formateur_user_creates_formateur_profile(self):
+        from formations.models import Formateur
+
+        user = User.objects.create_user(
+            username='F1234',
+            password='pass12345',
+            first_name='Anne',
+            last_name='Leroy',
+            matricule='F1234',
+            role=User.Role.FORMATEUR,
+        )
+        formateur = user.formateur_profile
+        self.assertEqual(formateur.numerobadge, 'F1234')
+        self.assertEqual(formateur.prenom, 'Anne')
+        self.assertEqual(formateur.nom, 'Leroy')
+
+    def test_my_fiche_creates_missing_formateur_profile(self):
+        from formations.models import Formateur
+        from rest_framework.test import APIClient
+
+        user = User.objects.create_user(
+            username='F5678',
+            password='pass12345',
+            first_name='Paul',
+            last_name='Martin',
+            matricule='F5678',
+            role=User.Role.FORMATEUR,
+        )
+        Formateur.objects.filter(user=user).delete()
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        resp = client.get('/api/me/fiche/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Formateur.objects.filter(user=user).exists())
+        self.assertEqual(resp.data['profil']['type_personne'], 'formateur')
+
+    def test_encadrant_user_gets_matricule_for_fiche(self):
+        from rest_framework.test import APIClient
+
+        user = User.objects.create_user(
+            username='ENC-001',
+            password='pass12345',
+            first_name='Sophie',
+            last_name='Moreau',
+            role=User.Role.ENCADRANT,
+        )
+        User.objects.filter(pk=user.pk).update(matricule='')
+        user.refresh_from_db()
+        self.assertEqual(user.matricule, '')
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        resp = client.get('/api/me/fiche/')
+        self.assertEqual(resp.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.matricule, 'ENC-001')
+        self.assertEqual(resp.data['profil']['type_personne'], 'encadrant')
+
