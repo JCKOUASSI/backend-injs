@@ -35,6 +35,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
   final _service = ScanService();
   bool _loading = true;
   Map<String, dynamic>? _payload;
+  int _lastRefreshTick = -1;
 
   @override
   bool get wantKeepAlive => true;
@@ -42,6 +43,16 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void reload() => _load();
+
+  void _maybeReloadFromTick(int tick) {
+    if (tick == _lastRefreshTick) {
+      return;
+    }
+    _lastRefreshTick = tick;
     _load();
   }
 
@@ -110,6 +121,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
   Widget build(BuildContext context) {
     super.build(context);
     final session = context.watch<SessionProvider>();
+    _maybeReloadFromTick(session.historyRefreshTick);
     final items = _pointages();
     final dernier = _dernierPointage(items);
     final aVerifier = _ouvertsSansSortie(items) +

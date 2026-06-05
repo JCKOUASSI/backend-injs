@@ -332,7 +332,9 @@ def _resolve_authenticated_personne(user):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    participant = Participant.objects.filter(user_id=user.pk).first()
+    from .participant_scope import link_user_to_primary_participant
+
+    participant = link_user_to_primary_participant(user)
     if participant:
         return participant, 'participant', None
 
@@ -1305,29 +1307,12 @@ def my_historique(request):
     if err:
         return err
 
-    if type_str == 'formateur':
-        filt = {'formateur': personne}
-    elif type_str == 'encadrant':
-        filt = {'encadrant': personne}
-    else:
-        filt = {'participant': personne}
-    pointages = Pointage.objects.filter(**filt).select_related('session__module__formation')
+    pointages_qs = _pointages_queryset_for_personne(personne, type_str, user=user)
+    pointages = pointages_qs.select_related('session__module__formation')
 
-    data = []
-    for pt in pointages:
-        data.append({
-            'id': pt.id,
-            'formation_id': pt.session.module.formation_id,
-            'formation_titre': pt.session.module.formation.formation,
-            'date_journee': str(pt.date_journee),
-            'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
-            'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
-            'duree_presence_minutes': float(pt.duree_presence_minutes) if pt.duree_presence_minutes else None,
-            'statut': pt.statut,
-        })
+    data = [_pointage_historique_item(pt) for pt in pointages]
 
     modules_data = _modules_for_personne(personne, type_str)
-    pointages_qs = _pointages_queryset_for_personne(personne, type_str)
     stats = _compute_fiche_stats(pointages_qs)
     stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
 
@@ -1396,12 +1381,35 @@ def _modules_for_personne(personne, type_str):
     return modules_data
 
 
-def _pointages_queryset_for_personne(personne, type_str):
+def _pointages_queryset_for_personne(personne, type_str, user=None):
     if type_str == 'formateur':
         return Pointage.objects.filter(formateur=personne)
     if type_str == 'encadrant':
         return Pointage.objects.filter(encadrant=personne)
+    if user is not None:
+        from .participant_scope import participant_ids_for_user
+        participant_ids = participant_ids_for_user(user)
+        if participant_ids:
+            return Pointage.objects.filter(participant_id__in=participant_ids)
     return Pointage.objects.filter(participant=personne)
+
+
+def _pointage_historique_item(pt):
+    module = pt.session.module if pt.session_id else None
+    formation = module.formation if module and module.formation_id else None
+    return {
+        'id': pt.id,
+        'formation_id': formation.pk if formation else None,
+        'formation_titre': formation.formation if formation else '',
+        'module_intitule': module.intitule if module else '',
+        'seance_numero': pt.session.numero if pt.session_id else None,
+        'seance_intitule': pt.session.intitule if pt.session_id else '',
+        'date_journee': str(pt.date_journee),
+        'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
+        'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
+        'duree_presence_minutes': float(pt.duree_presence_minutes) if pt.duree_presence_minutes else None,
+        'statut': pt.statut,
+    }
 
 
 def _compute_fiche_stats(pointages_qs):
@@ -1530,7 +1538,7 @@ def my_fiche(request):
         return Response({'profil': {**formateur_sensitive_payload(personne), 'updated': True}})
 
     modules_data = _modules_for_personne(personne, type_str)
-    pointages_qs = _pointages_queryset_for_personne(personne, type_str)
+    pointages_qs = _pointages_queryset_for_personne(personne, type_str, user=user)
     stats = _compute_fiche_stats(pointages_qs)
     stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
     stats['nb_modules_inscrits'] = len(modules_data)
@@ -1546,6 +1554,8 @@ def my_fiche(request):
         'nom': getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '',
         'prenom': getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or '',
     }
+    if type_str == 'participant':
+        profil['pointages'] = [_pointage_historique_item(pt) for pt in pointages_qs.select_related('session__module__formation')]
     if type_str == 'formateur':
         profil['specialite'] = getattr(personne, 'specialite', '') or ''
         from formations.formateur_privacy import can_view_formateur_sensitive_data, formateur_sensitive_payload
@@ -2205,16 +2215,17 @@ def participant_historique(request, pk):
     if request.user.role != User.Role.AUDITEUR:
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        participant = request.user.participant_profile
-    except Participant.DoesNotExist:
+    from .participant_scope import link_user_to_primary_participant, participant_ids_for_user
+
+    participant = link_user_to_primary_participant(request.user)
+    if participant is None:
         return Response({'detail': 'Auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if participant.id != pk:
+    if pk not in participant_ids_for_user(request.user):
         return Response({'detail': 'Acces interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     pointages = Pointage.objects.filter(
-        participant=participant
+        participant_id__in=participant_ids_for_user(request.user)
     ).select_related('session__module__formation')
     serializer = PointageSerializer(pointages, many=True)
     return Response({

@@ -189,7 +189,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ? null
           : NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (v) => setState(() => _index = v),
+        onDestinationSelected: (v) {
+          setState(() => _index = v);
+          if (v == 1 || v == 2) {
+            context.read<SessionProvider>().requestHistoryRefresh();
+          }
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.qr_code_scanner_outlined),
