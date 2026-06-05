@@ -113,10 +113,14 @@ def _finance_formateur_summary_rows(formateur, request=None):
     from formations.api_views import (
         _parse_finance_date_range,
         _finance_session_in_range,
-        _finance_prix_heure,
+        _finance_build_prix_map,
+        _finance_resolve_prix_heure,
+        _finance_module_formation_label,
         _finance_montant_from_minutes,
         _finance_secretariat_id_from_request,
         _finance_periode_payload,
+        _finance_realized_minutes,
+        _finance_taux_realisation_pct,
     )
 
     period = _parse_finance_date_range(request) if request else {
@@ -125,7 +129,7 @@ def _finance_formateur_summary_rows(formateur, request=None):
     if period.get('error'):
         period = {'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'}}
     secretariat_id = _finance_secretariat_id_from_request(request) if request else None
-    prix_heure = _finance_prix_heure()
+    default_prix, prix_map = _finance_build_prix_map()
 
     module_ids = set(
         ModuleFormateur.objects.filter(formateur_id=formateur.pk).values_list('module_id', flat=True)
@@ -147,19 +151,33 @@ def _finance_formateur_summary_rows(formateur, request=None):
     rows = []
     total_planned = 0.0
     total_realized = 0.0
+    taux_planned = 0.0
+    taux_realized_capped = 0.0
     date_min = None
     date_max = None
+    rates_used = set()
+    grades_seen = set()
+    groupes_seen = set()
     for s in sessions:
         mod = modules_by_id.get(s.module_id) if s.module_id else None
         if secretariat_id and (not mod or mod.secretariat_id != secretariat_id):
             continue
         if not _finance_session_in_range(s, period['date_debut'], period['date_fin']):
             continue
+        formation_label = _finance_module_formation_label(mod)
+        session_prix = _finance_resolve_prix_heure(
+            formation_label, prix_map=prix_map, default=default_prix,
+        )
+        rates_used.add(session_prix)
         planned = _session_planned_minutes(s)
-        realized = _session_realized_minutes_for_formateur(formateur.pk, s, now=now)
-        montant = _finance_montant_from_minutes(realized, prix_heure)
+        raw_realized = _session_realized_minutes_for_formateur(formateur.pk, s, now=now)
+        realized = _finance_realized_minutes(raw_realized, planned)
+        montant = _finance_montant_from_minutes(realized, session_prix)
         total_planned += planned
         total_realized += realized
+        if planned > 0:
+            taux_planned += planned
+            taux_realized_capped += realized
         if s.date_journee:
             if date_min is None or s.date_journee < date_min:
                 date_min = s.date_journee
@@ -168,18 +186,36 @@ def _finance_formateur_summary_rows(formateur, request=None):
         sec_nom = ''
         if mod and mod.secretariat_id and mod.secretariat:
             sec_nom = f"{mod.secretariat.nom} ({mod.secretariat.numero})"
+        grade_val = (mod.grade if mod else '') or ''
+        groupe_val = (mod.groupe if mod else '') or ''
+        if grade_val.strip():
+            grades_seen.add(grade_val.strip())
+        if groupe_val.strip():
+            groupes_seen.add(groupe_val.strip())
         rows.append({
             'date': s.date_journee.strftime('%d/%m/%Y') if s.date_journee else '-',
             'session': s.intitule or f'Séance {s.numero}',
             'module': s.module.intitule if s.module else '-',
             'formation': s.module.formation.formation if s.module and s.module.formation else '-',
+            'grade': grade_val or '-',
+            'groupe': groupe_val or '-',
             'secretariat': sec_nom or '-',
             'duree_seance': planned,
             'temps_realise': realized,
+            'heures_planifiees': round(planned / 60, 2) if planned else 0,
+            'heures_realisees': round(realized / 60, 2) if realized else 0,
             'montant': montant,
+            'prix_heure': session_prix,
         })
-    montant_total = _finance_montant_from_minutes(total_realized, prix_heure)
-    taux = round((total_realized / total_planned) * 100, 1) if total_planned > 0 else 0
+    montant_total = round(sum(float(r.get('montant') or 0) for r in rows), 2)
+    tarifs_variables = len(rates_used) > 1
+    if len(rates_used) == 1:
+        prix_heure = next(iter(rates_used))
+    elif len(rates_used) == 0:
+        prix_heure = default_prix
+    else:
+        prix_heure = None
+    taux = _finance_taux_realisation_pct(taux_realized_capped, taux_planned)
     periode_info = _finance_periode_payload(
         period['date_debut'], period['date_fin'], period['meta'], date_min, date_max,
     )
@@ -187,13 +223,237 @@ def _finance_formateur_summary_rows(formateur, request=None):
         'rows': rows,
         'total_planned': total_planned,
         'total_realized': total_realized,
+        'total_heures_planifiees': round(total_planned / 60, 2) if total_planned else 0,
+        'total_heures_realisees': round(total_realized / 60, 2) if total_realized else 0,
         'montant_total': montant_total,
         'prix_heure': prix_heure,
+        'tarifs_variables': tarifs_variables,
+        'prix_heure_defaut': default_prix,
         'taux_realisation_pct': taux,
         'periode': periode_info,
         'sessions_count': len(rows),
+        'formateur': {
+            'numerobadge': formateur.numerobadge or '',
+            'nom': formateur.nom or '',
+            'prenom': formateur.prenom or '',
+            'email': formateur.email or '',
+            'telephone': formateur.telephone or '',
+            'specialite': formateur.specialite or '',
+            'organisation': formateur.organisation or '',
+            'grades': ', '.join(sorted(grades_seen)) if grades_seen else '-',
+            'groupes': ', '.join(sorted(groupes_seen)) if groupes_seen else '-',
+            'secretariats': [
+                f"{s.nom} ({s.numero})" for s in formateur.secretariats.all()
+            ],
+            'numero_piece_identite': formateur.numero_piece_identite or '',
+            'numero_compte_bancaire': formateur.numero_compte_bancaire or '',
+        },
     }
     return meta
+
+
+def _parse_bool_query(value, default=True):
+    if value is None or value == '':
+        return default
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'oui', 'on')
+
+
+def _finance_export_settings():
+    from formations.models import FinanceSettings
+    return FinanceSettings.get_solo()
+
+
+def _afficher_montants_export(request):
+    settings = _finance_export_settings()
+    default = bool(getattr(settings, 'afficher_montants_exports', True))
+    if request is not None and request.query_params.get('afficher_montants') is not None:
+        return _parse_bool_query(request.query_params.get('afficher_montants'), default)
+    return default
+
+
+def _finance_export_document_options(request, formateur):
+    settings = _finance_export_settings()
+    prefix = (settings.export_reference_prefix or 'EFI').strip() or 'EFI'
+    ref_date = datetime.now().strftime('%Y%m%d')
+    badge = formateur.numerobadge or str(formateur.pk)
+    return {
+        'afficher_montants': _afficher_montants_export(request),
+        'titre_document': settings.export_titre_document or 'ÉTAT FINANCIER FORMATEUR',
+        'entete_ligne1': settings.export_entete_ligne1 or '',
+        'entete_ligne2': settings.export_entete_ligne2 or '',
+        'organisme': settings.export_organisme or '',
+        'adresse': settings.export_adresse or '',
+        'reference': f'{prefix}-{badge}-{ref_date}',
+        'mention_legale': settings.export_mention_legale or '',
+        'signataire_nom': settings.export_signataire_nom or '',
+        'signataire_fonction': settings.export_signataire_fonction or '',
+    }
+
+
+def _finance_formateur_export_context(formateur, request):
+    summary = _finance_formateur_summary_rows(formateur, request)
+    options = _finance_export_document_options(request, formateur)
+    prix_heure = summary.get('prix_heure')
+    tarifs_variables = summary.get('tarifs_variables', False)
+    if tarifs_variables or prix_heure is None:
+        prix_label = 'Variable (selon formation)'
+    else:
+        prix_label = f'{float(prix_heure or 0):,.0f} FCFA / h'
+    summary['export'] = options
+    summary['prix_label'] = prix_label
+    summary['periode_label'] = summary['periode'].get('periode_label') or 'Toutes périodes'
+    return summary
+
+
+def _finance_export_table_headers(afficher_montants):
+    headers = [
+        'Date', 'Séance', 'Module', 'Formation', 'Grade', 'Groupe', 'Secrétariat',
+        'Durée (min)', 'Réalisé (min)', 'Heures réalisées',
+    ]
+    if afficher_montants:
+        headers.append('Tarif (FCFA/h)')
+        headers.append('Montant (FCFA)')
+    return headers
+
+
+def _finance_export_table_row(row, afficher_montants):
+    values = [
+        row['date'],
+        row['session'],
+        row['module'],
+        row['formation'],
+        row.get('grade') or '-',
+        row.get('groupe') or '-',
+        row['secretariat'],
+        row['duree_seance'],
+        row['temps_realise'],
+        row.get('heures_realisees', round(float(row.get('temps_realise') or 0) / 60, 2)),
+    ]
+    if afficher_montants:
+        values.append(row.get('prix_heure', ''))
+        values.append(row.get('montant', 0))
+    return values
+
+
+def _finance_synthese_document_options(request):
+    settings = _finance_export_settings()
+    prefix = (settings.export_reference_prefix or 'EFI').strip() or 'EFI'
+    ref_date = datetime.now().strftime('%Y%m%d')
+    return {
+        'afficher_montants': _afficher_montants_export(request),
+        'titre_document': 'ÉTAT FINANCIER CONSOLIDÉ — FORMATEURS',
+        'entete_ligne1': settings.export_entete_ligne1 or '',
+        'entete_ligne2': settings.export_entete_ligne2 or '',
+        'organisme': settings.export_organisme or '',
+        'adresse': settings.export_adresse or '',
+        'reference': f'{prefix}-SYN-{ref_date}',
+        'mention_legale': settings.export_mention_legale or '',
+        'signataire_nom': settings.export_signataire_nom or '',
+        'signataire_fonction': settings.export_signataire_fonction or '',
+    }
+
+
+def _finance_synthese_export_context(request):
+    from django.db.models import Q
+    from formations.api_views import (
+        _parse_finance_date_range,
+        _finance_secretariat_id_from_request,
+        _finance_filter_formateur_queryset,
+        _finance_report_rows,
+        _finance_periode_payload,
+    )
+
+    period = _parse_finance_date_range(request)
+    if period.get('error'):
+        return None, period.get('detail') or 'Période invalide.'
+
+    secretariat_id = _finance_secretariat_id_from_request(request)
+    queryset = Formateur.objects.prefetch_related('secretariats').order_by('nom', 'prenom')
+    queryset = _finance_filter_formateur_queryset(queryset, secretariat_id)
+    search = (request.query_params.get('search') or '').strip()
+    if search:
+        queryset = queryset.filter(
+            Q(nom__icontains=search)
+            | Q(prenom__icontains=search)
+            | Q(specialite__icontains=search)
+        )
+
+    formateurs = list(queryset)
+    global_agg = {'activite_par_mois': {}, 'date_min': None, 'date_max': None}
+    rows = _finance_report_rows(
+        formateurs,
+        include_sessions=False,
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        global_aggregates=global_agg,
+        secretariat_id=secretariat_id,
+    )
+    if request.user.role != 'FINANCE':
+        for row in rows:
+            row.pop('numero_piece_identite', None)
+            row.pop('numero_compte_bancaire', None)
+
+    totals = {
+        'sessions_count': sum(int(r.get('sessions_count') or 0) for r in rows),
+        'total_planned': round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1),
+        'total_realized': round(sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1),
+        'total_heures_realisees': round(
+            sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows) / 60, 2,
+        ),
+        'montant_total': round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2),
+        'formateurs_count': len(rows),
+        'formateurs_actifs': sum(1 for r in rows if (r.get('sessions_count') or 0) > 0),
+    }
+    periode_info = _finance_periode_payload(
+        period['date_debut'],
+        period['date_fin'],
+        period['meta'],
+        global_agg.get('date_min'),
+        global_agg.get('date_max'),
+    )
+    return {
+        'rows': rows,
+        'totals': totals,
+        'export': _finance_synthese_document_options(request),
+        'periode_label': periode_info.get('periode_label') or 'Toutes périodes',
+    }, None
+
+
+def _finance_synthese_table_headers(afficher_montants, include_sensitive=False):
+    headers = [
+        'N° Badge', 'Nom', 'Prénom', 'Spécialité', 'Grade(s)', 'Groupe(s)', 'Séances',
+        'Planifié (min)', 'Réalisé (min)', 'Heures réal.', 'Taux %',
+    ]
+    if afficher_montants:
+        headers.append('Montant (FCFA)')
+    if include_sensitive:
+        headers.extend(['N° pièce identité', 'N° compte bancaire'])
+    return headers
+
+
+def _finance_synthese_table_row(row, afficher_montants, include_sensitive=False):
+    stats = row.get('statistiques') or {}
+    values = [
+        row.get('numerobadge') or '-',
+        row.get('nom') or '',
+        row.get('prenom') or '',
+        row.get('specialite') or '-',
+        row.get('grades') or '-',
+        row.get('groupes') or '-',
+        row.get('sessions_count') or 0,
+        round(float(row.get('total_duree_minutes') or 0), 1),
+        round(float(row.get('total_duree_realisee_minutes') or 0), 1),
+        round(float(row.get('total_duree_realisee_minutes') or 0) / 60, 2),
+        stats.get('taux_realisation_pct', 0),
+    ]
+    if afficher_montants:
+        values.append(round(float(row.get('montant_total_realise') or 0), 2))
+    if include_sensitive:
+        values.extend([
+            row.get('numero_piece_identite') or '-',
+            row.get('numero_compte_bancaire') or '-',
+        ])
+    return values
 
 
 def _formation_meta(formation):
@@ -1860,118 +2120,162 @@ def export_excel_session(request, session_pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_finance_formateur_pdf(request, formateur_pk):
-    """Export PDF de la fiche résumé d'un formateur (finance/direction)."""
+    """Export PDF état financier formateur (finance/direction)."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
     if not _check_finance_export_access(request):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
-    formateur = get_object_or_404(Formateur, pk=formateur_pk)
-    summary = _finance_formateur_summary_rows(formateur, request)
-    rows = summary['rows']
-    total_planned = summary['total_planned']
-    total_realized = summary['total_realized']
-    montant_total = summary['montant_total']
-    prix_heure = summary['prix_heure']
-    periode_label = summary['periode'].get('periode_label') or 'Toutes périodes'
+    formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
+    ctx = _finance_formateur_export_context(formateur, request)
+    rows = ctx['rows']
+    export_opts = ctx['export']
+    afficher_montants = export_opts['afficher_montants']
+    fmt = ctx.get('formateur') or {}
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        leftMargin=1.2 * cm, rightMargin=1.2 * cm,
-        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
+        leftMargin=1.0 * cm, rightMargin=1.0 * cm,
+        topMargin=1.0 * cm, bottomMargin=1.0 * cm,
     )
     styles = getSampleStyleSheet()
     style_title = ParagraphStyle(
         'FinFmtTitle', parent=styles['Title'],
-        fontSize=16, textColor=colors.HexColor(CI_GREEN_DARK),
-        alignment=TA_CENTER, spaceAfter=4,
+        fontSize=15, textColor=colors.HexColor(CI_GREEN_DARK),
+        alignment=TA_CENTER, spaceAfter=3,
     )
-    style_subtitle = ParagraphStyle(
+    style_sub = ParagraphStyle(
         'FinFmtSub', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor('#444444'),
+        fontSize=9, textColor=colors.HexColor('#444444'),
         alignment=TA_CENTER, spaceAfter=2,
+    )
+    style_info = ParagraphStyle(
+        'FinFmtInfo', parent=styles['Normal'],
+        fontSize=8, textColor=colors.HexColor('#333333'), leading=11,
     )
     style_stats = ParagraphStyle(
         'FinFmtStats', parent=styles['Normal'],
-        fontSize=10, textColor=colors.HexColor(CI_GREEN_DARK),
-        spaceAfter=8,
+        fontSize=9, textColor=colors.HexColor(CI_GREEN_DARK), spaceAfter=6,
     )
-    cell_normal = ParagraphStyle('FinFmtCell', parent=styles['Normal'], fontSize=8, leading=10)
-    cell_center = ParagraphStyle('FinFmtCellC', parent=styles['Normal'], fontSize=8, leading=10, alignment=TA_CENTER)
+    cell_normal = ParagraphStyle('FinFmtCell', parent=styles['Normal'], fontSize=7, leading=9)
+    cell_center = ParagraphStyle('FinFmtCellC', parent=styles['Normal'], fontSize=7, leading=9, alignment=TA_CENTER)
     cell_header = ParagraphStyle(
         'FinFmtHdr', parent=styles['Normal'],
-        fontSize=9, leading=11, alignment=TA_CENTER,
+        fontSize=8, leading=10, alignment=TA_CENTER,
         textColor=colors.white, fontName='Helvetica-Bold',
     )
 
     def _p(text, center=False, hdr=False):
         s = cell_header if hdr else (cell_center if center else cell_normal)
-        return Paragraph(str(text), s)
+        return Paragraph(str(text).replace('&', '&amp;'), s)
 
     elements = []
-    elements.append(Paragraph('FICHE RÉSUMÉ FORMATEUR — FINANCE', style_title))
-    elements.append(Paragraph(
-        f"<b>{formateur.nom} {formateur.prenom}</b> — {formateur.numerobadge or '-'}",
-        style_subtitle,
-    ))
-    elements.append(Paragraph(f"Période : <b>{periode_label}</b>", style_subtitle))
-    elements.append(Paragraph(
-        f"Planifié : <b>{round(total_planned, 1)}</b> min &nbsp;|&nbsp; "
-        f"Réalisé : <b>{round(total_realized, 1)}</b> min &nbsp;|&nbsp; "
-        f"Taux : <b>{summary['taux_realisation_pct']}%</b> &nbsp;|&nbsp; "
-        f"Tarif : <b>{prix_heure:,.0f}</b> FCFA/h &nbsp;|&nbsp; "
-        f"À verser : <b>{montant_total:,.0f}</b> FCFA",
-        style_stats,
-    ))
-    elements.append(Spacer(1, 0.3 * cm))
+    if export_opts.get('entete_ligne1'):
+        elements.append(Paragraph(export_opts['entete_ligne1'], style_sub))
+    if export_opts.get('entete_ligne2'):
+        elements.append(Paragraph(export_opts['entete_ligne2'], style_sub))
+    if export_opts.get('organisme'):
+        elements.append(Paragraph(f"<b>{export_opts['organisme']}</b>", style_sub))
+    if export_opts.get('adresse'):
+        elements.append(Paragraph(export_opts['adresse'].replace('\n', '<br/>'), style_sub))
 
-    header = [
-        'Date', 'Séance', 'Module', 'Formation', 'Secrétariat',
-        'Durée (min)', 'Réalisé (min)', 'Montant (FCFA)',
+    elements.append(Spacer(1, 0.2 * cm))
+    elements.append(Paragraph(export_opts.get('titre_document') or 'ÉTAT FINANCIER FORMATEUR', style_title))
+    elements.append(Paragraph(f"Réf. : <b>{export_opts.get('reference', '-')}</b>", style_sub))
+    elements.append(Paragraph(f"Période : <b>{ctx['periode_label']}</b>", style_sub))
+    elements.append(Spacer(1, 0.15 * cm))
+
+    identite_lines = [
+        f"<b>Formateur :</b> {fmt.get('prenom', '')} {fmt.get('nom', '')} — N° {fmt.get('numerobadge') or '-'}",
+        f"<b>Spécialité :</b> {fmt.get('specialite') or '-'} &nbsp;|&nbsp; <b>Organisation :</b> {fmt.get('organisation') or '-'}",
+        f"<b>Grade(s) :</b> {fmt.get('grades') or '-'} &nbsp;|&nbsp; <b>Groupe(s) :</b> {fmt.get('groupes') or '-'}",
+        f"<b>E-mail :</b> {fmt.get('email') or '-'} &nbsp;|&nbsp; <b>Tél. :</b> {fmt.get('telephone') or '-'}",
+        f"<b>Secrétariat(s) :</b> {', '.join(fmt.get('secretariats') or []) or '-'}",
     ]
-    data = [[_p(h, hdr=True) for h in header]]
-    for r in rows:
-        data.append([
-            _p(r['date'], center=True),
-            _p(r['session']),
-            _p(r['module']),
-            _p(r['formation']),
-            _p(r['secretariat']),
-            _p(r['duree_seance'], center=True),
-            _p(r['temps_realise'], center=True),
-            _p(f"{r['montant']:,.0f}", center=True),
-        ])
+    if fmt.get('numero_piece_identite'):
+        identite_lines.append(f"<b>N° pièce d'identité :</b> {fmt.get('numero_piece_identite')}")
+    if fmt.get('numero_compte_bancaire'):
+        identite_lines.append(f"<b>N° compte bancaire :</b> {fmt.get('numero_compte_bancaire')}")
+    for line in identite_lines:
+        elements.append(Paragraph(line, style_info))
+    elements.append(Spacer(1, 0.2 * cm))
 
-    col_widths = [2.0 * cm, 2.8 * cm, 4.5 * cm, 4.8 * cm, 3.2 * cm, 1.8 * cm, 1.8 * cm, 2.2 * cm]
+    stats_parts = [
+        f"Planifié : <b>{round(ctx['total_planned'], 1)}</b> min",
+        f"Réalisé : <b>{round(ctx['total_realized'], 1)}</b> min ({ctx.get('total_heures_realisees', 0)} h)",
+        f"Taux : <b>{ctx['taux_realisation_pct']}%</b>",
+        f"Séances : <b>{ctx['sessions_count']}</b>",
+    ]
+    if afficher_montants:
+        stats_parts.append(f"Tarif : <b>{ctx['prix_label']}</b>")
+        stats_parts.append(f"À verser : <b>{ctx['montant_total']:,.0f}</b> FCFA")
+    elements.append(Paragraph(' &nbsp;|&nbsp; '.join(stats_parts), style_stats))
+
+    headers = _finance_export_table_headers(afficher_montants)
+    data = [[_p(h, hdr=True) for h in headers]]
+    for r in rows:
+        row_vals = _finance_export_table_row(r, afficher_montants)
+        formatted = []
+        for i, val in enumerate(row_vals):
+            if afficher_montants and i == len(row_vals) - 1:
+                formatted.append(_p(f"{float(val or 0):,.0f}", center=True))
+            elif afficher_montants and i == len(row_vals) - 2 and val not in ('', None):
+                formatted.append(_p(f"{float(val):,.0f}", center=True))
+            elif i >= 7:
+                formatted.append(_p(val, center=True))
+            else:
+                formatted.append(_p(val))
+        data.append(formatted)
+
+    base_widths = [1.8, 2.4, 3.2, 3.6, 1.2, 1.6, 2.4, 1.5, 1.5, 1.6]
+    if afficher_montants:
+        base_widths.extend([1.8, 2.0])
+    col_widths = [w * cm for w in base_widths]
     table = Table(data, repeatRows=1, colWidths=col_widths)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
     ]))
     elements.append(table)
-    elements.append(Spacer(1, 0.4 * cm))
+    elements.append(Spacer(1, 0.35 * cm))
+
+    if export_opts.get('signataire_nom') or export_opts.get('signataire_fonction'):
+        sig_style = ParagraphStyle(
+            'FinFmtSig', parent=styles['Normal'], fontSize=9,
+            alignment=TA_RIGHT, textColor=colors.HexColor('#333333'),
+        )
+        sig_lines = []
+        if export_opts.get('signataire_fonction'):
+            sig_lines.append(export_opts['signataire_fonction'])
+        if export_opts.get('signataire_nom'):
+            sig_lines.append(f"<b>{export_opts['signataire_nom']}</b>")
+        elements.append(Paragraph('<br/>'.join(sig_lines), sig_style))
+        elements.append(Spacer(1, 0.2 * cm))
+
+    foot_parts = [f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"]
+    if export_opts.get('mention_legale'):
+        foot_parts.append(export_opts['mention_legale'])
     elements.append(Paragraph(
-        f"<i>Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}</i>",
+        '<br/>'.join(foot_parts),
         ParagraphStyle('FinFmtFoot', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999999')),
     ))
 
     doc.build(elements)
     buffer.seek(0)
-    filename = f"fiche_resume_formateur_{formateur.numerobadge or formateur.pk}.pdf"
+    filename = f"etat_financier_{formateur.numerobadge or formateur.pk}.pdf"
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
@@ -1980,26 +2284,26 @@ def export_finance_formateur_pdf(request, formateur_pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_finance_formateur_excel(request, formateur_pk):
-    """Export Excel de la fiche résumé d'un formateur (finance/direction)."""
+    """Export Excel état financier formateur (finance/direction)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
 
     if not _check_finance_export_access(request):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
-    formateur = get_object_or_404(Formateur, pk=formateur_pk)
-    summary = _finance_formateur_summary_rows(formateur, request)
-    rows = summary['rows']
-    total_planned = summary['total_planned']
-    total_realized = summary['total_realized']
-    montant_total = summary['montant_total']
-    prix_heure = summary['prix_heure']
-    periode_label = summary['periode'].get('periode_label') or 'Toutes périodes'
-    last_col = 8
+    formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
+    ctx = _finance_formateur_export_context(formateur, request)
+    rows = ctx['rows']
+    export_opts = ctx['export']
+    afficher_montants = export_opts['afficher_montants']
+    fmt = ctx.get('formateur') or {}
+    headers = _finance_export_table_headers(afficher_montants)
+    last_col = len(headers)
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Résumé formateur"
+    ws.title = "État financier"
 
     green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
     light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
@@ -2012,89 +2316,407 @@ def export_finance_formateur_excel(request, formateur_pk):
         bottom=Side(style='thin', color='CCCCCC'),
     )
 
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=last_col)
-    ws['A1'] = "FICHE RÉSUMÉ FORMATEUR — FINANCE"
-    ws['A1'].font = Font(bold=True, size=13, color='388E3C')
-    ws['A1'].alignment = Alignment(horizontal='center')
+    row_idx = 1
+    for line in (
+        export_opts.get('entete_ligne1'),
+        export_opts.get('entete_ligne2'),
+        export_opts.get('organisme'),
+    ):
+        if line:
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+            ws.cell(row=row_idx, column=1, value=line).alignment = Alignment(horizontal='center')
+            row_idx += 1
+    if export_opts.get('adresse'):
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+        ws.cell(row=row_idx, column=1, value=export_opts['adresse']).alignment = Alignment(horizontal='center', wrap_text=True)
+        row_idx += 1
 
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=last_col)
-    ws['A2'] = f"{formateur.nom} {formateur.prenom} ({formateur.numerobadge})"
-    ws['A2'].font = Font(size=11, color='444444')
-    ws['A2'].alignment = Alignment(horizontal='center')
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document') or 'ÉTAT FINANCIER FORMATEUR')
+    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
+    row_idx += 1
 
-    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=last_col)
-    ws['A3'] = f"Période : {periode_label}"
-    ws['A3'].font = Font(size=10, color='555555', italic=True)
-    ws['A3'].alignment = Alignment(horizontal='center')
+    for label, value in (
+        ('Référence', export_opts.get('reference', '-')),
+        ('Période', ctx['periode_label']),
+        ('Formateur', f"{fmt.get('prenom', '')} {fmt.get('nom', '')}".strip()),
+        ('N° Badge', fmt.get('numerobadge') or '-'),
+        ('Spécialité', fmt.get('specialite') or '-'),
+        ('Grade(s)', fmt.get('grades') or '-'),
+        ('Groupe(s)', fmt.get('groupes') or '-'),
+        ('Organisation', fmt.get('organisation') or '-'),
+        ('E-mail', fmt.get('email') or '-'),
+        ('Téléphone', fmt.get('telephone') or '-'),
+        ('Secrétariat(s)', ', '.join(fmt.get('secretariats') or []) or '-'),
+        ('N° pièce d\'identité', fmt.get('numero_piece_identite') or '-'),
+        ('N° compte bancaire', fmt.get('numero_compte_bancaire') or '-'),
+    ):
+        ws.cell(row=row_idx, column=1, value=label).font = Font(bold=True, size=9)
+        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=last_col)
+        ws.cell(row=row_idx, column=2, value=value)
+        row_idx += 1
 
-    ws['A5'] = "Planifié (min)"
-    ws['B5'] = round(total_planned, 1)
-    ws['C5'] = "Réalisé (min)"
-    ws['D5'] = round(total_realized, 1)
-    ws['E5'] = "Taux %"
-    ws['F5'] = summary['taux_realisation_pct']
-    ws['G5'] = "À verser (FCFA)"
-    ws['H5'] = montant_total
-    for c in ('A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5'):
-        ws[c].fill = orange_fill
-        ws[c].font = Font(bold=True, color='FFFFFF', size=9)
-        ws[c].alignment = Alignment(horizontal='center')
-        ws[c].border = thin_border
-
-    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=last_col)
-    ws['A6'] = f"Tarif horaire appliqué : {prix_heure:,.0f} FCFA / h réalisée"
-    ws['A6'].font = Font(size=9, color='388E3C')
-    ws['A6'].alignment = Alignment(horizontal='center')
-
-    headers = [
-        'Date', 'Séance', 'Module', 'Formation', 'Secrétariat',
-        'Durée séance (min)', 'Temps réalisé (min)', 'Montant (FCFA)',
+    row_idx += 1
+    synth_labels = ['Planifié (min)', 'Réalisé (min)', 'Heures réalisées', 'Taux %', 'Séances']
+    synth_values = [
+        round(ctx['total_planned'], 1),
+        round(ctx['total_realized'], 1),
+        ctx.get('total_heures_realisees', 0),
+        ctx['taux_realisation_pct'],
+        ctx['sessions_count'],
     ]
-    start_row = 8
+    if afficher_montants:
+        synth_labels.extend(['Tarif horaire', 'À verser (FCFA)'])
+        synth_values.extend([ctx['prix_label'], ctx['montant_total']])
+    for col, (label, val) in enumerate(zip(synth_labels, synth_values), start=1):
+        cell_l = ws.cell(row=row_idx, column=col, value=label)
+        cell_v = ws.cell(row=row_idx + 1, column=col, value=val)
+        for cell in (cell_l, cell_v):
+            cell.fill = orange_fill
+            cell.font = Font(bold=True, color='FFFFFF', size=9)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = thin_border
+    row_idx += 3
+
+    start_row = row_idx
     for idx, h in enumerate(headers, 1):
         cell = ws.cell(row=start_row, column=idx, value=h)
         cell.font = header_font
         cell.fill = green_fill
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         cell.border = thin_border
 
     for i, r in enumerate(rows, start=1):
         row_num = start_row + i
-        values = [
-            r['date'], r['session'], r['module'], r['formation'], r['secretariat'],
-            r['duree_seance'], r['temps_realise'], r['montant'],
-        ]
+        values = _finance_export_table_row(r, afficher_montants)
         for col, val in enumerate(values, start=1):
             cell = ws.cell(row=row_num, column=col, value=val)
             cell.border = thin_border
             cell.alignment = Alignment(vertical='center')
-            if col >= 6:
+            if col >= 8:
                 cell.alignment = Alignment(horizontal='center', vertical='center')
             if i % 2 == 0:
                 cell.fill = light_green_fill
 
-    ws.column_dimensions['A'].width = 12
-    ws.column_dimensions['B'].width = 18
-    ws.column_dimensions['C'].width = 24
-    ws.column_dimensions['D'].width = 26
-    ws.column_dimensions['E'].width = 20
-    ws.column_dimensions['F'].width = 14
-    ws.column_dimensions['G'].width = 14
-    ws.column_dimensions['H'].width = 14
+    col_widths = [12, 18, 22, 24, 10, 14, 20, 14, 14, 14]
+    if afficher_montants:
+        col_widths.extend([14, 14])
+    for idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = width
 
     footer_row = start_row + len(rows) + 2
+    if export_opts.get('signataire_nom') or export_opts.get('signataire_fonction'):
+        ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
+        sig = ' — '.join(filter(None, [export_opts.get('signataire_fonction'), export_opts.get('signataire_nom')]))
+        ws.cell(row=footer_row, column=1, value=sig).alignment = Alignment(horizontal='right')
+        footer_row += 1
+
     ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
-    ws.cell(row=footer_row, column=1, value=f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+    foot = f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+    if export_opts.get('mention_legale'):
+        foot = f"{foot} — {export_opts['mention_legale']}"
+    ws.cell(row=footer_row, column=1, value=foot)
     ws.cell(row=footer_row, column=1).font = Font(size=8, color='999999', italic=True)
-    ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right')
+    ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right', wrap_text=True)
 
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
-    filename = f"fiche_resume_formateur_{formateur.numerobadge or formateur.pk}.xlsx"
+    filename = f"etat_financier_{formateur.numerobadge or formateur.pk}.xlsx"
     response = HttpResponse(
         buffer,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_synthese_pdf(request):
+    """Export PDF consolidé : synthèse finance de tous les formateurs (période / filtres)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    ctx, err = _finance_synthese_export_context(request)
+    if err:
+        return Response({'detail': err}, status=400)
+
+    rows = ctx['rows']
+    totals = ctx['totals']
+    export_opts = ctx['export']
+    afficher_montants = export_opts['afficher_montants']
+    include_sensitive = request.user.role == 'FINANCE'
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        leftMargin=0.8 * cm, rightMargin=0.8 * cm,
+        topMargin=1.0 * cm, bottomMargin=1.0 * cm,
+    )
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle(
+        'FinSynTitle', parent=styles['Title'],
+        fontSize=14, textColor=colors.HexColor(CI_GREEN_DARK),
+        alignment=TA_CENTER, spaceAfter=3,
+    )
+    style_sub = ParagraphStyle(
+        'FinSynSub', parent=styles['Normal'],
+        fontSize=9, textColor=colors.HexColor('#444444'),
+        alignment=TA_CENTER, spaceAfter=2,
+    )
+    style_stats = ParagraphStyle(
+        'FinSynStats', parent=styles['Normal'],
+        fontSize=9, textColor=colors.HexColor(CI_GREEN_DARK), spaceAfter=6,
+    )
+    cell_normal = ParagraphStyle('FinSynCell', parent=styles['Normal'], fontSize=7, leading=9)
+    cell_center = ParagraphStyle('FinSynCellC', parent=styles['Normal'], fontSize=7, leading=9, alignment=TA_CENTER)
+    cell_header = ParagraphStyle(
+        'FinSynHdr', parent=styles['Normal'],
+        fontSize=8, leading=10, alignment=TA_CENTER,
+        textColor=colors.white, fontName='Helvetica-Bold',
+    )
+
+    def _p(text, center=False, hdr=False):
+        s = cell_header if hdr else (cell_center if center else cell_normal)
+        return Paragraph(str(text).replace('&', '&amp;'), s)
+
+    elements = []
+    for line in (export_opts.get('entete_ligne1'), export_opts.get('entete_ligne2'), export_opts.get('organisme')):
+        if line:
+            elements.append(Paragraph(line, style_sub))
+    if export_opts.get('adresse'):
+        elements.append(Paragraph(export_opts['adresse'].replace('\n', '<br/>'), style_sub))
+    elements.append(Spacer(1, 0.15 * cm))
+    elements.append(Paragraph(export_opts.get('titre_document') or 'ÉTAT FINANCIER CONSOLIDÉ', style_title))
+    elements.append(Paragraph(f"Réf. : <b>{export_opts.get('reference', '-')}</b>", style_sub))
+    elements.append(Paragraph(f"Période : <b>{ctx['periode_label']}</b>", style_sub))
+    elements.append(Spacer(1, 0.15 * cm))
+
+    stats_parts = [
+        f"Formateurs : <b>{totals['formateurs_count']}</b> ({totals['formateurs_actifs']} actifs)",
+        f"Séances : <b>{totals['sessions_count']}</b>",
+        f"Réalisé : <b>{totals['total_realized']}</b> min ({totals['total_heures_realisees']} h)",
+    ]
+    if afficher_montants:
+        stats_parts.append(f"Total à verser : <b>{totals['montant_total']:,.0f}</b> FCFA")
+    elements.append(Paragraph(' &nbsp;|&nbsp; '.join(stats_parts), style_stats))
+
+    headers = _finance_synthese_table_headers(afficher_montants, include_sensitive)
+    data = [[_p(h, hdr=True) for h in headers]]
+    for row in rows:
+        vals = _finance_synthese_table_row(row, afficher_montants, include_sensitive)
+        data.append([_p(v, center=(i >= 6)) for i, v in enumerate(vals)])
+    total_vals = ['TOTAL', '', '', '', '', '', totals['sessions_count'], totals['total_planned'],
+                  totals['total_realized'], totals['total_heures_realisees'], '']
+    if afficher_montants:
+        total_vals.append(totals['montant_total'])
+    if include_sensitive:
+        total_vals.extend(['', ''])
+    data.append([_p(v, center=(i >= 6)) for i, v in enumerate(total_vals)])
+
+    col_count = len(headers)
+    base_w = [1.4, 1.8, 1.8, 2.2, 1.2, 1.6, 1.0, 1.3, 1.3, 1.2, 1.0]
+    if afficher_montants:
+        base_w.append(1.6)
+    if include_sensitive:
+        base_w.extend([1.8, 1.8])
+    while len(base_w) < col_count:
+        base_w.append(1.5)
+    col_widths = [w * cm for w in base_w[:col_count]]
+
+    table = Table(data, repeatRows=1, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(CI_LIGHT_ORANGE)),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 0.3 * cm))
+
+    if export_opts.get('signataire_nom') or export_opts.get('signataire_fonction'):
+        sig_style = ParagraphStyle(
+            'FinSynSig', parent=styles['Normal'], fontSize=9,
+            alignment=TA_RIGHT, textColor=colors.HexColor('#333333'),
+        )
+        sig_lines = []
+        if export_opts.get('signataire_fonction'):
+            sig_lines.append(export_opts['signataire_fonction'])
+        if export_opts.get('signataire_nom'):
+            sig_lines.append(f"<b>{export_opts['signataire_nom']}</b>")
+        elements.append(Paragraph('<br/>'.join(sig_lines), sig_style))
+
+    foot = f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+    if export_opts.get('mention_legale'):
+        foot += f"<br/>{export_opts['mention_legale']}"
+    elements.append(Paragraph(
+        foot,
+        ParagraphStyle('FinSynFoot', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999999')),
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="etat_financier_consolide.pdf"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_synthese_excel(request):
+    """Export Excel consolidé : synthèse finance de tous les formateurs."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    ctx, err = _finance_synthese_export_context(request)
+    if err:
+        return Response({'detail': err}, status=400)
+
+    rows = ctx['rows']
+    totals = ctx['totals']
+    export_opts = ctx['export']
+    afficher_montants = export_opts['afficher_montants']
+    include_sensitive = request.user.role == 'FINANCE'
+    headers = _finance_synthese_table_headers(afficher_montants, include_sensitive)
+    last_col = len(headers)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Synthèse formateurs'
+
+    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
+    total_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=10)
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+
+    row_idx = 1
+    for line in (export_opts.get('entete_ligne1'), export_opts.get('entete_ligne2'), export_opts.get('organisme')):
+        if line:
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+            ws.cell(row=row_idx, column=1, value=line).alignment = Alignment(horizontal='center')
+            row_idx += 1
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document'))
+    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=f"Réf. {export_opts.get('reference')} — Période : {ctx['periode_label']}")
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
+    row_idx += 2
+
+    synth = [
+        ('Formateurs', totals['formateurs_count']),
+        ('Actifs', totals['formateurs_actifs']),
+        ('Séances', totals['sessions_count']),
+        ('Réalisé (min)', totals['total_realized']),
+        ('Heures réalisées', totals['total_heures_realisees']),
+    ]
+    if afficher_montants:
+        synth.append(('Total à verser (FCFA)', totals['montant_total']))
+    for col, (label, val) in enumerate(synth, start=1):
+        ws.cell(row=row_idx, column=col, value=label).fill = orange_fill
+        ws.cell(row=row_idx, column=col).font = Font(bold=True, color='FFFFFF', size=9)
+        ws.cell(row=row_idx + 1, column=col, value=val).fill = orange_fill
+        ws.cell(row=row_idx + 1, column=col).font = Font(bold=True, color='FFFFFF', size=9)
+        ws.cell(row=row_idx, column=col).alignment = Alignment(horizontal='center')
+        ws.cell(row=row_idx + 1, column=col).alignment = Alignment(horizontal='center')
+    row_idx += 4
+
+    start_row = row_idx
+    for idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=start_row, column=idx, value=h)
+        cell.font = header_font
+        cell.fill = green_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = thin_border
+
+    for i, row in enumerate(rows, start=1):
+        row_num = start_row + i
+        values = _finance_synthese_table_row(row, afficher_montants, include_sensitive)
+        for col, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_num, column=col, value=val)
+            cell.border = thin_border
+            if col >= 7:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            if i % 2 == 0:
+                cell.fill = light_green_fill
+
+    total_row = start_row + len(rows) + 1
+    total_values = _finance_synthese_table_row(
+        {
+            'numerobadge': 'TOTAL', 'nom': '', 'prenom': '', 'specialite': '',
+            'grades': '', 'groupes': '',
+            'sessions_count': totals['sessions_count'],
+            'total_duree_minutes': totals['total_planned'],
+            'total_duree_realisee_minutes': totals['total_realized'],
+            'montant_total_realise': totals['montant_total'],
+            'statistiques': {},
+        },
+        afficher_montants,
+        include_sensitive,
+    )
+    total_values[0] = 'TOTAL'
+    for col, val in enumerate(total_values, start=1):
+        cell = ws.cell(row=total_row, column=col, value=val)
+        cell.border = thin_border
+        cell.fill = total_fill
+        cell.font = Font(bold=True)
+        if col >= 7:
+            cell.alignment = Alignment(horizontal='center')
+
+    col_widths = [12, 14, 14, 18, 10, 14, 8, 12, 12, 12, 8]
+    if afficher_montants:
+        col_widths.append(14)
+    if include_sensitive:
+        col_widths.extend([16, 16])
+    for idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = width
+
+    footer_row = total_row + 2
+    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
+    foot = f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+    if export_opts.get('mention_legale'):
+        foot += f" — {export_opts['mention_legale']}"
+    ws.cell(row=footer_row, column=1, value=foot)
+    ws.cell(row=footer_row, column=1).font = Font(size=8, color='999999', italic=True)
+    ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right', wrap_text=True)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="etat_financier_consolide.xlsx"'
     return response

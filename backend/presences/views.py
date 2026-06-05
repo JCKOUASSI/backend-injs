@@ -1495,11 +1495,15 @@ def _compute_volume_horaire_stats(modules_data, pointages_qs):
     }
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def my_fiche(request):
     """Fiche personnelle mobile : profil, modules inscrits et statistiques de badgeage."""
     from authentication.serializers import UserSerializer
+    from formations.formateur_privacy import (
+        can_edit_formateur_sensitive_data,
+        formateur_sensitive_payload,
+    )
 
     user = request.user
     if getattr(user, 'must_change_password', False):
@@ -1508,6 +1512,20 @@ def my_fiche(request):
     personne, type_str, err = _resolve_authenticated_personne(user)
     if err:
         return err
+
+    if request.method == 'PATCH':
+        if type_str != 'formateur':
+            return Response({'detail': 'Modification réservée aux formateurs.'}, status=403)
+        if not can_edit_formateur_sensitive_data(user, personne):
+            return Response({'detail': 'Modification interdite.'}, status=403)
+        update_fields = []
+        for field in ('numero_piece_identite', 'numero_compte_bancaire'):
+            if field in request.data:
+                setattr(personne, field, str(request.data.get(field) or '').strip())
+                update_fields.append(field)
+        if update_fields:
+            personne.save(update_fields=update_fields)
+        return Response({'profil': {**formateur_sensitive_payload(personne), 'updated': True}})
 
     modules_data = _modules_for_personne(personne, type_str)
     pointages_qs = _pointages_queryset_for_personne(personne, type_str)
@@ -1528,6 +1546,9 @@ def my_fiche(request):
     }
     if type_str == 'formateur':
         profil['specialite'] = getattr(personne, 'specialite', '') or ''
+        from formations.formateur_privacy import can_view_formateur_sensitive_data, formateur_sensitive_payload
+        if can_view_formateur_sensitive_data(user, personne):
+            profil.update(formateur_sensitive_payload(personne))
 
     return Response({
         'utilisateur': UserSerializer(user).data,

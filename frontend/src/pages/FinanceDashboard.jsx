@@ -365,6 +365,8 @@ export default function FinanceDashboard() {
                     <th>Nom</th>
                     <th>Prénom</th>
                     <th>Spécialité</th>
+                    <th>Grade(s)</th>
+                    <th>Groupe(s)</th>
                     <th>Mod.</th>
                     <th>Séances</th>
                     <th>Taux</th>
@@ -383,6 +385,8 @@ export default function FinanceDashboard() {
                         <td><strong>{f.nom}</strong></td>
                         <td>{f.prenom}</td>
                         <td className="small text-muted">{f.specialite || '—'}</td>
+                        <td className="small">{f.grades || '—'}</td>
+                        <td className="small">{f.groupes || '—'}</td>
                         <td>{f.nb_formations ?? 0}</td>
                         <td>{f.sessions_count ?? 0}</td>
                         <td>
@@ -400,7 +404,7 @@ export default function FinanceDashboard() {
                     )
                   }) : (
                     <tr>
-                      <td colSpan="10">
+                      <td colSpan="12">
                         <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
                       </td>
                     </tr>

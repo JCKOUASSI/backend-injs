@@ -10,10 +10,14 @@ import FinancePageShell, { FinanceNavActions } from '../components/finance/Finan
 import FinanceDetailModal from '../components/finance/FinanceDetailModal'
 import {
   buildFinanceListSearchParams,
+  buildFinanceExportQuery,
   buildFinanceQuery,
+  FINANCE_EXPORT_MONTANTS_KEY,
   FINANCE_QUERY_STORAGE_KEY,
+  loadFinanceExportMontants,
   loadFinancePeriod,
   readFinanceStateFromSearchParams,
+  saveFinanceExportMontants,
   saveFinancePeriod,
 } from '../utils/financePeriod'
 import {
@@ -38,6 +42,7 @@ const financeStatsForGrid = (detail) => ({
 export default function Formateurs() {
   const { user } = useAuth()
   const canViewFinanceData = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canEditFormateurSensitive = user?.role === 'FINANCE'
   const [searchParams] = useSearchParams()
   const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const listExtras = readFormateursListExtras(searchParams)
@@ -60,6 +65,8 @@ export default function Formateurs() {
   const [financeDetail, setFinanceDetail] = useState(null)
   const [financeDetailLoading, setFinanceDetailLoading] = useState(false)
   const [financeDetailTab, setFinanceDetailTab] = useState('statistiques')
+  const [exportAfficherMontants, setExportAfficherMontants] = useState(() => loadFinanceExportMontants(true))
+  const [exportingSynthese, setExportingSynthese] = useState(false)
   const [financePeriod, setFinancePeriod] = useState(
     () => urlFinance?.period ?? loadFinancePeriod(),
   )
@@ -90,6 +97,22 @@ export default function Formateurs() {
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!canViewFinanceData) return
+    api.get('/formations/finance/settings/')
+      .then((res) => {
+        if (localStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY) === null) {
+          setExportAfficherMontants(res.data?.afficher_montants_exports !== false)
+        }
+      })
+      .catch(() => {})
+  }, [canViewFinanceData])
+
+  const handleExportMontantsChange = (checked) => {
+    setExportAfficherMontants(checked)
+    saveFinanceExportMontants(checked)
+  }
 
   const loadFormateurs = async () => {
     setLoading(true)
@@ -196,9 +219,9 @@ export default function Formateurs() {
     URL.revokeObjectURL(url)
   }
 
-  const exportFinanceSummary = async (f, format) => {
+  const exportFinanceSummary = async (f, format, afficherMontants = exportAfficherMontants) => {
     const ext = format === 'pdf' ? 'pdf' : 'xlsx'
-    const qs = buildFinanceQuery(appliedFinancePeriod).toString()
+    const qs = buildFinanceExportQuery(appliedFinancePeriod, afficherMontants).toString()
     const base = format === 'pdf'
       ? `/exports/formateur/${f.id}/pdf/`
       : `/exports/formateur/${f.id}/excel/`
@@ -206,10 +229,31 @@ export default function Formateurs() {
     try {
       const blob = await api.getBlob(path)
       const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
-      downloadBlob(blob, `fiche_resume_${safeName || f.id}.${ext}`)
-      showToast(`Fiche résumé exportée (${ext.toUpperCase()})`)
+      downloadBlob(blob, `etat_financier_${safeName || f.id}.${ext}`)
+      showToast(`État financier exporté (${ext.toUpperCase()})`)
     } catch (err) {
-      showToast(err.response?.data?.detail || 'Erreur export fiche résumé', 'error')
+      showToast(err.response?.data?.detail || 'Erreur export état financier', 'error')
+    }
+  }
+
+  const exportFinanceSynthese = async (format) => {
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
+    const params = buildFinanceExportQuery(appliedFinancePeriod, exportAfficherMontants)
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    const qs = params.toString()
+    const base = format === 'pdf'
+      ? '/exports/finance/synthese/pdf/'
+      : '/exports/finance/synthese/excel/'
+    const path = qs ? `${base}?${qs}` : base
+    setExportingSynthese(true)
+    try {
+      const blob = await api.getBlob(path)
+      downloadBlob(blob, `etat_financier_consolide.${ext}`)
+      showToast(`Export consolidé (${ext.toUpperCase()})`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur export consolidé', 'error')
+    } finally {
+      setExportingSynthese(false)
     }
   }
 
@@ -264,6 +308,37 @@ export default function Formateurs() {
                 />
               </div>
             </div>
+            <label className="form-check mb-0 small text-nowrap" style={{ cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="form-check-input me-1"
+                checked={exportAfficherMontants}
+                onChange={(e) => handleExportMontantsChange(e.target.checked)}
+              />
+              Montants sur les exports
+            </label>
+            <div className="d-flex gap-1 flex-wrap">
+              <button
+                type="button"
+                className="btn btn-outline-success btn-sm"
+                disabled={exportingSynthese || loading}
+                onClick={() => exportFinanceSynthese('excel')}
+                title="Export consolidé Excel (tous les formateurs)"
+              >
+                <i className="bi bi-file-earmark-spreadsheet me-1"></i>
+                {exportingSynthese ? 'Export…' : 'Consolidé Excel'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                disabled={exportingSynthese || loading}
+                onClick={() => exportFinanceSynthese('pdf')}
+                title="Export consolidé PDF (tous les formateurs)"
+              >
+                <i className="bi bi-file-earmark-pdf me-1"></i>
+                {exportingSynthese ? 'Export…' : 'Consolidé PDF'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -287,6 +362,8 @@ export default function Formateurs() {
                     <th>Nom</th>
                     <th>Prénom</th>
                     <th>Spécialité</th>
+                    <th>Grade(s)</th>
+                    <th>Groupe(s)</th>
                     <th>Séances</th>
                     <th>Planifié</th>
                     <th>Réalisé</th>
@@ -304,6 +381,8 @@ export default function Formateurs() {
                         <td><strong>{f.nom}</strong></td>
                         <td>{f.prenom}</td>
                         <td className="small text-muted">{f.specialite || '—'}</td>
+                        <td className="small">{f.grades || '—'}</td>
+                        <td className="small">{f.groupes || '—'}</td>
                         <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
                         <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_realisee_minutes)}</td>
@@ -329,7 +408,7 @@ export default function Formateurs() {
                     )
                   }) : (
                     <tr>
-                      <td colSpan="10">
+                      <td colSpan="12">
                         <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
                       </td>
                     </tr>
@@ -379,6 +458,13 @@ export default function Formateurs() {
             formatDuration={formatDuration}
             formatDate={formatDate}
             exportFinanceSummary={exportFinanceSummary}
+            exportAfficherMontants={exportAfficherMontants}
+            onExportMontantsChange={handleExportMontantsChange}
+            canViewSensitive={canEditFormateurSensitive}
+            canEditSensitive={canEditFormateurSensitive}
+            onSensitiveSaved={(data) => {
+              setFinanceDetail((prev) => prev ? { ...prev, ...data } : prev)
+            }}
             financeStatsForGrid={financeStatsForGrid}
           />
         )}
