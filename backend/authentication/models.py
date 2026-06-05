@@ -1,5 +1,13 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.db import models
+
+
+class UserManager(DjangoUserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', User.Role.ADMIN)
+        return super().create_superuser(username, email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -44,6 +52,8 @@ class User(AbstractUser):
         default=False,
         help_text="Si vrai, l'utilisateur doit changer son mot de passe avant d'utiliser les fonctions sensibles.",
     )
+
+    objects = UserManager()
 
     class Meta:
         verbose_name = 'Utilisateur'

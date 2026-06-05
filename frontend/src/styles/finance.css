@@ -153,8 +153,15 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 0.85rem;
 }
+.finance-hero-kpis--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 1100px) {
+  .finance-hero-kpis--4 { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 900px) {
   .finance-hero-kpis { grid-template-columns: 1fr; }
+  .finance-hero-kpis--4 { grid-template-columns: 1fr; }
 }
 .finance-hero-kpi {
   border-radius: var(--fin-radius);
@@ -163,6 +170,22 @@
   position: relative;
   overflow: hidden;
   box-shadow: var(--fin-shadow);
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+.finance-hero-kpi--clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.finance-hero-kpi--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+.finance-hero-kpi--clickable:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
 }
 .finance-hero-kpi::after {
   content: '';
@@ -176,6 +199,9 @@
 }
 .finance-hero-kpi--money {
   background: linear-gradient(135deg, #1b5e20, #2e7d32);
+}
+.finance-hero-kpi--plan {
+  background: linear-gradient(135deg, #37474f, #546e7a);
 }
 .finance-hero-kpi--time {
   background: linear-gradient(135deg, #1565c0, #1976d2);
@@ -203,6 +229,13 @@
 .finance-hero-kpi-sub {
   font-size: 0.8rem;
   opacity: 0.85;
+}
+.finance-hero-kpi-hint {
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  opacity: 0.75;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* Grille KPI secondaires */
