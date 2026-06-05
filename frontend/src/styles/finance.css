@@ -525,6 +525,15 @@
   box-shadow: var(--fin-shadow);
   padding: 1.5rem;
 }
+.finance-settings-card-wide {
+  max-width: 900px;
+}
+.finance-settings-table th {
+  font-size: 0.8rem;
+}
+.finance-settings-table td {
+  vertical-align: middle;
+}
 .finance-settings-preview {
   margin-top: 1rem;
   padding: 1rem;

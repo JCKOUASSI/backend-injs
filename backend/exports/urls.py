@@ -14,4 +14,7 @@ urlpatterns = [
     # Export finance par formateur
     path('formateur/<int:formateur_pk>/pdf/', views.export_finance_formateur_pdf, name='export-finance-formateur-pdf'),
     path('formateur/<int:formateur_pk>/excel/', views.export_finance_formateur_excel, name='export-finance-formateur-excel'),
+    # Export finance consolidé (tous les formateurs)
+    path('finance/synthese/pdf/', views.export_finance_synthese_pdf, name='export-finance-synthese-pdf'),
+    path('finance/synthese/excel/', views.export_finance_synthese_excel, name='export-finance-synthese-excel'),
 ]

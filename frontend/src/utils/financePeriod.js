@@ -129,6 +129,31 @@ export const financePeriodQueryString = (period) => {
 }
 
 export const FINANCE_QUERY_STORAGE_KEY = 'finance_list_query'
+export const FINANCE_EXPORT_MONTANTS_KEY = 'finance_export_afficher_montants'
+
+export const loadFinanceExportMontants = (defaultValue = true) => {
+  try {
+    const v = localStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY)
+    if (v === null) return defaultValue
+    return v === '1' || v === 'true'
+  } catch {
+    return defaultValue
+  }
+}
+
+export const saveFinanceExportMontants = (value) => {
+  try {
+    localStorage.setItem(FINANCE_EXPORT_MONTANTS_KEY, value ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
+export const buildFinanceExportQuery = (period, afficherMontants = true) => {
+  const q = buildFinanceQuery(period)
+  q.set('afficher_montants', afficherMontants ? '1' : '0')
+  return q
+}
 
 /** Lit période + filtres finance depuis l’URL (?preset=…). */
 export const readFinanceStateFromSearchParams = (searchParams) => {

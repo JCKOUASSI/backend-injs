@@ -184,4 +184,22 @@ class ProfileService {
       'volume_horaire_effectue_taux': 0,
     };
   }
+
+  Future<Map<String, dynamic>> updateMySensitiveData({
+    required String baseUrl,
+    required String accessToken,
+    required String numeroPieceIdentite,
+    required String numeroCompteBancaire,
+    Future<String?> Function()? onRefreshToken,
+  }) async {
+    final client = ApiClient(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      onRefreshToken: onRefreshToken,
+    );
+    return client.patch('/api/me/fiche/', data: {
+      'numero_piece_identite': numeroPieceIdentite,
+      'numero_compte_bancaire': numeroCompteBancaire,
+    });
+  }
 }

@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import api from '../../services/api'
+import { useToast } from '../../context/ToastContext'
 import { FinanceStatsGrid, FinanceModulesList, formatMoney } from '../FinanceStatsGrid'
 import Pagination from '../Pagination'
 import { useClientPagination, TABLE_PAGE_SIZE } from '../../hooks/useClientPagination'
@@ -20,8 +23,43 @@ export default function FinanceDetailModal({
   formatDuration,
   formatDate,
   exportFinanceSummary,
+  exportAfficherMontants = true,
+  onExportMontantsChange,
   financeStatsForGrid,
+  canEditSensitive = false,
+  canViewSensitive = false,
+  onSensitiveSaved,
 }) {
+  const { showToast } = useToast()
+  const [sensitive, setSensitive] = useState({ numero_piece_identite: '', numero_compte_bancaire: '' })
+  const [savingSensitive, setSavingSensitive] = useState(false)
+
+  useEffect(() => {
+    if (financeDetail) {
+      setSensitive({
+        numero_piece_identite: financeDetail.numero_piece_identite || '',
+        numero_compte_bancaire: financeDetail.numero_compte_bancaire || '',
+      })
+    }
+  }, [
+    financeDetail?.id,
+    financeDetail?.numero_piece_identite,
+    financeDetail?.numero_compte_bancaire,
+  ])
+
+  const saveSensitive = async () => {
+    if (!financeDetail?.id || !canEditSensitive) return
+    setSavingSensitive(true)
+    try {
+      const res = await api.patch(`/formations/formateurs/${financeDetail.id}/donnees-sensibles/`, sensitive)
+      showToast('Coordonnées bancaires enregistrées')
+      onSensitiveSaved?.(res.data)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors de la sauvegarde', 'error')
+    } finally {
+      setSavingSensitive(false)
+    }
+  }
   const sessions = financeDetail?.sessions ?? []
   const {
     page: sessionsPage,
@@ -101,6 +139,8 @@ export default function FinanceDetailModal({
                   <div><small className="text-muted">Nom</small><div><strong>{financeDetail.nom || '-'}</strong></div></div>
                   <div><small className="text-muted">Prénom</small><div><strong>{financeDetail.prenom || '-'}</strong></div></div>
                   <div><small className="text-muted">Spécialité</small><div>{financeDetail.specialite || '-'}</div></div>
+                  <div><small className="text-muted">Grade(s)</small><div>{financeDetail.grades || '-'}</div></div>
+                  <div><small className="text-muted">Groupe(s)</small><div>{financeDetail.groupes || '-'}</div></div>
                   <div><small className="text-muted">E-mail</small><div>{financeDetail.email || '-'}</div></div>
                   <div><small className="text-muted">Téléphone</small><div>{financeDetail.telephone || '-'}</div></div>
                   <div><small className="text-muted">Organisation</small><div>{financeDetail.organisation || '-'}</div></div>
@@ -115,6 +155,54 @@ export default function FinanceDetailModal({
                   </div>
                   {financeDetail.created_at && (
                     <div><small className="text-muted">Enregistré le</small><div>{formatDate(financeDetail.created_at)}</div></div>
+                  )}
+                  {canViewSensitive && (
+                    <>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <hr className="my-2" />
+                        <small className="text-muted fw-semibold">Données confidentielles (finance)</small>
+                      </div>
+                      <div>
+                        <small className="text-muted">N° pièce d&apos;identité</small>
+                        {canEditSensitive ? (
+                          <input
+                            type="text"
+                            className="form-control form-control-sm mt-1"
+                            value={sensitive.numero_piece_identite}
+                            onChange={(e) => setSensitive((s) => ({ ...s, numero_piece_identite: e.target.value }))}
+                            disabled={savingSensitive}
+                          />
+                        ) : (
+                          <div>{financeDetail.numero_piece_identite || '-'}</div>
+                        )}
+                      </div>
+                      <div>
+                        <small className="text-muted">N° compte bancaire</small>
+                        {canEditSensitive ? (
+                          <input
+                            type="text"
+                            className="form-control form-control-sm mt-1"
+                            value={sensitive.numero_compte_bancaire}
+                            onChange={(e) => setSensitive((s) => ({ ...s, numero_compte_bancaire: e.target.value }))}
+                            disabled={savingSensitive}
+                          />
+                        ) : (
+                          <div>{financeDetail.numero_compte_bancaire || '-'}</div>
+                        )}
+                      </div>
+                      {canEditSensitive && (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <button
+                            type="button"
+                            className="btn btn-dfrc btn-sm"
+                            disabled={savingSensitive}
+                            onClick={saveSensitive}
+                          >
+                            {savingSensitive ? 'Enregistrement…' : 'Enregistrer les données bancaires'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -135,6 +223,8 @@ export default function FinanceDetailModal({
                               <th>Séance</th>
                               <th>Module</th>
                               <th>Formation</th>
+                              <th>Grade</th>
+                              <th>Groupe</th>
                               <th>Planifié</th>
                               <th>Réalisé</th>
                               <th>Taux</th>
@@ -148,6 +238,8 @@ export default function FinanceDetailModal({
                                 <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
                                 <td>{s.module_intitule || '—'}</td>
                                 <td>{s.formation_intitule || '—'}</td>
+                                <td>{s.grade || '—'}</td>
+                                <td>{s.groupe || '—'}</td>
                                 <td>{formatDuration(s.duree_minutes)}</td>
                                 <td>{formatDuration(s.duree_realisee_minutes)}</td>
                                 <td>{s.taux_realisation_pct ?? 0}%</td>
@@ -177,7 +269,11 @@ export default function FinanceDetailModal({
                     <div className="grid-2">
                       <div>
                         <small className="text-muted">Tarif horaire</small>
-                        <div style={{ fontWeight: 600 }}>{formatMoney(financeDetail.prix_heure_realisee ?? 0)} FCFA / h</div>
+                        <div style={{ fontWeight: 600 }}>
+                          {financeDetail.tarifs_variables
+                            ? 'Variable (selon la formation)'
+                            : `${formatMoney(financeDetail.prix_heure_realisee ?? 0)} FCFA / h`}
+                        </div>
                       </div>
                       <div>
                         <small className="text-muted">Temps réalisé</small>
@@ -195,7 +291,7 @@ export default function FinanceDetailModal({
                     </div>
                   </div>
 
-                  {(financeDetail.prix_heure_realisee ?? 0) <= 0 && (
+                  {!financeDetail.tarifs_variables && (financeDetail.prix_heure_realisee ?? 0) <= 0 && (
                     <div className="alert alert-warning py-2 small">
                       <i className="bi bi-exclamation-triangle me-1"></i>
                       Tarif non défini — <Link to="/finance-parametrage">Paramétrage Finance</Link>
@@ -251,13 +347,32 @@ export default function FinanceDetailModal({
 
         <div className="modal-footer">
           {!financeDetailLoading && (
-            <div className="btn-group me-auto">
-              <button type="button" className="btn btn-outline-success btn-sm" onClick={() => exportFinanceSummary(financeDetail, 'excel')}>
-                <i className="bi bi-file-earmark-spreadsheet me-1"></i>Excel
-              </button>
-              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => exportFinanceSummary(financeDetail, 'pdf')}>
-                <i className="bi bi-file-earmark-pdf me-1"></i>PDF
-              </button>
+            <div className="d-flex flex-wrap align-items-center gap-3 me-auto">
+              <label className="form-check mb-0 small" style={{ cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  className="form-check-input me-1"
+                  checked={exportAfficherMontants}
+                  onChange={(e) => onExportMontantsChange?.(e.target.checked)}
+                />
+                Afficher les montants sur l&apos;export
+              </label>
+              <div className="btn-group">
+                <button
+                  type="button"
+                  className="btn btn-outline-success btn-sm"
+                  onClick={() => exportFinanceSummary(financeDetail, 'excel', exportAfficherMontants)}
+                >
+                  <i className="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={() => exportFinanceSummary(financeDetail, 'pdf', exportAfficherMontants)}
+                >
+                  <i className="bi bi-file-earmark-pdf me-1"></i>PDF
+                </button>
+              </div>
             </div>
           )}
           <button type="button" className="btn btn-secondary" disabled={financeDetailLoading} onClick={onClose}>Fermer</button>

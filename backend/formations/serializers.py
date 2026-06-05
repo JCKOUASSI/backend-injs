@@ -1,6 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
+from .formateur_privacy import can_view_formateur_sensitive_data, can_edit_formateur_sensitive_data
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from authentication.serializers import UserSerializer
@@ -148,9 +149,28 @@ class FormateurSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'numerobadge', 'nom', 'prenom', 'email',
             'telephone', 'specialite', 'organisation',
+            'numero_piece_identite', 'numero_compte_bancaire',
             'secretariats', 'secretariats_noms', 'nb_formations', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        user = request.user if request else None
+        if not can_view_formateur_sensitive_data(user, instance):
+            data.pop('numero_piece_identite', None)
+            data.pop('numero_compte_bancaire', None)
+        return data
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = request.user if request else None
+        instance = self.instance
+        if not can_edit_formateur_sensitive_data(user, instance):
+            attrs.pop('numero_piece_identite', None)
+            attrs.pop('numero_compte_bancaire', None)
+        return super().validate(attrs)
 
     def get_secretariats_noms(self, obj):
         return [f"{s.nom} ({s.numero})" for s in obj.secretariats.all()]

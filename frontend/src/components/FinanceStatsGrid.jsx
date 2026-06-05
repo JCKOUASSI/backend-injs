@@ -103,6 +103,13 @@ export function FinanceModulesList({ modules, formatDuration }) {
               {m.formation_intitule && (
                 <span className="text-muted" style={{ fontSize: '0.82rem' }}> — {m.formation_intitule}</span>
               )}
+              {(m.grade || m.groupe) && (
+                <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.15rem' }}>
+                  {m.grade && <span><i className="bi bi-award me-1"></i>{m.grade}</span>}
+                  {m.grade && m.groupe && ' · '}
+                  {m.groupe && <span><i className="bi bi-people me-1"></i>{m.groupe}</span>}
+                </div>
+              )}
               <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>
                 {(m.site || m.salle) && <span><i className="bi bi-building me-1"></i>{[m.site, m.salle].filter(Boolean).join(' / ')} </span>}
                 {m.secretariat_nom && <span><i className="bi bi-briefcase me-1"></i>{m.secretariat_nom} </span>}

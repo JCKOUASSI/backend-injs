@@ -134,6 +134,44 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? data,
+    bool withAuth = true,
+  }) async {
+    final uri = _uri(path);
+    try {
+      final res = await http
+          .patch(
+            uri,
+            headers: _headers(withAuth: withAuth),
+            body: jsonEncode(data ?? <String, dynamic>{}),
+          )
+          .timeout(_kTimeout);
+      if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
+        final newToken = await onRefreshToken!();
+        if (newToken != null) {
+          final retryRes = await http
+              .patch(
+                uri,
+                headers: _headersWithToken(newToken),
+                body: jsonEncode(data ?? <String, dynamic>{}),
+              )
+              .timeout(_kTimeout);
+          return _parse(retryRes, method: 'PATCH', path: path, uri: uri);
+        }
+        throw const SessionExpiredException();
+      }
+      return _parse(res, method: 'PATCH', path: path, uri: uri);
+    } on SessionExpiredException {
+      rethrow;
+    } on ApiResponseException {
+      rethrow;
+    } on TimeoutException {
+      throw NetworkTimeoutException(uri.host, uri.port);
+    }
+  }
+
   Map<String, dynamic> _parse(
     http.Response res, {
     required String method,
