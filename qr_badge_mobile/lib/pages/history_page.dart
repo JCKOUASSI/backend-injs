@@ -6,7 +6,7 @@ import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
-import 'login_page.dart';
+import '../utils/auth_navigation.dart';
 
 class _HistoryEvent {
   _HistoryEvent({
@@ -97,10 +97,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       if (mounted) {
         await context.read<SessionProvider>().logout();
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (_) => false,
-        );
+        resetToAuthRoot(context);
       }
       return;
     } catch (e) {
