@@ -353,9 +353,11 @@ class ScanModuleExclusivityTest(TestCase):
         )
 
     def test_secure_scan_blocks_new_entry_when_other_session_open_same_module_same_day(self):
-        user = make_user('participant_scan_secure', role='AUDITEUR')
-        self.participant.user = user
-        self.participant.save(update_fields=['user'])
+        user = make_user(self.participant.matricule, role='AUDITEUR')
+        user.matricule = self.participant.matricule
+        user.save(update_fields=['matricule'])
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.user_id, user.id)
         self.client.force_authenticate(user)
 
         Pointage.objects.create(
