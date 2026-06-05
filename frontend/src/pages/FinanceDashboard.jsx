@@ -92,11 +92,9 @@ const KPI_GROUPS = [
     ],
   },
   {
-    title: 'Temps',
+    title: 'Moyenne',
     iconClass: 'finance-kpi-card-icon--time',
     items: [
-      { key: 'total_duree_minutes', label: 'Planifié', format: 'duration', icon: 'bi-clock' },
-      { key: 'total_duree_realisee_minutes', label: 'Réalisé', format: 'duration', icon: 'bi-clock-history' },
       { key: 'moyenne_heures_realisees_par_formateur', label: 'Moy. h / actif', format: 'hours', icon: 'bi-graph-up' },
     ],
   },
@@ -231,6 +229,16 @@ export default function FinanceDashboard() {
       periodeInfo={periode}
     >
       {error && <div className="error-message">{error}</div>}
+
+      {!loading && kpis.tarifs_variables && (
+        <div className="alert alert-info py-2 small mb-3">
+          <i className="bi bi-info-circle me-1"></i>
+          Les montants sont calculés avec le <strong>tarif horaire propre à chaque type de formation</strong>
+          {Array.isArray(kpis.tarifs_appliques) && kpis.tarifs_appliques.length > 0 && (
+            <> ({kpis.tarifs_appliques.map((t) => `${formatMoney(t)} F/h`).join(', ')})</>
+          )}.
+        </div>
+      )}
 
       {loading ? (
         <div className="loading py-5"><div className="spinner"></div></div>
@@ -390,7 +398,7 @@ export default function FinanceDashboard() {
 
           <section className="finance-section">
             <div className="finance-section-header">
-              <h2><i className="bi bi-table"></i>Synthèse complète</h2>
+              <h2><i className="bi bi-table"></i>Fiche de paie globale — synthèse formateurs</h2>
               <span className="badge-bg-secondary">
                 {synthese.length} formateur(s)
                 {syntheseTotalPages > 1 && (

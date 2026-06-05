@@ -229,8 +229,8 @@ export default function Formateurs() {
     try {
       const blob = await api.getBlob(path)
       const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
-      downloadBlob(blob, `etat_financier_${safeName || f.id}.${ext}`)
-      showToast(`État financier exporté (${ext.toUpperCase()})`)
+      downloadBlob(blob, `fiche_paie_${safeName || f.id}.${ext}`)
+      showToast(`Fiche de paie exportée (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export état financier', 'error')
     }
@@ -248,8 +248,8 @@ export default function Formateurs() {
     setExportingSynthese(true)
     try {
       const blob = await api.getBlob(path)
-      downloadBlob(blob, `etat_financier_consolide.${ext}`)
-      showToast(`Export consolidé (${ext.toUpperCase()})`)
+      downloadBlob(blob, `fiche_paie_globale.${ext}`)
+      showToast(`Fiche de paie globale (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export consolidé', 'error')
     } finally {
@@ -323,20 +323,20 @@ export default function Formateurs() {
                 className="btn btn-outline-success btn-sm"
                 disabled={exportingSynthese || loading}
                 onClick={() => exportFinanceSynthese('excel')}
-                title="Export consolidé Excel (tous les formateurs)"
+                title="Fiche de paie globale Excel (tous les formateurs)"
               >
                 <i className="bi bi-file-earmark-spreadsheet me-1"></i>
-                {exportingSynthese ? 'Export…' : 'Consolidé Excel'}
+                {exportingSynthese ? 'Export…' : 'Paie globale Excel'}
               </button>
               <button
                 type="button"
                 className="btn btn-outline-danger btn-sm"
                 disabled={exportingSynthese || loading}
                 onClick={() => exportFinanceSynthese('pdf')}
-                title="Export consolidé PDF (tous les formateurs)"
+                title="Fiche de paie globale PDF (tous les formateurs)"
               >
                 <i className="bi bi-file-earmark-pdf me-1"></i>
-                {exportingSynthese ? 'Export…' : 'Consolidé PDF'}
+                {exportingSynthese ? 'Export…' : 'Paie globale PDF'}
               </button>
             </div>
           </div>

@@ -125,6 +125,9 @@ def _sync_auditeur_user_link(user):
             updates.append('secretariat')
         if updates:
             participant.save(update_fields=updates)
+        if participant.matricule and (user.matricule or '').strip() != participant.matricule:
+            User.objects.filter(pk=user.pk).update(matricule=participant.matricule)
+            user.matricule = participant.matricule
         return
 
     Participant.objects.create(

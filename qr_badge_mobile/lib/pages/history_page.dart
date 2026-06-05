@@ -32,6 +32,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   bool _loading = true;
   String? _error;
   List<_HistoryEvent> _events = [];
+  int _lastRefreshTick = -1;
 
   @override
   bool get wantKeepAlive => true;
@@ -39,6 +40,14 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _maybeReloadFromTick(int tick) {
+    if (tick == _lastRefreshTick) {
+      return;
+    }
+    _lastRefreshTick = tick;
     _load();
   }
 
@@ -51,18 +60,30 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       final entree = DateTime.tryParse((m['timestamp_entree'] ?? '').toString());
       final sortie = DateTime.tryParse((m['timestamp_sortie'] ?? '').toString());
       final statut = (m['statut'] ?? '').toString();
-      final ok = statut.isEmpty || statut == 'PRESENT' || statut == 'VALIDE';
+      const okStatuts = {
+        '', 'PRESENT', 'VALIDE', 'EN_COURS', 'TERMINE', 'FORCE_DFRC',
+      };
+      const alertStatuts = {
+        'HORS_LIGNE_SUSPECT', 'ABSENT_NON_BADGE', 'SORTIE_AUTO',
+      };
+      final ok = okStatuts.contains(statut) && !alertStatuts.contains(statut);
+      final titre = (m['formation_titre'] ?? '').toString().trim();
+      final module = (m['module_intitule'] ?? '').toString().trim();
+      final contexte = [titre, module].where((s) => s.isNotEmpty).join(' · ');
       if (entree != null) {
         events.add(_HistoryEvent(
           at: entree.toLocal(),
-          label: 'Pointage réussi',
+          label: contexte.isEmpty ? 'Entrée' : '$contexte — Entrée',
           success: ok,
         ));
       }
       if (sortie != null) {
+        final sortieLabel = statut == 'SORTIE_AUTO'
+            ? 'Sortie automatique'
+            : 'Sortie';
         events.add(_HistoryEvent(
           at: sortie.toLocal(),
-          label: 'Pointage réussi',
+          label: contexte.isEmpty ? sortieLabel : '$contexte — $sortieLabel',
           success: ok,
         ));
       }
@@ -112,6 +133,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
