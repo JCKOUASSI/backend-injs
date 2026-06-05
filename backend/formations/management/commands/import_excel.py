@@ -302,6 +302,20 @@ class Command(BaseCommand):
             or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
         )
 
+    def _resolve_ref_site(self, site_name):
+        """
+        Résout un libellé Excel (ex. « CPFAE-AGC ») en instance RefSite.
+        Crée le site référentiel s'il n'existe pas encore.
+        """
+        from formations.models import RefSite
+        name = self._str(site_name)
+        if not name:
+            return None
+        site = RefSite.objects.filter(nom__iexact=name).first()
+        if site:
+            return site
+        return RefSite.objects.create(nom=name, actif=True)
+
     def _int(self, val, default=None):
         if val is None:
             return default
@@ -450,7 +464,11 @@ class Command(BaseCommand):
             _site = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
-            if _site: module_defaults['site'] = _site
+            if _site:
+                site_obj = self._resolve_ref_site(_site)
+                if site_obj:
+                    module_defaults['site'] = site_obj
+                module_defaults['site_legacy'] = _site
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
             if _secretariat: module_defaults['secretariat'] = _secretariat

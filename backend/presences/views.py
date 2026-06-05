@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -26,6 +28,7 @@ from .serializers import (
     SecureScanSerializer,
     SecureHeartbeatSerializer,
     ForcePointageSerializer,
+    ForceBadgeageBulkAuditeursSerializer,
 )
 
 User = get_user_model()
@@ -1966,6 +1969,11 @@ def close_session(request, pk):
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def force_pointage(request, pk):
     """Secrétariat / Superviseur / DFRC : forcer un pointage entrée ou sortie pour participant, formateur ou encadrant (R6)."""
+    with transaction.atomic():
+        return _force_pointage_impl(request, pk)
+
+
+def _force_pointage_impl(request, pk):
     serializer = ForcePointageSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -2099,6 +2107,68 @@ def force_pointage(request, pk):
             'detail': 'Sortie forcée enregistrée.',
             'pointage': PointageSerializer(pointage).data,
         })
+
+    return Response({'detail': 'Action non reconnue.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrEncadrantOrDFRC])
+def force_badgeage_auditeurs_bulk(request, pk):
+    """
+    Forcer l'entrée d'un sous-ensemble aléatoire d'auditeurs absents par séance (80–95 %).
+    Secrétariat / Superviseur / DFRC uniquement.
+    """
+    from django.conf import settings
+    from .bulk_force_auditeurs import run_bulk_force_badgeage_auditeurs
+
+    serializer = ForceBadgeageBulkAuditeursSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    formation = _get_accessible_formation(request.user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable ou non autorisée.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    date_journee = data.get('date_journee') or timezone.localdate()
+    module_id = data['module_id']
+    try:
+        module = Module.objects.get(pk=module_id, formation=formation)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    ignore_constraints = bool(data.get('ignore_constraints'))
+    if ignore_constraints and not (request.user.is_superuser or getattr(settings, 'DEBUG', False)):
+        return Response(
+            {'detail': 'Le mode ignore_constraints est réservé aux tests (superuser ou DEBUG).'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    session_id = data.get('session_id')
+    if session_id and not ignore_constraints:
+        try:
+            seance = SessionModule.objects.get(pk=session_id, module=module, date_journee=date_journee)
+        except SessionModule.DoesNotExist:
+            return Response({'detail': 'Séance introuvable pour ce module et cette date.'}, status=status.HTTP_404_NOT_FOUND)
+        if not seance.demarree_le or seance.terminee_le:
+            return Response(
+                {'detail': 'La séance doit être démarrée et non terminée.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    result, status_hint = run_bulk_force_badgeage_auditeurs(
+        formation,
+        module,
+        motif=data['motif'],
+        request=request,
+        date_journee=date_journee,
+        session_id=session_id,
+        all_sessions=bool(data.get('all_sessions')),
+        ignore_constraints=ignore_constraints,
+    )
+    return Response(result, status=status.HTTP_201_CREATED if status_hint == 201 else status.HTTP_400_BAD_REQUEST)
 
 
 # ──────────────────────────────────────────────
