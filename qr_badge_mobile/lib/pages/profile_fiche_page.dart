@@ -28,6 +28,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _payload;
+  int _lastRefreshTick = -1;
 
   @override
   void dispose() {
@@ -153,8 +154,17 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     }
   }
 
+  void _maybeReloadFromTick(int tick) {
+    if (tick == _lastRefreshTick) {
+      return;
+    }
+    _lastRefreshTick = tick;
+    _load(showSpinner: false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
     final isFallback = _payload?['_fallback'] == true;
 
     return PopScope(

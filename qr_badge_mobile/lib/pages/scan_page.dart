@@ -454,6 +454,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       } else if (action == 'SORTIE' || action == 'SORTIE_AUTO') {
         session.stopSecureSessionHeartbeat();
       }
+      session.requestHistoryRefresh();
       final confirmation = _confirmationMessage(action);
       // Caméra arrêtée tant que l'utilisateur n'a pas demandé un nouveau scan.
       await _camera.stop();

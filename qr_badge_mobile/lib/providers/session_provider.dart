@@ -32,6 +32,9 @@ class SessionProvider extends ChangeNotifier {
   Map<String, dynamic>? user;
   bool mustChangePassword = false;
 
+  /// Incrémenté après un badgeage pour rafraîchir accueil / historique.
+  int historyRefreshTick = 0;
+
   /// Résultat de la demande de permission GPS au démarrage.
   /// Initialisé à `true` pour éviter un flash d'avertissement avant
   /// que la permission ait été vérifiée.
@@ -282,6 +285,11 @@ class SessionProvider extends ChangeNotifier {
       user!['must_change_password'] = false;
     }
     await _storage.setMustChangePassword(false);
+    notifyListeners();
+  }
+
+  void requestHistoryRefresh() {
+    historyRefreshTick++;
     notifyListeners();
   }
 
