@@ -314,7 +314,6 @@ class Command(BaseCommand):
         if site:
             return site
         return RefSite.objects.create(nom=name, actif=True)
-
     def _int(self, val, default=None):
         if val is None:
             return default
