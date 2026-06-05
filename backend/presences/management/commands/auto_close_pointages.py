@@ -8,46 +8,32 @@ Pour chaque pointage EN_COURS dont la séance est terminée depuis plus d'1 heur
   - statut = ABSENT_NON_BADGE
   - motif tracé en AuditLog (AUTO_ABSENT)
 
+Applique aussi les sanctions heartbeat via process_mobile_heartbeats (même logique).
+
 À planifier via cron toutes les 5-15 minutes :
   */10 * * * * /path/to/venv/bin/python /path/to/manage.py auto_close_pointages
 
-Ne sont pas soumis aux règles MOBILE_HEARTBEAT_* (suspect / sortie auto / mail) :
-  - badgeage web Django : device_id WEB_BADGE / OFFLINE_WEB ;
-  - PWA Flutter (navigateur) : device_id préfixé FLUTTER_PWA_ (heartbeat non fiable en arrière-plan).
+Pour n'exécuter que la surveillance heartbeat :
+  python manage.py process_mobile_heartbeats
 """
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from django.conf import settings
-
+from presences.heartbeat_sanctions import process_mobile_heartbeat_sanctions
 from presences.models import AuditLog, Pointage
-from authentication.emails import send_suspect_heartbeat_email
-
 
 MOTIF = "N'a pas badgé à la sortie de la séance"
-DELAI_MINUTES = getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
-SUSPECT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
-AUTO_EXIT_TIMEOUT_MINUTES = getattr(settings, 'MOBILE_HEARTBEAT_AUTO_EXIT_TIMEOUT_MINUTES', 120)
-
-# Canaux sans heartbeat « mobile » fiable → ne pas appliquer les timeouts MOBILE_HEARTBEAT_*.
-NO_MOBILE_HEARTBEAT_DEVICE_IDS = frozenset({'WEB_BADGE', 'OFFLINE_WEB'})
-FLUTTER_PWA_DEVICE_PREFIX = 'FLUTTER_PWA_'
-
-
-def _skip_mobile_heartbeat_sanctions(pointage):
-    did = (pointage.device_id or '').strip()
-    if did in NO_MOBILE_HEARTBEAT_DEVICE_IDS:
-        return True
-    if did.startswith(FLUTTER_PWA_DEVICE_PREFIX):
-        return True
-    return False
 
 
 class Command(BaseCommand):
-    help = "Marque ABSENT les auditeurs/formateurs qui n'ont pas badgé la sortie 1h après la fin de la séance."
+    help = (
+        "Marque ABSENT les pointages non soldés après fin de séance "
+        "et surveille les heartbeats mobiles."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -60,14 +46,41 @@ class Command(BaseCommand):
             type=int,
             default=None,
             help="Délai en minutes après la fin de séance avant marquage absent "
-                 "(défaut : valeur AUTO_ABSENT_DELAI_MINUTES du .env).",
+                 "(défaut : valeur AUTO_ABSENT_DELAI_MINUTES du .env).",
+        )
+        parser.add_argument(
+            '--skip-heartbeat',
+            action='store_true',
+            help="Ne pas exécuter la surveillance heartbeat (utiliser process_mobile_heartbeats).",
         )
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
-        delai = options['delai'] if options['delai'] is not None else getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
+        delai = (
+            options['delai']
+            if options['delai'] is not None
+            else getattr(settings, 'AUTO_ABSENT_DELAI_MINUTES', 60)
+        )
         now = timezone.now()
 
+        absents = self._process_absent_non_badge(delai=delai, now=now, dry_run=dry_run)
+
+        heartbeats = 0
+        if not options['skip_heartbeat']:
+            heartbeats = process_mobile_heartbeat_sanctions(
+                dry_run=dry_run,
+                write=self.stdout.write,
+            )
+
+        label = "simulés" if dry_run else "traités"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{absents} absent(s) non badgé(s) {label}, "
+                f"{heartbeats} pointage(s) heartbeat {label}."
+            )
+        )
+
+    def _process_absent_non_badge(self, *, delai, now, dry_run):
         pointages_ouverts = (
             Pointage.objects
             .filter(
@@ -76,7 +89,6 @@ class Command(BaseCommand):
             )
             .select_related(
                 'session__module__formation',
-                'session__module__superviseur',
                 'participant',
                 'formateur',
                 'encadrant',
@@ -87,6 +99,8 @@ class Command(BaseCommand):
         for pt in pointages_ouverts:
             seance = pt.session
             fin_seance = self._fin_seance(seance)
+            if not fin_seance or fin_seance + timedelta(minutes=delai) > now:
+                continue
 
             personne = pt.participant or pt.formateur or pt.encadrant
             if personne:
@@ -102,157 +116,60 @@ class Command(BaseCommand):
                 or getattr(personne, 'matricule', None)
                 or getattr(personne, 'numero', '?')
             ) if personne else '?'
-            type_str = 'formateur' if pt.formateur_id else 'encadrant' if pt.encadrant_id else 'participant'
+            type_str = (
+                'formateur' if pt.formateur_id
+                else 'encadrant' if pt.encadrant_id
+                else 'participant'
+            )
 
             if dry_run:
                 self.stdout.write(
-                    f"[DRY-RUN] {numero} {nom} — séance {seance} — fin estimée {fin_seance}"
+                    f"[DRY-RUN] ABSENT_NON_BADGE {numero} {nom} — séance {seance}"
                 )
                 traites += 1
                 continue
 
-            # 1) Règle historique : absent non badgé après fin de séance + délai
-            if fin_seance and fin_seance + timedelta(minutes=delai) <= now:
-                pt.timestamp_sortie = pt.timestamp_entree
-                pt.duree_presence_minutes = 0
-                pt.statut = Pointage.Statut.ABSENT_NON_BADGE
-                pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
+            pt.timestamp_sortie = pt.timestamp_entree
+            pt.duree_presence_minutes = 0
+            pt.statut = Pointage.Statut.ABSENT_NON_BADGE
+            pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
 
-                AuditLog.objects.create(
-                    action=AuditLog.Action.AUTO_ABSENT,
-                    acteur=None,
-                    acteur_label='Système',
-                    cible_type=type_str,
-                    cible_numero=numero,
-                    cible_nom=nom,
-                    formation=seance.module.formation,
-                    formation_titre=seance.module.formation.formation,
-                    pointage=pt,
-                    ip_address=None,
-                    device_id='SYSTEM',
-                    extra={
-                        'motif': MOTIF,
-                        'delai_minutes': delai,
-                        'fin_seance': fin_seance.isoformat(),
-                    },
+            AuditLog.objects.create(
+                action=AuditLog.Action.AUTO_ABSENT,
+                acteur=None,
+                acteur_label='Système',
+                cible_type=type_str,
+                cible_numero=numero,
+                cible_nom=nom,
+                formation=seance.module.formation,
+                formation_titre=seance.module.formation.formation,
+                pointage=pt,
+                ip_address=None,
+                device_id='SYSTEM',
+                extra={
+                    'motif': MOTIF,
+                    'delai_minutes': delai,
+                    'fin_seance': fin_seance.isoformat(),
+                },
+            )
+
+            traites += 1
+            self.stdout.write(
+                self.style.WARNING(
+                    f"ABSENT_NON_BADGE : {numero} {nom} — {seance.module.formation.formation}"
                 )
+            )
 
-                traites += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"ABSENT_NON_BADGE : {numero} {nom} — {seance.module.formation.formation}"
-                    )
-                )
-                continue
-
-            # 2) Règle anti-fraude mobile : gestion du timeout heartbeat
-            if _skip_mobile_heartbeat_sanctions(pt):
-                continue
-
-            last_seen_at = pt.last_heartbeat_at or pt.timestamp_entree
-            silence_minutes = int((now - last_seen_at).total_seconds() // 60)
-
-            if silence_minutes >= AUTO_EXIT_TIMEOUT_MINUTES:
-                pt.timestamp_sortie = now
-                pt.statut = Pointage.Statut.SORTIE_AUTO
-                pt.calculer_duree()
-                pt.save(update_fields=['timestamp_sortie', 'duree_presence_minutes', 'statut', 'updated_at'])
-
-                AuditLog.objects.create(
-                    action=AuditLog.Action.AUTO_EXIT,
-                    acteur=None,
-                    acteur_label='Système',
-                    cible_type=type_str,
-                    cible_numero=numero,
-                    cible_nom=nom,
-                    formation=seance.module.formation,
-                    formation_titre=seance.module.formation.formation,
-                    pointage=pt,
-                    ip_address=None,
-                    device_id='SYSTEM',
-                    extra={
-                        'motif': 'NO_HEARTBEAT_TIMEOUT',
-                        'silence_minutes': silence_minutes,
-                        'last_heartbeat_at': last_seen_at.isoformat() if last_seen_at else None,
-                        'auto_exit_timeout_minutes': AUTO_EXIT_TIMEOUT_MINUTES,
-                        'battery_level': pt.last_battery_level,
-                        'is_charging': pt.last_is_charging,
-                    },
-                )
-
-                traites += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"SORTIE_AUTO : {numero} {nom} — {seance.module.formation.formation}"
-                    )
-                )
-                continue
-
-            if (
-                silence_minutes >= SUSPECT_TIMEOUT_MINUTES
-                and pt.statut == Pointage.Statut.EN_COURS
-            ):
-                pt.statut = Pointage.Statut.HORS_LIGNE_SUSPECT
-                pt.save(update_fields=['statut', 'updated_at'])
-
-                AuditLog.objects.create(
-                    action=AuditLog.Action.NO_HEARTBEAT,
-                    acteur=None,
-                    acteur_label='Système',
-                    cible_type=type_str,
-                    cible_numero=numero,
-                    cible_nom=nom,
-                    formation=seance.module.formation,
-                    formation_titre=seance.module.formation.formation,
-                    pointage=pt,
-                    ip_address=None,
-                    device_id='SYSTEM',
-                    extra={
-                        'motif': 'NO_HEARTBEAT',
-                        'silence_minutes': silence_minutes,
-                        'last_heartbeat_at': last_seen_at.isoformat() if last_seen_at else None,
-                        'suspect_timeout_minutes': SUSPECT_TIMEOUT_MINUTES,
-                        'battery_level': pt.last_battery_level,
-                        'is_charging': pt.last_is_charging,
-                    },
-                )
-
-                traites += 1
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"HORS_LIGNE_SUSPECT : {numero} {nom} — {seance.module.formation.formation}"
-                    )
-                )
-
-                encadrant = seance.module.superviseur
-                seance_label = seance.intitule or f'Séance {seance.numero}'
-                send_suspect_heartbeat_email(
-                    encadrant=encadrant,
-                    personne_nom=nom,
-                    personne_numero=numero,
-                    formation_titre=seance.module.formation.formation,
-                    module_intitule=seance.module.intitule,
-                    seance_label=seance_label,
-                    silence_minutes=silence_minutes,
-                )
-                continue
-
-        label = "simulés" if dry_run else "traités"
-        self.stdout.write(self.style.SUCCESS(f"{traites} pointage(s) {label}."))
+        return traites
 
     def _fin_seance(self, seance):
-        """
-        Retourne le datetime de fin de séance (UTC-aware) :
-          1. seance.terminee_le  (fin réelle)
-          2. combinaison date_journee + heure_fin_prevue
-          3. None si aucune info disponible
-        """
         if seance.terminee_le:
             return seance.terminee_le
 
         if seance.date_journee and seance.heure_fin_prevue:
             from datetime import datetime
             from zoneinfo import ZoneInfo
+
             tz = ZoneInfo('Africa/Abidjan')
             return timezone.make_aware(
                 datetime.combine(seance.date_journee, seance.heure_fin_prevue),

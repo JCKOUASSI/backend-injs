@@ -851,6 +851,12 @@ def _sync_ref_formations_from_cycles():
             existing_keys.add(label.strip().lower())
 
 
+def _finance_normalize_label(label):
+    """Normalise un libellé de formation pour la recherche de tarif."""
+    s = (label or '').strip().lower()
+    return re.sub(r'\s+', ' ', s)
+
+
 def _finance_prix_heure():
     return float(FinanceSettings.get_solo().prix_heure_realisee or 0)
 
@@ -860,18 +866,44 @@ def _finance_build_prix_map():
     default = _finance_prix_heure()
     prix_map = {}
     for ref in RefFormation.objects.exclude(prix_heure_realisee__isnull=True):
-        prix_map[ref.intitule.strip().lower()] = float(ref.prix_heure_realisee or 0)
+        key = _finance_normalize_label(ref.intitule)
+        if key:
+            prix_map[key] = float(ref.prix_heure_realisee or 0)
     return default, prix_map
 
 
-def _finance_prix_heure_for_formation(formation_label, prix_map=None, default=None):
+def _finance_formation_label_candidates(formation_label=None, module_obj=None):
+    """Libellés possibles pour retrouver le tarif d'une formation."""
+    labels = []
+    for raw in (formation_label,):
+        if raw and str(raw).strip():
+            labels.append(str(raw).strip())
+    if module_obj:
+        if getattr(module_obj, 'cycle', None) and str(module_obj.cycle).strip():
+            labels.append(str(module_obj.cycle).strip())
+        if module_obj.formation_id and module_obj.formation:
+            f = (module_obj.formation.formation or '').strip()
+            if f:
+                labels.append(f)
+    seen = set()
+    ordered = []
+    for lbl in labels:
+        key = _finance_normalize_label(lbl)
+        if key and key not in seen:
+            seen.add(key)
+            ordered.append(lbl)
+    return ordered
+
+
+def _finance_prix_heure_for_formation(formation_label, prix_map=None, default=None, module_obj=None):
     if default is None:
         default = _finance_prix_heure()
     if prix_map is None:
         _, prix_map = _finance_build_prix_map()
-    key = (formation_label or '').strip().lower()
-    if key and key in prix_map:
-        return prix_map[key]
+    for raw in _finance_formation_label_candidates(formation_label, module_obj):
+        key = _finance_normalize_label(raw)
+        if key and key in prix_map:
+            return prix_map[key]
     return default
 
 
@@ -879,14 +911,18 @@ def _finance_module_formation_label(module_obj):
     if not module_obj:
         return ''
     if module_obj.formation_id and module_obj.formation:
-        return module_obj.formation.formation or ''
-    return module_obj.cycle or ''
+        label = (module_obj.formation.formation or '').strip()
+        if label:
+            return label
+    return (module_obj.cycle or '').strip()
 
 
-def _finance_resolve_prix_heure(formation_label, *, prix_heure_override=None, prix_map=None, default=None):
+def _finance_resolve_prix_heure(formation_label, *, prix_heure_override=None, prix_map=None, default=None, module_obj=None):
     if prix_heure_override is not None:
         return float(prix_heure_override or 0)
-    return _finance_prix_heure_for_formation(formation_label, prix_map, default)
+    return _finance_prix_heure_for_formation(
+        formation_label, prix_map=prix_map, default=default, module_obj=module_obj,
+    )
 
 
 def _finance_montant_from_minutes(minutes, prix_heure):
@@ -1482,6 +1518,7 @@ def _finance_report_rows(
                 prix_heure_override=None if use_variable_rates else default_prix,
                 prix_map=prix_map,
                 default=default_prix,
+                module_obj=module_obj,
             )
             module_sessions = sessions_by_module.get(module_id, [])
             for session in module_sessions:
@@ -1678,7 +1715,7 @@ def formateur_finance_report_api(request):
     """
     allowed_roles = _finance_allowed_roles()
     if request.user.role not in allowed_roles:
-        return Response({'detail': 'Accès réservé au service finance.'}, status=403)
+        return Response({'detail': 'Accès réservé à la Direction et au service Finance.'}, status=403)
 
     period = _parse_finance_date_range(request)
     if period['error']:
@@ -1981,6 +2018,9 @@ def finance_settings_api(request):
 
     if request.method == 'GET':
         return Response(_settings_payload())
+
+    if request.user.role != 'FINANCE':
+        return Response({'detail': 'Seul le service Finance peut modifier les paramètres.'}, status=403)
 
     updated = False
 
