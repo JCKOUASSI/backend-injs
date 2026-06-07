@@ -281,7 +281,7 @@ export default function Dashboard() {
         </div>
         <div
           className="headline-kpi-card headline-kpi-card-side headline-kpi-card-volume"
-          title="Heures de cours déjà réalisées par rapport aux heures prévues sur les modules concernés, et pourcentage d’avancement du volume horaire."
+          title="Réalisé = somme des séances terminées. Prévu = somme des créneaux horaires planifiés des séances, par module."
         >
           <div className="headline-kpi-icon">
             <i className="bi bi-clock-history"></i>

@@ -42,11 +42,18 @@
     </div>
     {% endif %}
     {% endblock %}
-    {% block nav-global %}{% endblock %}
+    {% block nav-global %}
+    {% if user.is_staff %}
+    <nav class="dfrc-admin-tabs" aria-label="Navigation admin">
+        <a href="{% url 'admin:index' %}" class="dfrc-admin-tab">Accueil</a>
+        <a href="{% url 'admin:formations_volume_horaire_diagnostic' %}" class="dfrc-admin-tab{% if request.resolver_match.url_name == 'formations_volume_horaire_diagnostic' %} is-active{% endif %}">Diagnostique</a>
+    </nav>
+    {% endif %}
+    {% endblock %}
 </header>
 {% endblock %}
 
 {% block responsive %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'admin/custom_admin.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'admin/custom_admin.css' %}?v=5">
 {% endblock %}
