@@ -279,10 +279,10 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(row))
             else:
                 self.stdout.write(row)
-
         self.stdout.write('=' * len(header))
         self.stdout.write(
             "Insc.=inscription fiche | Brut=Σ duree_presence_minutes | "
             "Compté=plafond module inscrit (hors inscription ignoré) | "
             "Plaf.=brut non compté (cap module)"
         )
+

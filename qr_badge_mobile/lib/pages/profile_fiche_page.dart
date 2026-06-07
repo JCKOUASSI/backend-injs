@@ -341,7 +341,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
           _StatsGrid(
             stats: stats,
             volumeLabel: volumeLabel,
-            volumeTaux: volumeTaux is num ? volumeTaux.toDouble() : 0,
+            volumeTaux: volumeTaux,
             minutesLabel: minutesLabel,
             dernierLabel: dernierLabel,
             onVolumeTap: () => _showStatSheet(
@@ -350,7 +350,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
               value: volumeLabel,
               description:
                   'Heures de présence badgeées sur le volume total prévu de vos modules inscrits.'
-                  '${volumeTaux is num && volumeTotal is num && volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
+                  '${volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
             ),
             onBadgeagesTap: widget.onOpenHistory ?? () => _showStatSheet(
                       context,

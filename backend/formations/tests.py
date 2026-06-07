@@ -1,12 +1,16 @@
+from datetime import timedelta, time as dt_time
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from authentication.models import User
 from .models import (
     Formation, Module, Participant, Formateur,
-    Secretariat, ModuleParticipant, ModuleFormateur,
+    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
 )
+from .volume_horaire import compute_dashboard_volume_horaire
 
 
 def make_user(username, role='CPFAE_ADMIN', **kwargs):
@@ -370,4 +374,48 @@ class ParticipantSecretariatDispatchByMatriculeAPITest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         participant.refresh_from_db()
         self.assertEqual(participant.secretariat_id, self.sec_fac.id)
+
+
+class DashboardVolumeHoraireTest(TestCase):
+
+    def test_prevu_et_realise_par_seances(self):
+        f = make_formation()
+        module = make_module(f, duree_prevue_heures=99)
+        now = timezone.now()
+        for num in range(1, 3):
+            SessionModule.objects.create(
+                module=module,
+                date_journee=timezone.localdate(),
+                numero=num,
+                demarree_le=now - timedelta(hours=5),
+                terminee_le=now,
+                heure_debut_prevue=dt_time(8, 0),
+                heure_fin_prevue=dt_time(13, 0),
+            )
+        effectue, total, taux = compute_dashboard_volume_horaire(
+            Module.objects.filter(pk=module.pk)
+        )
+        self.assertEqual(total, 10)
+        self.assertEqual(effectue, 10)
+        self.assertEqual(taux, 100)
+
+    def test_realise_plafonne_au_prevu_seance(self):
+        """Une séance laissée ouverte ne compte pas plus que son créneau planifié."""
+        from .volume_horaire import _accumulate_module_session_volumes
+
+        f = make_formation()
+        module = make_module(f, duree_prevue_heures=12)
+        SessionModule.objects.create(
+            module=module,
+            date_journee=timezone.localdate(),
+            numero=1,
+            demarree_le=timezone.now() - timedelta(days=5),
+            terminee_le=timezone.now(),
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(12, 0),
+        )
+        vol = _accumulate_module_session_volumes(module)
+        self.assertEqual(vol['prevu_h'], 4.0)
+        self.assertEqual(vol['realise_h'], 4.0)
+        self.assertEqual(vol['ecart_h'], 0.0)
 

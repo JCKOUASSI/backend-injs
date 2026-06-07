@@ -1,0 +1,319 @@
+"""Volume horaire : dashboard web et diagnostic admin (modules / séances).
+
+Prévu module  = Σ durées planifiées des séances (heure_fin_prevue − heure_debut_prevue).
+Réalisé module = Σ min(durée réelle, durée prévue) par séance terminée.
+La durée réelle (terminee_le − demarree_le) est plafonnée au créneau planifié de chaque séance.
+"""
+
+from django.urls import reverse
+
+from formations.models import Module, Secretariat, SessionModule
+
+_MAX_DUREE_SESSION_MIN_DEFAUT = 8 * 60
+
+
+def _minutes_entre_heures(h_debut, h_fin):
+    if not h_debut or not h_fin:
+        return None
+    return (
+        (h_fin.hour * 60 + h_fin.minute + h_fin.second / 60)
+        - (h_debut.hour * 60 + h_debut.minute + h_debut.second / 60)
+    )
+
+
+def _session_prevu_minutes(session):
+    """Durée planifiée d'une séance (créneau horaire)."""
+    prevu = _minutes_entre_heures(
+        session.heure_debut_prevue, session.heure_fin_prevue
+    )
+    if prevu is None or prevu <= 0:
+        return 0.0
+    return prevu
+
+
+def _session_elapsed_brut_minutes(session):
+    """Durée brute (terminee_le − demarree_le), sans plafond."""
+    if not session.demarree_le or not session.terminee_le:
+        return 0.0
+    elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+    return elapsed if elapsed > 0 else 0.0
+
+
+def _session_realise_minutes(session):
+    """Durée comptée : brute plafonnée au créneau planifié de la séance."""
+    elapsed = _session_elapsed_brut_minutes(session)
+    if elapsed <= 0:
+        return 0.0
+    plafond = _session_prevu_minutes(session)
+    if plafond <= 0:
+        plafond, _ = _session_plafond_minutes(session)
+    return min(elapsed, plafond)
+
+
+def _session_plafond_minutes(session):
+    """Plafond horaire d'une séance (pour détecter les dépassements séance par séance)."""
+    plafond = _minutes_entre_heures(
+        session.heure_debut_prevue, session.heure_fin_prevue
+    )
+    if plafond is None or plafond <= 0:
+        return _MAX_DUREE_SESSION_MIN_DEFAUT, True
+    return plafond, False
+
+
+def _accumulate_module_session_volumes(module):
+    """Agrège prévu (toutes séances) et réalisé (séances terminées) pour un module."""
+    prevu_min = 0.0
+    realise_min = 0.0
+    nb_sessions_planifiees = 0
+    nb_sessions = 0
+    nb_sessions_terminees = 0
+    sessions_sans_horaires = 0
+
+    sessions = SessionModule.objects.filter(module=module).only(
+        'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le',
+    )
+    for s in sessions:
+        nb_sessions += 1
+        prevu = _session_prevu_minutes(s)
+        if prevu > 0:
+            prevu_min += prevu
+            nb_sessions_planifiees += 1
+        elif not (s.heure_debut_prevue and s.heure_fin_prevue):
+            sessions_sans_horaires += 1
+
+        realise = _session_realise_minutes(s)
+        if realise > 0:
+            realise_min += realise
+            nb_sessions_terminees += 1
+
+    prevu_h = round(prevu_min / 60, 1)
+    realise_h = round(realise_min / 60, 1)
+    compte_h = realise_h
+
+    return {
+        'prevu_min': prevu_min,
+        'realise_min': realise_min,
+        'prevu_h': prevu_h,
+        'realise_h': realise_h,
+        'compte_h': compte_h,
+        'ecart_h': round(realise_h - prevu_h, 1),
+        'nb_sessions': nb_sessions,
+        'nb_sessions_planifiees': nb_sessions_planifiees,
+        'nb_sessions_terminees': nb_sessions_terminees,
+        'sessions_sans_horaires': sessions_sans_horaires,
+        'duree_fiche_h': round(float(module.duree_prevue_heures or 0), 1),
+        'taux_realise_pct': (
+            round(realise_h / prevu_h * 100, 1) if prevu_h > 0 else None
+        ),
+    }
+
+
+def modules_qs_for_admin(request):
+    """Modules visibles selon le rôle admin (aligné dashboard)."""
+    from admin_mixins import admin_user_has_global_access
+
+    qs = Module.objects.select_related('formation', 'secretariat', 'secretariat__type')
+    if not request.user.is_staff:
+        return qs.none()
+
+    if admin_user_has_global_access(request.user):
+        secretariat_id = (request.GET.get('secretariat') or '').strip()
+        if secretariat_id.isdigit():
+            qs = qs.filter(secretariat_id=int(secretariat_id))
+        return qs
+
+    role = getattr(request.user, 'role', None)
+    secretariat = getattr(request.user, 'secretariat', None)
+    if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and secretariat:
+        return qs.filter(secretariat=secretariat)
+    if role == 'ENCADRANT':
+        return qs.filter(superviseur=request.user)
+    return qs.none()
+
+
+def secretariats_for_admin_filter(request):
+    from admin_mixins import admin_user_has_global_access
+
+    if not admin_user_has_global_access(request.user):
+        return []
+    return list(
+        Secretariat.objects.select_related('type')
+        .order_by('nom')
+        .values('id', 'nom', 'type__libelle')
+    )
+
+
+def compute_dashboard_volume_horaire(modules_qs):
+    """Volume agrégé dashboard : prévu/réalisé par séances, taux ≤ 100 %."""
+    module_ids = list(modules_qs.values_list('pk', flat=True))
+    if not module_ids:
+        return 0, 0, 0
+
+    total_prevu_min = 0.0
+    total_compte_min = 0.0
+
+    # Requête légère sans select_related (incompatible avec .only()).
+    for module in Module.objects.filter(pk__in=module_ids).only(
+        'pk', 'duree_prevue_heures'
+    ):
+        vol = _accumulate_module_session_volumes(module)
+        total_prevu_min += vol['prevu_min']
+        total_compte_min += vol['realise_min']
+
+    total_heures = int(round(total_prevu_min / 60))
+    effectue_heures = int(round(total_compte_min / 60))
+    if total_heures > 0:
+        effectue_heures = min(effectue_heures, total_heures)
+        taux = min(100, int((effectue_heures / total_heures) * 100))
+    else:
+        effectue_heures = 0
+        taux = 0
+    return effectue_heures, total_heures, taux
+
+
+def _module_admin_url(module_id):
+    try:
+        return reverse('admin:formations_module_change', args=[module_id])
+    except Exception:
+        return None
+
+
+def _session_admin_url(session_id):
+    try:
+        return reverse('admin:formations_sessionmodule_change', args=[session_id])
+    except Exception:
+        return None
+
+
+def compute_modules_diagnostic(modules_qs):
+    """Diagnostic par module : prévu (séances planifiées) vs réalisé (séances terminées)."""
+    rows = []
+    totaux = {
+        'prevu_h': 0.0,
+        'realise_h': 0.0,
+        'compte_dashboard_h': 0.0,
+        'duree_fiche_h': 0.0,
+    }
+
+    for module in modules_qs:
+        vol = _accumulate_module_session_volumes(module)
+
+        sec_label = ''
+        if module.secretariat_id:
+            sec_label = module.secretariat.nom or ''
+            if module.secretariat.type_id:
+                sec_label = f"{module.secretariat.type.libelle} — {sec_label}".strip(' —')
+
+        rows.append({
+            'module_id': module.pk,
+            'module_label': module.intitule or '',
+            'formation': module.formation.formation if module.formation_id else '',
+            'secretariat': sec_label,
+            'statut': module.statut or '',
+            'prevu_h': vol['prevu_h'],
+            'realise_h': vol['realise_h'],
+            'compte_dashboard_h': vol['compte_h'],
+            'duree_fiche_h': vol['duree_fiche_h'],
+            'ecart_h': vol['ecart_h'],
+            'nb_sessions': vol['nb_sessions'],
+            'nb_sessions_planifiees': vol['nb_sessions_planifiees'],
+            'nb_sessions_terminees': vol['nb_sessions_terminees'],
+            'sessions_sans_horaires': vol['sessions_sans_horaires'],
+            'depasse': vol['ecart_h'] > 0,
+            'module_url': _module_admin_url(module.pk),
+            'taux_realise_pct': vol['taux_realise_pct'],
+        })
+
+        totaux['prevu_h'] += vol['prevu_h']
+        totaux['realise_h'] += vol['realise_h']
+        totaux['compte_dashboard_h'] += vol['compte_h']
+        totaux['duree_fiche_h'] += vol['duree_fiche_h']
+
+    for key in totaux:
+        totaux[key] = round(totaux[key], 1)
+    totaux['ecart_h'] = round(totaux['realise_h'] - totaux['prevu_h'], 1)
+    if totaux['prevu_h'] > 0:
+        totaux['taux_realise_pct'] = round(
+            totaux['realise_h'] / totaux['prevu_h'] * 100, 1
+        )
+    else:
+        totaux['taux_realise_pct'] = None
+
+    return rows, totaux
+
+
+def compute_sessions_depassement(modules_qs):
+    """Séances terminées dont la durée réelle dépasse l'horaire planifié."""
+    rows = []
+    module_ids = list(modules_qs.values_list('pk', flat=True))
+    if not module_ids:
+        return rows
+
+    modules_by_id = {m.pk: m for m in modules_qs}
+    sessions = (
+        SessionModule.objects.filter(module_id__in=module_ids)
+        .exclude(demarree_le__isnull=True)
+        .exclude(terminee_le__isnull=True)
+        .select_related('module__formation')
+        .order_by('-date_journee', '-numero')
+    )
+
+    for s in sessions:
+        elapsed = _session_elapsed_brut_minutes(s)
+        if elapsed <= 0:
+            continue
+        plafond, sans_horaires = _session_plafond_minutes(s)
+        depasse_min = elapsed - plafond
+        if depasse_min <= 1:
+            continue
+
+        module = modules_by_id.get(s.module_id)
+        rows.append({
+            'session_id': s.pk,
+            'date': s.date_journee,
+            'numero': s.numero,
+            'intitule': s.intitule or f"Séance {s.numero}",
+            'module_id': s.module_id,
+            'module_label': module.intitule if module else '',
+            'formation': (
+                module.formation.formation
+                if module and module.formation_id else ''
+            ),
+            'prevu_seance_h': round(plafond / 60, 2),
+            'realise_h': round(elapsed / 60, 2),
+            'depasse_h': round(depasse_min / 60, 2),
+            'sans_horaires_planifies': sans_horaires,
+            'session_url': _session_admin_url(s.pk),
+            'module_url': _module_admin_url(s.module_id),
+        })
+
+    rows.sort(key=lambda r: r['depasse_h'], reverse=True)
+    return rows
+
+
+def run_organisation_diagnostic(request, depassements_only=False):
+    """Diagnostic global modules + séances (dashboard web)."""
+    modules_qs = modules_qs_for_admin(request)
+    module_rows, totaux = compute_modules_diagnostic(modules_qs)
+    if depassements_only:
+        module_rows = [r for r in module_rows if r['depasse']]
+    module_rows.sort(key=lambda r: r['ecart_h'], reverse=True)
+
+    session_rows = compute_sessions_depassement(modules_qs)
+    effectue, total, taux = compute_dashboard_volume_horaire(modules_qs)
+
+    return {
+        'modules': module_rows,
+        'sessions': session_rows,
+        'totaux': totaux,
+        'dashboard': {
+            'effectue_h': effectue,
+            'prevu_h': total,
+            'taux_pct': taux,
+        },
+        'nb_modules': len(module_rows),
+        'nb_sessions_depassement': len(session_rows),
+        'secretariats': secretariats_for_admin_filter(request),
+        'selected_secretariat': (request.GET.get('secretariat') or '').strip(),
+        'depassements_only': depassements_only,
+    }
