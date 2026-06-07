@@ -491,3 +491,61 @@ class SecureScanFormateurEncadrantTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data.get('type_personne'), 'encadrant')
 
+
+class VolumeHoraireFicheStatsTest(TestCase):
+
+    def test_effectue_ne_depasse_pas_prevu(self):
+        from presences.views import _compute_volume_horaire_stats
+
+        f = Formation.objects.create(formation='F')
+        m_inscrit = Module.objects.create(
+            formation=f, intitule='Inscrit', duree_prevue_heures=10,
+        )
+        m_hors = Module.objects.create(
+            formation=f, intitule='Hors inscription', duree_prevue_heures=50,
+        )
+        s1 = SessionModule.objects.create(
+            module=m_inscrit, date_journee=timezone.localdate(), numero=1,
+        )
+        s2 = SessionModule.objects.create(
+            module=m_hors, date_journee=timezone.localdate(), numero=1,
+        )
+        p = Participant.objects.create(matricule='VH001', nom='A', prenom='B')
+        ModuleParticipant.objects.create(module=m_inscrit, participant=p)
+        entree = timezone.now() - timedelta(hours=20)
+        Pointage.objects.create(
+            session=s1,
+            participant=p,
+            date_journee=timezone.localdate(),
+            timestamp_entree=entree,
+            timestamp_sortie=timezone.now(),
+            duree_presence_minutes=20 * 60,
+        )
+        Pointage.objects.create(
+            session=s2,
+            participant=p,
+            date_journee=timezone.localdate(),
+            timestamp_entree=entree,
+            timestamp_sortie=timezone.now(),
+            duree_presence_minutes=30 * 60,
+        )
+        modules_data = [{'id': m_inscrit.id, 'duree_prevue_heures': 10}]
+        pointages_qs = Pointage.objects.filter(participant=p)
+        stats = _compute_volume_horaire_stats(modules_data, pointages_qs)
+
+        self.assertEqual(stats['volume_horaire_total_heures'], 10.0)
+        self.assertEqual(stats['volume_horaire_effectue_heures'], 10.0)
+        self.assertEqual(stats['volume_horaire_effectue_taux'], 100.0)
+
+    def test_total_prevu_deduplique_par_module(self):
+        from presences.views import _compute_volume_horaire_stats
+
+        f = Formation.objects.create(formation='F')
+        m = Module.objects.create(formation=f, intitule='M', duree_prevue_heures=12)
+        modules_data = [
+            {'id': m.id, 'duree_prevue_heures': 12},
+            {'id': m.id, 'duree_prevue_heures': 8},
+        ]
+        stats = _compute_volume_horaire_stats(modules_data, Pointage.objects.none())
+        self.assertEqual(stats['volume_horaire_total_heures'], 12.0)
+
