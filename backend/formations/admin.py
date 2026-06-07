@@ -904,3 +904,8 @@ class RefSalleAdmin(admin.ModelAdmin):
     autocomplete_fields = ['site', 'batiment']
     list_select_related = ['site', 'batiment']
     ordering = ['site__nom', 'batiment__nom', 'nom']
+
+
+from formations.admin_diagnostic import attach_volume_diagnostic_admin_urls
+
+attach_volume_diagnostic_admin_urls()

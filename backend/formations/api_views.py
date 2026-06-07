@@ -93,41 +93,10 @@ def dashboard_stats(request):
     groupes_en_cours = modules_qs.filter(statut='EN_COURS', groupe__isnull=False).exclude(groupe='').values('groupe').distinct().count()
     total_participants = participants_qs.count()
 
-    volume_horaire_total_heures = int(
-        sum(float(v or 0) for v in modules_qs.values_list('duree_prevue_heures', flat=True))
-    )
-    # Volume effectué : pour éviter qu'une session démarrée puis clôturée le
-    # lendemain (oubli, batch de clôture, etc.) ne fasse exploser le total,
-    # on plafonne la durée réelle par la durée *prévue* de la session
-    # (heure_fin_prevue - heure_debut_prevue). Repli : 8 h si non renseignées.
-    _MAX_DUREE_SESSION_MIN_DEFAUT = 8 * 60
-    volume_horaire_effectue_minutes = 0.0
-    for session in (
-        SessionModule.objects.filter(module__in=modules_qs)
-        .exclude(demarree_le__isnull=True)
-        .exclude(terminee_le__isnull=True)
-        .only('demarree_le', 'terminee_le', 'heure_debut_prevue', 'heure_fin_prevue')
-    ):
-        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
-        if elapsed <= 0:
-            continue
-        # Plafond = durée prévue de la session, sinon 8 h.
-        if session.heure_debut_prevue and session.heure_fin_prevue:
-            _hd = session.heure_debut_prevue
-            _hf = session.heure_fin_prevue
-            plafond = (
-                (_hf.hour * 60 + _hf.minute + _hf.second / 60)
-                - (_hd.hour * 60 + _hd.minute + _hd.second / 60)
-            )
-            if plafond <= 0:
-                plafond = _MAX_DUREE_SESSION_MIN_DEFAUT
-        else:
-            plafond = _MAX_DUREE_SESSION_MIN_DEFAUT
-        volume_horaire_effectue_minutes += min(elapsed, plafond)
-    volume_horaire_effectue_heures = int(volume_horaire_effectue_minutes / 60)
-    volume_horaire_effectue_taux = (
-        int((volume_horaire_effectue_heures / volume_horaire_total_heures) * 100)
-        if volume_horaire_total_heures > 0 else 0
+    from .volume_horaire import compute_dashboard_volume_horaire
+
+    volume_horaire_effectue_heures, volume_horaire_total_heures, volume_horaire_effectue_taux = (
+        compute_dashboard_volume_horaire(modules_qs)
     )
 
     formateurs_qs = Formateur.objects.all()

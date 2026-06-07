@@ -254,6 +254,84 @@ select,
     gap: 18px;
 }
 
+.dfrc-admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: 1 1 100%;
+    order: 3;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.dfrc-admin-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff !important;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.dfrc-admin-tab:hover,
+.dfrc-admin-tab.is-active {
+    background: rgba(255, 255, 255, 0.28);
+    color: #ffffff !important;
+}
+
+.dfrc-diag-page .warning {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.dfrc-diag-page tr.dfrc-row-warning td {
+    background: #fff7ed;
+}
+
+.dfrc-diag-totaux {
+    font-size: 1.05rem;
+}
+
+.dfrc-diag-tfoot th,
+.dfrc-diag-tfoot td {
+    background: #e8f4f0 !important;
+    font-weight: 700;
+    border-top: 2px solid var(--border-color);
+}
+
+.dfrc-diag-muted {
+    color: var(--body-quiet-color);
+    font-size: 0.85em;
+}
+
+.dfrc-diag-filters {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+}
+
+.dfrc-diag-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    align-items: center;
+}
+
+.dfrc-diag-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.dfrc-diag-modules-table th:nth-child(n+5),
+.dfrc-diag-modules-table td:nth-child(n+5) {
+    text-align: right;
+    white-space: nowrap;
+}
+
 .dfrc-quick-links {
     border: 1px solid #dbe7f2;
     border-radius: 10px;
