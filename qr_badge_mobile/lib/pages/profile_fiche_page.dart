@@ -254,9 +254,18 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         ? '${totalMin.round()} min de présence'
         : '0 min de présence';
 
-    final volumeEffectue = stats['volume_horaire_effectue_heures'];
-    final volumeTotal = stats['volume_horaire_total_heures'];
-    final volumeTaux = stats['volume_horaire_effectue_taux'];
+    final volumeTotalRaw = stats['volume_horaire_total_heures'];
+    final volumeTotal =
+        volumeTotalRaw is num ? volumeTotalRaw.toDouble() : 0.0;
+    final volumeEffectueRaw = stats['volume_horaire_effectue_heures'];
+    final volumeEffectue = volumeEffectueRaw is num
+        ? (volumeTotal > 0
+            ? volumeEffectueRaw.toDouble().clamp(0.0, volumeTotal)
+            : volumeEffectueRaw.toDouble())
+        : 0.0;
+    final volumeTauxRaw = stats['volume_horaire_effectue_taux'];
+    final volumeTaux =
+        volumeTauxRaw is num ? volumeTauxRaw.toDouble().clamp(0.0, 100.0) : 0.0;
     final volumeLabel =
         '${_formatHeures(volumeEffectue)} / ${_formatHeures(volumeTotal)}';
 
