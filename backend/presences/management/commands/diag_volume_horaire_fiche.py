@@ -75,14 +75,15 @@ def _compute_volume_breakdown(modules_data, pointages_qs):
     """Même règles que _compute_volume_horaire_stats, avec détail module par module."""
     module_cap_minutes = {}
     module_prevu_heures = {}
-    total_heures = 0.0
     for m in modules_data:
         mid = m.get('id')
+        if mid is None:
+            continue
         heures = float(m.get('duree_prevue_heures') or 0)
-        total_heures += heures
-        if mid is not None:
-            module_cap_minutes[mid] = heures * 60
-            module_prevu_heures[mid] = heures
+        cap = heures * 60
+        module_cap_minutes[mid] = max(module_cap_minutes.get(mid, 0.0), cap)
+        module_prevu_heures[mid] = module_cap_minutes[mid] / 60
+    total_heures = sum(module_prevu_heures.values())
 
     module_accum = {mid: 0.0 for mid in module_cap_minutes}
     module_brut = {}
@@ -178,7 +179,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         personne, type_str, user = _resolve_target(options)
-        modules_data = _modules_for_personne(personne, type_str)
+        modules_data = _modules_for_personne(personne, type_str, user=user)
         pointages_qs = _pointages_queryset_for_personne(personne, type_str, user=user)
 
         stats_api = _compute_volume_horaire_stats(modules_data, pointages_qs)

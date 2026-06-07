@@ -1309,7 +1309,7 @@ def my_historique(request):
 
     data = [_pointage_historique_item(pt) for pt in pointages]
 
-    modules_data = _modules_for_personne(personne, type_str)
+    modules_data = _modules_for_personne(personne, type_str, user=user)
     stats = _compute_fiche_stats(pointages_qs)
     stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
 
@@ -1349,11 +1349,17 @@ def _module_fiche_payload(module, inscrit_le=None):
     }
 
 
-def _modules_for_personne(personne, type_str):
+def _modules_for_personne(personne, type_str, user=None):
     modules_data = []
     if type_str == 'participant':
+        participant_ids = [personne.pk]
+        if user is not None:
+            from .participant_scope import participant_ids_for_user
+            linked_ids = participant_ids_for_user(user)
+            if linked_ids:
+                participant_ids = list(linked_ids)
         inscriptions = (
-            ModuleParticipant.objects.filter(participant=personne)
+            ModuleParticipant.objects.filter(participant_id__in=participant_ids)
             .select_related('module__formation', 'module__secretariat', 'module__site')
             .order_by('-inscrit_le')
         )
@@ -1465,13 +1471,15 @@ def _compute_volume_horaire_stats(modules_data, pointages_qs):
     duree_prevue_heures par module — l'effectué ne peut pas dépasser le prévu.
     """
     module_cap_minutes = {}
-    total_heures = 0.0
     for m in modules_data:
         mid = m.get('id')
+        if mid is None:
+            continue
         heures = float(m.get('duree_prevue_heures') or 0)
-        total_heures += heures
-        if mid is not None:
-            module_cap_minutes[mid] = heures * 60
+        cap = heures * 60
+        module_cap_minutes[mid] = max(module_cap_minutes.get(mid, 0.0), cap)
+
+    total_heures_r = round(sum(module_cap_minutes.values()) / 60, 1)
 
     module_accum = {mid: 0.0 for mid in module_cap_minutes}
     effectue_minutes = 0.0
@@ -1491,11 +1499,11 @@ def _compute_volume_horaire_stats(modules_data, pointages_qs):
         effectue_minutes += counted
 
     effectue_heures = round(effectue_minutes / 60, 1)
-    total_heures_r = round(total_heures, 1)
     if total_heures_r > 0:
         effectue_heures = min(effectue_heures, total_heures_r)
         taux = min(100.0, round((effectue_heures / total_heures_r) * 100, 1))
     else:
+        effectue_heures = 0.0
         taux = 0.0
 
     return {
@@ -1537,11 +1545,11 @@ def my_fiche(request):
             personne.save(update_fields=update_fields)
         return Response({'profil': {**formateur_sensitive_payload(personne), 'updated': True}})
 
-    modules_data = _modules_for_personne(personne, type_str)
+    modules_data = _modules_for_personne(personne, type_str, user=user)
     pointages_qs = _pointages_queryset_for_personne(personne, type_str, user=user)
     stats = _compute_fiche_stats(pointages_qs)
     stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
-    stats['nb_modules_inscrits'] = len(modules_data)
+    stats['nb_modules_inscrits'] = len({m.get('id') for m in modules_data if m.get('id') is not None})
 
     profil = {
         'type_personne': type_str,
