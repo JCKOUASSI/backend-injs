@@ -38,7 +38,9 @@ def create_superuser_from_env():
 
 
 class AuthenticationConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
     name = 'authentication'
+    verbose_name = 'Authentification'
 
     def ready(self):
         from admin_mixins import patch_admin_related_widgets

@@ -242,6 +242,11 @@ class Formation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['formation']
+        verbose_name = 'Formation'
+        verbose_name_plural = 'Formations'
+
     def __str__(self):
         return f"{self.formation}"
 
@@ -571,8 +576,8 @@ class SessionModule(models.Model):
     class Meta:
         ordering = ['date_journee', 'heure_debut_prevue', 'numero']
         unique_together = ('module', 'date_journee', 'numero')
-        verbose_name = 'Session de formation'
-        verbose_name_plural = 'Sessions de formation'
+        verbose_name = 'Séance'
+        verbose_name_plural = 'Séances'
 
     def __str__(self):
         label = self.intitule or f"Session {self.numero}"
@@ -635,8 +640,8 @@ class QRToken(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'QR Token'
-        verbose_name_plural = 'QR Tokens'
+        verbose_name = 'Code QR'
+        verbose_name_plural = 'Codes QR'
 
     @property
     def formation(self):

@@ -7,7 +7,7 @@ from .volume_horaire import run_organisation_diagnostic
 
 
 class VolumeHoraireDiagnosticView(UnfoldModelAdminViewMixin, TemplateView):
-    title = 'Diagnostique volume horaire'
+    title = 'Diagnostic volume horaire'
     permission_required = ()
     template_name = 'admin/formations/volume_horaire_diagnostic.html'
 
