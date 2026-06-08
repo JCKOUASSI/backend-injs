@@ -2246,6 +2246,7 @@ def api_import_excel(request):
                         debug_headers = [l for l in _logs if '[DEBUG]' in l]
                         return Response({
                             'created': stats.get('created', 0),
+                            'accounts': cmd.account_provision_stats.get('auditeurs', {}),
                             'errors': errors[:20],
                             'debug_headers': debug_headers,
                         })
@@ -2288,6 +2289,7 @@ def api_import_excel(request):
     return Response({
         'created': stats.get('created', 0),
         'updated': stats.get('updated', 0),
+        'accounts': cmd.account_provision_stats,
         'errors': errors[:20],
         'debug_headers': debug_headers,
     })

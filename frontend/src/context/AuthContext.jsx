@@ -39,10 +39,10 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     const response = await api.post('/auth/login/', { username, password })
     const { access, refresh, user: userData } = response.data
-    
-    if (userData?.role === 'ADMIN') {
-      const err = new Error('Admin access forbidden')
-      err.response = { data: { detail: 'Les administrateurs doivent utiliser l\'interface d\'administration.' } }
+
+    if (userData?.role === 'AUDITEUR') {
+      const err = new Error('Mobile only')
+      err.response = { data: { detail: 'Les comptes auditeur sont réservés à l\'application mobile.' } }
       throw err
     }
 

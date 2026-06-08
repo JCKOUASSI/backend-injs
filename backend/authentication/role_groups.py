@@ -5,6 +5,18 @@ from django.contrib.auth.models import Group, Permission
 User = get_user_model()
 
 
+# Rôles pouvant accéder à l'admin Django ET à la plateforme web.
+DUAL_ACCESS_ROLES = frozenset({
+    User.Role.ADMIN,
+    User.Role.CHEF_CPFAE_ADMIN,
+    User.Role.CPFAE_ADMIN,
+})
+
+# Rôles réservés à l'application mobile (pas de plateforme web ni admin Django).
+MOBILE_ONLY_ROLES = frozenset({
+    User.Role.AUDITEUR,
+})
+
 ROLE_GROUP_NAMES = {
     User.Role.ADMIN: "ROLE_ADMIN",
     User.Role.DIRECTION: "ROLE_DIRECTION",
@@ -140,6 +152,18 @@ def sync_user_role_group(user):
         user.groups.add(target_group)
 
 
+def sync_user_staff_status(user):
+    """Active is_staff pour les rôles autorisés sur l'admin Django."""
+    if not user or not user.pk or user.is_superuser:
+        return
+
+    should_be_staff = user.role in DUAL_ACCESS_ROLES
+    if user.is_staff != should_be_staff:
+        User.objects.filter(pk=user.pk).update(is_staff=should_be_staff)
+        user.is_staff = should_be_staff
+
+
 def sync_all_users_role_groups():
-    for user in User.objects.all().only("id", "role"):
+    for user in User.objects.all().only("id", "role", "is_staff", "is_superuser"):
         sync_user_role_group(user)
+        sync_user_staff_status(user)

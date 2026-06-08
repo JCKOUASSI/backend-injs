@@ -28,6 +28,10 @@ FormationFormateur = ModuleFormateur
 class Command(BaseCommand):
     help = 'Importer les données depuis un fichier Excel ou CSV (formations ou participants)'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.account_provision_stats = {}
+
     def add_arguments(self, parser):
         parser.add_argument('file', type=str, help='Chemin vers le fichier Excel (.xlsx) ou CSV (.csv)')
         parser.add_argument(
@@ -117,6 +121,15 @@ class Command(BaseCommand):
             else:
                 icon = '✅' if count > 0 else '⏭️'
                 self.stdout.write(f'  {icon} {label.capitalize():.<30} {count}')
+
+        for label, provision in self.account_provision_stats.items():
+            if not provision:
+                continue
+            self.stdout.write(
+                f"  🔐 Comptes {label}: {provision.get('created', 0)} créés, "
+                f"{provision.get('updated', 0)} mis à jour, "
+                f"{provision.get('emails_sent', 0)} email(s) envoyé(s)"
+            )
 
         if errors:
             self.stdout.write(self.style.ERROR(f'\n⚠️  {len(errors)} erreur(s) :'))
@@ -522,9 +535,11 @@ class Command(BaseCommand):
     # ─── Import Participants ─────────────────────────
 
     def _import_participants(self, ws, errors, secretariat=None):
+        from authentication.badge_accounts import provision_auditeur_accounts
         from formations.models import Secretariat as SecretariatModel
         count = 0
         inscriptions = 0
+        touched_ids = set()
         # Cache secretariat par categorie pour éviter une requête DB par ligne
         _secretariat_cache = {}
 
@@ -622,6 +637,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'  + Participant : {obj.matricule} — {nom} {prenom}')
             else:
                 self.stdout.write(f'  ~ Participant mis à jour : {matricule}')
+            touched_ids.add(obj.pk)
 
             # Inscrire le participant aux formations
             formations_str = self._str(data.get('formation(s)') or data.get('formations'))
@@ -715,12 +731,19 @@ class Command(BaseCommand):
 
         if inscriptions:
             self.stdout.write(f'  📌 {inscriptions} inscription(s) créée(s)')
+
+        self.account_provision_stats['auditeurs'] = provision_auditeur_accounts(
+            touched_ids,
+            log=self.stdout.write,
+        )
         return count
 
     # ─── Import Formateurs ───────────────────────────
 
     def _import_formateurs(self, ws, errors):
+        from authentication.badge_accounts import provision_formateur_accounts
         count = 0
+        touched_ids = set()
         for row_idx, data in self._rows(ws):
             nom = self._str(data.get('nom'))
             prenom = self._str(data.get('prenom'))
@@ -763,6 +786,12 @@ class Command(BaseCommand):
                 self.stdout.write(f'  + Formateur : {obj.numerobadge} — {nom} {prenom}')
             else:
                 self.stdout.write(f'  ~ Formateur mis à jour : {obj.numerobadge} — {nom} {prenom}')
+            touched_ids.add(obj.pk)
+
+        self.account_provision_stats['formateurs'] = provision_formateur_accounts(
+            touched_ids,
+            log=self.stdout.write,
+        )
         return count
 
     # ─── Import Inscriptions ─────────────────────────

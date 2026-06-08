@@ -1,5 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
 
+/** URL admin Django : VITE_ADMIN_URL ou dérivée de VITE_API_URL (…/api → …/admin/). */
+const ADMIN_URL = (() => {
+  const explicit = (import.meta.env.VITE_ADMIN_URL || '').trim()
+  if (explicit) return explicit.replace(/\/?$/, '/')
+  const base = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace(/\/api\/?$/, '')
+  return `${base}/admin/`
+})()
+
 let _sessionExpiredCallback = null
 export function setSessionExpiredCallback(cb) {
   _sessionExpiredCallback = cb
@@ -120,5 +128,5 @@ const api = {
   getBlob: (path)                      => getBlob(path),
 }
 
-export { API_BASE_URL }
+export { API_BASE_URL, ADMIN_URL }
 export default api

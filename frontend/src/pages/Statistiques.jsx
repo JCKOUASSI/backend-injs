@@ -974,30 +974,6 @@ function Kpi({ icon, label, value, color, sub, help }) {
   )
 }
 
-function StatsTauxLegendBanner() {
-  return (
-    <div style={{
-      background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
-      padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.55,
-    }}>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-        <i className="bi bi-info-circle" style={{ color: '#43A047', marginTop: '0.1rem', flexShrink: 0 }}/>
-        <div>
-          <strong style={{ color: '#1e293b' }}>Comment lire les taux</strong>
-          <p style={{ margin: '0.35rem 0 0' }}>
-            <strong>{TAUX_PEDAGOGIE.assiduite.label}</strong> — {TAUX_PEDAGOGIE.assiduite.help}
-            {' '}Visible dans les alertes, la vue d&apos;ensemble et l&apos;historique.
-          </p>
-          <p style={{ margin: '0.35rem 0 0' }}>
-            <strong>{TAUX_PEDAGOGIE.couverture.label}</strong> — {TAUX_PEDAGOGIE.couverture.help}
-            {' '}Utilisée dans les bilans CPFAE et les tableaux détaillés.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function PedagogieTauxPrincipaux({ ped }) {
   const a = TAUX_PEDAGOGIE.assiduite
   const c = TAUX_PEDAGOGIE.couverture
@@ -1676,8 +1652,6 @@ export default function Statistiques() {
           </button>
         </div>
       </div>
-
-      <StatsTauxLegendBanner/>
 
       {error && data && (
         <div style={{background:'#fff3f3',border:'1px solid #fca5a5',borderRadius:8,padding:'0.65rem 0.85rem',color:'#C62828',fontSize:'0.82rem',marginBottom:'0.75rem'}}>

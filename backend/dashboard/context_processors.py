@@ -1,12 +1,15 @@
 from formations.models import Formation, Participant, Formateur
 from django.contrib.auth import get_user_model
 
+from authentication.role_groups import DUAL_ACCESS_ROLES
+
 User = get_user_model()
 
 ALLOWED_WEB_ROLES = (
+    *DUAL_ACCESS_ROLES,
     'DIRECTION',
-    'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
-    'CHEF_SECRETARIAT', 'SECRETARIAT',
+    'CHEF_SECRETARIAT',
+    'SECRETARIAT',
     'FINANCE',
     'ENCADRANT',
 )
