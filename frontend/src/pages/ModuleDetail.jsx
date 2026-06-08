@@ -74,6 +74,9 @@ export default function ModuleDetail() {
   const [forceModal, setForceModal] = useState(false)
   const [forceForm, setForceForm] = useState({ personne_id: '', type_personne: 'participant', action: 'ENTREE', motif: '' })
   const [forceSaving, setForceSaving] = useState(false)
+  const [bulkForceModal, setBulkForceModal] = useState(false)
+  const [bulkForceMotif, setBulkForceMotif] = useState('')
+  const [bulkForceSaving, setBulkForceSaving] = useState(false)
   const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
 
   const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
@@ -300,7 +303,7 @@ export default function ModuleDetail() {
 
   const handleExportSession = async (sessionId, sessionLabel, type) => {
     try {
-      const blob = await api.getBlob(`/exports/session/${sessionId}/${type}/`)
+      const { blob } = await api.getBlob(`/exports/session/${sessionId}/${type}/`)
       const safeName = (sessionLabel || `session_${sessionId}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
       _downloadBlob(blob, type, `rapport_${safeName}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
     } catch (err) {
@@ -310,7 +313,7 @@ export default function ModuleDetail() {
 
   const handleExportAllSeances = async (type) => {
     try {
-      const blob = await api.getBlob(`/exports/module/${moduleId}/${type}/`)
+      const { blob } = await api.getBlob(`/exports/module/${moduleId}/${type}/`)
       _downloadBlob(blob, type, `rapport_module_${moduleId}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
     } catch (err) {
       showToast(err.response?.data?.detail || `Erreur export ${type.toUpperCase()} (toutes séances).`, 'error')
@@ -339,6 +342,36 @@ export default function ModuleDetail() {
       showToast(err.response?.data?.detail || 'Erreur lors du forçage', 'error')
     } finally {
       setForceSaving(false)
+    }
+  }
+
+  const handleBulkForceAuditeurs = async (e) => {
+    e.preventDefault()
+    const motif = bulkForceMotif.trim()
+    if (!motif) return
+    setBulkForceSaving(true)
+    try {
+      const body = {
+        module_id: parseInt(moduleId, 10),
+        date_journee: selectedPresenceDate,
+        motif,
+      }
+      if (selectedPresenceSessionId !== 'ALL') {
+        body.session_id = parseInt(selectedPresenceSessionId, 10)
+      }
+      const res = await api.post(`/formations/${formationId}/force-badgeage-auditeurs-bulk/`, body)
+      const sessionsInfo = (res.data.sessions || [])
+        .filter(s => s.nb_badges > 0)
+        .map(s => `${s.session_intitule}: ${s.nb_badges}/${s.nb_absents} (${s.taux_pct}%)`)
+        .join(' · ')
+      showToast(sessionsInfo ? `${res.data.detail} — ${sessionsInfo}` : res.data.detail)
+      setBulkForceModal(false)
+      setBulkForceMotif('')
+      loadModule(true)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors du forçage en masse', 'error')
+    } finally {
+      setBulkForceSaving(false)
     }
   }
 
@@ -892,6 +925,17 @@ export default function ModuleDetail() {
                     onClick={() => { setSelectedPresenceDate(new Date().toISOString().slice(0, 10)); setSelectedPresenceSessionId('ALL'); loadModule() }}>
                     <i className="bi bi-arrow-clockwise"></i> Actualiser
                   </button>
+                  {canSupervise && sessionsOfDay.some(s => s.en_cours) && (
+                    <button
+                      type="button"
+                      className="btn btn-success btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                      title="Forcer l'entrée de 80 à 95 % des auditeurs absents, tirage aléatoire par séance"
+                      onClick={() => { setBulkForceMotif(''); setBulkForceModal(true) }}
+                    >
+                      <i className="bi bi-shuffle"></i> Forcer auditeurs (80–95 %)
+                    </button>
+                  )}
                 </div>
                 <div style={{ marginLeft: 'auto', minWidth: '220px' }}>
                   <div className="input-group">
@@ -1168,6 +1212,38 @@ export default function ModuleDetail() {
           </div>
         )
       })()}
+
+      {/* ── MODAL: FORÇAGE BADGEAGE EN MASSE (auditeurs) ── */}
+      {bulkForceModal && (
+        <div className="modal-overlay" onClick={() => !bulkForceSaving && setBulkForceModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h5><i className="bi bi-shuffle me-2"></i>Forcer le badgeage des auditeurs</h5>
+              <button className="btn-close" disabled={bulkForceSaving} onClick={() => setBulkForceModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleBulkForceAuditeurs}>
+              <div className="modal-body">
+                <p style={{ fontSize: '0.9rem', color: '#475569', marginBottom: '0.75rem' }}>
+                  Pour chaque séance active du {formatDate(selectedPresenceDate)}
+                  {selectedPresenceSessionId !== 'ALL' ? ' (séance sélectionnée uniquement)' : ''},
+                  un tirage aléatoire badge <strong>entre 80 % et 95 %</strong> des auditeurs encore absents.
+                  Les formateurs et encadrants ne sont pas concernés.
+                </p>
+                <label className="form-label">Motif <span className="text-danger">*</span></label>
+                <textarea className="form-control" rows={3} required
+                  placeholder="Ex. : Rattrapage collectif — problème réseau QR"
+                  value={bulkForceMotif} onChange={e => setBulkForceMotif(e.target.value)} />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" disabled={bulkForceSaving} onClick={() => setBulkForceModal(false)}>Annuler</button>
+                <button type="submit" className="btn btn-success" disabled={bulkForceSaving || !bulkForceMotif.trim()}>
+                  {bulkForceSaving ? 'Traitement…' : 'Confirmer le forçage'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL: FORÇAGE BADGEAGE ── */}
       {forceModal && (

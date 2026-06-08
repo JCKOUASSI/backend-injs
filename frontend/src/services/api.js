@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
 
 let _sessionExpiredCallback = null
 export function setSessionExpiredCallback(cb) {
@@ -96,7 +96,19 @@ const getBlob = async (path) => {
     err.response = { status: res.status, data }
     throw err
   }
-  return res.blob()
+  const blob = await res.blob()
+  const ctype = res.headers.get('Content-Type') || ''
+  if (ctype.includes('application/json')) {
+    let data = null
+    try { data = JSON.parse(await blob.text()) } catch { data = null }
+    const err = new Error('Export failed')
+    err.response = { status: res.status, data }
+    throw err
+  }
+  const disp = res.headers.get('Content-Disposition') || ''
+  const m = disp.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i)
+  const fileName = m ? decodeURIComponent(m[1].replace(/"/g, '')) : null
+  return { blob, fileName, contentType: ctype }
 }
 
 const api = {

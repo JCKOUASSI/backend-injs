@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import logo from './assets/logo.png'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -17,10 +17,6 @@ import Referentiels from './pages/Referentiels'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
-import FinanceParametrage from './pages/FinanceParametrage'
-import ModulesListLink from './components/ModulesListLink'
-import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
-import { financeNavHref } from './utils/financePeriod'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -53,8 +49,7 @@ function Layout({ children, breadcrumb }) {
   }
 
   const isFinanceRole = user?.role === 'FINANCE'
-  const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
-  const canViewFinanceDashboard = canViewFinanceModule
+  const canViewFinanceDashboard = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canViewParticipants = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
   const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
     || canViewFinanceModule
@@ -153,6 +148,11 @@ function Layout({ children, breadcrumb }) {
           {canViewReferentiels && (
             <Link to={listHref('/referentiels', LIST_STORAGE_KEYS.referentiels)} className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-sliders"></i> <span className="nav-label">Référentiels</span></span>
+            </Link>
+          )}
+          {canViewStatistiques && (
+            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
         </nav>
@@ -303,6 +303,15 @@ function App() {
             <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Référentiels</li></>}>
                 <Referentiels />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/statistiques" element={
+            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Statistiques</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Statistiques />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />

@@ -383,7 +383,7 @@ export default function FormationDetail() {
 
   const handleExport = async (type) => {
     try {
-      const blob = await api.getBlob(`/exports/formation/${id}/${type}/`)
+      const { blob } = await api.getBlob(`/exports/formation/${id}/${type}/`)
       _downloadBlob(blob, type, `rapport_formation_${id}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
     } catch (err) {
       console.error('[handleExport] erreur:', err, err.response)
@@ -393,7 +393,7 @@ export default function FormationDetail() {
 
   const handleExportSession = async (sessionId, sessionLabel, type) => {
     try {
-      const blob = await api.getBlob(`/exports/session/${sessionId}/${type}/`)
+      const { blob } = await api.getBlob(`/exports/session/${sessionId}/${type}/`)
       const safeName = (sessionLabel || `session_${sessionId}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
       _downloadBlob(blob, type, `rapport_${safeName}.${type === 'pdf' ? 'pdf' : 'xlsx'}`)
     } catch (err) {

@@ -6,3 +6,10 @@ frontend/.env.local
 frontend/.env.*.local
 
 credentials_mobile.txt
+.DS_Store
+**/.DS_Store
+
+# Doublons locaux (sources canoniques dans docs/)
+/Manuel utilisateur App Statistiques.md
+/Manuel utilisateur App Statistiques.docx
+/Sauvegardes tâches réalisées.txt
