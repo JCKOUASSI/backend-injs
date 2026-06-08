@@ -31,6 +31,21 @@ Remplacez les champs entre **crochets** `[…]` par les informations officielles
 
 Le fichier **`.nojekyll`** à la racine de `docs/` évite que Jekyll ignore ou transforme des fichiers.
 
+## Manuel utilisateur — Module Statistiques
+
+| Fichier | Description |
+|---------|-------------|
+| [Manuel utilisateur App Statistiques.md](./Manuel%20utilisateur%20App%20Statistiques.md) | Source Markdown (maintenue à jour par l'équipe / l'agent) |
+| [Manuel utilisateur App Statistiques.docx](./Manuel%20utilisateur%20App%20Statistiques.docx) | Version Word formatée |
+
+Régénérer le Word après modification du Markdown :
+
+```bash
+python scripts/generate_manuel_statistiques_docx.py
+```
+
+Un hook Cursor (`.cursor/hooks/sync-manuel-statistiques.sh`) régénère automatiquement le `.docx` à la fin de chaque session agent ou après édition du `.md`.
+
 ## HTTPS
 
 GitHub Pages sert le site en **HTTPS** par défaut — compatible avec l’exigence Play Console pour l’URL de politique de confidentialité.

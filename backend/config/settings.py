@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     'presences',
     'exports',
     'dashboard',
+    'statistiques',
 ]
 
 MIDDLEWARE = [

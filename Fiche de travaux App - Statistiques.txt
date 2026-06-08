@@ -1,0 +1,184 @@
+================================================================================
+  FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
+  Module Statistiques & Bilans — Lot 5
+================================================================================
+Dernière mise à jour : 08/06/2026 10:53
+Statut global         : EN COURS — fonctionnel, enrichissements continus
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SYNTHÈSE DU MODULE
+────────────────────────────────────────────────────────────────────────────────
+
+  Objectif     : Tableaux de bord, bilans, rapports officiels, points journaliers
+                 CPFAE et alertes de seuils.
+
+  Accès UI     : Menu latéral → Statistiques (/statistiques)
+
+  Backend      : backend/statistiques/ (Django REST)
+  Frontend     : frontend/src/pages/Statistiques.jsx
+
+  Documentation:
+  · Manuel utilisateur (MD)  : docs/Manuel utilisateur App Statistiques.md
+  · Manuel utilisateur (Word): docs/Manuel utilisateur App Statistiques.docx
+
+
+────────────────────────────────────────────────────────────────────────────────
+ TÂCHES RÉALISÉES
+────────────────────────────────────────────────────────────────────────────────
+
+
+[08/06/2026] Vue d'ensemble : retrait widgets Pointages et Pointages par statut (Statistiques.jsx)
+  · Enregistré automatiquement le 08/06/2026 10:53
+
+[04/06/2026] Recalcul Statistiques : effectifs centralisés (inscrits/séances terminées/présents-absents/H-F réels)
+  · Enregistré automatiquement le 04/06/2026 17:14
+
+[04/06/2026] Correction charge des formateurs : agrégation via séances/modules (formateur principal + ModuleFormateur + pointages), au lieu des seuls pointages avec formateur_id.
+  · Enregistré automatiquement le 04/06/2026 16:21
+
+[03/06/2026] Manuel utilisateur v2.0.0 : documentation détaillée de toutes les fonctionnalités Statistiques avec captures d'écran intégrées dans le Word
+  · Enregistré automatiquement le 03/06/2026 20:10
+
+[03/06/2026] Onglet Alertes enrichi : jauges visuelles, guide, synthèse KPI, init seuils CPFAE depuis l'interface
+  · Enregistré automatiquement le 03/06/2026 14:00
+[02/06/2026] Lot 5 — Module Statistiques & Bilans (version initiale complète)
+
+  BACKEND
+  · App Django statistiques créée (models, views, urls, admin, migrations)
+  · Modèles : ConfigAlerteSeuil, Rapport, ObservationQualitative, SignatureRapport
+  · API GET /api/statistiques/ — dashboard filtrable (formation, secrétariat)
+  · KPIs globaux, indicateurs pédagogiques et administratifs
+  · Historique 12 mois (pointages, modules)
+  · Alertes automatiques vs seuils configurables
+  · CRUD rapports + workflow (soumettre / valider / publier / rejeter)
+  · Observations qualitatives + signatures numériques
+  · GET/PUT /api/statistiques/alertes/seuils/
+  · Contrôle d'accès par rôle (STATS, GENERATION, VALIDATION)
+
+  FRONTEND
+  · Statistiques.jsx — 6 onglets initiaux (Vue d'ensemble, Pédagogique,
+    Administratif, Historique, Rapports & Bilans, Alertes)
+  · Filtres globaux formation / secrétariat
+  · Graphiques SVG natifs (Donut, Bars, HBars, Line, Kpi, Card)
+  · Intégration App.jsx (route + navbar)
+
+  VÉRIFICATIONS
+  · python manage.py check OK
+  · npm run build OK
+  · Migrations appliquées
+
+
+[03/06/2026] Onglet Point Journalier + exports CPFAE
+
+  BACKEND
+  · point_journalier.py — calcul journalier par catégorie × formation × jour
+  · point_journalier_exports.py — Excel / PDF / Word (format modèle CPFAE)
+  · Routes : GET /api/statistiques/point-journalier/
+             GET /api/statistiques/point-journalier-export/?export=xlsx|pdf|docx
+  · Dépendance python-docx ajoutée (requirements.txt)
+  · Catégories : liste RefCategorie + catégories avec données (fix cat. D)
+
+  FRONTEND
+  · Onglet « Point Journalier » (filtres année, mois, catégorie, formation)
+  · Liste des tableaux + détail MATIN/SOIR (groupes, salles, effectifs, taux)
+  · Exports Excel, PDF, Word (barre verte + boutons par tableau)
+  · Défilement horizontal pour tableaux larges
+
+  CORRECTIONS
+  · Import Excel Cours : résolution RefSite (backend/formations/import_excel.py)
+  · Fix export : paramètre DRF « format » → « export » (évite 404 « Pas trouvé »)
+  · PDF/Excel/Word : colonnes dynamiques, découpage si > 14 groupes (PDF)
+
+
+[03/06/2026] Rapports — modification / suppression Admin + notifications
+
+  BACKEND
+  · Modèle NotificationRapport (migration 0002_notificationrapport)
+  · PATCH rapports publiés autorisé pour ADMIN_RAPPORT_ROLES
+  · DELETE rapports admin avec motif obligatoire
+  · rapport_notifications.py — notifications in-app + e-mail
+  · GET/PATCH /api/statistiques/rapports/notifications/
+
+  FRONTEND
+  · Boutons Modifier / Supprimer (rôles validation)
+  · Bandeau notifications non lues (onglet Rapports)
+  · Formulaire édition + confirmation suppression avec motif
+
+
+[03/06/2026] Onglet Historique — visualisation enrichie
+
+  BACKEND
+  · Timeline 12 mois complète (mois sans activité = 0)
+  · Pointages par date_journee, séances, modules actifs
+  · Cartes synthèse + variation mois courant vs précédent
+
+  FRONTEND
+  · 5 KPI historique + graphiques empilés présents/absents
+  · Barres mensuelles avec libellés français (janv. 26, févr. 26…)
+
+
+[03/06/2026] Documentation et suivi de travaux
+
+  · Manuel utilisateur App Statistiques (.md + .docx généré)
+  · Script : scripts/generate_manuel_statistiques_docx.py
+  · Règle Cursor : .cursor/rules/manuel-statistiques.mdc
+  · Hook auto : .cursor/hooks/sync-manuel-statistiques.sh
+  · Fiche de travaux App - Statistiques.txt (ce fichier)
+  · Script : scripts/sync_fiche_travaux_statistiques.py
+
+
+────────────────────────────────────────────────────────────────────────────────
+ TÂCHES EN ATTENTE / BACKLOG
+────────────────────────────────────────────────────────────────────────────────
+
+  · Modales UI soignées (remplacer alert/prompt sur rapports)
+  · Tests automatisés module statistiques (API + exports)
+  · Notification e-mail : vérifier SMTP en production
+  · Point journalier : alignement 100 % sur fichiers Excel modèles CPFAE
+    (validation métier avec secrétariats)
+
+
+────────────────────────────────────────────────────────────────────────────────
+ FICHIERS CLÉS (état au 03/06/2026)
+────────────────────────────────────────────────────────────────────────────────
+
+  backend/statistiques/
+  ├── models.py                 Rapport, ConfigAlerteSeuil, NotificationRapport…
+  ├── views.py                  Dashboard, rapports, point journalier, alertes
+  ├── point_journalier.py       Logique point journalier CPFAE
+  ├── point_journalier_exports.py  Exports xlsx / pdf / docx
+  ├── rapport_notifications.py  Notifications modif / suppression
+  ├── urls.py
+  ├── admin.py
+  └── migrations/
+      ├── 0001_initial.py
+      └── 0002_notificationrapport.py
+
+  frontend/src/pages/Statistiques.jsx   Dashboard 8 onglets
+
+  docs/
+  ├── Manuel utilisateur App Statistiques.md
+  └── Manuel utilisateur App Statistiques.docx
+
+  scripts/
+  ├── generate_manuel_statistiques_docx.py
+  └── sync_fiche_travaux_statistiques.py
+
+
+────────────────────────────────────────────────────────────────────────────────
+ COMMANDES UTILES
+────────────────────────────────────────────────────────────────────────────────
+
+  Démarrer backend  : cd backend && source venv/bin/activate && python manage.py runserver
+  Démarrer frontend : cd frontend && npm run dev
+  Migrer            : cd backend && python manage.py migrate statistiques
+  Générer manuel Word : python scripts/generate_manuel_statistiques_docx.py
+  Ajouter une tâche à cette fiche :
+                      python scripts/sync_fiche_travaux_statistiques.py --add "description"
+
+
+================================================================================
+  FIN DE LA FICHE DE TRAVAUX
+================================================================================

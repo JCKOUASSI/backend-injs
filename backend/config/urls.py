@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/formations/', include('formations.urls')),
     path('api/', include('presences.urls')),
     path('api/exports/', include('exports.urls')),
+    path('api/statistiques/', include('statistiques.urls')),
 
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),

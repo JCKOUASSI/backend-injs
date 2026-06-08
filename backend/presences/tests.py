@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
@@ -306,6 +308,48 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertTrue(Pointage.objects.filter(pk=pointage_id, statut=Pointage.Statut.FORCE_DFRC).exists())
         self.assertTrue(
             AuditLog.objects.filter(action=AuditLog.Action.FORCE_ENTREE, pointage_id=pointage_id, extra__motif=motif).exists()
+        )
+
+    def test_force_badgeage_auditeurs_bulk_applies_ratio(self):
+        from presences.models import AuditLog
+
+        user = make_user('bulk_force_user', role='CPFAE_ADMIN')
+        self.client.force_authenticate(user)
+
+        participants = []
+        for i in range(10):
+            p = Participant.objects.create(matricule=f'BULK{i:03d}', nom=f'N{i}', prenom=f'P{i}')
+            ModuleParticipant.objects.create(module=self.module, participant=p)
+            participants.append(p)
+
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
+        with patch('presences.bulk_force_auditeurs.random.uniform', return_value=0.90):
+            res = self.client.post(
+                f'/api/formations/{self.formation.pk}/force-badgeage-auditeurs-bulk/',
+                {
+                    'module_id': self.module.pk,
+                    'session_id': self.seance_2.pk,
+                    'date_journee': str(self.today),
+                    'motif': 'Test forçage masse 90%',
+                },
+                format='json',
+            )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        # 11 auditeurs absents (10 créés + P1001) × 90 % ≈ 10 entrées forcées
+        expected = max(1, round(11 * 0.90))
+        self.assertEqual(res.data['total_badges'], expected)
+        self.assertEqual(
+            Pointage.objects.filter(session=self.seance_2, statut=Pointage.Statut.FORCE_DFRC).count(),
+            expected,
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.FORCE_ENTREE,
+                extra__bulk_force_auditeurs=True,
+            ).exists()
         )
 
     def test_secure_scan_blocks_new_entry_when_other_session_open_same_module_same_day(self):

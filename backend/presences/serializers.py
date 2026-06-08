@@ -102,6 +102,24 @@ class ForcePointageSerializer(serializers.Serializer):
     module_id = serializers.IntegerField(required=False, allow_null=True, default=None)
 
 
+class ForceBadgeageBulkAuditeursSerializer(serializers.Serializer):
+    """Forçage en masse des entrées auditeurs (80–95 % aléatoire par séance)."""
+    module_id = serializers.IntegerField()
+    session_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    date_journee = serializers.DateField(required=False, allow_null=True, default=None)
+    motif = serializers.CharField(
+        max_length=500,
+        required=True,
+        allow_blank=False,
+        error_messages={
+            'blank': 'Le motif est obligatoire pour forcer un badgeage.',
+            'required': 'Le motif est obligatoire pour forcer un badgeage.',
+        },
+    )
+    ignore_constraints = serializers.BooleanField(required=False, default=False)
+    all_sessions = serializers.BooleanField(required=False, default=False)
+
+
 class DashboardSerializer(serializers.Serializer):
     formation = serializers.DictField()
     presents = serializers.ListField()
