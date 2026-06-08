@@ -432,40 +432,56 @@ Menu latéral → **Import Excel** *(Secrétariat / Chef Secrétariat / CPFAE Ad
 
 Permet d'importer en masse des données depuis des fichiers Excel (`.xlsx`).
 
+### Ordre d'import recommandé
+
+1. **Cours** (formations / modules) — les cours doivent exister en premier
+2. **Formateurs**
+3. **Auditeurs** (inscriptions aux cours)
+4. **Séances** (planning rattaché aux cours)
+
+> Les séances sont reliées aux cours par la combinaison **module_titre + grade + groupe + vague**. Ces quatre valeurs doivent être **identiques** entre l'import des cours et celui des séances.
+
 ### Types d'import disponibles
 
-#### Formations
+#### Cours (formations)
+**Feuille Excel :** `Formations`  
 **Colonnes attendues :**
-`N°` · `Formation` · `Module (titre)` · `Site` · `Date début` · `Date fin` · `Volume horaire (h)` · `Catégorie` · `Grade` · `Groupe` · `Vague`
+`N°` · `Formation` · `Module (titre)` · `Site` · `Bâtiment` · `Salle` · `Date début` · `Date fin` · `Volume horaire (h)` · `Catégorie` · `Grade` · `Groupe` · `Vague`
+
+> La colonne `Lieu` est acceptée en remplacement de `Site`. Les dates début et fin sont obligatoires.
 
 #### Auditeurs
+**Feuille Excel :** `Participants` (ou `Auditeurs` pour les exports compatibles)  
 **Colonnes attendues :**
-`N° d'inscription` · `Nom` · `Prénoms` · `Genre` · `Date de naissance` · `Lieu de naissance` · `E-mail` · `Téléphone 1` · `Téléphone 2` · `Type concours` · `Libellé concours` · `Catégorie` · `Grade` · `Groupe` · `Grade-Groupe` · `Vague` · `Site` · `Salle` · `Formation(s)`
+`N° d'inscription` · `Nom` · `Prénoms` · `Genre` · `Date de naissance` · `Lieu de naissance` · `E-mail` · `Téléphone 1` · `Téléphone 2` · `Type concours` · `Libellé concours` · `Catégorie` · `Grade` · `Groupe` · `Grade-Groupe` · `Vague` · `Formation(s)`
+
+> Variantes acceptées : `Prénom` / `Sexe` / `Email`. La colonne `Formation(s)` permet l'inscription automatique (titres séparés par `|`). Sans cette colonne, l'inscription se fait par correspondance grade + groupe (+ vague).
 
 #### Formateurs
+**Feuille Excel :** `Formateurs`  
 **Colonnes attendues :**
 `Numéro` · `Nom` · `Prénom` · `E-mail` · `Téléphone` · `Spécialité` · `Organisation`
 
 #### Séances
-**Sans sélection de module :**
-`module_titre` · `date_journee` · `numero` · `intitule` · `heure_debut` · `heure_fin`
+**Feuille Excel :** `Séances` (ou `Seances`)
 
-**Avec un module sélectionné :**
+**Depuis la page Import Excel** (plusieurs cours dans le même fichier) :
+`module_titre` · `grade` · `groupe` · `vague` · `date_journee` · `numero` · `intitule` · `heure_debut` · `heure_fin`
+
+**Depuis la fiche d'une formation** (menu Formations → détail → onglet Séances → Importer Excel) :
 `date_journee` · `numero` · `intitule` · `heure_debut` · `heure_fin`
 
-> **Format des données :** date → `JJ/MM/AAAA` · heure → `HH:MM` · numéro → `1, 2, 3…`
+> Dans ce second cas, le cours cible est déjà connu : seules les colonnes de planning sont nécessaires.
 
-#### Emploi du temps
-Import du planning global au format Excel propriétaire.
+> **Format des données :** date → `JJ/MM/AAAA` · heure → `HH:MM` · numéro → `1, 2, 3…` (1 = matin, 2 = après-midi, etc.)
 
 ### Procédure d'import
 
-1. Cliquez sur **Modèle CSV** pour télécharger un fichier modèle avec les colonnes attendues.
-2. Ouvrez le modèle dans Excel et remplissez vos données en respectant les colonnes.
-3. Sauvegardez en format `.xlsx`.
-4. Sur la plateforme, sélectionnez votre fichier via le bouton de sélection de fichier.
-5. Pour les **séances** : sélectionnez optionnellement le module cible dans la liste déroulante.
-6. Cliquez sur **Importer**.
+1. Cliquez sur **Modèle CSV** pour télécharger un modèle (en-têtes + lignes d'exemple, séparateur `;`).
+2. Ouvrez le modèle dans Excel, adaptez ou complétez les données, puis sauvegardez en `.xlsx` (feuille nommée selon le type : `Formations`, `Participants`, `Formateurs` ou `Séances`).
+3. Sur la page **Import Excel**, sélectionnez le fichier et cliquez sur **Importer** pour le type concerné (Cours, Auditeurs, Formateurs ou Séances).
+4. Pour importer des séances **d'une formation précise**, ouvrez la fiche de cette formation → onglet **Séances** → **Importer Excel**.
+5. Consultez le message de résultat (éléments créés, mis à jour, erreurs éventuelles).
 
 ### Résultats de l'import
 Après chaque import, un message s'affiche indiquant :

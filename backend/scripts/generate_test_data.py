@@ -109,17 +109,17 @@ print(f'✅ {p1}  ({len(rows_f)} formations)')
 rows_p = [
     # matricule, Nom, Prénoms, Sexe, Date naiss, Lieu naiss,
     # Tel1, Tel2, Email, Type concours, Libelle concours,
-    # Catégorie, Grade, Groupe, Grade-Groupe, Vague, Site, Salle, Formation(s)
-    ['TEST-A001', 'KOUASSI',   'AMANI JEAN',      'MASCULIN', '15/03/1988', 'ABIDJAN',      '0700111001', '',           'jean.kouassi@test.ci',     'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE A', ''],
-    ['TEST-A002', 'BAMBA',     'FATOUMATA',        'FEMININ',  '22/07/1992', 'BOUAKE',       '0700111002', '',           'fatoumata.bamba@test.ci',  'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE A', ''],
-    ['TEST-A003', 'TRAORE',    'MOUSSA',            'MASCULIN', '03/11/1985', 'DALOA',        '0700111003', '',           '',                         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE A', ''],
-    ['TEST-A004', 'DIALLO',    'MARIAME',           'FEMININ',  '11/05/1990', 'KORHOGO',      '0700111004', '0500111004', 'm.diallo@test.ci',         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE A', ''],
-    ['TEST-A005', "N'GUESSAN", 'KOFFI FRANCK',     'MASCULIN', '28/09/1987', 'YAMOUSSOUKRO', '0700111005', '',           'koffi.ng@test.ci',         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE A', ''],
-    ['TEST-B001', 'OUATTARA',  'SEYDOU',            'MASCULIN', '07/01/1983', 'MAN',          '0700111006', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE B', ''],
-    ['TEST-B002', 'KONE',      'AMINATA',           'FEMININ',  '19/06/1994', 'ABIDJAN',      '0700111007', '0500111007', 'aminata.kone@test.ci',     'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE B', ''],
-    ['TEST-B003', 'COULIBALY', 'IBRAHIM',           'MASCULIN', '30/12/1989', 'GAGNOA',       '0700111008', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE B', ''],
-    ['TEST-B004', 'SISSOKO',   'KADIATOU',          'FEMININ',  '14/08/1991', 'ODIENNE',      '0700111009', '',           'kadiatou.sissoko@test.ci', 'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE B', ''],
-    ['TEST-B005', 'FOFANA',    'ABOUBACAR',         'MASCULIN', '02/04/1986', 'BONDOUKOU',    '0700111010', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', 'CPFAE', 'SALLE B', ''],
+    # Catégorie, Grade, Groupe, Grade-Groupe, Vague, Formation(s)
+    ['TEST-A001', 'KOUASSI',   'AMANI JEAN',      'MASCULIN', '15/03/1988', 'ABIDJAN',      '0700111001', '',           'jean.kouassi@test.ci',     'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-A002', 'BAMBA',     'FATOUMATA',        'FEMININ',  '22/07/1992', 'BOUAKE',       '0700111002', '',           'fatoumata.bamba@test.ci',  'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-A003', 'TRAORE',    'MOUSSA',            'MASCULIN', '03/11/1985', 'DALOA',        '0700111003', '',           '',                         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-A004', 'DIALLO',    'MARIAME',           'FEMININ',  '11/05/1990', 'KORHOGO',      '0700111004', '0500111004', 'm.diallo@test.ci',         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-A005', "N'GUESSAN", 'KOFFI FRANCK',     'MASCULIN', '28/09/1987', 'YAMOUSSOUKRO', '0700111005', '',           'koffi.ng@test.ci',         'PROFESSIONNEL', 'ADMINISTRATEUR', 'A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-B001', 'OUATTARA',  'SEYDOU',            'MASCULIN', '07/01/1983', 'MAN',          '0700111006', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-B002', 'KONE',      'AMINATA',           'FEMININ',  '19/06/1994', 'ABIDJAN',      '0700111007', '0500111007', 'aminata.kone@test.ci',     'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-B003', 'COULIBALY', 'IBRAHIM',           'MASCULIN', '30/12/1989', 'GAGNOA',       '0700111008', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-B004', 'SISSOKO',   'KADIATOU',          'FEMININ',  '14/08/1991', 'ODIENNE',      '0700111009', '',           'kadiatou.sissoko@test.ci', 'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', ''],
+    ['TEST-B005', 'FOFANA',    'ABOUBACAR',         'MASCULIN', '02/04/1986', 'BONDOUKOU',    '0700111010', '',           '',                         'PROFESSIONNEL', 'TECHNICIEN',     'B', 'B2', 'GROUPE 1', 'B2/GROUPE 1', 'SESSION 2025', ''],
 ]
 
 wb2 = Workbook()
@@ -129,7 +129,7 @@ write_sheet(ws2,
              'Date naissance', 'Lieu naissance', 'Téléphone 1', 'Téléphone 2', 'Email',
              'Type concours', 'Libelle concours',
              'Catégorie', 'Grade', 'Groupe', 'Grade-Groupe', 'Vague',
-             'Site', 'Salle', 'Formation(s)'],
+             'Formation(s)'],
     rows=rows_p, fill=fill_b,
 )
 p2 = os.path.join(BASE_DIR, 'import_test_participants.xlsx')

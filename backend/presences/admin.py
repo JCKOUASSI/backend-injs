@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
@@ -38,7 +39,7 @@ class TypePersonneFilter(admin.SimpleListFilter):
 
 
 @admin.register(Pointage)
-class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
+class PointageAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'session__module__secretariat'
     admin_scope_superviseur_field = 'session__module__superviseur'
     list_display = [
@@ -355,11 +356,11 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
 
 
 @admin.register(AuditLog)
-class AuditLogAdmin(AdminScopeMixin, admin.ModelAdmin):
+class AuditLogAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = None
 
     def get_queryset(self, request):
-        qs = super(admin.ModelAdmin, self).get_queryset(request)
+        qs = super(ModelAdmin, self).get_queryset(request)
         if admin_user_has_global_access(request.user):
             return qs
 
@@ -413,7 +414,7 @@ class AuditLogAdmin(AdminScopeMixin, admin.ModelAdmin):
 
 
 @admin.register(DeviceBinding)
-class DeviceBindingAdmin(admin.ModelAdmin):
+class DeviceBindingAdmin(ModelAdmin):
     list_display = [
         'user', 'device_id_court', 'device_info', 'is_active', 'bound_at',
     ]

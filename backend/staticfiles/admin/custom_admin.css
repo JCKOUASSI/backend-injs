@@ -1,0 +1,162 @@
+/* Styles complémentaires SYGEP-CPFAE pour Django Unfold */
+
+.dfrc-admin-home {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.dfrc-diag-page .warning {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.dfrc-diag-page tr.dfrc-row-warning td {
+    background: #fff7ed;
+}
+
+.dfrc-diag-totaux {
+    font-size: 1.05rem;
+}
+
+.dfrc-diag-tfoot th,
+.dfrc-diag-tfoot td {
+    background: #e8f4f0 !important;
+    font-weight: 700;
+    border-top: 2px solid #d9e2ec;
+}
+
+.dfrc-diag-muted {
+    color: #6b7280;
+    font-size: 0.85em;
+}
+
+.dfrc-diag-filters {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+}
+
+.dfrc-diag-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    align-items: center;
+}
+
+.dfrc-diag-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.dfrc-diag-modules-table th:nth-child(n+5),
+.dfrc-diag-modules-table td:nth-child(n+5) {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.dfrc-quick-links {
+    border: 1px solid #dbe7f2;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.dfrc-quick-links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 14px;
+}
+
+.dfrc-quick-link {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid #dbe7f2;
+    text-decoration: none;
+    transition: all 0.18s ease;
+    background: #f8fbff;
+}
+
+.dfrc-quick-link:hover {
+    border-color: #9ec1de;
+    box-shadow: 0 6px 16px rgba(15, 76, 129, 0.12);
+    transform: translateY(-1px);
+}
+
+.dfrc-quick-link-title {
+    font-weight: 700;
+    color: #0f4c81;
+    font-size: 14px;
+}
+
+.dfrc-quick-link-subtitle {
+    color: #4b5563;
+    font-size: 12px;
+}
+
+.dfrc-app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.dfrc-app-card {
+    border: 1px solid #dbe7f2;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.dfrc-model-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dfrc-model-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-top: 1px solid #edf2f7;
+}
+
+.dfrc-model-item:nth-child(even) {
+    background: #fbfdff;
+}
+
+.dfrc-model-name {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.dfrc-model-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.dfrc-model-actions a {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 8px;
+    border: 1px solid #c9d9e8;
+    border-radius: 999px;
+    text-decoration: none;
+    color: #0f4c81;
+    background: #ffffff;
+}
+
+.dfrc-model-actions a:hover {
+    border-color: #0f4c81;
+    background: #f0f7ff;
+}
+
+/* Boutons « + Ajouter » relationnels (inlines, formulaires) */
+.related-widget-wrapper-link.add-related,
+.related-widget-wrapper-link.delete-related {
+    display: none !important;
+}

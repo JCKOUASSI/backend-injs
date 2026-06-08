@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+from unfold.admin import ModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from admin_mixins import AuditLogAdminMixin, UserAdminScopeMixin
 from presences.models import AuditLog
@@ -9,7 +11,10 @@ from .models import User
 
 
 @admin.register(User)
-class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin):
+class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
     audit_action_create = AuditLog.Action.USER_CREATE
     audit_action_update = AuditLog.Action.USER_UPDATE
     audit_action_delete = AuditLog.Action.USER_DELETE
