@@ -419,3 +419,27 @@ class DashboardVolumeHoraireTest(TestCase):
         self.assertEqual(vol['realise_h'], 4.0)
         self.assertEqual(vol['ecart_h'], 0.0)
 
+    def test_volume_horaire_canonique_aligne_stats_et_dashboard(self):
+        from .volume_horaire import (
+            compute_volume_horaire_from_modules,
+            compute_dashboard_volume_horaire,
+        )
+
+        f = make_formation()
+        module = make_module(f, duree_prevue_heures=99)
+        now = timezone.now()
+        SessionModule.objects.create(
+            module=module,
+            date_journee=timezone.localdate(),
+            numero=1,
+            demarree_le=now - timedelta(hours=3),
+            terminee_le=now,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(11, 0),
+        )
+        qs = Module.objects.filter(pk=module.pk)
+        dash = compute_dashboard_volume_horaire(qs)
+        canon = compute_volume_horaire_from_modules(qs)
+        self.assertEqual(dash[1], canon['prevu_heures'])
+        self.assertEqual(dash[0], canon['realise_heures'])
+

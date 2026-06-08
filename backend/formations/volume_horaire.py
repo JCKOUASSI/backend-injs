@@ -60,19 +60,32 @@ def _session_plafond_minutes(session):
     return plafond, False
 
 
-def _accumulate_module_session_volumes(module):
-    """Agrège prévu (toutes séances) et réalisé (séances terminées) pour un module."""
+def session_in_date_range(session, date_debut=None, date_fin=None):
+    """Vrai si la séance tombe dans l'intervalle inclusif ``date_journee``."""
+    if date_debut is None and date_fin is None:
+        return True
+    d = session.date_journee
+    if not d:
+        return False
+    if date_debut and d < date_debut:
+        return False
+    if date_fin and d > date_fin:
+        return False
+    return True
+
+
+def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):
+    """Agrège prévu / réalisé sur un iterable de séances (règle commune SYGEP)."""
     prevu_min = 0.0
     realise_min = 0.0
-    nb_sessions_planifiees = 0
     nb_sessions = 0
+    nb_sessions_planifiees = 0
     nb_sessions_terminees = 0
     sessions_sans_horaires = 0
 
-    sessions = SessionModule.objects.filter(module=module).only(
-        'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le',
-    )
     for s in sessions:
+        if not session_in_date_range(s, date_debut, date_fin):
+            continue
         nb_sessions += 1
         prevu = _session_prevu_minutes(s)
         if prevu > 0:
@@ -86,21 +99,109 @@ def _accumulate_module_session_volumes(module):
             realise_min += realise
             nb_sessions_terminees += 1
 
-    prevu_h = round(prevu_min / 60, 1)
-    realise_h = round(realise_min / 60, 1)
-    compte_h = realise_h
-
     return {
         'prevu_min': prevu_min,
         'realise_min': realise_min,
-        'prevu_h': prevu_h,
-        'realise_h': realise_h,
-        'compte_h': compte_h,
-        'ecart_h': round(realise_h - prevu_h, 1),
         'nb_sessions': nb_sessions,
         'nb_sessions_planifiees': nb_sessions_planifiees,
         'nb_sessions_terminees': nb_sessions_terminees,
         'sessions_sans_horaires': sessions_sans_horaires,
+    }
+
+
+def finalize_volume_totals(prevu_min, realise_min, *, integer_hours=False):
+    """Convertit des minutes agrégées en heures + taux (plafond réalisé ≤ prévu)."""
+    if integer_hours:
+        prevu_h = int(round(prevu_min / 60))
+        realise_h = int(round(realise_min / 60))
+        if prevu_h > 0:
+            realise_h = min(realise_h, prevu_h)
+            taux = min(100, int((realise_h / prevu_h) * 100))
+        else:
+            realise_h = 0
+            taux = 0
+        return {
+            'prevu_heures': prevu_h,
+            'realise_heures': realise_h,
+            'taux_pct': taux,
+            'prevu_minutes': round(prevu_min, 1),
+            'realise_minutes': round(min(realise_min, prevu_min) if prevu_min > 0 else 0.0, 1),
+        }
+
+    prevu_h = round(prevu_min / 60, 1)
+    realise_h = round(realise_min / 60, 1)
+    if prevu_h > 0:
+        realise_h = min(realise_h, prevu_h)
+        taux = min(100.0, round((realise_h / prevu_h) * 100, 1))
+    else:
+        realise_h = 0.0
+        taux = 0.0
+    return {
+        'prevu_heures': prevu_h,
+        'realise_heures': realise_h,
+        'taux_pct': taux,
+        'prevu_minutes': round(prevu_min, 1),
+        'realise_minutes': round(min(realise_min, prevu_min) if prevu_min > 0 else 0.0, 1),
+    }
+
+
+def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin=None, *, integer_hours=False):
+    """Volume horaire canonique : créneaux séances (prévu) / séances terminées plafonnées (réalisé)."""
+    module_ids = list(module_ids or [])
+    if not module_ids:
+        totals = finalize_volume_totals(0.0, 0.0, integer_hours=integer_hours)
+        totals['nb_sessions'] = 0
+        return totals
+
+    sessions = SessionModule.objects.filter(module_id__in=module_ids).only(
+        'heure_debut_prevue',
+        'heure_fin_prevue',
+        'demarree_le',
+        'terminee_le',
+        'date_journee',
+    )
+    agg = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
+    totals = finalize_volume_totals(
+        agg['prevu_min'],
+        agg['realise_min'],
+        integer_hours=integer_hours,
+    )
+    totals['nb_sessions'] = agg['nb_sessions']
+    return totals
+
+
+def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=None, *, integer_hours=False):
+    module_ids = list(modules_qs.values_list('pk', flat=True))
+    return compute_volume_horaire_from_module_ids(
+        module_ids,
+        date_debut=date_debut,
+        date_fin=date_fin,
+        integer_hours=integer_hours,
+    )
+
+
+def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None):
+    """Agrège prévu (toutes séances) et réalisé (séances terminées) pour un module."""
+    sessions = SessionModule.objects.filter(module=module).only(
+        'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'date_journee',
+    )
+    agg = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
+    prevu_h = round(agg['prevu_min'] / 60, 1)
+    realise_h = round(agg['realise_min'] / 60, 1)
+    if prevu_h > 0:
+        realise_h = min(realise_h, prevu_h)
+
+    return {
+        'prevu_min': agg['prevu_min'],
+        'realise_min': agg['realise_min'],
+        'prevu_h': prevu_h,
+        'realise_h': realise_h,
+        'compte_h': realise_h,
+        'ecart_h': round(realise_h - prevu_h, 1),
+        'nb_sessions': agg['nb_sessions'],
+        'nb_sessions_planifiees': agg['nb_sessions_planifiees'],
+        'nb_sessions_terminees': agg['nb_sessions_terminees'],
+        'sessions_sans_horaires': agg['sessions_sans_horaires'],
         'duree_fiche_h': round(float(module.duree_prevue_heures or 0), 1),
         'taux_realise_pct': (
             round(realise_h / prevu_h * 100, 1) if prevu_h > 0 else None
@@ -143,32 +244,15 @@ def secretariats_for_admin_filter(request):
     )
 
 
-def compute_dashboard_volume_horaire(modules_qs):
-    """Volume agrégé dashboard : prévu/réalisé par séances, taux ≤ 100 %."""
-    module_ids = list(modules_qs.values_list('pk', flat=True))
-    if not module_ids:
-        return 0, 0, 0
-
-    total_prevu_min = 0.0
-    total_compte_min = 0.0
-
-    # Requête légère sans select_related (incompatible avec .only()).
-    for module in Module.objects.filter(pk__in=module_ids).only(
-        'pk', 'duree_prevue_heures'
-    ):
-        vol = _accumulate_module_session_volumes(module)
-        total_prevu_min += vol['prevu_min']
-        total_compte_min += vol['realise_min']
-
-    total_heures = int(round(total_prevu_min / 60))
-    effectue_heures = int(round(total_compte_min / 60))
-    if total_heures > 0:
-        effectue_heures = min(effectue_heures, total_heures)
-        taux = min(100, int((effectue_heures / total_heures) * 100))
-    else:
-        effectue_heures = 0
-        taux = 0
-    return effectue_heures, total_heures, taux
+def compute_dashboard_volume_horaire(modules_qs, date_debut=None, date_fin=None):
+    """Volume agrégé dashboard web : prévu/réalisé par séances, taux ≤ 100 %."""
+    totals = compute_volume_horaire_from_modules(
+        modules_qs,
+        date_debut=date_debut,
+        date_fin=date_fin,
+        integer_hours=True,
+    )
+    return totals['realise_heures'], totals['prevu_heures'], totals['taux_pct']
 
 
 def _module_admin_url(module_id):

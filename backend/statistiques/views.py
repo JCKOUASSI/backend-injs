@@ -223,7 +223,7 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, module_ids=None, 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None):
+def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None, date_debut=None, date_fin=None):
     mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
     # Formations
@@ -256,19 +256,17 @@ def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None):
     nb_sessions_en_cours  = SessionModule.objects.filter(demarree_le__isnull=False, terminee_le__isnull=True, **sm).count()
     nb_pointages          = Pointage.objects.filter(**pf).count()
 
-    # Volume horaire prévu
-    vh_prevu = float(Module.objects.filter(**mq).aggregate(total=Sum('duree_prevue_heures'))['total'] or 0)
+    from formations.volume_horaire import compute_volume_horaire_from_module_ids
 
-    # Volume horaire réalisé (calcul Python pour éviter conflits de types ORM)
-    vh_realise_h = sum(
-        (fin - deb).total_seconds() / 3600
-        for deb, fin in SessionModule.objects.filter(
-            demarree_le__isnull=False, terminee_le__isnull=False, **sm
-        ).values_list('demarree_le', 'terminee_le')
-        if deb and fin
+    module_ids_scope = list(Module.objects.filter(**mq).values_list('id', flat=True))
+    vh_totals = compute_volume_horaire_from_module_ids(
+        module_ids_scope,
+        date_debut=date_debut,
+        date_fin=date_fin,
     )
-    vh_realise_h = round(vh_realise_h, 1)
-    taux_execution_vh = _taux(vh_realise_h, vh_prevu)
+    vh_prevu = vh_totals['prevu_heures']
+    vh_realise_h = vh_totals['realise_heures']
+    taux_execution_vh = vh_totals['taux_pct']
 
     return {
         'formations': nb_formations,
@@ -852,11 +850,13 @@ def _parse_dashboard_sections(request):
     return {s.strip() for s in raw.split(',') if s.strip()} & DASHBOARD_SECTIONS
 
 
-def _build_dashboard_payload(scope: StatsScope, sections, user):
+def _build_dashboard_payload(scope: StatsScope, sections, user, period=None):
     """Construit uniquement les blocs demandés (chargement par onglet)."""
     formation_id = scope.formation_id
     secretariat_id = scope.secretariat_id
     module_ids = scope.module_ids
+    date_debut = period['date_debut'] if period else None
+    date_fin = period['date_fin'] if period else None
     need_ped = bool(sections & {'pedagogiques', 'alertes', 'alertes_overview'})
     need_adm = bool(sections & {'admin_operationnel', 'alertes', 'alertes_overview'})
     need_kpis = bool(sections & {'kpis', 'alertes', 'alertes_overview'})
@@ -864,12 +864,19 @@ def _build_dashboard_payload(scope: StatsScope, sections, user):
 
     ped = _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids) if need_ped else None
     adm = _indicateurs_admin(formation_id, secretariat_id, module_ids) if need_adm else None
-    kpis = _kpis_globaux(formation_id, secretariat_id, module_ids) if need_kpis else None
+    kpis = _kpis_globaux(
+        formation_id, secretariat_id, module_ids, date_debut, date_fin,
+    ) if need_kpis else None
 
     payload = {}
 
     if 'kpis' in sections and kpis is not None:
         payload['kpis'] = kpis
+        if period:
+            from formations.period_filter import periode_api_payload
+            payload['periode'] = periode_api_payload(
+                period['date_debut'], period['date_fin'], period['meta'],
+            )
     if 'pedagogiques' in sections and ped is not None:
         payload['pedagogiques'] = ped
     if 'admin_operationnel' in sections and adm is not None:
@@ -912,8 +919,14 @@ class DashboardView(APIView):
         if err:
             return err
 
+        from formations.period_filter import parse_period_from_request
+
+        period = parse_period_from_request(request)
+        if period['error']:
+            return Response({'detail': period['detail']}, status=400)
+
         sections = _parse_dashboard_sections(request)
-        return Response(_build_dashboard_payload(scope, sections, request.user))
+        return Response(_build_dashboard_payload(scope, sections, request.user, period=period))
 
 
 class SecretariatsStatsView(APIView):
@@ -928,9 +941,17 @@ class SecretariatsStatsView(APIView):
         if err:
             return err
 
+        from formations.period_filter import parse_period_from_request, periode_api_payload
+
+        period = parse_period_from_request(request)
+        if period['error']:
+            return Response({'detail': period['detail']}, status=400)
+
         formation_id = scope.formation_id
         module_ids = scope.module_ids
         mod_kw = module_filter_kwargs(scope)
+        date_debut = period['date_debut']
+        date_fin = period['date_fin']
 
         resultats = []
 
@@ -962,17 +983,13 @@ class SecretariatsStatsView(APIView):
             # Formateurs du secrétariat
             nb_formateurs = Formateur.objects.filter(secretariats=s).distinct().count()
 
-            # Volume horaire
-            vh_prevu = float(Module.objects.filter(**mq).aggregate(t=Sum('duree_prevue_heures'))['t'] or 0)
-            vh_realise = sum(
-                (fin - deb).total_seconds() / 3600
-                for deb, fin in SessionModule.objects.filter(
-                    demarree_le__isnull=False, terminee_le__isnull=False,
-                    module__secretariat=s,
-                    **({'module__formation_id': formation_id} if formation_id else {})
-                ).values_list('demarree_le', 'terminee_le')
-                if deb and fin
+            from formations.volume_horaire import compute_volume_horaire_from_module_ids
+
+            vh_totals = compute_volume_horaire_from_module_ids(
+                mod_ids, date_debut=date_debut, date_fin=date_fin,
             )
+            vh_prevu = vh_totals['prevu_heures']
+            vh_realise = vh_totals['realise_heures']
 
             resultats.append({
                 'secretariat_id': s.id,
@@ -994,14 +1011,15 @@ class SecretariatsStatsView(APIView):
                 'ratio_hf': {'hommes': hommes, 'femmes': femmes,
                              'pct_hommes': _taux(hommes, hommes+femmes),
                              'pct_femmes': _taux(femmes, hommes+femmes)},
-                'vh_prevu': round(vh_prevu, 1),
-                'vh_realise': round(vh_realise, 1),
-                'taux_execution_vh': _taux(round(vh_realise, 1), vh_prevu),
+                'vh_prevu': vh_prevu,
+                'vh_realise': vh_realise,
+                'taux_execution_vh': vh_totals['taux_pct'],
             })
 
         return Response({
             'secretariats': resultats,
             'total': len(resultats),
+            'periode': periode_api_payload(date_debut, date_fin, period['meta']),
         })
 
 
