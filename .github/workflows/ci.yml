@@ -54,6 +54,16 @@ jobs:
           python manage.py migrate --noinput
           python manage.py test --noinput -v 2
 
+      - name: Vérifier l'image Docker backend (collectstatic / permissions)
+        run: |
+          docker build -t sygep-backend-ci ./backend
+          OWNER=$(docker run --rm sygep-backend-ci stat -c '%U' /app/staticfiles)
+          if [ "$OWNER" != "appuser" ]; then
+            echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
+            exit 1
+          fi
+          docker run --rm sygep-backend-ci python manage.py collectstatic --noinput --dry-run
+
   frontend:
     name: Frontend (Vite / React)
     runs-on: ubuntu-latest

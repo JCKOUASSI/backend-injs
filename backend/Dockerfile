@@ -26,15 +26,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Créer les répertoires persistants et appliquer les permissions
-RUN mkdir -p /app/media && \
+RUN mkdir -p /app/media /app/staticfiles && \
     chown -R appuser:appuser /app
 
-# Collecter les fichiers statiques (servis par WhiteNoise)
+# Collecter les fichiers statiques en tant qu'appuser (évite PermissionError au runtime)
+USER appuser
 RUN SECRET_KEY=build-time-only DEBUG=True \
     python manage.py collectstatic --noinput
-
-# Basculer vers l'utilisateur non-root
-USER appuser
 
 EXPOSE 8000
 
