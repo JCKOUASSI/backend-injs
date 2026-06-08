@@ -17,6 +17,13 @@ def admin_user_has_global_access(user):
     return getattr(user, 'role', None) in _ADMIN_GLOBAL_ROLES
 
 
+class AdminSidebarHiddenMixin:
+    """Masque le modèle de l'index et de la navigation (accès via inlines / liens directs)."""
+
+    def has_module_permission(self, request):
+        return False
+
+
 class AdminScopeMixin:
     """Restreint les querysets admin selon le rôle (aligné dashboard / API)."""
 
