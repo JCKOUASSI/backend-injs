@@ -139,19 +139,17 @@ def gen_participants():
         'Email',               # → email
         'Téléphone 1',         # → telephone
         'Téléphone 2',         # → telephone2
-        'Lieu',                # → site
-        'Salle',               # → salle
         'Formation(s)',        # → inscription auto (séparateur |)
     ]
-    widths = [18, 20, 22, 12, 18, 24, 12, 12, 18, 18, 22, 20, 34, 30, 16, 16, 24, 14, 50]
+    widths = [18, 20, 22, 12, 18, 24, 12, 12, 18, 18, 22, 20, 34, 30, 16, 16, 50]
     set_headers(ws, headers, widths)
 
     rows = [
-        ['MAT001', 'DUPONT',   'Jean',        'MASCULIN', date(1990, 3, 15),  'Abidjan',  'A', 'A4', 'A4/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'jean.dupont@exemple.ci',   '0701000001', '',           'CPFAE',  'Salle 101', 'FORMATION EN ADMINISTRATION DE BASE'],
-        ['MAT002', 'KONAN',    'Aya Marie',   'FEMININ',  date(1992, 7, 22),  'Bouaké',   'A', 'A4', 'A4/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'aya.konan@exemple.ci',     '0702000002', '',           'CPFAE',  'Salle 101', 'FORMATION EN ADMINISTRATION DE BASE'],
-        ['MAT003', 'BAMBA',    'Oumar',       'MASCULIN', date(1988, 11, 5),  'Korhogo',  'B', 'B1', 'B1/GROUPE 1', 'GROUPE 1', 'DEUXIEME VAGUE',  'Concours professionnel','Concours Attaché Administration', 'oumar.bamba@exemple.ci',   '0703000003', '0703000099', 'CPFAE',  'Salle 201', 'FORMATION EN ADMINISTRATION DE BASE'],
-        ['MAT004', 'YAO',      'Kouassi',     'MASCULIN', date(1985, 4, 10),  'Yamoussoukro', 'A', 'A3', 'A3/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE', 'Concours direct',  'Concours Administrateur Principal', 'kouassi.yao@exemple.ci', '0704000004', '',           'ENAFOP', 'Salle 301', 'FORMATION SPECIALISEE EN GESTION'],
-        ['MAT005', 'COULIBALY', 'Aminata',   'FEMININ',  date(1995, 9, 30),  'Man',      'A', 'A4', 'A4/GROUPE 2', 'GROUPE 2', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'aminata.coulibaly@exemple.ci', '0705000005', '',        'CPFAE',  'Salle 102', 'FORMATION EN ADMINISTRATION DE BASE'],
+        ['MAT001', 'DUPONT',   'Jean',        'MASCULIN', date(1990, 3, 15),  'Abidjan',  'A', 'A4', 'A4/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'jean.dupont@exemple.ci',   '0701000001', '',           'FORMATION EN ADMINISTRATION DE BASE'],
+        ['MAT002', 'KONAN',    'Aya Marie',   'FEMININ',  date(1992, 7, 22),  'Bouaké',   'A', 'A4', 'A4/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'aya.konan@exemple.ci',     '0702000002', '',           'FORMATION EN ADMINISTRATION DE BASE'],
+        ['MAT003', 'BAMBA',    'Oumar',       'MASCULIN', date(1988, 11, 5),  'Korhogo',  'B', 'B1', 'B1/GROUPE 1', 'GROUPE 1', 'DEUXIEME VAGUE',  'Concours professionnel','Concours Attaché Administration', 'oumar.bamba@exemple.ci',   '0703000003', '0703000099', 'FORMATION EN ADMINISTRATION DE BASE'],
+        ['MAT004', 'YAO',      'Kouassi',     'MASCULIN', date(1985, 4, 10),  'Yamoussoukro', 'A', 'A3', 'A3/GROUPE 1', 'GROUPE 1', 'PREMIERE VAGUE', 'Concours direct',  'Concours Administrateur Principal', 'kouassi.yao@exemple.ci', '0704000004', '',           'FORMATION SPECIALISEE EN GESTION'],
+        ['MAT005', 'COULIBALY', 'Aminata',   'FEMININ',  date(1995, 9, 30),  'Man',      'A', 'A4', 'A4/GROUPE 2', 'GROUPE 2', 'PREMIERE VAGUE',  'Concours direct',       'Concours Administrateur Civil',  'aminata.coulibaly@exemple.ci', '0705000005', '',        'FORMATION EN ADMINISTRATION DE BASE'],
     ]
     for i, row in enumerate(rows, 2):
         add_row(ws, i, row)

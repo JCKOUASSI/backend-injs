@@ -1,37 +1,45 @@
 from django.contrib import admin
-from django.shortcuts import render
+from django.urls import path
+from django.views.generic import TemplateView
+from unfold.views import UnfoldModelAdminViewMixin
 
 from .volume_horaire import run_organisation_diagnostic
 
 
-def volume_horaire_diagnostic_view(request):
-    """Onglet admin : modules et séances ayant dépassé le volume horaire prévu."""
-    depassements_only = request.GET.get('depassements_only') == '1'
-    result = run_organisation_diagnostic(request, depassements_only=depassements_only)
+class VolumeHoraireDiagnosticView(UnfoldModelAdminViewMixin, TemplateView):
+    title = 'Diagnostique volume horaire'
+    permission_required = ()
+    template_name = 'admin/formations/volume_horaire_diagnostic.html'
 
-    context = {
-        **admin.site.each_context(request),
-        'title': 'Diagnostique volume horaire',
-        'result': result,
-        'depassements_only': depassements_only,
-    }
-    return render(request, 'admin/formations/volume_horaire_diagnostic.html', context)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        depassements_only = self.request.GET.get('depassements_only') == '1'
+        context.update({
+            'result': run_organisation_diagnostic(
+                self.request,
+                depassements_only=depassements_only,
+            ),
+            'depassements_only': depassements_only,
+        })
+        return context
 
 
 def attach_volume_diagnostic_admin_urls():
-    from django.contrib import admin
-    from django.urls import path
+    from formations.models import Module
 
     if getattr(admin.site, '_org_volume_diag_urls', False):
         return
 
+    module_admin = admin.site._registry[Module]
     original_get_urls = admin.site.get_urls
 
     def get_urls():
         custom = [
             path(
                 'diagnostique-volume-horaire/',
-                admin.site.admin_view(volume_horaire_diagnostic_view),
+                admin.site.admin_view(
+                    VolumeHoraireDiagnosticView.as_view(model_admin=module_admin)
+                ),
                 name='formations_volume_horaire_diagnostic',
             ),
         ]
