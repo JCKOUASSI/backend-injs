@@ -1,252 +1,4 @@
-:root {
-    --primary: #0f4c81;
-    --secondary: #1a7f64;
-    --accent: #1a7f64;
-    --header-color: #ffffff;
-    --link-fg: #0f4c81;
-    --link-selected-fg: #1a7f64;
-    --button-fg: #ffffff;
-    --button-bg: #0f4c81;
-    --button-hover-bg: #0b3a63;
-    --default-button-bg: #1a7f64;
-    --default-button-hover-bg: #13624e;
-    --border-color: #d9e2ec;
-    --body-fg: #1f2937;
-    --body-quiet-color: #6b7280;
-    --body-loud-color: #111827;
-    --hairline-color: #e5e7eb;
-    --darkened-bg: #f8fafc;
-}
-
-/* ── En-tête admin (surcharge après responsive.css) ─────────────────────── */
-
-html,
-body {
-    height: auto;
-    min-height: 100%;
-}
-
-#container {
-    height: auto;
-    min-height: 100%;
-}
-
-#container > #header,
-#container > header#header {
-    flex: 0 0 auto;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px 24px;
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-    padding: 16px 40px;
-    background: linear-gradient(90deg, #0f4c81 0%, #13624e 100%);
-    color: #ffffff;
-}
-
-#branding {
-    display: block;
-    flex: 1 1 280px;
-    min-width: 0;
-    height: auto;
-    overflow: visible;
-    padding: 0;
-    margin: 0;
-}
-
-.dfrc-branding {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 4px;
-}
-
-#branding h1,
-#branding #site-name {
-    margin: 0 !important;
-    padding: 0;
-    line-height: 1.35;
-    font-size: 1.35rem;
-    font-weight: 700;
-}
-
-#branding #site-name a,
-#branding #site-name a:link,
-#branding #site-name a:visited {
-    color: #ffffff !important;
-    text-decoration: none;
-}
-
-#branding #site-name a:hover,
-#branding #site-name a:focus {
-    color: #ffffff !important;
-    text-decoration: underline;
-}
-
-.dfrc-branding-subtitle {
-    margin: 0 !important;
-    padding: 0;
-    font-size: 0.8125rem;
-    line-height: 1.35;
-    color: rgba(255, 255, 255, 0.88);
-}
-
-#user-tools {
-    float: none;
-    flex: 0 0 auto;
-    align-self: center;
-    margin: 0;
-    padding: 0;
-    line-height: 1.5;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-transform: none;
-    text-align: right;
-    white-space: normal;
-}
-
-#header a:link,
-#header a:visited,
-#logout-form button {
-    color: #ffffff;
-}
-
-#user-tools a,
-#logout-form button {
-    border-bottom-color: rgba(255, 255, 255, 0.35);
-}
-
-#user-tools .theme-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    vertical-align: middle;
-    margin-inline-start: 6px;
-    margin-top: 0;
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-/* Libellés accessibilité du thème : ne pas les afficher visuellement */
-#user-tools .theme-toggle .visually-hidden,
-#user-tools .theme-toggle .theme-label-when-auto,
-#user-tools .theme-toggle .theme-label-when-light,
-#user-tools .theme-toggle .theme-label-when-dark {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
-    display: none !important;
-}
-
-#user-tools .theme-toggle svg {
-    display: none;
-    width: 1rem;
-    height: 1rem;
-    fill: #ffffff;
-}
-
-html[data-theme="auto"] #user-tools .theme-toggle svg.theme-icon-when-auto,
-html[data-theme="light"] #user-tools .theme-toggle svg.theme-icon-when-light,
-html[data-theme="dark"] #user-tools .theme-toggle svg.theme-icon-when-dark {
-    display: block;
-}
-
-div.breadcrumbs {
-    background: #f1f5f9;
-    color: #334155;
-}
-
-div.breadcrumbs a {
-    color: #0f4c81;
-}
-
-#content h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.module h2,
-.module caption,
-.inline-group h2 {
-    background: #eef6fc;
-    color: #0f4c81;
-    border-bottom: 1px solid #d7e8f6;
-    font-weight: 700;
-}
-
-#changelist table thead th {
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
-}
-
-#changelist table tbody tr:nth-child(even) {
-    background: #fcfdff;
-}
-
-#changelist-filter h2 {
-    background: #f1f5f9;
-    color: #334155;
-}
-
-.selector-chosen h2 {
-    background: #e8f6f1;
-    color: #13624e;
-}
-
-.button,
-input[type="submit"],
-input[type="button"],
-.submit-row input,
-a.button {
-    border-radius: 6px;
-    font-weight: 600;
-}
-
-.submit-row {
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    background: #f8fafc;
-}
-
-input,
-textarea,
-select,
-.vTextField {
-    border-radius: 6px;
-}
-
-@media (max-width: 1024px) {
-    #content h1 {
-        font-size: 20px;
-    }
-
-    #container > #header,
-    #container > header#header {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 16px 30px;
-    }
-
-    #user-tools {
-        width: 100%;
-        text-align: left;
-    }
-}
+/* Styles complémentaires SYGEP-CPFAE pour Django Unfold (orange #F57C00 / #E65100) */
 
 .dfrc-admin-home {
     display: flex;
@@ -254,36 +6,8 @@ select,
     gap: 18px;
 }
 
-.dfrc-admin-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    flex: 1 1 100%;
-    order: 3;
-    width: 100%;
-    margin-top: 4px;
-}
-
-.dfrc-admin-tab {
-    display: inline-flex;
-    align-items: center;
-    padding: 6px 14px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.14);
-    color: #ffffff !important;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.dfrc-admin-tab:hover,
-.dfrc-admin-tab.is-active {
-    background: rgba(255, 255, 255, 0.28);
-    color: #ffffff !important;
-}
-
 .dfrc-diag-page .warning {
-    color: #b45309;
+    color: #c2410c;
     font-weight: 600;
 }
 
@@ -297,13 +21,13 @@ select,
 
 .dfrc-diag-tfoot th,
 .dfrc-diag-tfoot td {
-    background: #e8f4f0 !important;
+    background: #ffedd5 !important;
     font-weight: 700;
-    border-top: 2px solid var(--border-color);
+    border-top: 2px solid #fed7aa;
 }
 
 .dfrc-diag-muted {
-    color: var(--body-quiet-color);
+    color: #6b7280;
     font-size: 0.85em;
 }
 
@@ -333,7 +57,7 @@ select,
 }
 
 .dfrc-quick-links {
-    border: 1px solid #dbe7f2;
+    border: 1px solid #fed7aa;
     border-radius: 10px;
     overflow: hidden;
 }
@@ -343,7 +67,6 @@ select,
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
     padding: 14px;
-    background: #ffffff;
 }
 
 .dfrc-quick-link {
@@ -352,21 +75,21 @@ select,
     gap: 4px;
     padding: 14px;
     border-radius: 8px;
-    border: 1px solid #dbe7f2;
+    border: 1px solid #fed7aa;
     text-decoration: none;
     transition: all 0.18s ease;
-    background: #f8fbff;
+    background: #fff7ed;
 }
 
 .dfrc-quick-link:hover {
-    border-color: #9ec1de;
-    box-shadow: 0 6px 16px rgba(15, 76, 129, 0.12);
+    border-color: #fb923c;
+    box-shadow: 0 6px 16px rgba(230, 81, 0, 0.15);
     transform: translateY(-1px);
 }
 
 .dfrc-quick-link-title {
     font-weight: 700;
-    color: #0f4c81;
+    color: #e65100;
     font-size: 14px;
 }
 
@@ -382,10 +105,9 @@ select,
 }
 
 .dfrc-app-card {
-    border: 1px solid #dbe7f2;
+    border: 1px solid #fed7aa;
     border-radius: 10px;
     overflow: hidden;
-    background: #ffffff;
 }
 
 .dfrc-model-list {
@@ -400,11 +122,11 @@ select,
     justify-content: space-between;
     gap: 12px;
     padding: 10px 12px;
-    border-top: 1px solid #edf2f7;
+    border-top: 1px solid #ffedd5;
 }
 
 .dfrc-model-item:nth-child(even) {
-    background: #fbfdff;
+    background: #fffaf5;
 }
 
 .dfrc-model-name {
@@ -421,16 +143,16 @@ select,
     display: inline-block;
     font-size: 12px;
     padding: 3px 8px;
-    border: 1px solid #c9d9e8;
+    border: 1px solid #fdba74;
     border-radius: 999px;
     text-decoration: none;
-    color: #0f4c81;
+    color: #e65100;
     background: #ffffff;
 }
 
 .dfrc-model-actions a:hover {
-    border-color: #0f4c81;
-    background: #f0f7ff;
+    border-color: #e65100;
+    background: #fff7ed;
 }
 
 /* Boutons « + Ajouter » relationnels (inlines, formulaires) */

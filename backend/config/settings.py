@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -67,6 +70,9 @@ if DEBUG:
 
 # Application definition
 INSTALLED_APPS = [
+    'unfold',
+    'unfold.contrib.filters',
+    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -271,6 +277,61 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API de gestion des formations, participants et badgeage QR.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+}
+
+# ── Django Unfold (admin) ─────────────────────────────────────────────────────
+UNFOLD = {
+    'SITE_TITLE': 'SYGEP-CPFAE Admin',
+    'SITE_HEADER': 'SYGEP-CPFAE',
+    'SITE_SUBHEADER': 'Gestion des formations et présences',
+    'SITE_URL': '/dashboard/',
+    'SITE_SYMBOL': 'school',
+    'BORDER_RADIUS': '6px',
+    'COLORS': {
+        'primary': {
+            '50': 'oklch(98% 0.02 75)',
+            '100': 'oklch(95% 0.04 72)',
+            '200': 'oklch(90% 0.08 68)',
+            '300': 'oklch(83% 0.13 62)',
+            '400': 'oklch(75% 0.17 58)',
+            '500': 'oklch(67.5% 0.19 52)',   # #F57C00
+            '600': 'oklch(57% 0.20 42)',     # #E65100
+            '700': 'oklch(48% 0.17 40)',
+            '800': 'oklch(40% 0.14 38)',
+            '900': 'oklch(34% 0.11 36)',
+            '950': 'oklch(26% 0.08 34)',
+        },
+    },
+    'STYLES': [
+        lambda request: static('admin/custom_admin.css'),
+    ],
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': True,
+        'navigation': [
+            {
+                'title': _('Navigation'),
+                'separator': True,
+                'items': [
+                    {
+                        'title': _('Accueil'),
+                        'icon': 'dashboard',
+                        'link': reverse_lazy('admin:index'),
+                    },
+                    {
+                        'title': _('Diagnostique volume horaire'),
+                        'icon': 'monitoring',
+                        'link': reverse_lazy('admin:formations_volume_horaire_diagnostic'),
+                    },
+                    {
+                        'title': _('Dashboard web'),
+                        'icon': 'open_in_new',
+                        'link': '/dashboard/',
+                    },
+                ],
+            },
+        ],
+    },
 }
 
 # ── Production security (activé quand DEBUG=False) ──

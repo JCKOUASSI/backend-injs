@@ -2,10 +2,6 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
-admin.site.site_header = "SYGEP-CPFAE Administration"
-admin.site.site_title = "SYGEP-CPFAE Admin"
-admin.site.index_title = "Gestion des formations et présences"
-
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),

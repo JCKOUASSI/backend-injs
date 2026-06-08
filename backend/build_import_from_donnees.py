@@ -257,9 +257,6 @@ def build_participants():
         idx_grade    = col_idx(["GRADE"])
         idx_groupe   = col_idx(["GROUPE"])
         idx_gg       = col_idx(["GRADE-GROUPE", "GRADE_GROUPE", "GRADE/GROUPE"])
-        idx_site     = col_idx(["SITE"])
-        idx_salle    = col_idx(["SALLE"])
-
         def g(row, idx):
             if idx is None or idx >= len(row): return ''
             v = row[idx]
@@ -323,8 +320,6 @@ def build_participants():
                 '',                                 # Email
                 clean(g(row, idx_tel1)),            # Téléphone 1
                 clean(g(row, idx_tel2)),            # Téléphone 2
-                clean(g(row, idx_site)),            # Lieu/Site
-                clean(g(row, idx_salle)),           # Salle
                 FORMATION_TITLE,                    # Formation(s)
             ])
 
@@ -339,9 +334,9 @@ def build_participants():
         "N° d'inscription", 'Nom', 'Prénom', 'Sexe', 'Date de naissance',
         'Lieu de naissance', 'Catégorie', 'Grade', 'Grade/Groupe', 'Groupe',
         'Vague', 'Type concours', 'Libelle concours', 'Email',
-        'Téléphone 1', 'Téléphone 2', 'Lieu', 'Salle', 'Formation(s)',
+        'Téléphone 1', 'Téléphone 2', 'Formation(s)',
     ]
-    widths_out = [20, 22, 28, 12, 18, 28, 12, 10, 18, 16, 20, 30, 45, 28, 15, 15, 40, 35, 55]
+    widths_out = [20, 22, 28, 12, 18, 28, 12, 10, 18, 16, 20, 30, 45, 28, 15, 15, 55]
     set_headers(ws_out, headers_out, widths_out)
 
     for i, row in enumerate(all_participants, 2):

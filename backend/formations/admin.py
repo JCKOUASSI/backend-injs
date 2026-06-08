@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 from django.db.models import Count, Exists, OuterRef
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -62,7 +63,7 @@ class FormationAdminScopeMixin:
 
 
 @admin.register(Secretariat)
-class SecretariatAdmin(AdminScopeMixin, admin.ModelAdmin):
+class SecretariatAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'pk'
 
     def get_queryset(self, request):
@@ -157,7 +158,7 @@ class SessionModuleInline(admin.TabularInline):
 
 
 @admin.register(Formation)
-class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
+class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     audit_action_create = AuditLog.Action.FORMATION_CREATE
     audit_action_update = AuditLog.Action.FORMATION_UPDATE
     audit_action_delete = AuditLog.Action.FORMATION_DELETE
@@ -181,7 +182,7 @@ class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, admin.ModelAd
 
 
 @admin.register(Participant)
-class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
+class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     audit_action_create = AuditLog.Action.PARTICIPANT_CREATE
     audit_action_update = AuditLog.Action.PARTICIPANT_UPDATE
     audit_action_delete = AuditLog.Action.PARTICIPANT_DELETE
@@ -236,7 +237,7 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, admin.Mod
 
 
 @admin.register(ModuleParticipant)
-class ModuleParticipantAdmin(AdminScopeMixin, admin.ModelAdmin):
+class ModuleParticipantAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
     list_display = [
@@ -276,7 +277,7 @@ class ModuleParticipantAdmin(AdminScopeMixin, admin.ModelAdmin):
 
 
 @admin.register(Module)
-class ModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
+class ModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     admin_scope_secretariat_field = 'secretariat'
     admin_scope_superviseur_field = 'superviseur'
     audit_action_create = AuditLog.Action.FORMATION_CREATE
@@ -504,7 +505,7 @@ class ModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(SessionModule)
-class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
+class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
     audit_action_create = AuditLog.Action.SEANCE_CREATE
@@ -676,7 +677,7 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Formateur)
-class FormateurAdmin(FormateurAdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
+class FormateurAdmin(FormateurAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     audit_action_create = AuditLog.Action.FORMATEUR_CREATE
     audit_action_update = AuditLog.Action.FORMATEUR_UPDATE
     audit_action_delete = AuditLog.Action.FORMATEUR_DELETE
@@ -721,7 +722,7 @@ class FormateurAdmin(FormateurAdminScopeMixin, AuditLogAdminMixin, admin.ModelAd
 
 
 @admin.register(ModuleFormateur)
-class ModuleFormateurAdmin(AdminScopeMixin, admin.ModelAdmin):
+class ModuleFormateurAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
     list_display = [
@@ -761,7 +762,7 @@ class ModuleFormateurAdmin(AdminScopeMixin, admin.ModelAdmin):
 
 
 @admin.register(QRToken)
-class QRTokenAdmin(AdminScopeMixin, admin.ModelAdmin):
+class QRTokenAdmin(AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'session__module__secretariat'
     admin_scope_superviseur_field = 'session__module__superviseur'
     list_display = [
@@ -814,7 +815,7 @@ class QRTokenAdmin(AdminScopeMixin, admin.ModelAdmin):
 
 
 @admin.register(RefTypeSecretariat)
-class RefTypeSecretariatAdmin(admin.ModelAdmin):
+class RefTypeSecretariatAdmin(ModelAdmin):
     list_display = ['libelle', 'actif']
     search_fields = ['libelle']
     list_filter = ['actif']
@@ -822,7 +823,7 @@ class RefTypeSecretariatAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefVague)
-class RefVagueAdmin(admin.ModelAdmin):
+class RefVagueAdmin(ModelAdmin):
     list_display = ['libelle', 'ordre', 'actif']
     search_fields = ['libelle']
     list_filter = ['actif']
@@ -830,7 +831,7 @@ class RefVagueAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefCategorie)
-class RefCategorieAdmin(admin.ModelAdmin):
+class RefCategorieAdmin(ModelAdmin):
     list_display = ['libelle', 'actif']
     search_fields = ['libelle']
     list_filter = ['actif']
@@ -838,7 +839,7 @@ class RefCategorieAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefGrade)
-class RefGradeAdmin(admin.ModelAdmin):
+class RefGradeAdmin(ModelAdmin):
     list_display = ['libelle', 'categorie', 'actif']
     search_fields = ['libelle', 'categorie__libelle']
     list_filter = ['categorie', 'actif']
@@ -848,14 +849,14 @@ class RefGradeAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefFormation)
-class RefFormationAdmin(admin.ModelAdmin):
+class RefFormationAdmin(ModelAdmin):
     list_display = ['intitule', 'prix_heure_realisee', 'actif']
     search_fields = ['intitule']
     list_filter = ['actif']
 
 
 @admin.register(RefModule)
-class RefModuleAdmin(admin.ModelAdmin):
+class RefModuleAdmin(ModelAdmin):
     list_display = ['intitule', 'formation', 'volume_horaire', 'actif']
     search_fields = ['intitule', 'formation__intitule']
     list_filter = ['actif', 'formation']
@@ -875,7 +876,7 @@ class RefSalleInline(admin.TabularInline):
 
 
 @admin.register(RefSite)
-class RefSiteAdmin(admin.ModelAdmin):
+class RefSiteAdmin(ModelAdmin):
     list_display = ['nom', 'actif', 'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m']
     search_fields = ['nom']
     list_filter = ['actif']
@@ -887,7 +888,7 @@ class RefSiteAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefBatiment)
-class RefBatimentAdmin(admin.ModelAdmin):
+class RefBatimentAdmin(ModelAdmin):
     list_display = ['nom', 'site', 'actif']
     search_fields = ['nom', 'site__nom']
     list_filter = ['site', 'actif']
@@ -897,7 +898,7 @@ class RefBatimentAdmin(admin.ModelAdmin):
 
 
 @admin.register(RefSalle)
-class RefSalleAdmin(admin.ModelAdmin):
+class RefSalleAdmin(ModelAdmin):
     list_display = ['nom', 'site', 'batiment', 'actif']
     search_fields = ['nom', 'site__nom', 'batiment__nom']
     list_filter = ['site', 'batiment', 'actif']
