@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 from django.db.models import Count, Exists, OuterRef
 from django.http import HttpResponseRedirect
@@ -10,6 +11,7 @@ from datetime import timedelta
 
 from admin_mixins import (
     AdminScopeMixin,
+    AdminSidebarHiddenMixin,
     AuditLogAdminMixin,
     FormateurAdminScopeMixin,
     ParticipantAdminScopeMixin,
@@ -20,6 +22,7 @@ from .models import (
     Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur,
     Formateur, QRToken, RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
     RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, SessionModule,
+    FinanceSettings,
 )
 from presences.models import AuditLog
 FormationFormateur = ModuleFormateur
@@ -237,7 +240,7 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
 
 
 @admin.register(ModuleParticipant)
-class ModuleParticipantAdmin(AdminScopeMixin, ModelAdmin):
+class ModuleParticipantAdmin(AdminSidebarHiddenMixin, AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
     list_display = [
@@ -722,7 +725,7 @@ class FormateurAdmin(FormateurAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
 
 
 @admin.register(ModuleFormateur)
-class ModuleFormateurAdmin(AdminScopeMixin, ModelAdmin):
+class ModuleFormateurAdmin(AdminSidebarHiddenMixin, AdminScopeMixin, ModelAdmin):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
     list_display = [
@@ -888,7 +891,7 @@ class RefSiteAdmin(ModelAdmin):
 
 
 @admin.register(RefBatiment)
-class RefBatimentAdmin(ModelAdmin):
+class RefBatimentAdmin(AdminSidebarHiddenMixin, ModelAdmin):
     list_display = ['nom', 'site', 'actif']
     search_fields = ['nom', 'site__nom']
     list_filter = ['site', 'actif']
@@ -898,13 +901,50 @@ class RefBatimentAdmin(ModelAdmin):
 
 
 @admin.register(RefSalle)
-class RefSalleAdmin(ModelAdmin):
+class RefSalleAdmin(AdminSidebarHiddenMixin, ModelAdmin):
     list_display = ['nom', 'site', 'batiment', 'actif']
     search_fields = ['nom', 'site__nom', 'batiment__nom']
     list_filter = ['site', 'batiment', 'actif']
     autocomplete_fields = ['site', 'batiment']
     list_select_related = ['site', 'batiment']
     ordering = ['site__nom', 'batiment__nom', 'nom']
+
+
+@admin.register(FinanceSettings)
+class FinanceSettingsAdmin(ModelAdmin):
+    list_display = ['prix_heure_realisee', 'afficher_montants_exports', 'updated_at', 'updated_by']
+    readonly_fields = ['updated_at']
+    autocomplete_fields = ['updated_by']
+    fieldsets = (
+        (_("Tarification"), {
+            'fields': ('prix_heure_realisee', 'afficher_montants_exports'),
+        }),
+        (_("Mise en page des exports"), {
+            'fields': (
+                'export_titre_document',
+                ('export_entete_ligne1', 'export_entete_ligne2'),
+                'export_organisme',
+                'export_adresse',
+                'export_reference_prefix',
+                'export_mention_legale',
+                ('export_signataire_nom', 'export_signataire_fonction'),
+            ),
+        }),
+        (_("Traçabilité"), {
+            'classes': ('collapse',),
+            'fields': ('updated_at', 'updated_by'),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return not FinanceSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 from formations.admin_diagnostic import attach_volume_diagnostic_admin_urls

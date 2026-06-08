@@ -62,6 +62,16 @@
     overflow: hidden;
 }
 
+.dfrc-quick-links h2 {
+    margin: 0;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #9a3412;
+    background: #fff7ed;
+    border-bottom: 1px solid #fed7aa;
+}
+
 .dfrc-quick-links-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -3,8 +3,9 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 from django.templatetags.static import static
-from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+
+from config.admin_sidebar import get_admin_sidebar_navigation, get_admin_tabs
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -307,31 +308,10 @@ UNFOLD = {
     ],
     'SIDEBAR': {
         'show_search': True,
-        'show_all_applications': True,
-        'navigation': [
-            {
-                'title': _('Navigation'),
-                'separator': True,
-                'items': [
-                    {
-                        'title': _('Accueil'),
-                        'icon': 'dashboard',
-                        'link': reverse_lazy('admin:index'),
-                    },
-                    {
-                        'title': _('Diagnostique volume horaire'),
-                        'icon': 'monitoring',
-                        'link': reverse_lazy('admin:formations_volume_horaire_diagnostic'),
-                    },
-                    {
-                        'title': _('Dashboard web'),
-                        'icon': 'open_in_new',
-                        'link': '/dashboard/',
-                    },
-                ],
-            },
-        ],
+        'show_all_applications': False,
+        'navigation': get_admin_sidebar_navigation(),
     },
+    'TABS': get_admin_tabs(),
 }
 
 # ── Production security (activé quand DEBUG=False) ──
