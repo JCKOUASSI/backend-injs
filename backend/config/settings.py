@@ -119,6 +119,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'dashboard.context_processors.sidebar_counts',
+                'config.context_processors.public_urls',
             ],
         },
     },
@@ -281,12 +282,15 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+# URL publique de l'application web (bouton « Voir le site » dans l'admin Unfold).
+PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'https://app.sygepcpfae.org').rstrip('/')
+
 # ── Django Unfold (admin) ─────────────────────────────────────────────────────
 UNFOLD = {
     'SITE_TITLE': 'SYGEP-CPFAE Admin',
     'SITE_HEADER': 'SYGEP-CPFAE',
     'SITE_SUBHEADER': 'Gestion des formations et présences',
-    'SITE_URL': '/dashboard/',
+    'SITE_URL': PUBLIC_APP_URL,
     'SITE_SYMBOL': 'school',
     'BORDER_RADIUS': '6px',
     'COLORS': {
@@ -310,7 +314,7 @@ UNFOLD = {
     'SIDEBAR': {
         'show_search': True,
         'show_all_applications': False,
-        'navigation': get_admin_sidebar_navigation(),
+        'navigation': get_admin_sidebar_navigation(PUBLIC_APP_URL),
     },
     'TABS': get_admin_tabs(),
 }

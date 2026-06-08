@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 
-def get_admin_sidebar_navigation():
+def get_admin_sidebar_navigation(app_url='https://app.sygepcpfae.org'):
   return [
     {
       'title': _('Navigation'),
@@ -18,7 +18,7 @@ def get_admin_sidebar_navigation():
         {
           'title': _('Dashboard web'),
           'icon': 'open_in_new',
-          'link': '/dashboard/',
+          'link': app_url,
         },
         {
           'title': _('Diagnostic volume horaire'),
