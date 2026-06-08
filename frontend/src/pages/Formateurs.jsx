@@ -227,10 +227,10 @@ export default function Formateurs() {
       : `/exports/formateur/${f.id}/excel/`
     const path = qs ? `${base}?${qs}` : base
     try {
-      const blob = await api.getBlob(path)
+      const { blob, fileName } = await api.getBlob(path)
       const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
-      downloadBlob(blob, `fiche_paie_${safeName || f.id}.${ext}`)
-      showToast(`Fiche de paie exportée (${ext.toUpperCase()})`)
+      downloadBlob(blob, fileName || `fiche_resume_${safeName || f.id}.${ext}`)
+      showToast(`Fiche résumé exportée (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export état financier', 'error')
     }
