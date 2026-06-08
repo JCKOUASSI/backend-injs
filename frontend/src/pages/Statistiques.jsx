@@ -5,6 +5,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import FinancePeriodFilter from '../components/FinancePeriodFilter'
+import {
+  appendPeriodToSearchParams,
+  loadFinancePeriod,
+  saveFinancePeriod,
+} from '../utils/financePeriod'
 
 // ── Palettes & constantes ────────────────────────────────────────────────────
 const C = ['#43A047','#1565C0','#F57C00','#7B1FA2','#C62828','#00838F','#558B2F','#AD1457','#0277BD','#4E342E']
@@ -1037,6 +1043,8 @@ export default function Statistiques() {
   const [formationId, setFormationId] = useState('')
   const [secretariatId, setSecretariatId] = useState('')
   const [lastRefresh, setLastRefresh] = useState(null)
+  const [vhPeriod, setVhPeriod] = useState(() => loadFinancePeriod())
+  const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => loadFinancePeriod())
 
   // Secrétariats — onglet dédié
   const [secStats, setSecStats] = useState(null)
@@ -1099,7 +1107,7 @@ export default function Statistiques() {
   const [exportingRb, setExportingRb] = useState(null)
 
   const canValidate = VALIDATION_ROLES.includes(user?.role)
-  const prevLoadCtx = useRef({ onglet, formationId, secretariatId })
+  const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedVhPeriod })
   const hasDataRef = useRef(false)
 
   const fetchData = useCallback(async (sections, { silent = false, initial = false } = {}) => {
@@ -1115,6 +1123,7 @@ export default function Statistiques() {
       params.set('sections', allSections.join(','))
       if (formationId) params.set('formation_id', formationId)
       if (secretariatId) params.set('secretariat_id', secretariatId)
+      appendPeriodToSearchParams(params, appliedVhPeriod)
       const res = await api.get(`/statistiques/?${params}`)
       setData(prev => ({ ...(prev || {}), ...res.data }))
       hasDataRef.current = true
@@ -1125,14 +1134,17 @@ export default function Statistiques() {
       setLoadingInitial(false)
       setLoadingTab(false)
     }
-  }, [formationId, secretariatId, onglet])
+  }, [formationId, secretariatId, onglet, appliedVhPeriod])
 
   const fetchSecStats = useCallback(async () => {
     setLoadingSecStats(true)
     setSecDetail(null)
     try {
-      const params = formationId ? `?formation_id=${formationId}` : ''
-      const res = await api.get(`/statistiques/secretariats/${params}`)
+      const params = new URLSearchParams()
+      if (formationId) params.set('formation_id', formationId)
+      appendPeriodToSearchParams(params, appliedVhPeriod)
+      const qs = params.toString()
+      const res = await api.get(`/statistiques/secretariats/${qs ? `?${qs}` : ''}`)
       setSecStats(res.data)
       setSecSelection(prev => {
         if (!res.data.secretariats?.length) return null
@@ -1145,7 +1157,7 @@ export default function Statistiques() {
     } finally {
       setLoadingSecStats(false)
     }
-  }, [formationId])
+  }, [formationId, appliedVhPeriod])
 
   const fetchSecDetail = useCallback(async (secId) => {
     if (!secId) {
@@ -1159,6 +1171,7 @@ export default function Statistiques() {
         sections: 'kpis,pedagogiques,admin_operationnel,filtre_actif',
       })
       if (formationId) params.set('formation_id', formationId)
+      appendPeriodToSearchParams(params, appliedVhPeriod)
       const res = await api.get(`/statistiques/?${params}`)
       setSecDetail(res.data)
     } catch {
@@ -1166,7 +1179,7 @@ export default function Statistiques() {
     } finally {
       setLoadingSecDetail(false)
     }
-  }, [formationId])
+  }, [formationId, appliedVhPeriod])
 
   const fetchSeuils = useCallback(async () => {
     try {
@@ -1437,6 +1450,11 @@ export default function Statistiques() {
     }
   }
 
+  const handleApplyVhPeriod = () => {
+    saveFinancePeriod(vhPeriod)
+    setAppliedVhPeriod({ ...vhPeriod })
+  }
+
   const handleRefreshAll = () => {
     fetchData(TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
     if (onglet === 'point_journalier') {
@@ -1454,8 +1472,10 @@ export default function Statistiques() {
   useEffect(() => {
     const prev = prevLoadCtx.current
     const ongletChanged = prev.onglet !== onglet
-    const filtreChanged = prev.formationId !== formationId || prev.secretariatId !== secretariatId
-    prevLoadCtx.current = { onglet, formationId, secretariatId }
+    const filtreChanged = prev.formationId !== formationId
+      || prev.secretariatId !== secretariatId
+      || prev.appliedVhPeriod !== appliedVhPeriod
+    prevLoadCtx.current = { onglet, formationId, secretariatId, appliedVhPeriod }
 
     const sections = TAB_SECTIONS[onglet] || TAB_SECTIONS.overview
     const isFirst = !hasDataRef.current
@@ -1463,7 +1483,7 @@ export default function Statistiques() {
       initial: isFirst,
       silent: !isFirst && ongletChanged && !filtreChanged,
     })
-  }, [formationId, secretariatId, onglet, fetchData])
+  }, [formationId, secretariatId, onglet, appliedVhPeriod, fetchData])
 
   useEffect(() => {
     setHistSelection(null)
@@ -1651,6 +1671,32 @@ export default function Statistiques() {
             <i className="bi bi-arrow-clockwise me-1"/>Actualiser
           </button>
         </div>
+      </div>
+
+      <div className="finance-filter-panel" style={{ marginBottom: '1rem' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
+          PÉRIODE — VOLUME HORAIRE
+        </div>
+        <div className="finance-filter-panel-inner">
+          <FinancePeriodFilter
+            period={vhPeriod}
+            onChange={setVhPeriod}
+            onApply={handleApplyVhPeriod}
+            applying={loadingInitial || loadingTab || loadingSecStats}
+            embedded
+          />
+        </div>
+        {data?.periode?.label && (
+          <div className="finance-period-badge">
+            <i className="bi bi-calendar-check"></i>
+            <div>
+              <strong>{data.periode.label}</strong>
+              {data.periode.periode_label && (
+                <span className="ms-1">— {data.periode.periode_label}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && data && (

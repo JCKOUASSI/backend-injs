@@ -120,6 +120,11 @@ export const buildFinancePeriodQuery = (period) => {
   return p
 }
 
+export const appendPeriodToSearchParams = (params, period) => {
+  const q = buildFinancePeriodQuery(period)
+  q.forEach((value, key) => params.set(key, value))
+}
+
 export const buildFinanceQuery = (period) => buildFinancePeriodQuery(period)
 
 export const financePeriodQueryString = (period) => {

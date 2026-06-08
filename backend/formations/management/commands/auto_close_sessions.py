@@ -2,7 +2,7 @@
 Commande : python manage.py auto_close_sessions
 
 Clôt automatiquement toute SessionModule démarrée dont l'heure de fin prévue
-est dépassée d'au moins ``--delai`` minutes (60 par défaut).
+est dépassée d'au moins ``--delai`` minutes (30 par défaut).
 
 Particularité : ``terminee_le`` est posé à ``date_journee + heure_fin_prevue``
 (et **non** à ``now``) pour empêcher l'inflation de la durée effective lorsque
@@ -12,23 +12,26 @@ la clôture intervient bien après la fin réelle de la séance.
   */10 * * * * /path/to/venv/bin/python /path/to/manage.py auto_close_sessions
 """
 
-from datetime import datetime, timedelta, timezone as dt_timezone
-from zoneinfo import ZoneInfo
+from datetime import timezone as dt_timezone
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from formations.models import SessionModule, QRToken
+from formations.session_views import (
+    AUTO_CLOSE_DELAY_MINUTES,
+    _session_fin_prevue_local,
+    _should_auto_close_session,
+)
 
 
-DEFAUT_DELAI_MINUTES = 60
-TZ_LOCALE = ZoneInfo('Africa/Abidjan')
+DEFAUT_DELAI_MINUTES = AUTO_CLOSE_DELAY_MINUTES
 
 
 class Command(BaseCommand):
     help = (
         "Clôt automatiquement les SessionModule dont heure_fin_prevue est dépassée "
-        "d'au moins --delai minutes (par défaut 60)."
+        "d'au moins --delai minutes (par défaut 30)."
     )
 
     def add_arguments(self, parser):
@@ -66,16 +69,11 @@ class Command(BaseCommand):
         cloturees = 0
         ignorees = 0
         for sess in sessions:
-            # Datetime local correspondant à la fin prévue de la séance.
-            fin_prevue_dt_local = datetime.combine(
-                sess.date_journee,
-                sess.heure_fin_prevue,
-                tzinfo=TZ_LOCALE,
-            )
-            if local_now < fin_prevue_dt_local + timedelta(minutes=delai_minutes):
+            if not _should_auto_close_session(sess, local_now, delai_minutes=delai_minutes):
                 ignorees += 1
                 continue
 
+            fin_prevue_dt_local = _session_fin_prevue_local(sess)
             # ``terminee_le`` borné à la fin prévue (UTC).
             terminee_le_utc = fin_prevue_dt_local.astimezone(dt_timezone.utc)
 

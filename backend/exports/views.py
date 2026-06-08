@@ -354,6 +354,7 @@ def _finance_synthese_export_context(request):
         _finance_filter_formateur_queryset,
         _finance_report_rows,
         _finance_periode_payload,
+        _finance_canonical_volume_kpis,
     )
 
     period = _parse_finance_date_range(request)
@@ -386,13 +387,16 @@ def _finance_synthese_export_context(request):
             row.pop('numero_piece_identite', None)
             row.pop('numero_compte_bancaire', None)
 
+    vh_totals = _finance_canonical_volume_kpis(
+        rows,
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+    )
     totals = {
         'sessions_count': sum(int(r.get('sessions_count') or 0) for r in rows),
-        'total_planned': round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1),
-        'total_realized': round(sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1),
-        'total_heures_realisees': round(
-            sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows) / 60, 2,
-        ),
+        'total_planned': vh_totals['prevu_minutes'],
+        'total_realized': vh_totals['realise_minutes'],
+        'total_heures_realisees': round(vh_totals['realise_minutes'] / 60, 2),
         'montant_total': round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2),
         'formateurs_count': len(rows),
         'formateurs_actifs': sum(1 for r in rows if (r.get('sessions_count') or 0) > 0),

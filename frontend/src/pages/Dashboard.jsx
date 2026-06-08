@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import FinancePeriodFilter from '../components/FinancePeriodFilter'
 import { formatDate } from '../utils/dates'
+import {
+  appendPeriodToSearchParams,
+  loadFinancePeriod,
+  readFinanceStateFromSearchParams,
+  saveFinancePeriod,
+} from '../utils/financePeriod'
 import {
   buildDashboardSearchParams,
   LIST_STORAGE_KEYS,
@@ -15,6 +22,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const listNavState = useListNavigationState()
   const [searchParams] = useSearchParams()
+  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
   const canFilterBySecretariat = ['CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'].includes(user?.role)
@@ -27,6 +35,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [loadingSecretariats, setLoadingSecretariats] = useState(false)
+  const [vhPeriod, setVhPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
+  const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
 
   usePersistedListQuery(
     LIST_STORAGE_KEYS.dashboard,
@@ -43,7 +53,12 @@ export default function Dashboard() {
     // Rafraîchissement périodique des indicateurs "live"
     const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
     return () => clearInterval(intervalId)
-  }, [selectedSecretariatId, referenceDate, presencePeriod])
+  }, [selectedSecretariatId, referenceDate, presencePeriod, appliedVhPeriod])
+
+  const handleApplyVhPeriod = () => {
+    saveFinancePeriod(vhPeriod)
+    setAppliedVhPeriod({ ...vhPeriod })
+  }
 
   useEffect(() => {
     if (!canFilterBySecretariat) return
@@ -54,6 +69,7 @@ export default function Dashboard() {
     const statsParams = new URLSearchParams()
     if (selectedSecretariatId) statsParams.set('secretariat', selectedSecretariatId)
     if (referenceDate) statsParams.set('reference_date', referenceDate)
+    appendPeriodToSearchParams(statsParams, appliedVhPeriod)
     const statsQuery = statsParams.toString()
     const listParams = new URLSearchParams()
     listParams.set('statut', 'EN_COURS')
@@ -257,6 +273,32 @@ export default function Dashboard() {
             • Référence: {new Date(`${referenceDate}T00:00:00`).toLocaleDateString('fr-FR')}
           </span>
         </p>
+      </div>
+
+      <div className="finance-filter-panel" style={{ marginBottom: '1rem' }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
+          PÉRIODE — VOLUME HORAIRE
+        </div>
+        <div className="finance-filter-panel-inner">
+          <FinancePeriodFilter
+            period={vhPeriod}
+            onChange={setVhPeriod}
+            onApply={handleApplyVhPeriod}
+            applying={loading}
+            embedded
+          />
+        </div>
+        {stats?.periode?.label && (
+          <div className="finance-period-badge">
+            <i className="bi bi-calendar-check"></i>
+            <div>
+              <strong>{stats.periode.label}</strong>
+              {stats.periode.periode_label && (
+                <span className="ms-1">— {stats.periode.periode_label}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="headline-kpis">

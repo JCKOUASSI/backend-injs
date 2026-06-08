@@ -1,7 +1,9 @@
 """
 Session management views for the React frontend.
 """
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +15,8 @@ from .serializers import SessionSerializer, ModuleSerializer
 
 
 REACTIVATION_GRACE_HOURS = 4
+AUTO_CLOSE_DELAY_MINUTES = 30
+TZ_LOCALE = ZoneInfo('Africa/Abidjan')
 
 
 def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
@@ -120,16 +124,61 @@ def _has_unfinished_previous_session(session):
     ).exists()
 
 
+def _session_debut_prevu_local(session):
+    return datetime.combine(
+        session.date_journee, session.heure_debut_prevue, tzinfo=TZ_LOCALE,
+    )
+
+
+def _session_fin_prevue_local(session):
+    return datetime.combine(
+        session.date_journee, session.heure_fin_prevue, tzinfo=TZ_LOCALE,
+    )
+
+
+def _should_auto_start_session(session, local_now):
+    """
+    Démarrage auto si l'heure de début prévue est atteinte et que
+    l'encadrant n'a pas encore démarré la séance (``demarree_le`` encore vide).
+    """
+    if session.demarree_le is not None or session.terminee_le is not None:
+        return False
+    if not session.auto_demarrage or session.heure_debut_prevue is None:
+        return False
+    if session.date_journee != local_now.date():
+        return False
+    if local_now < _session_debut_prevu_local(session):
+        return False
+    return not _has_unfinished_previous_session(session)
+
+
+def _should_auto_close_session(session, local_now, *, delai_minutes=AUTO_CLOSE_DELAY_MINUTES):
+    """
+    Fermeture auto uniquement si l'heure de fin prévue est dépassée et que
+    l'encadrant n'a pas encore fermé la séance (``terminee_le`` encore vide).
+    Dans ce cas, on attend ``delai_minutes`` avant de clôturer automatiquement.
+    """
+    if (
+        session.demarree_le is None
+        or session.terminee_le is not None
+        or session.heure_fin_prevue is None
+    ):
+        return False
+    fin_prevue_local = _session_fin_prevue_local(session)
+    if local_now < fin_prevue_local:
+        return False
+    return local_now >= fin_prevue_local + timedelta(minutes=delai_minutes)
+
+
 def _auto_manage_sessions(formation):
     """
-    Auto-start sessions with auto_demarrage=True when heure_debut_prevue is reached.
-    Auto-close sessions when heure_fin_prevue is passed.
-    Called lazily whenever the session list is loaded.
+    Auto-start sessions when heure_debut_prevue is reached and the encadrant
+    has not started them yet. Auto-close sessions when heure_fin_prevue is
+    passed, the encadrant has not closed them yet, and AUTO_CLOSE_DELAY_MINUTES
+    has elapsed. Called lazily whenever the session list is loaded.
     """
     now = timezone.now()
     local_now = timezone.localtime(now)
-    today = local_now.date()
-    current_time = local_now.time()
 
     sessions = SessionModule.objects.filter(module__formation=formation)
     changed_formation = False
@@ -138,42 +187,21 @@ def _auto_manage_sessions(formation):
 
     for session in sessions:
         module = session.module
-        # Auto-start
-        if (
-            session.auto_demarrage
-            and session.demarree_le is None
-            and session.heure_debut_prevue is not None
-            and session.date_journee == today
-            and session.heure_debut_prevue <= current_time
-            and not _has_unfinished_previous_session(session)
-        ):
-            session.demarree_le = now
+        # Auto-start si l'heure de début est passée et l'encadrant n'a pas démarré.
+        # ``demarree_le`` est posé à l'heure prévue (et non ``now``).
+        if _should_auto_start_session(session, local_now):
+            session.demarree_le = _session_debut_prevu_local(session)
             session.save(update_fields=['demarree_le'])
             if module.statut == 'PLANIFIEE':
                 module.statut = 'EN_COURS'
                 module.save(update_fields=['statut'])
                 modules_updated.add(module.pk)
 
-        # Auto-close. ``terminee_le`` est borné à la fin prévue de la séance
-        # (combinaison ``date_journee`` + ``heure_fin_prevue``) pour éviter qu'une
-        # clôture tardive (chargement plusieurs heures après la fin) ne gonfle
-        # la durée effective utilisée par les statistiques de volume horaire.
-        if (
-            session.demarree_le is not None
-            and session.terminee_le is None
-            and session.heure_fin_prevue is not None
-            and (
-                session.date_journee < today
-                or (session.date_journee == today and session.heure_fin_prevue <= current_time)
-            )
-        ):
-            from datetime import datetime as _dt
-            from zoneinfo import ZoneInfo as _ZI
-            _tz = _ZI('Africa/Abidjan')
-            fin_prevue_local = _dt.combine(
-                session.date_journee, session.heure_fin_prevue, tzinfo=_tz,
-            )
-            session.terminee_le = fin_prevue_local
+        # Auto-close si l'heure de fin est passée, l'encadrant n'a pas fermé,
+        # et le délai de grâce est écoulé. ``terminee_le`` reste borné à la fin
+        # prévue pour ne pas gonfler la durée effective (volume horaire).
+        if _should_auto_close_session(session, local_now):
+            session.terminee_le = _session_fin_prevue_local(session)
             session.save(update_fields=['terminee_le'])
             QRToken.objects.filter(session=session, actif=True).update(actif=False)
 

@@ -39,9 +39,7 @@ export default function Login() {
           <p className="subtitle">Ministère d'Etat, Ministère de la Fonction Publique et de la Modernisation de l'Administration</p>
           <p>DFRC - CPFAE — Gestion des présences</p>
         </div>
-
         
-
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label fw-semibold">Nom d'utilisateur</label>
