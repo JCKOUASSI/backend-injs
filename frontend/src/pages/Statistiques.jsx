@@ -16,6 +16,38 @@ const STATUT_LABELS = {
 }
 const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN']
 
+/** Libellés harmonisés des taux pédagogiques (vague 1). */
+const TAUX_PEDAGOGIE = {
+  assiduite: {
+    label: 'Assiduité séance',
+    help: 'Places présentes ÷ places attendues sur les séances terminées du périmètre. Utilisé pour le dashboard, les alertes et l\'historique.',
+    color: '#43A047',
+    getValue: (ped) => ped?.taux_presence ?? 0,
+  },
+  couverture: {
+    label: 'Couverture auditeurs',
+    help: 'Auditeurs ayant au moins une présence ÷ auditeurs inscrits. Aligné sur la logique des bilans CPFAE.',
+    color: '#1565C0',
+    getValue: (ped) => ped?.taux_couverture_auditeurs ?? ped?.taux_achevement ?? 0,
+  },
+  absence: {
+    label: 'Absence séance',
+    help: 'Places absentes ÷ places attendues sur les séances terminées du périmètre.',
+    color: '#C62828',
+    getValue: (ped) => ped?.taux_absence ?? 0,
+  },
+  evenements: {
+    label: 'Événements absence / suspect',
+    help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits.',
+    color: '#F57C00',
+    getValue: (ped) => ped?.taux_abandon ?? 0,
+  },
+}
+const KPI_VH_EXEC = {
+  label: 'Avancement VH (sessions clôturées)',
+  help: 'Heures réalisées ÷ heures prévues, sur les séances clôturées du périmètre filtré.',
+}
+
 /** Sections API chargées par onglet (évite le calcul de tout le dashboard d'un coup). */
 const TAB_SECTIONS = {
   overview: ['kpis', 'pedagogiques', 'admin_operationnel', 'alertes_overview', 'alertes'],
@@ -922,7 +954,7 @@ function TauxBar({ value, small }) {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
-function Kpi({ icon, label, value, color, sub }) {
+function Kpi({ icon, label, value, color, sub, help }) {
   return (
     <div style={{background:'#fff',borderRadius:12,padding:'1.1rem 1.3rem',display:'flex',alignItems:'center',gap:'0.9rem',boxShadow:'0 1px 4px rgba(0,0,0,0.07)',borderLeft:`4px solid ${color}`}}>
       <div style={{width:42,height:42,borderRadius:'50%',background:color+'1a',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -930,9 +962,74 @@ function Kpi({ icon, label, value, color, sub }) {
       </div>
       <div>
         <div style={{fontSize:'1.55rem',fontWeight:800,color:'#1e293b',lineHeight:1}}>{value??'—'}</div>
-        <div style={{fontSize:'0.77rem',color:'#64748b',marginTop:'0.15rem'}}>{label}</div>
+        <div style={{fontSize:'0.77rem',color:'#64748b',marginTop:'0.15rem',display:'flex',alignItems:'center',gap:'0.25rem'}}>
+          {label}
+          {help && (
+            <i className="bi bi-info-circle" title={help} style={{fontSize:'0.72rem',color:'#94a3b8',cursor:'help'}}/>
+          )}
+        </div>
         {sub && <div style={{fontSize:'0.72rem',color:'#94a3b8'}}>{sub}</div>}
       </div>
+    </div>
+  )
+}
+
+function StatsTauxLegendBanner() {
+  return (
+    <div style={{
+      background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
+      padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.55,
+    }}>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+        <i className="bi bi-info-circle" style={{ color: '#43A047', marginTop: '0.1rem', flexShrink: 0 }}/>
+        <div>
+          <strong style={{ color: '#1e293b' }}>Comment lire les taux</strong>
+          <p style={{ margin: '0.35rem 0 0' }}>
+            <strong>{TAUX_PEDAGOGIE.assiduite.label}</strong> — {TAUX_PEDAGOGIE.assiduite.help}
+            {' '}Visible dans les alertes, la vue d&apos;ensemble et l&apos;historique.
+          </p>
+          <p style={{ margin: '0.35rem 0 0' }}>
+            <strong>{TAUX_PEDAGOGIE.couverture.label}</strong> — {TAUX_PEDAGOGIE.couverture.help}
+            {' '}Utilisée dans les bilans CPFAE et les tableaux détaillés.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PedagogieTauxPrincipaux({ ped }) {
+  const a = TAUX_PEDAGOGIE.assiduite
+  const c = TAUX_PEDAGOGIE.couverture
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+      <Kpi icon="bi-person-check" label={a.label} value={`${a.getValue(ped)}%`} color={a.color} help={a.help}/>
+      <Kpi icon="bi-people" label={c.label} value={`${c.getValue(ped)}%`} color={c.color} help={c.help}/>
+    </div>
+  )
+}
+
+function PedagogieTauxGrille({ ped, withBars = false }) {
+  const items = [
+    TAUX_PEDAGOGIE.assiduite,
+    TAUX_PEDAGOGIE.absence,
+    TAUX_PEDAGOGIE.evenements,
+    TAUX_PEDAGOGIE.couverture,
+  ]
+  return (
+    <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center', padding: withBars ? '0.5rem 0' : 0 }}>
+      {items.map((t) => (
+        <div key={t.label} style={{ textAlign: 'center', minWidth: withBars ? 100 : 80 }} title={t.help}>
+          <div style={{ fontSize: withBars ? '2rem' : '1.6rem', fontWeight: 800, color: t.color }}>{t.getValue(ped)}%</div>
+          <div style={{ fontSize: withBars ? '0.78rem' : '0.72rem', color: '#64748b', fontWeight: withBars ? 600 : 400, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}>
+            {t.label}
+            <i className="bi bi-info-circle" style={{ fontSize: '0.68rem', color: '#94a3b8', cursor: 'help' }}/>
+          </div>
+          {withBars && (
+            <div style={{ marginTop: '0.35rem' }}><TauxBar value={t.getValue(ped)} small/></div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -953,6 +1050,9 @@ function Card({ title, icon, children, col }) {
 // ── Composant principal ────────────────────────────────────────────────────────
 export default function Statistiques() {
   const { user } = useAuth()
+  const isSecretariatScoped = ['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(user?.role)
+  const isEncadrantScoped = user?.role === 'ENCADRANT'
+  const secretariatFilterLocked = isSecretariatScoped
   const [onglet, setOnglet] = useState('overview')
   const [data, setData] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
@@ -1413,6 +1513,12 @@ export default function Statistiques() {
   }, [onglet, secretariatId, secStats])
 
   useEffect(() => {
+    if (data?.filtre_actif?.scope_locked && data.filtre_actif.secretariat_id) {
+      setSecretariatId(String(data.filtre_actif.secretariat_id))
+    }
+  }, [data?.filtre_actif?.scope_locked, data?.filtre_actif?.secretariat_id])
+
+  useEffect(() => {
     if (onglet !== 'point_journalier') return
     fetchPointJournalier()
   }, [onglet, pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, fetchPointJournalier])
@@ -1498,7 +1604,7 @@ export default function Statistiques() {
     </div>
   )
 
-  const { kpis, pedagogiques, admin_operationnel: adm, historique, alertes, alertes_overview, formations_liste, secretariats_liste } = data || {}
+  const { kpis, pedagogiques, admin_operationnel: adm, historique, alertes, alertes_overview, formations_liste, secretariats_liste, filtre_actif } = data || {}
 
   const tabLoading = loadingTab && (
     <div style={{display:'flex',alignItems:'center',gap:'0.4rem',fontSize:'0.78rem',color:'#64748b',marginBottom:'0.65rem'}}>
@@ -1540,17 +1646,26 @@ export default function Statistiques() {
               <option key={f.id} value={f.id}>{f.formation}</option>
             ))}
           </select>
-          <select
-            className="form-select form-select-sm"
-            value={secretariatId}
-            onChange={e => { setSecretariatId(e.target.value) }}
-            style={{minWidth:170,maxWidth:220}}
-          >
-            <option value="">Tous les secrétariats</option>
-            {(secretariats_liste||[]).map(s => (
-              <option key={s.id} value={s.id}>{s.nom}</option>
-            ))}
-          </select>
+          {!secretariatFilterLocked && (
+            <select
+              className="form-select form-select-sm"
+              value={secretariatId}
+              onChange={e => { setSecretariatId(e.target.value) }}
+              style={{minWidth:170,maxWidth:220}}
+              disabled={isEncadrantScoped && (secretariats_liste || []).length <= 1}
+            >
+              <option value="">Tous les secrétariats</option>
+              {(secretariats_liste||[]).map(s => (
+                <option key={s.id} value={s.id}>{s.nom}</option>
+              ))}
+            </select>
+          )}
+          {secretariatFilterLocked && (secretariats_liste||[]).length > 0 && (
+            <span className="badge bg-light text-dark border" style={{fontSize:'0.78rem',padding:'0.45rem 0.65rem'}}>
+              <i className="bi bi-building me-1"/>
+              {(secretariats_liste||[])[0]?.nom || user?.secretariat_nom || 'Mon secrétariat'}
+            </span>
+          )}
           {(formationId || secretariatId) && (
             <button className="btn btn-sm btn-outline-danger" onClick={() => { setFormationId(''); setSecretariatId('') }} title="Effacer les filtres">
               <i className="bi bi-x-lg"/>
@@ -1561,6 +1676,8 @@ export default function Statistiques() {
           </button>
         </div>
       </div>
+
+      <StatsTauxLegendBanner/>
 
       {error && data && (
         <div style={{background:'#fff3f3',border:'1px solid #fca5a5',borderRadius:8,padding:'0.65rem 0.85rem',color:'#C62828',fontSize:'0.82rem',marginBottom:'0.75rem'}}>
@@ -1699,7 +1816,7 @@ export default function Statistiques() {
         <>
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
             <span style={{fontSize:'0.78rem',color:'#64748b'}}>
-              Indicateurs pédagogiques (présence, absence, abandon, achèvement)
+              Indicateurs pédagogiques (assiduité séance, couverture auditeurs, absences, événements)
               {formationId && <> · <b>{(formations_liste||[]).find(f => String(f.id) === formationId)?.formation}</b></>}
               {secretariatId && <> · <b>{(secretariats_liste||[]).find(s => String(s.id) === secretariatId)?.nom}</b></>}
             </span>
@@ -2909,7 +3026,7 @@ function buildOverviewSections(alertesItems) {
     ...def,
     sub: def.id === 'alertes' ? alertesSub
       : def.id === 'kpis' ? 'Formations, modules, auditeurs, séances…'
-      : def.id === 'pedagogie' ? 'Présence, absence, abandon, achèvement'
+      : def.id === 'pedagogie' ? 'Assiduité séance, couverture auditeurs, absences'
       : 'Répartition H/F, charge formateurs',
   }))
 }
@@ -2953,26 +3070,16 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
           <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
-          <Kpi icon="bi-check2-all" label="Taux exéc. vol. horaire" value={`${kpis.taux_execution_vh}%`}
-            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}/>
+          <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
+            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
+            help={KPI_VH_EXEC.help}/>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
           <div onClick={onSelectSection ? () => onSelectSection('pedagogie') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
-            <Card title="Taux de présence (global)" icon="bi-pie-chart">
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                {[
-                  { label: 'Présence', value: pedagogiques.taux_presence, col: '#43A047' },
-                  { label: 'Absence', value: pedagogiques.taux_absence, col: '#C62828' },
-                  { label: 'Abandon', value: pedagogiques.taux_abandon, col: '#F57C00' },
-                  { label: 'Achèvement', value: pedagogiques.taux_achevement, col: '#1565C0' },
-                ].map((t, i) => (
-                  <div key={i} style={{ textAlign: 'center', minWidth: 80 }}>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: t.col }}>{t.value}%</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{t.label}</div>
-                  </div>
-                ))}
-              </div>
+            <Card title="Indicateurs pédagogiques" icon="bi-pie-chart">
+              <PedagogieTauxPrincipaux ped={pedagogiques}/>
+              <PedagogieTauxGrille ped={pedagogiques}/>
             </Card>
           </div>
 
@@ -3049,8 +3156,9 @@ function VueOverviewDetailPanel({
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
           <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
-          <Kpi icon="bi-check2-all" label="Taux exéc. vol. horaire" value={`${kpis.taux_execution_vh}%`}
-            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}/>
+          <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
+            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
+            help={KPI_VH_EXEC.help}/>
         </div>
         <p style={{ margin: '1rem 0 0', fontSize: '0.76rem', color: '#64748b' }}>
           Effectifs et volumes sur le périmètre filtré (séances comptabilisables).
@@ -3068,23 +3176,12 @@ function VueOverviewDetailPanel({
           <Kpi icon="bi-person-check" label="Inscrits" value={ped.total_inscrits} color="#1565C0"/>
           <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#43A047"/>
           <Kpi icon="bi-x-circle" label="Absents" value={ped.total_absents} color="#C62828"/>
-          <Kpi icon="bi-arrow-right-circle" label="Abandons" value={ped.total_abandons} color="#F57C00"/>
+          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F57C00"
+            help={TAUX_PEDAGOGIE.evenements.help}/>
         </div>
-        <Card title="Taux pédagogiques" icon="bi-pie-chart">
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center', padding: '0.5rem 0' }}>
-            {[
-              { label: 'Présence', value: ped.taux_presence, col: '#43A047' },
-              { label: 'Absence', value: ped.taux_absence, col: '#C62828' },
-              { label: 'Abandon', value: ped.taux_abandon, col: '#F57C00' },
-              { label: 'Achèvement', value: ped.taux_achevement, col: '#1565C0' },
-            ].map((t, i) => (
-              <div key={i} style={{ textAlign: 'center', minWidth: 100 }}>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: t.col }}>{t.value}%</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{t.label}</div>
-                <div style={{ marginTop: '0.35rem' }}><TauxBar value={t.value} small/></div>
-              </div>
-            ))}
-          </div>
+        <PedagogieTauxPrincipaux ped={ped}/>
+        <Card title="Indicateurs pédagogiques" icon="bi-pie-chart">
+          <PedagogieTauxGrille ped={ped} withBars/>
         </Card>
         {onGoPedagogie && (
           <button type="button" className="btn btn-sm btn-outline-success mt-2" onClick={onGoPedagogie}>
@@ -3183,15 +3280,17 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect }) {
           <Kpi icon="bi-person-check" label="Inscrits" value={ped.total_inscrits} color="#1565C0"/>
           <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#43A047"/>
           <Kpi icon="bi-x-circle" label="Absents" value={ped.total_absents} color="#C62828"/>
-          <Kpi icon="bi-arrow-right-circle" label="Abandons" value={ped.total_abandons} color="#F57C00"/>
-          <Kpi icon="bi-percent" label="Taux présence" value={`${ped.taux_presence}%`} color="#43A047"/>
-          <Kpi icon="bi-percent" label="Taux absence" value={`${ped.taux_absence}%`} color="#C62828"/>
-          <Kpi icon="bi-percent" label="Taux abandon" value={`${ped.taux_abandon}%`} color="#F57C00"/>
-          <Kpi icon="bi-percent" label="Taux achèvement" value={`${ped.taux_achevement}%`} color="#1565C0"/>
+          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F57C00"
+            help={TAUX_PEDAGOGIE.evenements.help}/>
+        </div>
+        <PedagogieTauxPrincipaux ped={ped}/>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '0.8rem', marginBottom: '1.1rem' }}>
+          <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.absence.label} value={`${TAUX_PEDAGOGIE.absence.getValue(ped)}%`} color={TAUX_PEDAGOGIE.absence.color} help={TAUX_PEDAGOGIE.absence.help}/>
+          <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.evenements.label} value={`${TAUX_PEDAGOGIE.evenements.getValue(ped)}%`} color={TAUX_PEDAGOGIE.evenements.color} help={TAUX_PEDAGOGIE.evenements.help}/>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
-          <Card title="Taux de présence par formation" icon="bi-building">
+          <Card title="Assiduité séance par formation" icon="bi-building">
             {ped.taux_par_formation?.length ? (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
@@ -3226,7 +3325,7 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect }) {
             ) : <Empty/>}
           </Card>
 
-          <Card title="Taux de présence par grade" icon="bi-bar-chart-steps">
+          <Card title="Assiduité séance par grade" icon="bi-bar-chart-steps">
             {ped.taux_par_grade?.length ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {ped.taux_par_grade.map((r, i) => (
@@ -3252,7 +3351,7 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect }) {
           </Card>
 
           {ped.taux_par_secretariat?.length > 0 && (
-            <Card title="Taux de présence par secrétariat" icon="bi-building">
+            <Card title="Assiduité séance par secrétariat" icon="bi-building">
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
@@ -3332,20 +3431,20 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <Kpi icon="bi-person-check" label="Inscrits" value={r.inscrits} color="#1565C0"/>
         <Kpi icon="bi-check-circle" label="Présents" value={r.presents} color="#43A047"/>
-        <Kpi icon="bi-percent" label="Taux présence" value={`${Number(r.taux).toFixed(1)}%`} color="#43A047"/>
+        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${Number(r.taux).toFixed(1)}%`} color={TAUX_PEDAGOGIE.assiduite.color} help={TAUX_PEDAGOGIE.assiduite.help}/>
         {ecart != null && (
           <Kpi
             icon="bi-arrow-left-right"
             label="Écart vs global"
             value={`${ecart > 0 ? '+' : ''}${ecart} pt`}
             color={ecart >= 0 ? '#43A047' : '#C62828'}
-            sub={`Moyenne globale : ${ped.taux_presence}%`}
+            sub={`Moyenne globale : ${ped.taux_presence}% (assiduité séance)`}
           />
         )}
       </div>
 
       <div style={{ marginBottom: '1rem' }}>
-        <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.35rem' }}>Taux de présence du périmètre</p>
+        <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.35rem' }}>Assiduité séance du périmètre</p>
         <TauxBar value={r.taux}/>
       </div>
 
@@ -3361,7 +3460,7 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat }) {
               <b style={{ color: '#43A047' }}>{ped.total_presents}</b>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>Taux présence global</span>
+              <span style={{ color: '#64748b' }}>{TAUX_PEDAGOGIE.assiduite.label} (global)</span>
               <b style={{ color: '#1e293b' }}>{ped.taux_presence}%</b>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -3434,7 +3533,7 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois }) {
               sub={`Moy. ${resume.moy_pointages_mois}/mois actif`} color="#C62828"/>
             <Kpi icon="bi-calendar-event" label="Séances (12 mois)" value={resume.total_sessions}
               sub={resume.sessions_mois_courant != null ? `${resume.sessions_mois_courant} ce mois` : undefined} color="#1565C0"/>
-            <Kpi icon="bi-percent" label="Taux présence moyen" value={`${resume.moy_taux_presence}%`} color="#43A047"/>
+            <Kpi icon="bi-percent" label={`${TAUX_PEDAGOGIE.assiduite.label} moyen`} value={`${resume.moy_taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
             <Kpi icon="bi-book" label="Modules actifs" value={resume.modules_actifs_dernier_mois}
               sub="Dernier mois avec séances" color="#7B1FA2"/>
             <Kpi icon="bi-graph-up-arrow" label="Pointages ce mois" value={resume.pointages_mois_courant}
@@ -3449,7 +3548,7 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois }) {
           <Card title="Volume de pointages (12 mois)" icon="bi-graph-up">
             <MonthTrendChart data={historique.pointages_par_mois} valueKey="total" color="#C62828"/>
           </Card>
-          <Card title="Taux de présence mensuel" icon="bi-percent">
+          <Card title={`${TAUX_PEDAGOGIE.assiduite.label} mensuel`} icon="bi-percent">
             <MonthTrendChart data={historique.taux_presence_par_mois} valueKey="total" color="#43A047" unit="%"/>
             <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.5rem', marginBottom: 0 }}>
               Calculé sur présents / (présents + absents) par mois.
@@ -3519,7 +3618,7 @@ function HistoriqueMoisPanel({ historique, monthIndex }) {
           sub={varPt != null ? <TrendBadge pct={varPt}/> : undefined}/>
         <Kpi icon="bi-person-check" label="Présents" value={pt.presents ?? 0} color="#43A047"/>
         <Kpi icon="bi-person-x" label="Absents" value={pt.absents ?? 0} color="#C62828"/>
-        <Kpi icon="bi-percent" label="Taux présence" value={`${Number(taux?.total || 0).toFixed(1)}%`} color="#43A047"/>
+        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${Number(taux?.total || 0).toFixed(1)}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-calendar-event" label="Séances" value={sess?.total ?? 0} color="#1565C0"/>
         <Kpi icon="bi-book" label="Modules créés" value={mod?.total ?? 0} color="#7B1FA2"/>
         <Kpi icon="bi-book-half" label="Modules actifs" value={mod?.actifs ?? 0} color="#558B2F"/>
@@ -3533,7 +3632,7 @@ function HistoriqueMoisPanel({ historique, monthIndex }) {
         <Card title={`Contexte — ${windowSlice(historique.pointages_par_mois).length} mois`} icon="bi-graph-up">
           <MonthTrendChart data={windowSlice(historique.pointages_par_mois)} valueKey="total" color="#C62828" height={140}/>
         </Card>
-        <Card title="Taux de présence (contexte)" icon="bi-percent">
+        <Card title={`${TAUX_PEDAGOGIE.assiduite.label} (contexte)`} icon="bi-percent">
           <MonthTrendChart data={windowSlice(historique.taux_presence_par_mois)} valueKey="total" color="#43A047" unit="%" height={140}/>
         </Card>
         <Card title="Séances (contexte)" icon="bi-calendar-week">
@@ -3546,7 +3645,7 @@ function HistoriqueMoisPanel({ historique, monthIndex }) {
 
 const SEC_TABLE_HEADERS = [
   'N°', 'Secrétariat', 'Responsable', 'Modules', 'Auditeurs', 'Formateurs', 'Séances',
-  'Inscrits', 'Présents', 'Taux présence', 'Absences', 'Vol.H. prévu', 'Taux exec.VH', 'Hommes', 'Femmes', '',
+  'Inscrits', 'Présents', 'Assiduité séance', 'Absences', 'Vol.H. prévu', 'Avancement VH', 'Hommes', 'Femmes', '',
 ]
 
 function SecretariatsComparatifTable({ secretariats, onRowClick }) {
@@ -3646,7 +3745,7 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
           <Card title="Modules par secrétariat" icon="bi-book">
             <Bars data={secretariats.map(s => ({ label: s.secretariat, value: s.nb_modules }))} labelKey="label" valueKey="value" color="#43A047"/>
           </Card>
-          <Card title="Taux de présence par secrétariat" icon="bi-percent">
+          <Card title={`${TAUX_PEDAGOGIE.assiduite.label} par secrétariat`} icon="bi-percent">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
               {secretariats.map((s, i) => (
                 <div key={s.secretariat_id}>
@@ -3705,7 +3804,7 @@ function SecretariatDetailPanel({ row, detail }) {
         <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
         <Kpi icon="bi-calendar-event" label="Séances" value={kpis.sessions_total} color="#00838F"/>
         <Kpi icon="bi-qr-code-scan" label="Pointages" value={kpis.pointages} color="#C62828"/>
-        <Kpi icon="bi-percent" label="Taux présence" value={`${pedagogiques.taux_presence}%`} color="#43A047"/>
+        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${pedagogiques.taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-percent" label="Taux absence" value={`${pedagogiques.taux_absence}%`} color="#C62828"/>
         <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
       </div>
@@ -3717,7 +3816,7 @@ function SecretariatDetailPanel({ row, detail }) {
         <Card title="Répartition Hommes / Femmes" icon="bi-gender-ambiguous">
           <Donut data={adm.participants_par_sexe} labelKey="sexe" valueKey="total"/>
         </Card>
-        <Card title="Taux de présence par formation" icon="bi-building">
+        <Card title="Assiduité séance par formation" icon="bi-building">
           {pedagogiques.taux_par_formation?.length
             ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

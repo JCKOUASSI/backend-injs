@@ -42,6 +42,16 @@ from .effectifs import (
 from .rapport_notifications import (
     ADMIN_RAPPORT_ROLES, notifier_rapport, notifier_rapport_supprime,
 )
+from .access import (
+    StatsScope,
+    resolve_stats_scope,
+    formations_liste_for_user,
+    secretariats_liste_for_user,
+    secretariats_stats_queryset,
+    module_filter_kwargs,
+    rapports_queryset_for_user,
+    rapport_accessible,
+)
 
 # ── Rôles ─────────────────────────────────────────────────────────────────────
 STATS_ROLES      = {'ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN',
@@ -89,7 +99,7 @@ def _dict_par_mois(qs, date_field, agg=Count('id')):
 
 # ── Construction des filtres selon formation_id et/ou secretariat_id ──────────
 
-def _filtres(formation_id=None, secretariat_id=None):
+def _filtres(formation_id=None, secretariat_id=None, module_ids=None):
     """
     Retourne un dict de 3 ensembles de filtres kwargs Django :
       mf  → sur ModuleParticipant (via module__)
@@ -113,10 +123,47 @@ def _filtres(formation_id=None, secretariat_id=None):
         mq['secretariat_id'] = secretariat_id
         pq['secretariat_id'] = secretariat_id
 
+    if module_ids is not None:
+        mf['module_id__in'] = module_ids
+        pf['session__module_id__in'] = module_ids
+        sm['module_id__in'] = module_ids
+        mq['id__in'] = module_ids
+        if module_ids:
+            pq['modules_inscrits__module_id__in'] = module_ids
+        else:
+            pq['pk__in'] = []
+
     return mf, pf, sm, mq, pq
 
 
-def _charge_formateurs(formation_id=None, secretariat_id=None, limit=8):
+def _scope_from_request(request, *, parse_module_id=False):
+    def _int_key(key):
+        v = request.query_params.get(key)
+        if v is None and hasattr(request, 'data'):
+            raw = request.data.get(key)
+            v = raw if raw is not None else None
+        return int(v) if v is not None and str(v).isdigit() else None
+
+    scope, err = resolve_stats_scope(
+        request.user,
+        formation_id=_int_key('formation_id'),
+        secretariat_id=_int_key('secretariat_id'),
+        module_id=_int_key('module_id') if parse_module_id else None,
+    )
+    if err:
+        return None, Response({'detail': err}, status=403)
+    return scope, None
+
+
+def _scope_compute_kwargs(scope):
+    return {
+        'formation_id': scope.formation_id,
+        'secretariat_id': scope.secretariat_id,
+        'module_ids': scope.module_ids,
+    }
+
+
+def _charge_formateurs(formation_id=None, secretariat_id=None, module_ids=None, limit=8):
     """
     Charge pédagogique : nombre de séances distinctes par formateur.
     Sources : pointages badge formateur, formateur principal du module,
@@ -124,7 +171,7 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, limit=8):
     """
     from collections import defaultdict
 
-    _, pf, sm, _, _ = _filtres(formation_id, secretariat_id)
+    _, pf, sm, _, _ = _filtres(formation_id, secretariat_id, module_ids)
     par_formateur = defaultdict(lambda: {'nom': '', 'sessions': set()})
 
     def _enregistrer(fid, nom, prenom, session_id):
@@ -176,12 +223,14 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, limit=8):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _kpis_globaux(formation_id=None, secretariat_id=None):
-    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id)
+def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None):
+    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
     # Formations
     if formation_id:
         nb_formations = 1
+    elif module_ids is not None:
+        nb_formations = Module.objects.filter(id__in=module_ids).values('formation').distinct().count()
     elif secretariat_id:
         nb_formations = Module.objects.filter(secretariat_id=secretariat_id).values('formation').distinct().count()
     else:
@@ -251,8 +300,8 @@ def _taux_par_modules(module_ids):
     }
 
 
-def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
-    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id)
+def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids=None):
+    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
     module_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
     agg_global = aggregation_seances_modules(module_ids)
@@ -270,6 +319,10 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
         formations_qs = Formation.objects.filter(
             modules__secretariat_id=secretariat_id,
         ).distinct().order_by('-id')[:10]
+    elif module_ids is not None:
+        formations_qs = Formation.objects.filter(
+            modules__id__in=module_ids,
+        ).distinct().order_by('-id')[:10]
     elif formation_id:
         formations_qs = Formation.objects.filter(id=formation_id)
     else:
@@ -280,7 +333,12 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
         f_mq = {'formation_id': f.id}
         if secretariat_id:
             f_mq['secretariat_id'] = secretariat_id
-        f_mod_ids = list(Module.objects.filter(**f_mq).values_list('id', flat=True))
+        if module_ids is not None:
+            f_mod_ids = list(
+                Module.objects.filter(**f_mq, id__in=module_ids).values_list('id', flat=True)
+            )
+        else:
+            f_mod_ids = list(Module.objects.filter(**f_mq).values_list('id', flat=True))
         stats = _taux_par_modules(f_mod_ids)
         taux_par_formation.append({
             'formation': str(f),
@@ -317,9 +375,19 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
 
     taux_par_secretariat = []
     if not secretariat_id:
-        for s in Secretariat.objects.order_by('nom'):
+        sec_qs = Secretariat.objects.order_by('nom')
+        if module_ids is not None:
+            sec_ids = (
+                Module.objects.filter(id__in=module_ids)
+                .exclude(secretariat_id__isnull=True)
+                .values_list('secretariat_id', flat=True)
+                .distinct()
+            )
+            sec_qs = sec_qs.filter(pk__in=sec_ids)
+        for s in sec_qs:
             s_mod_ids = list(
                 Module.objects.filter(secretariat=s, **({'formation_id': formation_id} if formation_id else {}))
+                .filter(**({'id__in': module_ids} if module_ids is not None else {}))
                 .values_list('id', flat=True)
             )
             stats = _taux_par_modules(s_mod_ids)
@@ -344,7 +412,8 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
         'taux_presence': _taux(agg_global['places_presentes'], agg_global['places_attendues']),
         'taux_absence': _taux(agg_global['places_absentes'], agg_global['places_attendues']),
         'taux_abandon': _taux(total_abandons, total_inscrits),
-        'taux_achevement': _taux(total_presents, total_inscrits),
+        'taux_couverture_auditeurs': _taux(total_presents, total_inscrits),
+        'taux_achevement': _taux(total_presents, total_inscrits),  # compat. API — alias couverture
         'taux_par_formation': taux_par_formation,
         'taux_par_grade': taux_par_grade,
         'par_type_concours': par_type_concours,
@@ -352,8 +421,8 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None):
     }
 
 
-def _indicateurs_admin(formation_id=None, secretariat_id=None):
-    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id)
+def _indicateurs_admin(formation_id=None, secretariat_id=None, module_ids=None):
+    mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
     nb_groupes    = Module.objects.filter(**mq).exclude(groupe='').values('groupe').distinct().count()
     nb_encadrants = Module.objects.filter(**mq).exclude(superviseur=None).values('superviseur').distinct().count()
@@ -376,7 +445,7 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None):
 
     nb_absences_notoires = Pointage.objects.filter(statut=Pointage.Statut.ABSENT_NON_BADGE, **pf).count()
 
-    charge_formateurs = _charge_formateurs(formation_id, secretariat_id)
+    charge_formateurs = _charge_formateurs(formation_id, secretariat_id, module_ids)
 
     statuts = list(
         Pointage.objects.filter(**pf)
@@ -386,12 +455,25 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None):
     # Stats par secrétariat — résumé opérationnel global
     stats_secretariats = []
     if not secretariat_id:
-        for s in Secretariat.objects.order_by('nom'):
+        sec_qs = Secretariat.objects.order_by('nom')
+        if module_ids is not None:
+            sec_ids = (
+                Module.objects.filter(id__in=module_ids)
+                .exclude(secretariat_id__isnull=True)
+                .values_list('secretariat_id', flat=True)
+                .distinct()
+            )
+            sec_qs = sec_qs.filter(pk__in=sec_ids)
+        for s in sec_qs:
             s_sm = {**sm, 'module__secretariat': s}
             s_pf = {**pf, 'session__module__secretariat': s}
             stats_secretariats.append({
                 'secretariat': s.nom, 'secretariat_id': s.id, 'numero': s.numero,
-                'nb_modules': Module.objects.filter(secretariat=s, **({'formation_id': formation_id} if formation_id else {})).count(),
+                'nb_modules': Module.objects.filter(
+                    secretariat=s,
+                    **({'formation_id': formation_id} if formation_id else {}),
+                    **({'id__in': module_ids} if module_ids is not None else {}),
+                ).count(),
                 'nb_participants': Participant.objects.filter(secretariat=s).count(),
                 'nb_sessions': SessionModule.objects.filter(**s_sm).count(),
                 'nb_pointages': Pointage.objects.filter(**s_pf).count(),
@@ -425,8 +507,8 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None):
     }
 
 
-def _historique_mensuel(mois=12, formation_id=None, secretariat_id=None):
-    _, pf, sm, mq, _ = _filtres(formation_id, secretariat_id)
+def _historique_mensuel(mois=12, formation_id=None, secretariat_id=None, module_ids=None):
+    _, pf, sm, mq, _ = _filtres(formation_id, secretariat_id, module_ids)
     mois_cles = _derniers_mois_cles(mois)
     date_debut = _date_debut_mois(mois_cles[0])
     module_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
@@ -563,12 +645,15 @@ SEUILS_DEFAUT = {
 
 INDICATEUR_META = {
     'taux_presence': {
-        'libelle': 'Taux de présence',
+        'libelle': 'Assiduité séance',
         'unite': '%',
         'inverse': False,
         'icone': 'bi-person-check',
         'couleur': '#43A047',
-        'aide': 'Part des auditeurs présents par rapport aux inscriptions. Un taux bas signale un problème de suivi.',
+        'aide': (
+            'Places présentes ÷ places attendues sur les séances terminées du périmètre. '
+            'Mesure l\'assiduité séance par séance (dashboard, alertes, historique).'
+        ),
         'echelle_max': 100,
     },
     'taux_absence': {
@@ -581,21 +666,27 @@ INDICATEUR_META = {
         'echelle_max': 100,
     },
     'taux_abandon': {
-        'libelle': "Taux d'abandon",
+        'libelle': 'Événements absence / suspect',
         'unite': '%',
         'inverse': True,
         'icone': 'bi-box-arrow-right',
         'couleur': '#F57C00',
-        'aide': 'Auditeurs ayant abandonné la formation. Surveiller les modules à fort turnover.',
+        'aide': (
+            'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits. '
+            'Signale des absences atypiques à investiguer.'
+        ),
         'echelle_max': 100,
     },
     'taux_execution_vh': {
-        'libelle': "Exécution volume horaire",
+        'libelle': 'Avancement VH (sessions clôturées)',
         'unite': '%',
         'inverse': False,
         'icone': 'bi-clock-history',
         'couleur': '#1565C0',
-        'aide': 'Heures réalisées vs heures prévues. Indique l\'avancement pédagogique global.',
+        'aide': (
+            'Heures réalisées ÷ heures prévues sur les séances clôturées du périmètre. '
+            'Indique l\'avancement du volume horaire.'
+        ),
         'echelle_max': 100,
     },
     'nb_absences_notoires': {
@@ -648,11 +739,11 @@ def _valeurs_indicateurs_from(ped, adm, kpis):
     }
 
 
-def _valeurs_indicateurs(formation_id=None, secretariat_id=None):
+def _valeurs_indicateurs(formation_id=None, secretariat_id=None, module_ids=None):
     """Calcule les valeurs courantes de tous les indicateurs surveillés."""
-    ped = _indicateurs_pedagogiques(formation_id, secretariat_id)
-    adm = _indicateurs_admin(formation_id, secretariat_id)
-    kpis = _kpis_globaux(formation_id, secretariat_id)
+    ped = _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids)
+    adm = _indicateurs_admin(formation_id, secretariat_id, module_ids)
+    kpis = _kpis_globaux(formation_id, secretariat_id, module_ids)
     return _valeurs_indicateurs_from(ped, adm, kpis)
 
 
@@ -708,9 +799,9 @@ def _indicateurs_suivi_from_valeurs(valeurs):
     return result
 
 
-def _indicateurs_suivi(formation_id=None, secretariat_id=None):
+def _indicateurs_suivi(formation_id=None, secretariat_id=None, module_ids=None):
     """Liste complète des indicateurs avec valeur, seuils et statut visuel."""
-    valeurs = _valeurs_indicateurs(formation_id, secretariat_id)
+    valeurs = _valeurs_indicateurs(formation_id, secretariat_id, module_ids)
     return _indicateurs_suivi_from_valeurs(valeurs)
 
 
@@ -720,8 +811,8 @@ def _alertes_overview_from_suivi(suivi):
     return [by_code[c] for c in ALERTES_OVERVIEW_CODES if c in by_code]
 
 
-def _alertes_overview(formation_id=None, secretariat_id=None):
-    return _alertes_overview_from_suivi(_indicateurs_suivi(formation_id, secretariat_id))
+def _alertes_overview(formation_id=None, secretariat_id=None, module_ids=None):
+    return _alertes_overview_from_suivi(_indicateurs_suivi(formation_id, secretariat_id, module_ids))
 
 
 def _verifier_alertes_from_suivi(suivi):
@@ -743,8 +834,8 @@ def _verifier_alertes_from_suivi(suivi):
     return alertes
 
 
-def _verifier_alertes(formation_id=None, secretariat_id=None):
-    return _verifier_alertes_from_suivi(_indicateurs_suivi(formation_id, secretariat_id))
+def _verifier_alertes(formation_id=None, secretariat_id=None, module_ids=None):
+    return _verifier_alertes_from_suivi(_indicateurs_suivi(formation_id, secretariat_id, module_ids))
 
 
 DASHBOARD_SECTIONS = frozenset({
@@ -761,16 +852,19 @@ def _parse_dashboard_sections(request):
     return {s.strip() for s in raw.split(',') if s.strip()} & DASHBOARD_SECTIONS
 
 
-def _build_dashboard_payload(formation_id, secretariat_id, sections):
+def _build_dashboard_payload(scope: StatsScope, sections, user):
     """Construit uniquement les blocs demandés (chargement par onglet)."""
+    formation_id = scope.formation_id
+    secretariat_id = scope.secretariat_id
+    module_ids = scope.module_ids
     need_ped = bool(sections & {'pedagogiques', 'alertes', 'alertes_overview'})
     need_adm = bool(sections & {'admin_operationnel', 'alertes', 'alertes_overview'})
     need_kpis = bool(sections & {'kpis', 'alertes', 'alertes_overview'})
     need_alertes = bool(sections & {'alertes', 'alertes_overview'})
 
-    ped = _indicateurs_pedagogiques(formation_id, secretariat_id) if need_ped else None
-    adm = _indicateurs_admin(formation_id, secretariat_id) if need_adm else None
-    kpis = _kpis_globaux(formation_id, secretariat_id) if need_kpis else None
+    ped = _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids) if need_ped else None
+    adm = _indicateurs_admin(formation_id, secretariat_id, module_ids) if need_adm else None
+    kpis = _kpis_globaux(formation_id, secretariat_id, module_ids) if need_kpis else None
 
     payload = {}
 
@@ -781,7 +875,7 @@ def _build_dashboard_payload(formation_id, secretariat_id, sections):
     if 'admin_operationnel' in sections and adm is not None:
         payload['admin_operationnel'] = adm
     if 'historique' in sections:
-        payload['historique'] = _historique_mensuel(12, formation_id, secretariat_id)
+        payload['historique'] = _historique_mensuel(12, formation_id, secretariat_id, module_ids)
 
     if need_alertes and ped is not None and adm is not None and kpis is not None:
         suivi = _indicateurs_suivi_from_valeurs(_valeurs_indicateurs_from(ped, adm, kpis))
@@ -791,17 +885,14 @@ def _build_dashboard_payload(formation_id, secretariat_id, sections):
             payload['alertes_overview'] = _alertes_overview_from_suivi(suivi)
 
     if 'formations_liste' in sections:
-        payload['formations_liste'] = list(
-            Formation.objects.order_by('-id').values('id', 'formation')[:50],
-        )
+        payload['formations_liste'] = formations_liste_for_user(user)
     if 'secretariats_liste' in sections:
-        payload['secretariats_liste'] = list(
-            Secretariat.objects.order_by('nom').values('id', 'nom', 'numero'),
-        )
+        payload['secretariats_liste'] = secretariats_liste_for_user(user)
     if 'filtre_actif' in sections:
         payload['filtre_actif'] = {
             'formation_id': formation_id,
             'secretariat_id': secretariat_id,
+            'scope_locked': getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'),
         }
 
     return payload
@@ -817,22 +908,12 @@ class DashboardView(APIView):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
-        def _int(key):
-            v = request.query_params.get(key)
-            return int(v) if v and v.isdigit() else None
-
-        formation_id   = _int('formation_id')
-        secretariat_id = _int('secretariat_id')
-
-        # Restreindre automatiquement un SECRETARIAT à son propre périmètre
-        user = request.user
-        if getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT') and not secretariat_id:
-            sec = getattr(user, 'secretariat', None)
-            if sec:
-                secretariat_id = sec.id
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
 
         sections = _parse_dashboard_sections(request)
-        return Response(_build_dashboard_payload(formation_id, secretariat_id, sections))
+        return Response(_build_dashboard_payload(scope, sections, request.user))
 
 
 class SecretariatsStatsView(APIView):
@@ -843,14 +924,19 @@ class SecretariatsStatsView(APIView):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
-        formation_id = request.query_params.get('formation_id')
-        formation_id = int(formation_id) if formation_id and formation_id.isdigit() else None
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
+
+        formation_id = scope.formation_id
+        module_ids = scope.module_ids
+        mod_kw = module_filter_kwargs(scope)
 
         resultats = []
 
-        for s in Secretariat.objects.order_by('nom').prefetch_related('responsable'):
-            mq = {'secretariat': s}
-            pf = {'session__module__secretariat': s}
+        for s in secretariats_stats_queryset(request.user):
+            mq = {'secretariat': s, **mod_kw}
+            pf = {'session__module__secretariat': s, **({'session__module_id__in': module_ids} if module_ids is not None else {})}
             if formation_id:
                 mq['formation_id'] = formation_id
                 pf['session__module__formation_id'] = formation_id
@@ -924,16 +1010,15 @@ class SecretariatsStatsView(APIView):
 class AlertesSeuilsView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def _params(self, request):
-        def _int(key):
-            v = request.query_params.get(key) or request.data.get(key)
-            return int(v) if v and str(v).isdigit() else None
-        return _int('formation_id'), _int('secretariat_id')
+    def _scope(self, request):
+        return _scope_from_request(request)
 
     def get(self, request):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
-        formation_id, secretariat_id = self._params(request)
+        scope, err = self._scope(request)
+        if err:
+            return err
         choices = dict(ConfigAlerteSeuil.Indicateur.choices)
         seuils = list(ConfigAlerteSeuil.objects.values('id', 'indicateur', 'seuil_avertissement', 'seuil_critique', 'actif'))
         for s in seuils:
@@ -941,7 +1026,7 @@ class AlertesSeuilsView(APIView):
             s['libelle'] = meta.get('libelle') or choices.get(s['indicateur'], s['indicateur'])
             s['aide'] = meta.get('aide', '')
             s['icone'] = meta.get('icone', 'bi-speedometer2')
-        indicateurs = _indicateurs_suivi(formation_id, secretariat_id)
+        indicateurs = _indicateurs_suivi(scope.formation_id, scope.secretariat_id, scope.module_ids)
         synthese = {
             'ok': sum(1 for i in indicateurs if i['niveau'] == 'ok'),
             'avertissement': sum(1 for i in indicateurs if i['niveau'] == 'avertissement'),
@@ -961,11 +1046,13 @@ class AlertesSeuilsView(APIView):
         if not _check_role(request.user, VALIDATION_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         created = _init_seuils_defaut()
-        formation_id, secretariat_id = self._params(request)
+        scope, err = self._scope(request)
+        if err:
+            return err
         return Response({
             'detail': 'Seuils initialisés.' if created else 'Seuils déjà configurés.',
             'creees': created,
-            'indicateurs': _indicateurs_suivi(formation_id, secretariat_id),
+            'indicateurs': _indicateurs_suivi(scope.formation_id, scope.secretariat_id, scope.module_ids),
         })
 
     def put(self, request):
@@ -982,10 +1069,12 @@ class AlertesSeuilsView(APIView):
                     'actif': item.get('actif', True),
                 },
             )
-        formation_id, secretariat_id = self._params(request)
+        scope, err = self._scope(request)
+        if err:
+            return err
         return Response({
             'detail': 'Seuils mis à jour.',
-            'indicateurs': _indicateurs_suivi(formation_id, secretariat_id),
+            'indicateurs': _indicateurs_suivi(scope.formation_id, scope.secretariat_id, scope.module_ids),
         })
 
 
@@ -996,23 +1085,31 @@ class RapportsListView(APIView):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         return Response(list(
-            Rapport.objects.select_related('generateur', 'validateur', 'formation')
+            rapports_queryset_for_user(request.user)
+            .select_related('generateur', 'validateur', 'formation', 'secretariat')
             .order_by('-created_at')
-            .values('id','titre','type','statut','periode_debut','periode_fin','commentaire',
-                    'created_at','updated_at','date_validation','date_publication',
-                    'generateur__username','validateur__username','formation__formation')[:100]
+            .values(
+                'id', 'titre', 'type', 'statut', 'periode_debut', 'periode_fin', 'commentaire',
+                'created_at', 'updated_at', 'date_validation', 'date_publication',
+                'generateur__username', 'validateur__username', 'formation__formation',
+                'secretariat_id', 'secretariat__nom',
+            )[:100]
         ))
 
     def post(self, request):
         if not _check_role(request.user, GENERATION_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
-        formation_id   = request.data.get('formation_id')
-        secretariat_id = request.data.get('secretariat_id')
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
+        formation_id = scope.formation_id
+        secretariat_id = scope.secretariat_id
+        module_ids = scope.module_ids
         snapshot = {
-            'kpis':         _kpis_globaux(formation_id, secretariat_id),
-            'pedagogiques': _indicateurs_pedagogiques(formation_id, secretariat_id),
-            'admin':        _indicateurs_admin(formation_id, secretariat_id),
-            'historique':   _historique_mensuel(12, formation_id, secretariat_id),
+            'kpis':         _kpis_globaux(formation_id, secretariat_id, module_ids),
+            'pedagogiques': _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids),
+            'admin':        _indicateurs_admin(formation_id, secretariat_id, module_ids),
+            'historique':   _historique_mensuel(12, formation_id, secretariat_id, module_ids),
         }
         rapport = Rapport.objects.create(
             titre=request.data.get('titre') or f"Rapport {request.data.get('type','MENSUEL')} — {timezone.now().strftime('%d/%m/%Y')}",
@@ -1021,6 +1118,7 @@ class RapportsListView(APIView):
             periode_debut=request.data.get('periode_debut', date.today().replace(day=1)),
             periode_fin=request.data.get('periode_fin', date.today()),
             formation_id=formation_id,
+            secretariat_id=secretariat_id,
             generateur=request.user,
             commentaire=request.data.get('commentaire', ''),
             donnees_json=snapshot,
@@ -1050,10 +1148,15 @@ class RapportDetailView(APIView):
     def get(self, request, rapport_id):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
-        return Response(self._data(get_object_or_404(Rapport, id=rapport_id)))
+        rapport = get_object_or_404(Rapport, id=rapport_id)
+        if not rapport_accessible(request.user, rapport):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
+        return Response(self._data(rapport))
 
     def patch(self, request, rapport_id):
         rapport = get_object_or_404(Rapport, id=rapport_id)
+        if not rapport_accessible(request.user, rapport):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
         is_admin = _check_role(request.user, ADMIN_RAPPORT_ROLES)
         is_generator = _check_role(request.user, GENERATION_ROLES)
 
@@ -1166,6 +1269,8 @@ class RapportWorkflowView(APIView):
 
     def post(self, request, rapport_id):
         rapport = get_object_or_404(Rapport, id=rapport_id)
+        if not rapport_accessible(request.user, rapport):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
         action  = request.data.get('action')
         TRANSITIONS = {
             'soumettre': (Rapport.Statut.BROUILLON,     Rapport.Statut.EN_VALIDATION, GENERATION_ROLES),
@@ -1210,40 +1315,35 @@ class PointJournalierView(APIView):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
+
         def _int(key):
             v = request.query_params.get(key)
             return int(v) if v and v.isdigit() else None
 
         annee = _int('annee') or date.today().year
         mois = _int('mois')
-        formation_id = _int('formation_id')
-        secretariat_id = _int('secretariat_id')
         categorie = request.query_params.get('categorie') or None
-
         jour = request.query_params.get('jour') or None
         detail = request.query_params.get('detail', '').lower() in ('1', 'true', 'yes')
         tous_tableaux = request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes')
-
-        user = request.user
-        if getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT') and not secretariat_id:
-            sec = getattr(user, 'secretariat', None)
-            if sec:
-                secretariat_id = sec.id
+        kw = _scope_compute_kwargs(scope)
 
         fmt = (request.query_params.get('export') or request.query_params.get('file_format') or '').lower()
         if fmt in ('xlsx', 'pdf', 'docx', 'word', 'excel'):
             fmt = 'xlsx' if fmt == 'excel' else fmt
             try:
                 return build_export_response(
-                    fmt, annee, mois=mois, categorie=categorie,
-                    formation_id=formation_id, secretariat_id=secretariat_id, jour=jour,
+                    fmt, annee, mois=mois, categorie=categorie, jour=jour, **kw,
                 )
             except ValueError as exc:
                 return Response({'detail': str(exc)}, status=400)
 
-        if detail and jour and formation_id:
+        if detail and jour and scope.formation_id:
             tb = get_tableau_detail(
-                annee, formation_id, categorie or '—', jour, secretariat_id=secretariat_id,
+                annee, scope.formation_id, categorie or '—', jour, **kw,
             )
             if not tb:
                 return Response({'detail': 'Tableau introuvable.'}, status=404)
@@ -1251,14 +1351,12 @@ class PointJournalierView(APIView):
 
         if tous_tableaux and not detail and not jour:
             return Response(compute_point_journalier_avec_tableaux(
-                annee=annee, mois=mois, categorie=categorie,
-                formation_id=formation_id, secretariat_id=secretariat_id,
+                annee=annee, mois=mois, categorie=categorie, **kw,
             ))
 
         return Response(compute_point_journalier(
-            annee=annee, mois=mois, categorie=categorie,
-            formation_id=formation_id, secretariat_id=secretariat_id, jour=jour,
-            index_only=True,
+            annee=annee, mois=mois, categorie=categorie, jour=jour,
+            index_only=True, **kw,
         ))
 
 
@@ -1280,21 +1378,17 @@ def point_journalier_export(request):
 
     annee = _int('annee') or date.today().year
     mois = _int('mois')
-    formation_id = _int('formation_id')
-    secretariat_id = _int('secretariat_id')
     categorie = request.query_params.get('categorie') or None
     jour = request.query_params.get('jour') or None
 
-    user = request.user
-    if getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT') and not secretariat_id:
-        sec = getattr(user, 'secretariat', None)
-        if sec:
-            secretariat_id = sec.id
+    scope, err = _scope_from_request(request)
+    if err:
+        return err
+    kw = _scope_compute_kwargs(scope)
 
     try:
         raw = build_export_response(
-            fmt, annee, mois=mois, categorie=categorie,
-            formation_id=formation_id, secretariat_id=secretariat_id, jour=jour,
+            fmt, annee, mois=mois, categorie=categorie, jour=jour, **kw,
         )
         from django.http import HttpResponse as DjangoHttpResponse
         out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
@@ -1324,24 +1418,20 @@ def bilans_export(request):
     dimension = request.query_params.get('dimension') or 'module'
     annee = _int('annee') or date.today().year
     mois = _int('mois')
-    formation_id = _int('formation_id')
-    secretariat_id = _int('secretariat_id')
     module_id = _int('module_id')
     categorie = request.query_params.get('categorie') or None
     periode = request.query_params.get('periode') or None
     calendrier = request.query_params.get('calendrier') or None
 
-    user = request.user
-    if getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT') and not secretariat_id:
-        sec = getattr(user, 'secretariat', None)
-        if sec:
-            secretariat_id = sec.id
+    scope, err = _scope_from_request(request, parse_module_id=True)
+    if err:
+        return err
+    kw = _scope_compute_kwargs(scope)
 
     try:
         raw = build_bilans_export_response(
             fmt, dimension, annee, mois=mois, categorie=categorie,
-            module_id=module_id, formation_id=formation_id, secretariat_id=secretariat_id,
-            periode=periode, calendrier=calendrier,
+            module_id=module_id, periode=periode, calendrier=calendrier, **kw,
         )
         from django.http import HttpResponse as DjangoHttpResponse
         out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
@@ -1373,8 +1463,6 @@ class BilansView(APIView):
 
         annee = _int('annee') or date.today().year
         mois = _int('mois')
-        formation_id = _int('formation_id')
-        secretariat_id = _int('secretariat_id')
         module_id = _int('module_id')
         categorie = request.query_params.get('categorie') or None
         periode = request.query_params.get('periode') or None
@@ -1383,11 +1471,12 @@ class BilansView(APIView):
         detail = request.query_params.get('detail', '').lower() in ('1', 'true', 'yes')
         tous_tableaux = request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes')
 
-        user = request.user
-        if getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT') and not secretariat_id:
-            sec = getattr(user, 'secretariat', None)
-            if sec:
-                secretariat_id = sec.id
+        scope, err = _scope_from_request(request, parse_module_id=True)
+        if err:
+            return err
+        kw = _scope_compute_kwargs(scope)
+        formation_id = scope.formation_id
+        secretariat_id = scope.secretariat_id
 
         if detail and dimension == 'categorie':
             if not categorie:
@@ -1421,16 +1510,14 @@ class BilansView(APIView):
         if tous_tableaux:
             return Response(compute_bilans_avec_tableaux(
                 annee=annee, mois=mois, categorie=categorie,
-                module_id=module_id, formation_id=formation_id,
-                secretariat_id=secretariat_id, periode=periode,
-                calendrier=calendrier, dimension=dimension,
+                module_id=module_id, periode=periode,
+                calendrier=calendrier, dimension=dimension, **kw,
             ))
 
         return Response(compute_bilans(
             annee=annee, mois=mois, categorie=categorie,
-            module_id=module_id, formation_id=formation_id,
-            secretariat_id=secretariat_id, periode=periode,
-            calendrier=calendrier, dimension=dimension,
+            module_id=module_id, periode=periode,
+            calendrier=calendrier, dimension=dimension, **kw,
         ))
 
 
@@ -1440,7 +1527,10 @@ class ObservationsView(APIView):
     def get(self, request, rapport_id):
         if not _check_role(request.user, STATS_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
-        return Response(list(get_object_or_404(Rapport, id=rapport_id).observations.values(
+        rapport = get_object_or_404(Rapport, id=rapport_id)
+        if not rapport_accessible(request.user, rapport):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
+        return Response(list(rapport.observations.values(
             'id','type','description','auteur__username','created_at'
         )))
 
@@ -1448,6 +1538,8 @@ class ObservationsView(APIView):
         if not _check_role(request.user, GENERATION_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         rapport = get_object_or_404(Rapport, id=rapport_id)
+        if not rapport_accessible(request.user, rapport):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
         obs = ObservationQualitative.objects.create(
             rapport=rapport,
             type=request.data.get('type', ObservationQualitative.Type.POINT_POSITIF),

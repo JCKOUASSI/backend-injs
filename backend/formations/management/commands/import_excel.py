@@ -450,7 +450,12 @@ class Command(BaseCommand):
             _site_name = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
-            if _site: module_defaults['site'] = _site
+            if _site_name:
+                _site, _ = RefSite.objects.get_or_create(
+                    nom=_site_name, defaults={'actif': True},
+                )
+                module_defaults['site'] = _site
+                module_defaults['site_legacy'] = _site_name
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
             if _secretariat: module_defaults['secretariat'] = _secretariat

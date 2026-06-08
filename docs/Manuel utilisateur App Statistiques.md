@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Application** | SYGEP-CPFAE — Module Statistiques & Bilans |
-| **Version du manuel** | 2.0.1 |
-| **Dernière mise à jour** | 05/06/2026 |
+| **Version du manuel** | 2.1.0 |
+| **Dernière mise à jour** | 08/06/2026 |
 | **Public** | Administrateurs CPFAE, direction, secrétariats, encadrants autorisés |
 | **Fichier Word** | `Manuel utilisateur App Statistiques.docx` (généré automatiquement) |
 
@@ -134,6 +134,26 @@ L'onglet actif est souligné en **vert** (#43A047).
 | **Bilan** | Tableau de synthèse des effectifs sur une période |
 | **Seuil avertissement (⚠)** | Premier palier d'alerte |
 | **Seuil critique (🔴)** | Palier nécessitant une action corrective |
+| **Assiduité séance** | Places présentes ÷ places attendues sur les séances terminées (dashboard, alertes, historique) |
+| **Couverture auditeurs** | Auditeurs avec ≥ 1 présence ÷ inscrits (logique des bilans CPFAE) |
+| **Événements absence / suspect** | Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits |
+| **Avancement VH (sessions clôturées)** | Heures réalisées ÷ heures prévues sur les séances clôturées du périmètre |
+
+### 5.1 Comment lire les chiffres
+
+Deux logiques de taux coexistent dans le module. Un **bandeau explicatif** sous les filtres rappelle cette distinction à chaque visite.
+
+| Indicateur affiché | Formule | Où le trouver |
+|--------------------|---------|---------------|
+| **Assiduité séance** | places présentes ÷ places attendues (séances terminées) | Vue d'ensemble, alertes, historique, tableaux « par formation / grade / secrétariat » |
+| **Couverture auditeurs** | auditeurs avec ≥ 1 présence ÷ inscrits | Cartes pédagogiques, bilans CPFAE |
+| **Absence séance** | places absentes ÷ places attendues | Cartes pédagogiques |
+| **Événements absence / suspect** | pointages atypiques ÷ inscrits | Cartes pédagogiques, alertes (seuil configurable) |
+| **Avancement VH (sessions clôturées)** | heures réalisées ÷ heures prévues | KPI volume horaire, alertes |
+
+Les infobulles (icône ℹ sur les cartes KPI) décrivent chaque indicateur au survol.
+
+**Compatibilité API :** le champ technique `taux_achevement` reste disponible ; il correspond à **Couverture auditeurs** (`taux_couverture_auditeurs`).
 
 ### Statuts de pointage affichés
 
@@ -154,11 +174,11 @@ L'onglet actif est souligné en **vert** (#43A047).
 
 Uniquement sur cet onglet, un bandeau affiche les **3 indicateurs prioritaires** :
 
-1. **Taux de présence**
-2. **Taux d'exécution du volume horaire**
+1. **Assiduité séance** (anciennement « taux de présence »)
+2. **Avancement VH (sessions clôturées)**
 3. **Saturation des groupes**
 
-Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / Avertissement / Critique).
+Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / Avertissement / Critique). Une infobulle décrit le calcul de chaque indicateur.
 
 ![Vue d'ensemble — KPI et graphiques](screenshots/manuel-statistiques/02-vue-ensemble.png)
 
@@ -174,13 +194,13 @@ Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / A
 | 4 | **Formateurs** | Encadrants référencés |
 | 5 | **Séances totales** | Sessions programmées |
 | 6 | **Vol. horaire prévu** | Heures prévues (format `Xh`) |
-| 7 | **Taux exéc. vol. horaire** | % réalisé / prévu (vert ≥ 70 %, orange 40–69 %, rouge < 40 %) |
+| 7 | **Avancement VH (sessions clôturées)** | % réalisé / prévu (vert ≥ 70 %, orange 40–69 %, rouge < 40 %) |
 
 ### 6.3 Graphiques
 
 | Carte | Contenu |
 |-------|---------|
-| **Taux de présence (global)** | 4 pourcentages : Présence, Absence, Abandon, Achèvement |
+| **Indicateurs pédagogiques** | Deux cartes principales (**Assiduité séance**, **Couverture auditeurs**) puis les quatre taux détaillés |
 | **Répartition Hommes / Femmes** | Donut par sexe |
 | **Charge des formateurs (top 8)** | Barres horizontales — nombre de séances par formateur |
 
@@ -195,17 +215,22 @@ Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / A
 | **Inscrits** | Effectif total inscrit |
 | **Présents** | Ayant au moins un pointage « présent » |
 | **Absents** | Non présents sur la période |
-| **Abandons** | Abandons enregistrés |
-| **Taux présence / absence / abandon / achèvement** | Pourcentages calculés sur l'effectif |
+| **Événements** | Pointages « absent non badgé » ou « hors ligne suspect » |
+| **Assiduité séance** | Places présentes ÷ places attendues (séances terminées) |
+| **Couverture auditeurs** | Auditeurs avec ≥ 1 présence ÷ inscrits |
+| **Absence séance** | Places absentes ÷ places attendues |
+| **Événements absence / suspect** | Événements atypiques ÷ inscrits |
+
+Les cartes **Assiduité séance** et **Couverture auditeurs** sont mises en avant côte à côte en tête de l'onglet.
 
 ### 7.2 Tableaux et graphiques
 
 | Bloc | Détail |
 |------|--------|
-| **Taux de présence par formation (10 der.)** | Colonnes : Formation, Inscrits, Présents, Taux (barre colorée) |
-| **Taux de présence par grade** | Une barre par grade avec effectif inscrit |
+| **Assiduité séance par formation (10 der.)** | Colonnes : Formation, Inscrits, Présents, Taux (barre colorée) |
+| **Assiduité séance par grade** | Une barre par grade avec effectif inscrit |
 | **Auditeurs par type de concours** | Barres horizontales |
-| **Taux de présence par secrétariat** | Tableau cliquable → bascule vers l'onglet Secrétariats |
+| **Assiduité séance par secrétariat** | Tableau cliquable → bascule vers l'onglet Secrétariats |
 
 ### 7.3 Code couleur des barres de taux
 
@@ -560,6 +585,7 @@ Réservée aux **validateurs / administrateurs** :
 | 1.0.0 | 03/06/2026 | Création initiale : 8 onglets, point journalier, alertes, profils |
 | 2.0.0 | 03/06/2026 | Manuel détaillé complet : bilans CPFAE (module, catégorie, formation), exports Excel/PDF/Word bilans et PJ, alertes visuelles, suppression section « Rapports générés », captures d'écran intégrées |
 | 2.0.1 | 05/06/2026 | Vue d'ensemble : retrait des widgets Pointages et Pointages par statut |
+| 2.1.0 | 08/06/2026 | Harmonisation des libellés (assiduité séance, couverture auditeurs, événements absence/suspect, avancement VH), bandeau explicatif sous les filtres, infobulles KPI, champ API `taux_couverture_auditeurs`, §5.1 « Comment lire les chiffres » |
 
 ---
 

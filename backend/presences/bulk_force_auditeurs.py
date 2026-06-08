@@ -153,7 +153,7 @@ def force_entree_personne(
         extra={
             'acteur_role': getattr(getattr(request, 'user', None), 'role', 'SYSTEM'),
             'motif': motif,
-            'bulk_force_presences': True,
+            'bulk_force_auditeurs': True,
             'ignore_constraints': ignore_constraints,
         },
     )

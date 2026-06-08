@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans — Lot 5
 ================================================================================
-Dernière mise à jour : 08/06/2026 10:53
+Dernière mise à jour : 08/06/2026 14:27
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,6 +28,9 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+
+[08/06/2026] Vague 1 harmonisation libellés stats : assiduité séance, couverture auditeurs, bandeau explicatif, infobulles KPI, API taux_couverture_auditeurs, manuel v2.1.0
+  · Enregistré automatiquement le 08/06/2026 14:27
 
 [08/06/2026] Vue d'ensemble : retrait widgets Pointages et Pointages par statut (Statistiques.jsx)
   · Enregistré automatiquement le 08/06/2026 10:53
