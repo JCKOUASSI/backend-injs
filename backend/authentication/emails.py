@@ -1,8 +1,14 @@
-from django.core.mail import send_mail
-from django.conf import settings
+import base64
 import logging
+import mimetypes
+from pathlib import Path
+
+from django.conf import settings
+from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
+
+_LOGO_DATA_URI_CACHE = None
 
 # Couleurs alignées sur frontend/src/index.css (:root --ci-*, --text-*)
 _CI_ORANGE = '#F57C00'
@@ -30,14 +36,56 @@ ROLE_LABELS = {
 }
 
 
+def _logo_candidates():
+    base_dir = Path(settings.BASE_DIR)
+    return [
+        base_dir / 'static' / 'img' / 'logo-sygepcpfae.png',
+        base_dir.parent / 'frontend' / 'src' / 'assets' / 'logo.png',
+        base_dir / 'static' / 'img' / 'logo-mfpma.jpeg',
+    ]
+
+
+def _logo_data_uri() -> str:
+    """Retourne le logo SYGEP-CPFAE encodé en data URI pour les emails HTML."""
+    global _LOGO_DATA_URI_CACHE
+    if _LOGO_DATA_URI_CACHE is not None:
+        return _LOGO_DATA_URI_CACHE
+
+    for path in _logo_candidates():
+        if not path.is_file():
+            continue
+        mime, _ = mimetypes.guess_type(path.name)
+        mime = mime or 'image/png'
+        encoded = base64.b64encode(path.read_bytes()).decode('ascii')
+        _LOGO_DATA_URI_CACHE = f'data:{mime};base64,{encoded}'
+        return _LOGO_DATA_URI_CACHE
+
+    _LOGO_DATA_URI_CACHE = ''
+    return _LOGO_DATA_URI_CACHE
+
+
+def _html_logo_block() -> str:
+    data_uri = _logo_data_uri()
+    if not data_uri:
+        return ''
+    return (
+        f"<div style='margin-bottom:14px;'>"
+        f"<img src='{data_uri}' alt='SYGEP-CPFAE' "
+        f"style='width:88px; height:auto; display:inline-block;'>"
+        f"</div>"
+    )
+
+
 def _html_email_shell(*, title: str, subtitle: str, inner: str) -> str:
     """Enveloppe HTML commune (charte SYGEP-CPFAE / frontend)."""
+    logo = _html_logo_block()
     return f"""
 <!DOCTYPE html>
 <html lang="fr">
 <body style="margin:0; padding:24px 12px; background:{_CI_LIGHT}; font-family:{_FONT}; color:{_TEXT_PRIMARY};">
   <div style="max-width:600px; margin:0 auto;">
     <div style="background:linear-gradient(180deg, {_CI_GREEN_DARK} 0%, {_CI_GREEN} 100%); background-color:{_CI_GREEN_DARK}; padding:24px; border-radius:12px 12px 0 0; text-align:center; border-bottom:3px solid {_CI_ORANGE};">
+      {logo}
       <h1 style="color:#fff; margin:0; font-size:1.35rem; font-weight:700;">{title}</h1>
       <p style="color:rgba(255,255,255,0.88); margin:8px 0 0; font-size:0.9rem;">{subtitle}</p>
     </div>
@@ -60,7 +108,15 @@ def _html_cta_button(href: str, label: str) -> str:
     )
 
 
-def send_welcome_email(user, plain_password):
+def _app_url():
+    return (
+        getattr(settings, 'FRONTEND_URL', None)
+        or getattr(settings, 'PUBLIC_APP_URL', '')
+        or ''
+    ).rstrip('/')
+
+
+def send_welcome_email(user, plain_password, *, mobile: bool = False):
     """Envoie un email de bienvenue à l'utilisateur avec ses identifiants initiaux.
     Ne fait rien si l'utilisateur n'a pas d'adresse email renseignée."""
     if not user.email:
@@ -68,34 +124,53 @@ def send_welcome_email(user, plain_password):
 
     full_name = user.get_full_name() or user.username
     role_label = ROLE_LABELS.get(user.role, user.role)
-    frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else ''
+    app_url = _app_url()
 
-    subject = "Bienvenue sur SYGEP-CPFAE — Vos identifiants de connexion"
+    if mobile:
+        subject = "SYGEP-CPFAE — Vos identifiants application mobile"
+        platform_label = "l'application mobile SYGEP-CPFAE (badge QR)"
+        usage_hint = (
+            "Utilisez ces identifiants pour vous connecter à l'application mobile "
+            "et badgez vos présences."
+        )
+        login_url_line = ''
+        cta = ''
+        security_hint = (
+            "Changez votre mot de passe dès votre première connexion dans l'application "
+            "(Menu → Mon profil → Changer mon mot de passe)."
+        )
+    else:
+        subject = "Bienvenue sur SYGEP-CPFAE — Vos identifiants de connexion"
+        platform_label = "la plateforme SYGEP-CPFAE"
+        usage_hint = "Connectez-vous avec les identifiants ci-dessous."
+        login_url_line = f"\nURL de connexion : {app_url}/login\n" if app_url else ''
+        cta = _html_cta_button(app_url + '/login', 'Se connecter') if app_url else ''
+        security_hint = (
+            "Changez votre mot de passe dès votre première connexion "
+            "(Menu → Changer mon mot de passe)."
+        )
 
     message = f"""Bonjour {full_name},
 
-Votre compte sur la plateforme SYGEP-CPFAE a été créé.
+Votre compte sur {platform_label} a été créé.
 
 Voici vos identifiants de connexion :
 
   Identifiant : {user.username}
   Mot de passe : {plain_password}
   Rôle         : {role_label}
+{login_url_line}
+{usage_hint}
 
-{"URL de connexion : " + frontend_url + "/login" if frontend_url else ""}
-
-Pour des raisons de sécurité, veuillez changer votre mot de passe dès votre première connexion
-(Menu → Changer mon mot de passe).
+Pour des raisons de sécurité, veuillez changer votre mot de passe dès votre première connexion.
 
 Cordialement,
 L'équipe DFRC — SYGEP-CPFAE
 """
 
-    cta = _html_cta_button(frontend_url + '/login', 'Se connecter') if frontend_url else ''
-
     inner = f"""
     <p style="margin:0 0 12px; line-height:1.6;">Bonjour <strong>{full_name}</strong>,</p>
-    <p style="margin:0 0 20px; color:{_TEXT_SECONDARY}; line-height:1.6;">Votre compte sur la plateforme <strong style="color:{_TEXT_PRIMARY};">SYGEP-CPFAE</strong> a été créé avec succès.</p>
+    <p style="margin:0 0 20px; color:{_TEXT_SECONDARY}; line-height:1.6;">Votre compte sur <strong style="color:{_TEXT_PRIMARY};">{platform_label}</strong> a été créé avec succès.</p>
 
     <div style="background:{_CI_LIGHT}; border:1px solid {_BORDER}; border-radius:10px; padding:20px; margin:20px 0;">
       <h3 style="margin:0 0 16px; color:{_CI_GREEN_DARK}; font-size:1.05rem;">Vos identifiants</h3>
@@ -119,7 +194,7 @@ L'équipe DFRC — SYGEP-CPFAE
 
     <div style="background:#FFF3E0; border-left:4px solid {_CI_ORANGE_DARK}; padding:14px 18px; border-radius:8px; margin-top:8px;">
       <strong style="color:{_CI_ORANGE_DARK};">Sécurité</strong><br>
-      <span style="color:{_TEXT_PRIMARY}; font-size:0.95rem; line-height:1.5;">Changez votre mot de passe dès votre première connexion via <em>Menu → Changer mon mot de passe</em>.</span>
+      <span style="color:{_TEXT_PRIMARY}; font-size:0.95rem; line-height:1.5;">{security_hint}</span>
     </div>
 
     <p style="margin-top:28px; color:{_TEXT_SECONDARY}; font-size:0.9rem; line-height:1.5;">
@@ -155,7 +230,7 @@ def send_suspect_heartbeat_email(encadrant, personne_nom, personne_numero, forma
         return
 
     encadrant_nom = encadrant.get_full_name() or encadrant.username
-    frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else ''
+    app_url = _app_url()
 
     subject = f"[SYGEP-CPFAE] Alerte présence — {personne_nom} hors ligne ({silence_minutes} min)"
 
@@ -172,13 +247,13 @@ L'auditeur suivant n'a plus envoyé de signal depuis {silence_minutes} minutes :
 
 Son statut est passé à « Hors ligne — suspect ». Veuillez vérifier sa présence physique en salle.
 
-{"Tableau de bord : " + frontend_url if frontend_url else ""}
+{"Tableau de bord : " + app_url if app_url else ""}
 
 Cordialement,
 L'équipe DFRC — SYGEP-CPFAE
 """
 
-    cta = _html_cta_button(frontend_url, 'Accéder au tableau de bord') if frontend_url else ''
+    cta = _html_cta_button(app_url, 'Accéder au tableau de bord') if app_url else ''
 
     inner = f"""
     <p style="margin:0 0 16px; line-height:1.6;">Bonjour <strong>{encadrant_nom}</strong>,</p>

@@ -17,6 +17,18 @@ import Referentiels from './pages/Referentiels'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
+import FinanceParametrage from './pages/FinanceParametrage'
+import ModulesListLink from './components/ModulesListLink'
+import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
+import { financeNavHref } from './utils/financePeriod'
+
+const Statistiques = lazy(() => import('./pages/Statistiques'))
+
+/** Aligné sur backend/authentication/role_groups.py DUAL_ACCESS_ROLES */
+const ADMIN_LEVEL_ROLES = ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
+/** Aligné sur backend/statistiques/views.py STATS_ROLES */
+const STATS_ALLOWED_ROLES = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT']
+const STAFF_WEB_ROLES = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -49,16 +61,18 @@ function Layout({ children, breadcrumb }) {
   }
 
   const isFinanceRole = user?.role === 'FINANCE'
-  const canViewFinanceDashboard = ['FINANCE', 'DIRECTION'].includes(user?.role)
-  const canViewParticipants = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
-  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canViewFinanceDashboard = canViewFinanceModule
+  const canViewParticipants = [...STAFF_WEB_ROLES].includes(user?.role)
+  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
     || canViewFinanceModule
-  const canViewUsers = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewSecretariats = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
-  const canViewImport = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewReferentiels = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
+  const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
+  const canViewImport = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canViewReferentiels = ADMIN_LEVEL_ROLES.includes(user?.role)
+  const canViewStatistiques = STATS_ALLOWED_ROLES.includes(user?.role)
 
-  const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
+  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
@@ -223,42 +237,42 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Détail</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/modules" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Cours</li></>}>
                 <Modules />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/participants" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formateurs" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'FINANCE']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
               </Layout>
@@ -286,7 +300,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/secretariats" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']}>
+            <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Secrétariats</li></>}>
                 <Secretariats />
               </Layout>
@@ -300,14 +314,14 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/referentiels" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']}>
+            <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Référentiels</li></>}>
                 <Referentiels />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/statistiques" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STATS_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Statistiques</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <Statistiques />

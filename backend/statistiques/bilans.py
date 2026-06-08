@@ -34,18 +34,20 @@ PERIODES_BILAN = [
 ]
 
 
-def _liste_categories(formation_id=None, secretariat_id=None):
+def _liste_categories(formation_id=None, secretariat_id=None, module_ids=None):
     cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
     pq = Participant.objects.exclude(categorie='')
     if secretariat_id:
         pq = pq.filter(secretariat_id=secretariat_id)
     if formation_id:
         pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
+    if module_ids is not None:
+        pq = pq.filter(modules_inscrits__module_id__in=module_ids).distinct()
     cats.update(pq.values_list('categorie', flat=True))
     return sorted(cats, key=lambda c: (len(c), c))
 
 
-def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, module_id=None):
+def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, module_id=None, module_ids=None):
     mq = Q()
     if formation_id:
         mq &= Q(formation_id=formation_id)
@@ -53,6 +55,8 @@ def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, mo
         mq &= Q(secretariat_id=secretariat_id)
     if module_id:
         mq &= Q(id=module_id)
+    if module_ids is not None:
+        mq &= Q(id__in=module_ids)
     qs = Module.objects.filter(mq).select_related('formation').order_by(
         'formation__formation', 'grade', 'groupe', 'ordre', 'intitule',
     )
@@ -63,12 +67,14 @@ def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, mo
     return qs
 
 
-def _formations_queryset(formation_id=None, secretariat_id=None):
+def _formations_queryset(formation_id=None, secretariat_id=None, module_ids=None):
     fq = Formation.objects.all()
     if formation_id:
         fq = fq.filter(id=formation_id)
     if secretariat_id:
         fq = fq.filter(modules__secretariat_id=secretariat_id).distinct()
+    if module_ids is not None:
+        fq = fq.filter(modules__id__in=module_ids).distinct()
     return fq.order_by('formation')
 
 
@@ -380,6 +386,7 @@ def compute_bilans(
     module_id=None,
     formation_id=None,
     secretariat_id=None,
+    module_ids=None,
     periode=None,
     calendrier=None,
     dimension='formation',
@@ -393,14 +400,14 @@ def compute_bilans(
     if dimension not in ('module', 'categorie', 'formation'):
         dimension = 'formation'
 
-    categories = _liste_categories(formation_id, secretariat_id)
-    modules_qs = _modules_queryset(formation_id, secretariat_id, categorie, module_id)
+    categories = _liste_categories(formation_id, secretariat_id, module_ids)
+    modules_qs = _modules_queryset(formation_id, secretariat_id, categorie, module_id, module_ids)
     modules_liste = [
         {'id': m.id, 'intitule': m.intitule, 'formation_id': m.formation_id, 'formation': str(m.formation)}
         for m in modules_qs[:500]
     ]
 
-    formations_qs = _formations_queryset(formation_id, secretariat_id)
+    formations_qs = _formations_queryset(formation_id, secretariat_id, module_ids)
     formations_liste = [{'id': f.id, 'formation': f.formation} for f in formations_qs[:200]]
 
     periode_label = dict(PERIODES_BILAN).get(periode, 'Toutes périodes') if periode else 'Toutes périodes'
@@ -545,6 +552,7 @@ def compute_bilans_avec_tableaux(
     module_id=None,
     formation_id=None,
     secretariat_id=None,
+    module_ids=None,
     periode=None,
     calendrier=None,
     dimension='formation',
@@ -557,6 +565,7 @@ def compute_bilans_avec_tableaux(
         module_id=module_id,
         formation_id=formation_id,
         secretariat_id=secretariat_id,
+        module_ids=module_ids,
         periode=periode,
         calendrier=calendrier,
         dimension=dimension,

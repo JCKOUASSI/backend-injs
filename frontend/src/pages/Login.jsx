@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { API_BASE_URL } from '../services/api'
+import { ADMIN_URL } from '../services/api'
 import logo from '../assets/logo.png'
-
-const ADMIN_URL = API_BASE_URL.replace(/\/api$/, '/admin/')
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -103,6 +101,16 @@ export default function Login() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+
+        <div className="text-center" style={{ marginTop: '1.25rem' }}>
+          <a
+            href={ADMIN_URL}
+            className="login-admin-link"
+            title="Interface d'administration"
+          >
+            administration
+          </a>
+        </div>
 
         <div className="text-center mt-3">
           <small className="text-muted">MEMFPMA — DFRC — SYGEP-CPFAE</small>

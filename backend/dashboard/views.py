@@ -15,11 +15,11 @@ from django.shortcuts import render, redirect
 
 User = get_user_model()
 
+from authentication.role_groups import DUAL_ACCESS_ROLES
+
 ALLOWED_WEB_ROLES = (
-    'ADMIN',
+    *DUAL_ACCESS_ROLES,
     'DIRECTION',
-    'CHEF_CPFAE_ADMIN',
-    'CPFAE_ADMIN',
     'CHEF_SECRETARIAT',
     'SECRETARIAT',
     'FINANCE',
@@ -43,7 +43,7 @@ def login_view(request):
             return redirect('web-dashboard')
         elif user:
             return render(request, 'dashboard/login.html', {
-                'error': 'Accès réservé à la Direction, CPFAE, Secrétariat, Finance et Encadrants.'
+                'error': 'Accès réservé au personnel autorisé (administration, CPFAE, secrétariat, finance, encadrants).'
             })
         else:
             return render(request, 'dashboard/login.html', {

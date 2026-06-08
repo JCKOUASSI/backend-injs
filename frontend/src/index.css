@@ -396,6 +396,19 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 }
 .btn-login:hover { background: linear-gradient(135deg, #E65100, #BF360C); }
 
+.login-admin-link {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #94a3b8;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: color 0.15s ease;
+}
+.login-admin-link:hover {
+  color: #64748b;
+  text-decoration: underline;
+}
+
 /* ═══ Pagination ═══ */
 .pagination {
   display: flex; justify-content: center; align-items: center;

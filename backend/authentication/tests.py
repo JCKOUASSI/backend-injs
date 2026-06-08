@@ -256,6 +256,33 @@ class RoleGroupsTest(TestCase):
         self.assertFalse(user.groups.filter(name=old_group).exists())
         self.assertTrue(user.groups.filter(name=new_group).exists())
 
+    def test_dual_access_roles_get_staff_status(self):
+        from authentication.role_groups import DUAL_ACCESS_ROLES, MOBILE_ONLY_ROLES
+
+        for role in DUAL_ACCESS_ROLES:
+            user = make_user(f'staff-{role.lower()}', role=role)
+            user.refresh_from_db()
+            self.assertTrue(user.is_staff, f'is_staff attendu pour {role}')
+
+        for role in MOBILE_ONLY_ROLES:
+            user = make_user(f'mobile-{role.lower()}', role=role)
+            user.refresh_from_db()
+            self.assertFalse(user.is_staff, f'is_staff interdit pour {role}')
+
+        encadrant = make_user('staff-encadrant', role=User.Role.ENCADRANT)
+        encadrant.refresh_from_db()
+        self.assertFalse(encadrant.is_staff)
+
+    def test_staff_status_removed_when_role_changes_away(self):
+        user = make_user('staff-role-change', role=User.Role.ADMIN)
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+        user.role = User.Role.SECRETARIAT
+        user.save()
+        user.refresh_from_db()
+        self.assertFalse(user.is_staff)
+
     def test_create_superuser_assigns_admin_role(self):
         user = User.objects.create_superuser(
             username='superadmin',
@@ -392,4 +419,98 @@ class AuditeurProfileSyncTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.matricule, 'ENC-001')
         self.assertEqual(resp.data['profil']['type_personne'], 'encadrant')
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class BadgeAccountProvisionTests(TestCase):
+
+    def setUp(self):
+        from formations.models import Participant, Formateur
+
+        self.participant = Participant.objects.create(
+            matricule='FNCP26-100',
+            nom='Kouassi',
+            prenom='Aya',
+            email='aya.kouassi@example.com',
+        )
+        self.formateur = Formateur.objects.create(
+            numerobadge='F0100',
+            nom='Traore',
+            prenom='Ibrahim',
+            email='ibrahim.traore@example.com',
+        )
+
+    def test_auditeur_account_created_with_email_on_import_provision(self):
+        from authentication.badge_accounts import provision_auditeur_accounts
+
+        stats = provision_auditeur_accounts([self.participant.pk])
+        self.participant.refresh_from_db()
+
+        self.assertEqual(stats['created'], 1)
+        self.assertEqual(stats['emails_sent'], 1)
+        self.assertIsNotNone(self.participant.user_id)
+        self.assertEqual(self.participant.user.role, User.Role.AUDITEUR)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('FNCP26-100', mail.outbox[0].body)
+        self.assertIn('application mobile', mail.outbox[0].body.lower())
+
+    def test_formateur_account_created_with_email_on_import_provision(self):
+        from authentication.badge_accounts import provision_formateur_accounts
+
+        stats = provision_formateur_accounts([self.formateur.pk])
+        self.formateur.refresh_from_db()
+
+        self.assertEqual(stats['created'], 1)
+        self.assertEqual(stats['emails_sent'], 1)
+        self.assertIsNotNone(self.formateur.user_id)
+        self.assertEqual(self.formateur.user.role, User.Role.FORMATEUR)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_no_email_when_address_missing(self):
+        from authentication.badge_accounts import provision_auditeur_accounts
+
+        self.participant.email = ''
+        self.participant.save(update_fields=['email'])
+
+        stats = provision_auditeur_accounts([self.participant.pk])
+        self.assertEqual(stats['created'], 1)
+        self.assertEqual(stats['emails_sent'], 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_welcome_email_contains_logo(self):
+        from authentication.emails import send_welcome_email
+
+        user = make_user('logo-user', role=User.Role.SECRETARIAT)
+        user.email = 'logo-user@example.com'
+        user.save(update_fields=['email'])
+
+        send_welcome_email(user, 'pass1234!')
+        self.assertEqual(len(mail.outbox), 1)
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn('data:image', html)
+        self.assertIn('SYGEP-CPFAE', html)
+
+
+class LoginAccessTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.auditeur = make_user('auditeur-login', password='pass12345', role=User.Role.AUDITEUR)
+
+    def test_auditeur_web_login_forbidden(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'auditeur-login',
+            'password': 'pass12345',
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn('mobile', resp.data['detail'].lower())
+
+    def test_auditeur_mobile_login_allowed(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'auditeur-login',
+            'password': 'pass12345',
+            'device_id': 'test-device-001',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.data)
 
