@@ -23,6 +23,13 @@ def _in_groups(user, *roles):
     return bool(_cached_user_groups(user) & target)
 
 
+def _has_role(user, *roles):
+    """Groupe Django ou champ ``role`` (secours si groupes non synchronisés)."""
+    if getattr(user, 'role', None) in roles:
+        return True
+    return _in_groups(user, *roles)
+
+
 def _model_perm(request, app_label, model_name):
     """Vérifie la permission Django correspondant à la méthode HTTP et au modèle donné.
 
@@ -149,9 +156,14 @@ class IsSecretariatOrDFRC(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _in_groups(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if _has_role(
+            request.user,
+            'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN',
+        ):
             return True
-        if _in_groups(request.user, 'DIRECTION', 'FINANCE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(
+            request.user, 'DIRECTION', 'FINANCE', 'ENCADRANT',
+        ) and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
 

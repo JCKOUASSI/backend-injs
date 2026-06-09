@@ -110,15 +110,14 @@ def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
 
 def _finance_formateur_summary_rows(formateur, request=None):
     """Lignes détail + totaux pour export fiche de paie (aligné sur le rapport finance API)."""
+    from formations.period_filter import parse_period_from_request, periode_api_payload
     from formations.api_views import (
-        _parse_finance_date_range,
         _finance_secretariat_id_from_request,
         _finance_report_rows,
-        _finance_periode_payload,
         _finance_build_prix_map,
     )
 
-    period = _parse_finance_date_range(request) if request else {
+    period = parse_period_from_request(request) if request else {
         'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'},
     }
     if period.get('error'):
@@ -168,7 +167,7 @@ def _finance_formateur_summary_rows(formateur, request=None):
         })
 
     stats = row.get('statistiques') or {}
-    periode_info = _finance_periode_payload(
+    periode_info = periode_api_payload(
         period['date_debut'], period['date_fin'], period['meta'],
         global_agg.get('date_min'), global_agg.get('date_max'),
     )
@@ -348,16 +347,15 @@ def _finance_synthese_document_options(request):
 
 def _finance_synthese_export_context(request):
     from django.db.models import Q
+    from formations.period_filter import parse_period_from_request, periode_api_payload
     from formations.api_views import (
-        _parse_finance_date_range,
         _finance_secretariat_id_from_request,
         _finance_filter_formateur_queryset,
         _finance_report_rows,
-        _finance_periode_payload,
         _finance_canonical_volume_kpis,
     )
 
-    period = _parse_finance_date_range(request)
+    period = parse_period_from_request(request)
     if period.get('error'):
         return None, period.get('detail') or 'Période invalide.'
 
@@ -401,7 +399,7 @@ def _finance_synthese_export_context(request):
         'formateurs_count': len(rows),
         'formateurs_actifs': sum(1 for r in rows if (r.get('sessions_count') or 0) > 0),
     }
-    periode_info = _finance_periode_payload(
+    periode_info = periode_api_payload(
         period['date_debut'],
         period['date_fin'],
         period['meta'],

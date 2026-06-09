@@ -139,6 +139,55 @@ class ImportFormationsRefSiteTest(TestCase):
         self.assertIsInstance(mod.site, RefSite)
         self.assertEqual(float(mod.duree_prevue_heures), 32)
 
+    def test_import_skips_trailing_partial_empty_rows(self):
+        rows = [FORMATION_HEADERS]
+        rows.append(tuple(_formation_defaults().values()))
+        # Ligne résiduelle : une cellule parasite mais pas de formation/module/dates
+        rows.append((None, None, None, None, None, None, None, None, None, ' ', None))
+        errors = []
+        created, updated = self.cmd._import_formations(_MemorySheet(rows), errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(created + updated, 1)
+
+    def test_import_tolerates_malformed_date_strings(self):
+        errors = []
+        created, _ = self.cmd._import_formations(
+            build_formations_sheet({
+                'Module (titre)': 'Deontologie typo dates',
+                'Date début': '15/06/ 2026',
+                'Date fin': '03/072026',
+            }),
+            errors,
+        )
+        self.assertEqual(errors, [], errors)
+        self.assertEqual(created, 1)
+        mod = Module.objects.get(intitule='Deontologie typo dates')
+        self.assertEqual(mod.date_debut.isoformat(), '2026-06-15')
+        self.assertEqual(mod.date_fin.isoformat(), '2026-07-03')
+
+    def test_import_resolves_single_letter_categorie_to_fab(self):
+        RefTypeSecretariat.objects.create(libelle='FAC A')
+        Secretariat.objects.create(
+            nom='Secrétariat FAC A',
+            type=RefTypeSecretariat.objects.get(libelle='FAC A'),
+        )
+        errors = []
+        created, _ = self.cmd._import_formations(
+            build_formations_sheet({
+                'Catégorie': 'A',
+                'Module (titre)': 'Module catégorie A',
+            }),
+            errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
+        mod = Module.objects.get(intitule='Module catégorie A')
+        self.assertEqual(mod.secretariat.nom, 'Secrétariat FAB A')
+
+    def test_resolve_secretariat_fnce_hint_via_categorie(self):
+        sec = self.cmd._resolve_secretariat(Secretariat, 'FAB', 'A')
+        self.assertEqual(sec.nom, 'Secrétariat FAB A')
+
 
 class ImportExcelAPITest(TestCase):
     @classmethod
@@ -240,17 +289,48 @@ class ImportSeancesMatchTest(TestCase):
             ).exists()
         )
 
-    def test_import_seance_rejects_missing_grade_groupe_vague(self):
+    def test_import_seance_fallback_when_vague_differs_but_unique_module(self):
+        self.module.vague = 'VAGUE 2'
+        self.module.save(update_fields=['vague'])
         errors = []
         created, updated = self.cmd._import_seances(
-            build_seances_sheet({'grade': '', 'groupe': '', 'vague': ''}), errors,
+            build_seances_sheet({'vague': 'SESSION 2026'}), errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
+        self.assertTrue(
+            SessionModule.objects.filter(
+                module=self.module, date_journee='2026-05-05', numero=1,
+            ).exists()
+        )
+
+    def test_import_seance_rejects_missing_groupe(self):
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({'groupe': ''}), errors,
         )
         self.assertEqual(created, 0)
         self.assertEqual(updated, 0)
         self.assertEqual(len(errors), 1)
-        self.assertIn('grade', errors[0])
         self.assertIn('groupe', errors[0])
-        self.assertIn('vague', errors[0])
+
+    def test_import_seance_matches_when_grade_missing_but_unique_module(self):
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({'grade': ''}), errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
+
+    def test_import_seance_matches_when_grade_differs_but_unique_module(self):
+        self.module.grade = 'A5'
+        self.module.save(update_fields=['grade'])
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({'grade': 'A4'}), errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
 
     def test_import_seance_rejects_wrong_groupe(self):
         errors = []
@@ -261,6 +341,21 @@ class ImportSeancesMatchTest(TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn('introuvable', errors[0])
         self.assertIn('GROUPE 99', errors[0])
+
+    def test_import_seance_corrects_known_module_title_typos(self):
+        self.module.intitule = 'ETHIQUE PUBLIQUE ET LUTTE CONTRE LA CORRUPTION'
+        self.module.groupe = 'GROUPE 13'
+        self.module.save(update_fields=['intitule', 'groupe'])
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({
+                'module_titre': 'ETHIQUE PUBLIQUE ET MUTTE CONTRE LA CORRUPTION',
+                'groupe': 'GROUPE 13',
+            }),
+            errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
 
 
 class ImportCoherenceWorkbookTest(TestCase):

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
-import { formatMoney } from '../components/FinanceStatsGrid'
+import { formatMoney, fmtDuration } from '../components/FinanceStatsGrid'
 import FinancePageShell, { FinanceNavActions } from '../components/finance/FinancePageShell'
 import FinanceDetailModal from '../components/finance/FinanceDetailModal'
 import {
@@ -194,12 +194,6 @@ export default function Formateurs() {
 
   const canEdit = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canDelete = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const formatDuration = (minutes) => {
-    const value = Number(minutes || 0)
-    const hours = Math.floor(value / 60)
-    const remaining = Math.round(value % 60)
-    return `${hours}h ${remaining}min`
-  }
 
   const formatDate = (value) => {
     if (!value) return '-'
@@ -247,8 +241,8 @@ export default function Formateurs() {
     const path = qs ? `${base}?${qs}` : base
     setExportingSynthese(true)
     try {
-      const blob = await api.getBlob(path)
-      downloadBlob(blob, `fiche_paie_globale.${ext}`)
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || `fiche_paie_globale.${ext}`)
       showToast(`Fiche de paie globale (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export consolidé', 'error')
@@ -384,8 +378,8 @@ export default function Formateurs() {
                         <td className="small">{f.grades || '—'}</td>
                         <td className="small">{f.groupes || '—'}</td>
                         <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_minutes)}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_realisee_minutes)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_minutes)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_realisee_minutes)}</td>
                         <td>
                           <div>{taux}%</div>
                           <div className="finance-taux-bar">
@@ -455,7 +449,7 @@ export default function Formateurs() {
             financeDetailTab={financeDetailTab}
             setFinanceDetailTab={setFinanceDetailTab}
             onClose={() => !financeDetailLoading && setFinanceDetail(null)}
-            formatDuration={formatDuration}
+            formatDuration={fmtDuration}
             formatDate={formatDate}
             exportFinanceSummary={exportFinanceSummary}
             exportAfficherMontants={exportAfficherMontants}
@@ -541,10 +535,10 @@ export default function Formateurs() {
                           <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
                         )}
                         {canViewFinanceData && (
-                          <td><span className="badge-bg-info">{formatDuration(f.total_duree_minutes)}</span></td>
+                          <td><span className="badge-bg-info">{fmtDuration(f.total_duree_minutes)}</span></td>
                         )}
                         {canViewFinanceData && (
-                          <td><span className="badge-bg-success">{formatDuration(f.total_duree_realisee_minutes)}</span></td>
+                          <td><span className="badge-bg-success">{fmtDuration(f.total_duree_realisee_minutes)}</span></td>
                         )}
                         {canViewFinanceData && (
                           <td>{(f.statistiques?.taux_realisation_pct ?? 0)}%</td>

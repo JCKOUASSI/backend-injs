@@ -16,6 +16,39 @@ SECRETARIAT_ROLES = frozenset({'SECRETARIAT', 'CHEF_SECRETARIAT'})
 GLOBAL_STATS_ROLES = frozenset({
     'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE',
 })
+STATS_ACCESS_ROLES = frozenset({
+    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
+    'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT',
+})
+ROLE_ALIASES = {
+    'DFRC': 'CPFAE_ADMIN',
+    'SUPERVISEUR': 'ENCADRANT',
+    'SUPERVISOR': 'ENCADRANT',
+}
+
+
+def effective_user_role(user) -> Optional[str]:
+    role = getattr(user, 'role', None)
+    return ROLE_ALIASES.get(role, role)
+
+
+def user_stats_role(user) -> Optional[str]:
+    """Rôle effectif pour le périmètre stats (champ role ou groupe Django)."""
+    role = effective_user_role(user)
+    if role in STATS_ACCESS_ROLES:
+        return role
+    from authentication.permissions import _in_groups
+    for candidate in (
+        'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
+        'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT',
+    ):
+        if _in_groups(user, candidate):
+            return candidate
+    return role
+
+
+def user_has_stats_access(user) -> bool:
+    return user_stats_role(user) in STATS_ACCESS_ROLES
 
 
 @dataclass
@@ -54,7 +87,7 @@ def resolve_stats_scope(
     if not (user and user.is_authenticated):
         return StatsScope(), 'Authentification requise.'
 
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     scope = StatsScope(
         formation_id=int(formation_id) if formation_id else None,
         secretariat_id=int(secretariat_id) if secretariat_id else None,
@@ -70,8 +103,6 @@ def resolve_stats_scope(
 
     elif role == 'ENCADRANT':
         mod_ids = encadrant_module_ids(user)
-        if not mod_ids:
-            return StatsScope(module_ids=[]), 'Aucun module supervisé.'
         scope.module_ids = mod_ids
         allowed_secs = set(encadrant_secretariat_ids(user))
         if scope.secretariat_id:
@@ -94,7 +125,7 @@ def resolve_stats_scope(
 
 
 def _validate_formation(user, formation_id: int) -> Optional[str]:
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in GLOBAL_STATS_ROLES:
         return None
     if role in SECRETARIAT_ROLES:
@@ -117,7 +148,7 @@ def _validate_module(user, module_id: int, scope: StatsScope) -> Optional[str]:
     except Module.DoesNotExist:
         return 'Module introuvable.'
 
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in SECRETARIAT_ROLES:
         sec = getattr(user, 'secretariat', None)
         if not sec or module.secretariat_id != sec.id:
@@ -134,7 +165,7 @@ def _validate_module(user, module_id: int, scope: StatsScope) -> Optional[str]:
 
 def formations_liste_for_user(user, limit=50) -> list:
     qs = Formation.objects.order_by('-id')
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in SECRETARIAT_ROLES and getattr(user, 'secretariat_id', None):
         qs = qs.filter(modules__secretariat_id=user.secretariat_id).distinct()
     elif role == 'ENCADRANT':
@@ -144,7 +175,7 @@ def formations_liste_for_user(user, limit=50) -> list:
 
 def secretariats_liste_for_user(user) -> list:
     qs = Secretariat.objects.order_by('nom')
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in SECRETARIAT_ROLES and getattr(user, 'secretariat_id', None):
         qs = qs.filter(pk=user.secretariat_id)
     elif role == 'ENCADRANT':
@@ -154,7 +185,7 @@ def secretariats_liste_for_user(user) -> list:
 
 def secretariats_stats_queryset(user):
     qs = Secretariat.objects.order_by('nom').prefetch_related('responsable')
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in SECRETARIAT_ROLES and getattr(user, 'secretariat_id', None):
         return qs.filter(pk=user.secretariat_id)
     if role == 'ENCADRANT':
@@ -173,7 +204,7 @@ def module_filter_kwargs(scope: StatsScope) -> dict:
 
 def rapports_queryset_for_user(user):
     qs = Rapport.objects.all()
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in GLOBAL_STATS_ROLES:
         return qs
     if role in SECRETARIAT_ROLES and getattr(user, 'secretariat_id', None):
@@ -187,7 +218,7 @@ def rapports_queryset_for_user(user):
 
 
 def rapport_accessible(user, rapport: Rapport) -> bool:
-    role = getattr(user, 'role', None)
+    role = user_stats_role(user)
     if role in GLOBAL_STATS_ROLES:
         return True
     if role in SECRETARIAT_ROLES:
