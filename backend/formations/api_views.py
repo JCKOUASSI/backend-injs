@@ -1018,6 +1018,11 @@ def _finance_previous_period(date_debut, date_fin, meta):
     return None
 
 
+def _heures_entieres(minutes):
+    """Convertit des minutes en heures entières (affichage stats / finance)."""
+    return int(round(float(minutes or 0) / 60))
+
+
 def _finance_canonical_volume_kpis(rows, *, date_debut=None, date_fin=None):
     """Volume horaire global (séances uniques) aligné dashboard web / statistiques."""
     from .volume_horaire import compute_volume_horaire_from_module_ids
@@ -1032,14 +1037,15 @@ def _finance_canonical_volume_kpis(rows, *, date_debut=None, date_fin=None):
         module_ids,
         date_debut=date_debut,
         date_fin=date_fin,
+        integer_hours=True,
     )
 
 
 def _finance_apply_canonical_volume_kpis(kpis, volume_totals):
     kpis['total_duree_minutes'] = volume_totals['prevu_minutes']
-    kpis['total_duree_heures'] = round(volume_totals['prevu_minutes'] / 60, 2)
+    kpis['total_duree_heures'] = volume_totals['prevu_heures']
     kpis['total_duree_realisee_minutes'] = volume_totals['realise_minutes']
-    kpis['total_duree_realisee_heures'] = round(volume_totals['realise_minutes'] / 60, 2)
+    kpis['total_duree_realisee_heures'] = volume_totals['realise_heures']
     kpis['taux_realisation_global_pct'] = volume_totals['taux_pct']
 
 
@@ -1050,11 +1056,11 @@ def _finance_kpis_from_rows(rows, prix_heure):
     formateurs_inactifs = total_formateurs - formateurs_actifs
     total_sessions = sum(int(r.get('sessions_count') or 0) for r in rows)
     total_duree_minutes = round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1)
-    total_duree_heures = round(total_duree_minutes / 60, 2)
+    total_duree_heures = _heures_entieres(total_duree_minutes)
     total_duree_realisee_minutes = round(
         sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1,
     )
-    total_duree_realisee_heures = round(total_duree_realisee_minutes / 60, 2)
+    total_duree_realisee_heures = _heures_entieres(total_duree_realisee_minutes)
     total_montant_realise = round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2)
     taux_planned = sum(
         float((r.get('statistiques') or {}).get('taux_planned_minutes') or 0) for r in rows
@@ -1096,12 +1102,12 @@ def _finance_kpis_from_rows(rows, prix_heure):
         'tarifs_appliques': sorted(tarifs_appliques),
         'prix_heure_moyen_effectif': prix_heure_moyen_effectif,
         'taux_realisation_global_pct': taux_realisation_global,
-        'moyenne_heures_par_formateur': round(
-            (total_duree_heures / formateurs_actifs), 2,
-        ) if formateurs_actifs > 0 else 0,
-        'moyenne_heures_realisees_par_formateur': round(
-            (total_duree_realisee_heures / formateurs_actifs), 2,
-        ) if formateurs_actifs > 0 else 0,
+        'moyenne_heures_par_formateur': int(round(
+            total_duree_heures / formateurs_actifs,
+        )) if formateurs_actifs > 0 else 0,
+        'moyenne_heures_realisees_par_formateur': int(round(
+            total_duree_realisee_heures / formateurs_actifs,
+        )) if formateurs_actifs > 0 else 0,
         'moyenne_montant_par_formateur_actif': round(
             (total_montant_realise / formateurs_actifs), 2,
         ) if formateurs_actifs > 0 else 0,
@@ -1157,9 +1163,9 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
             **meta,
             'sessions_count': vol['nb_sessions'],
             'total_duree_minutes': planned,
-            'total_duree_heures': round(planned / 60, 2) if planned else 0,
+            'total_duree_heures': _heures_entieres(planned) if planned else 0,
             'total_duree_realisee_minutes': realized,
-            'total_duree_realisee_heures': round(realized / 60, 2) if realized else 0,
+            'total_duree_realisee_heures': _heures_entieres(realized) if realized else 0,
             'taux_realisation_pct': taux,
             'montant_realise': montant,
         })
@@ -1444,8 +1450,8 @@ def _finance_report_rows(
             entry = dict(entry)
             entry['total_duree_minutes'] = round(entry['total_duree_minutes'], 1)
             entry['total_duree_realisee_minutes'] = round(entry['total_duree_realisee_minutes'], 1)
-            entry['total_duree_heures'] = round(entry['total_duree_minutes'] / 60, 2)
-            entry['total_duree_realisee_heures'] = round(entry['total_duree_realisee_minutes'] / 60, 2)
+            entry['total_duree_heures'] = _heures_entieres(entry['total_duree_minutes'])
+            entry['total_duree_realisee_heures'] = _heures_entieres(entry['total_duree_realisee_minutes'])
             if entry.get('date_debut'):
                 entry['date_debut'] = entry['date_debut'].isoformat()
             if entry.get('date_fin'):
@@ -1499,9 +1505,9 @@ def _finance_report_rows(
             'tarifs_variables': tarifs_variables,
             'montant_total_realise': montant_total,
             'total_duree_minutes': round(total_minutes, 1),
-            'total_duree_heures': round(total_minutes / 60, 2),
+            'total_duree_heures': _heures_entieres(total_minutes),
             'total_duree_realisee_minutes': round(total_realized_minutes, 1),
-            'total_duree_realisee_heures': round(total_realized_minutes / 60, 2),
+            'total_duree_realisee_heures': _heures_entieres(total_realized_minutes),
             'sessions_count': session_count,
             'statistiques': statistiques,
             'modules': modules_list,
@@ -1695,7 +1701,7 @@ def finance_dashboard_api(request):
             'mois': mois,
             'label': datetime.strptime(mois, '%Y-%m').strftime('%b %Y'),
             'minutes_realisees': round(minutes, 1),
-            'heures_realisees': round(minutes / 60, 2),
+            'heures_realisees': _heures_entieres(minutes),
             'montant': round(float(montant_par_mois.get(mois, 0.0)), 2),
         }
         for mois, minutes in sorted(global_aggregates['activite_par_mois'].items())

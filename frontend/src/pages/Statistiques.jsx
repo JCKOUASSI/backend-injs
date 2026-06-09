@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
+import { fmtHeures } from '../components/FinanceStatsGrid'
 import {
   appendPeriodToSearchParams,
   loadFinancePeriod,
@@ -3089,7 +3090,7 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
           <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
           <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
-          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
+          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
             color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
             help={KPI_VH_EXEC.help}/>
@@ -3175,7 +3176,7 @@ function VueOverviewDetailPanel({
           <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
           <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
-          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
+          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
             color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
             help={KPI_VH_EXEC.help}/>
@@ -3711,7 +3712,7 @@ function SecretariatsComparatifTable({ secretariats, onRowClick }) {
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#43A047', fontWeight: 600 }}>{s.nb_presents}</td>
               <td style={{ padding: '0.45rem 0.65rem', minWidth: 110 }}><TauxBar value={s.taux_presence} small/></td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#C62828', fontWeight: 600 }}>{s.nb_absences}</td>
-              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#558B2F' }}>{s.vh_prevu}h</td>
+              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#558B2F' }}>{fmtHeures(s.vh_prevu)}h</td>
               <td style={{ padding: '0.45rem 0.65rem', minWidth: 80 }}><TauxBar value={s.taux_execution_vh} small/></td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#1565C0' }}>{s.ratio_hf.hommes}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#AD1457' }}>{s.ratio_hf.femmes}</td>
@@ -3826,7 +3827,7 @@ function SecretariatDetailPanel({ row, detail }) {
         <Kpi icon="bi-qr-code-scan" label="Pointages" value={kpis.pointages} color="#C62828"/>
         <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${pedagogiques.taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-percent" label="Taux absence" value={`${pedagogiques.taux_absence}%`} color="#C62828"/>
-        <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${kpis.vh_prevu_heures}h`} color="#558B2F"/>
+        <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
