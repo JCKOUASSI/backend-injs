@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
-import { fmtDuration, formatMoney } from '../components/FinanceStatsGrid'
+import { fmtDuration, fmtHeures, formatMoney } from '../components/FinanceStatsGrid'
 import FinancePageShell, { FinanceNavActions } from '../components/finance/FinancePageShell'
 import {
   buildFinanceListSearchParams,
@@ -28,7 +28,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_minutes',
-    sub: (kpis) => `${kpis.total_duree_heures ?? 0} h · ${kpis.total_sessions ?? 0} séance(s)`,
+    sub: (kpis) => `${fmtHeures(kpis.total_duree_heures)} h · ${kpis.total_sessions ?? 0} séance(s)`,
   },
   {
     id: 'realise',
@@ -38,7 +38,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_realisee_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_realisee_minutes',
-    sub: (kpis) => `${kpis.total_duree_realisee_heures ?? 0} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
+    sub: (kpis) => `${fmtHeures(kpis.total_duree_realisee_heures)} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
   },
   {
     id: 'taux',
@@ -104,7 +104,7 @@ function formatKpiValue(kpis, item) {
   const v = kpis[item.key]
   if (item.format === 'duration') return fmtDuration(v)
   if (item.format === 'money') return `${formatMoney(v)} FCFA`
-  if (item.format === 'hours') return `${v ?? 0} h`
+  if (item.format === 'hours') return `${fmtHeures(v)} h`
   return v ?? 0
 }
 

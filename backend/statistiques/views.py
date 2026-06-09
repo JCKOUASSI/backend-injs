@@ -263,6 +263,7 @@ def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None, date_
         module_ids_scope,
         date_debut=date_debut,
         date_fin=date_fin,
+        integer_hours=True,
     )
     vh_prevu = vh_totals['prevu_heures']
     vh_realise_h = vh_totals['realise_heures']
@@ -987,6 +988,7 @@ class SecretariatsStatsView(APIView):
 
             vh_totals = compute_volume_horaire_from_module_ids(
                 mod_ids, date_debut=date_debut, date_fin=date_fin,
+                integer_hours=True,
             )
             vh_prevu = vh_totals['prevu_heures']
             vh_realise = vh_totals['realise_heures']

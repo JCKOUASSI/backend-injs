@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-import { FinanceStatsGrid, FinanceModulesList, formatMoney } from '../FinanceStatsGrid'
+import { FinanceStatsGrid, FinanceModulesList, fmtHeures, formatMoney } from '../FinanceStatsGrid'
 import Pagination from '../Pagination'
 import { useClientPagination, TABLE_PAGE_SIZE } from '../../hooks/useClientPagination'
 
@@ -280,7 +280,7 @@ export default function FinanceDetailModal({
                         <div style={{ fontWeight: 600 }}>
                           {formatDuration(financeDetail.total_duree_realisee_minutes)}
                           <span className="text-muted small ms-1">
-                            ({Number(financeDetail.total_duree_realisee_heures ?? 0).toFixed(2)} h)
+                            ({fmtHeures(financeDetail.total_duree_realisee_heures)} h)
                           </span>
                         </div>
                       </div>

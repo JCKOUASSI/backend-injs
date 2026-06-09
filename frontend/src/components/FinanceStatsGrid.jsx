@@ -8,6 +8,8 @@ const fmtDuration = (minutes) => {
   return `${h}h ${m}min`
 }
 
+const fmtHeures = (heures) => `${Math.round(Number(heures) || 0)}`
+
 const formatMoney = (value) => {
   const n = Number(value || 0)
   return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
@@ -147,4 +149,4 @@ export function FinanceModulesList({ modules, formatDuration }) {
   )
 }
 
-export { fmtDuration, formatMoney, STATUT_LABELS }
+export { fmtDuration, fmtHeures, formatMoney, STATUT_LABELS }
