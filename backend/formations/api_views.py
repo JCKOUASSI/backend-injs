@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import timedelta, datetime, time, date
 import calendar
 import re
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q, F
 from django.db import transaction
 from django.utils import timezone
@@ -2178,18 +2179,41 @@ def ref_formation_detail(request, pk):
     return Response(status=204)
 
 
+def _ref_module_response(obj, status_code=200):
+    return Response(
+        {
+            'id': obj.id,
+            'intitule': obj.intitule,
+            'volume_horaire': obj.volume_horaire,
+            'actif': obj.actif,
+        },
+        status=status_code,
+    )
+
+
+def _ref_module_validation_response(exc):
+    if hasattr(exc, 'message_dict'):
+        return Response(exc.message_dict, status=400)
+    return Response({'detail': exc.messages}, status=400)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
         data = list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif'))
         return Response(data)
-    obj = RefModule.objects.create(
+    obj = RefModule(
         intitule=request.data.get('intitule', ''),
         volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
-    return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif}, status=201)
+    try:
+        obj.save()
+    except ValidationError as exc:
+        return _ref_module_validation_response(exc)
+    return _ref_module_response(obj, status_code=201)
+
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
@@ -2202,8 +2226,11 @@ def ref_module_detail(request, pk):
         obj.intitule = request.data.get('intitule', obj.intitule)
         obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
-        obj.save()
-        return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif})
+        try:
+            obj.save()
+        except ValidationError as exc:
+            return _ref_module_validation_response(exc)
+        return _ref_module_response(obj)
     obj.delete()
     return Response(status=204)
 

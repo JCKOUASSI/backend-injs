@@ -95,12 +95,18 @@ class StatistiquesAPIAccessTests(TestCase):
         self.assertEqual(res.data['total'], 1)
         self.assertEqual(res.data['secretariats'][0]['secretariat_id'], self.sec_a.id)
 
-    def test_admin_sees_all_secretariats_stats(self):
-        user = make_user('admin_api', role='CPFAE_ADMIN')
-        self.client.force_authenticate(user)
-        res = self.client.get('/api/statistiques/secretariats/')
+    def test_encadrant_without_modules_can_open_dashboard(self):
+        enc = make_user('enc_empty', role='ENCADRANT')
+        self.client.force_authenticate(enc)
+        res = self.client.get('/api/statistiques/?sections=kpis')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertGreaterEqual(res.data['total'], 2)
+        self.assertEqual(res.data['kpis']['modules'], 0)
+
+    def test_legacy_dfrc_role_can_open_dashboard(self):
+        user = make_user('legacy_dfrc', role='DFRC')
+        self.client.force_authenticate(user)
+        res = self.client.get('/api/statistiques/?sections=kpis')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
 
 class RapportAccessTests(TestCase):

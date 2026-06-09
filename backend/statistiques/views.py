@@ -51,11 +51,12 @@ from .access import (
     module_filter_kwargs,
     rapports_queryset_for_user,
     rapport_accessible,
+    user_has_stats_access,
+    STATS_ACCESS_ROLES,
 )
 
 # ── Rôles ─────────────────────────────────────────────────────────────────────
-STATS_ROLES      = {'ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN',
-                    'CHEF_SECRETARIAT','SECRETARIAT','FINANCE','ENCADRANT'}
+STATS_ROLES = STATS_ACCESS_ROLES
 VALIDATION_ROLES = {'ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN'}
 GENERATION_ROLES = {'ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN',
                     'CHEF_SECRETARIAT','SECRETARIAT'}
@@ -913,7 +914,7 @@ class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
         scope, err = _scope_from_request(request)
@@ -935,7 +936,7 @@ class SecretariatsStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
         scope, err = _scope_from_request(request)
@@ -1034,7 +1035,7 @@ class AlertesSeuilsView(APIView):
         return _scope_from_request(request)
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         scope, err = self._scope(request)
         if err:
@@ -1102,7 +1103,7 @@ class RapportsListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         return Response(list(
             rapports_queryset_for_user(request.user)
@@ -1166,7 +1167,7 @@ class RapportDetailView(APIView):
         }
 
     def get(self, request, rapport_id):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         rapport = get_object_or_404(Rapport, id=rapport_id)
         if not rapport_accessible(request.user, rapport):
@@ -1248,7 +1249,7 @@ class RapportNotificationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         qs = NotificationRapport.objects.filter(destinataire=request.user).select_related('auteur')
         items = list(qs[:50])
@@ -1271,7 +1272,7 @@ class RapportNotificationsView(APIView):
 
     def patch(self, request):
         """Marquer des notifications comme lues : { "ids": [1,2] } ou { "tout": true }."""
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         if request.data.get('tout'):
             NotificationRapport.objects.filter(destinataire=request.user, lu=False).update(lu=True)
@@ -1332,7 +1333,7 @@ class PointJournalierView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
         scope, err = _scope_from_request(request)
@@ -1387,7 +1388,7 @@ def point_journalier_export(request):
     GET /api/statistiques/point-journalier-export/?export=xlsx|pdf|docx
     Retourne un fichier binaire (HttpResponse).
     """
-    if not _check_role(request.user, STATS_ROLES):
+    if not user_has_stats_access(request.user):
         return Response({'detail': 'Accès non autorisé.'}, status=403)
 
     def _int(key):
@@ -1427,7 +1428,7 @@ def bilans_export(request):
     """
     GET /api/statistiques/bilans-export/?export=xlsx|pdf|docx
     """
-    if not _check_role(request.user, STATS_ROLES):
+    if not user_has_stats_access(request.user):
         return Response({'detail': 'Accès non autorisé.'}, status=403)
 
     def _int(key):
@@ -1474,7 +1475,7 @@ class BilansView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
         def _int(key):
@@ -1545,7 +1546,7 @@ class ObservationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, rapport_id):
-        if not _check_role(request.user, STATS_ROLES):
+        if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         rapport = get_object_or_404(Rapport, id=rapport_id)
         if not rapport_accessible(request.user, rapport):

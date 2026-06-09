@@ -8,7 +8,7 @@ from rest_framework import status
 from authentication.models import User
 from .models import (
     Formation, Module, Participant, Formateur,
-    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
+    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule, RefModule,
 )
 from .volume_horaire import compute_dashboard_volume_horaire
 
@@ -442,4 +442,38 @@ class DashboardVolumeHoraireTest(TestCase):
         canon = compute_volume_horaire_from_modules(qs)
         self.assertEqual(dash[1], canon['prevu_heures'])
         self.assertEqual(dash[0], canon['realise_heures'])
+
+
+class RefModuleUniqueIntituleTest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = make_user('ref_admin')
+        self.client.force_authenticate(user=self.user)
+        self.list_url = reverse('api-ref-module-list')
+
+    def test_create_duplicate_case_insensitive_rejected(self):
+        RefModule.objects.create(intitule='Déontologie')
+        response = self.client.post(self.list_url, {'intitule': 'DÉONTOLOGIE', 'actif': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('intitule', response.data)
+
+    def test_update_to_existing_intitule_case_insensitive_rejected(self):
+        first = RefModule.objects.create(intitule='Gestion budgétaire')
+        second = RefModule.objects.create(intitule='Communication')
+        url = reverse('api-ref-module-detail', args=[second.pk])
+        response = self.client.put(url, {'intitule': 'GESTION BUDGÉTAIRE', 'actif': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('intitule', response.data)
+        second.refresh_from_db()
+        self.assertEqual(second.intitule, 'Communication')
+        self.assertEqual(first.intitule, 'Gestion budgétaire')
+
+    def test_update_same_intitule_different_case_allowed(self):
+        module = RefModule.objects.create(intitule='Planification')
+        url = reverse('api-ref-module-detail', args=[module.pk])
+        response = self.client.put(url, {'intitule': 'PLANIFICATION', 'actif': True}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        module.refresh_from_db()
+        self.assertEqual(module.intitule, 'PLANIFICATION')
 

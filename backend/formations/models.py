@@ -1,5 +1,7 @@
 import uuid
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.functions import Lower
 from django.conf import settings
 from django.utils import timezone
 
@@ -165,9 +167,44 @@ class RefModule(models.Model):
         ordering = ['intitule']
         verbose_name = 'Référentiel – Module'
         verbose_name_plural = 'Référentiel – Modules'
+        constraints = [
+            models.UniqueConstraint(
+                Lower('intitule'),
+                name='uniq_refmodule_intitule_ci',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
+
+    @classmethod
+    def normalize_intitule(cls, intitule):
+        return (intitule or '').strip()
+
+    @classmethod
+    def intitule_exists(cls, intitule, exclude_pk=None):
+        normalized = cls.normalize_intitule(intitule)
+        if not normalized:
+            return False
+        qs = cls.objects.filter(intitule__iexact=normalized)
+        if exclude_pk is not None:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs.exists()
+
+    def clean(self):
+        super().clean()
+        self.intitule = self.normalize_intitule(self.intitule)
+        if not self.intitule:
+            raise ValidationError({'intitule': "L'intitulé est requis."})
+        if self.intitule_exists(self.intitule, exclude_pk=self.pk):
+            raise ValidationError({
+                'intitule': "Un module avec cet intitulé existe déjà (sans distinction majuscules/minuscules).",
+            })
+
+    def save(self, *args, **kwargs):
+        self.intitule = self.normalize_intitule(self.intitule)
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class RefSite(models.Model):
