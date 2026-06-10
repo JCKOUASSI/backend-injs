@@ -651,7 +651,7 @@ class Command(BaseCommand):
 
     # ─── Import Participants ─────────────────────────
 
-    def _import_participants(self, ws, errors, secretariat=None):
+    def _import_participants(self, ws, errors, secretariat=None, *, provision_accounts=True):
         from authentication.badge_accounts import provision_auditeur_accounts
         from formations.models import Secretariat as SecretariatModel
         count = 0
@@ -851,16 +851,26 @@ class Command(BaseCommand):
         if inscriptions:
             self.stdout.write(f'  📌 {inscriptions} inscription(s) créée(s)')
 
-        self.account_provision_stats['auditeurs'] = provision_auditeur_accounts(
-            touched_ids,
-            log=self.stdout.write,
-            send_email=False,
-        )
+        if provision_accounts and touched_ids:
+            self.account_provision_stats['auditeurs'] = provision_auditeur_accounts(
+                touched_ids,
+                log=self.stdout.write,
+                send_email=False,
+            )
+        elif not provision_accounts:
+            self.account_provision_stats['auditeurs'] = {
+                'deferred': True,
+                'created': 0,
+                'updated': 0,
+                'skipped': len(touched_ids),
+                'emails_sent': 0,
+                'errors': 0,
+            }
         return count
 
     # ─── Import Formateurs ───────────────────────────
 
-    def _import_formateurs(self, ws, errors):
+    def _import_formateurs(self, ws, errors, *, provision_accounts=True):
         from authentication.badge_accounts import provision_formateur_accounts
         count = 0
         touched_ids = set()
@@ -908,11 +918,21 @@ class Command(BaseCommand):
                 self.stdout.write(f'  ~ Formateur mis à jour : {obj.numerobadge} — {nom} {prenom}')
             touched_ids.add(obj.pk)
 
-        self.account_provision_stats['formateurs'] = provision_formateur_accounts(
-            touched_ids,
-            log=self.stdout.write,
-            send_email=False,
-        )
+        if provision_accounts and touched_ids:
+            self.account_provision_stats['formateurs'] = provision_formateur_accounts(
+                touched_ids,
+                log=self.stdout.write,
+                send_email=False,
+            )
+        elif not provision_accounts:
+            self.account_provision_stats['formateurs'] = {
+                'deferred': True,
+                'created': 0,
+                'updated': 0,
+                'skipped': len(touched_ids),
+                'emails_sent': 0,
+                'errors': 0,
+            }
         return count
 
     # ─── Import Inscriptions ─────────────────────────

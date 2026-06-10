@@ -2399,9 +2399,11 @@ def api_import_excel(request):
                 if import_type == 'formations':
                     stats['created'], stats['updated'] = cmd._import_formations(ws, errors, secretariat=secretariat)
                 elif import_type == 'participants':
-                    stats['created'] = cmd._import_participants(ws, errors, secretariat=secretariat)
+                    stats['created'] = cmd._import_participants(
+                        ws, errors, secretariat=secretariat, provision_accounts=False,
+                    )
                 elif import_type == 'formateurs':
-                    stats['created'] = cmd._import_formateurs(ws, errors)
+                    stats['created'] = cmd._import_formateurs(ws, errors, provision_accounts=False)
                 elif import_type == 'emploi_du_temps':
                     stats['created'] = cmd._import_emploi_du_temps(ws, errors)
                 elif import_type == 'seances':
@@ -2456,13 +2458,16 @@ def api_import_excel(request):
                             return Response({'error': 'Aucune feuille de participants trouvée dans le fichier.'}, status=400)
                         total_created = 0
                         for sn in candidate_sheets:
-                            total_created += cmd._import_participants(wb[sn], errors, secretariat=secretariat)
+                            total_created += cmd._import_participants(
+                                wb[sn], errors, secretariat=secretariat, provision_accounts=False,
+                            )
                         stats['created'] = total_created
                         wb.close()
                         debug_headers = [l for l in _logs if '[DEBUG]' in l]
                         return Response({
                             'created': stats.get('created', 0),
                             'accounts': cmd.account_provision_stats.get('auditeurs', {}),
+                            'accounts_deferred': True,
                             'errors': errors[:20],
                             'debug_headers': debug_headers,
                         })
@@ -2478,9 +2483,13 @@ def api_import_excel(request):
                 if import_type == 'formations':
                     stats['created'], stats['updated'] = cmd._import_formations(wb_sheets[sheet_name], errors, secretariat=secretariat)
                 elif import_type == 'participants':
-                    stats['created'] = cmd._import_participants(wb_sheets[sheet_name], errors, secretariat=secretariat)
+                    stats['created'] = cmd._import_participants(
+                        wb_sheets[sheet_name], errors, secretariat=secretariat, provision_accounts=False,
+                    )
                 elif import_type == 'formateurs':
-                    stats['created'] = cmd._import_formateurs(wb_sheets[sheet_name], errors)
+                    stats['created'] = cmd._import_formateurs(
+                        wb_sheets[sheet_name], errors, provision_accounts=False,
+                    )
                 elif import_type == 'emploi_du_temps':
                     stats['created'] = cmd._import_emploi_du_temps(wb_sheets[sheet_name], errors)
                 elif import_type == 'seances':
@@ -2502,10 +2511,12 @@ def api_import_excel(request):
         return Response({'error': f"Erreur lors de l'import: {e}"}, status=500)
 
     debug_headers = [l for l in _logs if '[DEBUG]' in l]
+    accounts_deferred = import_type in ('participants', 'formateurs')
     return Response({
         'created': stats.get('created', 0),
         'updated': stats.get('updated', 0),
         'accounts': cmd.account_provision_stats,
+        'accounts_deferred': accounts_deferred,
         'errors': errors[:20],
         'debug_headers': debug_headers,
     })
