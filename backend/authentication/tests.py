@@ -477,6 +477,49 @@ class BadgeAccountProvisionTests(TestCase):
         self.assertEqual(stats['emails_sent'], 0)
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_auditeur_account_links_existing_user_without_duplicate(self):
+        from formations.models import Participant
+        from authentication.badge_accounts import provision_auditeur_accounts
+
+        existing = User.objects.create_user(
+            username='FNCP26-100',
+            password='pass12345',
+            first_name='Ancien',
+            last_name='Nom',
+            role=User.Role.AUDITEUR,
+            matricule='FNCP26-100',
+        )
+        # Compte orphelin : user existe mais la fiche importée garde les données Excel.
+        Participant.objects.filter(pk=self.participant.pk).update(
+            user_id=None,
+            prenom='Aya',
+            nom='Kouassi',
+        )
+        self.participant.refresh_from_db()
+
+        stats = provision_auditeur_accounts([self.participant.pk])
+        self.participant.refresh_from_db()
+        existing.refresh_from_db()
+
+        self.assertEqual(stats['errors'], 0)
+        self.assertEqual(stats['updated'], 1)
+        self.assertEqual(self.participant.user_id, existing.id)
+        self.assertEqual(existing.first_name, 'Aya')
+        self.assertEqual(existing.last_name, 'Kouassi')
+
+    def test_auditeur_reimport_does_not_reset_password(self):
+        from authentication.badge_accounts import ensure_auditeur_account
+
+        self.participant.user = None
+        self.participant.save(update_fields=['user'])
+        ensure_auditeur_account(self.participant, send_email=False)
+        self.participant.refresh_from_db()
+        old_hash = self.participant.user.password
+
+        ensure_auditeur_account(self.participant, send_email=False, reset_password=False)
+        self.participant.user.refresh_from_db()
+        self.assertEqual(self.participant.user.password, old_hash)
+
     def test_welcome_email_contains_logo(self):
         from authentication.emails import send_welcome_email
 

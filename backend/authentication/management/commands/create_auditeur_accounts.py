@@ -86,6 +86,7 @@ class Command(BaseCommand):
                         password=password,
                         send_email=True,
                         skip_existing=True,
+                        reset_password=True,
                     )
                     if action == 'created':
                         created += 1
@@ -114,6 +115,7 @@ class Command(BaseCommand):
                 participant_ids,
                 password=password,
                 send_email=True,
+                reset_password=True,
                 log=self.stdout.write,
             )
 

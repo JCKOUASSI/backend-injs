@@ -1,5 +1,7 @@
 /** Persistance des filtres de listes (URL + sessionStorage pour les liens « Retour »). */
 
+import { appendPeriodToSearchParams } from './financePeriod'
+
 export const LIST_STORAGE_KEYS = {
   modules: 'modules_list_query',
   participants: 'participants_list_query',
@@ -157,7 +159,7 @@ export const readDashboardFilters = (searchParams) => ({
   reference_date: searchParams.get('reference_date') || new Date().toISOString().slice(0, 10),
 })
 
-export const buildDashboardSearchParams = (filters) => {
+export const buildDashboardSearchParams = (filters, period) => {
   const p = new URLSearchParams()
   if (filters.secretariat) p.set('secretariat', filters.secretariat)
   if (filters.presence_period && filters.presence_period !== 'jour') {
@@ -167,6 +169,7 @@ export const buildDashboardSearchParams = (filters) => {
   if (filters.reference_date && filters.reference_date !== today) {
     p.set('reference_date', filters.reference_date)
   }
+  if (period) appendPeriodToSearchParams(p, period)
   return p
 }
 

@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
+from presences.models import AuditLog, _log_audit, log_audit_system
 from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
 from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with_edt_balance
@@ -18,6 +19,17 @@ from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with
 REACTIVATION_GRACE_HOURS = 4
 AUTO_CLOSE_DELAY_MINUTES = 30
 TZ_LOCALE = ZoneInfo('Africa/Abidjan')
+
+
+def _session_audit_extra(session):
+    return {
+        'session_id': session.id,
+        'session_numero': session.numero,
+        'session_intitule': session.intitule or f'Séance {session.numero}',
+        'date_journee': str(session.date_journee),
+        'module_id': session.module_id,
+        'module_intitule': session.module.intitule,
+    }
 
 
 def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
@@ -181,13 +193,13 @@ def _auto_manage_sessions(formation):
     now = timezone.now()
     local_now = timezone.localtime(now)
 
-    sessions = SessionModule.objects.filter(module__formation=formation)
-    changed_formation = False
+    sessions = SessionModule.objects.filter(module__formation=formation).select_related('module__formation')
 
     modules_updated = set()
 
     for session in sessions:
         module = session.module
+        formation_obj = module.formation
         # Auto-start si l'heure de début est passée et l'encadrant n'a pas démarré.
         # ``demarree_le`` est posé à l'heure prévue (et non ``now``).
         if _should_auto_start_session(session, local_now):
@@ -197,6 +209,11 @@ def _auto_manage_sessions(formation):
                 module.statut = 'EN_COURS'
                 module.save(update_fields=['statut'])
                 modules_updated.add(module.pk)
+            log_audit_system(
+                AuditLog.Action.SEANCE_START,
+                formation=formation_obj,
+                extra={**_session_audit_extra(session), 'auto': True},
+            )
 
         # Auto-close si l'heure de fin est passée, l'encadrant n'a pas fermé,
         # et le délai de grâce est écoulé. ``terminee_le`` reste borné à la fin
@@ -205,6 +222,11 @@ def _auto_manage_sessions(formation):
             session.terminee_le = _session_fin_prevue_local(session)
             session.save(update_fields=['terminee_le'])
             QRToken.objects.filter(session=session, actif=True).update(actif=False)
+            log_audit_system(
+                AuditLog.Action.SEANCE_STOP,
+                formation=formation_obj,
+                extra={**_session_audit_extra(session), 'auto': True},
+            )
 
     # If all sessions of a module are terminated → mark module TERMINEE
     for module in formation.modules.all():
@@ -240,6 +262,12 @@ def session_start(request, formation_pk, session_pk):
         # Réouverture : ne pas fermer les séances des autres modules/groupes.
         reactiver_session_et_qr(session, close_other_open_sessions=False)
         session.refresh_from_db()
+        _log_audit(
+            action=AuditLog.Action.SEANCE_START,
+            request=request,
+            formation=formation,
+            extra={**_session_audit_extra(session), 'reactivation': True},
+        )
         return Response({
             'detail': 'Séance réactivée.',
             'session': SessionSerializer(session).data,
@@ -259,6 +287,13 @@ def session_start(request, formation_pk, session_pk):
     if module.statut == 'PLANIFIEE':
         module.statut = 'EN_COURS'
         module.save(update_fields=['statut'])
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_START,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
     
     return Response({
         'detail': 'Séance démarrée.',
@@ -293,6 +328,13 @@ def session_stop(request, formation_pk, session_pk):
     if remaining == 0:
         module.statut = 'TERMINEE'
         module.save(update_fields=['statut'])
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_STOP,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
     
     return Response({
         'detail': 'Séance terminée.',
@@ -345,6 +387,13 @@ def session_create(request, formation_pk, module_pk):
             status=400,
         )
 
+    _log_audit(
+        action=AuditLog.Action.SEANCE_CREATE,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
+
     return Response({
         'detail': 'Séance créée.',
         'session': SessionSerializer(session).data,
@@ -363,8 +412,16 @@ def session_delete(request, formation_pk, session_pk):
     
     if session.demarree_le:
         return Response({'detail': 'Impossible de supprimer une séance démarrée.'}, status=400)
-    
+
+    audit_extra = _session_audit_extra(session)
     session.delete()
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_DELETE,
+        request=request,
+        formation=formation,
+        extra=audit_extra,
+    )
     
     return Response({'detail': 'Séance supprimée.'}, status=204)
 
@@ -430,6 +487,16 @@ def session_update(request, formation_pk, session_pk):
             'delta_minutes': auto_adjustment.get('delta_minutes'),
             'deleted_last': auto_adjustment.get('deleted_last', False),
         }
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_UPDATE,
+        request=request,
+        formation=formation,
+        extra={
+            **_session_audit_extra(session),
+            'champs_modifies': list(request.data.keys()),
+        },
+    )
     return Response(payload)
 
 

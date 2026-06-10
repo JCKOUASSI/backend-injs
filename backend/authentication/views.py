@@ -135,6 +135,14 @@ def login_view(request):
     refresh['role'] = user.role
     refresh['full_name'] = user.get_full_name()
     refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
+    _log_audit(
+        action=AuditLog.Action.USER_LOGIN,
+        request=request,
+        cible_type='user',
+        cible_numero=user.username,
+        cible_nom=user.get_full_name() or user.username,
+        extra={'role': user.role, 'device_id': bool(device_id)},
+    )
     return Response({
         'access': str(refresh.access_token),
         'refresh': str(refresh),
@@ -153,6 +161,14 @@ def me_view(request):
     serializer = UserSelfProfileSerializer(user, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     serializer.save()
+    _log_audit(
+        action=AuditLog.Action.USER_UPDATE,
+        request=request,
+        cible_type='user',
+        cible_numero=user.username,
+        cible_nom=user.get_full_name() or user.username,
+        extra={'self_profile': True, 'champs_modifies': list(request.data.keys())},
+    )
     return Response(UserSerializer(user).data)
 
 
@@ -162,10 +178,19 @@ def change_password_view(request):
     """Permet à l'utilisateur connecté de changer son propre mot de passe."""
     serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
+    was_forced_change = bool(getattr(request.user, 'must_change_password', False))
     request.user.set_password(serializer.validated_data['new_password'])
     if getattr(request.user, 'must_change_password', False):
         request.user.must_change_password = False
     request.user.save()
+    _log_audit(
+        action=AuditLog.Action.USER_PASSWORD_CHANGE,
+        request=request,
+        cible_type='user',
+        cible_numero=request.user.username,
+        cible_nom=request.user.get_full_name() or request.user.username,
+        extra={'first_login_change': was_forced_change},
+    )
     return Response({'detail': 'Mot de passe modifié avec succès.'})
 
 

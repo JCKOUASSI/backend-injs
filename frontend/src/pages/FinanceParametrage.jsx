@@ -8,8 +8,7 @@ import { formatMoney } from '../components/FinanceStatsGrid'
 import {
   buildFinanceListSearchParams,
   FINANCE_QUERY_STORAGE_KEY,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 
@@ -29,8 +28,7 @@ export default function FinanceParametrage() {
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
     () => {
-      const fromUrl = readFinanceStateFromSearchParams(searchParams)
-      return buildFinanceListSearchParams(fromUrl?.period ?? loadFinancePeriod(), {})
+      return buildFinanceListSearchParams(resolveFinancePeriod(), {})
     },
     [searchParams],
   )
@@ -117,12 +115,6 @@ export default function FinanceParametrage() {
     e.preventDefault()
     if (!canEdit) return
 
-    const defaultPrix = parsePrix(prix)
-    if (Number.isNaN(defaultPrix)) {
-      showToast('Le tarif par défaut doit être un montant valide (≥ 0) ou vide (0).', 'error')
-      return
-    }
-
     const tarifsPayload = []
     for (const t of tarifs) {
       const value = parsePrix(t.prix_heure_realisee)
@@ -136,14 +128,12 @@ export default function FinanceParametrage() {
     setSaving(true)
     try {
       const res = await api.patch('/formations/finance/settings/', {
-        prix_heure_realisee: defaultPrix ?? 0,
         tarifs_formations: tarifsPayload,
         ...toleranceSettings,
         tolerance_minutes: Number(toleranceSettings.tolerance_minutes) || 0,
         tolerance_pct: Number(toleranceSettings.tolerance_pct) || 0,
         ...exportSettings,
       })
-      setPrix(String(res.data?.prix_heure_realisee ?? defaultPrix))
       setTarifs(
         (res.data?.tarifs_formations ?? []).map((t) => ({
           ...t,
@@ -245,22 +235,6 @@ export default function FinanceParametrage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            <div className="form-group mb-4">
-              <label className="form-label fw-semibold">Tarif par défaut (FCFA / h)</label>
-              <div className="input-group input-group-lg" style={{ maxWidth: 420 }}>
-                <input
-                  type="number"
-                  className="form-control"
-                  min="0"
-                  step="0.01"
-                  value={prix}
-                  onChange={(e) => setPrix(e.target.value)}
-                  disabled={!canEdit || saving}
-                />
-                <span className="input-group-text fw-semibold">FCFA / h</span>
-              </div>
-            </div>
-
             <h6 className="fw-semibold mb-3">
               <i className="bi bi-journal-bookmark me-2"></i>
               Tarifs par formation

@@ -7,8 +7,7 @@ import {
   buildFinanceListSearchParams,
   buildFinanceQuery,
   FINANCE_QUERY_STORAGE_KEY,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
   saveFinancePeriod,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
@@ -146,12 +145,11 @@ function EvolutionBadge({ evolution, kpiKey, format }) {
 
 export default function FinanceDashboard() {
   const [searchParams] = useSearchParams()
-  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [period, setPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
-  const [appliedPeriod, setAppliedPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
+  const [period, setPeriod] = useState(() => resolveFinancePeriod())
+  const [appliedPeriod, setAppliedPeriod] = useState(() => resolveFinancePeriod())
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
   const [synthesePage, setSynthesePage] = useState(1)
   const [moduleDrill, setModuleDrill] = useState(null)

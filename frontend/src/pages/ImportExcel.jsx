@@ -169,7 +169,10 @@ export default function ImportExcel() {
         if (data.created > 0) parts.push(`${data.created} créé(s)`)
         if (data.updated > 0) parts.push(`${data.updated} mis à jour`)
         const msg = parts.length > 0 ? parts.join(', ') : 'Aucun élément traité'
-        showToast(`${label} — Import réussi ! ${msg}`, 'success')
+        const accountsHint = data.accounts_deferred && (type === 'participants' || type === 'formateurs')
+          ? ' — Comptes badge : lancer create_auditeur_accounts sur le serveur.'
+          : ''
+        showToast(`${label} — Import réussi ! ${msg}${accountsHint}`, 'success')
       }
       if (resetFile) resetFile()
     } catch (err) {

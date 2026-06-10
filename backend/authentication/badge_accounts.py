@@ -3,7 +3,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db.models import Q
 
 from formations.models import Formateur, Participant
 
@@ -13,6 +13,18 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 DEFAULT_BADGE_PASSWORD = 'OPHIR2025'
+
+
+def _send_welcome_email_safe(user, password, *, mobile=False):
+    """Envoi non bloquant : un échec SMTP ne doit pas faire échouer la provision."""
+    try:
+        send_welcome_email(user, password, mobile=mobile)
+    except Exception as exc:
+        logger.warning(
+            'Email de bienvenue non envoyé pour %s : %s',
+            getattr(user, 'username', user.pk),
+            exc,
+        )
 
 
 def _empty_stats():
@@ -25,12 +37,36 @@ def _empty_stats():
     }
 
 
+def _find_user_by_badge(matricule):
+    badge = (matricule or '').strip()
+    if not badge:
+        return None
+    return User.objects.filter(
+        Q(username__iexact=badge) | Q(matricule__iexact=badge),
+    ).first()
+
+
+def _participant_linked_to_user(user):
+    try:
+        return user.participant_profile
+    except Participant.DoesNotExist:
+        return None
+
+
+def _formateur_linked_to_user(user):
+    try:
+        return user.formateur_profile
+    except Formateur.DoesNotExist:
+        return None
+
+
 def ensure_auditeur_account(
     participant: Participant,
     *,
     password: str = DEFAULT_BADGE_PASSWORD,
     send_email: bool = True,
     skip_existing: bool = False,
+    reset_password: bool = False,
 ) -> str:
     """Crée ou met à jour le compte User lié à un auditeur. Retourne created/updated/skipped."""
     if not participant.matricule:
@@ -39,9 +75,16 @@ def ensure_auditeur_account(
     if participant.user_id and skip_existing:
         return 'skipped'
 
-    with transaction.atomic():
-        user = participant.user
-        if user is None:
+    user = participant.user
+    if user is None:
+        user = _find_user_by_badge(participant.matricule)
+        if user is not None:
+            linked = _participant_linked_to_user(user)
+            if linked is not None and linked.pk != participant.pk:
+                return 'skipped'
+            participant.user = user
+            participant.save(update_fields=['user'])
+        else:
             user = User(
                 username=participant.matricule,
                 email=participant.email or '',
@@ -58,21 +101,22 @@ def ensure_auditeur_account(
             participant.user = user
             participant.save(update_fields=['user'])
             if send_email and user.email:
-                send_welcome_email(user, password, mobile=True)
+                _send_welcome_email_safe(user, password, mobile=True)
             return 'created'
 
-        user.username = participant.matricule
-        user.email = participant.email or ''
-        user.first_name = participant.prenom[:150]
-        user.last_name = participant.nom[:150]
-        user.role = User.Role.AUDITEUR
-        user.matricule = participant.matricule
-        user.secretariat = participant.secretariat
+    user.username = participant.matricule
+    user.email = participant.email or ''
+    user.first_name = participant.prenom[:150]
+    user.last_name = participant.nom[:150]
+    user.role = User.Role.AUDITEUR
+    user.matricule = participant.matricule
+    user.secretariat = participant.secretariat
+    user.is_active = True
+    if reset_password:
         user.set_password(password)
-        user.is_active = True
         user.must_change_password = True
-        user.save()
-        return 'updated'
+    user.save()
+    return 'updated'
 
 
 def ensure_formateur_account(
@@ -81,6 +125,7 @@ def ensure_formateur_account(
     password: str = DEFAULT_BADGE_PASSWORD,
     send_email: bool = True,
     skip_existing: bool = False,
+    reset_password: bool = False,
 ) -> str:
     """Crée ou met à jour le compte User lié à un formateur. Retourne created/updated/skipped."""
     if not formateur.numerobadge:
@@ -89,9 +134,16 @@ def ensure_formateur_account(
     if formateur.user_id and skip_existing:
         return 'skipped'
 
-    with transaction.atomic():
-        user = formateur.user
-        if user is None:
+    user = formateur.user
+    if user is None:
+        user = _find_user_by_badge(formateur.numerobadge)
+        if user is not None:
+            linked = _formateur_linked_to_user(user)
+            if linked is not None and linked.pk != formateur.pk:
+                return 'skipped'
+            formateur.user = user
+            formateur.save(update_fields=['user'])
+        else:
             user = User(
                 username=formateur.numerobadge,
                 email=formateur.email or '',
@@ -107,20 +159,21 @@ def ensure_formateur_account(
             formateur.user = user
             formateur.save(update_fields=['user'])
             if send_email and user.email:
-                send_welcome_email(user, password, mobile=True)
+                _send_welcome_email_safe(user, password, mobile=True)
             return 'created'
 
-        user.username = formateur.numerobadge
-        user.email = formateur.email or ''
-        user.first_name = formateur.prenom[:150]
-        user.last_name = formateur.nom[:150]
-        user.role = User.Role.FORMATEUR
-        user.matricule = formateur.numerobadge
+    user.username = formateur.numerobadge
+    user.email = formateur.email or ''
+    user.first_name = formateur.prenom[:150]
+    user.last_name = formateur.nom[:150]
+    user.role = User.Role.FORMATEUR
+    user.matricule = formateur.numerobadge
+    user.is_active = True
+    if reset_password:
         user.set_password(password)
-        user.is_active = True
         user.must_change_password = True
-        user.save()
-        return 'updated'
+    user.save()
+    return 'updated'
 
 
 def provision_auditeur_accounts(
@@ -128,6 +181,7 @@ def provision_auditeur_accounts(
     *,
     password: str = DEFAULT_BADGE_PASSWORD,
     send_email: bool = True,
+    reset_password: bool = False,
     log=None,
 ) -> dict:
     stats = _empty_stats()
@@ -146,6 +200,7 @@ def provision_auditeur_accounts(
                 participant,
                 password=password,
                 send_email=send_email,
+                reset_password=reset_password,
             )
             stats[action] += 1
             if action == 'created' and send_email and participant.email:
@@ -173,6 +228,7 @@ def provision_formateur_accounts(
     *,
     password: str = DEFAULT_BADGE_PASSWORD,
     send_email: bool = True,
+    reset_password: bool = False,
     log=None,
 ) -> dict:
     stats = _empty_stats()
@@ -191,6 +247,7 @@ def provision_formateur_accounts(
                 formateur,
                 password=password,
                 send_email=send_email,
+                reset_password=reset_password,
             )
             stats[action] += 1
             if action == 'created' and send_email and formateur.email:

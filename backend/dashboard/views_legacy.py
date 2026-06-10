@@ -123,6 +123,14 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user and user.role in ALLOWED_WEB_ROLES:
             login(request, user)
+            _log_audit(
+                action=AuditLog.Action.USER_LOGIN,
+                request=request,
+                cible_type='user',
+                cible_numero=user.username,
+                cible_nom=user.get_full_name() or user.username,
+                extra={'role': user.role, 'via': 'web_legacy'},
+            )
             return redirect('web-dashboard')
         elif user:
             return render(request, 'dashboard/login.html', {
@@ -136,6 +144,15 @@ def login_view(request):
 
 
 def logout_view(request):
+    if request.user.is_authenticated:
+        _log_audit(
+            action=AuditLog.Action.USER_LOGOUT,
+            request=request,
+            cible_type='user',
+            cible_numero=request.user.username,
+            cible_nom=request.user.get_full_name() or request.user.username,
+            extra={'via': 'web_legacy'},
+        )
     logout(request)
     return redirect('web-login')
 

@@ -88,16 +88,19 @@ def module_edt_planned_hours(module):
 def resolve_module_duree_prevue_heures(module, *, include_current=True):
     """
     Retourne ``(heures, source)`` avec source parmi
-    ``module``, ``ref_module``, ``sessions_edt`` ou ``None``.
+    ``ref_module``, ``module``, ``sessions_edt`` ou ``None``.
+
+    Le référentiel ``RefModule.volume_horaire`` est prioritaire sur la fiche
+    module (souvent remplie à tort par la somme brute de l'EDT à l'import).
     """
+    ref_h = _ref_module_volume_hours(module)
+    if ref_h > 0:
+        return ref_h, 'ref_module'
+
     if include_current:
         current = float(module.duree_prevue_heures or 0)
         if current > 0:
             return current, 'module'
-
-    ref_h = _ref_module_volume_hours(module)
-    if ref_h > 0:
-        return ref_h, 'ref_module'
 
     edt_h = module_edt_typical_hours(module)
     if edt_h > 0:
@@ -113,7 +116,7 @@ def _should_overwrite_duree(current, raw_edt, canonical, ref_h):
         return True
     if ref_h > 0 and abs(current - ref_h) >= 0.01:
         return True
-    # Corrige une somme brute gonflée par une séance aberrante (ex. 31 h → 30 h).
+    # Corrige une fiche calée sur une somme EDT trop élevée (ex. 31 h ou 35 h au lieu de 30 h).
     if (
         raw_edt > 0
         and abs(current - raw_edt) < 0.01
