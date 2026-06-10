@@ -122,11 +122,15 @@ class AuditLog(models.Model):
         FORMATION_STATUT = 'FORMATION_STATUT', 'Changement de statut de formation'
         FORMATION_ASSIGN_SUPERVISEUR = 'FORMATION_ASSIGN_SUPERVISEUR', 'Assignation superviseur'
         MODULE_ASSIGN_SUPERVISEUR = 'MODULE_ASSIGN_SUPERVISEUR', 'Assignation encadrant à un module'
+        MODULE_CREATE = 'MODULE_CREATE', 'Création de module'
+        MODULE_UPDATE = 'MODULE_UPDATE', 'Modification de module'
+        MODULE_DELETE = 'MODULE_DELETE', 'Suppression de module'
         FORMATION_QR_GENERATE = 'FORMATION_QR_GENERATE', 'Génération QR code'
         # ── Séances ──
         SEANCE_CREATE = 'SEANCE_CREATE', 'Création de séance'
         SEANCE_START = 'SEANCE_START', 'Démarrage de séance'
         SEANCE_STOP = 'SEANCE_STOP', 'Arrêt de séance'
+        SEANCE_UPDATE = 'SEANCE_UPDATE', 'Modification de séance'
         SEANCE_DELETE = 'SEANCE_DELETE', 'Suppression de séance'
         SEANCE_IMPORT = 'SEANCE_IMPORT', 'Import séances (Excel)'
         # ── Auditeurs ──
@@ -147,12 +151,24 @@ class AuditLog(models.Model):
         USER_CREATE = 'USER_CREATE', 'Création d\'utilisateur'
         USER_UPDATE = 'USER_UPDATE', 'Modification d\'utilisateur'
         USER_DELETE = 'USER_DELETE', 'Suppression d\'utilisateur'
+        USER_LOGIN = 'USER_LOGIN', 'Connexion utilisateur'
+        USER_LOGOUT = 'USER_LOGOUT', 'Déconnexion utilisateur'
+        USER_PASSWORD_CHANGE = 'USER_PASSWORD_CHANGE', 'Changement de mot de passe'
+        # ── Secrétariats ──
+        SECRETARIAT_CREATE = 'SECRETARIAT_CREATE', 'Création de secrétariat'
+        SECRETARIAT_UPDATE = 'SECRETARIAT_UPDATE', 'Modification de secrétariat'
+        SECRETARIAT_DELETE = 'SECRETARIAT_DELETE', 'Suppression de secrétariat'
+        # ── Référentiels ──
+        REFERENTIEL_CREATE = 'REFERENTIEL_CREATE', 'Création référentiel'
+        REFERENTIEL_UPDATE = 'REFERENTIEL_UPDATE', 'Modification référentiel'
+        REFERENTIEL_DELETE = 'REFERENTIEL_DELETE', 'Suppression référentiel'
         # ── Imports globaux ──
         IMPORT_EXCEL = 'IMPORT_EXCEL', 'Import Excel global'
         # ── Finance ──
         FINANCE_AJUSTEMENT_PROPOSE = 'FINANCE_AJUSTEMENT_PROPOSE', 'Proposition ajustement horaire finance'
         FINANCE_AJUSTEMENT_VALIDE = 'FINANCE_AJUSTEMENT_VALIDE', 'Validation ajustement horaire finance'
         FINANCE_AJUSTEMENT_REJETE = 'FINANCE_AJUSTEMENT_REJETE', 'Rejet ajustement horaire finance'
+        FINANCE_SETTINGS_UPDATE = 'FINANCE_SETTINGS_UPDATE', 'Modification paramètres finance'
 
     action = models.CharField(max_length=40, choices=Action.choices)
 
@@ -248,6 +264,18 @@ def _log_audit(
         pointage=pointage,
         ip_address=_get_client_ip(request) if request else None,
         device_id=device_id or '',
+        extra=extra or {},
+    )
+
+
+def log_audit_system(action, *, formation=None, extra=None):
+    """Journalise une action automatique (sans utilisateur connecté)."""
+    AuditLog.objects.create(
+        action=action,
+        acteur=None,
+        acteur_label='Système',
+        formation=formation,
+        formation_titre=formation.formation if formation else '',
         extra=extra or {},
     )
 

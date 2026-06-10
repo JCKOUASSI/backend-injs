@@ -95,7 +95,13 @@ class FormationListCreateView(generics.ListCreateAPIView):
         return Formation.objects.all().order_by('id')
 
     def perform_create(self, serializer):
-        serializer.save()
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATION_CREATE,
+            request=self.request,
+            formation=instance,
+            cible_nom=instance.formation,
+        )
 
 
 class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -115,6 +121,25 @@ class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
                 modules__secretariat=sec
             ).distinct().order_by('id')
         return Formation.objects.all().order_by('id')
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATION_UPDATE,
+            request=self.request,
+            formation=instance,
+            cible_nom=instance.formation,
+        )
+
+    def perform_destroy(self, instance):
+        titre = instance.formation
+        _log_audit(
+            action=AuditLog.Action.FORMATION_DELETE,
+            request=self.request,
+            formation=instance,
+            cible_nom=titre,
+        )
+        instance.delete()
 
 
 # ──────────────────────────────────────────────
@@ -546,6 +571,17 @@ def generate_qr(request, pk):
         expire_at=timezone.now() + delta,
     )
 
+    _log_audit(
+        action=AuditLog.Action.FORMATION_QR_GENERATE,
+        request=request,
+        formation=formation,
+        extra={
+            'session_id': session.id,
+            'session_numero': session.numero,
+            'token': str(qr_token.token),
+        },
+    )
+
     return Response({
         'detail': 'QR code généré avec succès.',
         'qr_token': QRTokenSerializer(qr_token).data,
@@ -740,6 +776,16 @@ class FormateurListCreateView(generics.ListCreateAPIView):
             return Formateur.objects.filter(secretariats=sec).distinct()
         return Formateur.objects.all()
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_CREATE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+
 
 class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Secrétariat/CPFAE_ADMIN : détail / modifier / supprimer un formateur. Encadrant : lecture seule."""
@@ -761,6 +807,26 @@ class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Formateur.objects.filter(secretariats=sec).distinct()
         return Formateur.objects.all()
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_UPDATE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_DELETE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+        instance.delete()
+
 
 # ──────────────────────────────────────────────
 # DFRC — Secretariats CRUD
@@ -772,12 +838,42 @@ class SecretariatListCreateView(generics.ListCreateAPIView):
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_CREATE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+
 
 class SecretariatDetailView(generics.RetrieveUpdateDestroyAPIView):
     """DFRC/Secrétariat : détail / modifier / supprimer un secrétariat."""
     queryset = Secretariat.objects.select_related('responsable').all()
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_UPDATE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_DELETE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+        instance.delete()
 
 
 # ──────────────────────────────────────────────

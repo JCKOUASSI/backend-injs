@@ -62,6 +62,60 @@ def _groupe_sort_key(value):
     return (1, value)
 
 
+def _module_audit_extra(module):
+    return {
+        'module_id': module.id,
+        'module_intitule': module.intitule,
+    }
+
+
+def _log_import_excel_audit(request, import_type, stats, errors, filename):
+    total = stats.get('created', 0) + stats.get('updated', 0)
+    if total <= 0:
+        return
+    action_map = {
+        'formations': AuditLog.Action.FORMATION_CREATE,
+        'formateurs': AuditLog.Action.FORMATEUR_IMPORT,
+        'participants': AuditLog.Action.PARTICIPANT_IMPORT,
+        'seances': AuditLog.Action.SEANCE_IMPORT,
+        'emploi_du_temps': AuditLog.Action.IMPORT_EXCEL,
+    }
+    audit_action = action_map.get(import_type, AuditLog.Action.IMPORT_EXCEL)
+    _log_audit(
+        action=audit_action,
+        request=request,
+        extra={
+            'type': import_type,
+            'created': stats.get('created', 0),
+            'updated': stats.get('updated', 0),
+            'errors': len(errors),
+            'filename': filename,
+        },
+    )
+
+
+def _ref_label(obj):
+    for attr in ('intitule', 'nom', 'libelle'):
+        val = getattr(obj, attr, None)
+        if val:
+            return str(val)
+    return str(obj.pk)
+
+
+def _log_referentiel_audit(request, action, ref_type, obj, extra=None):
+    payload = {'referentiel': ref_type}
+    if extra:
+        payload.update(extra)
+    _log_audit(
+        action=action,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(obj.pk),
+        cible_nom=_ref_label(obj),
+        extra=payload,
+    )
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
@@ -1814,6 +1868,14 @@ def formateur_donnees_sensibles_api(request, pk):
             update_fields.append(field)
     if update_fields:
         formateur.save(update_fields=update_fields)
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_UPDATE,
+            request=request,
+            cible_type='formateur',
+            cible_numero=formateur.numerobadge,
+            cible_nom=f'{formateur.prenom} {formateur.nom}',
+            extra={'donnees_sensibles': True, 'champs_modifies': update_fields},
+        )
     return Response(formateur_sensitive_payload(formateur))
 
 
@@ -2114,6 +2176,12 @@ def finance_settings_api(request):
     settings_obj.updated_by = request.user
     settings_obj.save()
 
+    _log_audit(
+        action=AuditLog.Action.FINANCE_SETTINGS_UPDATE,
+        request=request,
+        extra={'champs_modifies': list(request.data.keys())},
+    )
+
     payload = _settings_payload()
     payload['updated_by'] = request.user.get_full_name() or request.user.username
     return Response(payload)
@@ -2333,6 +2401,17 @@ def api_generate_qr(request, formation_pk, session_pk=None):
         genere_par=request.user,
         expire_at=timezone.now() + timedelta(hours=24),
     )
+
+    _log_audit(
+        action=AuditLog.Action.FORMATION_QR_GENERATE,
+        request=request,
+        formation=formation,
+        extra={
+            'session_id': session.id,
+            'session_numero': session.numero,
+            'token': str(qr_token.token),
+        },
+    )
     
     return Response({
         'detail': 'QR code généré.',
@@ -2464,6 +2543,7 @@ def api_import_excel(request):
                         stats['created'] = total_created
                         wb.close()
                         debug_headers = [l for l in _logs if '[DEBUG]' in l]
+                        _log_import_excel_audit(request, import_type, stats, errors, uploaded.name)
                         return Response({
                             'created': stats.get('created', 0),
                             'accounts': cmd.account_provision_stats.get('auditeurs', {}),
@@ -2512,6 +2592,7 @@ def api_import_excel(request):
 
     debug_headers = [l for l in _logs if '[DEBUG]' in l]
     accounts_deferred = import_type in ('participants', 'formateurs')
+    _log_import_excel_audit(request, import_type, stats, errors, uploaded.name)
     return Response({
         'created': stats.get('created', 0),
         'updated': stats.get('updated', 0),
@@ -2529,6 +2610,7 @@ def ref_formation_list(request):
         data = list(RefFormation.objects.values('id', 'intitule', 'actif'))
         return Response(data)
     obj = RefFormation.objects.create(intitule=request.data.get('intitule', ''), actif=request.data.get('actif', True))
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'formation', obj)
     return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2542,8 +2624,18 @@ def ref_formation_detail(request, pk):
         obj.intitule = request.data.get('intitule', obj.intitule)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'formation', obj)
         return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'formation', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2580,6 +2672,7 @@ def ref_module_list(request):
         obj.save()
     except ValidationError as exc:
         return _ref_module_validation_response(exc)
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'module', obj)
     return _ref_module_response(obj, status_code=201)
 
 
@@ -2598,8 +2691,18 @@ def ref_module_detail(request, pk):
             obj.save()
         except ValidationError as exc:
             return _ref_module_validation_response(exc)
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'module', obj)
         return _ref_module_response(obj)
+    audit_extra = {'referentiel': 'module', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2646,6 +2749,7 @@ def ref_site_list(request):
         geofence_longitude=_coerce_decimal(request.data.get('geofence_longitude')),
         geofence_rayon_m=request.data.get('geofence_rayon_m', 200) or 200,
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'site', obj)
     return Response(_serialize_site(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2666,8 +2770,18 @@ def ref_site_detail(request, pk):
             rayon = request.data.get('geofence_rayon_m')
             obj.geofence_rayon_m = int(rayon) if rayon not in (None, '') else 200
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'site', obj)
         return Response(_serialize_site(obj))
+    audit_extra = {'referentiel': 'site', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2682,6 +2796,7 @@ def ref_batiment_list(request):
         site_id=request.data.get('site_id'),
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'batiment', obj)
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2696,8 +2811,18 @@ def ref_batiment_detail(request, pk):
         obj.site_id = request.data.get('site_id', obj.site_id)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'batiment', obj)
         return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'batiment', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2713,6 +2838,7 @@ def ref_salle_list(request):
         batiment_id=request.data.get('batiment_id') or None,
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'salle', obj)
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2728,8 +2854,18 @@ def ref_salle_detail(request, pk):
         obj.batiment_id = request.data.get('batiment_id') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'salle', obj)
         return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'salle', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2743,6 +2879,7 @@ def ref_categorie_list(request):
         libelle=request.data.get('libelle', ''),
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'categorie', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2756,8 +2893,18 @@ def ref_categorie_detail(request, pk):
         obj.libelle = request.data.get('libelle', obj.libelle)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'categorie', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'categorie', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2772,6 +2919,7 @@ def ref_grade_list(request):
         categorie_id=request.data.get('categorie_id') or None,
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'grade', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'categorie_id': obj.categorie_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
@@ -2786,8 +2934,18 @@ def ref_grade_detail(request, pk):
         obj.categorie_id = request.data.get('categorie_id') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'grade', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'categorie_id': obj.categorie_id, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'grade', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2801,6 +2959,7 @@ def ref_type_secretariat_list(request):
         libelle=request.data.get('libelle', ''),
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'type_secretariat', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif}, status=201)
 
 
@@ -2815,8 +2974,18 @@ def ref_type_secretariat_detail(request, pk):
         obj.libelle = request.data.get('libelle', obj.libelle)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
+        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'type_secretariat', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif})
+    audit_extra = {'referentiel': 'type_secretariat', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
+    _log_audit(
+        action=AuditLog.Action.REFERENTIEL_DELETE,
+        request=request,
+        cible_type='referentiel',
+        cible_numero=str(audit_extra['id']),
+        cible_nom=audit_extra['label'],
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -2871,6 +3040,12 @@ def module_list_api(request, formation_pk):
         )
     except IntegrityError:
         return Response({'detail': f'Un module "{intitule}" existe déjà pour cette formation.'}, status=400)
+    _log_audit(
+        action=AuditLog.Action.MODULE_CREATE,
+        request=request,
+        formation=formation,
+        extra=_module_audit_extra(module),
+    )
     return Response(ModuleSerializer(module).data, status=201)
 
 
@@ -2961,12 +3136,28 @@ def module_detail_api(request, formation_pk, module_pk):
                     s.date_journee = s.date_journee + delta
                     s.save(update_fields=['date_journee'])
 
+        _log_audit(
+            action=AuditLog.Action.MODULE_UPDATE,
+            request=request,
+            formation=formation,
+            extra={
+                **_module_audit_extra(module),
+                'champs_modifies': list(request.data.keys()),
+            },
+        )
         return Response(ModuleSerializer(module).data)
 
     # DELETE
     if module.sessions.exists():
         return Response({'detail': 'Impossible de supprimer un module qui a des séances.'}, status=400)
+    audit_extra = _module_audit_extra(module)
     module.delete()
+    _log_audit(
+        action=AuditLog.Action.MODULE_DELETE,
+        request=request,
+        formation=formation,
+        extra=audit_extra,
+    )
     return Response(status=204)
 
 
@@ -3171,6 +3362,15 @@ def module_add_participant(request, formation_pk, module_pk):
     if ModuleParticipant.objects.filter(module=module, participant=participant).exists():
         return Response({'detail': 'Déjà inscrit.'}, status=400)
     ModuleParticipant.objects.create(module=module, participant=participant)
+    _log_audit(
+        action=AuditLog.Action.PARTICIPANT_ADD_FORMATION,
+        request=request,
+        cible_type='participant',
+        cible_numero=participant.matricule,
+        cible_nom=f'{participant.nom} {participant.prenom}',
+        formation=module.formation,
+        extra=_module_audit_extra(module),
+    )
     return Response({'detail': f'{participant} inscrit au module.'}, status=201)
 
 
@@ -3183,7 +3383,18 @@ def module_remove_participant(request, formation_pk, module_pk, participant_id):
         mp = ModuleParticipant.objects.get(module=module, participant_id=participant_id)
     except (Module.DoesNotExist, ModuleParticipant.DoesNotExist):
         return Response({'detail': 'Inscription introuvable.'}, status=404)
+    participant = mp.participant
+    formation = module.formation
     mp.delete()
+    _log_audit(
+        action=AuditLog.Action.PARTICIPANT_REMOVE_FORMATION,
+        request=request,
+        cible_type='participant',
+        cible_numero=participant.matricule,
+        cible_nom=f'{participant.nom} {participant.prenom}',
+        formation=formation,
+        extra=_module_audit_extra(module),
+    )
     return Response(status=204)
 
 
@@ -3205,6 +3416,15 @@ def module_add_formateur(request, formation_pk, module_pk):
     if ModuleFormateur.objects.filter(module=module, formateur=formateur).exists():
         return Response({'detail': 'Déjà assigné.'}, status=400)
     ModuleFormateur.objects.create(module=module, formateur=formateur)
+    _log_audit(
+        action=AuditLog.Action.FORMATEUR_ADD_FORMATION,
+        request=request,
+        cible_type='formateur',
+        cible_numero=formateur.numerobadge or str(formateur.pk),
+        cible_nom=f'{formateur.prenom} {formateur.nom}',
+        formation=module.formation,
+        extra=_module_audit_extra(module),
+    )
     return Response({'detail': f'{formateur} assigné au module.'}, status=201)
 
 
@@ -3217,7 +3437,18 @@ def module_remove_formateur(request, formation_pk, module_pk, formateur_id):
         mf = ModuleFormateur.objects.get(module=module, formateur_id=formateur_id)
     except (Module.DoesNotExist, ModuleFormateur.DoesNotExist):
         return Response({'detail': 'Assignation introuvable.'}, status=404)
+    formateur = mf.formateur
+    formation = module.formation
     mf.delete()
+    _log_audit(
+        action=AuditLog.Action.FORMATEUR_REMOVE_FORMATION,
+        request=request,
+        cible_type='formateur',
+        cible_numero=formateur.numerobadge or str(formateur.pk),
+        cible_nom=f'{formateur.prenom} {formateur.nom}',
+        formation=formation,
+        extra=_module_audit_extra(module),
+    )
     return Response(status=204)
 
 
@@ -3362,6 +3593,7 @@ def refvague_list_api(request):
         ordre=request.data.get('ordre', 1),
         actif=request.data.get('actif', True),
     )
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'vague', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif}, status=201)
 
 
@@ -3374,10 +3606,20 @@ def refvague_detail_api(request, pk):
     except RefVague.DoesNotExist:
         return Response({'detail': 'Vague introuvable.'}, status=404)
     if request.method == 'DELETE':
+        audit_extra = {'referentiel': 'vague', 'id': obj.pk, 'label': _ref_label(obj)}
         obj.delete()
+        _log_audit(
+            action=AuditLog.Action.REFERENTIEL_DELETE,
+            request=request,
+            cible_type='referentiel',
+            cible_numero=str(audit_extra['id']),
+            cible_nom=audit_extra['label'],
+            extra=audit_extra,
+        )
         return Response(status=204)
     obj.libelle = request.data.get('libelle', obj.libelle)
     obj.ordre = request.data.get('ordre', obj.ordre)
     obj.actif = request.data.get('actif', obj.actif)
     obj.save()
+    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'vague', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif})
