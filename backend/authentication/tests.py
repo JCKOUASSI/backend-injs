@@ -507,6 +507,19 @@ class BadgeAccountProvisionTests(TestCase):
         self.assertEqual(existing.first_name, 'Aya')
         self.assertEqual(existing.last_name, 'Kouassi')
 
+    def test_auditeur_reimport_does_not_reset_password(self):
+        from authentication.badge_accounts import ensure_auditeur_account
+
+        self.participant.user = None
+        self.participant.save(update_fields=['user'])
+        ensure_auditeur_account(self.participant, send_email=False)
+        self.participant.refresh_from_db()
+        old_hash = self.participant.user.password
+
+        ensure_auditeur_account(self.participant, send_email=False, reset_password=False)
+        self.participant.user.refresh_from_db()
+        self.assertEqual(self.participant.user.password, old_hash)
+
     def test_welcome_email_contains_logo(self):
         from authentication.emails import send_welcome_email
 
