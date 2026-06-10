@@ -1029,16 +1029,19 @@ def _heures_entieres(minutes):
     return int(round(float(minutes or 0) / 60))
 
 
-def _finance_canonical_volume_kpis(rows, *, date_debut=None, date_fin=None):
-    """Volume horaire global (séances uniques) aligné dashboard web / statistiques."""
+def _finance_scope_module_ids(secretariat_id=None):
+    """Modules du périmètre volume horaire global (aligné dashboard web / statistiques)."""
+    qs = Module.objects.all()
+    if secretariat_id:
+        qs = qs.filter(secretariat_id=secretariat_id)
+    return list(qs.values_list('id', flat=True))
+
+
+def _finance_canonical_volume_kpis(rows=None, *, date_debut=None, date_fin=None, secretariat_id=None):
+    """Volume horaire global aligné dashboard web / statistiques (tous les modules du périmètre)."""
     from .volume_horaire import compute_volume_horaire_from_module_ids
 
-    module_ids = set()
-    for row in rows:
-        for mod in row.get('modules') or []:
-            mid = mod.get('module_id')
-            if mid:
-                module_ids.add(mid)
+    module_ids = _finance_scope_module_ids(secretariat_id)
     return compute_volume_horaire_from_module_ids(
         module_ids,
         date_debut=date_debut,
@@ -1053,6 +1056,7 @@ def _finance_apply_canonical_volume_kpis(kpis, volume_totals):
     kpis['total_duree_realisee_minutes'] = volume_totals['realise_minutes']
     kpis['total_duree_realisee_heures'] = volume_totals['realise_heures']
     kpis['taux_realisation_global_pct'] = volume_totals['taux_pct']
+    kpis['total_sessions'] = int(volume_totals.get('nb_sessions') or 0)
 
 
 def _finance_kpis_from_rows(rows, prix_heure):
@@ -1120,31 +1124,41 @@ def _finance_kpis_from_rows(rows, prix_heure):
     }
 
 
+def _finance_module_row_meta(mod_obj, prix_heure=None):
+    if not mod_obj:
+        return None
+    return {
+        'module_id': mod_obj.id,
+        'module_intitule': mod_obj.canonical_intitule(),
+        'formation_intitule': (
+            mod_obj.formation.formation if mod_obj.formation_id else ''
+        ),
+        'grade': mod_obj.grade or '',
+        'groupe': mod_obj.groupe or '',
+        'secretariat_nom': (
+            f"{mod_obj.secretariat.nom} ({mod_obj.secretariat.numero})"
+            if mod_obj.secretariat_id and mod_obj.secretariat else ''
+        ),
+        'prix_heure_realisee': prix_heure,
+    }
+
+
 def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None):
-    """Ventilation dashboard par module (volume horaire canonique par séances)."""
+    """Ventilation dashboard par module (volume horaire canonique, périmètre = dashboard web)."""
     from .volume_horaire import _accumulate_module_session_volumes
 
-    meta_by_id = {}
+    prix_by_module = {}
     for row in rows:
         for mod in row.get('modules') or []:
             mid = mod.get('module_id')
-            if not mid:
-                continue
-            if mid not in meta_by_id:
-                meta_by_id[mid] = {
-                    'module_id': mid,
-                    'module_intitule': mod.get('module_intitule') or mod.get('module_intitule_brut') or '',
-                    'formation_intitule': mod.get('formation_intitule') or '',
-                    'grade': mod.get('grade') or '',
-                    'groupe': mod.get('groupe') or '',
-                    'secretariat_nom': mod.get('secretariat_nom') or '',
-                    'prix_heure_realisee': mod.get('prix_heure_realisee'),
-                }
+            if mid and mod.get('prix_heure_realisee') is not None:
+                prix_by_module[mid] = mod.get('prix_heure_realisee')
 
-    if not meta_by_id:
+    module_ids = _finance_scope_module_ids(secretariat_id)
+    if not module_ids:
         return []
 
-    module_ids = list(meta_by_id.keys())
+    default_prix, prix_map = _finance_build_prix_map()
     modules_by_id = {
         m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
             'formation', 'secretariat', 'ref_module',
@@ -1154,7 +1168,7 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
     results = []
     for mid in module_ids:
         mod_obj = modules_by_id.get(mid)
-        if secretariat_id and (not mod_obj or mod_obj.secretariat_id != secretariat_id):
+        if not mod_obj:
             continue
         vol = _accumulate_module_session_volumes(
             mod_obj,
@@ -1163,13 +1177,25 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
         )
         planned = round(vol['prevu_min'], 1)
         realized = round(vol['realise_min'], 1)
-        prix = meta_by_id[mid].get('prix_heure_realisee')
+        nb_sessions = int(vol['nb_sessions'] or 0)
+        if planned <= 0 and realized <= 0 and nb_sessions <= 0:
+            continue
+        prix = prix_by_module.get(mid)
+        if prix is None:
+            prix = _finance_resolve_prix_heure(
+                _finance_module_formation_label(mod_obj),
+                prix_map=prix_map,
+                default=default_prix,
+                module_obj=mod_obj,
+            )
+        meta = _finance_module_row_meta(mod_obj, prix_heure=prix)
+        if not meta:
+            continue
         montant = _finance_montant_from_minutes(realized, prix)
         taux = _finance_taux_realisation_pct(realized, planned)
-        meta = meta_by_id[mid]
         results.append({
             **meta,
-            'sessions_count': vol['nb_sessions'],
+            'sessions_count': nb_sessions,
             'total_duree_minutes': planned,
             'total_duree_heures': _heures_entieres(planned) if planned else 0,
             'total_duree_realisee_minutes': realized,
@@ -1824,9 +1850,9 @@ def finance_dashboard_api(request):
     prix_heure = _finance_prix_heure()
     kpis = _finance_kpis_from_rows(rows, prix_heure)
     vh_totals = _finance_canonical_volume_kpis(
-        rows,
         date_debut=period['date_debut'],
         date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
     )
     _finance_apply_canonical_volume_kpis(kpis, vh_totals)
 
@@ -1905,9 +1931,9 @@ def finance_dashboard_api(request):
             )
             prev_kpis = _finance_kpis_from_rows(prev_rows, prix_heure)
             prev_vh = _finance_canonical_volume_kpis(
-                prev_rows,
                 date_debut=prev_period['date_debut'],
                 date_fin=prev_period['date_fin'],
+                secretariat_id=secretariat_id,
             )
             _finance_apply_canonical_volume_kpis(prev_kpis, prev_vh)
             comparaison = {

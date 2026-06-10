@@ -15,8 +15,7 @@ import {
   FINANCE_EXPORT_MONTANTS_KEY,
   FINANCE_QUERY_STORAGE_KEY,
   loadFinanceExportMontants,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
   saveFinanceExportMontants,
   saveFinancePeriod,
 } from '../utils/financePeriod'
@@ -44,7 +43,6 @@ export default function Formateurs() {
   const canViewFinanceData = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canEditFormateurSensitive = user?.role === 'FINANCE'
   const [searchParams] = useSearchParams()
-  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const listExtras = readFormateursListExtras(searchParams)
   const [formateurs, setFormateurs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,15 +66,11 @@ export default function Formateurs() {
   const [exportAfficherMontants, setExportAfficherMontants] = useState(() => loadFinanceExportMontants(true))
   const [exportingSynthese, setExportingSynthese] = useState(false)
   const [exportingEncadrants, setExportingEncadrants] = useState(false)
-  const [financePeriod, setFinancePeriod] = useState(
-    () => urlFinance?.period ?? loadFinancePeriod(),
-  )
+  const [financePeriod, setFinancePeriod] = useState(() => resolveFinancePeriod())
   const [financePeriodeInfo, setFinancePeriodeInfo] = useState(null)
 
   const debouncedSearch = useDebounce(search)
-  const [appliedFinancePeriod, setAppliedFinancePeriod] = useState(
-    () => urlFinance?.period ?? loadFinancePeriod(),
-  )
+  const [appliedFinancePeriod, setAppliedFinancePeriod] = useState(() => resolveFinancePeriod())
   const syncFormateursQuery = () => buildFormateursListSearchParams(
     page,
     debouncedSearch,

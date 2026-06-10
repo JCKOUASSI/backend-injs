@@ -77,10 +77,12 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
 
 
 def module_contractual_planned_minutes(module):
-    """Volume horaire contractuel (minutes), figé à l'import formation."""
+    """Volume horaire contractuel (minutes) : référentiel, fiche module, puis EDT type."""
     if not module:
         return 0.0
-    heures = float(module.duree_prevue_heures or 0)
+    from .duree_prevue_resolve import resolve_module_duree_prevue_heures
+
+    heures, _ = resolve_module_duree_prevue_heures(module, include_current=True)
     return heures * 60 if heures > 0 else 0.0
 
 

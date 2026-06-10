@@ -6,8 +6,7 @@ import FinancePeriodFilter from '../components/FinancePeriodFilter'
 import { formatDate } from '../utils/dates'
 import {
   appendPeriodToSearchParams,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
   saveFinancePeriod,
 } from '../utils/financePeriod'
 import {
@@ -22,7 +21,6 @@ export default function Dashboard() {
   const { user } = useAuth()
   const listNavState = useListNavigationState()
   const [searchParams] = useSearchParams()
-  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
   const canFilterBySecretariat = ['CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'].includes(user?.role)
@@ -35,8 +33,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [loadingSecretariats, setLoadingSecretariats] = useState(false)
-  const [vhPeriod, setVhPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
-  const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
+  const [vhPeriod, setVhPeriod] = useState(() => resolveFinancePeriod())
+  const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => resolveFinancePeriod())
 
   usePersistedListQuery(
     LIST_STORAGE_KEYS.dashboard,
@@ -44,8 +42,8 @@ export default function Dashboard() {
       secretariat: selectedSecretariatId,
       presence_period: presencePeriod,
       reference_date: referenceDate,
-    }),
-    [selectedSecretariatId, presencePeriod, referenceDate],
+    }, appliedVhPeriod),
+    [selectedSecretariatId, presencePeriod, referenceDate, appliedVhPeriod],
   )
 
   useEffect(() => {

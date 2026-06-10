@@ -4,6 +4,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 
 from formations.models import Formateur, Participant
 
@@ -25,6 +26,29 @@ def _empty_stats():
     }
 
 
+def _find_user_by_badge(matricule):
+    badge = (matricule or '').strip()
+    if not badge:
+        return None
+    return User.objects.filter(
+        Q(username__iexact=badge) | Q(matricule__iexact=badge),
+    ).first()
+
+
+def _participant_linked_to_user(user):
+    try:
+        return user.participant_profile
+    except Participant.DoesNotExist:
+        return None
+
+
+def _formateur_linked_to_user(user):
+    try:
+        return user.formateur_profile
+    except Formateur.DoesNotExist:
+        return None
+
+
 def ensure_auditeur_account(
     participant: Participant,
     *,
@@ -42,24 +66,32 @@ def ensure_auditeur_account(
     with transaction.atomic():
         user = participant.user
         if user is None:
-            user = User(
-                username=participant.matricule,
-                email=participant.email or '',
-                first_name=participant.prenom[:150],
-                last_name=participant.nom[:150],
-                role=User.Role.AUDITEUR,
-                matricule=participant.matricule,
-                secretariat=participant.secretariat,
-                is_active=True,
-                must_change_password=True,
-            )
-            user.set_password(password)
-            user.save()
-            participant.user = user
-            participant.save(update_fields=['user'])
-            if send_email and user.email:
-                send_welcome_email(user, password, mobile=True)
-            return 'created'
+            user = _find_user_by_badge(participant.matricule)
+            if user is not None:
+                linked = _participant_linked_to_user(user)
+                if linked is not None and linked.pk != participant.pk:
+                    return 'skipped'
+                participant.user = user
+                participant.save(update_fields=['user'])
+            else:
+                user = User(
+                    username=participant.matricule,
+                    email=participant.email or '',
+                    first_name=participant.prenom[:150],
+                    last_name=participant.nom[:150],
+                    role=User.Role.AUDITEUR,
+                    matricule=participant.matricule,
+                    secretariat=participant.secretariat,
+                    is_active=True,
+                    must_change_password=True,
+                )
+                user.set_password(password)
+                user.save()
+                participant.user = user
+                participant.save(update_fields=['user'])
+                if send_email and user.email:
+                    send_welcome_email(user, password, mobile=True)
+                return 'created'
 
         user.username = participant.matricule
         user.email = participant.email or ''
@@ -92,23 +124,31 @@ def ensure_formateur_account(
     with transaction.atomic():
         user = formateur.user
         if user is None:
-            user = User(
-                username=formateur.numerobadge,
-                email=formateur.email or '',
-                first_name=formateur.prenom[:150],
-                last_name=formateur.nom[:150],
-                role=User.Role.FORMATEUR,
-                matricule=formateur.numerobadge,
-                is_active=True,
-                must_change_password=True,
-            )
-            user.set_password(password)
-            user.save()
-            formateur.user = user
-            formateur.save(update_fields=['user'])
-            if send_email and user.email:
-                send_welcome_email(user, password, mobile=True)
-            return 'created'
+            user = _find_user_by_badge(formateur.numerobadge)
+            if user is not None:
+                linked = _formateur_linked_to_user(user)
+                if linked is not None and linked.pk != formateur.pk:
+                    return 'skipped'
+                formateur.user = user
+                formateur.save(update_fields=['user'])
+            else:
+                user = User(
+                    username=formateur.numerobadge,
+                    email=formateur.email or '',
+                    first_name=formateur.prenom[:150],
+                    last_name=formateur.nom[:150],
+                    role=User.Role.FORMATEUR,
+                    matricule=formateur.numerobadge,
+                    is_active=True,
+                    must_change_password=True,
+                )
+                user.set_password(password)
+                user.save()
+                formateur.user = user
+                formateur.save(update_fields=['user'])
+                if send_email and user.email:
+                    send_welcome_email(user, password, mobile=True)
+                return 'created'
 
         user.username = formateur.numerobadge
         user.email = formateur.email or ''

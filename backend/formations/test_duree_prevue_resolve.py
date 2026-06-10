@@ -66,6 +66,29 @@ class DureePrevueResolveTest(TestCase):
         self.assertEqual(heures, 30)
         self.assertEqual(source, 'ref_module')
 
+    def test_ref_module_takes_priority_over_wrong_stored_duree(self):
+        ref = RefModule.objects.create(intitule='Fiche erronée', volume_horaire=30)
+        module = _module(
+            _formation(), intitule='Fiche erronée', ref_module=ref, duree_prevue_heures=35,
+        )
+
+        heures, source = resolve_module_duree_prevue_heures(module)
+        self.assertEqual(heures, 30)
+        self.assertEqual(source, 'ref_module')
+
+    def test_ensure_syncs_ref_over_wrong_stored_duree(self):
+        ref = RefModule.objects.create(intitule='Sync ref', volume_horaire=30)
+        module = _module(
+            _formation(), intitule='Sync ref', ref_module=ref, duree_prevue_heures=35,
+        )
+
+        heures, source = ensure_module_duree_prevue(module)
+        module.refresh_from_db()
+
+        self.assertEqual(heures, 30)
+        self.assertEqual(source, 'ref_module')
+        self.assertEqual(float(module.duree_prevue_heures), 30)
+
     def test_ensure_persists_from_sessions_edt(self):
         module = _module(_formation(), duree_prevue_heures=0)
         _session(module, 0, time(8, 0), time(18, 0))
