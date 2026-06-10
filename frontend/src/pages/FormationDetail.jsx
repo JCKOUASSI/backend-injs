@@ -479,10 +479,10 @@ export default function FormationDetail() {
     }
     setSavingSession(true)
     try {
-      await api.patch(`/formations/${id}/sessions/${editSession.id}/update/`, editSessionForm)
+      const res = await api.patch(`/formations/${id}/sessions/${editSession.id}/update/`, editSessionForm)
       setEditSession(null)
       loadFormationData()
-      showToast('Séance modifiée')
+      showToast(res.data?.detail || 'Séance modifiée')
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur lors de la modification', 'error')
     } finally { setSavingSession(false) }

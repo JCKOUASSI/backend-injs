@@ -191,6 +191,21 @@ class RefModule(models.Model):
             qs = qs.exclude(pk=exclude_pk)
         return qs.exists()
 
+    @classmethod
+    def get_or_create_for_intitule(cls, intitule, *, formation=None):
+        """Retourne le référentiel canonique (insensible à la casse)."""
+        normalized = cls.normalize_intitule(intitule)
+        if not normalized:
+            return None, False
+        existing = cls.objects.filter(intitule__iexact=normalized).first()
+        if existing:
+            return existing, False
+        return cls.objects.create(
+            intitule=normalized,
+            formation=formation,
+            actif=True,
+        ), True
+
     def clean(self):
         super().clean()
         self.intitule = self.normalize_intitule(self.intitule)
@@ -477,6 +492,14 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
+    ref_module = models.ForeignKey(
+        RefModule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modules_instances',
+        help_text="Référentiel canonique du module (nomenclature unifiée)",
+    )
     # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
     cycle = models.CharField(
         max_length=255,
@@ -562,6 +585,21 @@ class Module(models.Model):
         help_text="Utilisateur ayant créé le module",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def canonical_intitule(self):
+        if self.ref_module_id and self.ref_module:
+            return self.ref_module.intitule
+        return self.intitule or ''
+
+    def link_ref_module(self, *, save=True):
+        """Associe le module à l'entrée RefModule correspondante."""
+        ref, _ = RefModule.get_or_create_for_intitule(self.intitule)
+        if not ref:
+            return None
+        self.ref_module = ref
+        if save and self.pk:
+            self.save(update_fields=['ref_module'])
+        return ref
 
     class Meta:
         ordering = ['ordre', 'intitule']
@@ -771,6 +809,23 @@ class FinanceSettings(models.Model):
         default='',
         verbose_name='Fonction du signataire',
     )
+    tolerance_active = models.BooleanField(
+        default=False,
+        verbose_name='Activer la tolérance horaire',
+        help_text='Active la marge de tolérance sur les volumes réalisés inférieurs au planifié.',
+    )
+    tolerance_minutes = models.PositiveIntegerField(
+        default=30,
+        verbose_name='Tolérance (minutes)',
+        help_text='Marge absolue acceptée (minutes) entre planifié et réalisé.',
+    )
+    tolerance_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=5,
+        verbose_name='Tolérance (%)',
+        help_text='Marge relative (% du volume planifié). Le seuil retenu est le plus favorable des deux.',
+    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -791,3 +846,84 @@ class FinanceSettings(models.Model):
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class FinanceAjustement(models.Model):
+    """Ajustement horaire sur une séance réelle, soumis à validation Direction/Finance."""
+
+    class Statut(models.TextChoices):
+        EN_ATTENTE = 'EN_ATTENTE', 'En attente'
+        VALIDE = 'VALIDE', 'Validé'
+        REJETE = 'REJETE', 'Rejeté'
+
+    session = models.ForeignKey(
+        SessionModule,
+        on_delete=models.CASCADE,
+        related_name='finance_ajustements',
+    )
+    formateur = models.ForeignKey(
+        Formateur,
+        on_delete=models.CASCADE,
+        related_name='finance_ajustements',
+    )
+    minutes_delta = models.IntegerField(
+        help_text='Minutes à ajouter (positif) ou retirer (négatif) du volume réalisé.',
+    )
+    motif = models.TextField()
+    statut = models.CharField(
+        max_length=20,
+        choices=Statut.choices,
+        default=Statut.EN_ATTENTE,
+        db_index=True,
+    )
+    realise_avant_minutes = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='Volume réalisé de la séance avant ajustement (snapshot).',
+    )
+    realise_apres_minutes = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='Volume réalisé attendu après validation.',
+    )
+    proposed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_proposes',
+    )
+    proposed_at = models.DateTimeField(auto_now_add=True)
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_valides',
+    )
+    validated_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_rejetes',
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_motif = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-proposed_at']
+        verbose_name = 'Ajustement horaire finance'
+        verbose_name_plural = 'Ajustements horaires finance'
+        indexes = [
+            models.Index(fields=['statut', 'proposed_at']),
+            models.Index(fields=['session', 'statut']),
+        ]
+
+    def __str__(self):
+        sign = '+' if self.minutes_delta >= 0 else ''
+        return (
+            f"Ajustement {sign}{self.minutes_delta} min — "
+            f"{self.formateur} / séance {self.session_id} ({self.get_statut_display()})"
+        )

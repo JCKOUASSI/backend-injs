@@ -3,12 +3,15 @@ import { useEffect, useState } from 'react'
 import api from '../../services/api'
 import { useToast } from '../../context/ToastContext'
 import { FinanceStatsGrid, FinanceModulesList, fmtHeures, formatMoney } from '../FinanceStatsGrid'
-import Pagination from '../Pagination'
-import { useClientPagination, TABLE_PAGE_SIZE } from '../../hooks/useClientPagination'
+import FinanceModulesRecap from './FinanceModulesRecap'
+import { FinanceSessionsByGroupeTable } from './FinanceSessionsByGroupe'
+import FinanceToleranceBadge from './FinanceToleranceBadge'
+import FinanceProposeAjustementModal from './FinanceProposeAjustementModal'
 
 const FINANCE_DETAIL_TABS = [
   { id: 'statistiques', label: 'Statistiques', icon: 'bi-graph-up' },
   { id: 'identite', label: 'Identité', icon: 'bi-person-badge' },
+  { id: 'recap_modules', label: 'Récap modules', icon: 'bi-list-check' },
   { id: 'modules', label: 'Modules', icon: 'bi-journal-bookmark' },
   { id: 'seances', label: 'Séances', icon: 'bi-clock-history' },
   { id: 'paie', label: 'Fiche de paie', icon: 'bi-cash-coin' },
@@ -29,10 +32,13 @@ export default function FinanceDetailModal({
   canEditSensitive = false,
   canViewSensitive = false,
   onSensitiveSaved,
+  canProposeAjustement = false,
+  onRefreshDetail,
 }) {
   const { showToast } = useToast()
   const [sensitive, setSensitive] = useState({ numero_piece_identite: '', numero_compte_bancaire: '' })
   const [savingSensitive, setSavingSensitive] = useState(false)
+  const [ajustementSession, setAjustementSession] = useState(null)
 
   useEffect(() => {
     if (financeDetail) {
@@ -60,26 +66,9 @@ export default function FinanceDetailModal({
       setSavingSensitive(false)
     }
   }
-  const sessions = financeDetail?.sessions ?? []
-  const {
-    page: sessionsPage,
-    setPage: setSessionsPage,
-    totalPages: sessionsTotalPages,
-    totalItems: sessionsTotalItems,
-    pageItems: sessionsPageRows,
-    pageSize: sessionsPageSize,
-  } = useClientPagination(sessions, TABLE_PAGE_SIZE, [financeDetail?.id, financeDetailTab])
+  const sessionsByGroupe = financeDetail?.sessions_by_groupe ?? []
 
   if (!financeDetail) return null
-
-  const financePaginationProps = {
-    page: sessionsPage,
-    totalPages: sessionsTotalPages,
-    onPageChange: setSessionsPage,
-    totalItems: sessionsTotalItems,
-    pageSize: sessionsPageSize,
-    activeClassName: 'pagination-num--active pagination-num--finance',
-  }
 
   return (
     <div className="modal-overlay finance-modal" onClick={onClose}>
@@ -123,6 +112,12 @@ export default function FinanceDetailModal({
                 <span><i className="bi bi-clock"></i>Planifié <strong>{formatDuration(financeDetail.total_duree_minutes)}</strong></span>
                 <span><i className="bi bi-clock-history"></i>Réalisé <strong>{formatDuration(financeDetail.total_duree_realisee_minutes)}</strong></span>
                 <span><i className="bi bi-percent"></i>Taux <strong>{financeDetail.statistiques?.taux_realisation_pct ?? 0}%</strong></span>
+                {financeDetail.tolerance && (
+                  <span>
+                    <i className="bi bi-shield-check"></i>
+                    Statut <FinanceToleranceBadge tolerance={financeDetail.tolerance} showInactive />
+                  </span>
+                )}
                 <span><i className="bi bi-cash-stack"></i>À verser <strong>{formatMoney(financeDetail.montant_total_realise)} FCFA</strong></span>
               </div>
 
@@ -207,59 +202,33 @@ export default function FinanceDetailModal({
                 </div>
               )}
 
+              {financeDetailTab === 'recap_modules' && (
+                <FinanceModulesRecap
+                  modules={financeDetail.recap_modules ?? financeDetail.modules}
+                  formatDuration={formatDuration}
+                />
+              )}
+
               {financeDetailTab === 'modules' && (
                 <FinanceModulesList modules={financeDetail.modules} formatDuration={formatDuration} />
               )}
 
               {financeDetailTab === 'seances' && (
                 <>
-                  {Array.isArray(financeDetail.sessions) && financeDetail.sessions.length > 0 ? (
-                    <>
-                      <div className="finance-table-wrap">
-                        <table className="finance-table">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Séance</th>
-                              <th>Module</th>
-                              <th>Formation</th>
-                              <th>Grade</th>
-                              <th>Groupe</th>
-                              <th>Planifié</th>
-                              <th>Réalisé</th>
-                              <th>Taux</th>
-                              <th>Pointage</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sessionsPageRows.map((s) => (
-                              <tr key={s.session_id}>
-                                <td>{s.date_journee || '—'}</td>
-                                <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
-                                <td>{s.module_intitule || '—'}</td>
-                                <td>{s.formation_intitule || '—'}</td>
-                                <td>{s.grade || '—'}</td>
-                                <td>{s.groupe || '—'}</td>
-                                <td>{formatDuration(s.duree_minutes)}</td>
-                                <td>{formatDuration(s.duree_realisee_minutes)}</td>
-                                <td>{s.taux_realisation_pct ?? 0}%</td>
-                                <td>
-                                  {s.a_pointage
-                                    ? <span className="badge-bg-success">Oui</span>
-                                    : <span className="badge-bg-secondary">Non</span>}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="finance-section-footer">
-                      <Pagination {...financePaginationProps} />
-                    </div>
-                    </>
-                  ) : (
-                    <div className="finance-empty"><i className="bi bi-calendar-x"></i>Aucune séance sur cette période</div>
+                  {canProposeAjustement && (
+                    <p className="small text-muted mb-2">
+                      <i className="bi bi-arrow-left-right me-1"></i>
+                      Cliquez sur <i className="bi bi-arrow-left-right"></i> pour proposer un ajustement sur une séance terminée.
+                    </p>
                   )}
+                  <FinanceSessionsByGroupeTable
+                    groups={sessionsByGroupe}
+                    formatDuration={formatDuration}
+                    formatMoney={formatMoney}
+                    showPointage
+                    showAjustement={canProposeAjustement}
+                    onProposeAjustement={setAjustementSession}
+                  />
                 </>
               )}
 
@@ -298,42 +267,24 @@ export default function FinanceDetailModal({
                     </div>
                   )}
 
-                  {Array.isArray(financeDetail.sessions) && financeDetail.sessions.length > 0 ? (
+                  {sessionsByGroupe.length > 0 ? (
                     <>
-                      <div className="finance-table-wrap">
-                        <table className="finance-table">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Séance</th>
-                              <th>Module</th>
-                              <th>Réalisé</th>
-                              <th style={{ textAlign: 'right' }}>Montant</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sessionsPageRows.map((s) => (
-                              <tr key={s.session_id}>
-                                <td>{s.date_journee || '—'}</td>
-                                <td>{s.intitule || `Session ${s.numero ?? ''}`}</td>
-                                <td>{s.module_intitule || '—'}</td>
-                                <td>{formatDuration(s.duree_realisee_minutes)}</td>
-                                <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatMoney(s.montant_realise ?? 0)} F</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr style={{ background: '#f0fdf4' }}>
-                              <td colSpan="4" style={{ textAlign: 'right', fontWeight: 700 }}>Total</td>
-                              <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--fin-green)' }}>
-                                {formatMoney(financeDetail.montant_total_realise ?? 0)} FCFA
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                      <div className="finance-section-footer">
-                        <Pagination {...financePaginationProps} />
+                      {canProposeAjustement && (
+                        <p className="small text-muted mb-2">
+                          <i className="bi bi-arrow-left-right me-1"></i>
+                          Ajustement horaire disponible sur chaque ligne (validation Direction/Finance).
+                        </p>
+                      )}
+                      <FinanceSessionsByGroupeTable
+                        groups={sessionsByGroupe}
+                        formatDuration={formatDuration}
+                        formatMoney={formatMoney}
+                        showMontant
+                        showAjustement={canProposeAjustement}
+                        onProposeAjustement={setAjustementSession}
+                      />
+                      <div className="finance-paie-total mt-3" style={{ textAlign: 'right' }}>
+                        Total à verser : {formatMoney(financeDetail.montant_total_realise ?? 0)} FCFA
                       </div>
                     </>
                   ) : (
@@ -375,9 +326,23 @@ export default function FinanceDetailModal({
               </div>
             </div>
           )}
+          {canProposeAjustement && (
+            <Link to="/finance-ajustements" className="btn btn-outline-warning btn-sm">
+              <i className="bi bi-inbox me-1"></i>File d&apos;attente
+            </Link>
+          )}
           <button type="button" className="btn btn-secondary" disabled={financeDetailLoading} onClick={onClose}>Fermer</button>
         </div>
       </div>
+
+      <FinanceProposeAjustementModal
+        open={!!ajustementSession}
+        session={ajustementSession}
+        formateurId={financeDetail.id}
+        formateurLabel={`${financeDetail.prenom} ${financeDetail.nom}`.trim()}
+        onClose={() => setAjustementSession(null)}
+        onSuccess={onRefreshDetail}
+      />
     </div>
   )
 }

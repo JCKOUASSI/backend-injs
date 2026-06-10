@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
 from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
+from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with_edt_balance
 
 
 REACTIVATION_GRACE_HOURS = 4
@@ -381,6 +382,10 @@ def session_update(request, formation_pk, session_pk):
     if session.terminee_le:
         return Response({'detail': 'Impossible de modifier une séance terminée.'}, status=400)
 
+    old_debut = session.heure_debut_prevue
+    old_fin = session.heure_fin_prevue
+    hours_changed = False
+
     if 'intitule' in request.data:
         session.intitule = request.data['intitule']
     if 'date_journee' in request.data:
@@ -390,18 +395,42 @@ def session_update(request, formation_pk, session_pk):
         session.date_journee = val
     if 'heure_debut_prevue' in request.data:
         session.heure_debut_prevue = request.data['heure_debut_prevue'] or None
+        hours_changed = True
     if 'heure_fin_prevue' in request.data:
         session.heure_fin_prevue = request.data['heure_fin_prevue'] or None
+        hours_changed = True
 
     try:
         session.full_clean()
-        session.save()
+        auto_adjustment = None
+        if hours_changed:
+            auto_adjustment = apply_session_edit_with_edt_balance(
+                session,
+                old_debut=old_debut,
+                old_fin=old_fin,
+            )
+        else:
+            session.save()
+    except SessionEdtBalanceError as e:
+        return Response({'detail': str(e)}, status=400)
     except Exception as e:
         return Response({'detail': str(e)}, status=400)
-    return Response({
-        'detail': 'Séance mise à jour.',
+
+    detail = 'Séance mise à jour.'
+    if auto_adjustment and auto_adjustment.get('message'):
+        detail = f"{detail} {auto_adjustment['message']}"
+
+    payload = {
+        'detail': detail,
         'session': SessionSerializer(session).data,
-    })
+    }
+    if auto_adjustment:
+        payload['auto_adjustment'] = {
+            'last_session_id': auto_adjustment.get('last_session_id'),
+            'delta_minutes': auto_adjustment.get('delta_minutes'),
+            'deleted_last': auto_adjustment.get('deleted_last', False),
+        }
+    return Response(payload)
 
 
 @api_view(['GET'])

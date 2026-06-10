@@ -18,6 +18,7 @@ import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
 import FinanceParametrage from './pages/FinanceParametrage'
+import FinanceAjustements from './pages/FinanceAjustements'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -282,6 +283,13 @@ function App() {
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Dashboard Finance</li></>}>
                 <FinanceDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance-ajustements" element={
+            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Ajustements Finance</li></>}>
+                <FinanceAjustements />
               </Layout>
             </ProtectedRoute>
           } />

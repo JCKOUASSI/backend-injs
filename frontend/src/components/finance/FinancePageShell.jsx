@@ -67,7 +67,7 @@ export default function FinancePageShell({
   )
 }
 
-export function FinanceNavActions({ active }) {
+export function FinanceNavActions({ active, pendingAjustements = 0 }) {
   return (
     <>
       <Link
@@ -81,6 +81,15 @@ export function FinanceNavActions({ active }) {
         className={`btn btn-sm ${active === 'formateurs' ? 'btn-finance-accent' : ''}`}
       >
         <i className="bi bi-people me-1"></i>Formateurs
+      </Link>
+      <Link
+        to={financeNavHref('/finance-ajustements')}
+        className={`btn btn-sm ${active === 'ajustements' ? 'btn-finance-accent' : ''}`}
+      >
+        <i className="bi bi-arrow-left-right me-1"></i>Ajustements
+        {pendingAjustements > 0 && (
+          <span className="badge bg-danger ms-1">{pendingAjustements}</span>
+        )}
       </Link>
       <Link
         to={financeNavHref('/finance-parametrage')}

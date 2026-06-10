@@ -20,7 +20,12 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings
+from .models import (
+    Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant,
+    ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
+    RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings,
+    FinanceAjustement,
+)
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .formateur_privacy import (
@@ -1128,7 +1133,7 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
             if mid not in meta_by_id:
                 meta_by_id[mid] = {
                     'module_id': mid,
-                    'module_intitule': mod.get('module_intitule') or '',
+                    'module_intitule': mod.get('module_intitule') or mod.get('module_intitule_brut') or '',
                     'formation_intitule': mod.get('formation_intitule') or '',
                     'grade': mod.get('grade') or '',
                     'groupe': mod.get('groupe') or '',
@@ -1141,7 +1146,9 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
 
     module_ids = list(meta_by_id.keys())
     modules_by_id = {
-        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related('formation', 'secretariat')
+        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
+            'formation', 'secretariat', 'ref_module',
+        )
     }
 
     results = []
@@ -1200,6 +1207,109 @@ def _finance_join_unique_labels(values):
     """Concatène des libellés uniques (grade, groupe…) triés."""
     cleaned = sorted({str(v).strip() for v in values if v and str(v).strip()})
     return ', '.join(cleaned)
+
+
+def _finance_recap_par_module(modules, *, settings=None):
+    """Fiche récapitulative des modules dispensés par formateur."""
+    from .finance_tolerance import evaluate_volume_tolerance
+
+    recap = []
+    for mod in modules or []:
+        planned = round(float(mod.get('total_duree_minutes') or 0), 1)
+        realized = round(float(mod.get('total_duree_realisee_minutes') or 0), 1)
+        tol = evaluate_volume_tolerance(planned, realized, settings=settings)
+        recap.append({
+            'module_id': mod.get('module_id'),
+            'module_intitule': mod.get('module_intitule') or mod.get('module_intitule_brut') or '',
+            'formation_intitule': mod.get('formation_intitule') or '',
+            'grade': mod.get('grade') or '',
+            'groupe': mod.get('groupe') or '',
+            'sessions_count': int(mod.get('sessions_count') or 0),
+            'total_duree_minutes': planned,
+            'total_duree_realisee_minutes': realized,
+            'total_duree_heures': mod.get('total_duree_heures') or 0,
+            'total_duree_realisee_heures': mod.get('total_duree_realisee_heures') or 0,
+            'taux_realisation_pct': mod.get('taux_realisation_pct') or 0,
+            'montant_realise': round(float(mod.get('montant_realise') or 0), 2),
+            'prix_heure_realisee': mod.get('prix_heure_realisee'),
+            'tolerance': tol,
+        })
+    return sorted(
+        recap,
+        key=lambda x: (x.get('grade') or '', x.get('groupe') or '', x.get('module_intitule') or ''),
+    )
+
+
+def _finance_enrich_row_tolerance(row, settings=None):
+    """Ajoute l'évaluation tolérance au formateur et à chaque module."""
+    from .finance_tolerance import evaluate_volume_tolerance, tolerance_settings_payload
+
+    tol_row = evaluate_volume_tolerance(
+        row.get('total_duree_minutes'),
+        row.get('total_duree_realisee_minutes'),
+        settings=settings,
+    )
+    row['tolerance'] = tol_row
+    row['tolerance_parametres'] = tolerance_settings_payload(settings)
+
+    modules = row.get('modules') or []
+    for mod in modules:
+        mod['tolerance'] = evaluate_volume_tolerance(
+            mod.get('total_duree_minutes'),
+            mod.get('total_duree_realisee_minutes'),
+            settings=settings,
+        )
+
+    recap = row.get('recap_modules') or []
+    for item in recap:
+        if 'tolerance' not in item:
+            item['tolerance'] = evaluate_volume_tolerance(
+                item.get('total_duree_minutes'),
+                item.get('total_duree_realisee_minutes'),
+                settings=settings,
+            )
+    return row
+
+
+def _finance_group_sessions_by_groupe(sessions):
+    """Regroupe les séances par grade + groupe avec sous-totaux."""
+    groups = {}
+    for session in sessions or []:
+        grade = (session.get('grade') or '').strip()
+        groupe = (session.get('groupe') or '').strip()
+        key = (grade, groupe)
+        entry = groups.setdefault(key, {
+            'grade': grade,
+            'groupe': groupe,
+            'sessions': [],
+            'sous_total': {
+                'creneau_minutes': 0.0,
+                'realise_minutes': 0.0,
+                'montant': 0.0,
+                'sessions_count': 0,
+            },
+        })
+        creneau = float(session.get('duree_minutes') or 0)
+        realise = float(session.get('duree_realisee_minutes') or 0)
+        montant = float(session.get('montant_realise') or 0)
+        entry['sessions'].append(session)
+        entry['sous_total']['creneau_minutes'] += creneau
+        entry['sous_total']['realise_minutes'] += realise
+        entry['sous_total']['montant'] += montant
+        entry['sous_total']['sessions_count'] += 1
+
+    result = []
+    for key in sorted(groups.keys()):
+        entry = groups[key]
+        entry['sessions'].sort(
+            key=lambda s: (str(s.get('date_journee') or ''), int(s.get('numero') or 0)),
+        )
+        st = entry['sous_total']
+        st['creneau_minutes'] = round(st['creneau_minutes'], 1)
+        st['realise_minutes'] = round(st['realise_minutes'], 1)
+        st['montant'] = round(st['montant'], 2)
+        result.append(entry)
+    return result
 
 
 def _finance_build_statistiques(
@@ -1276,7 +1386,7 @@ def _finance_report_rows(
     modules_by_id = {}
     if all_module_ids:
         for module in Module.objects.filter(id__in=all_module_ids).select_related(
-            'formation', 'secretariat', 'site',
+            'formation', 'secretariat', 'site', 'ref_module',
         ):
             modules_by_id[module.id] = module
     sessions_by_module = {}
@@ -1307,8 +1417,13 @@ def _finance_report_rows(
             key = (pt.formateur_id, pt.session_id)
             realized_by_formateur_session[key] = realized_by_formateur_session.get(key, 0.0) + minutes
 
-    from .volume_horaire import _session_prevu_minutes, _session_realise_minutes
+    from .volume_horaire import (
+        _session_prevu_minutes,
+        _session_realise_minutes,
+        module_planned_minutes_for_period,
+    )
 
+    finance_settings = FinanceSettings.get_solo()
     results = []
     for formateur in formateurs:
         module_ids = sorted(module_formateur_map.get(formateur.id, set()))
@@ -1339,20 +1454,68 @@ def _finance_report_rows(
                 module_obj=module_obj,
             )
             module_sessions = sessions_by_module.get(module_id, [])
-            for session in module_sessions:
-                if not _finance_session_in_range(session, date_debut, date_fin):
-                    continue
+            sessions_in_period = [
+                s for s in module_sessions
+                if _finance_session_in_range(s, date_debut, date_fin)
+            ]
+            if not sessions_in_period:
+                continue
+            module_planned = round(module_planned_minutes_for_period(
+                module_obj,
+                len(sessions_in_period),
+                len(module_sessions),
+                sessions_in_period,
+            ), 1)
+            canonical_intitule = module_obj.canonical_intitule() if module_obj else ''
+            mod_entry = modules_data.setdefault(module_id, {
+                'module_id': module_id,
+                'module_intitule': canonical_intitule,
+                'module_intitule_brut': module_obj.intitule if module_obj else '',
+                'formation_intitule': (
+                    module_obj.formation.formation
+                    if module_obj and module_obj.formation_id else ''
+                ),
+                'grade': module_obj.grade if module_obj else '',
+                'groupe': module_obj.groupe if module_obj else '',
+                'statut': module_obj.statut if module_obj else '',
+                'site': (
+                    module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
+                    else (module_obj.site_legacy if module_obj else '')
+                ),
+                'salle': module_obj.salle if module_obj else '',
+                'date_debut': module_obj.date_debut if module_obj else None,
+                'date_fin': module_obj.date_fin if module_obj else None,
+                'secretariat_nom': (
+                    f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                    if module_obj and module_obj.secretariat_id else ''
+                ),
+                'sessions_count': 0,
+                'total_duree_minutes': module_planned,
+                'total_duree_realisee_minutes': 0.0,
+                'taux_planned_minutes': module_planned,
+                'taux_realized_capped_minutes': 0.0,
+                'montant_realise': 0.0,
+                'prix_heure_realisee': module_prix_heure,
+            })
+            total_minutes += module_planned
+            if module_planned > 0:
+                taux_planned_minutes += module_planned
+            if module_obj:
+                grade_val = (module_obj.grade or '').strip()
+                groupe_val = (module_obj.groupe or '').strip()
+                if grade_val:
+                    grades_seen.add(grade_val)
+                if groupe_val:
+                    groupes_seen.add(groupe_val)
+            if use_variable_rates and module_prix_heure is not None:
+                rates_used.add(module_prix_heure)
+            for session in sessions_in_period:
                 session_count += 1
-                duration_minutes = round(_session_prevu_minutes(session), 1)
+                creneau_minutes = round(_session_prevu_minutes(session), 1)
                 realized_minutes = round(_session_realise_minutes(session), 1)
                 pointage_minutes = round(
                     realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1,
                 )
-                total_minutes += duration_minutes
-                total_realized_minutes += realized_minutes
-                if duration_minutes > 0:
-                    taux_planned_minutes += duration_minutes
-                    taux_realized_capped_minutes += realized_minutes
                 if pointage_minutes > 0:
                     sessions_with_pointage += 1
                 if session.date_journee:
@@ -1372,56 +1535,13 @@ def _finance_report_rows(
                             global_aggregates['date_min'] = d
                         if cur_max is None or d > cur_max:
                             global_aggregates['date_max'] = d
-                if module_obj:
-                    grade_val = (module_obj.grade or '').strip()
-                    groupe_val = (module_obj.groupe or '').strip()
-                    if grade_val:
-                        grades_seen.add(grade_val)
-                    if groupe_val:
-                        groupes_seen.add(groupe_val)
-                mod_entry = modules_data.setdefault(module_id, {
-                    'module_id': module_id,
-                    'module_intitule': session.module.intitule if session.module else '',
-                    'formation_intitule': (
-                        session.module.formation.formation if session.module and session.module.formation else ''
-                    ),
-                    'grade': module_obj.grade if module_obj else '',
-                    'groupe': module_obj.groupe if module_obj else '',
-                    'statut': module_obj.statut if module_obj else '',
-                    'site': (
-                        module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
-                        else (module_obj.site_legacy if module_obj else '')
-                    ),
-                    'salle': module_obj.salle if module_obj else '',
-                    'date_debut': module_obj.date_debut if module_obj else None,
-                    'date_fin': module_obj.date_fin if module_obj else None,
-                    'secretariat_nom': (
-                        f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
-                        if module_obj and module_obj.secretariat_id else ''
-                    ),
-                    'sessions_count': 0,
-                    'total_duree_minutes': 0.0,
-                    'total_duree_realisee_minutes': 0.0,
-                    'taux_planned_minutes': 0.0,
-                    'taux_realized_capped_minutes': 0.0,
-                    'montant_realise': 0.0,
-                    'prix_heure_realisee': module_prix_heure,
-                })
                 mod_entry['sessions_count'] += 1
-                mod_entry['total_duree_minutes'] += duration_minutes
                 mod_entry['total_duree_realisee_minutes'] += realized_minutes
-                if duration_minutes > 0:
-                    mod_entry['taux_planned_minutes'] += duration_minutes
-                    mod_entry['taux_realized_capped_minutes'] += realized_minutes
-                mod_entry['montant_realise'] = _finance_montant_from_minutes(
-                    mod_entry['total_duree_realisee_minutes'], module_prix_heure,
-                )
-                if use_variable_rates and module_prix_heure is not None:
-                    rates_used.add(module_prix_heure)
+                mod_entry['taux_realized_capped_minutes'] += realized_minutes
                 if include_sessions:
                     taux_sess = (
-                        _finance_taux_realisation_pct(realized_minutes, duration_minutes)
-                        if duration_minutes > 0 else 0
+                        _finance_taux_realisation_pct(realized_minutes, creneau_minutes)
+                        if creneau_minutes > 0 else 0
                     )
                     sessions_data.append({
                         'session_id': session.id,
@@ -1429,20 +1549,31 @@ def _finance_report_rows(
                         'numero': session.numero,
                         'intitule': session.intitule or f"Session {session.numero}",
                         'module_id': session.module_id,
-                        'module_intitule': session.module.intitule,
-                        'formation_id': session.module.formation_id,
+                        'module_intitule': canonical_intitule,
+                        'formation_id': session.module.formation_id if session.module else None,
                         'formation_intitule': (
-                            session.module.formation.formation if session.module.formation else ''
+                            session.module.formation.formation
+                            if session.module and session.module.formation else ''
                         ),
                         'grade': module_obj.grade if module_obj else '',
                         'groupe': module_obj.groupe if module_obj else '',
-                        'duree_minutes': duration_minutes,
+                        'duree_minutes': creneau_minutes,
                         'duree_realisee_minutes': realized_minutes,
                         'montant_realise': _finance_montant_from_minutes(realized_minutes, module_prix_heure),
                         'prix_heure_realisee': module_prix_heure,
                         'taux_realisation_pct': taux_sess,
                         'a_pointage': pointage_minutes > 0,
                     })
+            realized_module = mod_entry['total_duree_realisee_minutes']
+            if module_planned > 0:
+                realized_module = min(realized_module, module_planned)
+            mod_entry['total_duree_realisee_minutes'] = realized_module
+            mod_entry['taux_realized_capped_minutes'] = realized_module
+            mod_entry['montant_realise'] = _finance_montant_from_minutes(
+                realized_module, module_prix_heure,
+            )
+            total_realized_minutes += realized_module
+            taux_realized_capped_minutes += realized_module
         modules_list = []
         for mid in module_ids:
             entry = modules_data.get(mid)
@@ -1512,9 +1643,12 @@ def _finance_report_rows(
             'sessions_count': session_count,
             'statistiques': statistiques,
             'modules': modules_list,
+            'recap_modules': _finance_recap_par_module(modules_list, settings=finance_settings),
         }
         if include_sessions:
             row['sessions'] = sessions_data
+            row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
+        _finance_enrich_row_tolerance(row, settings=finance_settings)
         results.append(row)
     return results
 
@@ -1696,6 +1830,24 @@ def finance_dashboard_api(request):
     )
     _finance_apply_canonical_volume_kpis(kpis, vh_totals)
 
+    from .finance_tolerance import tolerance_settings_payload
+    tol_settings = tolerance_settings_payload()
+    kpis['tolerance'] = {
+        **tol_settings,
+        'formateurs_conformes': sum(
+            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'ok'
+        ),
+        'formateurs_alerte': sum(
+            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'alerte'
+        ),
+        'formateurs_anomalie': sum(
+            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'anomalie'
+        ),
+        'formateurs_ecart': sum(
+            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'ecart'
+        ),
+    }
+
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
         {
@@ -1729,8 +1881,9 @@ def finance_dashboard_api(request):
     periode_payload['description'] = (
         period['meta'].get('description')
         or (
-            'Le volume horaire prévu est la somme des créneaux planifiés des séances '
-            '(heure de début → heure de fin). Le volume réalisé est la durée réelle des '
+            'Le volume horaire prévu est le volume contractuel du module '
+            '(duree_prevue_heures), indépendant des modifications d\'emploi du temps. '
+            'Le volume réalisé est la durée réelle des '
             'séances terminées, plafonnée au créneau prévu (même règle que le dashboard web '
             'et les statistiques). Les montants sont calculés sur le volume réalisé selon '
             'le tarif du cycle de formation (paramétrage Finance).'
@@ -1838,6 +1991,9 @@ def finance_settings_api(request):
             'export_mention_legale': settings_obj.export_mention_legale or '',
             'export_signataire_nom': settings_obj.export_signataire_nom or '',
             'export_signataire_fonction': settings_obj.export_signataire_fonction or '',
+            'tolerance_active': bool(settings_obj.tolerance_active),
+            'tolerance_minutes': int(settings_obj.tolerance_minutes or 0),
+            'tolerance_pct': float(settings_obj.tolerance_pct or 0),
             'updated_at': settings_obj.updated_at,
             'updated_by': (
                 settings_obj.updated_by.get_full_name() or settings_obj.updated_by.username
@@ -1890,11 +2046,31 @@ def finance_settings_api(request):
             ref.save(update_fields=['prix_heure_realisee'])
         updated = True
 
-    export_bool_fields = ('afficher_montants_exports',)
+    export_bool_fields = ('afficher_montants_exports', 'tolerance_active')
     for field in export_bool_fields:
         if field in request.data:
             setattr(settings_obj, field, bool(request.data.get(field)))
             updated = True
+
+    if 'tolerance_minutes' in request.data:
+        try:
+            mins = int(request.data.get('tolerance_minutes'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'tolerance_minutes invalide.'}, status=400)
+        if mins < 0:
+            return Response({'detail': 'La tolérance en minutes doit être positive ou nulle.'}, status=400)
+        settings_obj.tolerance_minutes = mins
+        updated = True
+
+    if 'tolerance_pct' in request.data:
+        try:
+            pct = float(request.data.get('tolerance_pct'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'tolerance_pct invalide.'}, status=400)
+        if pct < 0 or pct > 100:
+            return Response({'detail': 'La tolérance en % doit être entre 0 et 100.'}, status=400)
+        settings_obj.tolerance_pct = round(pct, 2)
+        updated = True
 
     export_text_fields = (
         'export_titre_document', 'export_entete_ligne1', 'export_entete_ligne2',
@@ -1915,6 +2091,161 @@ def finance_settings_api(request):
     payload = _settings_payload()
     payload['updated_by'] = request.user.get_full_name() or request.user.username
     return Response(payload)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustements_api(request):
+    """Liste et proposition d'ajustements horaires sur séances réelles."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    from .finance_ajustements import (
+        propose_ajustement,
+        serialize_ajustement,
+        _log_finance_audit,
+    )
+
+    if request.method == 'GET':
+        statut = (request.query_params.get('statut') or '').strip().upper()
+        qs = FinanceAjustement.objects.select_related(
+            'session',
+            'session__module',
+            'session__module__formation',
+            'formateur',
+            'proposed_by',
+            'validated_by',
+            'rejected_by',
+        )
+        if statut:
+            valid_statuts = {s.value for s in FinanceAjustement.Statut}
+            if statut not in valid_statuts:
+                return Response({'detail': 'Statut invalide.'}, status=400)
+            qs = qs.filter(statut=statut)
+        formateur_id = request.query_params.get('formateur_id')
+        if formateur_id:
+            try:
+                qs = qs.filter(formateur_id=int(formateur_id))
+            except (TypeError, ValueError):
+                return Response({'detail': 'formateur_id invalide.'}, status=400)
+        session_id = request.query_params.get('session_id')
+        if session_id:
+            try:
+                qs = qs.filter(session_id=int(session_id))
+            except (TypeError, ValueError):
+                return Response({'detail': 'session_id invalide.'}, status=400)
+        items = [serialize_ajustement(a) for a in qs[:200]]
+        pending_count = FinanceAjustement.objects.filter(
+            statut=FinanceAjustement.Statut.EN_ATTENTE,
+        ).count()
+        return Response({'items': items, 'pending_count': pending_count})
+
+    session_id = request.data.get('session_id')
+    formateur_id = request.data.get('formateur_id')
+    minutes_delta = request.data.get('minutes_delta')
+    motif = request.data.get('motif', '')
+
+    try:
+        session = SessionModule.objects.select_related(
+            'module', 'module__formation',
+        ).get(pk=int(session_id))
+    except (SessionModule.DoesNotExist, TypeError, ValueError):
+        return Response({'detail': 'Séance introuvable.'}, status=404)
+
+    try:
+        formateur = Formateur.objects.get(pk=int(formateur_id))
+    except (Formateur.DoesNotExist, TypeError, ValueError):
+        return Response({'detail': 'Formateur introuvable.'}, status=404)
+
+    ajustement, errors = propose_ajustement(
+        session, formateur, minutes_delta, motif, request.user,
+    )
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+
+    _log_finance_audit('FINANCE_AJUSTEMENT_PROPOSE', request, ajustement)
+    return Response(serialize_ajustement(ajustement), status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustement_valider_api(request, pk):
+    """Valide un ajustement horaire (Direction/Finance)."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    from .finance_ajustements import valider_ajustement, serialize_ajustement
+
+    try:
+        ajustement = FinanceAjustement.objects.select_related(
+            'session', 'session__module', 'session__module__formation', 'formateur',
+        ).get(pk=pk)
+    except FinanceAjustement.DoesNotExist:
+        return Response({'detail': 'Ajustement introuvable.'}, status=404)
+
+    ajustement, errors = valider_ajustement(ajustement, request.user, request=request)
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+    return Response(serialize_ajustement(ajustement))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def finance_encadrants_api(request):
+    """Liste des encadrants : groupe, volume planifié, volume réalisé (JSON)."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    period = parse_period_from_request(request)
+    if period['error']:
+        return Response({'detail': period['detail']}, status=400)
+
+    from .finance_encadrants import finance_encadrants_report
+
+    secretariat_id = _finance_secretariat_id_from_request(request)
+    report = finance_encadrants_report(
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+    )
+    payload = {
+        **report,
+        'periode': periode_api_payload(
+            period['date_debut'],
+            period['date_fin'],
+            period['meta'],
+            None,
+            None,
+        ),
+    }
+    return Response(payload)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustement_rejeter_api(request, pk):
+    """Rejette un ajustement horaire (Direction/Finance)."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    from .finance_ajustements import rejeter_ajustement, serialize_ajustement
+
+    try:
+        ajustement = FinanceAjustement.objects.select_related(
+            'session', 'session__module', 'session__module__formation', 'formateur',
+        ).get(pk=pk)
+    except FinanceAjustement.DoesNotExist:
+        return Response({'detail': 'Ajustement introuvable.'}, status=404)
+
+    ajustement, errors = rejeter_ajustement(
+        ajustement,
+        request.user,
+        rejection_motif=request.data.get('motif', ''),
+        request=request,
+    )
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+    return Response(serialize_ajustement(ajustement))
 
 
 @api_view(['GET'])
@@ -2615,8 +2946,12 @@ def module_full_detail_api(request, formation_pk, module_pk):
         return Response({'detail': 'Module introuvable.'}, status=404)
 
     from .serializers import SessionSerializer, ParticipantSerializer
+    from .duree_prevue_resolve import ensure_module_duree_prevue
     from presences.models import Pointage
-    module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
+    module = Module.objects.select_related(
+        'secretariat', 'formateur', 'superviseur', 'ref_module',
+    ).get(pk=module_pk, formation=formation)
+    ensure_module_duree_prevue(module)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
     formateurs_assignes = module.module_formateurs.select_related('formateur').all()

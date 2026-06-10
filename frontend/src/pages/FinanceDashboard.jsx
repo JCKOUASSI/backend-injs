@@ -14,6 +14,7 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import FinanceModuleBreakdownModal from '../components/finance/FinanceModuleBreakdownModal'
+import FinanceToleranceBadge from '../components/finance/FinanceToleranceBadge'
 
 const maxActivite = (items) => Math.max(...items.map((i) => Number(i.minutes_realisees || 0)), 1)
 
@@ -230,6 +231,19 @@ export default function FinanceDashboard() {
     >
       {error && <div className="error-message">{error}</div>}
 
+      {!loading && kpis.tolerance?.tolerance_active && (
+        <div className="alert alert-warning py-2 small mb-3">
+          <i className="bi bi-shield-check me-1"></i>
+          Tolérance active : {kpis.tolerance.tolerance_minutes} min ou {kpis.tolerance.tolerance_pct} % —
+          {' '}
+          <strong>{kpis.tolerance.formateurs_anomalie ?? 0}</strong> hors tolérance,
+          {' '}
+          <strong>{kpis.tolerance.formateurs_alerte ?? 0}</strong> dans la tolérance,
+          {' '}
+          <strong>{kpis.tolerance.formateurs_conformes ?? 0}</strong> conforme(s).
+        </div>
+      )}
+
       {!loading && kpis.tarifs_variables && (
         <div className="alert alert-info py-2 small mb-3">
           <i className="bi bi-info-circle me-1"></i>
@@ -419,6 +433,7 @@ export default function FinanceDashboard() {
                     <th>Mod.</th>
                     <th>Séances</th>
                     <th>Taux</th>
+                    <th>Statut</th>
                     <th>Planifié</th>
                     <th>Réalisé</th>
                     <th>Montant</th>
@@ -444,6 +459,9 @@ export default function FinanceDashboard() {
                             <div className="finance-taux-bar-fill" style={{ width: `${Math.min(100, taux)}%` }} />
                           </div>
                         </td>
+                        <td>
+                          <FinanceToleranceBadge tolerance={f.tolerance} showInactive />
+                        </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_realisee_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-green)' }}>
@@ -453,7 +471,7 @@ export default function FinanceDashboard() {
                     )
                   }) : (
                     <tr>
-                      <td colSpan="12">
+                      <td colSpan="13">
                         <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
                       </td>
                     </tr>
