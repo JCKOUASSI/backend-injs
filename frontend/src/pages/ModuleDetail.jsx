@@ -154,8 +154,8 @@ export default function ModuleDetail() {
     if (!editSessionForm.date_journee) { showToast('La date est obligatoire.', 'error'); return }
     setSavingSession(true)
     try {
-      await api.patch(`/formations/${formationId}/sessions/${editSession.id}/update/`, editSessionForm)
-      setEditSession(null); loadModule(); showToast('Séance modifiée')
+      const res = await api.patch(`/formations/${formationId}/sessions/${editSession.id}/update/`, editSessionForm)
+      setEditSession(null); loadModule(); showToast(res.data?.detail || 'Séance modifiée')
     } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
     finally { setSavingSession(false) }
   }

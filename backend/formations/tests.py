@@ -378,9 +378,9 @@ class ParticipantSecretariatDispatchByMatriculeAPITest(TestCase):
 
 class DashboardVolumeHoraireTest(TestCase):
 
-    def test_prevu_et_realise_par_seances(self):
+    def test_prevu_contractuel_independant_edt(self):
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=99)
+        module = make_module(f, duree_prevue_heures=10)
         now = timezone.now()
         for num in range(1, 3):
             SessionModule.objects.create(
@@ -399,6 +399,16 @@ class DashboardVolumeHoraireTest(TestCase):
         self.assertEqual(effectue, 10)
         self.assertEqual(taux, 100)
 
+        session = SessionModule.objects.filter(module=module).first()
+        session.heure_fin_prevue = dt_time(18, 0)
+        session.save(update_fields=['heure_fin_prevue'])
+        effectue2, total2, taux2 = compute_dashboard_volume_horaire(
+            Module.objects.filter(pk=module.pk)
+        )
+        self.assertEqual(total2, 10)
+        self.assertEqual(effectue2, 10)
+        self.assertEqual(taux2, 100)
+
     def test_realise_plafonne_au_prevu_seance(self):
         """Une séance laissée ouverte ne compte pas plus que son créneau planifié."""
         from .volume_horaire import _accumulate_module_session_volumes
@@ -415,9 +425,10 @@ class DashboardVolumeHoraireTest(TestCase):
             heure_fin_prevue=dt_time(12, 0),
         )
         vol = _accumulate_module_session_volumes(module)
-        self.assertEqual(vol['prevu_h'], 4.0)
+        self.assertEqual(vol['prevu_h'], 12.0)
+        self.assertEqual(vol['prevu_edt_h'], 4.0)
         self.assertEqual(vol['realise_h'], 4.0)
-        self.assertEqual(vol['ecart_h'], 0.0)
+        self.assertEqual(vol['ecart_h'], -8.0)
 
     def test_volume_horaire_canonique_aligne_stats_et_dashboard(self):
         from .volume_horaire import (
@@ -426,7 +437,7 @@ class DashboardVolumeHoraireTest(TestCase):
         )
 
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=99)
+        module = make_module(f, duree_prevue_heures=3)
         now = timezone.now()
         SessionModule.objects.create(
             module=module,
@@ -442,6 +453,18 @@ class DashboardVolumeHoraireTest(TestCase):
         canon = compute_volume_horaire_from_modules(qs)
         self.assertEqual(dash[1], canon['prevu_heures'])
         self.assertEqual(dash[0], canon['realise_heures'])
+
+
+class ModuleRefModuleLinkTest(TestCase):
+
+    def test_link_ref_module_on_create(self):
+        f = make_formation()
+        module = make_module(f, intitule='Déontologie')
+        module.link_ref_module()
+        module.refresh_from_db()
+        self.assertIsNotNone(module.ref_module_id)
+        self.assertEqual(module.ref_module.intitule, 'Déontologie')
+        self.assertEqual(module.canonical_intitule(), 'Déontologie')
 
 
 class RefModuleUniqueIntituleTest(TestCase):

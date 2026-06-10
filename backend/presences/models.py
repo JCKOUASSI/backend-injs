@@ -149,6 +149,10 @@ class AuditLog(models.Model):
         USER_DELETE = 'USER_DELETE', 'Suppression d\'utilisateur'
         # ── Imports globaux ──
         IMPORT_EXCEL = 'IMPORT_EXCEL', 'Import Excel global'
+        # ── Finance ──
+        FINANCE_AJUSTEMENT_PROPOSE = 'FINANCE_AJUSTEMENT_PROPOSE', 'Proposition ajustement horaire finance'
+        FINANCE_AJUSTEMENT_VALIDE = 'FINANCE_AJUSTEMENT_VALIDE', 'Validation ajustement horaire finance'
+        FINANCE_AJUSTEMENT_REJETE = 'FINANCE_AJUSTEMENT_REJETE', 'Rejet ajustement horaire finance'
 
     action = models.CharField(max_length=40, choices=Action.choices)
 

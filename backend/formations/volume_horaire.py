@@ -1,8 +1,10 @@
 """Volume horaire : dashboard web et diagnostic admin (modules / séances).
 
-Prévu module  = Σ durées planifiées des séances (heure_fin_prevue − heure_debut_prevue).
+Prévu contractuel = ``Module.duree_prevue_heures`` (figé, indépendant de l'EDT).
+Prévu EDT (diagnostic) = Σ créneaux séances (heure_fin_prevue − heure_debut_prevue).
 Réalisé module = Σ min(durée réelle, durée prévue) par séance terminée.
 La durée réelle (terminee_le − demarree_le) est plafonnée au créneau planifié de chaque séance.
+Sans ``duree_prevue_heures``, repli sur le prévu EDT.
 """
 
 from django.urls import reverse
@@ -72,6 +74,35 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
     if date_fin and d > date_fin:
         return False
     return True
+
+
+def module_contractual_planned_minutes(module):
+    """Volume horaire contractuel (minutes), figé à l'import formation."""
+    if not module:
+        return 0.0
+    heures = float(module.duree_prevue_heures or 0)
+    return heures * 60 if heures > 0 else 0.0
+
+
+def module_planned_minutes_for_period(
+    module,
+    sessions_in_period_count,
+    total_sessions_count,
+    sessions_in_period=None,
+):
+    """Prorata contractuel sur la période ; repli créneaux EDT si pas de durée fiche."""
+    contractual = module_contractual_planned_minutes(module)
+    in_period = int(sessions_in_period_count or 0)
+    total = int(total_sessions_count or 0)
+    if contractual > 0:
+        if total > 0 and in_period > 0:
+            return contractual * (in_period / total)
+        if in_period > 0:
+            return contractual
+        return 0.0
+    if sessions_in_period:
+        return sum(_session_prevu_minutes(s) for s in sessions_in_period)
+    return 0.0
 
 
 def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):
@@ -146,27 +177,54 @@ def finalize_volume_totals(prevu_min, realise_min, *, integer_hours=False):
 
 
 def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin=None, *, integer_hours=False):
-    """Volume horaire canonique : créneaux séances (prévu) / séances terminées plafonnées (réalisé)."""
+    """Volume horaire canonique : prévu contractuel / séances terminées plafonnées (réalisé)."""
     module_ids = list(module_ids or [])
     if not module_ids:
         totals = finalize_volume_totals(0.0, 0.0, integer_hours=integer_hours)
         totals['nb_sessions'] = 0
         return totals
 
+    modules_by_id = {
+        m.id: m
+        for m in Module.objects.filter(id__in=module_ids).only('duree_prevue_heures')
+    }
     sessions = SessionModule.objects.filter(module_id__in=module_ids).only(
+        'module_id',
         'heure_debut_prevue',
         'heure_fin_prevue',
         'demarree_le',
         'terminee_le',
         'date_journee',
     )
-    agg = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
+    sessions_by_module = {}
+    for s in sessions:
+        sessions_by_module.setdefault(s.module_id, []).append(s)
+
+    prevu_min = 0.0
+    realise_min = 0.0
+    nb_sessions = 0
+    for mid in module_ids:
+        module_sessions = sessions_by_module.get(mid, [])
+        in_period = [
+            s for s in module_sessions
+            if session_in_date_range(s, date_debut, date_fin)
+        ]
+        prevu_min += module_planned_minutes_for_period(
+            modules_by_id.get(mid),
+            len(in_period),
+            len(module_sessions),
+            in_period,
+        )
+        agg = accumulate_sessions_volume(in_period)
+        realise_min += agg['realise_min']
+        nb_sessions += agg['nb_sessions']
+
     totals = finalize_volume_totals(
-        agg['prevu_min'],
-        agg['realise_min'],
+        prevu_min,
+        realise_min,
         integer_hours=integer_hours,
     )
-    totals['nb_sessions'] = agg['nb_sessions']
+    totals['nb_sessions'] = nb_sessions
     return totals
 
 
@@ -181,20 +239,37 @@ def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=No
 
 
 def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None):
-    """Agrège prévu (toutes séances) et réalisé (séances terminées) pour un module."""
-    sessions = SessionModule.objects.filter(module=module).only(
-        'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'date_journee',
+    """Agrège prévu contractuel et réalisé (séances terminées) pour un module."""
+    sessions = list(
+        SessionModule.objects.filter(module=module).only(
+            'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'date_journee',
+        )
     )
-    agg = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
-    prevu_h = round(agg['prevu_min'] / 60, 1)
+    in_period = [
+        s for s in sessions
+        if session_in_date_range(s, date_debut, date_fin)
+    ]
+    agg_edt = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
+    agg = accumulate_sessions_volume(in_period)
+    prevu_min = module_planned_minutes_for_period(
+        module,
+        len(in_period),
+        len(sessions),
+        in_period,
+    )
+    prevu_edt_min = agg_edt['prevu_min']
+    prevu_h = round(prevu_min / 60, 1)
+    prevu_edt_h = round(prevu_edt_min / 60, 1)
     realise_h = round(agg['realise_min'] / 60, 1)
     if prevu_h > 0:
         realise_h = min(realise_h, prevu_h)
 
     return {
-        'prevu_min': agg['prevu_min'],
+        'prevu_min': prevu_min,
+        'prevu_edt_min': prevu_edt_min,
         'realise_min': agg['realise_min'],
         'prevu_h': prevu_h,
+        'prevu_edt_h': prevu_edt_h,
         'realise_h': realise_h,
         'compte_h': realise_h,
         'ecart_h': round(realise_h - prevu_h, 1),

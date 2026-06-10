@@ -67,6 +67,7 @@ export default function Formateurs() {
   const [financeDetailTab, setFinanceDetailTab] = useState('statistiques')
   const [exportAfficherMontants, setExportAfficherMontants] = useState(() => loadFinanceExportMontants(true))
   const [exportingSynthese, setExportingSynthese] = useState(false)
+  const [exportingEncadrants, setExportingEncadrants] = useState(false)
   const [financePeriod, setFinancePeriod] = useState(
     () => urlFinance?.period ?? loadFinancePeriod(),
   )
@@ -230,6 +231,25 @@ export default function Formateurs() {
     }
   }
 
+  const exportFinanceEncadrants = async (format) => {
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
+    const qs = buildFinanceQuery(appliedFinancePeriod).toString()
+    const base = format === 'pdf'
+      ? '/exports/finance/encadrants/pdf/'
+      : '/exports/finance/encadrants/excel/'
+    const path = qs ? `${base}?${qs}` : base
+    setExportingEncadrants(true)
+    try {
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || `liste_encadrants.${ext}`)
+      showToast(`Liste encadrants exportée (${ext.toUpperCase()})`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur export encadrants', 'error')
+    } finally {
+      setExportingEncadrants(false)
+    }
+  }
+
   const exportFinanceSynthese = async (format) => {
     const ext = format === 'pdf' ? 'pdf' : 'xlsx'
     const params = buildFinanceExportQuery(appliedFinancePeriod, exportAfficherMontants)
@@ -248,6 +268,25 @@ export default function Formateurs() {
       showToast(err.response?.data?.detail || 'Erreur export consolidé', 'error')
     } finally {
       setExportingSynthese(false)
+    }
+  }
+
+  const reloadFinanceDetail = async (formateurId = financeDetail?.id) => {
+    if (!formateurId) return
+    setFinanceDetailLoading(true)
+    try {
+      const periodQs = buildFinanceQuery(appliedFinancePeriod).toString()
+      const res = await api.get(
+        `/formations/formateurs/finance-report/?formateur_id=${formateurId}${periodQs ? `&${periodQs}` : ''}`
+      )
+      const rows = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const row = rows[0]
+      if (row) setFinanceDetail(row)
+      if (res.data?.periode) setFinancePeriodeInfo(res.data.periode)
+    } catch {
+      showToast('Impossible de recharger le détail', 'error')
+    } finally {
+      setFinanceDetailLoading(false)
     }
   }
 
@@ -331,6 +370,26 @@ export default function Formateurs() {
               >
                 <i className="bi bi-file-earmark-pdf me-1"></i>
                 {exportingSynthese ? 'Export…' : 'Paie globale PDF'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm"
+                disabled={exportingEncadrants || loading}
+                onClick={() => exportFinanceEncadrants('excel')}
+                title="Liste encadrants : groupe, volumes planifié et réalisé"
+              >
+                <i className="bi bi-person-badge me-1"></i>
+                {exportingEncadrants ? 'Export…' : 'Encadrants Excel'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                disabled={exportingEncadrants || loading}
+                onClick={() => exportFinanceEncadrants('pdf')}
+                title="Liste encadrants PDF"
+              >
+                <i className="bi bi-file-earmark-pdf me-1"></i>
+                {exportingEncadrants ? 'Export…' : 'Encadrants PDF'}
               </button>
             </div>
           </div>
@@ -460,6 +519,8 @@ export default function Formateurs() {
               setFinanceDetail((prev) => prev ? { ...prev, ...data } : prev)
             }}
             financeStatsForGrid={financeStatsForGrid}
+            canProposeAjustement
+            onRefreshDetail={() => reloadFinanceDetail()}
           />
         )}
       </FinancePageShell>

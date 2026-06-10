@@ -20,7 +20,7 @@ from openpyxl import load_workbook
 
 from formations.models import (
     Formation, Participant, Formateur, Module,
-    ModuleParticipant, ModuleFormateur, SessionModule, RefSite,
+    ModuleParticipant, ModuleFormateur, SessionModule, RefSite, RefModule,
 )
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -602,6 +602,10 @@ class Command(BaseCommand):
                 **module_lookup,
                 defaults=module_defaults,
             )
+            ref_module, _ = RefModule.get_or_create_for_intitule(module_val)
+            if ref_module and _mod.ref_module_id != ref_module.id:
+                _mod.ref_module = ref_module
+                _mod.save(update_fields=['ref_module'])
 
             if mod_created:
                 count += 1
