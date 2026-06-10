@@ -854,6 +854,7 @@ class Command(BaseCommand):
         self.account_provision_stats['auditeurs'] = provision_auditeur_accounts(
             touched_ids,
             log=self.stdout.write,
+            send_email=False,
         )
         return count
 
@@ -910,6 +911,7 @@ class Command(BaseCommand):
         self.account_provision_stats['formateurs'] = provision_formateur_accounts(
             touched_ids,
             log=self.stdout.write,
+            send_email=False,
         )
         return count
 

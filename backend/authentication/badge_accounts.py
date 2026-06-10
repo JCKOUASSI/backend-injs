@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_BADGE_PASSWORD = 'OPHIR2025'
 
 
+def _send_welcome_email_safe(user, password, *, mobile=False):
+    """Envoi non bloquant : un échec SMTP ne doit pas faire échouer la provision."""
+    try:
+        send_welcome_email(user, password, mobile=mobile)
+    except Exception as exc:
+        logger.warning(
+            'Email de bienvenue non envoyé pour %s : %s',
+            getattr(user, 'username', user.pk),
+            exc,
+        )
+
+
 def _empty_stats():
     return {
         'created': 0,
@@ -90,7 +102,7 @@ def ensure_auditeur_account(
                 participant.user = user
                 participant.save(update_fields=['user'])
                 if send_email and user.email:
-                    send_welcome_email(user, password, mobile=True)
+                    _send_welcome_email_safe(user, password, mobile=True)
                 return 'created'
 
         user.username = participant.matricule
@@ -147,7 +159,7 @@ def ensure_formateur_account(
                 formateur.user = user
                 formateur.save(update_fields=['user'])
                 if send_email and user.email:
-                    send_welcome_email(user, password, mobile=True)
+                    _send_welcome_email_safe(user, password, mobile=True)
                 return 'created'
 
         user.username = formateur.numerobadge

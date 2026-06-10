@@ -216,7 +216,7 @@ L'équipe DFRC — SYGEP-CPFAE
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
             html_message=html_message,
-            fail_silently=False,
+            fail_silently=True,
         )
         logger.info("Email de bienvenue envoyé à %s (%s)", user.email, user.username)
     except Exception as exc:
