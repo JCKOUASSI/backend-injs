@@ -116,7 +116,7 @@ function Layout({ children, breadcrumb }) {
           )}
           {canViewFinanceDashboard && (
             <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord</span></span>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
             </Link>
           )}
           {canViewStatistiques && (
@@ -283,7 +283,7 @@ function App() {
           } />
           <Route path="/finance-dashboard" element={
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord Finance</li></>}>
                 <FinanceDashboard />
               </Layout>
             </ProtectedRoute>
