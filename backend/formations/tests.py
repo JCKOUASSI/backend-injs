@@ -500,3 +500,54 @@ class RefModuleUniqueIntituleTest(TestCase):
         module.refresh_from_db()
         self.assertEqual(module.intitule, 'PLANIFICATION')
 
+
+class ParticipantFormationsScopeAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.sec_a = Secretariat.objects.create(nom='Sec A')
+        self.sec_b = Secretariat.objects.create(nom='Sec B')
+        self.secretariat_user = make_user('sec-scope', role='SECRETARIAT', secretariat=self.sec_a)
+        self.f_a = make_formation('Formation A')
+        self.f_b = make_formation('Formation B')
+        self.mod_a = make_module(self.f_a, intitule='Mod A', secretariat=self.sec_a)
+        self.mod_b = make_module(self.f_b, intitule='Mod B', secretariat=self.sec_b)
+        self.participant = make_participant(matricule='P-SCOPE')
+        ModuleParticipant.objects.create(module=self.mod_a, participant=self.participant)
+        ModuleParticipant.objects.create(module=self.mod_b, participant=self.participant)
+
+    def test_secretariat_only_sees_modules_in_own_perimeter(self):
+        self.client.force_authenticate(self.secretariat_user)
+        res = self.client.get(f'/api/formations/participants/{self.participant.pk}/formations/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['id'], self.mod_a.id)
+
+    def test_secretariat_cannot_read_participant_outside_perimeter(self):
+        outsider = make_participant(matricule='P-OUT')
+        ModuleParticipant.objects.create(module=self.mod_b, participant=outsider)
+        self.client.force_authenticate(self.secretariat_user)
+        res = self.client.get(f'/api/formations/participants/{outsider.pk}/formations/')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class FormateurListScopeAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.sec_a = Secretariat.objects.create(nom='Sec Form A')
+        self.sec_b = Secretariat.objects.create(nom='Sec Form B')
+        self.secretariat_user = make_user('sec-form', role='SECRETARIAT', secretariat=self.sec_a)
+        self.formateur_a = make_formateur(numero='FA001', nom='Alpha', prenom='Form')
+        self.formateur_b = make_formateur(numero='FB001', nom='Beta', prenom='Form')
+        self.formateur_a.secretariats.add(self.sec_a)
+        self.formateur_b.secretariats.add(self.sec_b)
+
+    def test_secretariat_formateur_list_scoped(self):
+        self.client.force_authenticate(self.secretariat_user)
+        res = self.client.get('/api/formations/formateurs/list/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ids = {item['id'] for item in res.data['results']}
+        self.assertIn(self.formateur_a.id, ids)
+        self.assertNotIn(self.formateur_b.id, ids)
+

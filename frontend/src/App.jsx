@@ -22,14 +22,15 @@ import FinanceAjustements from './pages/FinanceAjustements'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
+import {
+  ADMIN_LEVEL_ROLES,
+  STATS_ALLOWED_ROLES,
+  STAFF_WEB_ROLES,
+  USERS_ALLOWED_ROLES,
+  IMPORT_ALLOWED_ROLES,
+} from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
-
-/** Aligné sur backend/authentication/role_groups.py DUAL_ACCESS_ROLES */
-const ADMIN_LEVEL_ROLES = ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
-/** Aligné sur backend/statistiques/views.py STATS_ROLES */
-const STATS_ALLOWED_ROLES = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT']
-const STAFF_WEB_ROLES = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -211,7 +212,7 @@ function Layout({ children, breadcrumb }) {
 function App() {
   function HomeRoute() {
     const { user } = useAuth()
-    if (user?.role === 'FINANCE' || user?.role === 'DIRECTION') return <Navigate to="/finance-dashboard" replace />
+    if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
     return (
       <Layout breadcrumb={<li>Tableau de bord</li>}>
         <Dashboard />
@@ -301,7 +302,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/users" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={USERS_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Utilisateurs</li></>}>
                 <Users />
               </Layout>
@@ -315,7 +316,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/import" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={IMPORT_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Import Excel</li></>}>
                 <ImportExcel />
               </Layout>

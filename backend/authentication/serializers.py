@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .permissions import get_subordinate_roles, get_creatable_roles
+from .role_groups import get_creatable_roles
 
 User = get_user_model()
 

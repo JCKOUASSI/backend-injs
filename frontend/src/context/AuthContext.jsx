@@ -1,7 +1,17 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api, { setSessionExpiredCallback } from '../services/api'
+import { isWebRoleAllowed, webLoginForbiddenMessage } from '../utils/roles'
 
 const AuthContext = createContext(null)
+
+function normalizeUser(userData) {
+  return {
+    ...userData,
+    role_context: userData.role_context || {},
+    get_full_name: () =>
+      `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -13,7 +23,6 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  // Enregistrer le callback dans api.js pour gérer l'expiration de session
   useEffect(() => {
     setSessionExpiredCallback(_clearSession)
   }, [_clearSession])
@@ -23,11 +32,11 @@ export function AuthProvider({ children }) {
     if (token) {
       api.get('/auth/me/')
         .then(res => {
-          const userData = {
-            ...res.data,
-            get_full_name: () => `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim() || res.data.username,
+          if (!isWebRoleAllowed(res.data?.role)) {
+            _clearSession()
+            return
           }
-          setUser(userData)
+          setUser(normalizeUser(res.data))
         })
         .catch(() => _clearSession())
         .finally(() => setLoading(false))
@@ -40,39 +49,34 @@ export function AuthProvider({ children }) {
     const response = await api.post('/auth/login/', { username, password })
     const { access, refresh, user: userData } = response.data
 
-    if (userData?.role === 'AUDITEUR') {
-      const err = new Error('Mobile only')
-      err.response = { data: { detail: 'Les comptes auditeur sont réservés à l\'application mobile.' } }
+    if (!isWebRoleAllowed(userData?.role)) {
+      const err = new Error('Web access forbidden')
+      err.response = { data: { detail: webLoginForbiddenMessage(userData?.role) } }
       throw err
     }
 
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
-    
-    // Add get_full_name method to user
-    const userWithMethod = {
+    setUser(normalizeUser({
       ...userData,
-      get_full_name: () => `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-    }
-    setUser(userWithMethod)
-    
+      role_context: response.data.role_context || userData.role_context || {},
+    }))
+
     return response.data
   }
 
   const logout = () => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    setUser(null)
+    _clearSession()
   }
 
   const refreshUser = useCallback(async () => {
     const res = await api.get('/auth/me/')
-    const userData = {
-      ...res.data,
-      get_full_name: () => `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim() || res.data.username,
+    if (!isWebRoleAllowed(res.data?.role)) {
+      _clearSession()
+      return
     }
-    setUser(userData)
-  }, [])
+    setUser(normalizeUser(res.data))
+  }, [_clearSession])
 
   const isAuthenticated = !!user
 

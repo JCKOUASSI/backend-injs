@@ -539,6 +539,7 @@ class LoginAccessTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.auditeur = make_user('auditeur-login', password='pass12345', role=User.Role.AUDITEUR)
+        self.formateur = make_user('formateur-login', password='pass12345', role=User.Role.FORMATEUR)
 
     def test_auditeur_web_login_forbidden(self):
         resp = self.client.post('/api/auth/login/', {
@@ -556,4 +557,51 @@ class LoginAccessTests(TestCase):
         })
         self.assertEqual(resp.status_code, 200)
         self.assertIn('access', resp.data)
+
+    def test_formateur_web_login_forbidden(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'formateur-login',
+            'password': 'pass12345',
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn('mobile', resp.data['detail'].lower())
+
+    def test_formateur_mobile_login_allowed(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'formateur-login',
+            'password': 'pass12345',
+            'device_id': 'test-device-formateur',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.data)
+
+
+class RoleContextTests(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        ensure_role_groups()
+        self.direction = make_user('direction-ctx', role=User.Role.DIRECTION)
+        self.secretariat_user = make_user('secretariat-ctx', role=User.Role.SECRETARIAT)
+
+    def test_me_includes_role_context(self):
+        self.client.force_authenticate(user=self.direction)
+        resp = self.client.get(ME_URL)
+        self.assertEqual(resp.status_code, 200)
+        ctx = resp.data['role_context']
+        self.assertFalse(ctx['can_mutate_users'])
+        self.assertEqual(ctx['labels']['DIRECTION'], 'Direction')
+
+    def test_roles_endpoint_matches_me_context(self):
+        self.client.force_authenticate(user=self.secretariat_user)
+        me_ctx = self.client.get(ME_URL).data['role_context']
+        roles_ctx = self.client.get('/api/auth/roles/').data
+        self.assertEqual(me_ctx['creatable_roles'], roles_ctx['creatable_roles'])
+        self.assertTrue(roles_ctx['can_mutate_users'])
+
+    def test_direction_staff_filter_roles_for_read_only_users_page(self):
+        self.client.force_authenticate(user=self.direction)
+        ctx = self.client.get('/api/auth/roles/').data
+        self.assertFalse(ctx['can_mutate_users'])
+        self.assertTrue(len(ctx['staff_filter_roles']) > 0)
 

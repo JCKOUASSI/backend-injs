@@ -16,6 +16,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import { useListNavigationState } from '../hooks/useListReturn'
+import { canFilterDashboardBySecretariat } from '../utils/roles'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
-  const canFilterBySecretariat = ['CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'].includes(user?.role)
+  const canFilterBySecretariat = canFilterDashboardBySecretariat(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])
   const [secretariats, setSecretariats] = useState([])

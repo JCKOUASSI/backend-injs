@@ -17,40 +17,17 @@ from presences.models import Pointage, AuditLog
 
 def _calculer_duree_export(pointage):
     """
-    Recalcule la durée de présence à la volée pour l'export, en appliquant
-    le clamping aux heures prévues de la séance liée au pointage.
-    - Entrée avant heure_debut_prevue → ramenée à heure_debut_prevue
-    - Sortie après heure_fin_prevue   → ramenée à heure_fin_prevue
-    - Pointage en cours (sans sortie) → sortie = maintenant, clampée
-    Retourne (duree_minutes: float, heure_entree: str, heure_sortie: str).
+    Durée de présence pour l'export, via la règle commune ``presences.duree``
+    (clamp aux heures prévues de la séance ; pointage ouvert → sortie = maintenant).
+    Retourne (duree_minutes: float, duree_str, heure_entree: str, heure_sortie: str).
     """
-    from datetime import datetime as dt
-    seance = pointage.session
+    from presences.duree import pointage_bornes_clampees
 
-    entree = timezone.localtime(pointage.timestamp_entree)
-    if pointage.timestamp_sortie:
-        sortie = timezone.localtime(pointage.timestamp_sortie)
-    else:
-        sortie = timezone.localtime(timezone.now())
+    entree, sortie, en_cours = pointage_bornes_clampees(pointage)
+    entree = timezone.localtime(entree)
+    sortie = timezone.localtime(sortie)
 
-    # Clamp entrée
-    if seance and seance.heure_debut_prevue and entree.time() < seance.heure_debut_prevue:
-        entree = entree.replace(
-            hour=seance.heure_debut_prevue.hour,
-            minute=seance.heure_debut_prevue.minute,
-            second=0, microsecond=0,
-        )
-
-    # Clamp sortie
-    if seance and seance.heure_fin_prevue and sortie.time() > seance.heure_fin_prevue:
-        sortie = sortie.replace(
-            hour=seance.heure_fin_prevue.hour,
-            minute=seance.heure_fin_prevue.minute,
-            second=0, microsecond=0,
-        )
-
-    delta = sortie - entree
-    minutes = max(round(delta.total_seconds() / 60, 2), 0)
+    minutes = max(round((sortie - entree).total_seconds() / 60, 2), 0)
 
     h = int(minutes // 60)
     m = int(minutes % 60)
@@ -59,7 +36,7 @@ def _calculer_duree_export(pointage):
     heure_entree_str = entree.strftime('%H:%M')
     # Si la sortie n'est pas encore enregistrée, afficher explicitement "En cours"
     # plutôt qu'un tiret pour éviter l'ambiguïté dans les exports.
-    heure_sortie_str = sortie.strftime('%H:%M') if pointage.timestamp_sortie else 'En cours'
+    heure_sortie_str = 'En cours' if en_cours else sortie.strftime('%H:%M')
 
     return minutes, duree_str, heure_entree_str, heure_sortie_str
 
@@ -182,32 +159,24 @@ def _check_finance_export_access(request):
     return bool(user and user.is_authenticated and user.role in ('FINANCE', 'DIRECTION'))
 
 
-def _session_planned_minutes(session):
-    if session.demarree_le and session.terminee_le:
-        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    if session.heure_debut_prevue and session.heure_fin_prevue:
-        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
-        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
-        elapsed = (end_dt - start_dt).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    return 0
-
-
 def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
+    from presences.duree import pointage_minutes_clampees
+
     now = now or timezone.now()
     total = 0.0
     qset = Pointage.objects.filter(
         formateur_id=formateur_id,
         session_id=session.id,
-    ).only('duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
+    ).select_related('session').only(
+        'duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie',
+        'session__heure_debut_prevue', 'session__heure_fin_prevue',
+    )
     for pt in qset:
         if pt.duree_presence_minutes is not None:
             total += float(pt.duree_presence_minutes)
-        elif pt.timestamp_entree and pt.timestamp_sortie:
-            total += max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
-        elif pt.timestamp_entree and not pt.timestamp_sortie:
-            total += max((now - pt.timestamp_entree).total_seconds() / 60, 0)
+        else:
+            # Règle commune SYGEP : durée clampée au créneau de la séance.
+            total += pointage_minutes_clampees(pt, now=now)
     return round(total, 1)
 
 

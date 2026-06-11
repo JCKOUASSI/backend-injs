@@ -20,7 +20,6 @@ from formations.models import (
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
-from formations.session_views import _auto_manage_sessions
 from .models import Pointage, DeviceBinding, AuditLog, _log_audit
 from .serializers import (
     PointageSerializer,
@@ -279,23 +278,9 @@ def _check_fenetre_entree(seance):
 
 
 def _clamp_to_seance(ts, seance):
-    """
-    Borne un timestamp aux heures prévues de la séance.
-    - Si ts est avant heure_debut_prevue → retourne heure_debut_prevue
-    - Si ts est après heure_fin_prevue   → retourne heure_fin_prevue
-    - Sinon retourne ts tel quel.
-    """
-    if seance is None:
-        return ts
-    from datetime import datetime
-    local_ts = timezone.localtime(ts)
-    date = local_ts.date()
-    tz = local_ts.tzinfo
-    if seance.heure_debut_prevue and local_ts.time() < seance.heure_debut_prevue:
-        return timezone.make_aware(datetime.combine(date, seance.heure_debut_prevue), tz)
-    if seance.heure_fin_prevue and local_ts.time() > seance.heure_fin_prevue:
-        return timezone.make_aware(datetime.combine(date, seance.heure_fin_prevue), tz)
-    return ts
+    """Borne un timestamp aux heures prévues de la séance (règle commune ``presences.duree``)."""
+    from .duree import clamp_to_seance
+    return clamp_to_seance(ts, seance)
 
 
 def _resolve_authenticated_personne(user):
@@ -436,6 +421,19 @@ def _check_geofence(module, latitude, longitude, accuracy_m=None):
 # ENDPOINT /api/scan/ — Participants & Formateurs
 # ──────────────────────────────────────────────
 
+def _public_scan_disabled_response():
+    return Response(
+        {
+            'code': 'SCAN_DISABLED',
+            'detail': (
+                'Le badgeage public est désactivé. '
+                'Utilisez l\'application mobile QR Badge pour pointer.'
+            ),
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -445,7 +443,12 @@ def scan_view(request):
     Endpoint de scan QR — gère ENTREE et SORTIE pour participants (P0001) et formateurs (F0001).
 
     body: { token_qr, numero_participant, device_id }
+
+    Désactivé en production sauf PUBLIC_QR_SCAN_ENABLED=True (voir settings).
+    Préférer /api/scan/secure/ (JWT + profil lié + géofence).
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
     serializer = ScanSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -1639,8 +1642,6 @@ def formation_dashboard(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    _auto_manage_sessions(formation)
-
     date_str = request.GET.get('date')
     if date_str:
         try:
@@ -1736,9 +1737,8 @@ def formation_dashboard(request, pk):
         p_data['nb_sessions'] = len(sessions)
 
         if session_ouverte:
-            duree_session = round(
-                (now - session_ouverte.timestamp_entree).total_seconds() / 60, 2
-            )
+            from .duree import pointage_minutes_clampees
+            duree_session = pointage_minutes_clampees(session_ouverte, now=now)
             p_data['timestamp_entree'] = session_ouverte.timestamp_entree
             p_data['duree_actuelle_minutes'] = round(total_termine + duree_session, 2)
             return 'en_salle', p_data
@@ -2256,7 +2256,10 @@ def formation_offline_data(request, token):
     """
     Retourne les données d'une formation nécessaires au badgeage hors ligne.
     Authentification par token QR (pas besoin de login).
+    Désactivé si PUBLIC_QR_SCAN_ENABLED=False (aligné sur /api/scan/).
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
     try:
         qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
     except QRToken.DoesNotExist:
@@ -2579,7 +2582,11 @@ def check_badge_status(request):
     Retourne : { statut: 'ABSENT'|'EN_SALLE'|'TERMINE', action_suivante: 'ENTREE'|'SORTIE'|null,
                  nom, prenom, timestamp_entree, heure_entree }
     Endpoint public (lecture seule, pas de mutation).
+    Désactivé si PUBLIC_QR_SCAN_ENABLED=False.
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
+
     token_qr = request.GET.get('token_qr', '').strip()
     numero = request.GET.get('numero', '').strip()
 

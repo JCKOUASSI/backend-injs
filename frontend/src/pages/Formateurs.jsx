@@ -28,6 +28,7 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import { canMutateFormations } from '../utils/roles'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
 
@@ -187,8 +188,8 @@ export default function Formateurs() {
     })
   }
 
-  const canEdit = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canDelete = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canEdit = !canViewFinanceData && canMutateFormations(user?.role)
+  const canDelete = !canViewFinanceData && canMutateFormations(user?.role)
 
   const formatDate = (value) => {
     if (!value) return '-'

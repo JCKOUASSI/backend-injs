@@ -11,6 +11,7 @@ import { useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
+import { canMutateFormations, canSuperviseSessions } from '../utils/roles'
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
@@ -79,9 +80,9 @@ export default function ModuleDetail() {
   const [bulkForceSaving, setBulkForceSaving] = useState(false)
   const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
 
-  const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageModule = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canSupervise = canSuperviseSessions(user?.role)
+  const canManageSessions = canMutateFormations(user?.role)
+  const canManageModule = canMutateFormations(user?.role)
 
   useEffect(() => { loadModule() }, [formationId, moduleId])
   useEffect(() => { api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {}) }, [])

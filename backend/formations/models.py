@@ -690,6 +690,16 @@ class SessionModule(models.Model):
 
     @property
     def duree_minutes(self):
+        """Durée comptée de la séance — règle SYGEP unique :
+        durée brute plafonnée au créneau planifié (cf. ``volume_horaire``)."""
+        if self.demarree_le and self.terminee_le:
+            from .volume_horaire import _session_realise_minutes
+            return round(_session_realise_minutes(self), 1)
+        return None
+
+    @property
+    def duree_brute_minutes(self):
+        """Durée brute (terminee_le − demarree_le), sans plafond — diagnostic uniquement."""
         if self.demarree_le and self.terminee_le:
             return round((self.terminee_le - self.demarree_le).total_seconds() / 60, 1)
         return None

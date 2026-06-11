@@ -13,6 +13,7 @@ import {
   readModulesFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { canMutateFormations } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { useListNavigationState } from '../hooks/useListReturn'
@@ -57,7 +58,7 @@ export default function Modules() {
   const [savingFormation, setSavingFormation] = useState(false)
   const [formationError, setFormationError] = useState('')
 
-  const canManage = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canManage = canMutateFormations(user?.role)
 
   useEffect(() => {
     api.get('/formations/referentiels/').then(r => {

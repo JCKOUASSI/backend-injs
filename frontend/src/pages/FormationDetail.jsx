@@ -11,6 +11,12 @@ import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
+import {
+  canMutateFormations,
+  canPresenceAction,
+  canSuperviseSessions,
+  canViewPresences,
+} from '../utils/roles'
 
 export default function FormationDetail() {
   const { id } = useParams()
@@ -491,12 +497,11 @@ export default function FormationDetail() {
   const getStatutBadge = (s) => ({ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[s] || 'badge-info')
   const getStatutLabel = (s) => ({ 'PLANIFIEE': 'Planifié', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminé', 'SUSPENDUE': 'Suspendu' }[s] || s)
 
-  const canEdit = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canEdit = canMutateFormations(user?.role)
+  const canSupervise = canSuperviseSessions(user?.role)
+  const canManageSessions = canMutateFormations(user?.role)
   const canImport = user?.role === 'SECRETARIAT'
-  const isDFRC = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
-  const canViewPresences = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewPresencesTab = canViewPresences(user?.role)
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (error || !formation) return (
@@ -536,7 +541,7 @@ export default function FormationDetail() {
         <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', paddingLeft: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {[
             { key: 'info', label: 'Informations', icon: 'bi-info-circle', show: true },
-            { key: 'presences', label: 'Présences', icon: 'bi-person-check', show: canViewPresences },
+            { key: 'presences', label: 'Présences', icon: 'bi-person-check', show: canViewPresencesTab },
             { key: 'seances', label: `Séances (${sessions.length})`, icon: 'bi-calendar3', show: true },
             { key: 'participants', label: `Auditeurs (${participants.length})`, icon: 'bi-people', show: true },
             { key: 'formateurs', label: `Formateurs (${formateurs.length})`, icon: 'bi-person-video3', show: true },
@@ -749,7 +754,7 @@ export default function FormationDetail() {
           {dashboardLoading && <div className="loading"><div className="spinner"></div></div>}
 
           {dashboard && !dashboardLoading && (() => {
-            const canAction = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT', 'SECRETARIAT', 'CHEF_SECRETARIAT'].includes(user?.role)
+            const canAction = canPresenceAction(user?.role)
             const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
             const fmtMin = (m) => m != null ? `${Math.round(m)} min` : '—'
             const matricule = (p) => p.matricule || p.numero_matricule || p.numero || '—'
