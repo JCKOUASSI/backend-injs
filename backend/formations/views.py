@@ -340,6 +340,24 @@ def add_participant_to_formation(request, pk):
     except Module.DoesNotExist:
         return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
+    # Vérification de compatibilité grade/catégorie
+    # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
+    def _get_compat_key(g):
+        if not g:
+            return ''
+        g = g.strip().upper()
+        if g.startswith('A'):
+            return g  # A3, A4, A5... strict
+        return g[0] if g else ''  # B, C, D... par catégorie
+    p_compat = _get_compat_key(participant.grade)
+    mod_compat = _get_compat_key(module.grade)
+    if p_compat and mod_compat and p_compat != mod_compat:
+        return Response(
+            {'detail': f'Grade incompatible : le participant est {participant.grade}, '
+                      f'mais ce module est pour {module.grade}.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     fp, created = ModuleParticipant.objects.get_or_create(
         module=module,
         participant=participant,

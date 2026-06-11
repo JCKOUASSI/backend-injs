@@ -21,6 +21,7 @@ from authentication.permissions import (
     CanManageModuleParticipant,
 )
 from .api_access import IsWebStaff, IsOperationalWebStaff, CanListParticipants, formation_or_response, module_or_response
+from .sync_permission import IsInterPlatformServiceAccount
 from authentication.role_groups import SECRETARIAT_ROLES
 from .access import (
     can_filter_modules_by_secretariat,
@@ -3595,3 +3596,180 @@ def refvague_detail_api(request, pk):
     obj.save()
     _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'vague', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif})
+
+
+# ── Endpoints de synchronisation inter-plateformes (SVEVCPFAE) ────────────────
+
+
+@api_view(['GET'])
+@permission_classes([IsInterPlatformServiceAccount])
+def sync_participants_api(request):
+    """Retourne la liste paginée des participants (auditeurs) destinée à SVEVCPFAE.
+
+    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
+    Query params  : page (défaut 1), page_size (défaut 200)
+    """
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 200))
+
+    queryset = Participant.objects.select_related('secretariat').order_by('nom', 'prenom')
+
+    total_count = queryset.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    participants = queryset[start:end]
+
+    data = [
+        {
+            'id': p.id,
+            'matricule': p.matricule or '',
+            'nom': p.nom or '',
+            'prenom': p.prenom or '',
+            'email': p.email or '',
+            'telephone': p.telephone or '',
+            'date_naissance': p.date_naissance,
+            'grade': p.grade or '',
+            'groupe': p.groupe or '',
+            'secretariat': p.secretariat.nom if p.secretariat else '',
+        }
+        for p in participants
+    ]
+
+    return Response({
+        'results': data,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
+        'current_page': page,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsInterPlatformServiceAccount])
+def sync_formateurs_api(request):
+    """Retourne la liste paginée des formateurs destinée à SVEVCPFAE.
+
+    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
+    Query params  : page (défaut 1), page_size (défaut 200)
+    """
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 200))
+
+    queryset = Formateur.objects.order_by('nom', 'prenom')
+
+    total_count = queryset.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    formateurs = queryset[start:end]
+
+    data = [
+        {
+            'id': f.id,
+            'numerobadge': f.numerobadge or '',
+            'nom': f.nom or '',
+            'prenom': f.prenom or '',
+            'email': f.email or '',
+            'telephone': f.telephone or '',
+            'specialite': f.specialite or '',
+            'organisation': f.organisation or '',
+        }
+        for f in formateurs
+    ]
+
+    return Response({
+        'results': data,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
+        'current_page': page,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsInterPlatformServiceAccount])
+def sync_sessions_api(request):
+    """Retourne la liste paginée des séances destinée à SVEVCPFAE.
+
+    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
+    Query params  : page (défaut 1), page_size (défaut 500)
+    """
+    from .models import SessionModule as SessionMod
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 500))
+
+    queryset = SessionMod.objects.select_related('module').order_by('date_journee', 'module_id', 'numero')
+
+    total_count = queryset.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    sessions = queryset[start:end]
+
+    data = [
+        {
+            'id': s.id,
+            'module_id': s.module_id,
+            'date': s.date_journee,
+            'numero': s.numero,
+            'intitule': s.intitule or '',
+            'heure_debut': s.heure_debut_prevue,
+            'heure_fin': s.heure_fin_prevue,
+            'terminee': bool(s.terminee_le),
+        }
+        for s in sessions
+    ]
+
+    return Response({
+        'results': data,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
+        'current_page': page,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsInterPlatformServiceAccount])
+def sync_presences_api(request):
+    """Retourne la liste paginée des pointages (présences) destinée à SVEVCPFAE.
+
+    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
+    Query params  : page (défaut 1), page_size (défaut 500)
+    """
+    from presences.models import Pointage
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 500))
+
+    queryset = (
+        Pointage.objects
+        .filter(statut__in=['TERMINE', 'FORCE_DFRC', 'ABSENT_NON_BADGE'])
+        .select_related('participant', 'formateur', 'session')
+        .order_by('session_id', 'participant_id', 'formateur_id')
+    )
+
+    total_count = queryset.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    pointages = queryset[start:end]
+
+    def _statut_svevc(statut):
+        if statut in ('TERMINE', 'FORCE_DFRC'):
+            return 'present'
+        if statut == 'ABSENT_NON_BADGE':
+            return 'absent'
+        return 'present'
+
+    data = [
+        {
+            'id': p.id,
+            'session_id': p.session_id,
+            'participant_id': p.participant_id,
+            'formateur_id': p.formateur_id,
+            'statut': _statut_svevc(p.statut),
+            'duree_minutes': float(p.duree_presence_minutes) if p.duree_presence_minutes else None,
+        }
+        for p in pointages
+    ]
+
+    return Response({
+        'results': data,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
+        'current_page': page,
+    })

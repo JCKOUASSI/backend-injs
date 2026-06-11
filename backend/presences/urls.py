@@ -30,6 +30,7 @@ urlpatterns = [
 
     # Participant
     path('participant/<int:pk>/historique/', views.participant_historique, name='participant-historique'),
+    path('participant/<int:pk>/fiche-admin/', views.participant_fiche_admin, name='participant-fiche-admin'),
     path('participant/lookup/', views.participant_lookup, name='participant-lookup'),
 
     # Gestion liaisons appareils (superviseur / DFRC)

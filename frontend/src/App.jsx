@@ -108,14 +108,20 @@ function Layout({ children, breadcrumb }) {
         )}
 
         <nav className="sidebar-nav">
-          {canViewFinanceDashboard && (
-            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard Finance</span></span>
-            </Link>
-          )}
+          
           {!isFinanceRole && (
             <Link to={listHref('/', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
+            </Link>
+          )}
+          {canViewFinanceDashboard && (
+            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord</span></span>
+            </Link>
+          )}
+          {canViewStatistiques && (
+            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
           {!isFinanceRole && (
@@ -164,11 +170,6 @@ function Layout({ children, breadcrumb }) {
           {canViewReferentiels && (
             <Link to={listHref('/referentiels', LIST_STORAGE_KEYS.referentiels)} className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-sliders"></i> <span className="nav-label">Référentiels</span></span>
-            </Link>
-          )}
-          {canViewStatistiques && (
-            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
         </nav>
@@ -282,7 +283,7 @@ function App() {
           } />
           <Route path="/finance-dashboard" element={
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Dashboard Finance</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord</li></>}>
                 <FinanceDashboard />
               </Layout>
             </ProtectedRoute>
