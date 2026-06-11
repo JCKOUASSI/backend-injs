@@ -89,7 +89,10 @@ def participants_queryset_for_user(user, queryset=None):
         return qs.none()
     if user.role in SECRETARIAT_ROLES:
         if user.secretariat:
-            return qs.filter(secretariat=user.secretariat)
+            return qs.filter(
+                Q(secretariat=user.secretariat)
+                | Q(modules_inscrits__module__secretariat=user.secretariat)
+            ).distinct()
         return qs.filter(secretariat__isnull=True)
     if user.role == 'ENCADRANT':
         return qs.filter(

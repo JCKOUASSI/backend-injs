@@ -590,7 +590,7 @@ class RoleContextTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         ctx = resp.data['role_context']
         self.assertFalse(ctx['can_mutate_users'])
-        self.assertIn('DIRECTION', ctx['labels']['DIRECTION'])
+        self.assertEqual(ctx['labels']['DIRECTION'], 'Direction')
 
     def test_roles_endpoint_matches_me_context(self):
         self.client.force_authenticate(user=self.secretariat_user)
