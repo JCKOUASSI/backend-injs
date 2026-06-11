@@ -17,16 +17,7 @@ from presences.models import AuditLog, _log_audit
 
 User = get_user_model()
 
-from authentication.role_groups import DUAL_ACCESS_ROLES
-
-ALLOWED_WEB_ROLES = (
-    *DUAL_ACCESS_ROLES,
-    'DIRECTION',
-    'CHEF_SECRETARIAT',
-    'SECRETARIAT',
-    'FINANCE',
-    'ENCADRANT',
-)
+from authentication.role_groups import DUAL_ACCESS_ROLES, ALLOWED_WEB_ROLES
 
 
 # ──────────────────────────────────────────────

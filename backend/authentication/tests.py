@@ -539,6 +539,7 @@ class LoginAccessTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.auditeur = make_user('auditeur-login', password='pass12345', role=User.Role.AUDITEUR)
+        self.formateur = make_user('formateur-login', password='pass12345', role=User.Role.FORMATEUR)
 
     def test_auditeur_web_login_forbidden(self):
         resp = self.client.post('/api/auth/login/', {
@@ -553,6 +554,23 @@ class LoginAccessTests(TestCase):
             'username': 'auditeur-login',
             'password': 'pass12345',
             'device_id': 'test-device-001',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.data)
+
+    def test_formateur_web_login_forbidden(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'formateur-login',
+            'password': 'pass12345',
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn('mobile', resp.data['detail'].lower())
+
+    def test_formateur_mobile_login_allowed(self):
+        resp = self.client.post('/api/auth/login/', {
+            'username': 'formateur-login',
+            'password': 'pass12345',
+            'device_id': 'test-device-formateur',
         })
         self.assertEqual(resp.status_code, 200)
         self.assertIn('access', resp.data)

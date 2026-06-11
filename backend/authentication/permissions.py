@@ -24,7 +24,13 @@ def _in_groups(user, *roles):
 
 
 def _has_role(user, *roles):
-    """Groupe Django ou champ ``role`` (secours si groupes non synchronisés)."""
+    """Vérifie le rôle de l'utilisateur — règle unique pour toutes les permissions.
+
+    Le champ ``User.role`` est la source de vérité (c'est lui qui pilote
+    ``sync_user_role_group``) ; le groupe Django sert de secours si le champ
+    est vide ou désynchronisé. Toutes les classes de permission DOIVENT passer
+    par cette fonction, jamais par ``_in_groups`` directement.
+    """
     if getattr(user, 'role', None) in roles:
         return True
     return _in_groups(user, *roles)
@@ -96,9 +102,9 @@ class IsDFRC(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _in_groups(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
-        if _in_groups(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
 
@@ -108,9 +114,9 @@ class IsDFRCOrEncadrant(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _in_groups(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
+        if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
             return True
-        if _in_groups(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
 
@@ -127,7 +133,7 @@ class IsSecretariat(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and _in_groups(request.user, 'SECRETARIAT', 'CHEF_SECRETARIAT')
+            and _has_role(request.user, 'SECRETARIAT', 'CHEF_SECRETARIAT')
         )
 
 
@@ -137,7 +143,7 @@ class IsEncadrant(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and _in_groups(request.user, 'ENCADRANT')
+            and _has_role(request.user, 'ENCADRANT')
         )
 
 
@@ -147,7 +153,7 @@ class IsSecretariatOrEncadrant(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and _in_groups(request.user, 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT')
+            and _has_role(request.user, 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT')
         )
 
 
@@ -173,8 +179,8 @@ class IsSecretariatOrEncadrantOrDFRC(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _in_groups(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if _has_role(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
-        if _in_groups(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False

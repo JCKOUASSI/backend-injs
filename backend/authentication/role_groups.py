@@ -15,6 +15,17 @@ DUAL_ACCESS_ROLES = frozenset({
 # Rôles réservés à l'application mobile (pas de plateforme web ni admin Django).
 MOBILE_ONLY_ROLES = frozenset({
     User.Role.AUDITEUR,
+    User.Role.FORMATEUR,
+})
+
+# Rôles autorisés sur la plateforme web React (sans device_id mobile).
+ALLOWED_WEB_ROLES = frozenset({
+    *DUAL_ACCESS_ROLES,
+    User.Role.DIRECTION,
+    User.Role.CHEF_SECRETARIAT,
+    User.Role.SECRETARIAT,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
 })
 
 ROLE_GROUP_NAMES = {

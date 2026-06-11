@@ -188,7 +188,10 @@ def _auto_manage_sessions(formation):
     Auto-start sessions when heure_debut_prevue is reached and the encadrant
     has not started them yet. Auto-close sessions when heure_fin_prevue is
     passed, the encadrant has not closed them yet, and AUTO_CLOSE_DELAY_MINUTES
-    has elapsed. Called lazily whenever the session list is loaded.
+    has elapsed.
+
+    À appeler uniquement via la tâche planifiée ``manage.py auto_sessions``
+    (cron / service compose), jamais depuis un endpoint GET de lecture.
     """
     now = timezone.now()
     local_now = timezone.localtime(now)
@@ -508,8 +511,6 @@ def session_list(request, formation_pk):
     formation = formation_accessible(request.user, formation_pk)
     if not formation:
         return Response({'detail': 'Formation introuvable ou non autorisée.'}, status=404)
-
-    _auto_manage_sessions(formation)
 
     # If module_id filter provided, return only that module's sessions
     module_id = request.query_params.get('module_id')

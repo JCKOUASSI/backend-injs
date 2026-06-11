@@ -17,7 +17,7 @@ from .serializers import (
     ChangePasswordSerializer,
 )
 from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
-from .role_groups import MOBILE_ONLY_ROLES
+from .role_groups import ALLOWED_WEB_ROLES
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
 from presences.models import DeviceBinding, AuditLog, _log_audit
@@ -72,17 +72,20 @@ def login_view(request):
 
     device_id = request.data.get('device_id', '').strip()
 
-    if user.role in MOBILE_ONLY_ROLES and not device_id:
+    if not device_id and user.role not in ALLOWED_WEB_ROLES:
+        if user.role == User.Role.AUDITEUR:
+            detail = 'Les comptes auditeur sont réservés à l\'application mobile.'
+        elif user.role == User.Role.FORMATEUR:
+            detail = 'Les comptes formateur sont réservés à l\'application mobile.'
+        else:
+            detail = 'Ce compte n\'a pas accès à la plateforme web.'
         logger.warning(
-            'login_mobile_only role=%s username=%r ip=%s',
+            'login_web_forbidden role=%s username=%r ip=%s',
             user.role,
             user.username,
             client_ip,
         )
-        return Response(
-            {'detail': 'Les comptes auditeur sont réservés à l\'application mobile.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+        return Response({'detail': detail}, status=status.HTTP_403_FORBIDDEN)
 
     if user.role in ('AUDITEUR', 'FORMATEUR', 'ENCADRANT'):
         from .profile_sync import sync_user_profile_links

@@ -6,7 +6,13 @@ frontend/.env.local
 frontend/.env.*.local
 
 credentials_mobile.txt
-.DS_Store
+backend/credentials_mobile.txt
+backend/.local/
+backend/staticfiles/
+backend/media/
+backend/cache/
+
+# Doublons locaux (sources canoniques dans docs/)
 **/.DS_Store
 
 # Doublons locaux (sources canoniques dans docs/)

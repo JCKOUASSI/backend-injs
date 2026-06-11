@@ -50,6 +50,9 @@ def formation_accessible(user, pk):
             .first()
         )
 
+    if user.role == 'FINANCE':
+        return Formation.objects.filter(pk=pk).first()
+
     # ADMIN, DFRC, DIRECTION → accès complet
     if user.role in ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
         return Formation.objects.filter(pk=pk).first()

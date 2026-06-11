@@ -13,8 +13,14 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
+from authentication.permissions import (
+    IsSecretariat,
+    IsSecretariatOrDFRC,
+    IsSecretariatOrEncadrantOrDFRC,
+    IsDFRC,
+    CanManageModuleParticipant,
+)
+from .api_access import IsWebStaff, CanListParticipants, formation_or_response, module_or_response
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
@@ -117,7 +123,7 @@ def _log_referentiel_audit(request, action, ref_type, obj, extra=None):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def dashboard_stats(request):
     """Return dashboard statistics, scoped by secretariat for SECRETARIAT role."""
     modules_qs = Module.objects.all()
@@ -456,7 +462,7 @@ def dashboard_stats(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def formation_list_api(request):
     """
     List modules (une ligne par module) with optional filtering.
@@ -617,7 +623,7 @@ def formation_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([CanListParticipants])
 def participant_list_api(request):
     """
     List participants with optional search.
@@ -747,7 +753,7 @@ def participant_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def participant_formations_api(request, pk):
     """Return all modules a participant is enrolled in (with their formation)."""
     try:
@@ -786,7 +792,7 @@ def participant_formations_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def formateur_list_api(request):
     """
     List formateurs with optional search.
@@ -1479,21 +1485,25 @@ def _finance_report_rows(
 
     realized_by_formateur_session = {}
     if formateur_ids:
+        from presences.duree import pointage_minutes_clampees
+
         now = timezone.now()
         pointages = Pointage.objects.filter(
             formateur_id__in=formateur_ids,
             session__module_id__in=all_module_ids,
             session_id__isnull=False,
-        ).only('formateur_id', 'session_id', 'duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
+        ).select_related('session').only(
+            'formateur_id', 'session_id', 'duree_presence_minutes',
+            'timestamp_entree', 'timestamp_sortie',
+            'session__heure_debut_prevue', 'session__heure_fin_prevue',
+        )
         for pt in pointages:
-            minutes = 0.0
             if pt.duree_presence_minutes is not None:
                 minutes = float(pt.duree_presence_minutes)
-            elif pt.timestamp_entree and pt.timestamp_sortie:
-                minutes = max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
-            elif pt.timestamp_entree and not pt.timestamp_sortie:
-                # Pointage encore ouvert: compter le temps écoulé jusqu'à maintenant.
-                minutes = max((now - pt.timestamp_entree).total_seconds() / 60, 0)
+            else:
+                # Règle commune SYGEP : durée clampée au créneau de la séance
+                # (pointage ouvert compté jusqu'à maintenant, clampé).
+                minutes = pointage_minutes_clampees(pt, now=now)
             key = (pt.formateur_id, pt.session_id)
             realized_by_formateur_session[key] = realized_by_formateur_session.get(key, 0.0) + minutes
 
@@ -1734,7 +1744,7 @@ def _finance_report_rows(
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def formateur_finance_report_api(request):
     """Rapport finance : temps de cours par formateur, par séance, + total.
 
@@ -1844,7 +1854,7 @@ def formateur_finance_report_api(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def formateur_donnees_sensibles_api(request, pk):
     """Pièce d'identité et compte bancaire — visible/éditable par FINANCE ou le formateur lui-même."""
     try:
@@ -1880,7 +1890,7 @@ def formateur_donnees_sensibles_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_dashboard_api(request):
     """Dashboard finance: agrégats globaux + top formateurs."""
     if request.user.role not in _finance_allowed_roles():
@@ -2043,7 +2053,7 @@ def finance_dashboard_api(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_settings_api(request):
     """Paramètres finance : tarif horaire par défaut et tarifs par formation (référentiel)."""
     if not _check_finance_access(request):
@@ -2188,7 +2198,7 @@ def finance_settings_api(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_ajustements_api(request):
     """Liste et proposition d'ajustements horaires sur séances réelles."""
     if not _check_finance_access(request):
@@ -2262,7 +2272,7 @@ def finance_ajustements_api(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_ajustement_valider_api(request, pk):
     """Valide un ajustement horaire (Direction/Finance)."""
     if not _check_finance_access(request):
@@ -2284,7 +2294,7 @@ def finance_ajustement_valider_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_encadrants_api(request):
     """Liste des encadrants : groupe, volume planifié, volume réalisé (JSON)."""
     if not _check_finance_access(request):
@@ -2316,7 +2326,7 @@ def finance_encadrants_api(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def finance_ajustement_rejeter_api(request, pk):
     """Rejette un ajustement horaire (Direction/Finance)."""
     if not _check_finance_access(request):
@@ -2343,39 +2353,34 @@ def finance_ajustement_rejeter_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def formation_detail_api(request, pk):
     """
     Get formation details by ID.
     """
-    try:
-        formation = Formation.objects.prefetch_related(
-            'modules__sessions',
-            'modules__module_participants__participant',
-            'modules__secretariat',
-        ).get(pk=pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
+    formation, err = formation_or_response(request.user, pk)
+    if err:
+        return err
 
-    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        sec = request.user.secretariat
-        if not sec or not formation.modules.filter(secretariat=sec).exists():
-            return Response({'detail': 'Formation introuvable.'}, status=404)
+    formation = Formation.objects.prefetch_related(
+        'modules__sessions',
+        'modules__module_participants__participant',
+        'modules__secretariat',
+    ).get(pk=formation.pk)
     
     serializer = FormationDetailSerializer(formation)
     return Response(serializer.data)
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def api_generate_qr(request, formation_pk, session_pk=None):
     """
     Generate QR code for a formation or session.
     """
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
+    formation, err = formation_or_response(request.user, formation_pk)
+    if err:
+        return err
     
     if not session_pk:
         return Response({'detail': 'session_pk est obligatoire pour générer un QR.'}, status=400)
@@ -2604,7 +2609,7 @@ def api_import_excel(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_formation_list(request):
     if request.method == 'GET':
         data = list(RefFormation.objects.values('id', 'intitule', 'actif'))
@@ -2614,7 +2619,7 @@ def ref_formation_list(request):
     return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_formation_detail(request, pk):
     try:
         obj = RefFormation.objects.get(pk=pk)
@@ -2658,7 +2663,7 @@ def _ref_module_validation_response(exc):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_module_list(request):
     if request.method == 'GET':
         data = list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif'))
@@ -2677,7 +2682,7 @@ def ref_module_list(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_module_detail(request, pk):
     try:
         obj = RefModule.objects.get(pk=pk)
@@ -2737,7 +2742,7 @@ def _coerce_decimal(value):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_site_list(request):
     if request.method == 'GET':
         data = [_serialize_site(s) for s in RefSite.objects.all()]
@@ -2753,7 +2758,7 @@ def ref_site_list(request):
     return Response(_serialize_site(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_site_detail(request, pk):
     try:
         obj = RefSite.objects.get(pk=pk)
@@ -2786,7 +2791,7 @@ def ref_site_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_batiment_list(request):
     if request.method == 'GET':
         data = list(RefBatiment.objects.values('id', 'nom', 'site_id', 'actif'))
@@ -2800,7 +2805,7 @@ def ref_batiment_list(request):
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_batiment_detail(request, pk):
     try:
         obj = RefBatiment.objects.get(pk=pk)
@@ -2827,7 +2832,7 @@ def ref_batiment_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_salle_list(request):
     if request.method == 'GET':
         data = list(RefSalle.objects.values('id', 'nom', 'site_id', 'batiment_id', 'actif'))
@@ -2842,7 +2847,7 @@ def ref_salle_list(request):
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_salle_detail(request, pk):
     try:
         obj = RefSalle.objects.get(pk=pk)
@@ -2870,7 +2875,7 @@ def ref_salle_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_categorie_list(request):
     if request.method == 'GET':
         data = list(RefCategorie.objects.values('id', 'libelle', 'actif'))
@@ -2883,7 +2888,7 @@ def ref_categorie_list(request):
     return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_categorie_detail(request, pk):
     try:
         obj = RefCategorie.objects.get(pk=pk)
@@ -2909,7 +2914,7 @@ def ref_categorie_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_grade_list(request):
     if request.method == 'GET':
         data = list(RefGrade.objects.values('id', 'libelle', 'categorie_id', 'actif'))
@@ -2923,7 +2928,7 @@ def ref_grade_list(request):
     return Response({'id': obj.id, 'libelle': obj.libelle, 'categorie_id': obj.categorie_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_grade_detail(request, pk):
     try:
         obj = RefGrade.objects.get(pk=pk)
@@ -2950,7 +2955,7 @@ def ref_grade_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_type_secretariat_list(request):
     if request.method == 'GET':
         data = list(RefTypeSecretariat.objects.values('id', 'libelle', 'actif'))
@@ -2964,7 +2969,7 @@ def ref_type_secretariat_list(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsDFRC])
 def ref_type_secretariat_detail(request, pk):
     try:
         obj = RefTypeSecretariat.objects.get(pk=pk)
@@ -2990,17 +2995,19 @@ def ref_type_secretariat_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def module_list_api(request, formation_pk):
     """List or create modules for a formation."""
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
+    formation, err = formation_or_response(request.user, formation_pk)
+    if err:
+        return err
 
     if request.method == 'GET':
         modules = formation.modules.prefetch_related('sessions').all()
         return Response(ModuleSerializer(modules, many=True).data)
+
+    if not IsSecretariatOrDFRC().has_permission(request, None):
+        return Response({'detail': 'Accès refusé.'}, status=403)
 
     # POST — create module
     intitule = request.data.get('intitule', '').strip()
@@ -3050,21 +3057,19 @@ def module_list_api(request, formation_pk):
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def module_detail_api(request, formation_pk, module_pk):
     """Get, update or delete a module."""
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-        module = Module.objects.get(pk=module_pk, formation=formation)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
 
     if request.method == 'GET':
         return Response(ModuleSerializer(module).data)
 
     if request.method in ('PUT', 'PATCH'):
+        if not IsSecretariatOrDFRC().has_permission(request, None):
+            return Response({'detail': 'Accès refusé.'}, status=403)
         fields = [
             'intitule', 'duree_prevue_heures', 'ordre', 'statut',
             'grade', 'groupe', 'vague',
@@ -3148,6 +3153,8 @@ def module_detail_api(request, formation_pk, module_pk):
         return Response(ModuleSerializer(module).data)
 
     # DELETE
+    if not IsSecretariatOrDFRC().has_permission(request, None):
+        return Response({'detail': 'Accès refusé.'}, status=403)
     if module.sessions.exists():
         return Response({'detail': 'Impossible de supprimer un module qui a des séances.'}, status=400)
     audit_extra = _module_audit_extra(module)
@@ -3162,16 +3169,12 @@ def module_detail_api(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def module_full_detail_api(request, formation_pk, module_pk):
     """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-        module = Module.objects.get(pk=module_pk, formation=formation)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
 
     from .serializers import SessionSerializer, ParticipantSerializer
     from .duree_prevue_resolve import ensure_module_duree_prevue
@@ -3399,13 +3402,12 @@ def module_remove_participant(request, formation_pk, module_pk, participant_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSecretariatOrDFRC])
 def module_add_formateur(request, formation_pk, module_pk):
     """Assigner un formateur à un module."""
-    try:
-        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
     formateur_id = request.data.get('formateur_id')
     if not formateur_id:
         return Response({'detail': 'formateur_id requis.'}, status=400)
@@ -3429,13 +3431,15 @@ def module_add_formateur(request, formation_pk, module_pk):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsSecretariatOrDFRC])
 def module_remove_formateur(request, formation_pk, module_pk, formateur_id):
     """Retirer un formateur d'un module."""
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
     try:
-        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mf = ModuleFormateur.objects.get(module=module, formateur_id=formateur_id)
-    except (Module.DoesNotExist, ModuleFormateur.DoesNotExist):
+    except ModuleFormateur.DoesNotExist:
         return Response({'detail': 'Assignation introuvable.'}, status=404)
     formateur = mf.formateur
     formation = module.formation
@@ -3519,7 +3523,7 @@ def module_assign_superviseur(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def referentiels_api(request):
     """Retourne les référentiels prédéfinis pour les listes déroulantes."""
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
@@ -3582,7 +3586,7 @@ def referentiels_api(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def refvague_list_api(request):
     """Lister ou créer une vague dans le référentiel."""
     if request.method == 'GET':
@@ -3598,7 +3602,7 @@ def refvague_list_api(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsWebStaff])
 def refvague_detail_api(request, pk):
     """Modifier ou supprimer une vague du référentiel."""
     try:
