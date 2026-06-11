@@ -7,6 +7,7 @@ const AuthContext = createContext(null)
 function normalizeUser(userData) {
   return {
     ...userData,
+    role_context: userData.role_context || {},
     get_full_name: () =>
       `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
   }
@@ -56,7 +57,10 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
-    setUser(normalizeUser(userData))
+    setUser(normalizeUser({
+      ...userData,
+      role_context: response.data.role_context || userData.role_context || {},
+    }))
 
     return response.data
   }

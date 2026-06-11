@@ -2256,7 +2256,10 @@ def formation_offline_data(request, token):
     """
     Retourne les données d'une formation nécessaires au badgeage hors ligne.
     Authentification par token QR (pas besoin de login).
+    Désactivé si PUBLIC_QR_SCAN_ENABLED=False (aligné sur /api/scan/).
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
     try:
         qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
     except QRToken.DoesNotExist:

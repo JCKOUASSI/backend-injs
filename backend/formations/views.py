@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC, CanManageParticipant, CanManageModuleParticipant
@@ -13,6 +13,7 @@ from presences.models import AuditLog, _log_audit
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
+from .access import formation_accessible
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -516,9 +517,8 @@ def superviseur_formation_detail(request, pk):
 @permission_classes([IsDFRCOrEncadrant])
 def generate_qr(request, pk):
     """Superviseur : générer un QR code pour sa formation (R1)."""
-    try:
-        formation = Formation.objects.get(pk=pk, superviseur=request.user)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, pk)
+    if not formation:
         return Response(
             {'detail': 'Formation introuvable ou vous n\'êtes pas le superviseur assigné.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -592,9 +592,8 @@ def generate_qr(request, pk):
 @permission_classes([IsDFRCOrEncadrant])
 def get_active_qr(request, pk):
     """Superviseur : récupérer le QR token actif de sa formation."""
-    try:
-        formation = Formation.objects.get(pk=pk, superviseur=request.user)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, pk)
+    if not formation:
         return Response(
             {'detail': 'Formation introuvable ou non assignée.'},
             status=status.HTTP_404_NOT_FOUND,
@@ -618,30 +617,19 @@ def get_active_qr(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def qr_image(request, pk):
     """Génère l'image PNG du QR code actif d'une formation (A4 printable)."""
     import io
     import qrcode
     from django.http import HttpResponse
 
-    user_role = getattr(request.user, 'role', None)
-    if user_role == User.Role.ENCADRANT:
-        try:
-            formation = Formation.objects.get(pk=pk, superviseur=request.user)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-    else:
-        try:
-            formation = Formation.objects.get(pk=pk)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     qr_token = QRToken.objects.filter(
         session__module__formation=formation, actif=True
@@ -681,30 +669,19 @@ def qr_image(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def session_qr_image(request, pk, session_pk):
     """Génère l'image PNG du QR code actif d'une séance spécifique."""
     import io
     import qrcode
     from django.http import HttpResponse
 
-    user_role = getattr(request.user, 'role', None)
-    if user_role == User.Role.ENCADRANT:
-        try:
-            formation = Formation.objects.get(pk=pk, superviseur=request.user)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-    else:
-        try:
-            formation = Formation.objects.get(pk=pk)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     try:
         session = SessionModule.objects.get(pk=session_pk, module__formation=formation)

@@ -28,6 +28,116 @@ ALLOWED_WEB_ROLES = frozenset({
     User.Role.ENCADRANT,
 })
 
+# Personnel web hors module Finance (badgeage, formations, modules, dashboard opérationnel).
+OPERATIONAL_WEB_ROLES = frozenset(ALLOWED_WEB_ROLES - {User.Role.FINANCE})
+
+# Alias sémantique — même ensemble que DUAL_ACCESS_ROLES.
+ADMIN_LEVEL_ROLES = DUAL_ACCESS_ROLES
+
+SECRETARIAT_ROLES = frozenset({
+    User.Role.CHEF_SECRETARIAT,
+    User.Role.SECRETARIAT,
+})
+
+# Accès global formations / dashboard (filtre secrétariat optionnel).
+GLOBAL_ACCESS_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+})
+
+DASHBOARD_SECRETARIAT_FILTER_ROLES = GLOBAL_ACCESS_ROLES
+
+PARTICIPANT_LIST_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    *SECRETARIAT_ROLES,
+    User.Role.ENCADRANT,
+})
+
+STATS_ACCESS_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    *SECRETARIAT_ROLES,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
+})
+
+GLOBAL_STATS_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    User.Role.FINANCE,
+})
+
+USERS_PAGE_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    *SECRETARIAT_ROLES,
+})
+
+USER_MUTATION_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    *SECRETARIAT_ROLES,
+})
+
+BADGE_ACCOUNT_ROLES = MOBILE_ONLY_ROLES
+
+USER_MANAGEABLE_ROLES = frozenset({
+    User.Role.DIRECTION,
+    User.Role.CHEF_CPFAE_ADMIN,
+    User.Role.CPFAE_ADMIN,
+    *SECRETARIAT_ROLES,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
+    *MOBILE_ONLY_ROLES,
+})
+
+FINANCE_MODULE_ROLES = frozenset({
+    User.Role.FINANCE,
+    User.Role.DIRECTION,
+})
+
+FORMATION_MUTATION_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    *SECRETARIAT_ROLES,
+})
+
+PRESENCE_VIEW_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    *SECRETARIAT_ROLES,
+    User.Role.ENCADRANT,
+})
+
+PRESENCE_ACTION_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.ENCADRANT,
+    *SECRETARIAT_ROLES,
+})
+
+SUPERVISION_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.ENCADRANT,
+    *SECRETARIAT_ROLES,
+})
+
+IMPORT_ROLES = FORMATION_MUTATION_ROLES
+
+# Hiérarchie stricte : index bas = rang élevé.
+ROLE_HIERARCHY = [
+    User.Role.ADMIN,
+    User.Role.DIRECTION,
+    User.Role.CHEF_CPFAE_ADMIN,
+    User.Role.CPFAE_ADMIN,
+    User.Role.CHEF_SECRETARIAT,
+    User.Role.SECRETARIAT,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
+    User.Role.FORMATEUR,
+    User.Role.AUDITEUR,
+]
+
+ROLE_LABELS = {value: str(label) for value, label in User.Role.choices}
+
 ROLE_GROUP_NAMES = {
     User.Role.ADMIN: "ROLE_ADMIN",
     User.Role.DIRECTION: "ROLE_DIRECTION",
@@ -89,6 +199,52 @@ ROLE_POLICY = {
         "actions": ("view",),
     },
 }
+
+
+def get_subordinate_roles(role):
+    """Retourne les rôles strictement inférieurs au rôle donné."""
+    if role not in ROLE_HIERARCHY:
+        return []
+    idx = ROLE_HIERARCHY.index(role)
+    return ROLE_HIERARCHY[idx + 1:]
+
+
+def get_creatable_roles(role):
+    """Retourne les rôles qu'un utilisateur peut créer."""
+    subordinates = get_subordinate_roles(role)
+    if role == User.Role.CHEF_CPFAE_ADMIN and User.Role.DIRECTION not in subordinates:
+        return [User.Role.DIRECTION, *subordinates]
+    return subordinates
+
+
+def get_manageable_roles(role):
+    """Rôles créables visibles dans la page Utilisateurs (hors ADMIN système)."""
+    return [r for r in get_creatable_roles(role) if r in USER_MANAGEABLE_ROLES]
+
+
+def get_staff_filter_roles(role):
+    """Rôles proposés dans le filtre personnel de la page Utilisateurs."""
+    staff_roles = [r for r in USER_MANAGEABLE_ROLES if r not in BADGE_ACCOUNT_ROLES]
+    if role in USER_MUTATION_ROLES:
+        manageable = get_manageable_roles(role)
+        return [r for r in staff_roles if r in manageable]
+    if role in USERS_PAGE_ROLES:
+        return staff_roles
+    return []
+
+
+def user_role_context(user):
+    """Métadonnées rôles pour le frontend (login / auth/me)."""
+    role = getattr(user, 'role', None)
+    return {
+        'hierarchy': ROLE_HIERARCHY,
+        'labels': ROLE_LABELS,
+        'creatable_roles': get_creatable_roles(role),
+        'manageable_roles': get_manageable_roles(role),
+        'staff_filter_roles': get_staff_filter_roles(role),
+        'badge_account_roles': list(BADGE_ACCOUNT_ROLES),
+        'can_mutate_users': role in USER_MUTATION_ROLES,
+    }
 
 
 def _permission_codenames(actions, model_name):

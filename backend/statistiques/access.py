@@ -10,16 +10,14 @@ from django.db.models import Q
 
 from formations.models import Formation, Module, Secretariat
 
+from authentication.role_groups import (
+    GLOBAL_STATS_ROLES,
+    SECRETARIAT_ROLES,
+    STATS_ACCESS_ROLES,
+)
+
 from .models import Rapport
 
-SECRETARIAT_ROLES = frozenset({'SECRETARIAT', 'CHEF_SECRETARIAT'})
-GLOBAL_STATS_ROLES = frozenset({
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE',
-})
-STATS_ACCESS_ROLES = frozenset({
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
-    'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT',
-})
 ROLE_ALIASES = {
     'DFRC': 'CPFAE_ADMIN',
     'SUPERVISEUR': 'ENCADRANT',
@@ -38,10 +36,7 @@ def user_stats_role(user) -> Optional[str]:
     if role in STATS_ACCESS_ROLES:
         return role
     from authentication.permissions import _in_groups
-    for candidate in (
-        'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
-        'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT',
-    ):
+    for candidate in STATS_ACCESS_ROLES:
         if _in_groups(user, candidate):
             return candidate
     return role

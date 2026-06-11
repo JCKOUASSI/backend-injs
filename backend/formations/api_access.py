@@ -2,7 +2,11 @@
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
-from authentication.role_groups import ALLOWED_WEB_ROLES
+from authentication.role_groups import (
+    ALLOWED_WEB_ROLES,
+    OPERATIONAL_WEB_ROLES,
+    PARTICIPANT_LIST_ROLES,
+)
 from authentication.permissions import IsDFRC, IsSecretariatOrDFRC, IsSecretariatOrEncadrantOrDFRC
 
 from .access import formation_accessible
@@ -11,6 +15,7 @@ from .models import Module
 # Réexport des classes DRF déjà utilisées ailleurs dans le projet.
 __all__ = [
     'IsWebStaff',
+    'IsOperationalWebStaff',
     'CanListParticipants',
     'IsDFRC',
     'IsSecretariatOrDFRC',
@@ -20,18 +25,21 @@ __all__ = [
     'deny_if_not_formation_accessible',
 ]
 
-PARTICIPANT_LIST_ROLES = frozenset({
-    'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION',
-    'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT',
-})
-
 
 class IsWebStaff(BasePermission):
-    """Refuse AUDITEUR / FORMATEUR et tout rôle hors plateforme web."""
+    """Tout rôle autorisé sur la plateforme web (y compris FINANCE pour les endpoints finance)."""
 
     def has_permission(self, request, view):
         user = request.user
         return bool(user and user.is_authenticated and user.role in ALLOWED_WEB_ROLES)
+
+
+class IsOperationalWebStaff(BasePermission):
+    """Personnel opérationnel web — exclut FINANCE (réservé au module finance dédié)."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.role in OPERATIONAL_WEB_ROLES)
 
 
 class CanListParticipants(BasePermission):

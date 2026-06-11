@@ -1,18 +1,9 @@
 from formations.models import Formation, Participant, Formateur
 from django.contrib.auth import get_user_model
 
-from authentication.role_groups import DUAL_ACCESS_ROLES
+from authentication.role_groups import ALLOWED_WEB_ROLES
 
 User = get_user_model()
-
-ALLOWED_WEB_ROLES = (
-    *DUAL_ACCESS_ROLES,
-    'DIRECTION',
-    'CHEF_SECRETARIAT',
-    'SECRETARIAT',
-    'FINANCE',
-    'ENCADRANT',
-)
 
 
 def sidebar_counts(request):
@@ -23,7 +14,9 @@ def sidebar_counts(request):
         return {}
 
     if request.user.role == 'ENCADRANT':
-        nb_formations = Formation.objects.filter(superviseur=request.user).count()
+        nb_formations = Formation.objects.filter(
+            modules__superviseur=request.user
+        ).distinct().count()
     else:
         nb_formations = Formation.objects.count()
 

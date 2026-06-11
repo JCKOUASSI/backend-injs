@@ -20,7 +20,15 @@ from authentication.permissions import (
     IsDFRC,
     CanManageModuleParticipant,
 )
-from .api_access import IsWebStaff, CanListParticipants, formation_or_response, module_or_response
+from .api_access import IsWebStaff, IsOperationalWebStaff, CanListParticipants, formation_or_response, module_or_response
+from authentication.role_groups import SECRETARIAT_ROLES
+from .access import (
+    can_filter_modules_by_secretariat,
+    formateurs_queryset_for_user,
+    modules_queryset_for_user,
+    participant_accessible,
+    participants_queryset_for_user,
+)
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
@@ -123,23 +131,15 @@ def _log_referentiel_audit(request, action, ref_type, obj, extra=None):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def dashboard_stats(request):
     """Return dashboard statistics, scoped by secretariat for SECRETARIAT role."""
-    modules_qs = Module.objects.all()
-    participants_qs = Participant.objects.all()
+    modules_qs = modules_queryset_for_user(request.user)
+    participants_qs = participants_queryset_for_user(request.user)
     secretariat_filter = request.query_params.get('secretariat')
     reference_date_raw = request.query_params.get('reference_date')
 
-    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        sec = request.user.secretariat
-        modules_qs = modules_qs.filter(secretariat=sec)
-        participants_qs = participants_qs.filter(secretariat=sec)
-    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
-        modules_qs = modules_qs.filter(superviseur=request.user)
-        fp_ids = ModuleParticipant.objects.filter(module__superviseur=request.user).values_list('participant_id', flat=True)
-        participants_qs = participants_qs.filter(id__in=fp_ids).distinct()
-    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION') and secretariat_filter:
+    if can_filter_modules_by_secretariat(request.user) and secretariat_filter:
         modules_qs = modules_qs.filter(secretariat_id=secretariat_filter)
         participants_qs = participants_qs.filter(secretariat_id=secretariat_filter)
 
@@ -174,12 +174,7 @@ def dashboard_stats(request):
         )
     )
 
-    formateurs_qs = Formateur.objects.all()
-    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        sec = request.user.secretariat
-        formateurs_qs = formateurs_qs.filter(secretariats=sec)
-    elif request.user.role == 'ENCADRANT':
-        formateurs_qs = formateurs_qs.filter(modules_assignes__module__in=modules_qs).distinct()
+    formateurs_qs = formateurs_queryset_for_user(request.user)
     total_formateurs = formateurs_qs.count()
 
     seances_actives = PresenceSessionModule.objects.filter(
@@ -462,7 +457,7 @@ def dashboard_stats(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def formation_list_api(request):
     """
     List modules (une ligne par module) with optional filtering.
@@ -472,18 +467,12 @@ def formation_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
 
-    queryset = Module.objects.select_related(
-        'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par'
+    queryset = modules_queryset_for_user(
+        request.user,
+        Module.objects.select_related(
+            'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par'
+        ),
     )
-
-    # Restriction par rôle
-    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        if request.user.secretariat:
-            queryset = queryset.filter(secretariat=request.user.secretariat)
-        else:
-            queryset = queryset.none()
-    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
-        queryset = queryset.filter(superviseur=request.user)
 
     # Filtres
     statut = request.query_params.get('statut')
@@ -513,7 +502,7 @@ def formation_list_api(request):
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
 
     secretariat_id = request.query_params.get('secretariat')
-    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
+    if secretariat_id and can_filter_modules_by_secretariat(request.user):
         queryset = queryset.filter(secretariat_id=secretariat_id)
 
     vague_filter = request.query_params.get('vague')
@@ -638,16 +627,7 @@ def participant_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
 
-    queryset = Participant.objects.all()
-    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        if request.user.secretariat:
-            queryset = queryset.filter(secretariat=request.user.secretariat)
-        else:
-            queryset = queryset.filter(secretariat__isnull=True)
-    elif request.user.role == 'ENCADRANT':
-        queryset = queryset.filter(
-            modules_inscrits__module__superviseur=request.user
-        ).distinct()
+    queryset = participants_queryset_for_user(request.user)
 
     scoped_queryset = queryset
     raw_groupes = (
@@ -753,16 +733,15 @@ def participant_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def participant_formations_api(request, pk):
     """Return all modules a participant is enrolled in (with their formation)."""
-    try:
-        participant = Participant.objects.get(pk=pk)
-    except Participant.DoesNotExist:
+    participant = participant_accessible(request.user, pk)
+    if not participant:
         return Response({'error': 'Participant introuvable.'}, status=404)
 
     modules = (
-        Module.objects
+        modules_queryset_for_user(request.user)
         .filter(module_participants__participant=participant)
         .select_related('formation', 'secretariat')
         .order_by('-id')
@@ -792,7 +771,7 @@ def participant_formations_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def formateur_list_api(request):
     """
     List formateurs with optional search.
@@ -803,7 +782,7 @@ def formateur_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
     
-    queryset = Formateur.objects.all()
+    queryset = formateurs_queryset_for_user(request.user)
     
     # Apply search
     search = request.query_params.get('search')
@@ -2353,7 +2332,7 @@ def finance_ajustement_rejeter_api(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def formation_detail_api(request, pk):
     """
     Get formation details by ID.
@@ -2995,7 +2974,7 @@ def ref_type_secretariat_detail(request, pk):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def module_list_api(request, formation_pk):
     """List or create modules for a formation."""
     formation, err = formation_or_response(request.user, formation_pk)
@@ -3057,7 +3036,7 @@ def module_list_api(request, formation_pk):
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def module_detail_api(request, formation_pk, module_pk):
     """Get, update or delete a module."""
     formation, module, err = module_or_response(request.user, formation_pk, module_pk)
@@ -3169,7 +3148,7 @@ def module_detail_api(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def module_full_detail_api(request, formation_pk, module_pk):
     """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
     formation, module, err = module_or_response(request.user, formation_pk, module_pk)
@@ -3351,10 +3330,9 @@ def module_full_detail_api(request, formation_pk, module_pk):
 @permission_classes([CanManageModuleParticipant])
 def module_add_participant(request, formation_pk, module_pk):
     """Inscrire un participant à un module — respecte les permissions du groupe (add_moduleparticipant)."""
-    try:
-        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
     participant_id = request.data.get('participant_id')
     if not participant_id:
         return Response({'detail': 'participant_id requis.'}, status=400)
@@ -3381,10 +3359,12 @@ def module_add_participant(request, formation_pk, module_pk):
 @permission_classes([CanManageModuleParticipant])
 def module_remove_participant(request, formation_pk, module_pk, participant_id):
     """Retirer un participant d'un module — respecte les permissions du groupe (delete_moduleparticipant)."""
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
     try:
-        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mp = ModuleParticipant.objects.get(module=module, participant_id=participant_id)
-    except (Module.DoesNotExist, ModuleParticipant.DoesNotExist):
+    except ModuleParticipant.DoesNotExist:
         return Response({'detail': 'Inscription introuvable.'}, status=404)
     participant = mp.participant
     formation = module.formation
@@ -3466,19 +3446,14 @@ def module_assign_superviseur(request, formation_pk, module_pk):
       de leur propre secrétariat.
     - Body : { "superviseur_id": <int|null> }  (null ou omis => retrait).
     """
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-        module = Module.objects.select_related('secretariat', 'superviseur').get(
-            pk=module_pk, formation=formation,
-        )
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
+    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+    module = Module.objects.select_related('secretariat', 'superviseur').get(pk=module.pk)
 
     # Scope secrétariat
     user = request.user
-    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+    if user.role in SECRETARIAT_ROLES:
         if not user.secretariat or module.secretariat_id != user.secretariat_id:
             return Response(
                 {'detail': "Ce module n'appartient pas à votre secrétariat."},
@@ -3523,7 +3498,7 @@ def module_assign_superviseur(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def referentiels_api(request):
     """Retourne les référentiels prédéfinis pour les listes déroulantes."""
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
@@ -3540,14 +3515,7 @@ def referentiels_api(request):
     types_secretariat = list(RefTypeSecretariat.objects.filter(actif=True).values('id', 'libelle'))
     vagues = list(RefVague.objects.filter(actif=True).order_by('ordre', 'libelle').values('id', 'libelle', 'ordre'))
 
-    mods_groupes_qs = Module.objects.all()
-    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        if request.user.secretariat:
-            mods_groupes_qs = mods_groupes_qs.filter(secretariat=request.user.secretariat)
-        else:
-            mods_groupes_qs = mods_groupes_qs.none()
-    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
-        mods_groupes_qs = mods_groupes_qs.filter(superviseur=request.user)
+    mods_groupes_qs = modules_queryset_for_user(request.user)
     raw_module_groupes = (
         mods_groupes_qs.exclude(groupe__isnull=True)
         .exclude(groupe='')
@@ -3586,7 +3554,7 @@ def referentiels_api(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def refvague_list_api(request):
     """Lister ou créer une vague dans le référentiel."""
     if request.method == 'GET':
@@ -3602,7 +3570,7 @@ def refvague_list_api(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsOperationalWebStaff])
 def refvague_detail_api(request, pk):
     """Modifier ou supprimer une vague du référentiel."""
     try:

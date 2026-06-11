@@ -1,9 +1,34 @@
 from rest_framework.permissions import BasePermission
 
-from authentication.role_groups import ROLE_GROUP_NAMES
+from authentication.role_groups import (
+    ROLE_GROUP_NAMES,
+    ROLE_HIERARCHY,
+    get_subordinate_roles,
+    get_creatable_roles,
+)
 
-# Hiérarchie stricte : index bas = rang élevé
-ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
+__all__ = [
+    'ROLE_HIERARCHY',
+    'get_subordinate_roles',
+    'get_creatable_roles',
+    'ROLE_GROUP_NAMES',
+    '_has_role',
+    '_in_groups',
+    '_model_perm',
+    'HasFormationsPerm',
+    'CanManageParticipant',
+    'CanManageModuleParticipant',
+    'IsDFRC',
+    'IsDFRCOrEncadrant',
+    'IsParticipantOrReadOnly',
+    'IsSecretariat',
+    'IsEncadrant',
+    'IsSecretariatOrEncadrant',
+    'IsSecretariatOrDFRC',
+    'IsSecretariatOrEncadrantOrDFRC',
+]
+
+# Hiérarchie et helpers de création : source canonique authentication.role_groups
 
 
 def _cached_user_groups(user):
@@ -78,23 +103,6 @@ class CanManageParticipant(HasFormationsPerm):
 class CanManageModuleParticipant(HasFormationsPerm):
     """Permission basée sur les droits réels du groupe pour l'inscription d'un participant à un module."""
     model_name = 'moduleparticipant'
-
-
-def get_subordinate_roles(role):
-    """Retourne les rôles strictement inférieurs au rôle donné."""
-    if role not in ROLE_HIERARCHY:
-        return []
-    idx = ROLE_HIERARCHY.index(role)
-    return ROLE_HIERARCHY[idx + 1:]
-
-
-def get_creatable_roles(role):
-    """Retourne les rôles qu'un utilisateur peut créer.
-    Même chose que get_subordinate_roles, sauf CHEF_CPFAE_ADMIN qui peut aussi créer DIRECTION."""
-    subordinates = get_subordinate_roles(role)
-    if role == 'CHEF_CPFAE_ADMIN' and 'DIRECTION' not in subordinates:
-        subordinates = ['DIRECTION'] + subordinates
-    return subordinates
 
 
 class IsDFRC(BasePermission):

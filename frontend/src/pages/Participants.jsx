@@ -13,6 +13,7 @@ import {
   readParticipantsFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { canCreateParticipant, canManageParticipant } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 
@@ -210,7 +211,8 @@ export default function Participants() {
   const sexeLabel = (s) => ({ MASCULIN: 'Masculin', FEMININ: 'Féminin' }[s] || '-')
   const sexeBadge = (s) => s === 'MASCULIN' ? 'badge-bg-info' : s === 'FEMININ' ? 'badge-bg-warning' : ''
 
-  const canManage = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canManage = canManageParticipant(user?.role)
+  const canCreate = canCreateParticipant(user?.role)
 
   return (
     <div>
@@ -280,7 +282,7 @@ export default function Participants() {
                 </select>
               </div>
             )}
-            {canManage && (
+            {canCreate && (
               <button onClick={openCreate} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
               </button>
