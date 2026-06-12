@@ -217,7 +217,7 @@ export default function FinanceDashboard() {
 
   return (
     <FinancePageShell
-      title="Dashboard Finance"
+      title="Tableau de Bord Finance"
       subtitle="Suivi des temps de cours et rémunération des formateurs"
       icon="bi-speedometer2"
       actions={<FinanceNavActions active="dashboard" />}

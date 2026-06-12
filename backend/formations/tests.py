@@ -551,3 +551,31 @@ class FormateurListScopeAPITest(TestCase):
         self.assertIn(self.formateur_a.id, ids)
         self.assertNotIn(self.formateur_b.id, ids)
 
+
+class EncadrantFormationScopeAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.sec_a = Secretariat.objects.create(nom='Sec Enc A')
+        self.sec_b = Secretariat.objects.create(nom='Sec Enc B')
+        self.encadrant = make_user('enc-scope', role='ENCADRANT')
+        self.f_a = make_formation('Formation Enc A')
+        self.f_b = make_formation('Formation Enc B')
+        self.mod_a = make_module(self.f_a, intitule='Mod Enc A', secretariat=self.sec_a, superviseur=self.encadrant)
+        make_module(self.f_b, intitule='Mod Enc B', secretariat=self.sec_b)
+
+    def test_encadrant_sees_formations_without_user_secretariat(self):
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.get('/api/formations/list/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ids = {item['id'] for item in res.data['results']}
+        self.assertIn(self.f_a.id, ids)
+        self.assertNotIn(self.f_b.id, ids)
+
+    def test_encadrant_without_supervised_modules_sees_no_formations(self):
+        other = make_user('enc-empty', role='ENCADRANT')
+        self.client.force_authenticate(other)
+        res = self.client.get('/api/formations/list/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['results'], [])
+

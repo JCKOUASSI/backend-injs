@@ -927,8 +927,8 @@ class FinanceAjustement(models.Model):
         verbose_name = 'Ajustement horaire finance'
         verbose_name_plural = 'Ajustements horaires finance'
         indexes = [
-            models.Index(fields=['statut', 'proposed_at']),
-            models.Index(fields=['session', 'statut']),
+            models.Index(fields=['statut', 'proposed_at'], name='formations__statut_8e2f0a_idx'),
+            models.Index(fields=['session', 'statut'], name='formations__session_4c1b2d_idx'),
         ]
 
     def __str__(self):

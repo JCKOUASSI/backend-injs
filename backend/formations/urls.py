@@ -8,6 +8,8 @@ from .api_views import (
     module_add_formateur, module_remove_formateur,
     module_assign_superviseur,
     ref_type_secretariat_list, ref_type_secretariat_detail,
+    sync_participants_api, sync_formateurs_api,
+    sync_sessions_api, sync_presences_api,
 )
 
 urlpatterns = [
@@ -96,6 +98,12 @@ urlpatterns = [
 
     # Excel import (JWT-authenticated API endpoint)
     path('import-excel/', api_views.api_import_excel, name='api-import-excel'),
+
+    # Synchronisation inter-plateformes (SVEVCPFAE — Api-Key auth)
+    path('sync/participants/', sync_participants_api, name='api-sync-participants'),
+    path('sync/formateurs/', sync_formateurs_api, name='api-sync-formateurs'),
+    path('sync/sessions/', sync_sessions_api, name='api-sync-sessions'),
+    path('sync/presences/', sync_presences_api, name='api-sync-presences'),
     
     # Module management
     path('<int:formation_pk>/modules/', module_list_api, name='api-module-list'),

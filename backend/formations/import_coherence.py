@@ -44,6 +44,16 @@ def _combo_key(grade, groupe) -> tuple[str, str]:
     return (_norm(grade), _norm(groupe))
 
 
+def _grade_compat(grade_a, grade_b) -> bool:
+    """A3/A4 strict ; B/C/D par lettre de catégorie."""
+    a, b = _norm(grade_a).upper(), _norm(grade_b).upper()
+    if not a or not b:
+        return a == b
+    if a.startswith('A'):
+        return a == b
+    return a[0] == b[0]
+
+
 def check_workbook(wb) -> CoherenceReport:
     """Analyse un openpyxl Workbook déjà ouvert (read_only ou non)."""
     report = CoherenceReport()
@@ -168,15 +178,18 @@ def check_workbook(wb) -> CoherenceReport:
                     f"Participants ligne {row_idx} ({nom}) : grade et groupe obligatoires"
                 )
             elif modules and not formations_str:
-                combo = _combo_key(grade, groupe)
-                if combo not in combos_fg:
+                has_combo = any(
+                    _grade_compat(grade, mg) and gr == groupe
+                    for _, mg, gr, _ in modules
+                )
+                if not has_combo:
                     report.warnings.append(
                         f"Participants ligne {row_idx} ({nom}) : combo {grade}/{groupe} "
                         f"sans cours correspondant (auto-match grade+groupe)"
                     )
                 elif vague and modules:
                     has_module = any(
-                        g == grade and gr == groupe and v == vague
+                        _grade_compat(grade, g) and gr == groupe and v == vague
                         for _, g, gr, v in modules
                     )
                     if not has_module:

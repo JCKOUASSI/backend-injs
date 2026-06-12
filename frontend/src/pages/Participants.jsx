@@ -13,9 +13,10 @@ import {
   readParticipantsFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
-import { canCreateParticipant, canManageParticipant } from '../utils/roles'
+import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import ParticipantDetailModal from '../components/ParticipantDetailModal'
 
 const emptyForm = {
   matricule: '',
@@ -61,6 +62,9 @@ export default function Participants() {
   const [showDetail, setShowDetail] = useState(null)
   const [detailFormations, setDetailFormations] = useState([])
   const [detailFormationsLoading, setDetailFormationsLoading] = useState(false)
+  const [detailPointages, setDetailPointages] = useState([])
+  const [detailStats, setDetailStats] = useState(null)
+  const [detailPointagesLoading, setDetailPointagesLoading] = useState(false)
 
   const debouncedSearch = useDebounce(search)
 
@@ -103,14 +107,36 @@ export default function Participants() {
     vagueFilter,
   ])
 
+  const canViewPresences = PRESENCE_VIEW_ROLES.includes(user?.role)
+
   useEffect(() => {
-    if (!showDetail) { setDetailFormations([]); return }
+    if (!showDetail) {
+      setDetailFormations([])
+      setDetailPointages([])
+      setDetailStats(null)
+      return
+    }
     setDetailFormationsLoading(true)
     api.get(`/formations/participants/${showDetail.id}/formations/`)
       .then(res => setDetailFormations(Array.isArray(res.data) ? res.data : (res.data.results || [])))
       .catch(() => setDetailFormations([]))
       .finally(() => setDetailFormationsLoading(false))
-  }, [showDetail])
+
+    // Charger les pointages si l'utilisateur a les permissions
+    if (canViewPresences) {
+      setDetailPointagesLoading(true)
+      api.get(`/presences/participant/${showDetail.id}/fiche-admin/`)
+        .then(res => {
+          setDetailPointages(res.data.pointages || [])
+          setDetailStats(res.data.stats || null)
+        })
+        .catch(() => {
+          setDetailPointages([])
+          setDetailStats(null)
+        })
+        .finally(() => setDetailPointagesLoading(false))
+    }
+  }, [showDetail, canViewPresences])
 
   const loadParticipants = async () => {
     setLoading(true)
@@ -375,80 +401,14 @@ export default function Participants() {
 
       {/* Detail Modal */}
       {showDetail && (
-        <div className="modal-overlay" onClick={() => setShowDetail(null)}>
-          <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h5><i className="bi bi-person-badge me-2"></i>{showDetail.nom} {showDetail.prenom}</h5>
-              <button className="btn-close" onClick={() => setShowDetail(null)}>&times;</button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-              {/* Fiche identité */}
-              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identité</p>
-              <div className="grid-2" style={{ marginBottom: '1rem' }}>
-                <div><small className="text-muted">N° d'inscription</small><div><strong>{showDetail.matricule || '-'}</strong></div></div>
-                <div><small className="text-muted">Genre</small><div>{showDetail.sexe ? <span className={sexeBadge(showDetail.sexe)}>{sexeLabel(showDetail.sexe)}</span> : '-'}</div></div>
-                <div><small className="text-muted">Date de naissance</small><div>{formatDate(showDetail.date_naissance)}</div></div>
-                <div><small className="text-muted">Lieu de naissance</small><div>{showDetail.lieu_naissance || '-'}</div></div>
-                <div><small className="text-muted">Adresse e-mail</small><div>{showDetail.email || '-'}</div></div>
-                <div><small className="text-muted">Téléphone 1</small><div>{showDetail.telephone || '-'}</div></div>
-                <div><small className="text-muted">Téléphone 2</small><div>{showDetail.telephone2 || '-'}</div></div>
-                <div><small className="text-muted">Type concours</small><div>{showDetail.type_concours || '-'}</div></div>
-                <div><small className="text-muted">Libellé concours</small><div>{showDetail.libelle_concours || '-'}</div></div>
-              </div>
-
-              {/* Infos administratives */}
-              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administratif</p>
-              <div className="grid-2" style={{ marginBottom: '1rem' }}>
-                <div><small className="text-muted">Catégorie</small><div>{showDetail.categorie || '-'}</div></div>
-                <div><small className="text-muted">Grade</small><div>{showDetail.grade || '-'}</div></div>
-                <div><small className="text-muted">Groupe</small><div>{showDetail.groupe || '-'}</div></div>
-                <div><small className="text-muted">Grade-Groupe</small><div>{showDetail.grade_groupe || '-'}</div></div>
-                <div><small className="text-muted">Vague</small><div>{showDetail.vague || '-'}</div></div>
-                <div><small className="text-muted">Site</small><div>{showDetail.site || '-'}</div></div>
-                <div><small className="text-muted">Salle</small><div>{showDetail.salle || '-'}</div></div>
-                <div><small className="text-muted">Secrétariat</small><div>{showDetail.secretariat_nom || '-'}</div></div>
-              </div>
-
-              {/* Modules inscrits */}
-              <p className="text-muted small" style={{ fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <i className="bi bi-journal-bookmark me-1"></i>Modules inscrits
-              </p>
-              {detailFormationsLoading ? (
-                <div className="text-center py-2"><div className="spinner" style={{ width: '1.2rem', height: '1.2rem' }}></div></div>
-              ) : detailFormations.length === 0 ? (
-                <div className="text-muted small" style={{ padding: '0.5rem 0' }}>Aucun module assigné.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {detailFormations.map(m => (
-                    <div key={m.id} style={{ background: 'var(--bg-secondary, #f8fafc)', borderRadius: '6px', padding: '0.6rem 0.9rem', border: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                        <div>
-                          <strong style={{ fontSize: '0.9rem' }}>{m.module}</strong>
-                          {m.formation && <span className="text-muted" style={{ fontSize: '0.8rem' }}> — {m.formation}</span>}
-                          <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
-                            {(m.site || m.salle) && <span><i className="bi bi-building me-1"></i>{[m.site, m.salle].filter(Boolean).join(' / ')} &nbsp;</span>}
-                            {m.date_debut && <span><i className="bi bi-calendar3 me-1"></i>{formatDate(m.date_debut)} → {m.date_fin ? formatDate(m.date_fin) : '?'}</span>}
-                          </div>
-                        </div>
-                        <span className={`badge ${{ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[m.statut] || 'badge-info'}`} style={{ whiteSpace: 'nowrap' }}>
-                          {{ 'PLANIFIEE': 'Planifiée', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminée', 'SUSPENDUE': 'Suspendue' }[m.statut] || m.statut}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              {canManage && (
-                <button className="btn btn-dfrc" onClick={() => { setShowDetail(null); openEdit(showDetail) }}>
-                  <i className="bi bi-pencil me-1"></i>Modifier
-                </button>
-              )}
-              <button className="btn btn-secondary" onClick={() => setShowDetail(null)}>Fermer</button>
-            </div>
-          </div>
-        </div>
+        <ParticipantDetailModal
+          participant={showDetail}
+          modules={detailFormations}
+          pointages={detailPointages}
+          stats={detailStats}
+          onClose={() => setShowDetail(null)}
+          loading={detailFormationsLoading || detailPointagesLoading}
+        />
       )}
 
       {/* Create / Edit Modal */}

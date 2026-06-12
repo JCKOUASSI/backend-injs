@@ -14,6 +14,7 @@ from datetime import datetime, date
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from openpyxl import load_workbook
@@ -280,6 +281,24 @@ class Command(BaseCommand):
         if val is None:
             return default
         return str(val).strip()
+
+    def _grade_lookup_q(self, grade):
+        """Filtre ORM sur le grade : strict pour A3/A4…, par catégorie pour B/C/D…"""
+        g = self._str(grade).upper()
+        if not g:
+            return Q(pk__in=[])
+        if g.startswith('A'):
+            return Q(grade__iexact=g)
+        return Q(grade__istartswith=g[0])
+
+    def _get_grade_compat_key(self, grade):
+        """Clé de compatibilité grade : A3/A4 strict, B/C/D par lettre de catégorie."""
+        g = self._str(grade).upper()
+        if not g:
+            return ''
+        if g.startswith('A'):
+            return g
+        return g[0]
 
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
@@ -622,9 +641,8 @@ class Command(BaseCommand):
             cat_val_raw = self._str(data.get('categorie'))  # categorie est sur Participant, pas Module
             if grade_val and groupe_val:
                 qs = Participant.objects.filter(
-                    grade__iexact=grade_val,
                     groupe__iexact=groupe_val,
-                )
+                ).filter(self._grade_lookup_q(grade_val))
                 if cat_val_raw:
                     qs = qs.filter(categorie__iexact=cat_val_raw)
                 if vague_val:
@@ -766,25 +784,46 @@ class Command(BaseCommand):
                 p_groupe = self._str(data.get('groupe'))
                 p_grade  = self._str(data.get('grade'))
                 p_vague  = self._str(data.get('vague'))
+
+                # Validation : titre, grade, groupe, vague sont tous obligatoires
+                if not p_grade:
+                    errors.append(f'Participants ligne {row_idx}: grade requis pour inscrire {nom} {prenom}')
+                    continue
+                if not p_groupe:
+                    errors.append(f'Participants ligne {row_idx}: groupe requis pour inscrire {nom} {prenom}')
+                    continue
+                if not p_vague:
+                    errors.append(f'Participants ligne {row_idx}: vague requise pour inscrire {nom} {prenom}')
+                    continue
+
                 titres = [t.strip() for t in formations_str.split('|') if t.strip()]
                 for titre in titres:
-                    mod_qs = Module.objects.filter(formation__formation__iexact=titre)
-                    if p_grade:
-                        mod_qs_g = mod_qs.filter(grade__iexact=p_grade)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
-                    if p_groupe:
-                        mod_qs_g = mod_qs.filter(groupe__iexact=p_groupe)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
-                    if p_vague:
-                        mod_qs_g = mod_qs.filter(vague__iexact=p_vague)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
+                    mod_qs = Module.objects.filter(
+                        formation__formation__iexact=titre,
+                        groupe__iexact=p_groupe,
+                        vague__iexact=p_vague,
+                    ).filter(self._grade_lookup_q(p_grade))
                     matched_mods = list(mod_qs.order_by('ordre'))
                     if not matched_mods:
-                        errors.append(f'Participants ligne {row_idx}: formation "{titre}" introuvable')
+                        crit = f'titre={titre} grade={p_grade} groupe={p_groupe} vague={p_vague}'
+                        errors.append(f'Participants ligne {row_idx}: formation introuvable ({crit})')
                         continue
+
+                    # Vérification de compatibilité catégorielle (A, B, C, D...)
+                    # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
+                    p_compat = self._get_grade_compat_key(p_grade)
+                    mods_compatibles = []
+                    for _mod in matched_mods:
+                        mod_compat = self._get_grade_compat_key(_mod.grade)
+                        if not p_compat or not mod_compat or p_compat == mod_compat:
+                            mods_compatibles.append(_mod)
+                        else:
+                            errors.append(
+                                f'Participants ligne {row_idx}: grade incompatible pour {nom} {prenom} '
+                                f'(participant={p_grade}, module={_mod.formation.formation}={_mod.grade})'
+                            )
+                    matched_mods = mods_compatibles
+
                     for _mod in matched_mods:
                         try:
                             _, insc_created = ModuleParticipant.objects.get_or_create(
@@ -805,9 +844,8 @@ class Command(BaseCommand):
                 vague = self._str(data.get('vague'))
                 if grade and groupe:
                     mod_qs = Module.objects.filter(
-                        grade__iexact=grade,
                         groupe__iexact=groupe,
-                    )
+                    ).filter(self._grade_lookup_q(grade))
                     if vague:
                         mod_qs = mod_qs.filter(vague__iexact=vague)
                     matched_mods = list(mod_qs)
@@ -821,7 +859,17 @@ class Command(BaseCommand):
                             f'({crit})'
                         )
                     else:
+                        # Vérification de compatibilité en auto-match aussi
+                        # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
+                        p_compat = self._get_grade_compat_key(grade)
                         for _mod in matched_mods:
+                            mod_compat = self._get_grade_compat_key(_mod.grade)
+                            if p_compat and mod_compat and p_compat != mod_compat:
+                                errors.append(
+                                    f'Participants ligne {row_idx}: grade incompatible pour {nom} {prenom} '
+                                    f'(participant={grade}, module={_mod.formation.formation}={_mod.grade})'
+                                )
+                                continue
                             try:
                                 _, insc_created = ModuleParticipant.objects.get_or_create(
                                     module=_mod, participant=obj,
@@ -1192,19 +1240,17 @@ class Command(BaseCommand):
             strategies.append((
                 Module.objects.filter(
                     intitule__iexact=titre,
-                    grade__iexact=grade,
                     groupe__iexact=groupe,
                     vague__iexact=vague,
-                ),
+                ).filter(self._grade_lookup_q(grade)),
                 'exacte',
             ))
         if grade:
             strategies.append((
                 Module.objects.filter(
                     intitule__iexact=titre,
-                    grade__iexact=grade,
                     groupe__iexact=groupe,
-                ),
+                ).filter(self._grade_lookup_q(grade)),
                 'sans vague',
             ))
         if vague:

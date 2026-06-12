@@ -74,7 +74,7 @@ export function FinanceNavActions({ active, pendingAjustements = 0 }) {
         to={financeNavHref('/finance-dashboard')}
         className={`btn btn-sm ${active === 'dashboard' ? 'btn-finance-accent' : ''}`}
       >
-        <i className="bi bi-speedometer2 me-1"></i>Dashboard
+        <i className="bi bi-speedometer2 me-1"></i>Tableau de bord
       </Link>
       <Link
         to={financeNavHref('/formateurs')}
