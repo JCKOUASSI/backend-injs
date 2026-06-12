@@ -227,6 +227,32 @@ class WelcomeEmailTests(TestCase):
         self.assertIn('user1@example.com', recipients)
 
 
+class EncadrantSecretariatTests(TestCase):
+
+    def test_encadrant_secretariat_cleared_on_create(self):
+        from formations.models import Secretariat
+        from authentication.serializers import UserCreateSerializer
+        from rest_framework.test import APIRequestFactory
+
+        sec = Secretariat.objects.create(nom='Sec Enc Create')
+        admin = make_user('enc-admin', role='CHEF_CPFAE_ADMIN')
+        request = APIRequestFactory().post('/api/auth/users/')
+        request.user = admin
+        serializer = UserCreateSerializer(
+            data={
+                'username': 'enc_no_sec',
+                'password': 'pass1234!',
+                'email': 'enc_no_sec@example.com',
+                'role': 'ENCADRANT',
+                'secretariat': sec.id,
+            },
+            context={'request': request},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        user = serializer.save()
+        self.assertIsNone(user.secretariat_id)
+
+
 class RoleGroupsTest(TestCase):
 
     def setUp(self):

@@ -13,7 +13,7 @@ from presences.models import AuditLog, _log_audit
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
-from .access import formation_accessible
+from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -45,10 +45,22 @@ def _participants_grade_filter(secretariat):
 
 
 def _secretariat_scope(user):
-    """Retourne le secrétariat de l'utilisateur si rôle SECRETARIAT, CHEF_SECRETARIAT ou ENCADRANT."""
-    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT'):
+    """Retourne le secrétariat de l'utilisateur si rôle SECRETARIAT ou CHEF_SECRETARIAT."""
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         return user.secretariat
     return None
+
+
+def _formations_queryset_for_user(user):
+    """Formations visibles selon le périmètre opérationnel de l'utilisateur."""
+    if user.role == 'ENCADRANT':
+        return Formation.objects.filter(modules__superviseur=user).distinct().order_by('id')
+    sec = _secretariat_scope(user)
+    if sec is not None:
+        if not sec:
+            return Formation.objects.none()
+        return Formation.objects.filter(modules__secretariat=sec).distinct().order_by('id')
+    return Formation.objects.all().order_by('id')
 
 
 def _secretariat_hint_from_matricule(matricule):
@@ -87,13 +99,7 @@ class FormationListCreateView(generics.ListCreateAPIView):
         return [IsSecretariatOrEncadrantOrDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            return Formation.objects.none() if not sec else Formation.objects.filter(
-                modules__secretariat=sec
-            ).distinct().order_by('id')
-        return Formation.objects.all().order_by('id')
+        return _formations_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -115,13 +121,7 @@ class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [IsSecretariatOrEncadrantOrDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            return Formation.objects.none() if not sec else Formation.objects.filter(
-                modules__secretariat=sec
-            ).distinct().order_by('id')
-        return Formation.objects.all().order_by('id')
+        return _formations_queryset_for_user(self.request.user)
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -206,6 +206,8 @@ class ParticipantListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return participants_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
@@ -254,6 +256,8 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return participants_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
@@ -764,6 +768,8 @@ class FormateurListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return formateurs_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
@@ -795,6 +801,8 @@ class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return formateurs_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:

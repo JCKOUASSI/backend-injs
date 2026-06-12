@@ -11,6 +11,7 @@ from authentication.models import User
 from formations.management.commands.import_excel import Command
 from formations.models import (
     Formation, Module, RefSite, RefTypeSecretariat, Secretariat, SessionModule,
+    ModuleParticipant,
 )
 
 
@@ -409,3 +410,91 @@ class ImportPipelineCoherenceTest(TestCase):
         finally:
             wb.close()
         self.assertEqual(errors, [], '\n'.join(errors))
+
+
+PARTICIPANT_HEADERS = (
+    "N° d'inscription",
+    'Nom',
+    'Prénom',
+    'Sexe',
+    'Grade',
+    'Groupe',
+    'Vague',
+)
+
+
+def build_participants_sheet(*data_rows):
+    rows = [PARTICIPANT_HEADERS]
+    for overrides in data_rows:
+        base = {
+            "N° d'inscription": 'MAT001',
+            'Nom': 'TEST',
+            'Prénom': 'User',
+            'Sexe': 'MASCULIN',
+            'Grade': 'B1',
+            'Groupe': 'GROUPE 4',
+            'Vague': 'VAGUE 2',
+        }
+        base.update(overrides)
+        rows.append(tuple(base[h] for h in PARTICIPANT_HEADERS))
+    return _MemorySheet(rows)
+
+
+class ImportParticipantsGradeMatchTest(TestCase):
+    """Rapprochement grade : strict A3/A4, par catégorie B/C/D."""
+
+    @classmethod
+    def setUpTestData(cls):
+        ref = RefTypeSecretariat.objects.create(libelle='FAB B')
+        Secretariat.objects.create(nom='Secrétariat FAB B', type=ref)
+        formation = Formation.objects.create(formation='FORMATION CAT B')
+        Module.objects.create(
+            formation=formation,
+            intitule='Module B',
+            ordre=1,
+            grade='B3',
+            groupe='GROUPE 4',
+            vague='VAGUE 2',
+            date_debut='2026-06-01',
+            date_fin='2026-06-30',
+            cycle='FORMATION CAT B',
+        )
+
+    def setUp(self):
+        self.cmd = Command()
+        self.cmd.stdout = _SilentStdout()
+
+    def test_b_participant_matches_b_category_module(self):
+        errors = []
+        count = self.cmd._import_participants(
+            build_participants_sheet({'Grade': 'B1'}),
+            errors,
+        )
+        self.assertEqual(errors, [], errors)
+        self.assertEqual(count, 1)
+        self.assertEqual(ModuleParticipant.objects.count(), 1)
+
+    def test_a4_participant_does_not_match_a3_module(self):
+        Module.objects.all().delete()
+        formation = Formation.objects.create(formation='FORMATION CAT A')
+        Module.objects.create(
+            formation=formation,
+            intitule='Module A3',
+            ordre=1,
+            grade='A3',
+            groupe='GROUPE 1',
+            vague='VAGUE 1',
+            date_debut='2026-06-01',
+            date_fin='2026-06-30',
+            cycle='FORMATION CAT A',
+        )
+        errors = []
+        self.cmd._import_participants(
+            build_participants_sheet({
+                'Grade': 'A4',
+                'Groupe': 'GROUPE 1',
+                'Vague': 'VAGUE 1',
+            }),
+            errors,
+        )
+        self.assertTrue(any('aucun module trouvé' in e for e in errors))

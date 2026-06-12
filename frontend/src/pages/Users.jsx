@@ -428,7 +428,7 @@ export default function Users() {
                   <label className="form-label">Mot de passe *</label>
                   <input type="password" className="form-control" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
                 </div>
-                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(form.role) && (
+                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(form.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={form.secretariat} onChange={e => setForm({...form, secretariat: e.target.value})}>
@@ -512,7 +512,7 @@ export default function Users() {
                     ) : null
                   })()}
                 </div>
-                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(editForm.role) && (
+                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(editForm.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={editForm.secretariat} onChange={e => setEditForm({...editForm, secretariat: e.target.value})}>

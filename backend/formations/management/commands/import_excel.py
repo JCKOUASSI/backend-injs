@@ -14,6 +14,7 @@ from datetime import datetime, date
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from openpyxl import load_workbook
@@ -280,6 +281,24 @@ class Command(BaseCommand):
         if val is None:
             return default
         return str(val).strip()
+
+    def _grade_lookup_q(self, grade):
+        """Filtre ORM sur le grade : strict pour A3/A4…, par catégorie pour B/C/D…"""
+        g = self._str(grade).upper()
+        if not g:
+            return Q(pk__in=[])
+        if g.startswith('A'):
+            return Q(grade__iexact=g)
+        return Q(grade__istartswith=g[0])
+
+    def _get_grade_compat_key(self, grade):
+        """Clé de compatibilité grade : A3/A4 strict, B/C/D par lettre de catégorie."""
+        g = self._str(grade).upper()
+        if not g:
+            return ''
+        if g.startswith('A'):
+            return g
+        return g[0]
 
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
@@ -622,9 +641,8 @@ class Command(BaseCommand):
             cat_val_raw = self._str(data.get('categorie'))  # categorie est sur Participant, pas Module
             if grade_val and groupe_val:
                 qs = Participant.objects.filter(
-                    grade__iexact=grade_val,
                     groupe__iexact=groupe_val,
-                )
+                ).filter(self._grade_lookup_q(grade_val))
                 if cat_val_raw:
                     qs = qs.filter(categorie__iexact=cat_val_raw)
                 if vague_val:
@@ -782,10 +800,9 @@ class Command(BaseCommand):
                 for titre in titres:
                     mod_qs = Module.objects.filter(
                         formation__formation__iexact=titre,
-                        grade__iexact=p_grade,
                         groupe__iexact=p_groupe,
                         vague__iexact=p_vague,
-                    )
+                    ).filter(self._grade_lookup_q(p_grade))
                     matched_mods = list(mod_qs.order_by('ordre'))
                     if not matched_mods:
                         crit = f'titre={titre} grade={p_grade} groupe={p_groupe} vague={p_vague}'
@@ -794,17 +811,10 @@ class Command(BaseCommand):
 
                     # Vérification de compatibilité catégorielle (A, B, C, D...)
                     # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
-                    def _get_compat_key(grade):
-                        if not grade:
-                            return ''
-                        grade = grade.strip().upper()
-                        if grade.startswith('A'):
-                            return grade  # A3, A4, A5... strict
-                        return grade[0] if grade else ''  # B, C, D... par catégorie
-                    p_compat = _get_compat_key(p_grade)
+                    p_compat = self._get_grade_compat_key(p_grade)
                     mods_compatibles = []
                     for _mod in matched_mods:
-                        mod_compat = _get_compat_key(_mod.grade)
+                        mod_compat = self._get_grade_compat_key(_mod.grade)
                         if not p_compat or not mod_compat or p_compat == mod_compat:
                             mods_compatibles.append(_mod)
                         else:
@@ -834,9 +844,8 @@ class Command(BaseCommand):
                 vague = self._str(data.get('vague'))
                 if grade and groupe:
                     mod_qs = Module.objects.filter(
-                        grade__iexact=grade,
                         groupe__iexact=groupe,
-                    )
+                    ).filter(self._grade_lookup_q(grade))
                     if vague:
                         mod_qs = mod_qs.filter(vague__iexact=vague)
                     matched_mods = list(mod_qs)
@@ -852,16 +861,9 @@ class Command(BaseCommand):
                     else:
                         # Vérification de compatibilité en auto-match aussi
                         # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
-                        def _get_compat_key_auto(g):
-                            if not g:
-                                return ''
-                            g = g.strip().upper()
-                            if g.startswith('A'):
-                                return g
-                            return g[0] if g else ''
-                        p_compat = _get_compat_key_auto(grade)
+                        p_compat = self._get_grade_compat_key(grade)
                         for _mod in matched_mods:
-                            mod_compat = _get_compat_key_auto(_mod.grade)
+                            mod_compat = self._get_grade_compat_key(_mod.grade)
                             if p_compat and mod_compat and p_compat != mod_compat:
                                 errors.append(
                                     f'Participants ligne {row_idx}: grade incompatible pour {nom} {prenom} '
@@ -1238,19 +1240,17 @@ class Command(BaseCommand):
             strategies.append((
                 Module.objects.filter(
                     intitule__iexact=titre,
-                    grade__iexact=grade,
                     groupe__iexact=groupe,
                     vague__iexact=vague,
-                ),
+                ).filter(self._grade_lookup_q(grade)),
                 'exacte',
             ))
         if grade:
             strategies.append((
                 Module.objects.filter(
                     intitule__iexact=titre,
-                    grade__iexact=grade,
                     groupe__iexact=groupe,
-                ),
+                ).filter(self._grade_lookup_q(grade)),
                 'sans vague',
             ))
         if vague:
