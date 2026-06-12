@@ -560,6 +560,41 @@ class BadgeAccountProvisionTests(TestCase):
         self.assertIn('SYGEP-CPFAE', html)
 
 
+class UserListScopeTests(TestCase):
+
+    def setUp(self):
+        from formations.models import Secretariat
+        self.client = APIClient()
+        self.sec_a = Secretariat.objects.create(nom='Sec List A')
+        self.sec_b = Secretariat.objects.create(nom='Sec List B')
+        self.secretariat_user = make_user('sec-list', role='SECRETARIAT')
+        self.secretariat_user.secretariat = self.sec_a
+        self.secretariat_user.save(update_fields=['secretariat'])
+        self.encadrant = make_user('enc-global', role='ENCADRANT')
+        self.client.force_authenticate(user=self.secretariat_user)
+
+    def test_secretariat_lists_all_encadrants_for_assignment(self):
+        res = self.client.get('/api/auth/users/?role=ENCADRANT')
+        self.assertEqual(res.status_code, 200)
+        data = res.data.get('results', res.data)
+        usernames = {u['username'] for u in data}
+        self.assertIn('enc-global', usernames)
+
+    def test_secretariat_still_scopes_other_roles_to_own_secretariat(self):
+        aud_a = make_user('aud-a', role='AUDITEUR')
+        aud_a.secretariat = self.sec_a
+        aud_a.save(update_fields=['secretariat'])
+        aud_b = make_user('aud-b', role='AUDITEUR')
+        aud_b.secretariat = self.sec_b
+        aud_b.save(update_fields=['secretariat'])
+        res = self.client.get('/api/auth/users/?role=AUDITEUR')
+        self.assertEqual(res.status_code, 200)
+        data = res.data.get('results', res.data)
+        usernames = {u['username'] for u in data}
+        self.assertIn('aud-a', usernames)
+        self.assertNotIn('aud-b', usernames)
+
+
 class LoginAccessTests(TestCase):
 
     def setUp(self):
