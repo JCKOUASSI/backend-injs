@@ -16,7 +16,7 @@ from .serializers import (
     LoginSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsDFRC, IsSecretariatOrDFRC, ROLE_HIERARCHY
+from .permissions import IsDFRC, IsSecretariatOrDFRC, ROLE_HIERARCHY, get_creatable_roles
 from .role_groups import ALLOWED_WEB_ROLES, user_role_context
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
