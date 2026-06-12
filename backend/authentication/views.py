@@ -24,6 +24,14 @@ from presences.models import DeviceBinding, AuditLog, _log_audit
 
 User = get_user_model()
 
+# Rôles sans rattachement secrétariat sur le compte User (aligné serializers UserCreate/Update).
+USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
+    User.Role.CHEF_CPFAE_ADMIN,
+    User.Role.CPFAE_ADMIN,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
+})
+
 logger = logging.getLogger(__name__)
 
 
@@ -209,16 +217,23 @@ def change_password_view(request):
     return Response({'detail': 'Mot de passe modifié avec succès.'})
 
 
+def _staff_users_queryset(user):
+    """Utilisateurs visibles/gérables par un compte personnel (hors auto-gestion)."""
+    subordinates = get_creatable_roles(user.role)
+    qs = User.objects.filter(role__in=subordinates)
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        # Encadrants : assignables sur tout secrétariat, donc listés globalement.
+        qs = qs.filter(Q(role=User.Role.ENCADRANT) | Q(secretariat=user.secretariat))
+    return qs
+
+
 class UserListCreateView(generics.ListCreateAPIView):
     """DFRC/Secrétariat : lister et créer des utilisateurs."""
     permission_classes = [IsSecretariatOrDFRC]
 
     def get_queryset(self):
         user = self.request.user
-        subordinates = get_creatable_roles(user.role)
-        qs = User.objects.filter(role__in=subordinates).order_by('last_name', 'first_name')
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            qs = qs.filter(secretariat=user.secretariat)
+        qs = _staff_users_queryset(user).order_by('last_name', 'first_name')
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
@@ -248,7 +263,12 @@ class UserListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         plain_password = serializer.validated_data.get('password', '')
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and user.secretariat:
+        role = serializer.validated_data.get('role')
+        if (
+            user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT')
+            and user.secretariat
+            and role not in USER_ROLES_WITHOUT_SECRETARIAT
+        ):
             new_user = serializer.save(secretariat=user.secretariat)
         else:
             new_user = serializer.save()
@@ -269,10 +289,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        subordinates = get_creatable_roles(user.role)
-        qs = User.objects.filter(role__in=subordinates)
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            qs = qs.filter(secretariat=user.secretariat)
+        qs = _staff_users_queryset(user)
         if user.role == 'DIRECTION':
             qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
         return qs
