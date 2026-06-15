@@ -9,11 +9,26 @@ from django.http import HttpResponse
 
 from .point_journalier import compute_point_journalier, MOIS_FR
 
-# Couleurs extraites des fichiers modèles (aRGB 8 chars pour openpyxl)
-FILL_HEADER = 'FF43A047'
-FILL_GROUPE = 'FFFBFBDB'
-FILL_TOTAL = 'FFF7FA82'
+# Couleurs extraites du modèle CPFAE « POINT JOURNALIER CAT A » (Office theme accent2 + custom)
+FILL_HEADER = 'FFED7D31'       # Orange en-têtes (theme accent2)
+FILL_GROUPE = 'FFFBFDBB'       # Jaune clair — ligne GROUPES
+FILL_TOTAL = 'FFF7FA82'        # Jaune — colonne TOTAL
+FILL_SIDEBAR = 'FFFFFF00'      # Jaune vif — bande SECONDE VAGUE
+FILL_ABSENCE = 'FFED7D31'      # Orange — cellules taux d'absence
+FILL_PRESENCE_JOUR = 'FFED7D31'
+FILL_ABSENCE_JOUR = 'FFBDD7EE' # Bleu clair — taux absence du jour
+FONT_ABSENCE = 'FFFFFFFF'      # Blanc — pourcentages d'absence (fond orange)
 FMT_PCT = '0.00%'
+
+# Grille fixe modèle CPFAE (17 colonnes A→Q)
+COL_LABEL = 1
+COL_GROUP_START = 2
+COL_TOTAL = 14
+COL_SIDEBAR = 15
+COL_END = 17
+MAX_GROUP_COLS = 12
+ROW_FOOTER = 22
+ROW_FOOTER_END = 24
 PDF_GROUPES_PAR_TABLE = 14
 
 
@@ -151,39 +166,73 @@ def _filter_tableaux(data, formation_id=None, categorie=None, mois=None, jour=No
 
 
 def _write_bloc_creneau(ws, start_row, bloc, label_creneau, styles):
-    """Écrit MATIN ou SOIR (lignes créneau + groupes + stats). Retourne la prochaine ligne libre."""
-    n_groups = len(bloc['groupes'])
-    total_col = max(19, 2 + n_groups)
+    """Écrit MATIN ou SOIR — format CPFAE (colonnes B→M groupes, N total)."""
+    from openpyxl.utils import get_column_letter
+
+    groupes = (bloc.get('groupes') or [])[:MAX_GROUP_COLS]
+    n_groups = len(groupes)
+    last_group_col = COL_GROUP_START + max(n_groups, 1) - 1
+    data_end_col = COL_TOTAL - 1
+    groupes_row = start_row + 2
+    salles_row = start_row + 3
+    first_data_row = start_row + 4
+    last_data_row = start_row + 8
 
     # Ligne créneau (ex. MATIN: 08H00-12H00)
-    ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=total_col)
-    c = ws.cell(row=start_row, column=1, value=f"{label_creneau}: {bloc['horaire']}")
+    ws.merge_cells(
+        start_row=start_row, start_column=COL_LABEL,
+        end_row=start_row, end_column=COL_TOTAL,
+    )
+    c = ws.cell(row=start_row, column=COL_LABEL, value=f"{label_creneau}: {bloc['horaire']}")
     c.font = styles['font_creneau']
     c.fill = styles['fill_header']
     c.alignment = styles['align_center']
+    c.border = styles['thin']
     start_row += 1
 
-    # Ligne vide (spacer)
-    ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=total_col - 1)
+    # Ligne vide (spacer) + fusion colonne TOTAL (N4:N6 équivalent)
+    ws.merge_cells(
+        start_row=start_row, start_column=COL_LABEL,
+        end_row=start_row, end_column=data_end_col,
+    )
+    ws.merge_cells(
+        start_row=start_row, start_column=COL_TOTAL,
+        end_row=start_row + 2, end_column=COL_TOTAL,
+    )
+    for col in range(COL_LABEL, COL_TOTAL + 1):
+        ws.cell(row=start_row, column=col).border = styles['thin']
     start_row += 1
 
     # GROUPES
-    ws.cell(row=start_row, column=1, value='GROUPES').font = styles['font_label']
-    for i, g in enumerate(bloc['groupes']):
-        col = 2 + i
+    ws.cell(row=start_row, column=COL_LABEL, value='GROUPES').font = styles['font_label']
+    ws.cell(row=start_row, column=COL_LABEL).border = styles['thin']
+    for i, g in enumerate(groupes):
+        col = COL_GROUP_START + i
         cell = ws.cell(row=start_row, column=col, value=g['label'])
         cell.font = styles['font_groupe']
         cell.fill = styles['fill_groupe']
         cell.alignment = styles['align_center']
+        cell.border = styles['thin']
+    if n_groups < MAX_GROUP_COLS and last_group_col < data_end_col:
+        ws.merge_cells(
+            start_row=groupes_row, start_column=last_group_col + 1,
+            end_row=last_data_row, end_column=data_end_col,
+        )
+    ws.cell(row=start_row, column=COL_TOTAL).fill = styles['fill_total']
+    ws.cell(row=start_row, column=COL_TOTAL).border = styles['thin']
     start_row += 1
 
     # SALLES
-    ws.cell(row=start_row, column=1, value='SALLES').font = styles['font_label']
-    for i, g in enumerate(bloc['groupes']):
-        col = 2 + i
+    ws.cell(row=start_row, column=COL_LABEL, value='SALLES').font = styles['font_label']
+    ws.cell(row=start_row, column=COL_LABEL).border = styles['thin']
+    for i, g in enumerate(groupes):
+        col = COL_GROUP_START + i
         cell = ws.cell(row=start_row, column=col, value=g['salle'])
         cell.font = styles['font_salle']
         cell.alignment = styles['align_center']
+        cell.border = styles['thin']
+    ws.cell(row=start_row, column=COL_TOTAL).fill = styles['fill_total']
+    ws.cell(row=start_row, column=COL_TOTAL).border = styles['thin']
     start_row += 1
 
     rows_def = [
@@ -195,117 +244,155 @@ def _write_bloc_creneau(ws, start_row, bloc, label_creneau, styles):
     ]
 
     for row_label, key, bold, is_pct in rows_def:
-        ws.cell(row=start_row, column=1, value=row_label).font = styles['font_bold'] if bold else styles['font_label']
-        for i, g in enumerate(bloc['groupes']):
-            col = 2 + i
+        label_cell = ws.cell(row=start_row, column=COL_LABEL, value=row_label)
+        label_cell.font = styles['font_bold'] if bold else styles['font_label']
+        label_cell.border = styles['thin']
+        is_absence_row = key == 'taux_absence'
+        for i, g in enumerate(groupes):
+            col = COL_GROUP_START + i
             val = g[key]
             cell = ws.cell(row=start_row, column=col, value=val)
             cell.alignment = styles['align_center']
+            cell.border = styles['thin']
             if is_pct:
                 cell.number_format = FMT_PCT
                 cell.font = styles['font_bold']
+                if is_absence_row:
+                    cell.font = styles['font_absence']
+                    cell.fill = styles['fill_absence']
             elif bold:
                 cell.font = styles['font_bold']
 
         tot = bloc['total']
         tval = tot[key]
-        tcell = ws.cell(row=start_row, column=total_col, value=tval)
-        tcell.fill = styles['fill_total']
+        tcell = ws.cell(row=start_row, column=COL_TOTAL, value=tval)
+        tcell.fill = styles['fill_total'] if key != 'taux_absence' else styles['fill_absence']
         tcell.font = styles['font_total']
         tcell.alignment = styles['align_center']
+        tcell.border = styles['thin']
         if is_pct:
             tcell.number_format = FMT_PCT
+            if is_absence_row:
+                tcell.font = styles['font_absence_bold']
         start_row += 1
 
-    return start_row + 1  # spacer après le bloc
+    # Bordures zone données (libellés + colonnes groupes + total)
+    for r in range(groupes_row, start_row):
+        for col in range(COL_LABEL, COL_TOTAL + 1):
+            ws.cell(row=r, column=col).border = styles['thin']
+
+    return start_row + 1
 
 
-def _sheet_total_col(tb):
-    n = max(len(tb['matin']['groupes']), len(tb['soir']['groupes']), 17)
-    return max(19, 2 + n)
+def _write_sidebar(ws, row_start, row_end, text, styles):
+    from openpyxl.styles import Alignment
+
+    ws.merge_cells(
+        start_row=row_start, start_column=COL_SIDEBAR,
+        end_row=row_end, end_column=COL_END,
+    )
+    cell = ws.cell(row=row_start, column=COL_SIDEBAR, value=(text or 'SECONDE VAGUE').strip())
+    cell.fill = styles['fill_sidebar']
+    cell.font = styles['font_sidebar']
+    cell.alignment = Alignment(
+        horizontal='center', vertical='center', text_rotation=90, wrap_text=True,
+    )
 
 
 def _write_sheet(ws, tb, styles):
-    """Remplit une feuille au format modèle CPFAE."""
+    """Remplit une feuille au format modèle CPFAE (17 colonnes, bande vague)."""
     from openpyxl.utils import get_column_letter
 
-    total_col = _sheet_total_col(tb)
-
     # Ligne 1 — titre
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_col)
-    c1 = ws.cell(row=1, column=1, value=tb['titre_ligne1'])
+    ws.merge_cells(start_row=1, start_column=COL_LABEL, end_row=1, end_column=COL_TOTAL)
+    c1 = ws.cell(row=1, column=COL_LABEL, value=tb['titre_ligne1'])
     c1.font = styles['font_title']
     c1.fill = styles['fill_header']
     c1.alignment = styles['align_center']
+    c1.border = styles['thin']
 
     # Ligne 2 — DATE
-    for col in range(1, total_col + 1):
-        ws.cell(row=2, column=col).fill = styles['fill_header']
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
-    ws.cell(row=2, column=1, value='DATE').font = styles['font_date']
-    ws.cell(row=2, column=4, value=tb['jour']).font = styles['font_date']
-    ws.cell(row=2, column=5, value=tb['mois_libelle']).font = styles['font_date']
-    ws.cell(row=2, column=6, value=tb['annee']).font = styles['font_date']
-    ws.merge_cells(start_row=2, start_column=7, end_row=2, end_column=total_col)
-    ws.cell(row=2, column=7, value=tb['organisme']).font = styles['font_date']
-    ws.cell(row=2, column=7).alignment = styles['align_center']
+    ws.merge_cells(start_row=2, start_column=COL_LABEL, end_row=2, end_column=3)
+    for col, val in [(COL_LABEL, 'DATE'), (4, tb['jour']), (5, tb['mois_libelle']), (6, tb['annee'])]:
+        cell = ws.cell(row=2, column=col, value=val)
+        cell.font = styles['font_date']
+        cell.border = styles['thin']
+    ws.merge_cells(start_row=2, start_column=7, end_row=2, end_column=COL_TOTAL)
+    org = ws.cell(row=2, column=7, value=tb['organisme'])
+    org.font = styles['font_date']
+    org.alignment = styles['align_center']
+    org.border = styles['thin']
 
     row = 3
+    matin_start = row
     row = _write_bloc_creneau(ws, row, tb['matin'], 'MATIN', styles)
     row = _write_bloc_creneau(ws, row, tb['soir'], 'SOIR', styles)
 
     # Pied — taux du jour
-    ws.merge_cells(start_row=row, start_column=1, end_row=row + 2, end_column=2)
-    ws.cell(row=row, column=1, value='Taux de présence du jour').font = styles['font_bold']
-    ws.cell(row=row, column=1).alignment = styles['align_center_wrap']
+    ws.merge_cells(start_row=ROW_FOOTER, start_column=COL_LABEL, end_row=ROW_FOOTER_END, end_column=2)
+    ws.cell(row=ROW_FOOTER, column=COL_LABEL, value='Taux de présence du jour').font = styles['font_bold']
+    ws.cell(row=ROW_FOOTER, column=COL_LABEL).alignment = styles['align_center_wrap']
 
-    ws.merge_cells(start_row=row, start_column=3, end_row=row + 2, end_column=6)
-    cp = ws.cell(row=row, column=3, value=tb['taux_presence_jour'])
+    ws.merge_cells(start_row=ROW_FOOTER, start_column=3, end_row=ROW_FOOTER_END, end_column=6)
+    cp = ws.cell(row=ROW_FOOTER, column=3, value=tb['taux_presence_jour'])
     cp.number_format = FMT_PCT
     cp.font = styles['font_taux_jour']
-    cp.fill = styles['fill_header']
+    cp.fill = styles['fill_presence_jour']
     cp.alignment = styles['align_center']
 
-    ws.merge_cells(start_row=row, start_column=7, end_row=row + 2, end_column=8)
-    ws.cell(row=row, column=7, value="Taux d'absence du jour").font = styles['font_bold']
-    ws.cell(row=row, column=7).alignment = styles['align_center_wrap']
+    ws.merge_cells(start_row=ROW_FOOTER, start_column=7, end_row=ROW_FOOTER_END, end_column=8)
+    ws.cell(row=ROW_FOOTER, column=7, value="Taux d'absence du jour").font = styles['font_bold']
+    ws.cell(row=ROW_FOOTER, column=7).alignment = styles['align_center_wrap']
 
-    ws.merge_cells(start_row=row, start_column=9, end_row=row + 2, end_column=total_col)
-    ca = ws.cell(row=row, column=9, value=tb['taux_absence_jour'])
+    ws.merge_cells(start_row=ROW_FOOTER, start_column=9, end_row=ROW_FOOTER_END, end_column=COL_TOTAL)
+    ca = ws.cell(row=ROW_FOOTER, column=9, value=tb['taux_absence_jour'])
     ca.number_format = FMT_PCT
     ca.font = styles['font_taux_jour']
-    ca.fill = styles['fill_header']
+    ca.fill = styles['fill_absence_jour']
     ca.alignment = styles['align_center']
 
-    # Largeurs colonnes (modèle + colonnes supplémentaires si besoin)
-    for i in range(1, total_col + 1):
-        w = 13.0 if i > 1 else 19.29
-        ws.column_dimensions[get_column_letter(i)].width = w
+    _write_sidebar(ws, 1, ROW_FOOTER_END, tb.get('vague_sidebar', 'SECONDE VAGUE'), styles)
+
+    # Largeurs colonnes (modèle CPFAE)
+    widths = {
+        'A': 19.37, 'B': 35.51, 'C': 21.93, 'D': 38.47, 'E': 35.51,
+        'F': 29.05, 'G': 15.47, 'N': 15.47, 'O': 13.0, 'P': 13.0, 'Q': 13.0,
+    }
+    for i in range(1, COL_END + 1):
+        letter = get_column_letter(i)
+        ws.column_dimensions[letter].width = widths.get(letter, 13.0)
 
 
 def _make_styles():
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
     thin = Border(
-        left=Side(style='thin', color='CCCCCC'),
-        right=Side(style='thin', color='CCCCCC'),
-        top=Side(style='thin', color='CCCCCC'),
-        bottom=Side(style='thin', color='CCCCCC'),
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000'),
     )
     return {
         'thin': thin,
         'fill_header': PatternFill(start_color=FILL_HEADER, end_color=FILL_HEADER, fill_type='solid'),
         'fill_groupe': PatternFill(start_color=FILL_GROUPE, end_color=FILL_GROUPE, fill_type='solid'),
         'fill_total': PatternFill(start_color=FILL_TOTAL, end_color=FILL_TOTAL, fill_type='solid'),
-        'font_title': Font(bold=True, size=14, color='FFFFFF'),
-        'font_date': Font(bold=True, size=15, color='FFFFFF'),
-        'font_creneau': Font(bold=True, size=14, color='FFFFFF'),
-        'font_groupe': Font(bold=True, size=12),
+        'fill_sidebar': PatternFill(start_color=FILL_SIDEBAR, end_color=FILL_SIDEBAR, fill_type='solid'),
+        'fill_absence': PatternFill(start_color=FILL_ABSENCE, end_color=FILL_ABSENCE, fill_type='solid'),
+        'fill_presence_jour': PatternFill(start_color=FILL_PRESENCE_JOUR, end_color=FILL_PRESENCE_JOUR, fill_type='solid'),
+        'fill_absence_jour': PatternFill(start_color=FILL_ABSENCE_JOUR, end_color=FILL_ABSENCE_JOUR, fill_type='solid'),
+        'font_title': Font(bold=True, size=16),
+        'font_date': Font(bold=True, size=16),
+        'font_creneau': Font(bold=True, size=16),
+        'font_groupe': Font(bold=True, size=16),
         'font_salle': Font(size=9),
         'font_label': Font(size=11),
         'font_bold': Font(bold=True, size=11),
-        'font_total': Font(bold=True, size=14),
-        'font_taux_jour': Font(bold=True, size=20, color='FFFFFF'),
+        'font_total': Font(bold=True, size=16),
+        'font_absence': Font(bold=True, size=16, color=FONT_ABSENCE),
+        'font_absence_bold': Font(bold=True, size=16, color=FONT_ABSENCE),
+        'font_taux_jour': Font(bold=True, size=20),
+        'font_sidebar': Font(bold=True, size=22),
         'align_center': Alignment(horizontal='center', vertical='center'),
         'align_center_wrap': Alignment(horizontal='center', vertical='center', wrap_text=True),
     }
@@ -328,7 +415,7 @@ def export_excel(tableaux, annee):
 
     used = set()
     for tb in tableaux:
-        base = _safe_filename(f"{tb['categorie']}_{tb['date']}")[:28]
+        base = _safe_filename(tb.get('grade') or tb['categorie'] or tb['date'])[:28]
         name = base
         i = 1
         while name in used:

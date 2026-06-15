@@ -282,6 +282,13 @@ class Participant(models.Model):
         related_name='participants',
         help_text="Secrétariat responsable de ce participant",
     )
+    motif_notoire = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Motif auditeur notoire",
+        help_text="Justificatif si l'auditeur n'a jamais badgé (ex. Décédé(e), Report…)",
+    )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

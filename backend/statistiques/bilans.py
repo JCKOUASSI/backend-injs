@@ -6,7 +6,7 @@ Structure préparée pour accueillir les tableaux CPFAE fournis progressivement.
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from formations.models import Formation, Module, RefCategorie, Participant, ModuleParticipant, SessionModule
 from presences.models import Pointage
@@ -582,3 +582,275 @@ def compute_bilans_avec_tableaux(
     data['tableaux_complets'] = tableaux_complets
     data['total_tableaux'] = len(tableaux_complets)
     return data
+
+
+# ── Bilan FAC ─────────────────────────────────────────────────────────────────
+
+def _vh_grade_groupe(formation_id, grade, groupe=None, secretariat_id=None):
+    """VH prévu et épuisé pour un grade/groupe donné."""
+    mq = Module.objects.filter(formation_id=formation_id, grade=grade)
+    if groupe:
+        mq = mq.filter(groupe=groupe)
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
+
+    vh_prevu = float(mq.aggregate(total=Sum('duree_prevue_heures'))['total'] or 0)
+    vh_epuise = float(
+        mq.filter(statut=Module.Statut.TERMINEE).aggregate(total=Sum('duree_prevue_heures'))['total'] or 0
+    )
+    if vh_epuise == 0 and vh_prevu > 0:
+        # Si aucun module terminé, on regarde les séances terminées
+        module_ids = list(mq.values_list('id', flat=True))
+        sessions_done = SessionModule.objects.filter(
+            module_id__in=module_ids,
+            terminee_le__isnull=False,
+        ).values('module_id').distinct()
+        done_ids = {s['module_id'] for s in sessions_done}
+        vh_epuise = float(
+            mq.filter(id__in=done_ids).aggregate(total=Sum('duree_prevue_heures'))['total'] or 0
+        )
+
+    vh_restant = max(0.0, vh_prevu - vh_epuise)
+    taux_execution = _pct(vh_epuise, vh_prevu, decimals=4) if vh_prevu else 100.0
+    taux_restant = _pct(vh_restant, vh_prevu, decimals=4) if vh_prevu else 0.0
+    return {
+        'vh_prevu': vh_prevu,
+        'vh_epuise': vh_epuise,
+        'vh_restant': vh_restant,
+        'taux_execution': round(taux_execution, 2),
+        'taux_restant': round(taux_restant, 2),
+    }
+
+
+def _taux_presence_formation(formation_id, grade=None, secretariat_id=None, annee=None, mois=None, calendrier=None):
+    """Taux de présence et d'absence aux cours (via Pointage)."""
+    mq = Module.objects.filter(formation_id=formation_id)
+    if grade:
+        mq = mq.filter(grade=grade)
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
+    module_ids = list(mq.values_list('id', flat=True))
+
+    session_ids = _session_ids_modules(module_ids, annee, mois, calendrier)
+    if not session_ids:
+        return {'taux_presence': 0.0, 'taux_absence': 0.0, 'nb_presents': 0, 'nb_absents': 0}
+
+    nb_presents = Pointage.objects.filter(
+        session_id__in=session_ids, statut=Pointage.Statut.PRESENT,
+    ).values('participant_id').distinct().count()
+
+    nb_absents = Pointage.objects.filter(
+        session_id__in=session_ids, statut=Pointage.Statut.ABSENT_NON_BADGE,
+    ).values('participant_id').distinct().count()
+
+    total = nb_presents + nb_absents
+    return {
+        'taux_presence': round(_pct(nb_presents, total), 4) if total else 0.0,
+        'taux_absence': round(_pct(nb_absents, total), 4) if total else 0.0,
+        'nb_presents': nb_presents,
+        'nb_absents': nb_absents,
+    }
+
+
+def _groupes_termines_count(formation_id, grade, secretariat_id=None):
+    """Nombre de groupes pour lesquels tous les modules sont TERMINEE."""
+    mq = Module.objects.filter(formation_id=formation_id, grade=grade)
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
+    groupes = mq.exclude(groupe='').values_list('groupe', flat=True).distinct()
+    termines = 0
+    for grp in groupes:
+        total = mq.filter(groupe=grp).count()
+        done = mq.filter(groupe=grp, statut=Module.Statut.TERMINEE).count()
+        if total > 0 and done == total:
+            termines += 1
+    return termines
+
+
+def compute_bilan_fac(
+    formation_id,
+    annee=None,
+    categorie=None,
+    secretariat_id=None,
+    calendrier=None,
+):
+    """
+    Bilan FAC complet reprenant le format du fichier Excel BILAN FAC :
+
+    - Point global (par catégorie/grade) : effectifs, VH, taux présence/absence, difficultés
+    - Bilan Volume Horaire par groupe (par grade)
+    - Absents notoires (liste nominative)
+
+    Paramètres :
+        formation_id    : ID Formation ciblée (obligatoire)
+        annee           : Année de référence (défaut : année courante)
+        categorie       : Filtre catégorie (ex. 'A', 'B' …) ; None = toutes
+        secretariat_id  : Filtre secrétariat
+        calendrier      : Date pivot YYYY-MM-DD (calendrier prévisionnel)
+    """
+    try:
+        formation = Formation.objects.get(pk=formation_id)
+    except Formation.DoesNotExist:
+        return None
+
+    annee = annee or date.today().year
+    formation_nom = (formation.formation or f'Formation {formation.id}').strip().upper()
+
+    # Modules de base
+    mq_base = Module.objects.filter(formation_id=formation_id)
+    if secretariat_id:
+        mq_base = mq_base.filter(secretariat_id=secretariat_id)
+    if categorie:
+        mq_base = mq_base.filter(
+            module_participants__participant__categorie__iexact=categorie,
+        ).distinct()
+
+    # Grades disponibles (ex. A4, A3)
+    grades = sorted(
+        mq_base.exclude(grade='').values_list('grade', flat=True).distinct()
+    )
+    # Catégories principales (A, B, C, D)
+    cat_for_stats = categorie or 'A'
+
+    # ── Point global ──────────────────────────────────────────────────────────
+    lignes_global = []
+    for grade in grades:
+        try:
+            stats = _stats_ligne_formation(
+                formation_id, cat_for_stats, grade, secretariat_id, annee, None, calendrier,
+            )
+        except Exception:
+            stats = {
+                'grade': grade, 'nb_groupes': 0, 'nb_encadrants': 0, 'effectif_secretariat': 0,
+                'inscrits_actifs': 0, 'inscrits_reference': 0, 'pct_inscrits': 0,
+                'auditeurs_listes': 0, 'absents_notoires': 0, 'pct_absents': 0,
+            }
+
+        vh_data = _vh_grade_groupe(formation_id, grade, secretariat_id=secretariat_id)
+        pres = _taux_presence_formation(
+            formation_id, grade, secretariat_id, annee, None, calendrier,
+        )
+        nb_inscrits = stats['inscrits_actifs'] or 1
+        taux_participation = round(
+            _pct(nb_inscrits - stats['absents_notoires'], nb_inscrits, decimals=4), 4
+        )
+        groupes_termines = _groupes_termines_count(formation_id, grade, secretariat_id)
+
+        lignes_global.append({
+            'grade': grade,
+            'effectif_secretariat': stats['effectif_secretariat'],
+            'nb_encadrants': stats['nb_encadrants'],
+            'nb_groupes': stats['nb_groupes'],
+            'effectif_auditeurs': stats['inscrits_actifs'],
+            'absents_notoires': stats['absents_notoires'],
+            'groupes_termines': groupes_termines,
+            'justificatifs': JUSTIFICATIFS_ABSENCES,
+            'taux_participation': taux_participation,
+            'taux_absents_notoires': round(stats['pct_absents'], 4),
+            'vh_total': vh_data['vh_prevu'],
+            'vh_epuise': vh_data['vh_epuise'],
+            'taux_exec_vh': vh_data['taux_execution'],
+            'taux_presence_cours': pres['taux_presence'],
+            'taux_absence_cours': pres['taux_absence'],
+            'difficultes': '',
+        })
+
+    # Totaux point global
+    def _sum_keys(rows, *keys):
+        return {k: sum(r.get(k, 0) or 0 for r in rows) for k in keys}
+
+    total_keys = (
+        'effectif_secretariat', 'nb_encadrants', 'nb_groupes',
+        'effectif_auditeurs', 'absents_notoires', 'groupes_termines',
+        'vh_total', 'vh_epuise',
+    )
+    totaux = _sum_keys(lignes_global, *total_keys)
+    totaux['taux_exec_vh'] = round(
+        _pct(totaux['vh_epuise'], totaux['vh_total'], decimals=4), 4
+    ) if totaux['vh_total'] else 100.0
+
+    # ── VH par groupe (par grade) ─────────────────────────────────────────────
+    vh_par_grade = []
+    for grade in grades:
+        mq_g = mq_base.filter(grade=grade)
+        groupes_raw = sorted(
+            mq_g.exclude(groupe='').values_list('groupe', flat=True).distinct()
+        )
+        lignes_vh = []
+        for grp in groupes_raw:
+            vh_data = _vh_grade_groupe(formation_id, grade, groupe=grp, secretariat_id=secretariat_id)
+            lignes_vh.append({'groupe': grp, **vh_data})
+
+        recap_prevu = sum(l['vh_prevu'] for l in lignes_vh)
+        recap_epuise = sum(l['vh_epuise'] for l in lignes_vh)
+        recap_restant = max(0.0, recap_prevu - recap_epuise)
+        vh_par_grade.append({
+            'grade': grade,
+            'groupes': lignes_vh,
+            'recap': {
+                'vh_prevu': recap_prevu,
+                'vh_epuise': recap_epuise,
+                'vh_restant': recap_restant,
+                'taux_execution': round(_pct(recap_epuise, recap_prevu, decimals=4), 2) if recap_prevu else 100.0,
+                'taux_restant': round(_pct(recap_restant, recap_prevu, decimals=4), 2) if recap_prevu else 0.0,
+            },
+        })
+
+    # ── Absents notoires (liste nominative) ───────────────────────────────────
+    pq = Participant.objects.filter(
+        modules_inscrits__module__formation_id=formation_id,
+    ).distinct()
+    if secretariat_id:
+        pq = pq.filter(secretariat_id=secretariat_id)
+    if categorie:
+        pq = pq.filter(categorie__iexact=categorie)
+
+    pq_notoires = pq.exclude(motif_notoire='').order_by('groupe', 'nom').values(
+        'matricule', 'nom', 'prenom', 'libelle_concours', 'telephone', 'groupe', 'grade', 'motif_notoire',
+    )
+    absents_notoires = []
+    for i, p in enumerate(pq_notoires, 1):
+        absents_notoires.append({
+            'numero': i,
+            'matricule': p['matricule'],
+            'nom': p['nom'],
+            'prenom': p['prenom'],
+            'libelle_concours': p['libelle_concours'],
+            'contacts': p['telephone'],
+            'groupe': p['groupe'],
+            'grade': p['grade'],
+            'observations': p['motif_notoire'],
+        })
+
+    # ── Résumé modules (état d'avancement) ───────────────────────────────────
+    modules_qs = mq_base.select_related('formation').order_by('grade', 'groupe', 'intitule')
+    modules_statuts = []
+    for m in modules_qs:
+        modules_statuts.append({
+            'id': m.id,
+            'intitule': m.intitule,
+            'grade': m.grade,
+            'groupe': m.groupe,
+            'statut': m.statut,
+            'date_debut': m.date_debut.isoformat() if m.date_debut else None,
+            'date_fin': m.date_fin.isoformat() if m.date_fin else None,
+            'vh_prevu': float(m.duree_prevue_heures or 0),
+        })
+
+    return {
+        'type': 'bilan_fac',
+        'titre': f'BILAN FAC {annee} — {formation_nom}',
+        'formation_id': formation.id,
+        'formation': formation.formation,
+        'annee': annee,
+        'date_generation': date.today().strftime('%d/%m/%Y'),
+        'grades': grades,
+        'justificatifs': JUSTIFICATIFS_ABSENCES,
+        'point_global': {
+            'lignes': lignes_global,
+            'totaux': totaux,
+        },
+        'vh_par_grade': vh_par_grade,
+        'absents_notoires': absents_notoires,
+        'modules_statuts': modules_statuts,
+    }

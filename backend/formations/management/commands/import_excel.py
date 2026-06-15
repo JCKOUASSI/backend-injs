@@ -565,6 +565,9 @@ class Command(BaseCommand):
                 'groupe': self._str(data.get('groupe')),
                 'grade_groupe': self._str(data.get('grade_groupe')),
                 'vague': self._str(data.get('vague')),
+                'motif_notoire': self._str(
+                    data.get('motif_notoire') or data.get('motif') or data.get('motif_absence')
+                ),
             }
 
             if secretariat is not None:

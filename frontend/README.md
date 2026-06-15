@@ -45,7 +45,7 @@ npm install
 ```bash
 cp .env.example .env
 # Adapter si besoin — URL racine de l’API Django (suffixe /api obligatoire)
-# VITE_API_URL=http://127.0.0.1:8000/api
+# VITE_API_URL=http://127.0.0.1:8001/api
 ```
 
 3. Start the development server:
@@ -66,7 +66,7 @@ The frontend will be available at `http://localhost:3000`
 
 ### API
 
-There is no dev-server proxy: set `VITE_API_URL` to your Django API root (for example `http://127.0.0.1:8000/api`). Ensure `CORS_ALLOWED_ORIGINS` on the backend includes your frontend origin (for example `http://localhost:3000`).
+There is no dev-server proxy: set `VITE_API_URL` to your Django API root (for example `http://127.0.0.1:8001/api`). Ensure `CORS_ALLOWED_ORIGINS` on the backend includes your frontend origin (for example `http://localhost:3000`).
 
 ## Features
 

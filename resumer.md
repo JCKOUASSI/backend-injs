@@ -194,11 +194,11 @@ POST /api/scan/
 
 | Service | URL |
 |---------|-----|
-| Backend Django API | `http://localhost:8000/api/` |
+| Backend Django API | `http://localhost:8001/api/` |
 | Frontend React | `http://localhost:5173/` |
-| Page de badgeage | `http://localhost:8000/dashboard/badge/` |
-| API Docs (Swagger) | `http://localhost:8000/api/docs/` |
-| Admin Django | `http://localhost:8000/admin/` |
+| Page de badgeage | `http://localhost:8001/dashboard/badge/` |
+| API Docs (Swagger) | `http://localhost:8001/api/docs/` |
+| Admin Django | `http://localhost:8001/admin/` |
 
 ---
 
@@ -208,7 +208,7 @@ POST /api/scan/
 # Backend
 cd backend
 source venv/bin/activate
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:8001
 
 # Frontend (autre terminal)
 cd frontend

@@ -412,13 +412,26 @@ Même structure que le bilan module (5 colonnes), mais les effectifs sont **agr�
 
 ## 12. Onglet Point Journalier
 
-Reproduit le **format CPFAE officiel** : un tableau par **journée × catégorie × formation**, avec blocs **MATIN** et **SOIR**.
+Reproduit le **format CPFAE officiel** (modèle Excel « POINT JOURNALIER CAT A ») : un tableau par **journée × catégorie × formation × grade**, avec blocs **MATIN** (08H00-12H00) et **SOIR** (13H00-17H00).
 
 ![Point Journalier — liste et détail](screenshots/manuel-statistiques/03-point-journalier.png)
 
 *Figure 8 — Filtres, exports, liste des tableaux et détail d'une journée.*
 
-### 12.1 Filtres
+### 12.1 Structure du tableau (modèle FAC)
+
+| Zone | Contenu |
+|------|---------|
+| **Ligne 1** | `FORMATION D'ACCOMPAGNEMENT DE CARRIER CAT A _POINT DES PRÉSENCES_CPFAE` (orange) |
+| **Ligne 2** | DATE · jour · mois · année · `CATÉGORIE A_GRADE A3` |
+| **Bande droite** | Libellé vague (ex. **SECONDE VAGUE**, fond jaune) |
+| **MATIN / SOIR** | GROUPES (G7, G8…), SALLES (région/district), effectifs, taux |
+| **Colonne TOTAL** | Sommes et taux globaux du créneau (fond jaune) |
+| **Pied** | Taux de présence du jour · Taux d'absence du jour |
+
+> **Export Excel :** une feuille par grade (ex. feuilles **A3**, **A4**) pour une même catégorie.
+
+### 12.2 Filtres
 
 | Filtre | Description |
 |--------|-------------|
@@ -429,7 +442,7 @@ Reproduit le **format CPFAE officiel** : un tableau par **journée × catégorie
 
 Boutons sur la **même ligne** : **Actualiser**, **Excel**, **PDF**, **Word**.
 
-### 12.2 Navigation
+### 12.3 Navigation
 
 | Zone | Rôle |
 |------|------|
@@ -438,7 +451,7 @@ Boutons sur la **même ligne** : **Actualiser**, **Excel**, **PDF**, **Word**.
 
 > Tableaux larges : **défilement horizontal** au-delà de 10 groupes.
 
-### 12.3 Contenu d'un point journalier
+### 12.4 Contenu d'un point journalier
 
 Pour chaque créneau (MATIN / SOIR) :
 
@@ -453,7 +466,7 @@ Pour chaque créneau (MATIN / SOIR) :
 
 Pied de page : **Taux de présence du jour** (global).
 
-### 12.4 Exports Point Journalier
+### 12.5 Exports Point Journalier
 
 | Format | Usage |
 |--------|--------|
@@ -560,6 +573,8 @@ Réservée aux **validateurs / administrateurs** :
 | 1.0.0 | 03/06/2026 | Création initiale : 8 onglets, point journalier, alertes, profils |
 | 2.0.0 | 03/06/2026 | Manuel détaillé complet : bilans CPFAE (module, catégorie, formation), exports Excel/PDF/Word bilans et PJ, alertes visuelles, suppression section « Rapports générés », captures d'écran intégrées |
 | 2.0.1 | 05/06/2026 | Vue d'ensemble : retrait des widgets Pointages et Pointages par statut |
+| 2.1.0 | 08/06/2026 | Harmonisation des libellés (assiduité séance, couverture auditeurs, événements absence/suspect, avancement VH), bandeau explicatif sous les filtres, infobulles KPI, champ API `taux_couverture_auditeurs`, §5.1 « Comment lire les chiffres » |
+| 2.2.0 | 11/06/2026 | Point journalier aligné modèle Excel FAC 2025 : titre par catégorie, feuille par grade, visuel web CPFAE (orange/jaune), colonne TOTAL et bande vague |
 
 ---
 

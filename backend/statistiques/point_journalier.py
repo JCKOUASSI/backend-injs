@@ -24,6 +24,27 @@ ORGANISME_DEFAULT = 'CPFAE'
 DEFAULT_HORAIRES = {'MATIN': '08H00-12H00', 'SOIR': '13H00-17H00'}
 
 
+def _organisme_label(categorie, grade=None):
+    """Libellé ligne DATE — ex. CATÉGORIE A_GRADE A3 (modèle CPFAE)."""
+    cat = (categorie or '').strip()
+    gr = (grade or '').strip()
+    if cat and gr:
+        return f'CATÉGORIE {cat}_GRADE {gr}'
+    if gr:
+        return f'CATÉGORIE _GRADE {gr}'
+    if cat:
+        return f'CATÉGORIE {cat}'
+    return ORGANISME_DEFAULT
+
+
+def _vague_sidebar_label(modules):
+    for mod in modules:
+        v = (mod.vague or '').strip()
+        if v:
+            return v.upper()
+    return 'SECONDE VAGUE'
+
+
 def _creneau(session):
     label = (session.intitule or '').lower()
     if any(k in label for k in ('matin', 'mat ', 'mat.')):
@@ -73,14 +94,21 @@ def _salle_label(module):
     return (module.salle or module.batiment or '').strip() or '—'
 
 
-def _titre_ligne1(formation):
-    formation_upper = formation.formation.upper()
-    if 'ADMINISTRATION DE BASE' in formation_upper or 'FAB' in formation_upper:
+def _titre_ligne1(formation, categorie=None):
+    """Ligne 1 du modèle CPFAE (ex. FAC CAT A)."""
+    name = (formation.formation or '').strip().upper()
+    cat = (categorie or '').strip().upper()
+    if cat == '—':
+        cat = ''
+    if 'FAC' in name or ('ACCOMPAGNEMENT' in name and 'CARRIER' in name):
+        cat_part = f' CAT {cat}' if cat else ''
+        return f"FORMATION D'ACCOMPAGNEMENT DE CARRIER{cat_part} _POINT DES PRÉSENCES_CPFAE"
+    if 'ADMINISTRATION DE BASE' in name or 'FAB' in name:
         return 'FORMATION EN ADMINISTRATION DE BASE_POINT DES PRÉSENCES_CPFAE'
-    return f"{formation_upper}_POINT DES PRÉSENCES_CPFAE"
+    return f"{name}_POINT DES PRÉSENCES_CPFAE"
 
 
-def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None):
+def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None, allowed_module_ids=None):
     sm_q = filter_sessions(seulement_terminees=True).filter(date_journee__year=annee)
     if mois:
         sm_q = sm_q.filter(date_journee__month=mois)
@@ -88,28 +116,34 @@ def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None):
         sm_q = sm_q.filter(module__formation_id=formation_id)
     if secretariat_id:
         sm_q = sm_q.filter(module__secretariat_id=secretariat_id)
+    if allowed_module_ids is not None:
+        sm_q = sm_q.filter(module_id__in=allowed_module_ids)
     today = date.today()
     dates = sorted(set(sm_q.values_list('date_journee', flat=True)))
     return [d for d in dates if d <= today]
 
 
-def _liste_categories(formation_id=None, secretariat_id=None):
+def _liste_categories(formation_id=None, secretariat_id=None, allowed_module_ids=None):
     cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
     pq = Participant.objects.exclude(categorie='')
     if secretariat_id:
         pq = pq.filter(secretariat_id=secretariat_id)
     if formation_id:
         pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
+    if allowed_module_ids is not None:
+        pq = pq.filter(modules_inscrits__module_id__in=allowed_module_ids).distinct()
     cats.update(pq.values_list('categorie', flat=True))
     return sorted(cats, key=lambda c: (len(c), c))
 
 
-def _categories_pour_formation(formation_id, secretariat_id=None, cache=None):
+def _categories_pour_formation(formation_id, secretariat_id=None, cache=None, allowed_module_ids=None):
     if cache and formation_id in cache['cats_by_formation']:
         return cache['cats_by_formation'][formation_id]
     mq = {'module__formation_id': formation_id}
     if secretariat_id:
         mq['module__secretariat_id'] = secretariat_id
+    if allowed_module_ids is not None:
+        mq['module_id__in'] = allowed_module_ids
     cats = sorted(set(
         ModuleParticipant.objects.filter(**mq)
         .exclude(participant__categorie='')
@@ -118,7 +152,7 @@ def _categories_pour_formation(formation_id, secretariat_id=None, cache=None):
     return cats
 
 
-def _formation_ids_for_scope(annee, mois, formation_id, secretariat_id):
+def _formation_ids_for_scope(annee, mois, formation_id, secretariat_id, allowed_module_ids=None):
     if formation_id:
         return [formation_id]
     fq = Formation.objects.filter(
@@ -128,10 +162,12 @@ def _formation_ids_for_scope(annee, mois, formation_id, secretariat_id):
         fq = fq.filter(modules__sessions__date_journee__month=mois)
     if secretariat_id:
         fq = fq.filter(modules__secretariat_id=secretariat_id)
+    if allowed_module_ids is not None:
+        fq = fq.filter(modules__id__in=allowed_module_ids)
     return list(fq.distinct().values_list('id', flat=True))
 
 
-def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None):
+def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allowed_module_ids=None):
     """Pré-charge modules, séances, inscriptions et pointages pour la période."""
     cache = {
         'formations': {},
@@ -155,6 +191,8 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None):
     mq = Q(formation_id__in=formation_ids)
     if secretariat_id:
         mq &= Q(secretariat_id=secretariat_id)
+    if allowed_module_ids is not None:
+        mq &= Q(id__in=allowed_module_ids)
 
     modules = list(Module.objects.filter(mq).order_by('formation_id', 'grade', 'groupe', 'ordre', 'intitule'))
     module_ids = []
@@ -244,11 +282,10 @@ def _aggregate_total(groupes):
 
 
 def _bloc_creneau_cached(modules, jour, creneau, categorie, multi_grade, all_sessions, cache):
+    """Tous les modules du grade — y compris effectif 0 (colonnes vides du modèle CPFAE)."""
     groupes = []
     for mod in modules:
         stats = _stats_groupe_cached(mod, jour, creneau, categorie, cache)
-        if stats['effectif'] == 0:
-            continue
         groupes.append({
             'module_id': mod.id,
             'label': _group_label(mod, multi_grade),
@@ -257,12 +294,12 @@ def _bloc_creneau_cached(modules, jour, creneau, categorie, multi_grade, all_ses
         })
     return {
         'horaire': _horaire_creneau(all_sessions, creneau),
-        'groupes': groupes,
+        'groupes': groupes[:MAX_GROUP_COLS],
         'total': _aggregate_total(groupes),
     }
 
 
-def _modules_for_tableau(formation, categorie, cache, secretariat_id=None):
+def _modules_for_tableau(formation, categorie, cache, secretariat_id=None, grade=None):
     modules = list(cache['modules_by_formation'].get(formation.id, []))
     if not modules:
         return [], False
@@ -277,18 +314,28 @@ def _modules_for_tableau(formation, categorie, cache, secretariat_id=None):
         mod_ids = {m.id for m in modules if cache['participants_by_mod'][m.id]}
         modules = [m for m in modules if m.id in mod_ids]
 
+    if grade:
+        grade_up = grade.strip().upper()
+        modules = [m for m in modules if (m.grade or '').strip().upper() == grade_up]
+
     if not modules:
         return [], False
 
-    grades = {m.grade for m in modules if m.grade}
+    grades = {m.grade for m in modules if (m.grade or '').strip()}
     return modules, len(grades) > 1
 
 
 def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=None,
-                            full_detail=True, organisme=ORGANISME_DEFAULT):
-    modules, multi_grade = _modules_for_tableau(formation, categorie, cache, secretariat_id)
+                            full_detail=True, grade=None):
+    modules, multi_grade = _modules_for_tableau(
+        formation, categorie, cache, secretariat_id, grade=grade,
+    )
     if not modules:
         return None
+
+    grade_val = (grade or '').strip() or next(
+        ((m.grade or '').strip() for m in modules if (m.grade or '').strip()), ''
+    )
 
     all_sessions = []
     for mod in modules:
@@ -299,7 +346,7 @@ def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=No
     matin = _bloc_creneau_cached(modules, jour, 'MATIN', categorie, multi_grade, all_sessions, cache)
     soir = _bloc_creneau_cached(modules, jour, 'SOIR', categorie, multi_grade, all_sessions, cache)
 
-    if not matin['groupes'] and not soir['groupes']:
+    if not modules:
         return None
 
     taux_presence_jour = round(
@@ -309,9 +356,11 @@ def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=No
         (matin['total']['taux_absence'] + soir['total']['taux_absence']) / 2, 4
     ) if (matin['total']['effectif'] or soir['total']['effectif']) else 0.0
 
+    suffix = f"-{grade_val}" if grade_val else ''
     base = {
-        'id': f"{formation.id}-{categorie}-{jour.isoformat()}",
+        'id': f"{formation.id}-{categorie}-{jour.isoformat()}{suffix}",
         'categorie': categorie,
+        'grade': grade_val,
         'formation_id': formation.id,
         'formation': str(formation),
         'date': jour.isoformat(),
@@ -320,8 +369,9 @@ def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=No
         'mois': jour.month,
         'mois_libelle': MOIS_FR[jour.month],
         'annee': jour.year,
-        'organisme': organisme,
-        'titre_ligne1': _titre_ligne1(formation),
+        'organisme': _organisme_label(categorie, grade_val),
+        'vague_sidebar': _vague_sidebar_label(modules),
+        'titre_ligne1': _titre_ligne1(formation, categorie),
         'titre': f"POINT JOURNALIER CAT {categorie} — {formation.formation} — {jour.strftime('%d/%m/%Y')}",
         'taux_presence_jour': taux_presence_jour,
         'taux_absence_jour': taux_absence_jour,
@@ -337,7 +387,7 @@ def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=No
     return base
 
 
-def compute_tableau_jour(formation, categorie, jour, secretariat_id=None, organisme=ORGANISME_DEFAULT):
+def compute_tableau_jour(formation, categorie, jour, secretariat_id=None, grade=None):
     """Construit un point journalier complet pour UNE journée (exports / détail)."""
     cache = _build_pj_cache(
         jour.year, jour.month, [formation.id], [jour], secretariat_id=secretariat_id,
@@ -346,15 +396,18 @@ def compute_tableau_jour(formation, categorie, jour, secretariat_id=None, organi
         formation = cache['formations'].get(formation) or Formation.objects.get(pk=formation)
     return _compute_tableau_cached(
         formation, categorie, jour, cache,
-        secretariat_id=secretariat_id, full_detail=True, organisme=organisme,
+        secretariat_id=secretariat_id, full_detail=True, grade=grade,
     )
 
 
-def get_tableau_detail(annee, formation_id, categorie, jour, secretariat_id=None):
+def get_tableau_detail(annee, formation_id, categorie, jour, secretariat_id=None, module_ids=None, grade=None):
     """Retourne un seul tableau complet (lazy load côté frontend)."""
     if isinstance(jour, str):
         jour = date.fromisoformat(jour)
-    cache = _build_pj_cache(annee, jour.month, [formation_id], [jour], secretariat_id=secretariat_id)
+    cache = _build_pj_cache(
+        annee, jour.month, [formation_id], [jour],
+        secretariat_id=secretariat_id, allowed_module_ids=module_ids,
+    )
     formation = cache['formations'].get(formation_id)
     if not formation:
         try:
@@ -363,7 +416,7 @@ def get_tableau_detail(annee, formation_id, categorie, jour, secretariat_id=None
             return None
     return _compute_tableau_cached(
         formation, categorie, jour, cache,
-        secretariat_id=secretariat_id, full_detail=True,
+        secretariat_id=secretariat_id, full_detail=True, grade=grade,
     )
 
 
@@ -373,6 +426,7 @@ def compute_point_journalier(
     categorie=None,
     formation_id=None,
     secretariat_id=None,
+    module_ids=None,
     jour=None,
     index_only=False,
 ):
@@ -389,10 +443,10 @@ def compute_point_journalier(
         except ValueError:
             jour = None
 
-    jours = [jour] if jour else _jours_activite(annee, mois, formation_id, secretariat_id)
-    formation_ids = _formation_ids_for_scope(annee, mois, formation_id, secretariat_id)
+    jours = [jour] if jour else _jours_activite(annee, mois, formation_id, secretariat_id, module_ids)
+    formation_ids = _formation_ids_for_scope(annee, mois, formation_id, secretariat_id, module_ids)
 
-    cache = _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=secretariat_id)
+    cache = _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=secretariat_id, allowed_module_ids=module_ids)
 
     tableaux = []
     for fid in formation_ids:
@@ -400,23 +454,35 @@ def compute_point_journalier(
         if not formation:
             continue
 
-        cats = [categorie] if categorie else _categories_pour_formation(fid, secretariat_id, cache)
+        cats = [categorie] if categorie else _categories_pour_formation(fid, secretariat_id, cache, module_ids)
         if not cats:
             cats = ['—']
 
         for cat in cats:
             for j in jours:
-                tb = _compute_tableau_cached(
-                    formation, cat, j, cache, secretariat_id=secretariat_id,
-                    full_detail=not index_only,
+                modules, multi_grade = _modules_for_tableau(
+                    formation, cat, cache, secretariat_id,
                 )
-                if tb:
-                    tableaux.append(tb)
+                if not modules:
+                    continue
+                grade_list = sorted({
+                    (m.grade or '').strip()
+                    for m in modules if (m.grade or '').strip()
+                })
+                if not grade_list or not multi_grade:
+                    grade_list = [None]
+                for gr in grade_list:
+                    tb = _compute_tableau_cached(
+                        formation, cat, j, cache, secretariat_id=secretariat_id,
+                        full_detail=not index_only, grade=gr,
+                    )
+                    if tb:
+                        tableaux.append(tb)
 
     tableaux.sort(key=lambda t: (t['date'], t['categorie'], t['formation_id']))
 
     categories_avec_donnees = sorted({t['categorie'] for t in tableaux})
-    categories = _liste_categories(formation_id, secretariat_id)
+    categories = _liste_categories(formation_id, secretariat_id, module_ids)
     formations_idx = {t['formation_id']: t['formation'] for t in tableaux}
 
     sm_q = SessionModule.objects.filter(
@@ -426,6 +492,8 @@ def compute_point_journalier(
         sm_q = sm_q.filter(module__formation_id=formation_id)
     if secretariat_id:
         sm_q = sm_q.filter(module__secretariat_id=secretariat_id)
+    if module_ids is not None:
+        sm_q = sm_q.filter(module_id__in=module_ids)
     mois_avec_donnees = sorted(set(sm_q.values_list('date_journee__month', flat=True)))
 
     return {
@@ -441,8 +509,8 @@ def compute_point_journalier(
 
 
 PJ_META_KEYS = (
-    'id', 'categorie', 'formation_id', 'formation', 'date', 'date_fr', 'jour', 'mois',
-    'mois_libelle', 'annee', 'organisme', 'titre_ligne1', 'titre',
+    'id', 'categorie', 'grade', 'formation_id', 'formation', 'date', 'date_fr', 'jour', 'mois',
+    'mois_libelle', 'annee', 'organisme', 'vague_sidebar', 'titre_ligne1', 'titre',
     'taux_presence_jour', 'taux_absence_jour', 'matin_horaire', 'soir_horaire',
 )
 
@@ -453,6 +521,7 @@ def compute_point_journalier_avec_tableaux(
     categorie=None,
     formation_id=None,
     secretariat_id=None,
+    module_ids=None,
 ):
     """Index léger + tous les tableaux complets (vue d'ensemble Point Journalier)."""
     data = compute_point_journalier(
@@ -461,6 +530,7 @@ def compute_point_journalier_avec_tableaux(
         categorie=categorie,
         formation_id=formation_id,
         secretariat_id=secretariat_id,
+        module_ids=module_ids,
         index_only=False,
     )
     tableaux_complets = []

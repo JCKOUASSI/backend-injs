@@ -227,6 +227,7 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
                 ('groupe', 'vague'),
                 ('site', 'salle'),
                 'secretariat',
+                'motif_notoire',
             ),
         }),
         ("Compte utilisateur", {

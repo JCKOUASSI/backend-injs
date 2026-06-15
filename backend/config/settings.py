@@ -12,6 +12,9 @@ load_dotenv(BASE_DIR / '.env')
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
+# Port HTTP du serveur Django en développement local (runserver / gunicorn dev)
+DEV_SERVER_PORT = os.environ.get('DJANGO_DEV_PORT', '8001')
+
 _SECRET_KEY_ENV = os.environ.get('SECRET_KEY', '')
 if not _SECRET_KEY_ENV:
     if DEBUG:
@@ -48,9 +51,9 @@ if not BADGE_BASE_URL and DEBUG:
         s.connect(('8.8.8.8', 80))
         local_ip = s.getsockname()[0]
         s.close()
-        BADGE_BASE_URL = f'http://{local_ip}:8000'
+        BADGE_BASE_URL = f'http://{local_ip}:{DEV_SERVER_PORT}'
     except Exception:
-        BADGE_BASE_URL = 'http://localhost:8000'
+        BADGE_BASE_URL = f'http://localhost:{DEV_SERVER_PORT}'
 
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
@@ -60,10 +63,10 @@ if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 if DEBUG:
     CSRF_TRUSTED_ORIGINS.extend([
-        'http://localhost:8000',
-        'http://127.0.0.1:8000',
+        f'http://localhost:{DEV_SERVER_PORT}',
+        f'http://127.0.0.1:{DEV_SERVER_PORT}',
         'http://127.0.0.1:57128',
-        f'http://{BADGE_BASE_URL.split("//")[-1]}' if BADGE_BASE_URL else 'http://192.168.100.54:8000',
+        f'http://{BADGE_BASE_URL.split("//")[-1]}' if BADGE_BASE_URL else f'http://192.168.100.54:{DEV_SERVER_PORT}',
     ])
     # Ajouter l'IP LAN auto-détectée pour que les téléphones puissent badger
     if BADGE_BASE_URL and BADGE_BASE_URL not in CSRF_TRUSTED_ORIGINS:
@@ -251,15 +254,15 @@ CORS_ALLOWED_ORIGINS = [
 if DEBUG:
     CORS_ALLOWED_ORIGINS.extend([
         'http://localhost:3000',
-        'http://localhost:8000',
+        'http://localhost:3001',
+        f'http://localhost:{DEV_SERVER_PORT}',
         'http://127.0.0.1:3000',
-        'http://127.0.0.1:8000',
-        'http://192.168.1.90:3000',
-        'http://192.168.1.90:8000',
-        'http://192.168.1.90:8001',
-        'http://192.168.100.54:3000',
-        'http://192.168.100.54:8000',
-        'http://192.168.100.54:8001',
+        'http://127.0.0.1:3001',
+        f'http://127.0.0.1:{DEV_SERVER_PORT}',
+        f'http://192.168.1.90:3000',
+        f'http://192.168.1.90:{DEV_SERVER_PORT}',
+        f'http://192.168.100.54:3000',
+        f'http://192.168.100.54:{DEV_SERVER_PORT}',
     ])
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(CORS_ALLOWED_ORIGINS))
 CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']

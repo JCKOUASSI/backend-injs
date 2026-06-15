@@ -2,6 +2,7 @@ import { useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import logo from './assets/logo.png'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { hasAppRole } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -42,7 +43,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (allowedRoles && !allowedRoles.includes(user?.role)) return <Navigate to="/" replace />
+  if (allowedRoles && !hasAppRole(user, allowedRoles)) return <Navigate to="/" replace />
   return children
 }
 
