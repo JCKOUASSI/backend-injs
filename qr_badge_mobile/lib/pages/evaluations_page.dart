@@ -66,7 +66,7 @@ class _EvaluationsPageState extends State<EvaluationsPage>
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: _questionnaires.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (_, i) => _QuestionnaireCard(
                         data: _questionnaires[i],
                         onSubmitted: _load,
@@ -295,7 +295,7 @@ class _EvaluationFormPageState extends State<_EvaluationFormPage> {
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: widget.questions.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        separatorBuilder: (_, _) => const SizedBox(height: 16),
         itemBuilder: (_, i) => _QuestionWidget(
           question: widget.questions[i],
           index: i,
@@ -494,19 +494,21 @@ class _ChoixUniqueSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: choix.map((c) {
-        final id = c['id'] as int;
-        return RadioListTile<int>(
-          value: id,
-          groupValue: selected,
-          onChanged: onChanged,
-          title: Text(c['libelle']?.toString() ?? '', style: const TextStyle(fontSize: 14)),
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          activeColor: AppColors.ciGreenDark,
-        );
-      }).toList(),
+    return RadioGroup<int>(
+      groupValue: selected,
+      onChanged: onChanged,
+      child: Column(
+        children: choix.map((c) {
+          final id = c['id'] as int;
+          return RadioListTile<int>(
+            value: id,
+            title: Text(c['libelle']?.toString() ?? '', style: const TextStyle(fontSize: 14)),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            activeColor: AppColors.ciGreenDark,
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -531,7 +533,11 @@ class _ChoixMultipleSelector extends StatelessWidget {
           value: checked,
           onChanged: (_) {
             final next = Set<int>.from(selected);
-            if (checked) next.remove(id); else next.add(id);
+            if (checked) {
+              next.remove(id);
+            } else {
+              next.add(id);
+            }
             onChanged(next);
           },
           title: Text(c['libelle']?.toString() ?? '', style: const TextStyle(fontSize: 14)),
