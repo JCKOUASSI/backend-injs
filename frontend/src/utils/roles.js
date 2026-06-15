@@ -9,6 +9,7 @@ export const ALLOWED_WEB_ROLES = [
   'SECRETARIAT',
   'FINANCE',
   'ENCADRANT',
+  'SUPERVISEUR',
 ]
 
 export const STAFF_WEB_ROLES = [
@@ -17,6 +18,15 @@ export const STAFF_WEB_ROLES = [
   'CHEF_SECRETARIAT',
   'SECRETARIAT',
   'ENCADRANT',
+]
+
+/** Module suivi-évaluation (questionnaires). */
+export const EVALUATION_ALLOWED_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+  'ENCADRANT',
+  'SUPERVISEUR',
 ]
 
 /** FINANCE n'est pas du personnel opérationnel — module finance dédié uniquement. */

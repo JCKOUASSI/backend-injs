@@ -73,7 +73,8 @@ urlpatterns = [
     path('finance/ajustements/<int:pk>/valider/', api_views.finance_ajustement_valider_api, name='api-finance-ajustement-valider'),
     path('finance/ajustements/<int:pk>/rejeter/', api_views.finance_ajustement_rejeter_api, name='api-finance-ajustement-rejeter'),
     
-    # Référentiels (listes déroulantes)
+    # Référentiels (listes déroulantes + administration)
+    path('referentiels/gestion/', api_views.referentiels_gestion_api, name='api-referentiels-gestion'),
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
 
     # Référentiels CRUD

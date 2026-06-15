@@ -41,6 +41,8 @@ export default function ModuleDetail() {
   const [selectedSup, setSelectedSup] = useState('')
   const [assignSupError, setAssignSupError] = useState('')
   const [assignSupSaving, setAssignSupSaving] = useState(false)
+  const [encadrantSearch, setEncadrantSearch] = useState('')
+  const [encadrantLoading, setEncadrantLoading] = useState(false)
 
   // Participants
   const [showAddParticipant, setShowAddParticipant] = useState(false)
@@ -60,6 +62,7 @@ export default function ModuleDetail() {
   const formateursPager = useClientPagination(formateursList, TABLE_PAGE_SIZE, [moduleId, formateursList.length])
   const participantPicker = usePickerPagination(showAddParticipant)
   const formateurPicker = usePickerPagination(showAddFormateur)
+  const encadrantPicker = usePickerPagination(showAssignSup)
 
   // Séances
   const [showNewSession, setShowNewSession] = useState(false)
@@ -392,19 +395,36 @@ export default function ModuleDetail() {
   }
 
   const loadEncadrants = async () => {
+    setEncadrantLoading(true)
     try {
-      const res = await api.get('/auth/users/?role=ENCADRANT')
+      const params = new URLSearchParams({
+        role: 'ENCADRANT',
+        page: encadrantPicker.page,
+      })
+      if (encadrantSearch) params.set('search', encadrantSearch)
+      const res = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setEncadrants(data)
-    } catch {}
+      encadrantPicker.applyResponse(res.data, data.length)
+    } catch {} finally { setEncadrantLoading(false) }
   }
 
   const openAssignSuperviseur = () => {
     setSelectedSup(module?.superviseur_id || '')
     setAssignSupError('')
-    loadEncadrants()
+    setEncadrantSearch('')
     setShowAssignSup(true)
   }
+
+  useEffect(() => {
+    if (showAssignSup) encadrantPicker.resetPage()
+  }, [encadrantSearch])
+
+  useEffect(() => {
+    if (!showAssignSup) return
+    const t = setTimeout(() => loadEncadrants(), 300)
+    return () => clearTimeout(t)
+  }, [encadrantSearch, showAssignSup, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {
     setAssignSupSaving(true)
@@ -1630,7 +1650,7 @@ export default function ModuleDetail() {
       {/* ── MODAL: ASSIGNER ENCADRANT ── */}
       {showAssignSup && (
         <div className="modal-overlay" onClick={() => setShowAssignSup(false)}>
-          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-person-gear me-2"></i>Assigner un encadrant</h5>
               <button className="btn-close" onClick={() => setShowAssignSup(false)}>&times;</button>
@@ -1639,22 +1659,76 @@ export default function ModuleDetail() {
               <p className="text-muted" style={{ fontSize: '0.88rem' }}>
                 Choisir l'encadrant superviseur pour le module « <strong>{module.intitule}</strong> ».
               </p>
-              <div className="form-group">
-                <label className="form-label">Encadrant</label>
-                <select
-                  className="form-control"
-                  value={selectedSup}
-                  onChange={e => setSelectedSup(e.target.value)}
-                >
-                  <option value="">-- Aucun (retirer l'encadrant) --</option>
-                  {encadrants.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.first_name} {u.last_name} {u.username ? `(${u.username})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
               {assignSupError && <div className="error-message">{assignSupError}</div>}
+              {module.superviseur_id && (
+                <button
+                  type="button"
+                  className={`btn btn-sm mb-3 ${!selectedSup ? 'btn-warning' : 'btn-outline-secondary'}`}
+                  onClick={() => setSelectedSup('')}
+                >
+                  <i className="bi bi-person-x me-1"></i>Retirer l'encadrant
+                </button>
+              )}
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Rechercher par nom, identifiant, matricule…"
+                  value={encadrantSearch}
+                  onChange={e => setEncadrantSearch(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              {encadrantLoading && (
+                <div className="text-center text-muted py-2">
+                  <div className="spinner" style={{ width: 20, height: 20 }}></div>
+                </div>
+              )}
+              {!encadrantLoading && encadrants.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun encadrant trouvé</p>
+              )}
+              {!encadrantLoading && encadrants.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Identifiant</th>
+                        <th>Matricule</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {encadrants.map(u => {
+                        const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
+                        const isSelected = String(selectedSup) === String(u.id)
+                        return (
+                          <tr
+                            key={u.id}
+                            onClick={() => setSelectedSup(String(u.id))}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                          >
+                            <td>{fullName}</td>
+                            <td>{u.username}</td>
+                            <td>{u.matricule || '—'}</td>
+                            <td>
+                              {isSelected && <i className="bi bi-check-circle-fill text-success"></i>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Pagination
+                page={encadrantPicker.page}
+                totalPages={encadrantPicker.totalPages}
+                onPageChange={encadrantPicker.setPage}
+                totalItems={encadrantPicker.totalCount}
+                pageSize={encadrantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAssignSup(false)}>Annuler</button>

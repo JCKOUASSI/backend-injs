@@ -2712,6 +2712,23 @@ def _serialize_site(obj):
     }
 
 
+def _referentiels_gestion_payload():
+    """Données complètes des tables référentielles (actifs et inactifs)."""
+    return {
+        'formations': list(RefFormation.objects.values('id', 'intitule', 'actif')),
+        'modules': list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif')),
+        'categories': list(RefCategorie.objects.values('id', 'libelle', 'actif')),
+        'grades': list(RefGrade.objects.values('id', 'libelle', 'categorie_id', 'actif')),
+        'vagues': list(
+            RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')
+        ),
+        'sites': [_serialize_site(s) for s in RefSite.objects.all()],
+        'batiments': list(RefBatiment.objects.values('id', 'nom', 'site_id', 'actif')),
+        'salles': list(RefSalle.objects.values('id', 'nom', 'site_id', 'batiment_id', 'actif')),
+        'types_secretariat': list(RefTypeSecretariat.objects.values('id', 'libelle', 'actif')),
+    }
+
+
 def _coerce_decimal(value):
     if value in (None, ''):
         return None
@@ -3496,6 +3513,13 @@ def module_assign_superviseur(request, formation_pk, module_pk):
         'superviseur_id': superviseur.id if superviseur else None,
         'superviseur_nom': superviseur.get_full_name() if superviseur else None,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsDFRC])
+def referentiels_gestion_api(request):
+    """Retourne l'ensemble des tables référentielles pour la page d'administration."""
+    return Response(_referentiels_gestion_payload())
 
 
 @api_view(['GET'])

@@ -22,6 +22,7 @@ class User(AbstractUser):
         SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
         FINANCE = 'FINANCE', 'Finance'
         ENCADRANT = 'ENCADRANT', 'Encadrant'
+        SUPERVISEUR = 'SUPERVISEUR', 'Superviseur'
         FORMATEUR = 'FORMATEUR', 'Formateur'
         AUDITEUR = 'AUDITEUR', 'Auditeur'
 
@@ -85,6 +86,10 @@ class User(AbstractUser):
     @property
     def is_encadrant(self):
         return self.role == self.Role.ENCADRANT
+
+    @property
+    def is_superviseur(self):
+        return self.role == self.Role.SUPERVISEUR
 
     @property
     def is_formateur(self):

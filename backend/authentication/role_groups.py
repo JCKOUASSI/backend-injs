@@ -26,6 +26,7 @@ ALLOWED_WEB_ROLES = frozenset({
     User.Role.SECRETARIAT,
     User.Role.FINANCE,
     User.Role.ENCADRANT,
+    User.Role.SUPERVISEUR,
 })
 
 # Personnel web hors module Finance (badgeage, formations, modules, dashboard opérationnel).
@@ -88,6 +89,7 @@ USER_MANAGEABLE_ROLES = frozenset({
     *SECRETARIAT_ROLES,
     User.Role.FINANCE,
     User.Role.ENCADRANT,
+    User.Role.SUPERVISEUR,
     *MOBILE_ONLY_ROLES,
 })
 
@@ -132,6 +134,7 @@ ROLE_HIERARCHY = [
     User.Role.SECRETARIAT,
     User.Role.FINANCE,
     User.Role.ENCADRANT,
+    User.Role.SUPERVISEUR,
     User.Role.FORMATEUR,
     User.Role.AUDITEUR,
 ]
@@ -147,6 +150,7 @@ ROLE_GROUP_NAMES = {
     User.Role.SECRETARIAT: "ROLE_SECRETARIAT",
     User.Role.FINANCE: "ROLE_FINANCE",
     User.Role.ENCADRANT: "ROLE_ENCADRANT",
+    User.Role.SUPERVISEUR: "ROLE_SUPERVISEUR",
     User.Role.FORMATEUR: "ROLE_FORMATEUR",
     User.Role.AUDITEUR: "ROLE_AUDITEUR",
 }
@@ -189,6 +193,10 @@ ROLE_POLICY = {
     User.Role.ENCADRANT: {
         "apps": ("formations", "presences"),
         "actions": ("view", "change"),
+    },
+    User.Role.SUPERVISEUR: {
+        "apps": ("suiviEvaluation",),
+        "actions": ("view", "add", "change", "delete"),
     },
     User.Role.FORMATEUR: {
         "apps": ("formations", "presences"),

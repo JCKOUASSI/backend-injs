@@ -134,12 +134,18 @@ export default function Referentiels() {
   const loadAll = async () => {
     setLoading(true)
     try {
-      const results = await Promise.all(Object.entries(URL_MAP).map(([k, url]) =>
-        api.get(url).then(r => [k, r.data])
-      ))
-      const next = {}
-      results.forEach(([k, v]) => { next[k] = v })
-      setData(next)
+      const res = await api.get('/formations/referentiels/gestion/')
+      setData({
+        formations: res.data.formations || [],
+        modules: res.data.modules || [],
+        categories: res.data.categories || [],
+        grades: res.data.grades || [],
+        vagues: res.data.vagues || [],
+        sites: res.data.sites || [],
+        batiments: res.data.batiments || [],
+        salles: res.data.salles || [],
+        types_secretariat: res.data.types_secretariat || [],
+      })
     } catch { showToast('Erreur de chargement', 'error') }
     finally { setLoading(false) }
   }
