@@ -83,8 +83,13 @@
   border-color: #fff;
 }
 
-/* Filtre période */
+/* Filtre période (utilisé hors .finance-page : Statistiques, Dashboard) */
 .finance-filter-panel {
+  --fin-green: #1b5e20;
+  --fin-green-soft: #e8f5e9;
+  --fin-blue-soft: #e3f2fd;
+  --fin-radius: 14px;
+  --fin-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
   background: #fff;
   border-radius: var(--fin-radius);
   border: 1px solid var(--border-color);
@@ -112,13 +117,13 @@
   transition: all 0.15s;
 }
 .finance-preset-pill:hover {
-  border-color: var(--ci-green);
-  color: var(--fin-green);
-  background: var(--fin-green-soft);
+  border-color: var(--ci-green, #1b5e20);
+  color: var(--fin-green, #1b5e20);
+  background: var(--fin-green-soft, #e8f5e9);
 }
 .finance-preset-pill.active {
-  background: var(--fin-green);
-  border-color: var(--fin-green);
+  background: var(--fin-green, #1b5e20);
+  border-color: var(--fin-green, #1b5e20);
   color: #fff;
 }
 .finance-filter-fields {
@@ -646,8 +651,8 @@
 }
 .finance-trimestre-pill:hover,
 .finance-trimestre-pill.active {
-  background: var(--fin-green);
-  border-color: var(--fin-green);
+  background: var(--fin-green, #1b5e20);
+  border-color: var(--fin-green, #1b5e20);
   color: #fff;
 }
 

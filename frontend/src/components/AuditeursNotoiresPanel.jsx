@@ -1,5 +1,5 @@
 /**
- * Auditeurs notoires — inscrits sans aucun pointage (jamais badgés).
+ * Auditeurs notoires — inscrits sans pointage ou avec motif_notoire (définition CPFAE unifiée).
  * Données API : { total, inscrits, pct, liste[] }
  */
 

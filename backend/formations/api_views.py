@@ -3091,6 +3091,25 @@ def referentiels_api(request):
     })
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def referentiels_gestion_api(request):
+    """Toutes les tables référentielles (actifs + inactifs) — page admin Référentiels."""
+    return Response({
+        'formations': list(RefFormation.objects.order_by('intitule').values('id', 'intitule', 'actif')),
+        'modules': list(RefModule.objects.order_by('intitule').values('id', 'intitule', 'volume_horaire', 'actif')),
+        'categories': list(RefCategorie.objects.order_by('libelle').values('id', 'libelle', 'actif')),
+        'grades': list(RefGrade.objects.order_by('libelle').values('id', 'libelle', 'categorie_id', 'actif')),
+        'vagues': list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')),
+        'sites': list(RefSite.objects.order_by('nom').values(
+            'id', 'nom', 'actif', 'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
+        )),
+        'batiments': list(RefBatiment.objects.order_by('nom').values('id', 'nom', 'site_id', 'actif')),
+        'salles': list(RefSalle.objects.order_by('nom').values('id', 'nom', 'site_id', 'batiment_id', 'actif')),
+        'types_secretariat': list(RefTypeSecretariat.objects.order_by('libelle').values('id', 'libelle', 'actif')),
+    })
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def refvague_list_api(request):

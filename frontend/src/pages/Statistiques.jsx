@@ -47,7 +47,7 @@ const TAUX_PEDAGOGIE = {
   },
   evenements: {
     label: 'Événements absence / suspect',
-    help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits.',
+    help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits (événements, pas auditeurs notoires).',
     color: '#F57C00',
     getValue: (ped) => ped?.taux_abandon ?? 0,
   },
@@ -56,6 +56,21 @@ const KPI_VH_EXEC = {
   label: 'Avancement VH (sessions clôturées)',
   help: 'Heures réalisées ÷ heures prévues, sur les séances clôturées du périmètre filtré.',
 }
+
+const KPI_SESSIONS_COMPT = {
+  label: 'Séances comptabilisées',
+  help: 'Séances dont la date est atteinte (EDT importé), alignées avec le point journalier et l\'assiduité.',
+}
+
+/** Définition métier unifiée (dashboard, bilans, FAC, alertes). */
+const AUDITEURS_NOTOIRES = {
+  label: 'Auditeurs notoires',
+  cardTitle: 'Auditeurs notoires',
+  help: 'Inscrits sans aucun pointage, ou avec motif notoire renseigné sur le profil auditeur.',
+}
+
+/** Onglets où le filtre période (VH + séances comptabilisées) s\'applique. */
+const VH_PERIOD_TABS = new Set(['overview', 'pedagogy', 'admin', 'history', 'alertes'])
 
 /** Sections API chargées par onglet (évite le calcul de tout le dashboard d'un coup). */
 const TAB_SECTIONS = {
@@ -91,9 +106,22 @@ const RB_PERIODES = [
 
 const RB_DIMENSIONS = [
   { id: 'module', label: 'Par Module', icon: 'bi-book' },
+  { id: 'matiere', label: 'Par Matière', icon: 'bi-journals' },
   { id: 'categorie', label: 'Par Catégorie', icon: 'bi-tag' },
   { id: 'formation', label: 'Par Formation', icon: 'bi-journal-bookmark' },
 ]
+
+function rbMatiereOptionValue(m) {
+  if (m.ref_module_id) return `r:${m.ref_module_id}`
+  return `i:${m.intitule}`
+}
+
+function rbParseMatiereKey(key) {
+  if (!key) return {}
+  if (key.startsWith('r:')) return { ref_module_id: Number(key.slice(2)) }
+  if (key.startsWith('i:')) return { matiere_intitule: key.slice(2) }
+  return {}
+}
 
 // ── Utilitaires graphiques (SVG natif) ───────────────────────────────────────
 function Empty({ label = 'Aucune donnée' }) {
@@ -734,7 +762,7 @@ function AlertesEnsemblePanel(props) {
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+          <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
             <AuditeursNotoiresPanel data={auditeursNotoires} maxHeight={280} compact/>
           </Card>
         </div>
@@ -1012,14 +1040,14 @@ function PedagogieTauxPrincipaux({ ped, auditeursNotoires }) {
           value={an.total ?? 0}
           color="#C62828"
           sub={`${Number(an.pct || 0).toFixed(1).replace('.', ',')}% des inscrits`}
-          help="Inscrits sans aucun pointage (jamais badgés)."
+          help="Inscrits sans aucun pointage ou avec motif notoire renseigné."
         />
       )}
     </div>
   )
 }
 
-function PedagogieTauxGrille({ ped, withBars = false }) {
+function PedagogieTauxGrille({ ped, withBars = false, grid = false }) {
   const items = [
     TAUX_PEDAGOGIE.assiduite,
     TAUX_PEDAGOGIE.absence,
@@ -1027,7 +1055,14 @@ function PedagogieTauxGrille({ ped, withBars = false }) {
     TAUX_PEDAGOGIE.couverture,
   ]
   return (
-    <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', justifyContent: 'center', padding: withBars ? '0.5rem 0' : 0 }}>
+    <div style={{
+      display: grid ? 'grid' : 'flex',
+      gridTemplateColumns: grid ? 'repeat(2, minmax(0, 1fr))' : undefined,
+      gap: grid ? '0.75rem' : '1.25rem',
+      flexWrap: grid ? undefined : 'wrap',
+      justifyContent: grid ? 'stretch' : 'center',
+      padding: withBars || grid ? '0.5rem 0' : 0,
+    }}>
       {items.map((t) => (
         <div key={t.label} style={{ textAlign: 'center', minWidth: withBars ? 100 : 80 }} title={t.help}>
           <div style={{ fontSize: withBars ? '2rem' : '1.6rem', fontWeight: 800, color: t.color }}>{t.getValue(ped)}%</div>
@@ -1121,6 +1156,7 @@ export default function Statistiques() {
   const [rbMois, setRbMois] = useState('')
   const [rbCategorie, setRbCategorie] = useState('')
   const [rbModuleId, setRbModuleId] = useState('')
+  const [rbMatiereKey, setRbMatiereKey] = useState('')
   const [rbFormationId, setRbFormationId] = useState('')
   const [rbPeriode, setRbPeriode] = useState('')
   const [rbCalendrier, setRbCalendrier] = useState('')
@@ -1259,13 +1295,14 @@ export default function Statistiques() {
     setPjAllTableaux([])
     setPjError(null)
     try {
-      const params = new URLSearchParams({ annee: String(pjAnnee) })
+      const params = new URLSearchParams({ annee: String(pjAnnee), tous_tableaux: '1' })
       if (pjMois) params.set('mois', pjMois)
       if (pjCategorie) params.set('categorie', pjCategorie)
       if (pjFormationId) params.set('formation_id', pjFormationId)
       if (secretariatId) params.set('secretariat_id', secretariatId)
       const res = await api.get(`/statistiques/point-journalier/?${params}`)
       setPjData(res.data)
+      setPjAllTableaux(res.data.tableaux_complets || [])
       setPjSelection(prev => {
         if (!res.data.tableaux?.length) return null
         if (prev !== null && prev < res.data.tableaux.length) return prev
@@ -1283,6 +1320,7 @@ export default function Statistiques() {
   }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId])
 
   const fetchPjAllTableaux = useCallback(async () => {
+    if (pjAllTableaux.length) return
     if (!pjData?.tableaux?.length) return
     setLoadingPjAll(true)
     try {
@@ -1293,12 +1331,13 @@ export default function Statistiques() {
       if (secretariatId) params.set('secretariat_id', secretariatId)
       const res = await api.get(`/statistiques/point-journalier/?${params}`)
       setPjAllTableaux(res.data.tableaux_complets || [])
-    } catch {
+    } catch (err) {
+      console.error('Chargement tableaux point journalier:', err)
       setPjAllTableaux([])
     } finally {
       setLoadingPjAll(false)
     }
-  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, pjData])
+  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, pjData, pjAllTableaux.length])
 
   const fetchPjDetail = useCallback(async (tb) => {
     if (!tb) {
@@ -1362,7 +1401,12 @@ export default function Statistiques() {
       })
       if (rbMois) params.set('mois', rbMois)
       if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbModuleId) params.set('module_id', rbModuleId)
+      if (rbDimension === 'matiere') {
+        const mk = rbParseMatiereKey(rbMatiereKey)
+        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
+      } else if (rbModuleId) {
+        params.set('module_id', rbModuleId)
+      }
       if (effFormation) params.set('formation_id', effFormation)
       if (secretariatId) params.set('secretariat_id', secretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
@@ -1381,7 +1425,7 @@ export default function Statistiques() {
     } finally {
       setLoadingRb(false)
     }
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId])
+  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId])
 
   const fetchRbAllTableaux = useCallback(async () => {
     if (!rbData?.bilans?.length) return
@@ -1395,7 +1439,12 @@ export default function Statistiques() {
       })
       if (rbMois) params.set('mois', rbMois)
       if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbModuleId) params.set('module_id', rbModuleId)
+      if (rbDimension === 'matiere') {
+        const mk = rbParseMatiereKey(rbMatiereKey)
+        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
+      } else if (rbModuleId) {
+        params.set('module_id', rbModuleId)
+      }
       if (effFormation) params.set('formation_id', effFormation)
       if (secretariatId) params.set('secretariat_id', secretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
@@ -1407,7 +1456,7 @@ export default function Statistiques() {
     } finally {
       setLoadingRbAll(false)
     }
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, rbData])
+  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, rbData])
 
   const fetchBilanFac = useCallback(async () => {
     const effFormation = facFormationId || formationId
@@ -1443,7 +1492,11 @@ export default function Statistiques() {
       setRbDetail(null)
       return
     }
-    if (!['module', 'formation', 'categorie'].includes(bilan.dimension)) {
+    if (bilan.dimension === 'matiere' && !bilan.formation_id) {
+      setRbDetail(null)
+      return
+    }
+    if (!['module', 'matiere', 'formation', 'categorie'].includes(bilan.dimension)) {
       setRbDetail(null)
       return
     }
@@ -1458,6 +1511,10 @@ export default function Statistiques() {
       if (bilan.module_id) params.set('module_id', String(bilan.module_id))
       if (bilan.formation_id) params.set('formation_id', String(bilan.formation_id))
       else if (effFormation) params.set('formation_id', effFormation)
+      if (bilan.dimension === 'matiere') {
+        if (bilan.ref_module_id) params.set('ref_module_id', String(bilan.ref_module_id))
+        if (bilan.matiere_intitule) params.set('matiere_intitule', bilan.matiere_intitule)
+      }
       if (rbMois) params.set('mois', rbMois)
       const cat = (bilan.categorie && bilan.categorie !== '—') ? bilan.categorie : rbCategorie
       if (cat) params.set('categorie', cat)
@@ -1480,7 +1537,12 @@ export default function Statistiques() {
       const params = new URLSearchParams({ export: format, annee: String(rbAnnee), dimension: rbDimension })
       if (rbMois) params.set('mois', rbMois)
       if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbModuleId) params.set('module_id', rbModuleId)
+      if (rbDimension === 'matiere') {
+        const mk = rbParseMatiereKey(rbMatiereKey)
+        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
+      } else if (rbModuleId) {
+        params.set('module_id', rbModuleId)
+      }
       if (effFormation) params.set('formation_id', effFormation)
       if (secretariatId) params.set('secretariat_id', secretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
@@ -1488,6 +1550,8 @@ export default function Statistiques() {
       const bilan = rbSelection !== null && rbData?.bilans?.[rbSelection] ? rbData.bilans[rbSelection] : null
       if (bilan?.module_id) params.set('module_id', String(bilan.module_id))
       if (bilan?.formation_id) params.set('formation_id', String(bilan.formation_id))
+      if (bilan?.ref_module_id) params.set('ref_module_id', String(bilan.ref_module_id))
+      if (bilan?.matiere_intitule) params.set('matiere_intitule', bilan.matiere_intitule)
       if (bilan?.categorie && bilan.categorie !== '—') params.set('categorie', bilan.categorie)
       const { blob, fileName } = await api.getBlob(`/statistiques/bilans-export/?${params}`)
       const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
@@ -1577,7 +1641,7 @@ export default function Statistiques() {
   useEffect(() => {
     if (onglet !== 'rapports') return
     fetchBilans()
-  }, [onglet, rbAnnee, rbMois, rbCategorie, rbModuleId, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, fetchBilans])
+  }, [onglet, rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, fetchBilans])
 
   useEffect(() => {
     if (onglet !== 'rapports' || rbSelection === null || !rbData?.bilans?.length) return
@@ -1733,9 +1797,10 @@ export default function Statistiques() {
         </div>
       </div>
 
+      {VH_PERIOD_TABS.has(onglet) && (
       <div className="finance-filter-panel" style={{ marginBottom: '1rem' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
-          PÉRIODE — VOLUME HORAIRE
+          PÉRIODE — VOLUME HORAIRE & SÉANCES COMPTABILISÉES
         </div>
         <div className="finance-filter-panel-inner">
           <FinancePeriodFilter
@@ -1758,6 +1823,7 @@ export default function Statistiques() {
           </div>
         )}
       </div>
+      )}
 
       {error && data && (
         <div style={{background:'#fff3f3',border:'1px solid #fca5a5',borderRadius:8,padding:'0.65rem 0.85rem',color:'#C62828',fontSize:'0.82rem',marginBottom:'0.75rem'}}>
@@ -2015,11 +2081,12 @@ export default function Statistiques() {
             <Kpi icon="bi-diagram-3"    label="Groupes actifs"       value={adm.nb_groupes}            color="#1565C0"/>
             <Kpi icon="bi-person-badge" label="Encadrants"           value={adm.nb_encadrants}          color="#7B1FA2"/>
             <Kpi icon="bi-x-square"     label="Séances annulées"     value={adm.nb_seances_annulees}    color="#C62828"/>
-            <Kpi icon="bi-exclamation"  label="Pointages abs. notoires" value={adm.nb_absences_notoires}   color="#F57C00"
-              help="Nombre de pointages « absent non badgé » (distinct des auditeurs jamais badgés)."/>
-            <Kpi icon="bi-person-x-fill" label="Auditeurs notoires" value={auditeursNotoires?.total ?? 0} color="#C62828"
+            <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={adm.nb_seances_terminees} color="#00695C"
+              help={KPI_SESSIONS_COMPT.help}/>
+            <Kpi icon="bi-person-x-fill" label={AUDITEURS_NOTOIRES.label}
+              value={auditeursNotoires?.total ?? adm.nb_absences_notoires ?? 0} color="#C62828"
               sub={auditeursNotoires ? `${Number(auditeursNotoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}
-              help="Inscrits sans aucun pointage enregistré."/>
+              help={AUDITEURS_NOTOIRES.help}/>
             <Kpi icon="bi-people-fill"  label="Moy. auditeurs/groupe" value={adm.moy_auditeurs_groupe}  color="#00838F"/>
             <Kpi icon="bi-percent"      label="% Hommes"             value={`${adm.ratio_hf?.pct_hommes??0}%`} color="#1565C0"/>
             <Kpi icon="bi-percent"      label="% Femmes"             value={`${adm.ratio_hf?.pct_femmes??0}%`} color="#AD1457"/>
@@ -2051,7 +2118,7 @@ export default function Statistiques() {
           </div>
 
           <div style={{ marginTop: '1rem' }}>
-            <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+            <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
               <AuditeursNotoiresPanel data={auditeursNotoires} maxHeight={420}/>
             </Card>
           </div>
@@ -2280,15 +2347,29 @@ export default function Statistiques() {
               <option key={c} value={c}>Cat. {c}</option>
             ))}
           </select>
-          <select className="form-select form-select-sm" style={{minWidth:160,maxWidth:220}}
-            value={rbModuleId} onChange={e=>{ setRbModuleId(e.target.value); setRbSelection(null) }}>
-            <option value="">Tous modules</option>
-            {(rbData?.modules||[]).map(m=>(
-              <option key={m.id} value={m.id}>{m.intitule}</option>
-            ))}
-          </select>
+          {rbDimension === 'matiere' ? (
+            <select className="form-select form-select-sm" style={{minWidth:160,maxWidth:220}}
+              value={rbMatiereKey} onChange={e=>{ setRbMatiereKey(e.target.value); setRbSelection(null) }}>
+              <option value="">Toutes matières</option>
+              {(rbData?.matieres||[])
+                .filter(m => !rbFormationId || String(m.formation_id) === rbFormationId)
+                .map(m => (
+                  <option key={rbMatiereOptionValue(m)} value={rbMatiereOptionValue(m)}>
+                    {m.intitule}
+                  </option>
+                ))}
+            </select>
+          ) : (
+            <select className="form-select form-select-sm" style={{minWidth:160,maxWidth:220}}
+              value={rbModuleId} onChange={e=>{ setRbModuleId(e.target.value); setRbSelection(null) }}>
+              <option value="">Tous modules</option>
+              {(rbData?.modules||[]).map(m=>(
+                <option key={m.id} value={m.id}>{m.intitule}</option>
+              ))}
+            </select>
+          )}
           <select className="form-select form-select-sm" style={{minWidth:180,maxWidth:260}}
-            value={rbFormationId} onChange={e=>{ setRbFormationId(e.target.value); setRbModuleId(''); setRbSelection(null) }}>
+            value={rbFormationId} onChange={e=>{ setRbFormationId(e.target.value); setRbModuleId(''); setRbMatiereKey(''); setRbSelection(null) }}>
             <option value="">Toutes formations</option>
             {(rbData?.formations||formations_liste||[]).map(f=>(
               <option key={f.id} value={f.id}>{f.formation}</option>
@@ -2340,7 +2421,12 @@ export default function Statistiques() {
             <button
               key={d.id}
               type="button"
-              onClick={()=>{ setRbDimension(d.id); setRbSelection(null) }}
+              onClick={()=>{
+                setRbDimension(d.id)
+                setRbModuleId('')
+                setRbMatiereKey('')
+                setRbSelection(null)
+              }}
               style={{
                 display:'inline-flex', alignItems:'center', gap:'0.35rem',
                 padding:'0.45rem 0.85rem', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontWeight:600,
@@ -2407,14 +2493,25 @@ export default function Statistiques() {
                         MOD
                       </span>
                     )}
+                    {b.dimension==='matiere' && (
+                      <span style={{background:'#0D948818',color:'#0D9488',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
+                        MAT
+                      </span>
+                    )}
                     {b.libelle}
                   </div>
                   <div style={{color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                     {b.sous_titre}
                   </div>
+                  {b.dimension === 'module' && (b.grade || b.groupe) && (
+                    <div style={{color:'#94a3b8', fontSize:'0.7rem', marginTop:'0.05rem'}}>
+                      {b.grade ? `Grade ${b.grade}` : ''}{b.grade && b.groupe ? ' · ' : ''}{b.groupe || ''}
+                    </div>
+                  )}
                   {b.inscrits != null && (
                     <div style={{color:'#94a3b8', fontSize:'0.72rem', marginTop:'0.1rem'}}>
                       {b.inscrits} inscrit{b.inscrits > 1 ? 's' : ''}
+                      {b.nb_groupes != null ? ` · ${b.nb_groupes} groupe${b.nb_groupes > 1 ? 's' : ''}` : ''}
                       {b.nb_pointages != null ? ` · ${b.nb_pointages} pointages` : ''}
                     </div>
                   )}
@@ -2476,9 +2573,9 @@ export default function Statistiques() {
             <span style={{
               background:'#ED7D31', color:'#fff', borderRadius:6,
               padding:'0.2rem 0.55rem', fontSize:'0.72rem', fontWeight:800, letterSpacing:1,
-            }}>BILAN FAC</span>
+            }}>BILAN</span>
             <span style={{fontWeight:700, fontSize:'0.9rem', color:'#1e293b'}}>
-              Bilan Formation en Accompagnement de Carrières
+              Bilan formation
             </span>
             <span style={{marginLeft:'auto', color:'#94a3b8', fontSize:'0.78rem'}}>
               Point global · VH par groupe · Absents notoires
@@ -2717,7 +2814,7 @@ export default function Statistiques() {
               </div>
 
               {pjSelection === null ? (
-                loadingPjAll ? (
+                loadingPjAll && !pjAllTableaux.length ? (
                   <TabSpinner label="Chargement de tous les tableaux…"/>
                 ) : (
                 <PointJournalierEnsemblePanel
@@ -2743,7 +2840,11 @@ export default function Statistiques() {
                     </button>
                     <PointJournalierTableauCPFAE tb={pjDetail} />
                   </div>
-                ) : null
+                ) : (
+                  <div style={{ background: '#fff', borderRadius: 10, padding: '1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', color: '#64748b', fontSize: '0.85rem' }}>
+                    Impossible de charger le détail de ce tableau. Réessayez ou actualisez la liste.
+                  </div>
+                )
               )}
             </div>
           )}
@@ -3178,8 +3279,42 @@ const FAC_TD_RED = { ...FAC_TD, background: '#FCE4D6' }
 const FAC_TD_TEXT = { ...FAC_TD, textAlign: 'left', fontWeight: 500, fontSize: '0.7rem' }
 
 function BilanFACPointGlobalTable({ data }) {
-  const lignes = data?.lignes || []
+  const lignesRaw = data?.lignes || []
   const totaux = data?.totaux || {}
+
+  // Agréger les lignes par grade (évite les doublons)
+  const lignesMap = new Map()
+  for (const l of lignesRaw) {
+    const grade = l.grade?.trim()
+    if (!grade) continue
+    if (!lignesMap.has(grade)) {
+      lignesMap.set(grade, { ...l, grade })
+    } else {
+      const existing = lignesMap.get(grade)
+      // Sommer les valeurs numériques
+      const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes', 'effectif_auditeurs',
+        'absents_notoires', 'groupes_termines', 'vh_total', 'vh_epuise']
+      for (const k of sumKeys) {
+        existing[k] = (existing[k] || 0) + (l[k] || 0)
+      }
+      // Moyenne pondérée pour les taux
+      const n1 = existing.effectif_auditeurs || 0
+      const n2 = l.effectif_auditeurs || 0
+      const total = n1 + n2
+      if (total > 0) {
+        const w1 = n1 / total
+        const w2 = n2 / total
+        existing.taux_participation = (existing.taux_participation || 0) * w1 + (l.taux_participation || 0) * w2
+        existing.taux_absents_notoires = (existing.taux_absents_notoires || 0) * w1 + (l.taux_absents_notoires || 0) * w2
+        existing.taux_presence_cours = (existing.taux_presence_cours || 0) * w1 + (l.taux_presence_cours || 0) * w2
+        existing.taux_absence_cours = (existing.taux_absence_cours || 0) * w1 + (l.taux_absence_cours || 0) * w2
+        existing.taux_exec_vh = (existing.taux_exec_vh || 0) * w1 + (l.taux_exec_vh || 0) * w2
+      }
+      // Fusionner les justificatifs
+      existing.justificatifs = [...new Set([...(existing.justificatifs || []), ...(l.justificatifs || [])])]
+    }
+  }
+  const lignes = Array.from(lignesMap.values()).sort((a, b) => a.grade.localeCompare(b.grade))
 
   const pctStr = (n) => {
     if (n == null) return '—'
@@ -3277,7 +3412,24 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
   return (
     <div>
       {vhParGrade.map(gradeBlock => {
-        const groupes = gradeBlock.groupes || []
+        // Agréger les groupes identiques (sommer les VH)
+        const groupesRaw = gradeBlock.groupes || []
+        const groupesMap = new Map()
+        for (const g of groupesRaw) {
+          const grpName = (g.groupe || '').trim()
+          if (!grpName) continue
+          if (!groupesMap.has(grpName)) {
+            groupesMap.set(grpName, { ...g, groupe: grpName })
+          } else {
+            const existing = groupesMap.get(grpName)
+            existing.vh_prevu = (existing.vh_prevu || 0) + (g.vh_prevu || 0)
+            existing.vh_epuise = (existing.vh_epuise || 0) + (g.vh_epuise || 0)
+            existing.vh_restant = (existing.vh_restant || 0) + (g.vh_restant || 0)
+          }
+        }
+        const groupes = Array.from(groupesMap.values()).sort((a, b) =>
+          a.groupe.localeCompare(b.groupe, undefined, { numeric: true })
+        )
         const recap = gradeBlock.recap || {}
         return (
           <div key={gradeBlock.grade} style={{ marginBottom: '2rem' }}>
@@ -3472,6 +3624,7 @@ function BilanFACModulesTable({ modules }) {
                     <th style={{ ...FAC_TH, textAlign: 'left', minWidth: 200 }}>MODULE</th>
                     <th style={FAC_TH}>GROUPE</th>
                     <th style={FAC_TH}>VH PRÉVU (h)</th>
+                    <th style={FAC_TH}>VH RESTANT (h)</th>
                     <th style={FAC_TH}>DATE DÉBUT</th>
                     <th style={FAC_TH}>DATE FIN</th>
                     <th style={FAC_TH}>STATUT</th>
@@ -3485,6 +3638,7 @@ function BilanFACModulesTable({ modules }) {
                         <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 600, fontSize: '0.7rem' }}>{m.intitule}</td>
                         <td style={FAC_TD}>{m.groupe || '—'}</td>
                         <td style={FAC_TD}>{m.vh_prevu ? fmtVH(m.vh_prevu) : '—'}</td>
+                        <td style={FAC_TD}>{m.vh_restant ? fmtVH(m.vh_restant) : '—'}</td>
                         <td style={FAC_TD}>{m.date_debut || '—'}</td>
                         <td style={FAC_TD}>{m.date_fin || '—'}</td>
                         <td style={{ ...FAC_TD, background: st.bg, color: st.color }}>
@@ -3679,36 +3833,45 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
           <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047"/>
           <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
-          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
+          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"
+            help="Toutes les séances planifiées du périmètre (y compris futures)."/>
+          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
+            help={KPI_SESSIONS_COMPT.help}/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
             color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
             help={KPI_VH_EXEC.help}/>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
-          <div onClick={onSelectSection ? () => onSelectSection('pedagogie') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
-            <Card title="Indicateurs pédagogiques" icon="bi-pie-chart">
-              <PedagogieTauxPrincipaux ped={pedagogiques} auditeursNotoires={auditeursNotoires}/>
-              <PedagogieTauxGrille ped={pedagogiques}/>
-            </Card>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem', alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div onClick={onSelectSection ? () => onSelectSection('pedagogie') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
+              <Card title="Indicateurs pédagogiques" icon="bi-pie-chart">
+                <PedagogieTauxPrincipaux ped={pedagogiques} auditeursNotoires={auditeursNotoires}/>
+              </Card>
+            </div>
+            <div onClick={onSelectSection ? () => onSelectSection('operationnel') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
+              <Card title="Charge des formateurs (top 8)" icon="bi-trophy">
+                <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
+              </Card>
+            </div>
           </div>
 
           <div onClick={onSelectSection ? () => onSelectSection('operationnel') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
             <Card title="Répartition Hommes / Femmes" icon="bi-gender-ambiguous">
               <Donut data={adm.participants_par_sexe} labelKey="sexe" valueKey="total"/>
-            </Card>
-          </div>
-
-          <div onClick={onSelectSection ? () => onSelectSection('operationnel') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
-            <Card title="Charge des formateurs (top 8)" icon="bi-trophy">
-              <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginBottom: '0.65rem', textAlign: 'center' }}>
+                  Taux pédagogiques
+                </p>
+                <PedagogieTauxGrille ped={pedagogiques} grid/>
+              </div>
             </Card>
           </div>
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+          <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
             <AuditeursNotoiresPanel data={auditeursNotoires}/>
           </Card>
         </div>
@@ -3771,7 +3934,10 @@ function VueOverviewDetailPanel({
           <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047"/>
           <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
           <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
-          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"/>
+          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"
+            help="Toutes les séances planifiées du périmètre (y compris futures)."/>
+          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
+            help={KPI_SESSIONS_COMPT.help}/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
             color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
@@ -3800,7 +3966,7 @@ function VueOverviewDetailPanel({
         <Card title="Indicateurs pédagogiques" icon="bi-pie-chart">
           <PedagogieTauxGrille ped={ped} withBars/>
         </Card>
-        <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+        <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
           <AuditeursNotoiresPanel data={auditeursNotoires} maxHeight={360}/>
         </Card>
         {onGoPedagogie && (
@@ -3824,7 +3990,7 @@ function VueOverviewDetailPanel({
             <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
           </Card>
         </div>
-        <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+        <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
           <AuditeursNotoiresPanel data={auditeursNotoires} maxHeight={480}/>
         </Card>
         {onGoAdmin && (
@@ -4012,7 +4178,7 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+          <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
             <AuditeursNotoiresPanel data={an} maxHeight={360}/>
           </Card>
         </div>
@@ -4138,7 +4304,7 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat, auditeur
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+        <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
           <AuditeursNotoiresPanel data={an} maxHeight={320} compact/>
         </Card>
       </div>
@@ -4215,7 +4381,7 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois, auditeursNotoires }
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+          <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
             <AuditeursNotoiresPanel data={auditeursNotoires} maxHeight={320}/>
           </Card>
         </div>
@@ -4423,7 +4589,7 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
         </div>
 
         <div style={{ marginTop: '1rem' }}>
-          <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+          <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
             <AuditeursNotoiresPanel data={secStats.auditeurs_notoires} maxHeight={360}/>
           </Card>
         </div>
@@ -4520,7 +4686,7 @@ function SecretariatDetailPanel({ row, detail }) {
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <Card title="Auditeurs notoires (jamais badgés)" icon="bi-person-x-fill" col="1/-1">
+        <Card title={AUDITEURS_NOTOIRES.cardTitle} icon="bi-person-x-fill" col="1/-1">
           <AuditeursNotoiresPanel data={adm.auditeurs_notoires} maxHeight={360}/>
         </Card>
       </div>
@@ -4707,6 +4873,20 @@ function BilanDetailPanel({ bilan, tableau, filtres }) {
   if (bilan.dimension === 'module' && tableau?.type === 'effectifs_module') {
     return (
       <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
+        <BilanEffectifsModuleTable data={tableau} />
+      </div>
+    )
+  }
+
+  if (bilan.dimension === 'matiere' && tableau?.type === 'effectifs_matiere') {
+    return (
+      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
+        {tableau.nb_groupes != null && (
+          <p style={{ margin: '0 0 0.65rem', fontSize: '0.78rem', color: '#64748b' }}>
+            Agrégation de <strong>{tableau.nb_groupes}</strong> groupe{tableau.nb_groupes > 1 ? 's' : ''} —
+            auditeurs uniques sur tous les groupes.
+          </p>
+        )}
         <BilanEffectifsModuleTable data={tableau} />
       </div>
     )

@@ -276,6 +276,8 @@ Tous en **GET** (fichiers PDF ou Excel).
 | `/api/statistiques/bilans/` | GET | Bilans (`?dimension=module\|categorie\|formation`, période…) |
 | `/api/statistiques/bilans-export/` | GET | Export bilans (fichier binaire) |
 
+**Traçabilité des indicateurs** (sources, formules, filtres) : voir [`STATISTIQUES_INDICATEURS.md`](STATISTIQUES_INDICATEURS.md).
+
 ---
 
 ## 5. Dashboard web (pages HTML) — `/dashboard/`

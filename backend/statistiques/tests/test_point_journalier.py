@@ -1,11 +1,16 @@
 """Tests point journalier — format CPFAE (modèle FAC)."""
-from django.test import SimpleTestCase
+from datetime import date, time
+
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 from types import SimpleNamespace
 
+from formations.models import Formation, Module, ModuleParticipant, Participant, SessionModule
 from statistiques.point_journalier import (
     _titre_ligne1,
     _organisme_label,
     _aggregate_total,
+    compute_point_journalier,
 )
 
 
@@ -39,3 +44,105 @@ class PointJournalierFormatUnitTest(SimpleTestCase):
         self.assertEqual(total['absents'], 3)
         self.assertAlmostEqual(total['taux_presence'], 160 / 163, places=4)
         self.assertAlmostEqual(total['taux_absence'], 3 / 163, places=4)
+
+
+class PointJournalierPlannedSessionsTest(TestCase):
+    """Séances planifiées (import EDT) sans démarrage badge → fiche visible."""
+
+    def test_planned_session_without_demarree_le_appears_in_index(self):
+        formation = Formation.objects.create(formation='Formation en Administration de Base')
+        module = Module.objects.create(
+            formation=formation,
+            intitule='Module PJ test',
+            grade='A3',
+            groupe='GROUPE 1',
+        )
+        participant = Participant.objects.create(
+            matricule='PJ-001',
+            nom='Test',
+            prenom='Auditeur',
+            categorie='A',
+        )
+        ModuleParticipant.objects.create(module=module, participant=participant)
+
+        jour = timezone.localdate()
+        SessionModule.objects.create(
+            module=module,
+            date_journee=jour,
+            numero=1,
+            intitule='Matin',
+            heure_debut_prevue=time(8, 0),
+            heure_fin_prevue=time(12, 0),
+        )
+        SessionModule.objects.create(
+            module=module,
+            date_journee=jour,
+            numero=2,
+            intitule='Soir',
+            heure_debut_prevue=time(13, 0),
+            heure_fin_prevue=time(17, 0),
+        )
+
+        data = compute_point_journalier(annee=jour.year, mois=jour.month, index_only=True)
+        self.assertGreaterEqual(data['total_tableaux'], 1)
+        ids = {t['id'] for t in data['tableaux']}
+        self.assertTrue(any('A' in tid and jour.isoformat() in tid for tid in ids))
+
+        detail = compute_point_journalier(
+            annee=jour.year,
+            mois=jour.month,
+            categorie='A',
+            formation_id=formation.id,
+            index_only=False,
+        )
+        self.assertEqual(len(detail['tableaux']), 1)
+        tb = detail['tableaux'][0]
+        self.assertIn('matin', tb)
+        self.assertIn('soir', tb)
+        self.assertEqual(tb['matin']['total']['effectif'], 1)
+        self.assertEqual(tb['matin']['total']['presents'], 0)
+
+    def test_same_groupe_multiple_modules_one_column(self):
+        """Un groupe physique = une colonne, même si plusieurs matières (modules)."""
+        formation = Formation.objects.create(formation='Formation en Administration de Base')
+        participant = Participant.objects.create(
+            matricule='PJ-002',
+            nom='Dupont',
+            prenom='Marie',
+            categorie='A',
+        )
+        jour = timezone.localdate()
+        modules = []
+        for intitule in ('DEONTOLOGIE', 'REDACTION ADMINISTRATIVE', 'CULTURE CIVIQUE'):
+            mod = Module.objects.create(
+                formation=formation,
+                intitule=intitule,
+                grade='A4',
+                groupe='GROUPE 10',
+                salle='DISTRICT DES LACS',
+            )
+            ModuleParticipant.objects.create(module=mod, participant=participant)
+            SessionModule.objects.create(
+                module=mod,
+                date_journee=jour,
+                numero=1,
+                intitule='Matin',
+                heure_debut_prevue=time(8, 0),
+                heure_fin_prevue=time(12, 0),
+            )
+            modules.append(mod)
+
+        detail = compute_point_journalier(
+            annee=jour.year,
+            mois=jour.month,
+            categorie='A',
+            formation_id=formation.id,
+            jour=jour.isoformat(),
+            index_only=False,
+        )
+        tb = detail['tableaux'][0]
+        matin_groupes = tb['matin']['groupes']
+        self.assertEqual(len(matin_groupes), 1)
+        self.assertEqual(matin_groupes[0]['label'], 'G10')
+        self.assertEqual(matin_groupes[0]['effectif'], 1)
+        self.assertEqual(len(matin_groupes[0]['module_ids']), 3)

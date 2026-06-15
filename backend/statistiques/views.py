@@ -27,6 +27,7 @@ from presences.models import Pointage
 from .models import ConfigAlerteSeuil, Rapport, ObservationQualitative, SignatureRapport, NotificationRapport
 from .bilans import (
     compute_bilans, compute_bilans_avec_tableaux, compute_bilan_effectifs_module,
+    compute_bilan_effectifs_matiere,
     compute_bilan_effectifs_categorie, compute_bilan_periode_formation,
     compute_bilan_fac,
 )
@@ -37,8 +38,11 @@ from .point_journalier import (
 from .point_journalier_exports import build_export_response
 from .effectifs import (
     aggregation_seances_modules,
+    count_sessions_comptabilisables,
     filter_sessions,
+    participant_ids_notoires,
     q_pointage_present,
+    session_ids_for_scope,
 )
 from .rapport_notifications import (
     ADMIN_RAPPORT_ROLES, notifier_rapport, notifier_rapport_supprime,
@@ -225,9 +229,9 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, module_ids=None, 
 
 def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None):
     """
-    Auditeurs inscrits au périmètre sans aucun pointage les concernant.
+    Auditeurs notoires : inscrits au périmètre sans aucun pointage, ou motif_notoire renseigné.
     """
-    mf, pf, _, _, _ = _filtres(formation_id, secretariat_id, module_ids)
+    mf, _, _, _, _ = _filtres(formation_id, secretariat_id, module_ids)
 
     inscrits_pids = set(
         ModuleParticipant.objects.filter(**mf).values_list('participant_id', flat=True).distinct()
@@ -235,12 +239,12 @@ def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None)
     if not inscrits_pids:
         return {'total': 0, 'inscrits': 0, 'pct': 0.0, 'liste': []}
 
-    pids_avec_pointage = set(
-        Pointage.objects.filter(participant_id__isnull=False, **pf)
-        .values_list('participant_id', flat=True)
-        .distinct()
+    notoire_ids = participant_ids_notoires(
+        module_ids=module_ids,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
     )
-    notoire_ids = inscrits_pids - pids_avec_pointage
+    notoire_ids &= inscrits_pids
 
     participants = (
         Participant.objects.filter(id__in=notoire_ids)
@@ -266,7 +270,7 @@ def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None)
             'email': p.email or '—',
             'type_concours': p.type_concours or '—',
             'libelle_concours': p.libelle_concours or '—',
-            'motif': (p.motif_notoire or '').strip() or '—',
+            'motif': (p.motif_notoire or '').strip() or 'Jamais badgé',
         })
 
     total_inscrits = len(inscrits_pids)
@@ -310,7 +314,12 @@ def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None, date_
         nb_formateurs = Formateur.objects.count()
 
     nb_sessions_total     = SessionModule.objects.filter(**sm).count()
-    nb_sessions_terminees = SessionModule.objects.filter(terminee_le__isnull=False, **sm).count()
+    mod_ids_scope = list(Module.objects.filter(**mq).values_list('id', flat=True))
+    nb_sessions_terminees = count_sessions_comptabilisables(
+        module_ids=mod_ids_scope,
+        date_debut=date_debut,
+        date_fin=date_fin,
+    )
     nb_sessions_en_cours  = SessionModule.objects.filter(demarree_le__isnull=False, terminee_le__isnull=True, **sm).count()
     nb_pointages          = Pointage.objects.filter(**pf).count()
 
@@ -342,11 +351,12 @@ def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None, date_
     }
 
 
-def _taux_par_modules(module_ids):
-    """Taux de présence réel : places présentes / places attendues (séances terminées)."""
+def _taux_par_modules(module_ids, date_debut=None, date_fin=None):
+    """Taux de présence réel : places présentes / places attendues (séances comptabilisables)."""
     if not module_ids:
         return {'inscrits': 0, 'presents': 0, 'absents': 0, 'taux': 0.0}
-    agg = aggregation_seances_modules(module_ids)
+    session_ids = session_ids_for_scope(module_ids, date_debut=date_debut, date_fin=date_fin)
+    agg = aggregation_seances_modules(module_ids, session_ids=session_ids)
     return {
         'inscrits': agg['inscrits_distinct'],
         'presents': agg['presents_distinct'],
@@ -357,11 +367,14 @@ def _taux_par_modules(module_ids):
     }
 
 
-def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids=None):
+def _indicateurs_pedagogiques(
+    formation_id=None, secretariat_id=None, module_ids=None, date_debut=None, date_fin=None,
+):
     mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
     module_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
-    agg_global = aggregation_seances_modules(module_ids)
+    scope_session_ids = session_ids_for_scope(module_ids, date_debut=date_debut, date_fin=date_fin)
+    agg_global = aggregation_seances_modules(module_ids, session_ids=scope_session_ids)
 
     total_inscrits = agg_global['inscrits_distinct']
     total_presents = agg_global['presents_distinct']
@@ -396,7 +409,7 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids
             )
         else:
             f_mod_ids = list(Module.objects.filter(**f_mq).values_list('id', flat=True))
-        stats = _taux_par_modules(f_mod_ids)
+        stats = _taux_par_modules(f_mod_ids, date_debut=date_debut, date_fin=date_fin)
         taux_par_formation.append({
             'formation': str(f),
             'formation_id': f.id,
@@ -410,7 +423,7 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids
     for row in grade_qs:
         grade = row['grade']
         g_mod_ids = list(Module.objects.filter(**mq, grade=grade).values_list('id', flat=True))
-        stats = _taux_par_modules(g_mod_ids)
+        stats = _taux_par_modules(g_mod_ids, date_debut=date_debut, date_fin=date_fin)
         taux_par_grade.append({
             'grade': grade,
             'inscrits': stats['inscrits'],
@@ -447,7 +460,7 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids
                 .filter(**({'id__in': module_ids} if module_ids is not None else {}))
                 .values_list('id', flat=True)
             )
-            stats = _taux_par_modules(s_mod_ids)
+            stats = _taux_par_modules(s_mod_ids, date_debut=date_debut, date_fin=date_fin)
             taux_par_secretariat.append({
                 'secretariat': s.nom,
                 'secretariat_id': s.id,
@@ -479,17 +492,22 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids
     }
 
 
-def _indicateurs_admin(formation_id=None, secretariat_id=None, module_ids=None):
+def _indicateurs_admin(
+    formation_id=None, secretariat_id=None, module_ids=None, date_debut=None, date_fin=None,
+):
     mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
+    mod_ids_scope = list(Module.objects.filter(**mq).values_list('id', flat=True))
     nb_groupes    = Module.objects.filter(**mq).exclude(groupe='').values('groupe').distinct().count()
     nb_encadrants = Module.objects.filter(**mq).exclude(superviseur=None).values('superviseur').distinct().count()
     nb_seances_annulees = SessionModule.objects.filter(
         demarree_le__isnull=True, date_journee__lt=date.today(), **sm,
     ).count()
-    nb_seances_terminees = filter_sessions(module_ids=list(
-        Module.objects.filter(**mq).values_list('id', flat=True),
-    )).count()
+    nb_seances_terminees = count_sessions_comptabilisables(
+        module_ids=mod_ids_scope,
+        date_debut=date_debut,
+        date_fin=date_fin,
+    )
 
     # H/F sur auditeurs inscrits aux modules du périmètre
     inscrits_pids = ModuleParticipant.objects.filter(**mf).values_list('participant_id', flat=True).distinct()
@@ -501,7 +519,11 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None, module_ids=None):
     inscrits_q = ModuleParticipant.objects.filter(**mf).values('participant').distinct().count()
     moy_par_groupe = round(inscrits_q / nb_groupes, 1) if nb_groupes else 0
 
-    nb_absences_notoires = Pointage.objects.filter(statut=Pointage.Statut.ABSENT_NON_BADGE, **pf).count()
+    nb_absences_notoires = len(participant_ids_notoires(
+        module_ids=module_ids,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+    ))
 
     charge_formateurs = _charge_formateurs(formation_id, secretariat_id, module_ids)
 
@@ -535,7 +557,11 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None, module_ids=None):
                 'nb_participants': Participant.objects.filter(secretariat=s).count(),
                 'nb_sessions': SessionModule.objects.filter(**s_sm).count(),
                 'nb_pointages': Pointage.objects.filter(**s_pf).count(),
-                'nb_absences': Pointage.objects.filter(statut=Pointage.Statut.ABSENT_NON_BADGE, **s_pf).count(),
+                'nb_absences': len(participant_ids_notoires(
+                    secretariat_id=s.id,
+                    formation_id=formation_id,
+                    module_ids=module_ids,
+                )),
             })
 
     return {
@@ -732,7 +758,7 @@ INDICATEUR_META = {
         'couleur': '#F57C00',
         'aide': (
             'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits. '
-            'Signale des absences atypiques à investiguer.'
+            'Distinct des auditeurs notoires (jamais badgés).'
         ),
         'echelle_max': 100,
     },
@@ -749,12 +775,15 @@ INDICATEUR_META = {
         'echelle_max': 100,
     },
     'nb_absences_notoires': {
-        'libelle': 'Absences notoires',
+        'libelle': 'Auditeurs notoires',
         'unite': '',
         'inverse': True,
         'icone': 'bi-exclamation-triangle',
         'couleur': '#AD1457',
-        'aide': 'Nombre de pointages « absent non badgé ». Signale les absences non justifiées.',
+        'aide': (
+            'Nombre d\'auditeurs inscrits sans aucun pointage, ou avec motif notoire renseigné. '
+            'Aligné dashboard, bilans et Bilan FAC.'
+        ),
         'echelle_max': None,
     },
     'saturation_groupe': {
@@ -923,21 +952,26 @@ def _build_dashboard_payload(scope: StatsScope, sections, user, period=None):
     need_kpis = bool(sections & {'kpis', 'alertes', 'alertes_overview'})
     need_alertes = bool(sections & {'alertes', 'alertes_overview'})
 
-    ped = _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids) if need_ped else None
-    adm = _indicateurs_admin(formation_id, secretariat_id, module_ids) if need_adm else None
+    ped = _indicateurs_pedagogiques(
+        formation_id, secretariat_id, module_ids, date_debut, date_fin,
+    ) if need_ped else None
+    adm = _indicateurs_admin(
+        formation_id, secretariat_id, module_ids, date_debut, date_fin,
+    ) if need_adm else None
     kpis = _kpis_globaux(
         formation_id, secretariat_id, module_ids, date_debut, date_fin,
     ) if need_kpis else None
 
     payload = {}
 
+    if period and (need_kpis or need_ped or need_adm):
+        from formations.period_filter import periode_api_payload
+        payload['periode'] = periode_api_payload(
+            date_debut, date_fin, period['meta'],
+        )
+
     if 'kpis' in sections and kpis is not None:
         payload['kpis'] = kpis
-        if period:
-            from formations.period_filter import periode_api_payload
-            payload['periode'] = periode_api_payload(
-                period['date_debut'], period['date_fin'], period['meta'],
-            )
     if 'pedagogiques' in sections and ped is not None:
         payload['pedagogiques'] = ped
     if 'admin_operationnel' in sections and adm is not None:
@@ -1031,7 +1065,10 @@ class SecretariatsStatsView(APIView):
                 pf['session__module__formation_id'] = formation_id
 
             mod_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
-            agg = aggregation_seances_modules(mod_ids)
+            scope_session_ids = session_ids_for_scope(
+                mod_ids, date_debut=date_debut, date_fin=date_fin,
+            )
+            agg = aggregation_seances_modules(mod_ids, session_ids=scope_session_ids)
 
             nb_modules      = len(mod_ids)
             nb_inscrits     = agg['inscrits_distinct']
@@ -1201,7 +1238,7 @@ class RapportsListView(APIView):
         snapshot = {
             'kpis':         _kpis_globaux(formation_id, secretariat_id, module_ids),
             'pedagogiques': _indicateurs_pedagogiques(formation_id, secretariat_id, module_ids),
-            'admin':        _indicateurs_admin(formation_id, secretariat_id, module_ids),
+            'admin_operationnel': _indicateurs_admin(formation_id, secretariat_id, module_ids),
             'historique':   _historique_mensuel(12, formation_id, secretariat_id, module_ids),
         }
         rapport = Rapport.objects.create(
@@ -1513,6 +1550,7 @@ def bilans_export(request):
     annee = _int('annee') or date.today().year
     mois = _int('mois')
     module_id = _int('module_id')
+    ref_module_id = _int('ref_module_id')
     categorie = request.query_params.get('categorie') or None
     periode = request.query_params.get('periode') or None
     calendrier = request.query_params.get('calendrier') or None
@@ -1525,7 +1563,8 @@ def bilans_export(request):
     try:
         raw = build_bilans_export_response(
             fmt, dimension, annee, mois=mois, categorie=categorie,
-            module_id=module_id, periode=periode, calendrier=calendrier, **kw,
+            module_id=module_id, periode=periode, calendrier=calendrier,
+            ref_module_id=ref_module_id, **kw,
         )
         from django.http import HttpResponse as DjangoHttpResponse
         out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
@@ -1543,7 +1582,7 @@ class BilansView(APIView):
     GET /api/statistiques/bilans/
       ?annee=&mois=&categorie=&module_id=&formation_id=&secretariat_id=
       &periode=QUOTIDIEN|HEBDOMADAIRE|...&calendrier=YYYY-MM-DD
-      &dimension=module|categorie|formation
+      &dimension=module|matiere|categorie|formation
     """
     permission_classes = [IsAuthenticated]
 
@@ -1558,6 +1597,7 @@ class BilansView(APIView):
         annee = _int('annee') or date.today().year
         mois = _int('mois')
         module_id = _int('module_id')
+        ref_module_id = _int('ref_module_id')
         categorie = request.query_params.get('categorie') or None
         periode = request.query_params.get('periode') or None
         calendrier = request.query_params.get('calendrier') or None
@@ -1578,9 +1618,30 @@ class BilansView(APIView):
             tableau = compute_bilan_effectifs_categorie(
                 categorie, formation_id=formation_id, secretariat_id=secretariat_id,
                 annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+                module_ids=kw.get('module_ids'),
             )
             if not tableau:
                 return Response({'detail': 'Catégorie introuvable.'}, status=404)
+            return Response({'tableau': tableau})
+
+        if detail and dimension == 'matiere':
+            eff_formation = formation_id or _int('formation_id')
+            if not eff_formation:
+                return Response({'detail': 'Formation requise pour le bilan matière.'}, status=400)
+            matiere_intitule = request.query_params.get('matiere_intitule') or None
+            if not ref_module_id and not matiere_intitule:
+                return Response({'detail': 'ref_module_id ou matiere_intitule requis.'}, status=400)
+            tableau = compute_bilan_effectifs_matiere(
+                eff_formation,
+                ref_module_id=ref_module_id,
+                matiere_intitule=matiere_intitule,
+                categorie=categorie,
+                secretariat_id=secretariat_id,
+                annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+                module_ids=kw.get('module_ids'),
+            )
+            if not tableau:
+                return Response({'detail': 'Matière introuvable.'}, status=404)
             return Response({'tableau': tableau})
 
         if detail and module_id:
@@ -1596,6 +1657,7 @@ class BilansView(APIView):
             tableau = compute_bilan_periode_formation(
                 formation_id, annee=annee, mois=mois, calendrier=calendrier,
                 periode=periode, secretariat_id=secretariat_id, categorie_filter=categorie,
+                module_ids=kw.get('module_ids'),
             )
             if not tableau:
                 return Response({'detail': 'Formation introuvable.'}, status=404)
@@ -1605,13 +1667,15 @@ class BilansView(APIView):
             return Response(compute_bilans_avec_tableaux(
                 annee=annee, mois=mois, categorie=categorie,
                 module_id=module_id, periode=periode,
-                calendrier=calendrier, dimension=dimension, **kw,
+                calendrier=calendrier, dimension=dimension,
+                ref_module_id=ref_module_id, **kw,
             ))
 
         return Response(compute_bilans(
             annee=annee, mois=mois, categorie=categorie,
             module_id=module_id, periode=periode,
-            calendrier=calendrier, dimension=dimension, **kw,
+            calendrier=calendrier, dimension=dimension,
+            ref_module_id=ref_module_id, **kw,
         ))
 
 
@@ -1666,10 +1730,10 @@ class BilanFACView(APIView):
             return int(v) if v and v.isdigit() else None
 
         formation_id = _int('formation_id')
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
         if not formation_id:
-            scope, err = _scope_from_request(request)
-            if err:
-                return err
             formation_id = scope.formation_id
 
         if not formation_id:
@@ -1677,7 +1741,7 @@ class BilanFACView(APIView):
 
         annee = _int('annee') or date.today().year
         categorie = request.query_params.get('categorie') or None
-        secretariat_id = _int('secretariat_id')
+        secretariat_id = _int('secretariat_id') or scope.secretariat_id
         calendrier = request.query_params.get('calendrier') or None
 
         data = compute_bilan_fac(
@@ -1686,6 +1750,7 @@ class BilanFACView(APIView):
             categorie=categorie,
             secretariat_id=secretariat_id,
             calendrier=calendrier,
+            module_ids=scope.module_ids,
         )
         if not data:
             return Response({'detail': 'Formation introuvable.'}, status=404)

@@ -150,3 +150,8 @@ export function webLoginForbiddenMessage(role) {
   }
   return 'Ce compte n\'a pas accès à la plateforme web.'
 }
+
+export function hasAppRole(user, allowedRoles) {
+  if (!user || !user.role) return false
+  return allowedRoles.includes(user.role)
+}

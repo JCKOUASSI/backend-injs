@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from .bilans import (
     compute_bilans,
     compute_bilan_effectifs_module,
+    compute_bilan_effectifs_matiere,
     compute_bilan_effectifs_categorie,
     compute_bilan_periode_formation,
 )
@@ -64,16 +65,20 @@ def collect_bilans_tableaux(
     mois=None,
     categorie=None,
     module_id=None,
+    module_ids=None,
     formation_id=None,
     secretariat_id=None,
     periode=None,
     calendrier=None,
+    ref_module_id=None,
 ):
     """Construit la liste des tableaux détaillés à exporter."""
     data = compute_bilans(
         annee=annee, mois=mois, categorie=categorie, module_id=module_id,
+        module_ids=module_ids,
         formation_id=formation_id, secretariat_id=secretariat_id,
         periode=periode, calendrier=calendrier, dimension=dimension,
+        ref_module_id=ref_module_id,
     )
     bilans = data.get('bilans') or []
 
@@ -92,16 +97,28 @@ def collect_bilans_tableaux(
                 b['module_id'], categorie=categorie or b.get('categorie'),
                 annee=annee, mois=mois, calendrier=calendrier, periode=periode,
             )
+        elif b['dimension'] == 'matiere' and b.get('formation_id'):
+            t = compute_bilan_effectifs_matiere(
+                b['formation_id'],
+                ref_module_id=b.get('ref_module_id'),
+                matiere_intitule=b.get('matiere_intitule'),
+                categorie=categorie or b.get('categorie'),
+                secretariat_id=secretariat_id,
+                annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+                module_ids=module_ids,
+            )
         elif b['dimension'] == 'formation' and b.get('formation_id'):
             t = compute_bilan_periode_formation(
                 b['formation_id'], annee=annee, mois=mois, calendrier=calendrier,
                 periode=periode, secretariat_id=secretariat_id,
                 categorie_filter=categorie or b.get('categorie'),
+                module_ids=module_ids,
             )
         elif b['dimension'] == 'categorie' and b.get('categorie') and b['categorie'] != '—':
             t = compute_bilan_effectifs_categorie(
                 b['categorie'], formation_id=formation_id, secretariat_id=secretariat_id,
                 annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+                module_ids=module_ids,
             )
         if t:
             tableaux.append(t)
@@ -600,15 +617,18 @@ def build_bilans_export_response(
     mois=None,
     categorie=None,
     module_id=None,
+    module_ids=None,
     formation_id=None,
     secretariat_id=None,
     periode=None,
     calendrier=None,
+    ref_module_id=None,
 ):
     tableaux = collect_bilans_tableaux(
         dimension=dimension, annee=annee, mois=mois, categorie=categorie,
-        module_id=module_id, formation_id=formation_id, secretariat_id=secretariat_id,
-        periode=periode, calendrier=calendrier,
+        module_id=module_id, module_ids=module_ids,
+        formation_id=formation_id, secretariat_id=secretariat_id,
+        periode=periode, calendrier=calendrier, ref_module_id=ref_module_id,
     )
 
     if fmt == 'xlsx':

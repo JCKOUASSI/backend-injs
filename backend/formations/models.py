@@ -166,6 +166,13 @@ class RefModule(models.Model):
         verbose_name = 'Référentiel – Module'
         verbose_name_plural = 'Référentiel – Modules'
 
+    @staticmethod
+    def normalize_intitule(value):
+        """Normalise un intitulé pour la recherche dans le référentiel (trim + espaces)."""
+        if value is None:
+            return ''
+        return ' '.join(str(value).split())
+
     def __str__(self):
         return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
 
@@ -447,6 +454,14 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
+    ref_module = models.ForeignKey(
+        RefModule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modules_instances',
+        help_text='Référentiel canonique du module (nomenclature unifiée)',
+    )
     # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
     cycle = models.CharField(
         max_length=255,

@@ -608,10 +608,11 @@ def export_word(tableaux, annee):
 
 
 def build_export_response(fmt, annee, mois=None, categorie=None, formation_id=None,
-                          secretariat_id=None, jour=None):
+                          secretariat_id=None, module_ids=None, jour=None):
     data = compute_point_journalier(
         annee=annee, mois=mois, categorie=categorie,
-        formation_id=formation_id, secretariat_id=secretariat_id, jour=jour,
+        formation_id=formation_id, secretariat_id=secretariat_id,
+        module_ids=module_ids, jour=jour,
     )
     tableaux = _filter_tableaux(data, formation_id, categorie, mois, jour)
 

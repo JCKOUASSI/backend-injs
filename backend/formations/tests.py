@@ -327,6 +327,16 @@ class ReferentielsAPITest(TestCase):
         for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
 
+    def test_referentiels_gestion(self):
+        res = self.client.get('/api/formations/referentiels/gestion/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in (
+            'formations', 'modules', 'categories', 'grades', 'vagues',
+            'sites', 'batiments', 'salles', 'types_secretariat',
+        ):
+            self.assertIn(key, res.data)
+            self.assertIsInstance(res.data[key], list)
+
 
 # ──────────────────────────────────────────
 # API — dispatch secrétariat par matricule
