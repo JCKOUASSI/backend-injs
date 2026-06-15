@@ -54,6 +54,8 @@ export default function FormationDetail() {
   const [superviseurs, setSuperviseurs] = useState([])
   const [selectedSup, setSelectedSup] = useState('')
   const [assignError, setAssignError] = useState('')
+  const [encadrantSearch, setEncadrantSearch] = useState('')
+  const [encadrantLoading, setEncadrantLoading] = useState(false)
 
   // Add participant to formation
   const [showAddParticipant, setShowAddParticipant] = useState(false)
@@ -89,6 +91,7 @@ export default function FormationDetail() {
   const formateursPager = useClientPagination(formateurs, TABLE_PAGE_SIZE, [id, formateurs.length])
   const participantPicker = usePickerPagination(showAddParticipant)
   const formateurPicker = usePickerPagination(showAddFormateur)
+  const encadrantPicker = usePickerPagination(showAssignModal)
 
   // Import séances Excel
   const [importingSeances, setImportingSeances] = useState(false)
@@ -294,19 +297,36 @@ export default function FormationDetail() {
   }
 
   const loadSuperviseurs = async () => {
+    setEncadrantLoading(true)
     try {
-      const res = await api.get('/auth/users/?role=ENCADRANT')
+      const params = new URLSearchParams({
+        role: 'ENCADRANT',
+        page: encadrantPicker.page,
+      })
+      if (encadrantSearch) params.set('search', encadrantSearch)
+      const res = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setSuperviseurs(data)
-    } catch {}
+      encadrantPicker.applyResponse(res.data, data.length)
+    } catch {} finally { setEncadrantLoading(false) }
   }
 
   const openAssignModal = () => {
     setSelectedSup(formation?.superviseur || '')
     setAssignError('')
-    loadSuperviseurs()
+    setEncadrantSearch('')
     setShowAssignModal(true)
   }
+
+  useEffect(() => {
+    if (showAssignModal) encadrantPicker.resetPage()
+  }, [encadrantSearch])
+
+  useEffect(() => {
+    if (!showAssignModal) return
+    const t = setTimeout(() => loadSuperviseurs(), 300)
+    return () => clearTimeout(t)
+  }, [encadrantSearch, showAssignModal, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {
     if (!selectedSup) { setAssignError('Veuillez sélectionner un encadrant'); return }
@@ -1387,22 +1407,73 @@ export default function FormationDetail() {
       {/* ── MODAL: Assign superviseur ── */}
       {showAssignModal && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-person-badge me-2"></i>Assigner un encadrant</h5>
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>&times;</button>
             </div>
             <div className="modal-body">
               {assignError && <div className="alert alert-danger">{assignError}</div>}
-              <div className="form-group">
-                <label className="form-label">Encadrant</label>
-                <select className="form-control" value={selectedSup} onChange={e => setSelectedSup(e.target.value)}>
-                  <option value="">-- Sélectionner --</option>
-                  {superviseurs.map(s => (
-                    <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.username})</option>
-                  ))}
-                </select>
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Rechercher par nom, identifiant, matricule…"
+                  value={encadrantSearch}
+                  onChange={e => setEncadrantSearch(e.target.value)}
+                  autoFocus
+                />
               </div>
+              {encadrantLoading && (
+                <div className="text-center text-muted py-2">
+                  <div className="spinner" style={{ width: 20, height: 20 }}></div>
+                </div>
+              )}
+              {!encadrantLoading && superviseurs.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun encadrant trouvé</p>
+              )}
+              {!encadrantLoading && superviseurs.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Identifiant</th>
+                        <th>Matricule</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {superviseurs.map(s => {
+                        const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.username
+                        const isSelected = String(selectedSup) === String(s.id)
+                        return (
+                          <tr
+                            key={s.id}
+                            onClick={() => setSelectedSup(String(s.id))}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                          >
+                            <td>{fullName}</td>
+                            <td>{s.username}</td>
+                            <td>{s.matricule || '—'}</td>
+                            <td>
+                              {isSelected && <i className="bi bi-check-circle-fill text-success"></i>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Pagination
+                page={encadrantPicker.page}
+                totalPages={encadrantPicker.totalPages}
+                onPageChange={encadrantPicker.setPage}
+                totalItems={encadrantPicker.totalCount}
+                pageSize={encadrantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Annuler</button>

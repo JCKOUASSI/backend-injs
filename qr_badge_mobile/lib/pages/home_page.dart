@@ -7,6 +7,7 @@ import '../providers/session_provider.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/guarded_logout.dart';
 import '../utils/open_privacy_policy.dart';
+import 'evaluations_page.dart';
 import 'history_page.dart';
 import 'home_dashboard_page.dart';
 import 'profile_fiche_page.dart';
@@ -65,6 +66,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  bool _isAuditeur(SessionProvider session) =>
+      session.user?['role']?.toString() == 'AUDITEUR';
+
   String get _title {
     switch (_index) {
       case 0:
@@ -73,6 +77,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         return 'Accueil';
       case 2:
         return 'Historique';
+      case 3:
+        return 'Évaluations';
       default:
         return 'QR Badge';
     }
@@ -152,18 +158,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             ),
           Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: [
-                ScanPage(
-                  isActive: _index == 0,
-                  onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                ),
-                HomeDashboardPage(
-                  onOpenHistory: () => setState(() => _index = 2),
-                ),
-                const HistoryPage(),
-              ],
+            child: Builder(
+              builder: (context) {
+                final session = context.watch<SessionProvider>();
+                final auditeur = _isAuditeur(session);
+                return IndexedStack(
+                  index: _index,
+                  children: [
+                    ScanPage(
+                      isActive: _index == 0,
+                      onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+                    ),
+                    HomeDashboardPage(
+                      onOpenHistory: () => setState(() => _index = 2),
+                    ),
+                    const HistoryPage(),
+                    if (auditeur) const EvaluationsPage(),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -187,32 +200,44 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: _ficheVisible
           ? null
-          : NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (v) {
-          setState(() => _index = v);
-          if (v == 1 || v == 2) {
-            context.read<SessionProvider>().requestHistoryRefresh();
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner_outlined),
-            selectedIcon: Icon(Icons.qr_code_scanner),
-            label: 'Scanner',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'Historique',
-          ),
-        ],
-      ),
+          : Builder(
+              builder: (context) {
+                final session = context.watch<SessionProvider>();
+                final auditeur = _isAuditeur(session);
+                return NavigationBar(
+                  selectedIndex: _index,
+                  onDestinationSelected: (v) {
+                    setState(() => _index = v);
+                    if (v == 1 || v == 2) {
+                      context.read<SessionProvider>().requestHistoryRefresh();
+                    }
+                  },
+                  destinations: [
+                    const NavigationDestination(
+                      icon: Icon(Icons.qr_code_scanner_outlined),
+                      selectedIcon: Icon(Icons.qr_code_scanner),
+                      label: 'Scanner',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'Accueil',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(Icons.history_outlined),
+                      selectedIcon: Icon(Icons.history),
+                      label: 'Historique',
+                    ),
+                    if (auditeur)
+                      const NavigationDestination(
+                        icon: Icon(Icons.assignment_outlined),
+                        selectedIcon: Icon(Icons.assignment),
+                        label: 'Évaluations',
+                      ),
+                  ],
+                );
+              },
+            ),
     );
   }
 }
