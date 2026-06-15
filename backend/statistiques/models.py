@@ -68,6 +68,14 @@ class Rapport(models.Model):
         related_name='rapports',
         help_text="Formation ciblée (null = toutes formations)",
     )
+    secretariat    = models.ForeignKey(
+        'formations.Secretariat',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rapports',
+        help_text='Secrétariat ciblé (null = périmètre global)',
+    )
     generateur     = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

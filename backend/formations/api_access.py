@@ -23,6 +23,7 @@ __all__ = [
     'formation_or_response',
     'module_or_response',
     'deny_if_not_formation_accessible',
+    'deny_finance_operational_response',
 ]
 
 
@@ -73,3 +74,19 @@ def module_or_response(user, formation_pk, module_pk):
 def deny_if_not_formation_accessible(user, pk):
     """Alias court pour les vues qui n'ont besoin que du garde-fou."""
     return formation_or_response(user, pk)
+
+
+def deny_finance_operational_response(request):
+    """Bloque FINANCE sur les endpoints opérationnels du dashboard formations."""
+    user = getattr(request, 'user', None)
+    if user and user.is_authenticated and user.role == 'FINANCE':
+        return Response(
+            {
+                'detail': (
+                    'Accès réservé au personnel opérationnel. '
+                    'Utilisez le module Finance.'
+                ),
+            },
+            status=403,
+        )
+    return None

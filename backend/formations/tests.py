@@ -390,7 +390,7 @@ class DashboardVolumeHoraireTest(TestCase):
 
     def test_prevu_et_realise_par_seances(self):
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=99)
+        module = make_module(f, duree_prevue_heures=10)
         now = timezone.now()
         for num in range(1, 3):
             SessionModule.objects.create(
@@ -414,7 +414,7 @@ class DashboardVolumeHoraireTest(TestCase):
         from .volume_horaire import _accumulate_module_session_volumes
 
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=12)
+        module = make_module(f, duree_prevue_heures=4)
         SessionModule.objects.create(
             module=module,
             date_journee=timezone.localdate(),
