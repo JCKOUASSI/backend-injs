@@ -23,6 +23,7 @@ import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
+import NotesModule from './pages/NotesModule'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -276,6 +277,13 @@ function App() {
             <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formations/:formationId/modules/:moduleId/notes" element={
+            <ProtectedRoute allowedRoles={[...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Notes</li></>}>
+                <NotesModule />
               </Layout>
             </ProtectedRoute>
           } />

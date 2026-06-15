@@ -10,6 +10,7 @@ from .api_views import (
     ref_type_secretariat_list, ref_type_secretariat_detail,
     sync_participants_api, sync_formateurs_api,
     sync_sessions_api, sync_presences_api,
+    module_notes_list, module_note_upsert, module_notes_bulk,
 )
 
 urlpatterns = [
@@ -115,6 +116,9 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/add/', module_add_formateur, name='api-module-add-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/<int:formateur_id>/remove/', module_remove_formateur, name='api-module-remove-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/assign-superviseur/', module_assign_superviseur, name='api-module-assign-superviseur'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/', module_notes_list, name='api-module-notes-list'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/bulk/', module_notes_bulk, name='api-module-notes-bulk'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/<int:participant_id>/', module_note_upsert, name='api-module-note-upsert'),
 
     # Session management (via module)
     path('<int:formation_pk>/sessions/', session_views.session_list, name='api-session-list'),

@@ -39,7 +39,7 @@ from .models import (
     Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant,
     ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
     RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings,
-    FinanceAjustement,
+    FinanceAjustement, NoteModule,
 )
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -767,6 +767,7 @@ def participant_formations_api(request, pk):
             'date_fin': m.date_fin,
             'statut': m.statut,
             'secretariat_nom': m.secretariat.nom if m.secretariat else None,
+            'duree_prevue_heures': float(m.duree_prevue_heures or 0),
         })
     return Response(data)
 
@@ -3797,3 +3798,168 @@ def sync_presences_api(request):
         'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
         'current_page': page,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Notes auditeurs par module
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _mention_auto(note):
+    """Calcule automatiquement la mention à partir de la note (sur 20)."""
+    if note is None:
+        return ''
+    n = float(note)
+    if n >= 16:
+        return 'TRES_BIEN'
+    if n >= 14:
+        return 'BIEN'
+    if n >= 12:
+        return 'ASSEZ_BIEN'
+    if n >= 10:
+        return 'PASSABLE'
+    return 'INSUFFISANT'
+
+
+@api_view(['GET'])
+@permission_classes([IsSecretariatOrDFRC])
+def module_notes_list(request, formation_pk, module_pk):
+    """Liste des notes de tous les participants inscrits au module."""
+    _, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    inscriptions = (
+        ModuleParticipant.objects
+        .filter(module=module)
+        .select_related('participant')
+        .order_by('participant__nom', 'participant__prenom')
+    )
+    notes_map = {
+        n.participant_id: n
+        for n in NoteModule.objects.filter(module=module).select_related('saisie_par')
+    }
+
+    data = []
+    for mp in inscriptions:
+        p = mp.participant
+        note_obj = notes_map.get(p.pk)
+        data.append({
+            'participant_id': p.pk,
+            'matricule': p.matricule,
+            'nom': p.nom,
+            'prenom': p.prenom,
+            'grade': p.grade,
+            'categorie': p.categorie,
+            'note': float(note_obj.note) if note_obj and note_obj.note is not None else None,
+            'mention': note_obj.mention if note_obj else '',
+            'observations': note_obj.observations if note_obj else '',
+            'saisie_par': (
+                note_obj.saisie_par.get_full_name() or note_obj.saisie_par.username
+                if note_obj and note_obj.saisie_par else None
+            ),
+            'updated_at': note_obj.updated_at.isoformat() if note_obj else None,
+        })
+    return Response(data)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsSecretariatOrDFRC])
+def module_note_upsert(request, formation_pk, module_pk, participant_id):
+    """Créer ou mettre à jour la note d'un participant pour un module."""
+    _, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    if not ModuleParticipant.objects.filter(module=module, participant_id=participant_id).exists():
+        return Response({'detail': "Ce participant n'est pas inscrit à ce module."}, status=400)
+
+    try:
+        participant = Participant.objects.get(pk=participant_id)
+    except Participant.DoesNotExist:
+        return Response({'detail': 'Participant introuvable.'}, status=404)
+
+    note_val = request.data.get('note')
+    mention = request.data.get('mention', '')
+    observations = request.data.get('observations', '')
+
+    if note_val is not None:
+        try:
+            note_val = round(float(note_val), 2)
+            if not (0 <= note_val <= 20):
+                return Response({'detail': 'La note doit être comprise entre 0 et 20.'}, status=400)
+        except (ValueError, TypeError):
+            return Response({'detail': 'Note invalide.'}, status=400)
+        if not mention:
+            mention = _mention_auto(note_val)
+
+    note_obj, created = NoteModule.objects.update_or_create(
+        module=module,
+        participant=participant,
+        defaults={
+            'note': note_val,
+            'mention': mention,
+            'observations': observations,
+            'saisie_par': request.user,
+        },
+    )
+    return Response({
+        'participant_id': participant.pk,
+        'note': float(note_obj.note) if note_obj.note is not None else None,
+        'mention': note_obj.mention,
+        'observations': note_obj.observations,
+        'updated_at': note_obj.updated_at.isoformat(),
+    }, status=201 if created else 200)
+
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrDFRC])
+def module_notes_bulk(request, formation_pk, module_pk):
+    """
+    Sauvegarde groupée des notes du module.
+    Body: { "notes": [{"participant_id": X, "note": Y, "mention": Z, "observations": "..."}] }
+    """
+    _, module, err = module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    notes_data = request.data.get('notes', [])
+    if not isinstance(notes_data, list):
+        return Response({'detail': '"notes" doit être une liste.'}, status=400)
+
+    inscrits_ids = set(
+        ModuleParticipant.objects.filter(module=module).values_list('participant_id', flat=True)
+    )
+    saved, errors = [], []
+
+    for item in notes_data:
+        pid = item.get('participant_id')
+        if pid not in inscrits_ids:
+            errors.append({'participant_id': pid, 'detail': 'Non inscrit.'})
+            continue
+        note_val = item.get('note')
+        mention = item.get('mention', '')
+        observations = item.get('observations', '')
+        if note_val is not None:
+            try:
+                note_val = round(float(note_val), 2)
+                if not (0 <= note_val <= 20):
+                    errors.append({'participant_id': pid, 'detail': 'Note hors plage 0-20.'})
+                    continue
+            except (ValueError, TypeError):
+                errors.append({'participant_id': pid, 'detail': 'Note invalide.'})
+                continue
+            if not mention:
+                mention = _mention_auto(note_val)
+        NoteModule.objects.update_or_create(
+            module=module,
+            participant_id=pid,
+            defaults={
+                'note': note_val,
+                'mention': mention,
+                'observations': observations,
+                'saisie_par': request.user,
+            },
+        )
+        saved.append(pid)
+
+    return Response({'saved': len(saved), 'errors': errors})
