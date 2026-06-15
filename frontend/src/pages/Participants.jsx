@@ -125,7 +125,7 @@ export default function Participants() {
     // Charger les pointages si l'utilisateur a les permissions
     if (canViewPresences) {
       setDetailPointagesLoading(true)
-      api.get(`/presences/participant/${showDetail.id}/fiche-admin/`)
+      api.get(`/participant/${showDetail.id}/fiche-admin/`)
         .then(res => {
           setDetailPointages(res.data.pointages || [])
           setDetailStats(res.data.stats || null)
