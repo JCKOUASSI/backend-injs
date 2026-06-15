@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Application** | SYGEP-CPFAE — Module Statistiques & Bilans |
-| **Version du manuel** | 2.1.0 |
-| **Dernière mise à jour** | 08/06/2026 |
+| **Version du manuel** | 2.0.1 |
+| **Dernière mise à jour** | 05/06/2026 |
 | **Public** | Administrateurs CPFAE, direction, secrétariats, encadrants autorisés |
 | **Fichier Word** | `Manuel utilisateur App Statistiques.docx` (généré automatiquement) |
 
@@ -134,26 +134,6 @@ L'onglet actif est souligné en **vert** (#43A047).
 | **Bilan** | Tableau de synthèse des effectifs sur une période |
 | **Seuil avertissement (⚠)** | Premier palier d'alerte |
 | **Seuil critique (🔴)** | Palier nécessitant une action corrective |
-| **Assiduité séance** | Places présentes ÷ places attendues sur les séances terminées (dashboard, alertes, historique) |
-| **Couverture auditeurs** | Auditeurs avec ≥ 1 présence ÷ inscrits (logique des bilans CPFAE) |
-| **Événements absence / suspect** | Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits |
-| **Avancement VH (sessions clôturées)** | Heures réalisées ÷ heures prévues sur les séances clôturées du périmètre |
-
-### 5.1 Comment lire les chiffres
-
-Deux logiques de taux coexistent dans le module. Un **bandeau explicatif** sous les filtres rappelle cette distinction à chaque visite.
-
-| Indicateur affiché | Formule | Où le trouver |
-|--------------------|---------|---------------|
-| **Assiduité séance** | places présentes ÷ places attendues (séances terminées) | Vue d'ensemble, alertes, historique, tableaux « par formation / grade / secrétariat » |
-| **Couverture auditeurs** | auditeurs avec ≥ 1 présence ÷ inscrits | Cartes pédagogiques, bilans CPFAE |
-| **Absence séance** | places absentes ÷ places attendues | Cartes pédagogiques |
-| **Événements absence / suspect** | pointages atypiques ÷ inscrits | Cartes pédagogiques, alertes (seuil configurable) |
-| **Avancement VH (sessions clôturées)** | heures réalisées ÷ heures prévues | KPI volume horaire, alertes |
-
-Les infobulles (icône ℹ sur les cartes KPI) décrivent chaque indicateur au survol.
-
-**Compatibilité API :** le champ technique `taux_achevement` reste disponible ; il correspond à **Couverture auditeurs** (`taux_couverture_auditeurs`).
 
 ### Statuts de pointage affichés
 
@@ -174,11 +154,11 @@ Les infobulles (icône ℹ sur les cartes KPI) décrivent chaque indicateur au s
 
 Uniquement sur cet onglet, un bandeau affiche les **3 indicateurs prioritaires** :
 
-1. **Assiduité séance** (anciennement « taux de présence »)
-2. **Avancement VH (sessions clôturées)**
+1. **Taux de présence**
+2. **Taux d'exécution du volume horaire**
 3. **Saturation des groupes**
 
-Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / Avertissement / Critique). Une infobulle décrit le calcul de chaque indicateur.
+Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / Avertissement / Critique).
 
 ![Vue d'ensemble — KPI et graphiques](screenshots/manuel-statistiques/02-vue-ensemble.png)
 
@@ -194,13 +174,13 @@ Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / A
 | 4 | **Formateurs** | Encadrants référencés |
 | 5 | **Séances totales** | Sessions programmées |
 | 6 | **Vol. horaire prévu** | Heures prévues (format `Xh`) |
-| 7 | **Avancement VH (sessions clôturées)** | % réalisé / prévu (vert ≥ 70 %, orange 40–69 %, rouge < 40 %) |
+| 7 | **Taux exéc. vol. horaire** | % réalisé / prévu (vert ≥ 70 %, orange 40–69 %, rouge < 40 %) |
 
 ### 6.3 Graphiques
 
 | Carte | Contenu |
 |-------|---------|
-| **Indicateurs pédagogiques** | Deux cartes principales (**Assiduité séance**, **Couverture auditeurs**) puis les quatre taux détaillés |
+| **Taux de présence (global)** | 4 pourcentages : Présence, Absence, Abandon, Achèvement |
 | **Répartition Hommes / Femmes** | Donut par sexe |
 | **Charge des formateurs (top 8)** | Barres horizontales — nombre de séances par formateur |
 
@@ -215,22 +195,17 @@ Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / A
 | **Inscrits** | Effectif total inscrit |
 | **Présents** | Ayant au moins un pointage « présent » |
 | **Absents** | Non présents sur la période |
-| **Événements** | Pointages « absent non badgé » ou « hors ligne suspect » |
-| **Assiduité séance** | Places présentes ÷ places attendues (séances terminées) |
-| **Couverture auditeurs** | Auditeurs avec ≥ 1 présence ÷ inscrits |
-| **Absence séance** | Places absentes ÷ places attendues |
-| **Événements absence / suspect** | Événements atypiques ÷ inscrits |
-
-Les cartes **Assiduité séance** et **Couverture auditeurs** sont mises en avant côte à côte en tête de l'onglet.
+| **Abandons** | Abandons enregistrés |
+| **Taux présence / absence / abandon / achèvement** | Pourcentages calculés sur l'effectif |
 
 ### 7.2 Tableaux et graphiques
 
 | Bloc | Détail |
 |------|--------|
-| **Assiduité séance par formation (10 der.)** | Colonnes : Formation, Inscrits, Présents, Taux (barre colorée) |
-| **Assiduité séance par grade** | Une barre par grade avec effectif inscrit |
+| **Taux de présence par formation (10 der.)** | Colonnes : Formation, Inscrits, Présents, Taux (barre colorée) |
+| **Taux de présence par grade** | Une barre par grade avec effectif inscrit |
 | **Auditeurs par type de concours** | Barres horizontales |
-| **Assiduité séance par secrétariat** | Tableau cliquable → bascule vers l'onglet Secrétariats |
+| **Taux de présence par secrétariat** | Tableau cliquable → bascule vers l'onglet Secrétariats |
 
 ### 7.3 Code couleur des barres de taux
 
@@ -437,13 +412,26 @@ Même structure que le bilan module (5 colonnes), mais les effectifs sont **agr�
 
 ## 12. Onglet Point Journalier
 
-Reproduit le **format CPFAE officiel** : un tableau par **journée × catégorie × formation**, avec blocs **MATIN** et **SOIR**.
+Reproduit le **format CPFAE officiel** (modèle Excel « POINT JOURNALIER CAT A ») : un tableau par **journée × catégorie × formation × grade**, avec blocs **MATIN** (08H00-12H00) et **SOIR** (13H00-17H00).
 
 ![Point Journalier — liste et détail](screenshots/manuel-statistiques/03-point-journalier.png)
 
 *Figure 8 — Filtres, exports, liste des tableaux et détail d'une journée.*
 
-### 12.1 Filtres
+### 12.1 Structure du tableau (modèle FAC)
+
+| Zone | Contenu |
+|------|---------|
+| **Ligne 1** | `FORMATION D'ACCOMPAGNEMENT DE CARRIER CAT A _POINT DES PRÉSENCES_CPFAE` (orange) |
+| **Ligne 2** | DATE · jour · mois · année · `CATÉGORIE A_GRADE A3` |
+| **Bande droite** | Libellé vague (ex. **SECONDE VAGUE**, fond jaune) |
+| **MATIN / SOIR** | GROUPES (G7, G8…), SALLES (région/district), effectifs, taux |
+| **Colonne TOTAL** | Sommes et taux globaux du créneau (fond jaune) |
+| **Pied** | Taux de présence du jour · Taux d'absence du jour |
+
+> **Export Excel :** une feuille par grade (ex. feuilles **A3**, **A4**) pour une même catégorie.
+
+### 12.2 Filtres
 
 | Filtre | Description |
 |--------|-------------|
@@ -454,7 +442,7 @@ Reproduit le **format CPFAE officiel** : un tableau par **journée × catégorie
 
 Boutons sur la **même ligne** : **Actualiser**, **Excel**, **PDF**, **Word**.
 
-### 12.2 Navigation
+### 12.3 Navigation
 
 | Zone | Rôle |
 |------|------|
@@ -463,7 +451,7 @@ Boutons sur la **même ligne** : **Actualiser**, **Excel**, **PDF**, **Word**.
 
 > Tableaux larges : **défilement horizontal** au-delà de 10 groupes.
 
-### 12.3 Contenu d'un point journalier
+### 12.4 Contenu d'un point journalier
 
 Pour chaque créneau (MATIN / SOIR) :
 
@@ -478,7 +466,7 @@ Pour chaque créneau (MATIN / SOIR) :
 
 Pied de page : **Taux de présence du jour** (global).
 
-### 12.4 Exports Point Journalier
+### 12.5 Exports Point Journalier
 
 | Format | Usage |
 |--------|--------|
@@ -586,6 +574,7 @@ Réservée aux **validateurs / administrateurs** :
 | 2.0.0 | 03/06/2026 | Manuel détaillé complet : bilans CPFAE (module, catégorie, formation), exports Excel/PDF/Word bilans et PJ, alertes visuelles, suppression section « Rapports générés », captures d'écran intégrées |
 | 2.0.1 | 05/06/2026 | Vue d'ensemble : retrait des widgets Pointages et Pointages par statut |
 | 2.1.0 | 08/06/2026 | Harmonisation des libellés (assiduité séance, couverture auditeurs, événements absence/suspect, avancement VH), bandeau explicatif sous les filtres, infobulles KPI, champ API `taux_couverture_auditeurs`, §5.1 « Comment lire les chiffres » |
+| 2.2.0 | 11/06/2026 | Point journalier aligné modèle Excel FAC 2025 : titre par catégorie, feuille par grade, visuel web CPFAE (orange/jaune), colonne TOTAL et bande vague |
 
 ---
 

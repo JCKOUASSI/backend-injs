@@ -7,40 +7,19 @@ from io import BytesIO
 from datetime import timedelta, datetime, time, date
 import calendar
 import re
-from django.core.exceptions import ValidationError
 from django.db.models import Count, Q, F
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
-from authentication.permissions import (
-    IsSecretariat,
-    IsSecretariatOrDFRC,
-    IsSecretariatOrEncadrantOrDFRC,
-    IsDFRC,
-    CanManageModuleParticipant,
-)
-from .api_access import IsWebStaff, IsOperationalWebStaff, CanListParticipants, formation_or_response, module_or_response
-from .sync_permission import IsInterPlatformServiceAccount
-from authentication.role_groups import SECRETARIAT_ROLES
-from .access import (
-    can_filter_modules_by_secretariat,
-    formateurs_queryset_for_user,
-    modules_queryset_for_user,
-    participant_accessible,
-    participants_queryset_for_user,
-)
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import (
-    Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant,
-    ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
-    RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings,
-    FinanceAjustement, NoteModule,
-)
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .formateur_privacy import (
@@ -55,7 +34,6 @@ from .serializers import (
     FormateurSerializer,
     ModuleSerializer,
 )
-from .period_filter import parse_period_from_request, periode_api_payload
 
 
 def _normalize_groupe_value(value):
@@ -77,70 +55,24 @@ def _groupe_sort_key(value):
     return (1, value)
 
 
-def _module_audit_extra(module):
-    return {
-        'module_id': module.id,
-        'module_intitule': module.intitule,
-    }
-
-
-def _log_import_excel_audit(request, import_type, stats, errors, filename):
-    total = stats.get('created', 0) + stats.get('updated', 0)
-    if total <= 0:
-        return
-    action_map = {
-        'formations': AuditLog.Action.FORMATION_CREATE,
-        'formateurs': AuditLog.Action.FORMATEUR_IMPORT,
-        'participants': AuditLog.Action.PARTICIPANT_IMPORT,
-        'seances': AuditLog.Action.SEANCE_IMPORT,
-        'emploi_du_temps': AuditLog.Action.IMPORT_EXCEL,
-    }
-    audit_action = action_map.get(import_type, AuditLog.Action.IMPORT_EXCEL)
-    _log_audit(
-        action=audit_action,
-        request=request,
-        extra={
-            'type': import_type,
-            'created': stats.get('created', 0),
-            'updated': stats.get('updated', 0),
-            'errors': len(errors),
-            'filename': filename,
-        },
-    )
-
-
-def _ref_label(obj):
-    for attr in ('intitule', 'nom', 'libelle'):
-        val = getattr(obj, attr, None)
-        if val:
-            return str(val)
-    return str(obj.pk)
-
-
-def _log_referentiel_audit(request, action, ref_type, obj, extra=None):
-    payload = {'referentiel': ref_type}
-    if extra:
-        payload.update(extra)
-    _log_audit(
-        action=action,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(obj.pk),
-        cible_nom=_ref_label(obj),
-        extra=payload,
-    )
-
-
 @api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     """Return dashboard statistics, scoped by secretariat for SECRETARIAT role."""
-    modules_qs = modules_queryset_for_user(request.user)
-    participants_qs = participants_queryset_for_user(request.user)
+    modules_qs = Module.objects.all()
+    participants_qs = Participant.objects.all()
     secretariat_filter = request.query_params.get('secretariat')
     reference_date_raw = request.query_params.get('reference_date')
 
-    if can_filter_modules_by_secretariat(request.user) and secretariat_filter:
+    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        sec = request.user.secretariat
+        modules_qs = modules_qs.filter(secretariat=sec)
+        participants_qs = participants_qs.filter(secretariat=sec)
+    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
+        modules_qs = modules_qs.filter(superviseur=request.user)
+        fp_ids = ModuleParticipant.objects.filter(module__superviseur=request.user).values_list('participant_id', flat=True)
+        participants_qs = participants_qs.filter(id__in=fp_ids).distinct()
+    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION') and secretariat_filter:
         modules_qs = modules_qs.filter(secretariat_id=secretariat_filter)
         participants_qs = participants_qs.filter(secretariat_id=secretariat_filter)
 
@@ -163,19 +95,16 @@ def dashboard_stats(request):
 
     from .volume_horaire import compute_dashboard_volume_horaire
 
-    period = parse_period_from_request(request)
-    if period['error']:
-        return Response({'detail': period['detail']}, status=400)
-
     volume_horaire_effectue_heures, volume_horaire_total_heures, volume_horaire_effectue_taux = (
-        compute_dashboard_volume_horaire(
-            modules_qs,
-            date_debut=period['date_debut'],
-            date_fin=period['date_fin'],
-        )
+        compute_dashboard_volume_horaire(modules_qs)
     )
 
-    formateurs_qs = formateurs_queryset_for_user(request.user)
+    formateurs_qs = Formateur.objects.all()
+    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        sec = request.user.secretariat
+        formateurs_qs = formateurs_qs.filter(secretariats=sec)
+    elif request.user.role == 'ENCADRANT':
+        formateurs_qs = formateurs_qs.filter(modules_assignes__module__in=modules_qs).distinct()
     total_formateurs = formateurs_qs.count()
 
     seances_actives = PresenceSessionModule.objects.filter(
@@ -427,7 +356,6 @@ def dashboard_stats(request):
         'volume_horaire_total_heures': volume_horaire_total_heures,
         'volume_horaire_effectue_heures': volume_horaire_effectue_heures,
         'volume_horaire_effectue_taux': volume_horaire_effectue_taux,
-        'periode': periode_api_payload(period['date_debut'], period['date_fin'], period['meta']),
         'total_formateurs': total_formateurs,
         'seances_actives': seances_actives,
         'seances_planifiees_aujourd_hui': seances_planifiees_aujourd_hui,
@@ -458,7 +386,7 @@ def dashboard_stats(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def formation_list_api(request):
     """
     List modules (une ligne par module) with optional filtering.
@@ -468,12 +396,18 @@ def formation_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
 
-    queryset = modules_queryset_for_user(
-        request.user,
-        Module.objects.select_related(
-            'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par'
-        ),
+    queryset = Module.objects.select_related(
+        'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par'
     )
+
+    # Restriction par rôle
+    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.secretariat:
+            queryset = queryset.filter(secretariat=request.user.secretariat)
+        else:
+            queryset = queryset.none()
+    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
+        queryset = queryset.filter(superviseur=request.user)
 
     # Filtres
     statut = request.query_params.get('statut')
@@ -503,7 +437,7 @@ def formation_list_api(request):
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
 
     secretariat_id = request.query_params.get('secretariat')
-    if secretariat_id and can_filter_modules_by_secretariat(request.user):
+    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
         queryset = queryset.filter(secretariat_id=secretariat_id)
 
     vague_filter = request.query_params.get('vague')
@@ -613,7 +547,7 @@ def formation_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([CanListParticipants])
+@permission_classes([IsAuthenticated])
 def participant_list_api(request):
     """
     List participants with optional search.
@@ -628,7 +562,16 @@ def participant_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
 
-    queryset = participants_queryset_for_user(request.user)
+    queryset = Participant.objects.all()
+    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.secretariat:
+            queryset = queryset.filter(secretariat=request.user.secretariat)
+        else:
+            queryset = queryset.filter(secretariat__isnull=True)
+    elif request.user.role == 'ENCADRANT':
+        queryset = queryset.filter(
+            modules_inscrits__module__superviseur=request.user
+        ).distinct()
 
     scoped_queryset = queryset
     raw_groupes = (
@@ -734,15 +677,16 @@ def participant_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def participant_formations_api(request, pk):
     """Return all modules a participant is enrolled in (with their formation)."""
-    participant = participant_accessible(request.user, pk)
-    if not participant:
+    try:
+        participant = Participant.objects.get(pk=pk)
+    except Participant.DoesNotExist:
         return Response({'error': 'Participant introuvable.'}, status=404)
 
     modules = (
-        modules_queryset_for_user(request.user)
+        Module.objects
         .filter(module_participants__participant=participant)
         .select_related('formation', 'secretariat')
         .order_by('-id')
@@ -767,13 +711,12 @@ def participant_formations_api(request, pk):
             'date_fin': m.date_fin,
             'statut': m.statut,
             'secretariat_nom': m.secretariat.nom if m.secretariat else None,
-            'duree_prevue_heures': float(m.duree_prevue_heures or 0),
         })
     return Response(data)
 
 
 @api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def formateur_list_api(request):
     """
     List formateurs with optional search.
@@ -784,7 +727,7 @@ def formateur_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
     
-    queryset = formateurs_queryset_for_user(request.user)
+    queryset = Formateur.objects.all()
     
     # Apply search
     search = request.query_params.get('search')
@@ -811,6 +754,19 @@ def formateur_list_api(request):
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
     })
+
+
+def _session_duration_minutes(session):
+    """Durée d'une séance en minutes (réelle si terminée, sinon prévue)."""
+    if session.demarree_le and session.terminee_le:
+        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    if session.heure_debut_prevue and session.heure_fin_prevue:
+        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
+        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
+        elapsed = (end_dt - start_dt).total_seconds() / 60
+        return round(elapsed, 1) if elapsed > 0 else 0
+    return 0
 
 
 def _finance_realized_minutes(realized_minutes, planned_minutes):
@@ -956,6 +912,173 @@ def _finance_session_in_range(session, date_debut, date_fin):
     return True
 
 
+def _parse_finance_date_range(request):
+    """
+    Analyse les paramètres de période finance.
+
+    Query params:
+    - ``preset`` : ``tout`` | ``mois`` | ``trimestre`` | ``annee`` | ``custom``
+    - ``mois`` : ``YYYY-MM`` (si preset=mois)
+    - ``annee`` : ``YYYY`` (si preset=annee)
+    - ``trimestre`` : ``YYYY-Q1`` … ``YYYY-Q4`` (si preset=trimestre)
+    - ``date_debut``, ``date_fin`` : ``YYYY-MM-DD`` (si preset=custom ou dates seules)
+
+    Retourne un dict avec ``error``, ``detail``, ``date_debut``, ``date_fin``, ``meta``.
+    """
+    preset = (request.query_params.get('preset') or '').strip().lower()
+    date_debut_s = (request.query_params.get('date_debut') or '').strip()
+    date_fin_s = (request.query_params.get('date_fin') or '').strip()
+    today = timezone.localdate()
+
+    if not preset and not date_debut_s and not date_fin_s:
+        preset = 'tout'
+    elif not preset and date_debut_s and date_fin_s:
+        preset = 'custom'
+
+    def _err(detail):
+        return {'error': True, 'detail': detail, 'date_debut': None, 'date_fin': None, 'meta': {}}
+
+    try:
+        if preset == 'tout':
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': None,
+                'date_fin': None,
+                'meta': {
+                    'preset': 'tout',
+                    'type': 'tout',
+                    'label': 'Toutes les périodes',
+                    'description': (
+                        'Cumul de toutes les séances enregistrées (aucun filtre de dates).'
+                    ),
+                },
+            }
+
+        if preset == 'mois':
+            mois = (request.query_params.get('mois') or today.strftime('%Y-%m')).strip()
+            parts = mois.split('-')
+            if len(parts) != 2:
+                return _err('Paramètre mois invalide (format YYYY-MM attendu).')
+            year, month = int(parts[0]), int(parts[1])
+            last_day = calendar.monthrange(year, month)[1]
+            d0, d1 = date(year, month, 1), date(year, month, last_day)
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'mois',
+                    'mois': mois,
+                    'type': 'intervalle',
+                    'label': f"Mois de {d0.strftime('%m/%Y')}",
+                    'description': 'Séances dont la date est dans le mois sélectionné.',
+                },
+            }
+
+        if preset == 'trimestre':
+            trimestre = (request.query_params.get('trimestre') or '').strip()
+            if trimestre and '-Q' in trimestre.upper():
+                year_s, q_s = trimestre.upper().split('-Q', 1)
+                year, q = int(year_s), int(q_s)
+            else:
+                year = int(request.query_params.get('annee') or today.year)
+                q = (today.month - 1) // 3 + 1
+            if q not in (1, 2, 3, 4):
+                return _err('Trimestre invalide (1 à 4).')
+            start_month = (q - 1) * 3 + 1
+            end_month = start_month + 2
+            last_day = calendar.monthrange(year, end_month)[1]
+            d0 = date(year, start_month, 1)
+            d1 = date(year, end_month, last_day)
+            trimestre_key = f'{year}-Q{q}'
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'trimestre',
+                    'trimestre': trimestre_key,
+                    'type': 'intervalle',
+                    'label': f'Trimestre {q} — {year}',
+                    'description': 'Séances dont la date est dans le trimestre sélectionné.',
+                },
+            }
+
+        if preset == 'annee':
+            year = int(request.query_params.get('annee') or today.year)
+            d0, d1 = date(year, 1, 1), date(year, 12, 31)
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'annee',
+                    'annee': year,
+                    'type': 'intervalle',
+                    'label': f'Année {year}',
+                    'description': 'Séances dont la date est dans l\'année sélectionnée.',
+                },
+            }
+
+        if preset == 'custom':
+            if not date_debut_s or not date_fin_s:
+                return _err('date_debut et date_fin sont requis pour une période personnalisée.')
+            d0 = date.fromisoformat(date_debut_s)
+            d1 = date.fromisoformat(date_fin_s)
+            if d0 > d1:
+                return _err('La date de début doit être antérieure ou égale à la date de fin.')
+            return {
+                'error': False,
+                'detail': None,
+                'date_debut': d0,
+                'date_fin': d1,
+                'meta': {
+                    'preset': 'custom',
+                    'type': 'intervalle',
+                    'label': 'Période personnalisée',
+                    'description': 'Séances dont la date est dans l\'intervalle choisi.',
+                },
+            }
+
+        return _err(f'Preset inconnu : {preset}.')
+    except ValueError:
+        return _err('Format de date invalide (attendu : YYYY-MM-DD ou YYYY-MM).')
+
+
+def _finance_periode_payload(date_debut, date_fin, meta, date_min=None, date_max=None):
+    """Construit la réponse ``periode`` pour le frontend."""
+    if date_debut is None and date_fin is None:
+        if date_min and date_max:
+            plabel = f"Du {date_min.strftime('%d/%m/%Y')} au {date_max.strftime('%d/%m/%Y')}"
+        elif date_min:
+            plabel = f"Depuis le {date_min.strftime('%d/%m/%Y')}"
+        else:
+            plabel = 'Aucune séance enregistrée'
+        return {
+            **meta,
+            'date_debut': date_min.isoformat() if date_min else None,
+            'date_fin': date_max.isoformat() if date_max else None,
+            'periode_label': plabel,
+            'filtre_actif': False,
+        }
+    plabel = f"Du {date_debut.strftime('%d/%m/%Y')} au {date_fin.strftime('%d/%m/%Y')}"
+    payload = {
+        **meta,
+        'date_debut': date_debut.isoformat(),
+        'date_fin': date_fin.isoformat(),
+        'periode_label': plabel,
+        'filtre_actif': True,
+    }
+    if date_min and date_max:
+        payload['donnees_effectives_debut'] = date_min.isoformat()
+        payload['donnees_effectives_fin'] = date_max.isoformat()
+    return payload
+
+
 def _finance_secretariat_id_from_request(request):
     raw = (request.query_params.get('secretariat_id') or request.query_params.get('secretariat') or '').strip()
     if not raw:
@@ -1065,41 +1188,6 @@ def _finance_previous_period(date_debut, date_fin, meta):
     return None
 
 
-def _heures_entieres(minutes):
-    """Convertit des minutes en heures entières (affichage stats / finance)."""
-    return int(round(float(minutes or 0) / 60))
-
-
-def _finance_scope_module_ids(secretariat_id=None):
-    """Modules du périmètre volume horaire global (aligné dashboard web / statistiques)."""
-    qs = Module.objects.all()
-    if secretariat_id:
-        qs = qs.filter(secretariat_id=secretariat_id)
-    return list(qs.values_list('id', flat=True))
-
-
-def _finance_canonical_volume_kpis(rows=None, *, date_debut=None, date_fin=None, secretariat_id=None):
-    """Volume horaire global aligné dashboard web / statistiques (tous les modules du périmètre)."""
-    from .volume_horaire import compute_volume_horaire_from_module_ids
-
-    module_ids = _finance_scope_module_ids(secretariat_id)
-    return compute_volume_horaire_from_module_ids(
-        module_ids,
-        date_debut=date_debut,
-        date_fin=date_fin,
-        integer_hours=True,
-    )
-
-
-def _finance_apply_canonical_volume_kpis(kpis, volume_totals):
-    kpis['total_duree_minutes'] = volume_totals['prevu_minutes']
-    kpis['total_duree_heures'] = volume_totals['prevu_heures']
-    kpis['total_duree_realisee_minutes'] = volume_totals['realise_minutes']
-    kpis['total_duree_realisee_heures'] = volume_totals['realise_heures']
-    kpis['taux_realisation_global_pct'] = volume_totals['taux_pct']
-    kpis['total_sessions'] = int(volume_totals.get('nb_sessions') or 0)
-
-
 def _finance_kpis_from_rows(rows, prix_heure):
     """Agrège les KPI dashboard à partir des lignes rapport finance."""
     total_formateurs = len(rows)
@@ -1107,11 +1195,11 @@ def _finance_kpis_from_rows(rows, prix_heure):
     formateurs_inactifs = total_formateurs - formateurs_actifs
     total_sessions = sum(int(r.get('sessions_count') or 0) for r in rows)
     total_duree_minutes = round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1)
-    total_duree_heures = _heures_entieres(total_duree_minutes)
+    total_duree_heures = round(total_duree_minutes / 60, 2)
     total_duree_realisee_minutes = round(
         sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1,
     )
-    total_duree_realisee_heures = _heures_entieres(total_duree_realisee_minutes)
+    total_duree_realisee_heures = round(total_duree_realisee_minutes / 60, 2)
     total_montant_realise = round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2)
     taux_planned = sum(
         float((r.get('statistiques') or {}).get('taux_planned_minutes') or 0) for r in rows
@@ -1153,94 +1241,85 @@ def _finance_kpis_from_rows(rows, prix_heure):
         'tarifs_appliques': sorted(tarifs_appliques),
         'prix_heure_moyen_effectif': prix_heure_moyen_effectif,
         'taux_realisation_global_pct': taux_realisation_global,
-        'moyenne_heures_par_formateur': int(round(
-            total_duree_heures / formateurs_actifs,
-        )) if formateurs_actifs > 0 else 0,
-        'moyenne_heures_realisees_par_formateur': int(round(
-            total_duree_realisee_heures / formateurs_actifs,
-        )) if formateurs_actifs > 0 else 0,
+        'moyenne_heures_par_formateur': round(
+            (total_duree_heures / formateurs_actifs), 2,
+        ) if formateurs_actifs > 0 else 0,
+        'moyenne_heures_realisees_par_formateur': round(
+            (total_duree_realisee_heures / formateurs_actifs), 2,
+        ) if formateurs_actifs > 0 else 0,
         'moyenne_montant_par_formateur_actif': round(
             (total_montant_realise / formateurs_actifs), 2,
         ) if formateurs_actifs > 0 else 0,
     }
 
 
-def _finance_module_row_meta(mod_obj, prix_heure=None):
-    if not mod_obj:
-        return None
-    return {
-        'module_id': mod_obj.id,
-        'module_intitule': mod_obj.canonical_intitule(),
-        'formation_intitule': (
-            mod_obj.formation.formation if mod_obj.formation_id else ''
-        ),
-        'grade': mod_obj.grade or '',
-        'groupe': mod_obj.groupe or '',
-        'secretariat_nom': (
-            f"{mod_obj.secretariat.nom} ({mod_obj.secretariat.numero})"
-            if mod_obj.secretariat_id and mod_obj.secretariat else ''
-        ),
-        'prix_heure_realisee': prix_heure,
-    }
-
-
 def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None):
-    """Ventilation dashboard par module (volume horaire canonique, périmètre = dashboard web)."""
-    from .volume_horaire import _accumulate_module_session_volumes
+    """Ventilation dashboard par module (planifié unique, réalisé/coût cumulés formateurs)."""
+    meta_by_id = {}
+    realise_by_id = {}
+    montant_by_id = {}
+    taux_planned_by_id = {}
+    taux_realized_by_id = {}
 
-    prix_by_module = {}
     for row in rows:
         for mod in row.get('modules') or []:
             mid = mod.get('module_id')
-            if mid and mod.get('prix_heure_realisee') is not None:
-                prix_by_module[mid] = mod.get('prix_heure_realisee')
+            if not mid:
+                continue
+            if mid not in meta_by_id:
+                meta_by_id[mid] = {
+                    'module_id': mid,
+                    'module_intitule': mod.get('module_intitule') or '',
+                    'formation_intitule': mod.get('formation_intitule') or '',
+                    'grade': mod.get('grade') or '',
+                    'groupe': mod.get('groupe') or '',
+                    'secretariat_nom': mod.get('secretariat_nom') or '',
+                    'prix_heure_realisee': mod.get('prix_heure_realisee'),
+                }
+            realise_by_id[mid] = realise_by_id.get(mid, 0.0) + float(mod.get('total_duree_realisee_minutes') or 0)
+            montant_by_id[mid] = montant_by_id.get(mid, 0.0) + float(mod.get('montant_realise') or 0)
+            taux_planned_by_id[mid] = taux_planned_by_id.get(mid, 0.0) + float(mod.get('taux_planned_minutes') or 0)
+            taux_realized_by_id[mid] = taux_realized_by_id.get(mid, 0.0) + float(
+                mod.get('taux_realized_capped_minutes') or 0
+            )
 
-    module_ids = _finance_scope_module_ids(secretariat_id)
-    if not module_ids:
+    if not meta_by_id:
         return []
 
-    default_prix, prix_map = _finance_build_prix_map()
+    module_ids = list(meta_by_id.keys())
     modules_by_id = {
-        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
-            'formation', 'secretariat', 'ref_module',
-        )
+        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related('formation', 'secretariat')
     }
+    sessions_by_module = {}
+    for session in SessionModule.objects.filter(module_id__in=module_ids).order_by('date_journee', 'numero'):
+        sessions_by_module.setdefault(session.module_id, []).append(session)
 
     results = []
     for mid in module_ids:
         mod_obj = modules_by_id.get(mid)
-        if not mod_obj:
+        if secretariat_id and (not mod_obj or mod_obj.secretariat_id != secretariat_id):
             continue
-        vol = _accumulate_module_session_volumes(
-            mod_obj,
-            date_debut=date_debut,
-            date_fin=date_fin,
+        planned = 0.0
+        sessions_count = 0
+        for session in sessions_by_module.get(mid, []):
+            if not _finance_session_in_range(session, date_debut, date_fin):
+                continue
+            sessions_count += 1
+            planned += _session_duration_minutes(session)
+        realized = round(realise_by_id.get(mid, 0.0), 1)
+        montant = round(montant_by_id.get(mid, 0.0), 2)
+        taux = _finance_taux_realisation_pct(
+            taux_realized_by_id.get(mid, 0.0),
+            taux_planned_by_id.get(mid, 0.0),
         )
-        planned = round(vol['prevu_min'], 1)
-        realized = round(vol['realise_min'], 1)
-        nb_sessions = int(vol['nb_sessions'] or 0)
-        if planned <= 0 and realized <= 0 and nb_sessions <= 0:
-            continue
-        prix = prix_by_module.get(mid)
-        if prix is None:
-            prix = _finance_resolve_prix_heure(
-                _finance_module_formation_label(mod_obj),
-                prix_map=prix_map,
-                default=default_prix,
-                module_obj=mod_obj,
-            )
-        meta = _finance_module_row_meta(mod_obj, prix_heure=prix)
-        if not meta:
-            continue
-        montant = _finance_montant_from_minutes(realized, prix)
-        taux = _finance_taux_realisation_pct(realized, planned)
+        meta = meta_by_id[mid]
         results.append({
             **meta,
-            'sessions_count': nb_sessions,
-            'total_duree_minutes': planned,
-            'total_duree_heures': _heures_entieres(planned) if planned else 0,
+            'sessions_count': sessions_count,
+            'total_duree_minutes': round(planned, 1),
+            'total_duree_heures': round(planned / 60, 2) if planned else 0,
             'total_duree_realisee_minutes': realized,
-            'total_duree_realisee_heures': _heures_entieres(realized) if realized else 0,
+            'total_duree_realisee_heures': round(realized / 60, 2) if realized else 0,
             'taux_realisation_pct': taux,
             'montant_realise': montant,
         })
@@ -1274,109 +1353,6 @@ def _finance_join_unique_labels(values):
     """Concatène des libellés uniques (grade, groupe…) triés."""
     cleaned = sorted({str(v).strip() for v in values if v and str(v).strip()})
     return ', '.join(cleaned)
-
-
-def _finance_recap_par_module(modules, *, settings=None):
-    """Fiche récapitulative des modules dispensés par formateur."""
-    from .finance_tolerance import evaluate_volume_tolerance
-
-    recap = []
-    for mod in modules or []:
-        planned = round(float(mod.get('total_duree_minutes') or 0), 1)
-        realized = round(float(mod.get('total_duree_realisee_minutes') or 0), 1)
-        tol = evaluate_volume_tolerance(planned, realized, settings=settings)
-        recap.append({
-            'module_id': mod.get('module_id'),
-            'module_intitule': mod.get('module_intitule') or mod.get('module_intitule_brut') or '',
-            'formation_intitule': mod.get('formation_intitule') or '',
-            'grade': mod.get('grade') or '',
-            'groupe': mod.get('groupe') or '',
-            'sessions_count': int(mod.get('sessions_count') or 0),
-            'total_duree_minutes': planned,
-            'total_duree_realisee_minutes': realized,
-            'total_duree_heures': mod.get('total_duree_heures') or 0,
-            'total_duree_realisee_heures': mod.get('total_duree_realisee_heures') or 0,
-            'taux_realisation_pct': mod.get('taux_realisation_pct') or 0,
-            'montant_realise': round(float(mod.get('montant_realise') or 0), 2),
-            'prix_heure_realisee': mod.get('prix_heure_realisee'),
-            'tolerance': tol,
-        })
-    return sorted(
-        recap,
-        key=lambda x: (x.get('grade') or '', x.get('groupe') or '', x.get('module_intitule') or ''),
-    )
-
-
-def _finance_enrich_row_tolerance(row, settings=None):
-    """Ajoute l'évaluation tolérance au formateur et à chaque module."""
-    from .finance_tolerance import evaluate_volume_tolerance, tolerance_settings_payload
-
-    tol_row = evaluate_volume_tolerance(
-        row.get('total_duree_minutes'),
-        row.get('total_duree_realisee_minutes'),
-        settings=settings,
-    )
-    row['tolerance'] = tol_row
-    row['tolerance_parametres'] = tolerance_settings_payload(settings)
-
-    modules = row.get('modules') or []
-    for mod in modules:
-        mod['tolerance'] = evaluate_volume_tolerance(
-            mod.get('total_duree_minutes'),
-            mod.get('total_duree_realisee_minutes'),
-            settings=settings,
-        )
-
-    recap = row.get('recap_modules') or []
-    for item in recap:
-        if 'tolerance' not in item:
-            item['tolerance'] = evaluate_volume_tolerance(
-                item.get('total_duree_minutes'),
-                item.get('total_duree_realisee_minutes'),
-                settings=settings,
-            )
-    return row
-
-
-def _finance_group_sessions_by_groupe(sessions):
-    """Regroupe les séances par grade + groupe avec sous-totaux."""
-    groups = {}
-    for session in sessions or []:
-        grade = (session.get('grade') or '').strip()
-        groupe = (session.get('groupe') or '').strip()
-        key = (grade, groupe)
-        entry = groups.setdefault(key, {
-            'grade': grade,
-            'groupe': groupe,
-            'sessions': [],
-            'sous_total': {
-                'creneau_minutes': 0.0,
-                'realise_minutes': 0.0,
-                'montant': 0.0,
-                'sessions_count': 0,
-            },
-        })
-        creneau = float(session.get('duree_minutes') or 0)
-        realise = float(session.get('duree_realisee_minutes') or 0)
-        montant = float(session.get('montant_realise') or 0)
-        entry['sessions'].append(session)
-        entry['sous_total']['creneau_minutes'] += creneau
-        entry['sous_total']['realise_minutes'] += realise
-        entry['sous_total']['montant'] += montant
-        entry['sous_total']['sessions_count'] += 1
-
-    result = []
-    for key in sorted(groups.keys()):
-        entry = groups[key]
-        entry['sessions'].sort(
-            key=lambda s: (str(s.get('date_journee') or ''), int(s.get('numero') or 0)),
-        )
-        st = entry['sous_total']
-        st['creneau_minutes'] = round(st['creneau_minutes'], 1)
-        st['realise_minutes'] = round(st['realise_minutes'], 1)
-        st['montant'] = round(st['montant'], 2)
-        result.append(entry)
-    return result
 
 
 def _finance_build_statistiques(
@@ -1453,7 +1429,7 @@ def _finance_report_rows(
     modules_by_id = {}
     if all_module_ids:
         for module in Module.objects.filter(id__in=all_module_ids).select_related(
-            'formation', 'secretariat', 'site', 'ref_module',
+            'formation', 'secretariat', 'site',
         ):
             modules_by_id[module.id] = module
     sessions_by_module = {}
@@ -1466,35 +1442,24 @@ def _finance_report_rows(
 
     realized_by_formateur_session = {}
     if formateur_ids:
-        from presences.duree import pointage_minutes_clampees
-
         now = timezone.now()
         pointages = Pointage.objects.filter(
             formateur_id__in=formateur_ids,
             session__module_id__in=all_module_ids,
             session_id__isnull=False,
-        ).select_related('session').only(
-            'formateur_id', 'session_id', 'duree_presence_minutes',
-            'timestamp_entree', 'timestamp_sortie',
-            'session__heure_debut_prevue', 'session__heure_fin_prevue',
-        )
+        ).only('formateur_id', 'session_id', 'duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
         for pt in pointages:
+            minutes = 0.0
             if pt.duree_presence_minutes is not None:
                 minutes = float(pt.duree_presence_minutes)
-            else:
-                # Règle commune SYGEP : durée clampée au créneau de la séance
-                # (pointage ouvert compté jusqu'à maintenant, clampé).
-                minutes = pointage_minutes_clampees(pt, now=now)
+            elif pt.timestamp_entree and pt.timestamp_sortie:
+                minutes = max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
+            elif pt.timestamp_entree and not pt.timestamp_sortie:
+                # Pointage encore ouvert: compter le temps écoulé jusqu'à maintenant.
+                minutes = max((now - pt.timestamp_entree).total_seconds() / 60, 0)
             key = (pt.formateur_id, pt.session_id)
             realized_by_formateur_session[key] = realized_by_formateur_session.get(key, 0.0) + minutes
 
-    from .volume_horaire import (
-        _session_prevu_minutes,
-        _session_realise_minutes,
-        module_planned_minutes_for_period,
-    )
-
-    finance_settings = FinanceSettings.get_solo()
     results = []
     for formateur in formateurs:
         module_ids = sorted(module_formateur_map.get(formateur.id, set()))
@@ -1525,69 +1490,23 @@ def _finance_report_rows(
                 module_obj=module_obj,
             )
             module_sessions = sessions_by_module.get(module_id, [])
-            sessions_in_period = [
-                s for s in module_sessions
-                if _finance_session_in_range(s, date_debut, date_fin)
-            ]
-            if not sessions_in_period:
-                continue
-            module_planned = round(module_planned_minutes_for_period(
-                module_obj,
-                len(sessions_in_period),
-                len(module_sessions),
-                sessions_in_period,
-            ), 1)
-            canonical_intitule = module_obj.canonical_intitule() if module_obj else ''
-            mod_entry = modules_data.setdefault(module_id, {
-                'module_id': module_id,
-                'module_intitule': canonical_intitule,
-                'module_intitule_brut': module_obj.intitule if module_obj else '',
-                'formation_intitule': (
-                    module_obj.formation.formation
-                    if module_obj and module_obj.formation_id else ''
-                ),
-                'grade': module_obj.grade if module_obj else '',
-                'groupe': module_obj.groupe if module_obj else '',
-                'statut': module_obj.statut if module_obj else '',
-                'site': (
-                    module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
-                    else (module_obj.site_legacy if module_obj else '')
-                ),
-                'salle': module_obj.salle if module_obj else '',
-                'date_debut': module_obj.date_debut if module_obj else None,
-                'date_fin': module_obj.date_fin if module_obj else None,
-                'secretariat_nom': (
-                    f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
-                    if module_obj and module_obj.secretariat_id else ''
-                ),
-                'sessions_count': 0,
-                'total_duree_minutes': module_planned,
-                'total_duree_realisee_minutes': 0.0,
-                'taux_planned_minutes': module_planned,
-                'taux_realized_capped_minutes': 0.0,
-                'montant_realise': 0.0,
-                'prix_heure_realisee': module_prix_heure,
-            })
-            total_minutes += module_planned
-            if module_planned > 0:
-                taux_planned_minutes += module_planned
-            if module_obj:
-                grade_val = (module_obj.grade or '').strip()
-                groupe_val = (module_obj.groupe or '').strip()
-                if grade_val:
-                    grades_seen.add(grade_val)
-                if groupe_val:
-                    groupes_seen.add(groupe_val)
-            if use_variable_rates and module_prix_heure is not None:
-                rates_used.add(module_prix_heure)
-            for session in sessions_in_period:
+            for session in module_sessions:
+                if not _finance_session_in_range(session, date_debut, date_fin):
+                    continue
                 session_count += 1
-                creneau_minutes = round(_session_prevu_minutes(session), 1)
-                realized_minutes = round(_session_realise_minutes(session), 1)
-                pointage_minutes = round(
+                duration_minutes = _session_duration_minutes(session)
+                raw_realized_minutes = round(
                     realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1,
                 )
-                if pointage_minutes > 0:
+                realized_minutes = _finance_realized_minutes(
+                    raw_realized_minutes, duration_minutes,
+                )
+                total_minutes += duration_minutes
+                total_realized_minutes += realized_minutes
+                if duration_minutes > 0:
+                    taux_planned_minutes += duration_minutes
+                    taux_realized_capped_minutes += realized_minutes
+                if raw_realized_minutes > 0:
                     sessions_with_pointage += 1
                 if session.date_journee:
                     session_dates.append(session.date_journee)
@@ -1606,13 +1525,56 @@ def _finance_report_rows(
                             global_aggregates['date_min'] = d
                         if cur_max is None or d > cur_max:
                             global_aggregates['date_max'] = d
+                if module_obj:
+                    grade_val = (module_obj.grade or '').strip()
+                    groupe_val = (module_obj.groupe or '').strip()
+                    if grade_val:
+                        grades_seen.add(grade_val)
+                    if groupe_val:
+                        groupes_seen.add(groupe_val)
+                mod_entry = modules_data.setdefault(module_id, {
+                    'module_id': module_id,
+                    'module_intitule': session.module.intitule if session.module else '',
+                    'formation_intitule': (
+                        session.module.formation.formation if session.module and session.module.formation else ''
+                    ),
+                    'grade': module_obj.grade if module_obj else '',
+                    'groupe': module_obj.groupe if module_obj else '',
+                    'statut': module_obj.statut if module_obj else '',
+                    'site': (
+                        module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
+                        else (module_obj.site_legacy if module_obj else '')
+                    ),
+                    'salle': module_obj.salle if module_obj else '',
+                    'date_debut': module_obj.date_debut if module_obj else None,
+                    'date_fin': module_obj.date_fin if module_obj else None,
+                    'secretariat_nom': (
+                        f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                        if module_obj and module_obj.secretariat_id else ''
+                    ),
+                    'sessions_count': 0,
+                    'total_duree_minutes': 0.0,
+                    'total_duree_realisee_minutes': 0.0,
+                    'taux_planned_minutes': 0.0,
+                    'taux_realized_capped_minutes': 0.0,
+                    'montant_realise': 0.0,
+                    'prix_heure_realisee': module_prix_heure,
+                })
                 mod_entry['sessions_count'] += 1
+                mod_entry['total_duree_minutes'] += duration_minutes
                 mod_entry['total_duree_realisee_minutes'] += realized_minutes
-                mod_entry['taux_realized_capped_minutes'] += realized_minutes
+                if duration_minutes > 0:
+                    mod_entry['taux_planned_minutes'] += duration_minutes
+                    mod_entry['taux_realized_capped_minutes'] += realized_minutes
+                mod_entry['montant_realise'] = _finance_montant_from_minutes(
+                    mod_entry['total_duree_realisee_minutes'], module_prix_heure,
+                )
+                if use_variable_rates and module_prix_heure is not None:
+                    rates_used.add(module_prix_heure)
                 if include_sessions:
                     taux_sess = (
-                        _finance_taux_realisation_pct(realized_minutes, creneau_minutes)
-                        if creneau_minutes > 0 else 0
+                        _finance_taux_realisation_pct(realized_minutes, duration_minutes)
+                        if duration_minutes > 0 else 0
                     )
                     sessions_data.append({
                         'session_id': session.id,
@@ -1620,31 +1582,20 @@ def _finance_report_rows(
                         'numero': session.numero,
                         'intitule': session.intitule or f"Session {session.numero}",
                         'module_id': session.module_id,
-                        'module_intitule': canonical_intitule,
-                        'formation_id': session.module.formation_id if session.module else None,
+                        'module_intitule': session.module.intitule,
+                        'formation_id': session.module.formation_id,
                         'formation_intitule': (
-                            session.module.formation.formation
-                            if session.module and session.module.formation else ''
+                            session.module.formation.formation if session.module.formation else ''
                         ),
                         'grade': module_obj.grade if module_obj else '',
                         'groupe': module_obj.groupe if module_obj else '',
-                        'duree_minutes': creneau_minutes,
+                        'duree_minutes': duration_minutes,
                         'duree_realisee_minutes': realized_minutes,
                         'montant_realise': _finance_montant_from_minutes(realized_minutes, module_prix_heure),
                         'prix_heure_realisee': module_prix_heure,
                         'taux_realisation_pct': taux_sess,
-                        'a_pointage': pointage_minutes > 0,
+                        'a_pointage': raw_realized_minutes > 0,
                     })
-            realized_module = mod_entry['total_duree_realisee_minutes']
-            if module_planned > 0:
-                realized_module = min(realized_module, module_planned)
-            mod_entry['total_duree_realisee_minutes'] = realized_module
-            mod_entry['taux_realized_capped_minutes'] = realized_module
-            mod_entry['montant_realise'] = _finance_montant_from_minutes(
-                realized_module, module_prix_heure,
-            )
-            total_realized_minutes += realized_module
-            taux_realized_capped_minutes += realized_module
         modules_list = []
         for mid in module_ids:
             entry = modules_data.get(mid)
@@ -1653,8 +1604,8 @@ def _finance_report_rows(
             entry = dict(entry)
             entry['total_duree_minutes'] = round(entry['total_duree_minutes'], 1)
             entry['total_duree_realisee_minutes'] = round(entry['total_duree_realisee_minutes'], 1)
-            entry['total_duree_heures'] = _heures_entieres(entry['total_duree_minutes'])
-            entry['total_duree_realisee_heures'] = _heures_entieres(entry['total_duree_realisee_minutes'])
+            entry['total_duree_heures'] = round(entry['total_duree_minutes'] / 60, 2)
+            entry['total_duree_realisee_heures'] = round(entry['total_duree_realisee_minutes'] / 60, 2)
             if entry.get('date_debut'):
                 entry['date_debut'] = entry['date_debut'].isoformat()
             if entry.get('date_fin'):
@@ -1708,24 +1659,21 @@ def _finance_report_rows(
             'tarifs_variables': tarifs_variables,
             'montant_total_realise': montant_total,
             'total_duree_minutes': round(total_minutes, 1),
-            'total_duree_heures': _heures_entieres(total_minutes),
+            'total_duree_heures': round(total_minutes / 60, 2),
             'total_duree_realisee_minutes': round(total_realized_minutes, 1),
-            'total_duree_realisee_heures': _heures_entieres(total_realized_minutes),
+            'total_duree_realisee_heures': round(total_realized_minutes / 60, 2),
             'sessions_count': session_count,
             'statistiques': statistiques,
             'modules': modules_list,
-            'recap_modules': _finance_recap_par_module(modules_list, settings=finance_settings),
         }
         if include_sessions:
             row['sessions'] = sessions_data
-            row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
-        _finance_enrich_row_tolerance(row, settings=finance_settings)
         results.append(row)
     return results
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsAuthenticated])
 def formateur_finance_report_api(request):
     """Rapport finance : temps de cours par formateur, par séance, + total.
 
@@ -1738,7 +1686,7 @@ def formateur_finance_report_api(request):
     if request.user.role not in allowed_roles:
         return Response({'detail': 'Accès réservé à la Direction et au service Finance.'}, status=403)
 
-    period = parse_period_from_request(request)
+    period = _parse_finance_date_range(request)
     if period['error']:
         return Response({'detail': period['detail']}, status=400)
 
@@ -1768,7 +1716,7 @@ def formateur_finance_report_api(request):
             'count': 1,
             'total_pages': 1,
             'current_page': 1,
-            'periode': periode_api_payload(
+            'periode': _finance_periode_payload(
                 period['date_debut'],
                 period['date_fin'],
                 period['meta'],
@@ -1819,7 +1767,7 @@ def formateur_finance_report_api(request):
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,
-        'periode': periode_api_payload(period['date_debut'], period['date_fin'], period['meta']),
+        'periode': _finance_periode_payload(period['date_debut'], period['date_fin'], period['meta']),
     }
     if secretariat_id:
         try:
@@ -1835,7 +1783,7 @@ def formateur_finance_report_api(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsAuthenticated])
 def formateur_donnees_sensibles_api(request, pk):
     """Pièce d'identité et compte bancaire — visible/éditable par FINANCE ou le formateur lui-même."""
     try:
@@ -1859,25 +1807,17 @@ def formateur_donnees_sensibles_api(request, pk):
             update_fields.append(field)
     if update_fields:
         formateur.save(update_fields=update_fields)
-        _log_audit(
-            action=AuditLog.Action.FORMATEUR_UPDATE,
-            request=request,
-            cible_type='formateur',
-            cible_numero=formateur.numerobadge,
-            cible_nom=f'{formateur.prenom} {formateur.nom}',
-            extra={'donnees_sensibles': True, 'champs_modifies': update_fields},
-        )
     return Response(formateur_sensitive_payload(formateur))
 
 
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsAuthenticated])
 def finance_dashboard_api(request):
     """Dashboard finance: agrégats globaux + top formateurs."""
     if request.user.role not in _finance_allowed_roles():
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
-    period = parse_period_from_request(request)
+    period = _parse_finance_date_range(request)
     if period['error']:
         return Response({'detail': period['detail']}, status=400)
 
@@ -1902,30 +1842,6 @@ def finance_dashboard_api(request):
 
     prix_heure = _finance_prix_heure()
     kpis = _finance_kpis_from_rows(rows, prix_heure)
-    vh_totals = _finance_canonical_volume_kpis(
-        date_debut=period['date_debut'],
-        date_fin=period['date_fin'],
-        secretariat_id=secretariat_id,
-    )
-    _finance_apply_canonical_volume_kpis(kpis, vh_totals)
-
-    from .finance_tolerance import tolerance_settings_payload
-    tol_settings = tolerance_settings_payload()
-    kpis['tolerance'] = {
-        **tol_settings,
-        'formateurs_conformes': sum(
-            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'ok'
-        ),
-        'formateurs_alerte': sum(
-            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'alerte'
-        ),
-        'formateurs_anomalie': sum(
-            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'anomalie'
-        ),
-        'formateurs_ecart': sum(
-            1 for r in rows if (r.get('tolerance') or {}).get('statut') == 'ecart'
-        ),
-    }
 
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
@@ -1933,7 +1849,7 @@ def finance_dashboard_api(request):
             'mois': mois,
             'label': datetime.strptime(mois, '%Y-%m').strftime('%b %Y'),
             'minutes_realisees': round(minutes, 1),
-            'heures_realisees': _heures_entieres(minutes),
+            'heures_realisees': round(minutes / 60, 2),
             'montant': round(float(montant_par_mois.get(mois, 0.0)), 2),
         }
         for mois, minutes in sorted(global_aggregates['activite_par_mois'].items())
@@ -1950,7 +1866,7 @@ def finance_dashboard_api(request):
     )[:10]
     top_montants = sorted(rows, key=lambda r: float(r.get('montant_total_realise') or 0), reverse=True)[:10]
 
-    periode_payload = periode_api_payload(
+    periode_payload = _finance_periode_payload(
         period['date_debut'],
         period['date_fin'],
         period['meta'],
@@ -1960,12 +1876,11 @@ def finance_dashboard_api(request):
     periode_payload['description'] = (
         period['meta'].get('description')
         or (
-            'Le volume horaire prévu est le volume contractuel du module '
-            '(duree_prevue_heures), indépendant des modifications d\'emploi du temps. '
-            'Le volume réalisé est la durée réelle des '
-            'séances terminées, plafonnée au créneau prévu (même règle que le dashboard web '
-            'et les statistiques). Les montants sont calculés sur le volume réalisé selon '
-            'le tarif du cycle de formation (paramétrage Finance).'
+            'Le temps réalisé provient des pointages (badgeage), plafonné à la durée planifiée '
+            'de chaque séance (0 si la séance n’a pas d’horaire). '
+            'Le taux de réalisation exclut les séances sans horaire. '
+            'Les montants sont calculés heure par heure selon le tarif du cycle de formation '
+            'concerné (paramétrage Finance).'
         )
     )
 
@@ -1983,14 +1898,8 @@ def finance_dashboard_api(request):
                 secretariat_id=secretariat_id,
             )
             prev_kpis = _finance_kpis_from_rows(prev_rows, prix_heure)
-            prev_vh = _finance_canonical_volume_kpis(
-                date_debut=prev_period['date_debut'],
-                date_fin=prev_period['date_fin'],
-                secretariat_id=secretariat_id,
-            )
-            _finance_apply_canonical_volume_kpis(prev_kpis, prev_vh)
             comparaison = {
-                'periode': periode_api_payload(
+                'periode': _finance_periode_payload(
                     prev_period['date_debut'],
                     prev_period['date_fin'],
                     prev_period['meta'],
@@ -2034,7 +1943,7 @@ def finance_dashboard_api(request):
 
 
 @api_view(['GET', 'PATCH'])
-@permission_classes([IsWebStaff])
+@permission_classes([IsAuthenticated])
 def finance_settings_api(request):
     """Paramètres finance : tarif horaire par défaut et tarifs par formation (référentiel)."""
     if not _check_finance_access(request):
@@ -2070,9 +1979,6 @@ def finance_settings_api(request):
             'export_mention_legale': settings_obj.export_mention_legale or '',
             'export_signataire_nom': settings_obj.export_signataire_nom or '',
             'export_signataire_fonction': settings_obj.export_signataire_fonction or '',
-            'tolerance_active': bool(settings_obj.tolerance_active),
-            'tolerance_minutes': int(settings_obj.tolerance_minutes or 0),
-            'tolerance_pct': float(settings_obj.tolerance_pct or 0),
             'updated_at': settings_obj.updated_at,
             'updated_by': (
                 settings_obj.updated_by.get_full_name() or settings_obj.updated_by.username
@@ -2125,31 +2031,11 @@ def finance_settings_api(request):
             ref.save(update_fields=['prix_heure_realisee'])
         updated = True
 
-    export_bool_fields = ('afficher_montants_exports', 'tolerance_active')
+    export_bool_fields = ('afficher_montants_exports',)
     for field in export_bool_fields:
         if field in request.data:
             setattr(settings_obj, field, bool(request.data.get(field)))
             updated = True
-
-    if 'tolerance_minutes' in request.data:
-        try:
-            mins = int(request.data.get('tolerance_minutes'))
-        except (TypeError, ValueError):
-            return Response({'detail': 'tolerance_minutes invalide.'}, status=400)
-        if mins < 0:
-            return Response({'detail': 'La tolérance en minutes doit être positive ou nulle.'}, status=400)
-        settings_obj.tolerance_minutes = mins
-        updated = True
-
-    if 'tolerance_pct' in request.data:
-        try:
-            pct = float(request.data.get('tolerance_pct'))
-        except (TypeError, ValueError):
-            return Response({'detail': 'tolerance_pct invalide.'}, status=400)
-        if pct < 0 or pct > 100:
-            return Response({'detail': 'La tolérance en % doit être entre 0 et 100.'}, status=400)
-        settings_obj.tolerance_pct = round(pct, 2)
-        updated = True
 
     export_text_fields = (
         'export_titre_document', 'export_entete_ligne1', 'export_entete_ligne2',
@@ -2167,201 +2053,45 @@ def finance_settings_api(request):
     settings_obj.updated_by = request.user
     settings_obj.save()
 
-    _log_audit(
-        action=AuditLog.Action.FINANCE_SETTINGS_UPDATE,
-        request=request,
-        extra={'champs_modifies': list(request.data.keys())},
-    )
-
     payload = _settings_payload()
     payload['updated_by'] = request.user.get_full_name() or request.user.username
     return Response(payload)
 
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsWebStaff])
-def finance_ajustements_api(request):
-    """Liste et proposition d'ajustements horaires sur séances réelles."""
-    if not _check_finance_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    from .finance_ajustements import (
-        propose_ajustement,
-        serialize_ajustement,
-        _log_finance_audit,
-    )
-
-    if request.method == 'GET':
-        statut = (request.query_params.get('statut') or '').strip().upper()
-        qs = FinanceAjustement.objects.select_related(
-            'session',
-            'session__module',
-            'session__module__formation',
-            'formateur',
-            'proposed_by',
-            'validated_by',
-            'rejected_by',
-        )
-        if statut:
-            valid_statuts = {s.value for s in FinanceAjustement.Statut}
-            if statut not in valid_statuts:
-                return Response({'detail': 'Statut invalide.'}, status=400)
-            qs = qs.filter(statut=statut)
-        formateur_id = request.query_params.get('formateur_id')
-        if formateur_id:
-            try:
-                qs = qs.filter(formateur_id=int(formateur_id))
-            except (TypeError, ValueError):
-                return Response({'detail': 'formateur_id invalide.'}, status=400)
-        session_id = request.query_params.get('session_id')
-        if session_id:
-            try:
-                qs = qs.filter(session_id=int(session_id))
-            except (TypeError, ValueError):
-                return Response({'detail': 'session_id invalide.'}, status=400)
-        items = [serialize_ajustement(a) for a in qs[:200]]
-        pending_count = FinanceAjustement.objects.filter(
-            statut=FinanceAjustement.Statut.EN_ATTENTE,
-        ).count()
-        return Response({'items': items, 'pending_count': pending_count})
-
-    session_id = request.data.get('session_id')
-    formateur_id = request.data.get('formateur_id')
-    minutes_delta = request.data.get('minutes_delta')
-    motif = request.data.get('motif', '')
-
-    try:
-        session = SessionModule.objects.select_related(
-            'module', 'module__formation',
-        ).get(pk=int(session_id))
-    except (SessionModule.DoesNotExist, TypeError, ValueError):
-        return Response({'detail': 'Séance introuvable.'}, status=404)
-
-    try:
-        formateur = Formateur.objects.get(pk=int(formateur_id))
-    except (Formateur.DoesNotExist, TypeError, ValueError):
-        return Response({'detail': 'Formateur introuvable.'}, status=404)
-
-    ajustement, errors = propose_ajustement(
-        session, formateur, minutes_delta, motif, request.user,
-    )
-    if errors:
-        return Response({'detail': errors[0], 'errors': errors}, status=400)
-
-    _log_finance_audit('FINANCE_AJUSTEMENT_PROPOSE', request, ajustement)
-    return Response(serialize_ajustement(ajustement), status=201)
-
-
-@api_view(['POST'])
-@permission_classes([IsWebStaff])
-def finance_ajustement_valider_api(request, pk):
-    """Valide un ajustement horaire (Direction/Finance)."""
-    if not _check_finance_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    from .finance_ajustements import valider_ajustement, serialize_ajustement
-
-    try:
-        ajustement = FinanceAjustement.objects.select_related(
-            'session', 'session__module', 'session__module__formation', 'formateur',
-        ).get(pk=pk)
-    except FinanceAjustement.DoesNotExist:
-        return Response({'detail': 'Ajustement introuvable.'}, status=404)
-
-    ajustement, errors = valider_ajustement(ajustement, request.user, request=request)
-    if errors:
-        return Response({'detail': errors[0], 'errors': errors}, status=400)
-    return Response(serialize_ajustement(ajustement))
-
-
 @api_view(['GET'])
-@permission_classes([IsWebStaff])
-def finance_encadrants_api(request):
-    """Liste des encadrants : groupe, volume planifié, volume réalisé (JSON)."""
-    if not _check_finance_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    period = parse_period_from_request(request)
-    if period['error']:
-        return Response({'detail': period['detail']}, status=400)
-
-    from .finance_encadrants import finance_encadrants_report
-
-    secretariat_id = _finance_secretariat_id_from_request(request)
-    report = finance_encadrants_report(
-        date_debut=period['date_debut'],
-        date_fin=period['date_fin'],
-        secretariat_id=secretariat_id,
-    )
-    payload = {
-        **report,
-        'periode': periode_api_payload(
-            period['date_debut'],
-            period['date_fin'],
-            period['meta'],
-            None,
-            None,
-        ),
-    }
-    return Response(payload)
-
-
-@api_view(['POST'])
-@permission_classes([IsWebStaff])
-def finance_ajustement_rejeter_api(request, pk):
-    """Rejette un ajustement horaire (Direction/Finance)."""
-    if not _check_finance_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    from .finance_ajustements import rejeter_ajustement, serialize_ajustement
-
-    try:
-        ajustement = FinanceAjustement.objects.select_related(
-            'session', 'session__module', 'session__module__formation', 'formateur',
-        ).get(pk=pk)
-    except FinanceAjustement.DoesNotExist:
-        return Response({'detail': 'Ajustement introuvable.'}, status=404)
-
-    ajustement, errors = rejeter_ajustement(
-        ajustement,
-        request.user,
-        rejection_motif=request.data.get('motif', ''),
-        request=request,
-    )
-    if errors:
-        return Response({'detail': errors[0], 'errors': errors}, status=400)
-    return Response(serialize_ajustement(ajustement))
-
-
-@api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def formation_detail_api(request, pk):
     """
     Get formation details by ID.
     """
-    formation, err = formation_or_response(request.user, pk)
-    if err:
-        return err
+    try:
+        formation = Formation.objects.prefetch_related(
+            'modules__sessions',
+            'modules__module_participants__participant',
+            'modules__secretariat',
+        ).get(pk=pk)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
 
-    formation = Formation.objects.prefetch_related(
-        'modules__sessions',
-        'modules__module_participants__participant',
-        'modules__secretariat',
-    ).get(pk=formation.pk)
+    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        sec = request.user.secretariat
+        if not sec or not formation.modules.filter(secretariat=sec).exists():
+            return Response({'detail': 'Formation introuvable.'}, status=404)
     
     serializer = FormationDetailSerializer(formation)
     return Response(serializer.data)
 
 
 @api_view(['POST'])
-@permission_classes([IsSecretariatOrEncadrantOrDFRC])
+@permission_classes([IsAuthenticated])
 def api_generate_qr(request, formation_pk, session_pk=None):
     """
     Generate QR code for a formation or session.
     """
-    formation, err = formation_or_response(request.user, formation_pk)
-    if err:
-        return err
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
     
     if not session_pk:
         return Response({'detail': 'session_pk est obligatoire pour générer un QR.'}, status=400)
@@ -2386,17 +2116,6 @@ def api_generate_qr(request, formation_pk, session_pk=None):
         session=session,
         genere_par=request.user,
         expire_at=timezone.now() + timedelta(hours=24),
-    )
-
-    _log_audit(
-        action=AuditLog.Action.FORMATION_QR_GENERATE,
-        request=request,
-        formation=formation,
-        extra={
-            'session_id': session.id,
-            'session_numero': session.numero,
-            'token': str(qr_token.token),
-        },
     )
     
     return Response({
@@ -2464,11 +2183,9 @@ def api_import_excel(request):
                 if import_type == 'formations':
                     stats['created'], stats['updated'] = cmd._import_formations(ws, errors, secretariat=secretariat)
                 elif import_type == 'participants':
-                    stats['created'] = cmd._import_participants(
-                        ws, errors, secretariat=secretariat, provision_accounts=False,
-                    )
+                    stats['created'] = cmd._import_participants(ws, errors, secretariat=secretariat)
                 elif import_type == 'formateurs':
-                    stats['created'] = cmd._import_formateurs(ws, errors, provision_accounts=False)
+                    stats['created'] = cmd._import_formateurs(ws, errors)
                 elif import_type == 'emploi_du_temps':
                     stats['created'] = cmd._import_emploi_du_temps(ws, errors)
                 elif import_type == 'seances':
@@ -2523,17 +2240,12 @@ def api_import_excel(request):
                             return Response({'error': 'Aucune feuille de participants trouvée dans le fichier.'}, status=400)
                         total_created = 0
                         for sn in candidate_sheets:
-                            total_created += cmd._import_participants(
-                                wb[sn], errors, secretariat=secretariat, provision_accounts=False,
-                            )
+                            total_created += cmd._import_participants(wb[sn], errors, secretariat=secretariat)
                         stats['created'] = total_created
                         wb.close()
                         debug_headers = [l for l in _logs if '[DEBUG]' in l]
-                        _log_import_excel_audit(request, import_type, stats, errors, uploaded.name)
                         return Response({
                             'created': stats.get('created', 0),
-                            'accounts': cmd.account_provision_stats.get('auditeurs', {}),
-                            'accounts_deferred': True,
                             'errors': errors[:20],
                             'debug_headers': debug_headers,
                         })
@@ -2549,13 +2261,9 @@ def api_import_excel(request):
                 if import_type == 'formations':
                     stats['created'], stats['updated'] = cmd._import_formations(wb_sheets[sheet_name], errors, secretariat=secretariat)
                 elif import_type == 'participants':
-                    stats['created'] = cmd._import_participants(
-                        wb_sheets[sheet_name], errors, secretariat=secretariat, provision_accounts=False,
-                    )
+                    stats['created'] = cmd._import_participants(wb_sheets[sheet_name], errors, secretariat=secretariat)
                 elif import_type == 'formateurs':
-                    stats['created'] = cmd._import_formateurs(
-                        wb_sheets[sheet_name], errors, provision_accounts=False,
-                    )
+                    stats['created'] = cmd._import_formateurs(wb_sheets[sheet_name], errors)
                 elif import_type == 'emploi_du_temps':
                     stats['created'] = cmd._import_emploi_du_temps(wb_sheets[sheet_name], errors)
                 elif import_type == 'seances':
@@ -2577,30 +2285,25 @@ def api_import_excel(request):
         return Response({'error': f"Erreur lors de l'import: {e}"}, status=500)
 
     debug_headers = [l for l in _logs if '[DEBUG]' in l]
-    accounts_deferred = import_type in ('participants', 'formateurs')
-    _log_import_excel_audit(request, import_type, stats, errors, uploaded.name)
     return Response({
         'created': stats.get('created', 0),
         'updated': stats.get('updated', 0),
-        'accounts': cmd.account_provision_stats,
-        'accounts_deferred': accounts_deferred,
         'errors': errors[:20],
         'debug_headers': debug_headers,
     })
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_formation_list(request):
     if request.method == 'GET':
         data = list(RefFormation.objects.values('id', 'intitule', 'actif'))
         return Response(data)
     obj = RefFormation.objects.create(intitule=request.data.get('intitule', ''), actif=request.data.get('actif', True))
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'formation', obj)
     return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_formation_detail(request, pk):
     try:
         obj = RefFormation.objects.get(pk=pk)
@@ -2610,60 +2313,26 @@ def ref_formation_detail(request, pk):
         obj.intitule = request.data.get('intitule', obj.intitule)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'formation', obj)
         return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'formation', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
-def _ref_module_response(obj, status_code=200):
-    return Response(
-        {
-            'id': obj.id,
-            'intitule': obj.intitule,
-            'volume_horaire': obj.volume_horaire,
-            'actif': obj.actif,
-        },
-        status=status_code,
-    )
-
-
-def _ref_module_validation_response(exc):
-    if hasattr(exc, 'message_dict'):
-        return Response(exc.message_dict, status=400)
-    return Response({'detail': exc.messages}, status=400)
-
-
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
         data = list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif'))
         return Response(data)
-    obj = RefModule(
+    obj = RefModule.objects.create(
         intitule=request.data.get('intitule', ''),
         volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
-    try:
-        obj.save()
-    except ValidationError as exc:
-        return _ref_module_validation_response(exc)
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'module', obj)
-    return _ref_module_response(obj, status_code=201)
-
+    return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_module_detail(request, pk):
     try:
         obj = RefModule.objects.get(pk=pk)
@@ -2673,22 +2342,9 @@ def ref_module_detail(request, pk):
         obj.intitule = request.data.get('intitule', obj.intitule)
         obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
-        try:
-            obj.save()
-        except ValidationError as exc:
-            return _ref_module_validation_response(exc)
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'module', obj)
-        return _ref_module_response(obj)
-    audit_extra = {'referentiel': 'module', 'id': obj.pk, 'label': _ref_label(obj)}
+        obj.save()
+        return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif})
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
@@ -2713,23 +2369,6 @@ def _serialize_site(obj):
     }
 
 
-def _referentiels_gestion_payload():
-    """Données complètes des tables référentielles (actifs et inactifs)."""
-    return {
-        'formations': list(RefFormation.objects.values('id', 'intitule', 'actif')),
-        'modules': list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif')),
-        'categories': list(RefCategorie.objects.values('id', 'libelle', 'actif')),
-        'grades': list(RefGrade.objects.values('id', 'libelle', 'categorie_id', 'actif')),
-        'vagues': list(
-            RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')
-        ),
-        'sites': [_serialize_site(s) for s in RefSite.objects.all()],
-        'batiments': list(RefBatiment.objects.values('id', 'nom', 'site_id', 'actif')),
-        'salles': list(RefSalle.objects.values('id', 'nom', 'site_id', 'batiment_id', 'actif')),
-        'types_secretariat': list(RefTypeSecretariat.objects.values('id', 'libelle', 'actif')),
-    }
-
-
 def _coerce_decimal(value):
     if value in (None, ''):
         return None
@@ -2740,7 +2379,7 @@ def _coerce_decimal(value):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_site_list(request):
     if request.method == 'GET':
         data = [_serialize_site(s) for s in RefSite.objects.all()]
@@ -2752,11 +2391,10 @@ def ref_site_list(request):
         geofence_longitude=_coerce_decimal(request.data.get('geofence_longitude')),
         geofence_rayon_m=request.data.get('geofence_rayon_m', 200) or 200,
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'site', obj)
     return Response(_serialize_site(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_site_detail(request, pk):
     try:
         obj = RefSite.objects.get(pk=pk)
@@ -2773,23 +2411,13 @@ def ref_site_detail(request, pk):
             rayon = request.data.get('geofence_rayon_m')
             obj.geofence_rayon_m = int(rayon) if rayon not in (None, '') else 200
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'site', obj)
         return Response(_serialize_site(obj))
-    audit_extra = {'referentiel': 'site', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_batiment_list(request):
     if request.method == 'GET':
         data = list(RefBatiment.objects.values('id', 'nom', 'site_id', 'actif'))
@@ -2799,11 +2427,10 @@ def ref_batiment_list(request):
         site_id=request.data.get('site_id'),
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'batiment', obj)
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_batiment_detail(request, pk):
     try:
         obj = RefBatiment.objects.get(pk=pk)
@@ -2814,23 +2441,13 @@ def ref_batiment_detail(request, pk):
         obj.site_id = request.data.get('site_id', obj.site_id)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'batiment', obj)
         return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'batiment', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_salle_list(request):
     if request.method == 'GET':
         data = list(RefSalle.objects.values('id', 'nom', 'site_id', 'batiment_id', 'actif'))
@@ -2841,11 +2458,10 @@ def ref_salle_list(request):
         batiment_id=request.data.get('batiment_id') or None,
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'salle', obj)
     return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_salle_detail(request, pk):
     try:
         obj = RefSalle.objects.get(pk=pk)
@@ -2857,23 +2473,13 @@ def ref_salle_detail(request, pk):
         obj.batiment_id = request.data.get('batiment_id') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'salle', obj)
         return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'salle', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_categorie_list(request):
     if request.method == 'GET':
         data = list(RefCategorie.objects.values('id', 'libelle', 'actif'))
@@ -2882,11 +2488,10 @@ def ref_categorie_list(request):
         libelle=request.data.get('libelle', ''),
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'categorie', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_categorie_detail(request, pk):
     try:
         obj = RefCategorie.objects.get(pk=pk)
@@ -2896,23 +2501,13 @@ def ref_categorie_detail(request, pk):
         obj.libelle = request.data.get('libelle', obj.libelle)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'categorie', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'categorie', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_grade_list(request):
     if request.method == 'GET':
         data = list(RefGrade.objects.values('id', 'libelle', 'categorie_id', 'actif'))
@@ -2922,11 +2517,10 @@ def ref_grade_list(request):
         categorie_id=request.data.get('categorie_id') or None,
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'grade', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'categorie_id': obj.categorie_id, 'actif': obj.actif}, status=201)
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_grade_detail(request, pk):
     try:
         obj = RefGrade.objects.get(pk=pk)
@@ -2937,23 +2531,13 @@ def ref_grade_detail(request, pk):
         obj.categorie_id = request.data.get('categorie_id') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'grade', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'categorie_id': obj.categorie_id, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'grade', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_type_secretariat_list(request):
     if request.method == 'GET':
         data = list(RefTypeSecretariat.objects.values('id', 'libelle', 'actif'))
@@ -2962,12 +2546,11 @@ def ref_type_secretariat_list(request):
         libelle=request.data.get('libelle', ''),
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'type_secretariat', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif}, status=201)
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsDFRC])
+@permission_classes([IsAuthenticated])
 def ref_type_secretariat_detail(request, pk):
     try:
         obj = RefTypeSecretariat.objects.get(pk=pk)
@@ -2977,35 +2560,23 @@ def ref_type_secretariat_detail(request, pk):
         obj.libelle = request.data.get('libelle', obj.libelle)
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'type_secretariat', obj)
         return Response({'id': obj.id, 'libelle': obj.libelle, 'actif': obj.actif})
-    audit_extra = {'referentiel': 'type_secretariat', 'id': obj.pk, 'label': _ref_label(obj)}
     obj.delete()
-    _log_audit(
-        action=AuditLog.Action.REFERENTIEL_DELETE,
-        request=request,
-        cible_type='referentiel',
-        cible_numero=str(audit_extra['id']),
-        cible_nom=audit_extra['label'],
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def module_list_api(request, formation_pk):
     """List or create modules for a formation."""
-    formation, err = formation_or_response(request.user, formation_pk)
-    if err:
-        return err
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
 
     if request.method == 'GET':
         modules = formation.modules.prefetch_related('sessions').all()
         return Response(ModuleSerializer(modules, many=True).data)
-
-    if not IsSecretariatOrDFRC().has_permission(request, None):
-        return Response({'detail': 'Accès refusé.'}, status=403)
 
     # POST — create module
     intitule = request.data.get('intitule', '').strip()
@@ -3045,29 +2616,25 @@ def module_list_api(request, formation_pk):
         )
     except IntegrityError:
         return Response({'detail': f'Un module "{intitule}" existe déjà pour cette formation.'}, status=400)
-    _log_audit(
-        action=AuditLog.Action.MODULE_CREATE,
-        request=request,
-        formation=formation,
-        extra=_module_audit_extra(module),
-    )
     return Response(ModuleSerializer(module).data, status=201)
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def module_detail_api(request, formation_pk, module_pk):
     """Get, update or delete a module."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
 
     if request.method == 'GET':
         return Response(ModuleSerializer(module).data)
 
     if request.method in ('PUT', 'PATCH'):
-        if not IsSecretariatOrDFRC().has_permission(request, None):
-            return Response({'detail': 'Accès refusé.'}, status=403)
         fields = [
             'intitule', 'duree_prevue_heures', 'ordre', 'statut',
             'grade', 'groupe', 'vague',
@@ -3139,48 +2706,30 @@ def module_detail_api(request, formation_pk, module_pk):
                     s.date_journee = s.date_journee + delta
                     s.save(update_fields=['date_journee'])
 
-        _log_audit(
-            action=AuditLog.Action.MODULE_UPDATE,
-            request=request,
-            formation=formation,
-            extra={
-                **_module_audit_extra(module),
-                'champs_modifies': list(request.data.keys()),
-            },
-        )
         return Response(ModuleSerializer(module).data)
 
     # DELETE
-    if not IsSecretariatOrDFRC().has_permission(request, None):
-        return Response({'detail': 'Accès refusé.'}, status=403)
     if module.sessions.exists():
         return Response({'detail': 'Impossible de supprimer un module qui a des séances.'}, status=400)
-    audit_extra = _module_audit_extra(module)
     module.delete()
-    _log_audit(
-        action=AuditLog.Action.MODULE_DELETE,
-        request=request,
-        formation=formation,
-        extra=audit_extra,
-    )
     return Response(status=204)
 
 
 @api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def module_full_detail_api(request, formation_pk, module_pk):
     """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
 
     from .serializers import SessionSerializer, ParticipantSerializer
-    from .duree_prevue_resolve import ensure_module_duree_prevue
     from presences.models import Pointage
-    module = Module.objects.select_related(
-        'secretariat', 'formateur', 'superviseur', 'ref_module',
-    ).get(pk=module_pk, formation=formation)
-    ensure_module_duree_prevue(module)
+    module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
     formateurs_assignes = module.module_formateurs.select_related('formateur').all()
@@ -3349,9 +2898,10 @@ def module_full_detail_api(request, formation_pk, module_pk):
 @permission_classes([CanManageModuleParticipant])
 def module_add_participant(request, formation_pk, module_pk):
     """Inscrire un participant à un module — respecte les permissions du groupe (add_moduleparticipant)."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
+    try:
+        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
     participant_id = request.data.get('participant_id')
     if not participant_id:
         return Response({'detail': 'participant_id requis.'}, status=400)
@@ -3362,15 +2912,6 @@ def module_add_participant(request, formation_pk, module_pk):
     if ModuleParticipant.objects.filter(module=module, participant=participant).exists():
         return Response({'detail': 'Déjà inscrit.'}, status=400)
     ModuleParticipant.objects.create(module=module, participant=participant)
-    _log_audit(
-        action=AuditLog.Action.PARTICIPANT_ADD_FORMATION,
-        request=request,
-        cible_type='participant',
-        cible_numero=participant.matricule,
-        cible_nom=f'{participant.nom} {participant.prenom}',
-        formation=module.formation,
-        extra=_module_audit_extra(module),
-    )
     return Response({'detail': f'{participant} inscrit au module.'}, status=201)
 
 
@@ -3378,35 +2919,23 @@ def module_add_participant(request, formation_pk, module_pk):
 @permission_classes([CanManageModuleParticipant])
 def module_remove_participant(request, formation_pk, module_pk, participant_id):
     """Retirer un participant d'un module — respecte les permissions du groupe (delete_moduleparticipant)."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
     try:
+        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mp = ModuleParticipant.objects.get(module=module, participant_id=participant_id)
-    except ModuleParticipant.DoesNotExist:
+    except (Module.DoesNotExist, ModuleParticipant.DoesNotExist):
         return Response({'detail': 'Inscription introuvable.'}, status=404)
-    participant = mp.participant
-    formation = module.formation
     mp.delete()
-    _log_audit(
-        action=AuditLog.Action.PARTICIPANT_REMOVE_FORMATION,
-        request=request,
-        cible_type='participant',
-        cible_numero=participant.matricule,
-        cible_nom=f'{participant.nom} {participant.prenom}',
-        formation=formation,
-        extra=_module_audit_extra(module),
-    )
     return Response(status=204)
 
 
 @api_view(['POST'])
-@permission_classes([IsSecretariatOrDFRC])
+@permission_classes([IsAuthenticated])
 def module_add_formateur(request, formation_pk, module_pk):
     """Assigner un formateur à un module."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
+    try:
+        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
     formateur_id = request.data.get('formateur_id')
     if not formateur_id:
         return Response({'detail': 'formateur_id requis.'}, status=400)
@@ -3417,41 +2946,19 @@ def module_add_formateur(request, formation_pk, module_pk):
     if ModuleFormateur.objects.filter(module=module, formateur=formateur).exists():
         return Response({'detail': 'Déjà assigné.'}, status=400)
     ModuleFormateur.objects.create(module=module, formateur=formateur)
-    _log_audit(
-        action=AuditLog.Action.FORMATEUR_ADD_FORMATION,
-        request=request,
-        cible_type='formateur',
-        cible_numero=formateur.numerobadge or str(formateur.pk),
-        cible_nom=f'{formateur.prenom} {formateur.nom}',
-        formation=module.formation,
-        extra=_module_audit_extra(module),
-    )
     return Response({'detail': f'{formateur} assigné au module.'}, status=201)
 
 
 @api_view(['DELETE'])
-@permission_classes([IsSecretariatOrDFRC])
+@permission_classes([IsAuthenticated])
 def module_remove_formateur(request, formation_pk, module_pk, formateur_id):
     """Retirer un formateur d'un module."""
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
     try:
+        module = Module.objects.get(pk=module_pk, formation_id=formation_pk)
         mf = ModuleFormateur.objects.get(module=module, formateur_id=formateur_id)
-    except ModuleFormateur.DoesNotExist:
+    except (Module.DoesNotExist, ModuleFormateur.DoesNotExist):
         return Response({'detail': 'Assignation introuvable.'}, status=404)
-    formateur = mf.formateur
-    formation = module.formation
     mf.delete()
-    _log_audit(
-        action=AuditLog.Action.FORMATEUR_REMOVE_FORMATION,
-        request=request,
-        cible_type='formateur',
-        cible_numero=formateur.numerobadge or str(formateur.pk),
-        cible_nom=f'{formateur.prenom} {formateur.nom}',
-        formation=formation,
-        extra=_module_audit_extra(module),
-    )
     return Response(status=204)
 
 
@@ -3465,14 +2972,19 @@ def module_assign_superviseur(request, formation_pk, module_pk):
       de leur propre secrétariat.
     - Body : { "superviseur_id": <int|null> }  (null ou omis => retrait).
     """
-    formation, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
-    module = Module.objects.select_related('secretariat', 'superviseur').get(pk=module.pk)
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.select_related('secretariat', 'superviseur').get(
+            pk=module_pk, formation=formation,
+        )
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
 
     # Scope secrétariat
     user = request.user
-    if user.role in SECRETARIAT_ROLES:
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         if not user.secretariat or module.secretariat_id != user.secretariat_id:
             return Response(
                 {'detail': "Ce module n'appartient pas à votre secrétariat."},
@@ -3517,14 +3029,7 @@ def module_assign_superviseur(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsDFRC])
-def referentiels_gestion_api(request):
-    """Retourne l'ensemble des tables référentielles pour la page d'administration."""
-    return Response(_referentiels_gestion_payload())
-
-
-@api_view(['GET'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def referentiels_api(request):
     """Retourne les référentiels prédéfinis pour les listes déroulantes."""
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
@@ -3541,7 +3046,14 @@ def referentiels_api(request):
     types_secretariat = list(RefTypeSecretariat.objects.filter(actif=True).values('id', 'libelle'))
     vagues = list(RefVague.objects.filter(actif=True).order_by('ordre', 'libelle').values('id', 'libelle', 'ordre'))
 
-    mods_groupes_qs = modules_queryset_for_user(request.user)
+    mods_groupes_qs = Module.objects.all()
+    if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.secretariat:
+            mods_groupes_qs = mods_groupes_qs.filter(secretariat=request.user.secretariat)
+        else:
+            mods_groupes_qs = mods_groupes_qs.none()
+    elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
+        mods_groupes_qs = mods_groupes_qs.filter(superviseur=request.user)
     raw_module_groupes = (
         mods_groupes_qs.exclude(groupe__isnull=True)
         .exclude(groupe='')
@@ -3580,7 +3092,7 @@ def referentiels_api(request):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def refvague_list_api(request):
     """Lister ou créer une vague dans le référentiel."""
     if request.method == 'GET':
@@ -3591,12 +3103,11 @@ def refvague_list_api(request):
         ordre=request.data.get('ordre', 1),
         actif=request.data.get('actif', True),
     )
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_CREATE, 'vague', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif}, status=201)
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsOperationalWebStaff])
+@permission_classes([IsAuthenticated])
 def refvague_detail_api(request, pk):
     """Modifier ou supprimer une vague du référentiel."""
     try:
@@ -3604,362 +3115,10 @@ def refvague_detail_api(request, pk):
     except RefVague.DoesNotExist:
         return Response({'detail': 'Vague introuvable.'}, status=404)
     if request.method == 'DELETE':
-        audit_extra = {'referentiel': 'vague', 'id': obj.pk, 'label': _ref_label(obj)}
         obj.delete()
-        _log_audit(
-            action=AuditLog.Action.REFERENTIEL_DELETE,
-            request=request,
-            cible_type='referentiel',
-            cible_numero=str(audit_extra['id']),
-            cible_nom=audit_extra['label'],
-            extra=audit_extra,
-        )
         return Response(status=204)
     obj.libelle = request.data.get('libelle', obj.libelle)
     obj.ordre = request.data.get('ordre', obj.ordre)
     obj.actif = request.data.get('actif', obj.actif)
     obj.save()
-    _log_referentiel_audit(request, AuditLog.Action.REFERENTIEL_UPDATE, 'vague', obj)
     return Response({'id': obj.id, 'libelle': obj.libelle, 'ordre': obj.ordre, 'actif': obj.actif})
-
-
-# ── Endpoints de synchronisation inter-plateformes (SVEVCPFAE) ────────────────
-
-
-@api_view(['GET'])
-@permission_classes([IsInterPlatformServiceAccount])
-def sync_participants_api(request):
-    """Retourne la liste paginée des participants (auditeurs) destinée à SVEVCPFAE.
-
-    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
-    Query params  : page (défaut 1), page_size (défaut 200)
-    """
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 200))
-
-    queryset = Participant.objects.select_related('secretariat').order_by('nom', 'prenom')
-
-    total_count = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    participants = queryset[start:end]
-
-    data = [
-        {
-            'id': p.id,
-            'matricule': p.matricule or '',
-            'nom': p.nom or '',
-            'prenom': p.prenom or '',
-            'email': p.email or '',
-            'telephone': p.telephone or '',
-            'date_naissance': p.date_naissance,
-            'grade': p.grade or '',
-            'groupe': p.groupe or '',
-            'secretariat': p.secretariat.nom if p.secretariat else '',
-        }
-        for p in participants
-    ]
-
-    return Response({
-        'results': data,
-        'count': total_count,
-        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
-        'current_page': page,
-    })
-
-
-@api_view(['GET'])
-@permission_classes([IsInterPlatformServiceAccount])
-def sync_formateurs_api(request):
-    """Retourne la liste paginée des formateurs destinée à SVEVCPFAE.
-
-    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
-    Query params  : page (défaut 1), page_size (défaut 200)
-    """
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 200))
-
-    queryset = Formateur.objects.order_by('nom', 'prenom')
-
-    total_count = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    formateurs = queryset[start:end]
-
-    data = [
-        {
-            'id': f.id,
-            'numerobadge': f.numerobadge or '',
-            'nom': f.nom or '',
-            'prenom': f.prenom or '',
-            'email': f.email or '',
-            'telephone': f.telephone or '',
-            'specialite': f.specialite or '',
-            'organisation': f.organisation or '',
-        }
-        for f in formateurs
-    ]
-
-    return Response({
-        'results': data,
-        'count': total_count,
-        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
-        'current_page': page,
-    })
-
-
-@api_view(['GET'])
-@permission_classes([IsInterPlatformServiceAccount])
-def sync_sessions_api(request):
-    """Retourne la liste paginée des séances destinée à SVEVCPFAE.
-
-    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
-    Query params  : page (défaut 1), page_size (défaut 500)
-    """
-    from .models import SessionModule as SessionMod
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 500))
-
-    queryset = SessionMod.objects.select_related('module').order_by('date_journee', 'module_id', 'numero')
-
-    total_count = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    sessions = queryset[start:end]
-
-    data = [
-        {
-            'id': s.id,
-            'module_id': s.module_id,
-            'date': s.date_journee,
-            'numero': s.numero,
-            'intitule': s.intitule or '',
-            'heure_debut': s.heure_debut_prevue,
-            'heure_fin': s.heure_fin_prevue,
-            'terminee': bool(s.terminee_le),
-        }
-        for s in sessions
-    ]
-
-    return Response({
-        'results': data,
-        'count': total_count,
-        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
-        'current_page': page,
-    })
-
-
-@api_view(['GET'])
-@permission_classes([IsInterPlatformServiceAccount])
-def sync_presences_api(request):
-    """Retourne la liste paginée des pointages (présences) destinée à SVEVCPFAE.
-
-    Header requis : Authorization: Api-Key <INTER_PLATFORM_API_KEY>
-    Query params  : page (défaut 1), page_size (défaut 500)
-    """
-    from presences.models import Pointage
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 500))
-
-    queryset = (
-        Pointage.objects
-        .filter(statut__in=['TERMINE', 'FORCE_DFRC', 'ABSENT_NON_BADGE'])
-        .select_related('participant', 'formateur', 'session')
-        .order_by('session_id', 'participant_id', 'formateur_id')
-    )
-
-    total_count = queryset.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    pointages = queryset[start:end]
-
-    def _statut_svevc(statut):
-        if statut in ('TERMINE', 'FORCE_DFRC'):
-            return 'present'
-        if statut == 'ABSENT_NON_BADGE':
-            return 'absent'
-        return 'present'
-
-    data = [
-        {
-            'id': p.id,
-            'session_id': p.session_id,
-            'participant_id': p.participant_id,
-            'formateur_id': p.formateur_id,
-            'statut': _statut_svevc(p.statut),
-            'duree_minutes': float(p.duree_presence_minutes) if p.duree_presence_minutes else None,
-        }
-        for p in pointages
-    ]
-
-    return Response({
-        'results': data,
-        'count': total_count,
-        'total_pages': (total_count + page_size - 1) // page_size if page_size else 1,
-        'current_page': page,
-    })
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Notes auditeurs par module
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _mention_auto(note):
-    """Calcule automatiquement la mention à partir de la note (sur 20)."""
-    if note is None:
-        return ''
-    n = float(note)
-    if n >= 16:
-        return 'TRES_BIEN'
-    if n >= 14:
-        return 'BIEN'
-    if n >= 12:
-        return 'ASSEZ_BIEN'
-    if n >= 10:
-        return 'PASSABLE'
-    return 'INSUFFISANT'
-
-
-@api_view(['GET'])
-@permission_classes([IsSecretariatOrDFRC])
-def module_notes_list(request, formation_pk, module_pk):
-    """Liste des notes de tous les participants inscrits au module."""
-    _, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
-
-    inscriptions = (
-        ModuleParticipant.objects
-        .filter(module=module)
-        .select_related('participant')
-        .order_by('participant__nom', 'participant__prenom')
-    )
-    notes_map = {
-        n.participant_id: n
-        for n in NoteModule.objects.filter(module=module).select_related('saisie_par')
-    }
-
-    data = []
-    for mp in inscriptions:
-        p = mp.participant
-        note_obj = notes_map.get(p.pk)
-        data.append({
-            'participant_id': p.pk,
-            'matricule': p.matricule,
-            'nom': p.nom,
-            'prenom': p.prenom,
-            'grade': p.grade,
-            'categorie': p.categorie,
-            'note': float(note_obj.note) if note_obj and note_obj.note is not None else None,
-            'mention': note_obj.mention if note_obj else '',
-            'observations': note_obj.observations if note_obj else '',
-            'saisie_par': (
-                note_obj.saisie_par.get_full_name() or note_obj.saisie_par.username
-                if note_obj and note_obj.saisie_par else None
-            ),
-            'updated_at': note_obj.updated_at.isoformat() if note_obj else None,
-        })
-    return Response(data)
-
-
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsSecretariatOrDFRC])
-def module_note_upsert(request, formation_pk, module_pk, participant_id):
-    """Créer ou mettre à jour la note d'un participant pour un module."""
-    _, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
-
-    if not ModuleParticipant.objects.filter(module=module, participant_id=participant_id).exists():
-        return Response({'detail': "Ce participant n'est pas inscrit à ce module."}, status=400)
-
-    try:
-        participant = Participant.objects.get(pk=participant_id)
-    except Participant.DoesNotExist:
-        return Response({'detail': 'Participant introuvable.'}, status=404)
-
-    note_val = request.data.get('note')
-    mention = request.data.get('mention', '')
-    observations = request.data.get('observations', '')
-
-    if note_val is not None:
-        try:
-            note_val = round(float(note_val), 2)
-            if not (0 <= note_val <= 20):
-                return Response({'detail': 'La note doit être comprise entre 0 et 20.'}, status=400)
-        except (ValueError, TypeError):
-            return Response({'detail': 'Note invalide.'}, status=400)
-        if not mention:
-            mention = _mention_auto(note_val)
-
-    note_obj, created = NoteModule.objects.update_or_create(
-        module=module,
-        participant=participant,
-        defaults={
-            'note': note_val,
-            'mention': mention,
-            'observations': observations,
-            'saisie_par': request.user,
-        },
-    )
-    return Response({
-        'participant_id': participant.pk,
-        'note': float(note_obj.note) if note_obj.note is not None else None,
-        'mention': note_obj.mention,
-        'observations': note_obj.observations,
-        'updated_at': note_obj.updated_at.isoformat(),
-    }, status=201 if created else 200)
-
-
-@api_view(['POST'])
-@permission_classes([IsSecretariatOrDFRC])
-def module_notes_bulk(request, formation_pk, module_pk):
-    """
-    Sauvegarde groupée des notes du module.
-    Body: { "notes": [{"participant_id": X, "note": Y, "mention": Z, "observations": "..."}] }
-    """
-    _, module, err = module_or_response(request.user, formation_pk, module_pk)
-    if err:
-        return err
-
-    notes_data = request.data.get('notes', [])
-    if not isinstance(notes_data, list):
-        return Response({'detail': '"notes" doit être une liste.'}, status=400)
-
-    inscrits_ids = set(
-        ModuleParticipant.objects.filter(module=module).values_list('participant_id', flat=True)
-    )
-    saved, errors = [], []
-
-    for item in notes_data:
-        pid = item.get('participant_id')
-        if pid not in inscrits_ids:
-            errors.append({'participant_id': pid, 'detail': 'Non inscrit.'})
-            continue
-        note_val = item.get('note')
-        mention = item.get('mention', '')
-        observations = item.get('observations', '')
-        if note_val is not None:
-            try:
-                note_val = round(float(note_val), 2)
-                if not (0 <= note_val <= 20):
-                    errors.append({'participant_id': pid, 'detail': 'Note hors plage 0-20.'})
-                    continue
-            except (ValueError, TypeError):
-                errors.append({'participant_id': pid, 'detail': 'Note invalide.'})
-                continue
-            if not mention:
-                mention = _mention_auto(note_val)
-        NoteModule.objects.update_or_create(
-            module=module,
-            participant_id=pid,
-            defaults={
-                'note': note_val,
-                'mention': mention,
-                'observations': observations,
-                'saisie_par': request.user,
-            },
-        )
-        saved.append(pid)
-
-    return Response({'saved': len(saved), 'errors': errors})

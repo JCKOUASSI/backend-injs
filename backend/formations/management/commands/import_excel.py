@@ -9,35 +9,24 @@ Usage :
 """
 import csv
 import io
-import re
 from datetime import datetime, date
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from openpyxl import load_workbook
 
 from formations.models import (
     Formation, Participant, Formateur, Module,
-    ModuleParticipant, ModuleFormateur, SessionModule, RefSite, RefModule,
+    ModuleParticipant, ModuleFormateur, SessionModule, RefSite,
 )
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 
-MODULE_TITLE_TYPO_FIXES = {
-    'ETHIQUE PUBLIQUE ET MUTTE CONTRE LA CORRUPTION': 'ETHIQUE PUBLIQUE ET LUTTE CONTRE LA CORRUPTION',
-    'DROIT ADMINISTRATIVF': 'DROIT ADMINISTRATIF',
-}
-
 
 class Command(BaseCommand):
     help = 'Importer les données depuis un fichier Excel ou CSV (formations ou participants)'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.account_provision_stats = {}
 
     def add_arguments(self, parser):
         parser.add_argument('file', type=str, help='Chemin vers le fichier Excel (.xlsx) ou CSV (.csv)')
@@ -128,15 +117,6 @@ class Command(BaseCommand):
             else:
                 icon = '✅' if count > 0 else '⏭️'
                 self.stdout.write(f'  {icon} {label.capitalize():.<30} {count}')
-
-        for label, provision in self.account_provision_stats.items():
-            if not provision:
-                continue
-            self.stdout.write(
-                f"  🔐 Comptes {label}: {provision.get('created', 0)} créés, "
-                f"{provision.get('updated', 0)} mis à jour, "
-                f"{provision.get('emails_sent', 0)} email(s) envoyé(s)"
-            )
 
         if errors:
             self.stdout.write(self.style.ERROR(f'\n⚠️  {len(errors)} erreur(s) :'))
@@ -282,49 +262,23 @@ class Command(BaseCommand):
             return default
         return str(val).strip()
 
-    def _grade_lookup_q(self, grade):
-        """Filtre ORM sur le grade : strict pour A3/A4…, par catégorie pour B/C/D…"""
-        g = self._str(grade).upper()
-        if not g:
-            return Q(pk__in=[])
-        if g.startswith('A'):
-            return Q(grade__iexact=g)
-        return Q(grade__istartswith=g[0])
-
-    def _get_grade_compat_key(self, grade):
-        """Clé de compatibilité grade : A3/A4 strict, B/C/D par lettre de catégorie."""
-        g = self._str(grade).upper()
-        if not g:
-            return ''
-        if g.startswith('A'):
-            return g
-        return g[0]
-
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
         - Compacte les variantes collées (ex. 'FABA' -> 'FAB A', 'FACB' -> 'FAC B').
-        - Lettre seule ('A'/'B'/'C') → 'FAB A' / 'FAB B' / 'FAB C' (convention imports).
         - Préserve les autres codes pour permettre une résolution dynamique
           (ex. 'FAC A', 'FAR B'… seront cherchés tels quels dans RefTypeSecretariat).
+        - Une lettre seule ('A'/'B'/'C') est laissée telle quelle ; la résolution
+          du secrétariat tentera alors un match par suffixe (voir _import_formations).
         """
         c = cat.strip().upper()
         if not c:
             return c
-        if c in ('A', 'B', 'C'):
-            return f'FAB {c}'
         # Variantes collées : "FABA" -> "FAB A", "FAC B" reste "FAC B".
         import re as _re
         m = _re.fullmatch(r'([A-Z]{2,4})\s*([A-C])', c)
         if m:
             return f'{m.group(1)} {m.group(2)}'
         return c
-
-    def _normalize_module_title(self, titre):
-        """Corrige les fautes de frappe connues dans les intitulés de modules."""
-        s = (titre or '').strip()
-        if not s:
-            return s
-        return MODULE_TITLE_TYPO_FIXES.get(s.upper(), s)
 
     def _secretariat_hint_from_matricule(self, matricule):
         """Retourne le code secrétariat prioritaire selon le matricule.
@@ -337,29 +291,29 @@ class Command(BaseCommand):
             return 'FAC'
         return ''
 
-    def _resolve_secretariat(self, SecretariatModel, hint, categorie=''):
+    def _resolve_secretariat(self, SecretariatModel, hint):
         """Résout un secrétariat depuis un hint (nom ou type libellé)."""
         if not hint:
             return None
         h = hint.strip()
-        sec = (
+        return (
             SecretariatModel.objects.filter(nom__iexact=h).first()
             or SecretariatModel.objects.filter(type__libelle__iexact=h).first()
             or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
         )
-        if sec:
-            return sec
-        cat = self._normalize_categorie(categorie) if categorie else ''
-        if cat:
-            sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
-            if sec:
-                return sec
-        if h.upper() in ('FAB', 'FAC'):
-            return SecretariatModel.objects.filter(
-                type__libelle__istartswith=f'{h.upper()} ',
-            ).first()
-        return None
 
+    def _resolve_ref_site(self, site_name):
+        """
+        Résout un libellé Excel (ex. « CPFAE-AGC ») en instance RefSite.
+        Crée le site référentiel s'il n'existe pas encore.
+        """
+        name = self._str(site_name)
+        if not name:
+            return None
+        site = RefSite.objects.filter(nom__iexact=name).first()
+        if site:
+            return site
+        return RefSite.objects.create(nom=name, actif=True)
     def _int(self, val, default=None):
         if val is None:
             return default
@@ -368,28 +322,6 @@ class Command(BaseCommand):
         except (ValueError, TypeError):
             return default
 
-    def _normalize_date_string(self, val):
-        """Corrige les saisies Excel fréquentes : espaces parasites, slash manquant."""
-        s = str(val).strip()
-        if not s:
-            return s
-        s = re.sub(r'\s+', ' ', s)
-        # « 15/06/ 2026 » ou « 15/06 2026 » → « 15/06/2026 »
-        s = re.sub(r'(\d{1,2}/\d{1,2})/?\s+(\d{4})', r'\1/\2', s)
-        # « 03/072026 » → « 03/07/2026 » (slash manquant avant l'année)
-        s = re.sub(r'^(\d{1,2})/(\d{2})(\d{4})(.*)$', r'\1/\2/\3\4', s)
-        return s
-
-    def _from_excel_serial(self, val):
-        """Convertit un numéro de série Excel (float/int) en datetime naïf."""
-        if not isinstance(val, (int, float)) or val <= 0:
-            return None
-        try:
-            from openpyxl.utils.datetime import from_excel
-            return from_excel(val)
-        except (ValueError, TypeError, OverflowError):
-            return None
-
     def _parse_datetime(self, val):
         if val is None:
             return None
@@ -397,21 +329,9 @@ class Command(BaseCommand):
             if timezone.is_naive(val):
                 return timezone.make_aware(val)
             return val
-        if isinstance(val, date):
-            return timezone.make_aware(datetime.combine(val, datetime.min.time()))
-        excel_dt = self._from_excel_serial(val)
-        if excel_dt is not None:
-            if timezone.is_naive(excel_dt):
-                return timezone.make_aware(excel_dt)
-            return excel_dt
-        val = self._normalize_date_string(val)
-        if not val or val.lower() in ('-', 'n/a', '#n/a', 'na'):
-            return None
-        for fmt in (
-            '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%d/%m/%Y %H:%M:%S',
-            '%d/%m/%Y %H:%M', '%d.%m.%Y %H:%M', '%d-%m-%Y %H:%M', '%Y-%m-%dT%H:%M',
-            '%Y-%m-%d', '%d/%m/%Y', '%d.%m.%Y', '%d-%m-%Y', '%d/%m/%y', '%Y/%m/%d',
-        ):
+        val = str(val).strip()
+        for fmt in ('%Y-%m-%d %H:%M', '%d/%m/%Y %H:%M', '%Y-%m-%dT%H:%M',
+                     '%Y-%m-%d', '%d/%m/%Y'):
             try:
                 dt = datetime.strptime(val, fmt)
                 return timezone.make_aware(dt)
@@ -424,53 +344,12 @@ class Command(BaseCommand):
             return None
         if isinstance(val, (datetime, date)):
             return val if isinstance(val, date) else val.date()
-        excel_dt = self._from_excel_serial(val)
-        if excel_dt is not None:
-            return excel_dt.date()
-        val = self._normalize_date_string(val)
-        if not val or val.lower() in ('-', 'n/a', '#n/a', 'na'):
-            return None
-        for fmt in ('%d/%m/%Y', '%d.%m.%Y', '%d/%m/%y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d'):
+        val = str(val).strip()
+        for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
             try:
                 return datetime.strptime(val, fmt).date()
             except ValueError:
                 continue
-        return None
-
-    def _format_import_cell(self, val):
-        if val is None:
-            return 'vide'
-        if isinstance(val, datetime):
-            return val.isoformat(sep=' ', timespec='minutes')
-        if isinstance(val, date):
-            return val.isoformat()
-        s = str(val).strip()
-        return s or 'vide'
-
-    def _parse_formation_datetime(self, val, anchor=None):
-        """Parse une date/heure de formation ; accepte une heure seule si ``anchor`` est fourni."""
-        from datetime import time as dt_time
-
-        if val is None:
-            return None
-        if isinstance(val, dt_time) and anchor:
-            return timezone.make_aware(datetime.combine(anchor.date(), val))
-        if isinstance(val, (int, float)) and 0 < val < 1 and anchor:
-            t = self._parse_time(val)
-            if t:
-                return timezone.make_aware(datetime.combine(anchor.date(), t))
-
-        dt = self._parse_datetime(val)
-        if dt and dt.year < 1980:
-            if anchor:
-                return timezone.make_aware(datetime.combine(anchor.date(), dt.time()))
-            return None
-        if dt:
-            return dt
-        if anchor:
-            t = self._parse_time(val)
-            if t:
-                return timezone.make_aware(datetime.combine(anchor.date(), t))
         return None
 
     # ─── Import Formations ───────────────────────────
@@ -484,28 +363,13 @@ class Command(BaseCommand):
         for row_idx, data in self._rows(ws, sheet_type='formation'):
             titre = self._str(data.get('formation'))
             if not titre:
-                # Lignes résiduelles Excel (formatage, formules, cellules parasites)
-                if not self._str(data.get('module')) and not (
-                    data.get('date_debut') or data.get('date_fin')
-                ):
-                    continue
                 errors.append(f'Formations ligne {row_idx}: formation (module) manquante')
                 continue
 
-            module_val = self._str(data.get('module')) or titre
-
-            date_debut = self._parse_formation_datetime(data.get('date_debut'))
-            date_fin = self._parse_formation_datetime(data.get('date_fin'), anchor=date_debut)
+            date_debut = self._parse_datetime(data.get('date_debut'))
+            date_fin = self._parse_datetime(data.get('date_fin'))
             if not date_debut or not date_fin:
-                parts = []
-                if not date_debut:
-                    parts.append(f'début={self._format_import_cell(data.get("date_debut"))}')
-                if not date_fin:
-                    parts.append(f'fin={self._format_import_cell(data.get("date_fin"))}')
-                errors.append(
-                    f'Formations ligne {row_idx} (« {module_val} »): '
-                    f'date(s) invalide(s) ou vide(s) ({", ".join(parts)})'
-                )
+                errors.append(f'Formations ligne {row_idx}: date_debut ou date_fin invalide')
                 continue
 
             # ``duree_prevue_heures`` est facultative dans le fichier source.
@@ -519,6 +383,9 @@ class Command(BaseCommand):
                 duree = float(duree)
             except (ValueError, TypeError):
                 duree = 0
+
+            # intitulé du module : colonne séparée ou titre de la formation
+            module_val = self._str(data.get('module')) or titre
 
             # Formation ne porte que : formation (titre) + numero_formation
             formation_defaults = {
@@ -596,10 +463,9 @@ class Command(BaseCommand):
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
             if _site_name:
-                _site, _ = RefSite.objects.get_or_create(
-                    nom=_site_name, defaults={'actif': True},
-                )
-                module_defaults['site'] = _site
+                site_obj = self._resolve_ref_site(_site_name)
+                if site_obj:
+                    module_defaults['site'] = site_obj
                 module_defaults['site_legacy'] = _site_name
             if _bat:  module_defaults['batiment'] = _bat
             if _sal:  module_defaults['salle'] = _sal
@@ -621,10 +487,6 @@ class Command(BaseCommand):
                 **module_lookup,
                 defaults=module_defaults,
             )
-            ref_module, _ = RefModule.get_or_create_for_intitule(module_val)
-            if ref_module and _mod.ref_module_id != ref_module.id:
-                _mod.ref_module = ref_module
-                _mod.save(update_fields=['ref_module'])
 
             if mod_created:
                 count += 1
@@ -641,8 +503,9 @@ class Command(BaseCommand):
             cat_val_raw = self._str(data.get('categorie'))  # categorie est sur Participant, pas Module
             if grade_val and groupe_val:
                 qs = Participant.objects.filter(
+                    grade__iexact=grade_val,
                     groupe__iexact=groupe_val,
-                ).filter(self._grade_lookup_q(grade_val))
+                )
                 if cat_val_raw:
                     qs = qs.filter(categorie__iexact=cat_val_raw)
                 if vague_val:
@@ -669,12 +532,10 @@ class Command(BaseCommand):
 
     # ─── Import Participants ─────────────────────────
 
-    def _import_participants(self, ws, errors, secretariat=None, *, provision_accounts=True):
-        from authentication.badge_accounts import provision_auditeur_accounts
+    def _import_participants(self, ws, errors, secretariat=None):
         from formations.models import Secretariat as SecretariatModel
         count = 0
         inscriptions = 0
-        touched_ids = set()
         # Cache secretariat par categorie pour éviter une requête DB par ligne
         _secretariat_cache = {}
 
@@ -704,6 +565,9 @@ class Command(BaseCommand):
                 'groupe': self._str(data.get('groupe')),
                 'grade_groupe': self._str(data.get('grade_groupe')),
                 'vague': self._str(data.get('vague')),
+                'motif_notoire': self._str(
+                    data.get('motif_notoire') or data.get('motif') or data.get('motif_absence')
+                ),
             }
 
             if secretariat is not None:
@@ -717,9 +581,7 @@ class Command(BaseCommand):
                 if forced_hint:
                     cache_key = f'prefix:{forced_hint}'
                     if cache_key not in _secretariat_cache:
-                        sec = self._resolve_secretariat(
-                            SecretariatModel, forced_hint, fields.get('categorie'),
-                        )
+                        sec = self._resolve_secretariat(SecretariatModel, forced_hint)
                         _secretariat_cache[cache_key] = sec
                         if sec:
                             self.stdout.write(
@@ -774,7 +636,6 @@ class Command(BaseCommand):
                 self.stdout.write(f'  + Participant : {obj.matricule} — {nom} {prenom}')
             else:
                 self.stdout.write(f'  ~ Participant mis à jour : {matricule}')
-            touched_ids.add(obj.pk)
 
             # Inscrire le participant aux formations
             formations_str = self._str(data.get('formation(s)') or data.get('formations'))
@@ -784,46 +645,25 @@ class Command(BaseCommand):
                 p_groupe = self._str(data.get('groupe'))
                 p_grade  = self._str(data.get('grade'))
                 p_vague  = self._str(data.get('vague'))
-
-                # Validation : titre, grade, groupe, vague sont tous obligatoires
-                if not p_grade:
-                    errors.append(f'Participants ligne {row_idx}: grade requis pour inscrire {nom} {prenom}')
-                    continue
-                if not p_groupe:
-                    errors.append(f'Participants ligne {row_idx}: groupe requis pour inscrire {nom} {prenom}')
-                    continue
-                if not p_vague:
-                    errors.append(f'Participants ligne {row_idx}: vague requise pour inscrire {nom} {prenom}')
-                    continue
-
                 titres = [t.strip() for t in formations_str.split('|') if t.strip()]
                 for titre in titres:
-                    mod_qs = Module.objects.filter(
-                        formation__formation__iexact=titre,
-                        groupe__iexact=p_groupe,
-                        vague__iexact=p_vague,
-                    ).filter(self._grade_lookup_q(p_grade))
+                    mod_qs = Module.objects.filter(formation__formation__iexact=titre)
+                    if p_grade:
+                        mod_qs_g = mod_qs.filter(grade__iexact=p_grade)
+                        if mod_qs_g.exists():
+                            mod_qs = mod_qs_g
+                    if p_groupe:
+                        mod_qs_g = mod_qs.filter(groupe__iexact=p_groupe)
+                        if mod_qs_g.exists():
+                            mod_qs = mod_qs_g
+                    if p_vague:
+                        mod_qs_g = mod_qs.filter(vague__iexact=p_vague)
+                        if mod_qs_g.exists():
+                            mod_qs = mod_qs_g
                     matched_mods = list(mod_qs.order_by('ordre'))
                     if not matched_mods:
-                        crit = f'titre={titre} grade={p_grade} groupe={p_groupe} vague={p_vague}'
-                        errors.append(f'Participants ligne {row_idx}: formation introuvable ({crit})')
+                        errors.append(f'Participants ligne {row_idx}: formation "{titre}" introuvable')
                         continue
-
-                    # Vérification de compatibilité catégorielle (A, B, C, D...)
-                    # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
-                    p_compat = self._get_grade_compat_key(p_grade)
-                    mods_compatibles = []
-                    for _mod in matched_mods:
-                        mod_compat = self._get_grade_compat_key(_mod.grade)
-                        if not p_compat or not mod_compat or p_compat == mod_compat:
-                            mods_compatibles.append(_mod)
-                        else:
-                            errors.append(
-                                f'Participants ligne {row_idx}: grade incompatible pour {nom} {prenom} '
-                                f'(participant={p_grade}, module={_mod.formation.formation}={_mod.grade})'
-                            )
-                    matched_mods = mods_compatibles
-
                     for _mod in matched_mods:
                         try:
                             _, insc_created = ModuleParticipant.objects.get_or_create(
@@ -844,8 +684,9 @@ class Command(BaseCommand):
                 vague = self._str(data.get('vague'))
                 if grade and groupe:
                     mod_qs = Module.objects.filter(
+                        grade__iexact=grade,
                         groupe__iexact=groupe,
-                    ).filter(self._grade_lookup_q(grade))
+                    )
                     if vague:
                         mod_qs = mod_qs.filter(vague__iexact=vague)
                     matched_mods = list(mod_qs)
@@ -859,17 +700,7 @@ class Command(BaseCommand):
                             f'({crit})'
                         )
                     else:
-                        # Vérification de compatibilité en auto-match aussi
-                        # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
-                        p_compat = self._get_grade_compat_key(grade)
                         for _mod in matched_mods:
-                            mod_compat = self._get_grade_compat_key(_mod.grade)
-                            if p_compat and mod_compat and p_compat != mod_compat:
-                                errors.append(
-                                    f'Participants ligne {row_idx}: grade incompatible pour {nom} {prenom} '
-                                    f'(participant={grade}, module={_mod.formation.formation}={_mod.grade})'
-                                )
-                                continue
                             try:
                                 _, insc_created = ModuleParticipant.objects.get_or_create(
                                     module=_mod, participant=obj,
@@ -898,30 +729,12 @@ class Command(BaseCommand):
 
         if inscriptions:
             self.stdout.write(f'  📌 {inscriptions} inscription(s) créée(s)')
-
-        if provision_accounts and touched_ids:
-            self.account_provision_stats['auditeurs'] = provision_auditeur_accounts(
-                touched_ids,
-                log=self.stdout.write,
-                send_email=False,
-            )
-        elif not provision_accounts:
-            self.account_provision_stats['auditeurs'] = {
-                'deferred': True,
-                'created': 0,
-                'updated': 0,
-                'skipped': len(touched_ids),
-                'emails_sent': 0,
-                'errors': 0,
-            }
         return count
 
     # ─── Import Formateurs ───────────────────────────
 
-    def _import_formateurs(self, ws, errors, *, provision_accounts=True):
-        from authentication.badge_accounts import provision_formateur_accounts
+    def _import_formateurs(self, ws, errors):
         count = 0
-        touched_ids = set()
         for row_idx, data in self._rows(ws):
             nom = self._str(data.get('nom'))
             prenom = self._str(data.get('prenom'))
@@ -964,23 +777,6 @@ class Command(BaseCommand):
                 self.stdout.write(f'  + Formateur : {obj.numerobadge} — {nom} {prenom}')
             else:
                 self.stdout.write(f'  ~ Formateur mis à jour : {obj.numerobadge} — {nom} {prenom}')
-            touched_ids.add(obj.pk)
-
-        if provision_accounts and touched_ids:
-            self.account_provision_stats['formateurs'] = provision_formateur_accounts(
-                touched_ids,
-                log=self.stdout.write,
-                send_email=False,
-            )
-        elif not provision_accounts:
-            self.account_provision_stats['formateurs'] = {
-                'deferred': True,
-                'created': 0,
-                'updated': 0,
-                'skipped': len(touched_ids),
-                'emails_sent': 0,
-                'errors': 0,
-            }
         return count
 
     # ─── Import Inscriptions ─────────────────────────
@@ -1233,74 +1029,20 @@ class Command(BaseCommand):
                 self.stdout.write(f'  ~ Séance mise à jour : {titre} — {date_journee} n°{numero}')
         return count
 
-    def _match_seance_module(self, titre, grade, groupe, vague):
-        """Rapproche un module de séance ; assouplit grade/vague si correspondance unique."""
-        strategies = []
-        if grade and vague:
-            strategies.append((
-                Module.objects.filter(
-                    intitule__iexact=titre,
-                    groupe__iexact=groupe,
-                    vague__iexact=vague,
-                ).filter(self._grade_lookup_q(grade)),
-                'exacte',
-            ))
-        if grade:
-            strategies.append((
-                Module.objects.filter(
-                    intitule__iexact=titre,
-                    groupe__iexact=groupe,
-                ).filter(self._grade_lookup_q(grade)),
-                'sans vague',
-            ))
-        if vague:
-            strategies.append((
-                Module.objects.filter(
-                    intitule__iexact=titre,
-                    groupe__iexact=groupe,
-                    vague__iexact=vague,
-                ),
-                'sans grade',
-            ))
-        strategies.append((
-            Module.objects.filter(
-                intitule__iexact=titre,
-                groupe__iexact=groupe,
-            ),
-            'sans grade ni vague',
-        ))
-
-        for qs, label in strategies:
-            matches = list(qs.select_related('formation'))
-            if len(matches) == 1:
-                mod = matches[0]
-                if label == 'exacte':
-                    return matches, None
-                return matches, (
-                    f'rapprochement {label} → grade={mod.grade!r}, vague={mod.vague!r}'
-                )
-            if len(matches) > 1:
-                details = sorted({
-                    f'{m.grade}/{m.vague}' for m in matches if m.grade or m.vague
-                })
-                return None, f'ambigu ({label}) — candidats : {", ".join(details)}'
-        return None, None
-
     def _import_seances(self, ws, errors):
         """
         Dispatch des séances par Module (intitule + grade + groupe + vague).
-        ``groupe`` est obligatoire ; ``grade``/``vague`` sont assouplis si la
-        correspondance unique existe (cellules fusionnées Excel, écarts mineurs).
+        grade, groupe et vague sont obligatoires pour identifier le cours cible.
         """
         count = 0
         updated = 0
         for row_idx, data in self._rows(ws):
-            titre = self._normalize_module_title(self._str(
+            titre = self._str(
                 data.get('module_titre')
                 or data.get('formation_titre')
                 or data.get('formation')
                 or data.get('module')
-            ))
+            )
             if not titre:
                 errors.append(f'Séances ligne {row_idx}: module_titre manquant')
                 continue
@@ -1319,28 +1061,31 @@ class Command(BaseCommand):
             grade = self._str(data.get('grade'))
             vague = self._str(data.get('vague'))
 
-            if not groupe:
+            missing = [label for label, val in (
+                ('grade', grade), ('groupe', groupe), ('vague', vague),
+            ) if not val]
+            if missing:
                 errors.append(
-                    f'Séances ligne {row_idx}: groupe manquant '
-                    f'(obligatoire pour identifier le cours)'
+                    f'Séances ligne {row_idx}: {", ".join(missing)} manquant(s) '
+                    f'(obligatoires pour identifier le cours)'
                 )
                 continue
 
-            modules_matched, hint = self._match_seance_module(titre, grade, groupe, vague)
+            modules_matched = list(
+                Module.objects.filter(
+                    intitule__iexact=titre,
+                    grade__iexact=grade,
+                    groupe__iexact=groupe,
+                    vague__iexact=vague,
+                ).select_related('formation')
+            )
+
             if not modules_matched:
-                if hint and hint.startswith('ambigu'):
-                    errors.append(
-                        f'Séances ligne {row_idx}: module "{titre}" {hint} '
-                        f'(fichier : grade={grade!r}, groupe={groupe!r}, vague={vague!r})'
-                    )
-                else:
-                    errors.append(
-                        f'Séances ligne {row_idx}: module "{titre}" introuvable '
-                        f'(grade={grade!r}, groupe={groupe!r}, vague={vague!r})'
-                    )
+                errors.append(
+                    f'Séances ligne {row_idx}: module "{titre}" introuvable '
+                    f'(grade={grade!r}, groupe={groupe!r}, vague={vague!r})'
+                )
                 continue
-            if hint:
-                self.stdout.write(f'  ⚠ Séances ligne {row_idx}: {hint}')
 
             heure_debut = self._parse_time(data.get('heure_debut'))
             heure_fin = self._parse_time(data.get('heure_fin'))

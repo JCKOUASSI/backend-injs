@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans — Lot 5
 ================================================================================
-Dernière mise à jour : 08/06/2026 14:27
+Dernière mise à jour : 13/06/2026 12:00
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,9 +28,41 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+[11/06/2026] Point journalier CPFAE — alignement modèle Excel FAC 2025 (POINT JOURNALIER CAT A)
+  Fichiers modifiés :
+  · backend/statistiques/point_journalier.py — titre FAC par catégorie, param grade sur get_tableau_detail
+  · backend/statistiques/point_journalier_exports.py — (déjà format CPFAE 17 colonnes)
+  · backend/statistiques/views.py — query param grade sur détail PJ
+  · backend/statistiques/tests/test_point_journalier.py — tests titre / organisme / total colonne N
+  · frontend/src/components/PointJournalierCPFAE.jsx — composant visuel (orange, jaune, bande vague)
+  · frontend/src/pages/Statistiques.jsx — grade dans liste et chargement détail
+  · docs/Manuel utilisateur App Statistiques.md — §12 structure modèle FAC
+  Fonctionnalité :
+  · Un tableau par jour × catégorie × formation × grade (feuilles Excel A3, A4…)
+  · Ligne 1 : FORMATION D'ACCOMPAGNEMENT DE CARRIER CAT A _POINT DES PRÉSENCES_CPFAE
+  · Blocs MATIN/SOIR, colonnes groupes (G9…), salles, TOTAL, taux du jour
+  · Exports Excel/PDF/Word + affichage web identiques au visuel CPFAE
 
-[08/06/2026] Vague 1 harmonisation libellés stats : assiduité séance, couverture auditeurs, bandeau explicatif, infobulles KPI, API taux_couverture_auditeurs, manuel v2.1.0
-  · Enregistré automatiquement le 08/06/2026 14:27
+
+[13/06/2026] Bilan FAC complet — module Rapports & Bilans (analyse fichier Excel BILAN FAC 2025 NEW.xlsx)
+  Fichiers modifiés :
+  · backend/statistiques/bilans.py    — fonctions compute_bilan_fac(), _vh_grade_groupe(), _taux_presence_formation(), _groupes_termines_count()
+  · backend/statistiques/views.py     — classe BilanFACView (GET /api/statistiques/bilan-fac/)
+  · backend/statistiques/urls.py      — route 'bilan-fac/'
+  · frontend/src/pages/Statistiques.jsx — état facData/facFormationId/facAnnee/facCategorie, fetchBilanFac(),
+                                          composants BilanFACPanel, BilanFACPointGlobalTable,
+                                          BilanFACVHParGradeTable, BilanFACAbsentsNotoiresTable,
+                                          BilanFACModulesTable, panneau dépliable dans onglet Rapports & Bilans
+  Fonctionnalité :
+  · Point global (par grade) : effectif secrétariat/encadreurs/groupes, effectif auditeurs, absents notoires,
+    groupes terminés, justificatifs, taux participation, taux absents notoires, VH total/épuisé/taux exec,
+    taux présence/absence aux cours, difficultés rencontrées — colonnes identiques au fichier Excel
+  · VH par groupe : tableau par grade avec G1-Gn + récapitulatif ; VH cycle, VH épuisé, taux exec, VH restant,
+    taux restant — récapitulatif global multi-grade
+  · Absents notoires : liste nominative (N°, matricule, nom, prénoms, libellé concours, contacts, groupe/grade, observations)
+  · État des modules : tableau par grade/groupe avec statut TERMINEE/EN_COURS/PLANIFIEE/SUSPENDUE, VH prévu, dates
+  · Panneau collapsible "BILAN FAC" accessible depuis l'onglet Rapports & Bilans avec filtres Formation/Année/Catégorie
+  · Enregistré le 13/06/2026 12:00
 
 [08/06/2026] Vue d'ensemble : retrait widgets Pointages et Pointages par statut (Statistiques.jsx)
   · Enregistré automatiquement le 08/06/2026 10:53

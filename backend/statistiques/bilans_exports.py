@@ -66,14 +66,13 @@ def collect_bilans_tableaux(
     module_id=None,
     formation_id=None,
     secretariat_id=None,
-    module_ids=None,
     periode=None,
     calendrier=None,
 ):
     """Construit la liste des tableaux détaillés à exporter."""
     data = compute_bilans(
         annee=annee, mois=mois, categorie=categorie, module_id=module_id,
-        formation_id=formation_id, secretariat_id=secretariat_id, module_ids=module_ids,
+        formation_id=formation_id, secretariat_id=secretariat_id,
         periode=periode, calendrier=calendrier, dimension=dimension,
     )
     bilans = data.get('bilans') or []
@@ -603,14 +602,13 @@ def build_bilans_export_response(
     module_id=None,
     formation_id=None,
     secretariat_id=None,
-    module_ids=None,
     periode=None,
     calendrier=None,
 ):
     tableaux = collect_bilans_tableaux(
         dimension=dimension, annee=annee, mois=mois, categorie=categorie,
         module_id=module_id, formation_id=formation_id, secretariat_id=secretariat_id,
-        module_ids=module_ids, periode=periode, calendrier=calendrier,
+        periode=periode, calendrier=calendrier,
     )
 
     if fmt == 'xlsx':

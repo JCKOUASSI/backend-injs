@@ -1,7 +1,5 @@
 import uuid
-from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models.functions import Lower
 from django.conf import settings
 from django.utils import timezone
 
@@ -167,59 +165,9 @@ class RefModule(models.Model):
         ordering = ['intitule']
         verbose_name = 'Référentiel – Module'
         verbose_name_plural = 'Référentiel – Modules'
-        constraints = [
-            models.UniqueConstraint(
-                Lower('intitule'),
-                name='uniq_refmodule_intitule_ci',
-            ),
-        ]
 
     def __str__(self):
         return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
-
-    @classmethod
-    def normalize_intitule(cls, intitule):
-        return (intitule or '').strip()
-
-    @classmethod
-    def intitule_exists(cls, intitule, exclude_pk=None):
-        normalized = cls.normalize_intitule(intitule)
-        if not normalized:
-            return False
-        qs = cls.objects.filter(intitule__iexact=normalized)
-        if exclude_pk is not None:
-            qs = qs.exclude(pk=exclude_pk)
-        return qs.exists()
-
-    @classmethod
-    def get_or_create_for_intitule(cls, intitule, *, formation=None):
-        """Retourne le référentiel canonique (insensible à la casse)."""
-        normalized = cls.normalize_intitule(intitule)
-        if not normalized:
-            return None, False
-        existing = cls.objects.filter(intitule__iexact=normalized).first()
-        if existing:
-            return existing, False
-        return cls.objects.create(
-            intitule=normalized,
-            formation=formation,
-            actif=True,
-        ), True
-
-    def clean(self):
-        super().clean()
-        self.intitule = self.normalize_intitule(self.intitule)
-        if not self.intitule:
-            raise ValidationError({'intitule': "L'intitulé est requis."})
-        if self.intitule_exists(self.intitule, exclude_pk=self.pk):
-            raise ValidationError({
-                'intitule': "Un module avec cet intitulé existe déjà (sans distinction majuscules/minuscules).",
-            })
-
-    def save(self, *args, **kwargs):
-        self.intitule = self.normalize_intitule(self.intitule)
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class RefSite(models.Model):
@@ -333,6 +281,13 @@ class Participant(models.Model):
         blank=True,
         related_name='participants',
         help_text="Secrétariat responsable de ce participant",
+    )
+    motif_notoire = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Motif auditeur notoire",
+        help_text="Justificatif si l'auditeur n'a jamais badgé (ex. Décédé(e), Report…)",
     )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -492,14 +447,6 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
-    ref_module = models.ForeignKey(
-        RefModule,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='modules_instances',
-        help_text="Référentiel canonique du module (nomenclature unifiée)",
-    )
     # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
     cycle = models.CharField(
         max_length=255,
@@ -585,21 +532,6 @@ class Module(models.Model):
         help_text="Utilisateur ayant créé le module",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def canonical_intitule(self):
-        if self.ref_module_id and self.ref_module:
-            return self.ref_module.intitule
-        return self.intitule or ''
-
-    def link_ref_module(self, *, save=True):
-        """Associe le module à l'entrée RefModule correspondante."""
-        ref, _ = RefModule.get_or_create_for_intitule(self.intitule)
-        if not ref:
-            return None
-        self.ref_module = ref
-        if save and self.pk:
-            self.save(update_fields=['ref_module'])
-        return ref
 
     class Meta:
         ordering = ['ordre', 'intitule']
@@ -690,16 +622,6 @@ class SessionModule(models.Model):
 
     @property
     def duree_minutes(self):
-        """Durée comptée de la séance — règle SYGEP unique :
-        durée brute plafonnée au créneau planifié (cf. ``volume_horaire``)."""
-        if self.demarree_le and self.terminee_le:
-            from .volume_horaire import _session_realise_minutes
-            return round(_session_realise_minutes(self), 1)
-        return None
-
-    @property
-    def duree_brute_minutes(self):
-        """Durée brute (terminee_le − demarree_le), sans plafond — diagnostic uniquement."""
         if self.demarree_le and self.terminee_le:
             return round((self.terminee_le - self.demarree_le).total_seconds() / 60, 1)
         return None
@@ -819,23 +741,6 @@ class FinanceSettings(models.Model):
         default='',
         verbose_name='Fonction du signataire',
     )
-    tolerance_active = models.BooleanField(
-        default=False,
-        verbose_name='Activer la tolérance horaire',
-        help_text='Active la marge de tolérance sur les volumes réalisés inférieurs au planifié.',
-    )
-    tolerance_minutes = models.PositiveIntegerField(
-        default=30,
-        verbose_name='Tolérance (minutes)',
-        help_text='Marge absolue acceptée (minutes) entre planifié et réalisé.',
-    )
-    tolerance_pct = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=5,
-        verbose_name='Tolérance (%)',
-        help_text='Marge relative (% du volume planifié). Le seuil retenu est le plus favorable des deux.',
-    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -856,143 +761,3 @@ class FinanceSettings(models.Model):
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
-
-
-class FinanceAjustement(models.Model):
-    """Ajustement horaire sur une séance réelle, soumis à validation Direction/Finance."""
-
-    class Statut(models.TextChoices):
-        EN_ATTENTE = 'EN_ATTENTE', 'En attente'
-        VALIDE = 'VALIDE', 'Validé'
-        REJETE = 'REJETE', 'Rejeté'
-
-    session = models.ForeignKey(
-        SessionModule,
-        on_delete=models.CASCADE,
-        related_name='finance_ajustements',
-    )
-    formateur = models.ForeignKey(
-        Formateur,
-        on_delete=models.CASCADE,
-        related_name='finance_ajustements',
-    )
-    minutes_delta = models.IntegerField(
-        help_text='Minutes à ajouter (positif) ou retirer (négatif) du volume réalisé.',
-    )
-    motif = models.TextField()
-    statut = models.CharField(
-        max_length=20,
-        choices=Statut.choices,
-        default=Statut.EN_ATTENTE,
-        db_index=True,
-    )
-    realise_avant_minutes = models.FloatField(
-        null=True,
-        blank=True,
-        help_text='Volume réalisé de la séance avant ajustement (snapshot).',
-    )
-    realise_apres_minutes = models.FloatField(
-        null=True,
-        blank=True,
-        help_text='Volume réalisé attendu après validation.',
-    )
-    proposed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='finance_ajustements_proposes',
-    )
-    proposed_at = models.DateTimeField(auto_now_add=True)
-    validated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='finance_ajustements_valides',
-    )
-    validated_at = models.DateTimeField(null=True, blank=True)
-    rejected_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='finance_ajustements_rejetes',
-    )
-    rejected_at = models.DateTimeField(null=True, blank=True)
-    rejection_motif = models.TextField(blank=True, default='')
-
-    class Meta:
-        ordering = ['-proposed_at']
-        verbose_name = 'Ajustement horaire finance'
-        verbose_name_plural = 'Ajustements horaires finance'
-        indexes = [
-            models.Index(fields=['statut', 'proposed_at'], name='formations__statut_8e2f0a_idx'),
-            models.Index(fields=['session', 'statut'], name='formations__session_4c1b2d_idx'),
-        ]
-
-    def __str__(self):
-        sign = '+' if self.minutes_delta >= 0 else ''
-        return (
-            f"Ajustement {sign}{self.minutes_delta} min — "
-            f"{self.formateur} / séance {self.session_id} ({self.get_statut_display()})"
-        )
-
-
-class NoteModule(models.Model):
-    """Note obtenue par un auditeur (participant) pour un module donné."""
-
-    class Mention(models.TextChoices):
-        TRES_BIEN  = 'TRES_BIEN',  'Très bien'
-        BIEN       = 'BIEN',       'Bien'
-        ASSEZ_BIEN = 'ASSEZ_BIEN', 'Assez bien'
-        PASSABLE   = 'PASSABLE',   'Passable'
-        INSUFFISANT = 'INSUFFISANT', 'Insuffisant'
-
-    module = models.ForeignKey(
-        'Module',
-        on_delete=models.CASCADE,
-        related_name='notes',
-    )
-    participant = models.ForeignKey(
-        'Participant',
-        on_delete=models.CASCADE,
-        related_name='notes_modules',
-    )
-    note = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text="Note numérique (ex : 14.50)",
-    )
-    mention = models.CharField(
-        max_length=20,
-        choices=Mention.choices,
-        blank=True,
-        default='',
-        help_text="Mention calculée ou saisie manuellement",
-    )
-    observations = models.TextField(
-        blank=True,
-        default='',
-        help_text="Observations éventuelles du secrétariat",
-    )
-    saisie_par = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='notes_saisies',
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('module', 'participant')
-        ordering = ['module', 'participant__nom', 'participant__prenom']
-        verbose_name = 'Note module'
-        verbose_name_plural = 'Notes modules'
-
-    def __str__(self):
-        return f"{self.participant} — {self.module.intitule} : {self.note}"

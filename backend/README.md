@@ -42,7 +42,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python seed_data.py
-python manage.py runserver 0.0.0.0:8000  # Accessible sur le réseau local
+python manage.py runserver 0.0.0.0:8001  # Accessible sur le réseau local
 
 # 2. Frontend React (dans un autre terminal)
 cd frontend
@@ -133,7 +133,7 @@ flutter pub get
 
 ```bash
 # 1. Démarrer le serveur Django (accessible sur le réseau local)
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:8001
 
 # 2. Créer les comptes mobile (si pas encore fait)
 python manage.py shell < scripts/seed_mobile_users.py
@@ -154,7 +154,7 @@ flutter run
 
 ### Configuration serveur
 
-Au login, cliquer « Configurer le serveur » pour saisir l'IP LAN du serveur Django (ex: `http://192.168.1.x:8000`).
+Au login, cliquer « Configurer le serveur » pour saisir l'IP LAN du serveur Django (ex: `http://192.168.1.x:8001`).
 
 ### Fonctionnalités
 

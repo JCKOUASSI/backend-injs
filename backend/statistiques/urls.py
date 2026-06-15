@@ -12,6 +12,7 @@ from .views import (
     point_journalier_export,
     BilansView,
     bilans_export,
+    BilanFACView,
 )
 
 urlpatterns = [
@@ -27,4 +28,5 @@ urlpatterns = [
     path('point-journalier-export/',                  point_journalier_export,          name='statistiques-point-journalier-export'),
     path('bilans/',                                   BilansView.as_view(),             name='statistiques-bilans'),
     path('bilans-export/',                            bilans_export,                    name='statistiques-bilans-export'),
+    path('bilan-fac/',                                BilanFACView.as_view(),           name='statistiques-bilan-fac'),
 ]

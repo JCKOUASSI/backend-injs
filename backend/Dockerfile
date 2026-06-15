@@ -34,10 +34,10 @@ USER appuser
 RUN SECRET_KEY=build-time-only DEBUG=True \
     python manage.py collectstatic --noinput
 
-EXPOSE 8000
+EXPOSE 8001
 
 CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8000", \
+     "--bind", "0.0.0.0:8001", \
      "--workers", "2", \
      "--timeout", "120", \
      "--access-logfile", "-"]

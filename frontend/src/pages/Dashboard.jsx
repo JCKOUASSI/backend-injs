@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
+import { hasAppRole } from '../utils/roles'
 import { formatDate } from '../utils/dates'
 import {
   appendPeriodToSearchParams,

@@ -227,6 +227,7 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
                 ('groupe', 'vague'),
                 ('site', 'salle'),
                 'secretariat',
+                'motif_notoire',
             ),
         }),
         ("Compte utilisateur", {
@@ -614,40 +615,6 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
         url = reverse('admin:formations_sessionmodule_reactiver', args=[obj.pk])
         return format_html('<a class="button" href="{}">Réactiver</a>', url)
 
-    def save_model(self, request, obj, form, change):
-        old_debut = old_fin = None
-        hours_changed = False
-        if change and obj.pk and not obj.terminee_le:
-            old = SessionModule.objects.filter(pk=obj.pk).only(
-                'heure_debut_prevue', 'heure_fin_prevue',
-            ).first()
-            if old:
-                old_debut, old_fin = old.heure_debut_prevue, old.heure_fin_prevue
-                hours_changed = (
-                    obj.heure_debut_prevue != old_debut
-                    or obj.heure_fin_prevue != old_fin
-                )
-
-        if not change or obj.terminee_le or not hours_changed:
-            super().save_model(request, obj, form, change)
-            return
-
-        from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with_edt_balance
-
-        try:
-            obj.full_clean()
-            result = apply_session_edit_with_edt_balance(
-                obj, old_debut=old_debut, old_fin=old_fin,
-            )
-            if result and result.get('message'):
-                self.message_user(request, result['message'], level='info')
-        except SessionEdtBalanceError as exc:
-            self.message_user(request, str(exc), level='error')
-            return
-        except Exception as exc:
-            self.message_user(request, str(exc), level='error')
-            return
-
     def reactiver_view(self, request, object_id):
         session = self.get_object(request, object_id)
         if session is None:
@@ -952,9 +919,6 @@ class FinanceSettingsAdmin(ModelAdmin):
     fieldsets = (
         (_("Tarification"), {
             'fields': ('prix_heure_realisee', 'afficher_montants_exports'),
-        }),
-        (_("Tolérance horaire"), {
-            'fields': ('tolerance_active', 'tolerance_minutes', 'tolerance_pct'),
         }),
         (_("Mise en page des exports"), {
             'fields': (

@@ -129,7 +129,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             'email', 'telephone', 'telephone2',
             'type_concours', 'libelle_concours',
             'categorie', 'grade', 'groupe', 'grade_groupe', 'vague',
-            'site', 'salle',
+            'site', 'salle', 'motif_notoire',
             'secretariat', 'secretariat_nom', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']

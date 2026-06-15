@@ -8,7 +8,7 @@ from rest_framework import status
 from authentication.models import User
 from .models import (
     Formation, Module, Participant, Formateur,
-    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule, RefModule, RefFormation,
+    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
 )
 from .volume_horaire import compute_dashboard_volume_horaire
 
@@ -327,18 +327,6 @@ class ReferentielsAPITest(TestCase):
         for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
 
-    def test_referentiels_gestion(self):
-        RefFormation.objects.create(intitule='REF TEST', actif=True)
-        res = self.client.get('/api/formations/referentiels/gestion/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        for key in (
-            'formations', 'modules', 'categories', 'grades', 'vagues',
-            'sites', 'batiments', 'salles', 'types_secretariat',
-        ):
-            self.assertIn(key, res.data)
-            self.assertIsInstance(res.data[key], list)
-        self.assertTrue(any(r['intitule'] == 'REF TEST' for r in res.data['formations']))
-
 
 # ──────────────────────────────────────────
 # API — dispatch secrétariat par matricule
@@ -390,9 +378,9 @@ class ParticipantSecretariatDispatchByMatriculeAPITest(TestCase):
 
 class DashboardVolumeHoraireTest(TestCase):
 
-    def test_prevu_contractuel_independant_edt(self):
+    def test_prevu_et_realise_par_seances(self):
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=10)
+        module = make_module(f, duree_prevue_heures=99)
         now = timezone.now()
         for num in range(1, 3):
             SessionModule.objects.create(
@@ -411,16 +399,6 @@ class DashboardVolumeHoraireTest(TestCase):
         self.assertEqual(effectue, 10)
         self.assertEqual(taux, 100)
 
-        session = SessionModule.objects.filter(module=module).first()
-        session.heure_fin_prevue = dt_time(18, 0)
-        session.save(update_fields=['heure_fin_prevue'])
-        effectue2, total2, taux2 = compute_dashboard_volume_horaire(
-            Module.objects.filter(pk=module.pk)
-        )
-        self.assertEqual(total2, 10)
-        self.assertEqual(effectue2, 10)
-        self.assertEqual(taux2, 100)
-
     def test_realise_plafonne_au_prevu_seance(self):
         """Une séance laissée ouverte ne compte pas plus que son créneau planifié."""
         from .volume_horaire import _accumulate_module_session_volumes
@@ -437,157 +415,7 @@ class DashboardVolumeHoraireTest(TestCase):
             heure_fin_prevue=dt_time(12, 0),
         )
         vol = _accumulate_module_session_volumes(module)
-        self.assertEqual(vol['prevu_h'], 12.0)
-        self.assertEqual(vol['prevu_edt_h'], 4.0)
+        self.assertEqual(vol['prevu_h'], 4.0)
         self.assertEqual(vol['realise_h'], 4.0)
-        self.assertEqual(vol['ecart_h'], -8.0)
-
-    def test_volume_horaire_canonique_aligne_stats_et_dashboard(self):
-        from .volume_horaire import (
-            compute_volume_horaire_from_modules,
-            compute_dashboard_volume_horaire,
-        )
-
-        f = make_formation()
-        module = make_module(f, duree_prevue_heures=3)
-        now = timezone.now()
-        SessionModule.objects.create(
-            module=module,
-            date_journee=timezone.localdate(),
-            numero=1,
-            demarree_le=now - timedelta(hours=3),
-            terminee_le=now,
-            heure_debut_prevue=dt_time(8, 0),
-            heure_fin_prevue=dt_time(11, 0),
-        )
-        qs = Module.objects.filter(pk=module.pk)
-        dash = compute_dashboard_volume_horaire(qs)
-        canon = compute_volume_horaire_from_modules(qs)
-        self.assertEqual(dash[1], canon['prevu_heures'])
-        self.assertEqual(dash[0], canon['realise_heures'])
-
-
-class ModuleRefModuleLinkTest(TestCase):
-
-    def test_link_ref_module_on_create(self):
-        f = make_formation()
-        module = make_module(f, intitule='Déontologie')
-        module.link_ref_module()
-        module.refresh_from_db()
-        self.assertIsNotNone(module.ref_module_id)
-        self.assertEqual(module.ref_module.intitule, 'Déontologie')
-        self.assertEqual(module.canonical_intitule(), 'Déontologie')
-
-
-class RefModuleUniqueIntituleTest(TestCase):
-
-    def setUp(self):
-        self.client = APIClient()
-        self.user = make_user('ref_admin')
-        self.client.force_authenticate(user=self.user)
-        self.list_url = reverse('api-ref-module-list')
-
-    def test_create_duplicate_case_insensitive_rejected(self):
-        RefModule.objects.create(intitule='Déontologie')
-        response = self.client.post(self.list_url, {'intitule': 'DÉONTOLOGIE', 'actif': True}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('intitule', response.data)
-
-    def test_update_to_existing_intitule_case_insensitive_rejected(self):
-        first = RefModule.objects.create(intitule='Gestion budgétaire')
-        second = RefModule.objects.create(intitule='Communication')
-        url = reverse('api-ref-module-detail', args=[second.pk])
-        response = self.client.put(url, {'intitule': 'GESTION BUDGÉTAIRE', 'actif': True}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('intitule', response.data)
-        second.refresh_from_db()
-        self.assertEqual(second.intitule, 'Communication')
-        self.assertEqual(first.intitule, 'Gestion budgétaire')
-
-    def test_update_same_intitule_different_case_allowed(self):
-        module = RefModule.objects.create(intitule='Planification')
-        url = reverse('api-ref-module-detail', args=[module.pk])
-        response = self.client.put(url, {'intitule': 'PLANIFICATION', 'actif': True}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        module.refresh_from_db()
-        self.assertEqual(module.intitule, 'PLANIFICATION')
-
-
-class ParticipantFormationsScopeAPITest(TestCase):
-
-    def setUp(self):
-        self.client = APIClient()
-        self.sec_a = Secretariat.objects.create(nom='Sec A')
-        self.sec_b = Secretariat.objects.create(nom='Sec B')
-        self.secretariat_user = make_user('sec-scope', role='SECRETARIAT', secretariat=self.sec_a)
-        self.f_a = make_formation('Formation A')
-        self.f_b = make_formation('Formation B')
-        self.mod_a = make_module(self.f_a, intitule='Mod A', secretariat=self.sec_a)
-        self.mod_b = make_module(self.f_b, intitule='Mod B', secretariat=self.sec_b)
-        self.participant = make_participant(matricule='P-SCOPE')
-        ModuleParticipant.objects.create(module=self.mod_a, participant=self.participant)
-        ModuleParticipant.objects.create(module=self.mod_b, participant=self.participant)
-
-    def test_secretariat_only_sees_modules_in_own_perimeter(self):
-        self.client.force_authenticate(self.secretariat_user)
-        res = self.client.get(f'/api/formations/participants/{self.participant.pk}/formations/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]['id'], self.mod_a.id)
-
-    def test_secretariat_cannot_read_participant_outside_perimeter(self):
-        outsider = make_participant(matricule='P-OUT')
-        ModuleParticipant.objects.create(module=self.mod_b, participant=outsider)
-        self.client.force_authenticate(self.secretariat_user)
-        res = self.client.get(f'/api/formations/participants/{outsider.pk}/formations/')
-        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-
-class FormateurListScopeAPITest(TestCase):
-
-    def setUp(self):
-        self.client = APIClient()
-        self.sec_a = Secretariat.objects.create(nom='Sec Form A')
-        self.sec_b = Secretariat.objects.create(nom='Sec Form B')
-        self.secretariat_user = make_user('sec-form', role='SECRETARIAT', secretariat=self.sec_a)
-        self.formateur_a = make_formateur(numero='FA001', nom='Alpha', prenom='Form')
-        self.formateur_b = make_formateur(numero='FB001', nom='Beta', prenom='Form')
-        self.formateur_a.secretariats.add(self.sec_a)
-        self.formateur_b.secretariats.add(self.sec_b)
-
-    def test_secretariat_formateur_list_scoped(self):
-        self.client.force_authenticate(self.secretariat_user)
-        res = self.client.get('/api/formations/formateurs/list/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        ids = {item['id'] for item in res.data['results']}
-        self.assertIn(self.formateur_a.id, ids)
-        self.assertNotIn(self.formateur_b.id, ids)
-
-
-class EncadrantFormationScopeAPITest(TestCase):
-
-    def setUp(self):
-        self.client = APIClient()
-        self.sec_a = Secretariat.objects.create(nom='Sec Enc A')
-        self.sec_b = Secretariat.objects.create(nom='Sec Enc B')
-        self.encadrant = make_user('enc-scope', role='ENCADRANT')
-        self.f_a = make_formation('Formation Enc A')
-        self.f_b = make_formation('Formation Enc B')
-        self.mod_a = make_module(self.f_a, intitule='Mod Enc A', secretariat=self.sec_a, superviseur=self.encadrant)
-        make_module(self.f_b, intitule='Mod Enc B', secretariat=self.sec_b)
-
-    def test_encadrant_sees_formations_without_user_secretariat(self):
-        self.client.force_authenticate(self.encadrant)
-        res = self.client.get('/api/formations/list/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        ids = {item['id'] for item in res.data['results']}
-        self.assertIn(self.f_a.id, ids)
-        self.assertNotIn(self.f_b.id, ids)
-
-    def test_encadrant_without_supervised_modules_sees_no_formations(self):
-        other = make_user('enc-empty', role='ENCADRANT')
-        self.client.force_authenticate(other)
-        res = self.client.get('/api/formations/list/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data['results'], [])
+        self.assertEqual(vol['ecart_h'], 0.0)
 

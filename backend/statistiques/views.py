@@ -28,6 +28,7 @@ from .models import ConfigAlerteSeuil, Rapport, ObservationQualitative, Signatur
 from .bilans import (
     compute_bilans, compute_bilans_avec_tableaux, compute_bilan_effectifs_module,
     compute_bilan_effectifs_categorie, compute_bilan_periode_formation,
+    compute_bilan_fac,
 )
 from .bilans_exports import build_bilans_export_response
 from .point_journalier import (
@@ -220,6 +221,62 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, module_ids=None, 
     ]
     rows.sort(key=lambda x: x['nb_sessions'], reverse=True)
     return rows[:limit]
+
+
+def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None):
+    """
+    Auditeurs inscrits au périmètre sans aucun pointage les concernant.
+    """
+    mf, pf, _, _, _ = _filtres(formation_id, secretariat_id, module_ids)
+
+    inscrits_pids = set(
+        ModuleParticipant.objects.filter(**mf).values_list('participant_id', flat=True).distinct()
+    )
+    if not inscrits_pids:
+        return {'total': 0, 'inscrits': 0, 'pct': 0.0, 'liste': []}
+
+    pids_avec_pointage = set(
+        Pointage.objects.filter(participant_id__isnull=False, **pf)
+        .values_list('participant_id', flat=True)
+        .distinct()
+    )
+    notoire_ids = inscrits_pids - pids_avec_pointage
+
+    participants = (
+        Participant.objects.filter(id__in=notoire_ids)
+        .select_related('secretariat')
+        .order_by('nom', 'prenom')
+    )
+
+    liste = []
+    for p in participants:
+        liste.append({
+            'id': p.id,
+            'matricule': p.matricule,
+            'nom': p.nom,
+            'prenom': p.prenom,
+            'sexe': p.get_sexe_display() if p.sexe else '—',
+            'categorie': p.categorie or '—',
+            'grade': p.grade or '—',
+            'groupe': p.groupe or '—',
+            'vague': p.vague or '—',
+            'secretariat': p.secretariat.nom if p.secretariat_id else '—',
+            'secretariat_id': p.secretariat_id,
+            'telephone': p.telephone or p.telephone2 or '—',
+            'email': p.email or '—',
+            'type_concours': p.type_concours or '—',
+            'libelle_concours': p.libelle_concours or '—',
+            'motif': (p.motif_notoire or '').strip() or '—',
+        })
+
+    total_inscrits = len(inscrits_pids)
+    total = len(liste)
+    return {
+        'total': total,
+        'inscrits': total_inscrits,
+        'pct': _taux(total, total_inscrits),
+        'liste': liste,
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -418,6 +475,7 @@ def _indicateurs_pedagogiques(formation_id=None, secretariat_id=None, module_ids
         'taux_par_grade': taux_par_grade,
         'par_type_concours': par_type_concours,
         'taux_par_secretariat': taux_par_secretariat,
+        'auditeurs_notoires': _auditeurs_notoires(formation_id, secretariat_id, module_ids),
     }
 
 
@@ -503,6 +561,7 @@ def _indicateurs_admin(formation_id=None, secretariat_id=None, module_ids=None):
         'participants_par_grade': list(
             p_inscrits.exclude(grade='').values('grade').annotate(total=Count('id')).order_by('-total').values('grade', 'total')[:8]
         ),
+        'auditeurs_notoires': _auditeurs_notoires(formation_id, secretariat_id, module_ids),
         'stats_secretariats': stats_secretariats,
     }
 
@@ -957,6 +1016,13 @@ class SecretariatsStatsView(APIView):
 
         resultats = []
 
+        global_an = _auditeurs_notoires(formation_id, scope.secretariat_id, module_ids)
+        an_by_sec = {}
+        for item in global_an.get('liste') or []:
+            sid = item.get('secretariat_id')
+            if sid is not None:
+                an_by_sec.setdefault(sid, []).append(item)
+
         for s in secretariats_stats_queryset(request.user):
             mq = {'secretariat': s, **mod_kw}
             pf = {'session__module__secretariat': s, **({'session__module_id__in': module_ids} if module_ids is not None else {})}
@@ -994,6 +1060,9 @@ class SecretariatsStatsView(APIView):
             vh_prevu = vh_totals['prevu_heures']
             vh_realise = vh_totals['realise_heures']
 
+            an_list = an_by_sec.get(s.id, [])
+            nb_auditeurs_notoires = len(an_list)
+
             resultats.append({
                 'secretariat_id': s.id,
                 'secretariat': s.nom,
@@ -1007,6 +1076,8 @@ class SecretariatsStatsView(APIView):
                 'nb_inscrits': nb_inscrits,
                 'nb_presents': nb_presents,
                 'nb_absences': nb_absences,
+                'nb_auditeurs_notoires': nb_auditeurs_notoires,
+                'pct_auditeurs_notoires': _taux(nb_auditeurs_notoires, nb_inscrits),
                 'places_attendues': agg['places_attendues'],
                 'places_presentes': agg['places_presentes'],
                 'taux_presence': _taux(agg['places_presentes'], agg['places_attendues']),
@@ -1022,6 +1093,7 @@ class SecretariatsStatsView(APIView):
         return Response({
             'secretariats': resultats,
             'total': len(resultats),
+            'auditeurs_notoires': global_an,
             'periode': periode_api_payload(date_debut, date_fin, period['meta']),
         })
 
@@ -1363,8 +1435,9 @@ class PointJournalierView(APIView):
                 return Response({'detail': str(exc)}, status=400)
 
         if detail and jour and scope.formation_id:
+            grade = request.query_params.get('grade') or None
             tb = get_tableau_detail(
-                annee, scope.formation_id, categorie or '—', jour, **kw,
+                annee, scope.formation_id, categorie or '—', jour, grade=grade, **kw,
             )
             if not tb:
                 return Response({'detail': 'Tableau introuvable.'}, status=404)
@@ -1569,3 +1642,51 @@ class ObservationsView(APIView):
         )
         return Response({'id': obs.id, 'type': obs.type, 'description': obs.description,
                          'created_at': obs.created_at}, status=201)
+
+
+class BilanFACView(APIView):
+    """
+    GET /api/statistiques/bilan-fac/
+      ?formation_id=<id>&annee=<yyyy>&categorie=<A|B|C|D>&secretariat_id=<id>&calendrier=<YYYY-MM-DD>
+
+    Retourne le Bilan FAC complet :
+      - point_global    : tableau de synthèse par grade (effectifs, VH, taux…)
+      - vh_par_grade    : VH par groupe pour chaque grade
+      - absents_notoires: liste nominative des auditeurs notoires
+      - modules_statuts : état d'avancement des modules
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not user_has_stats_access(request.user):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
+
+        def _int(key):
+            v = request.query_params.get(key)
+            return int(v) if v and v.isdigit() else None
+
+        formation_id = _int('formation_id')
+        if not formation_id:
+            scope, err = _scope_from_request(request)
+            if err:
+                return err
+            formation_id = scope.formation_id
+
+        if not formation_id:
+            return Response({'detail': 'Paramètre formation_id requis.'}, status=400)
+
+        annee = _int('annee') or date.today().year
+        categorie = request.query_params.get('categorie') or None
+        secretariat_id = _int('secretariat_id')
+        calendrier = request.query_params.get('calendrier') or None
+
+        data = compute_bilan_fac(
+            formation_id=formation_id,
+            annee=annee,
+            categorie=categorie,
+            secretariat_id=secretariat_id,
+            calendrier=calendrier,
+        )
+        if not data:
+            return Response({'detail': 'Formation introuvable.'}, status=404)
+        return Response(data)

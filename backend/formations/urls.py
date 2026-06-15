@@ -8,9 +8,6 @@ from .api_views import (
     module_add_formateur, module_remove_formateur,
     module_assign_superviseur,
     ref_type_secretariat_list, ref_type_secretariat_detail,
-    sync_participants_api, sync_formateurs_api,
-    sync_sessions_api, sync_presences_api,
-    module_notes_list, module_note_upsert, module_notes_bulk,
 )
 
 urlpatterns = [
@@ -69,13 +66,8 @@ urlpatterns = [
     path('formateurs/<int:pk>/donnees-sensibles/', api_views.formateur_donnees_sensibles_api, name='api-formateur-donnees-sensibles'),
     path('finance/dashboard/', api_views.finance_dashboard_api, name='api-finance-dashboard'),
     path('finance/settings/', api_views.finance_settings_api, name='api-finance-settings'),
-    path('finance/encadrants/', api_views.finance_encadrants_api, name='api-finance-encadrants'),
-    path('finance/ajustements/', api_views.finance_ajustements_api, name='api-finance-ajustements'),
-    path('finance/ajustements/<int:pk>/valider/', api_views.finance_ajustement_valider_api, name='api-finance-ajustement-valider'),
-    path('finance/ajustements/<int:pk>/rejeter/', api_views.finance_ajustement_rejeter_api, name='api-finance-ajustement-rejeter'),
     
-    # Référentiels (listes déroulantes + administration)
-    path('referentiels/gestion/', api_views.referentiels_gestion_api, name='api-referentiels-gestion'),
+    # Référentiels (listes déroulantes)
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
 
     # Référentiels CRUD
@@ -100,12 +92,6 @@ urlpatterns = [
 
     # Excel import (JWT-authenticated API endpoint)
     path('import-excel/', api_views.api_import_excel, name='api-import-excel'),
-
-    # Synchronisation inter-plateformes (SVEVCPFAE — Api-Key auth)
-    path('sync/participants/', sync_participants_api, name='api-sync-participants'),
-    path('sync/formateurs/', sync_formateurs_api, name='api-sync-formateurs'),
-    path('sync/sessions/', sync_sessions_api, name='api-sync-sessions'),
-    path('sync/presences/', sync_presences_api, name='api-sync-presences'),
     
     # Module management
     path('<int:formation_pk>/modules/', module_list_api, name='api-module-list'),
@@ -116,9 +102,6 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/add/', module_add_formateur, name='api-module-add-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/<int:formateur_id>/remove/', module_remove_formateur, name='api-module-remove-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/assign-superviseur/', module_assign_superviseur, name='api-module-assign-superviseur'),
-    path('<int:formation_pk>/modules/<int:module_pk>/notes/', module_notes_list, name='api-module-notes-list'),
-    path('<int:formation_pk>/modules/<int:module_pk>/notes/bulk/', module_notes_bulk, name='api-module-notes-bulk'),
-    path('<int:formation_pk>/modules/<int:module_pk>/notes/<int:participant_id>/', module_note_upsert, name='api-module-note-upsert'),
 
     # Session management (via module)
     path('<int:formation_pk>/sessions/', session_views.session_list, name='api-session-list'),
