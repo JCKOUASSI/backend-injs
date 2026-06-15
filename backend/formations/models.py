@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.db.models.functions import Lower
 from django.conf import settings
 from django.utils import timezone
 
@@ -165,6 +166,9 @@ class RefModule(models.Model):
         ordering = ['intitule']
         verbose_name = 'Référentiel – Module'
         verbose_name_plural = 'Référentiel – Modules'
+        constraints = [
+            models.UniqueConstraint(Lower('intitule'), name='uniq_refmodule_intitule_ci'),
+        ]
 
     @staticmethod
     def normalize_intitule(value):
@@ -293,8 +297,7 @@ class Participant(models.Model):
         max_length=255,
         blank=True,
         default='',
-        verbose_name="Motif auditeur notoire",
-        help_text="Justificatif si l'auditeur n'a jamais badgé (ex. Décédé(e), Report…)",
+        help_text='Motif de notoriété du participant',
     )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -879,9 +882,65 @@ class FinanceAjustement(models.Model):
         verbose_name_plural = 'Ajustements horaires finance'
         ordering = ['-proposed_at']
         indexes = [
-            models.Index(fields=['statut', 'proposed_at']),
-            models.Index(fields=['session', 'statut']),
+            models.Index(fields=['statut', 'proposed_at'], name='formations__statut_8e2f0a_idx'),
+            models.Index(fields=['session', 'statut'], name='formations__session_4c1b2d_idx'),
         ]
 
     def __str__(self):
         return f'Ajustement {self.statut} — séance {self.session_id} ({self.minutes_delta} min)'
+
+
+class NoteModule(models.Model):
+    """Note / mention d'un participant sur un module (saisie secrétariat)."""
+
+    class Mention(models.TextChoices):
+        TRES_BIEN = 'TRES_BIEN', 'Très bien'
+        BIEN = 'BIEN', 'Bien'
+        ASSEZ_BIEN = 'ASSEZ_BIEN', 'Assez bien'
+        PASSABLE = 'PASSABLE', 'Passable'
+        INSUFFISANT = 'INSUFFISANT', 'Insuffisant'
+
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.CASCADE,
+        related_name='notes',
+    )
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name='notes_modules',
+    )
+    note = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Note numérique (ex : 14.50)',
+    )
+    mention = models.CharField(
+        max_length=20,
+        choices=Mention.choices,
+        blank=True,
+        default='',
+        help_text='Mention calculée ou saisie manuellement',
+    )
+    observations = models.TextField(
+        blank=True,
+        default='',
+        help_text='Observations éventuelles du secrétariat',
+    )
+    saisie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notes_saisies',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Note module'
+        verbose_name_plural = 'Notes modules'
+        ordering = ['module', 'participant__nom', 'participant__prenom']
+        unique_together = [('module', 'participant')]
