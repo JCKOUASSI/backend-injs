@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .formateur_privacy import (
@@ -27,6 +27,16 @@ from .formateur_privacy import (
     can_edit_formateur_sensitive_data,
     formateur_sensitive_payload,
 )
+from .api_access import deny_finance_operational_response
+from .finance_encadrants import finance_encadrants_report
+from .finance_ajustements import (
+    propose_ajustement,
+    valider_ajustement,
+    rejeter_ajustement,
+    serialize_ajustement,
+    _log_finance_audit,
+)
+from .finance_tolerance import tolerance_settings_payload
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -59,6 +69,10 @@ def _groupe_sort_key(value):
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     """Return dashboard statistics, scoped by secretariat for SECRETARIAT role."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
     modules_qs = Module.objects.all()
     participants_qs = Participant.objects.all()
     secretariat_filter = request.query_params.get('secretariat')
@@ -392,6 +406,10 @@ def formation_list_api(request):
     List modules (une ligne par module) with optional filtering.
     Query params: statut, search, module, categorie, grade, secretariat_type, vague, groupe, actives, page, page_size, date_mode, date
     """
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
     from presences.models import Pointage
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
@@ -1349,6 +1367,80 @@ def _finance_kpi_evolution(current, previous):
     return evolution
 
 
+def _finance_recap_sort_key(module_row):
+    return (
+        (module_row.get('grade') or '').strip(),
+        (module_row.get('groupe') or '').strip(),
+        (module_row.get('module_intitule') or '').strip(),
+    )
+
+
+def _finance_recap_par_module(modules):
+    """Tri récap modules par grade, groupe, intitulé."""
+    return sorted(modules or [], key=_finance_recap_sort_key)
+
+
+def _finance_group_sessions_by_groupe(sessions):
+    """Groupe les séances par grade/groupe avec sous-totaux."""
+    groups = {}
+    for sess in sessions or []:
+        grade = (sess.get('grade') or '').strip()
+        groupe = (sess.get('groupe') or '').strip()
+        key = (grade, groupe)
+        block = groups.setdefault(key, {
+            'grade': grade,
+            'groupe': groupe,
+            'sessions': [],
+            'sous_total': {
+                'sessions_count': 0,
+                'creneau_minutes': 0.0,
+                'realise_minutes': 0.0,
+                'montant': 0.0,
+            },
+        })
+        block['sessions'].append(sess)
+        st = block['sous_total']
+        st['sessions_count'] += 1
+        st['creneau_minutes'] = round(
+            st['creneau_minutes'] + float(sess.get('duree_minutes') or 0), 1,
+        )
+        st['realise_minutes'] = round(
+            st['realise_minutes'] + float(sess.get('duree_realisee_minutes') or 0), 1,
+        )
+        st['montant'] = round(st['montant'] + float(sess.get('montant_realise') or 0), 2)
+
+    result = []
+    for key in sorted(groups.keys()):
+        block = groups[key]
+        block['sessions'].sort(
+            key=lambda s: (s.get('date_journee') or '', s.get('numero') or 0),
+        )
+        result.append(block)
+    return result
+
+
+def _finance_canonical_volume_kpis(*, date_debut=None, date_fin=None, secretariat_id=None):
+    """Volumes prévu/réalisé agrégés (logique canonique dashboard / bilans)."""
+    from .volume_horaire import compute_volume_horaire_from_modules
+
+    qs = Module.objects.all()
+    if secretariat_id:
+        qs = qs.filter(secretariat_id=secretariat_id)
+    totals = compute_volume_horaire_from_modules(
+        qs,
+        date_debut=date_debut,
+        date_fin=date_fin,
+        integer_hours=False,
+    )
+    return {
+        'prevu_minutes': totals.get('prevu_minutes', 0),
+        'realise_minutes': totals.get('realise_minutes', 0),
+        'prevu_heures': totals.get('prevu_heures', 0),
+        'realise_heures': totals.get('realise_heures', 0),
+        'taux_pct': totals.get('taux_pct', 0),
+    }
+
+
 def _finance_join_unique_labels(values):
     """Concatène des libellés uniques (grade, groupe…) triés."""
     cleaned = sorted({str(v).strip() for v in values if v and str(v).strip()})
@@ -1498,6 +1590,12 @@ def _finance_report_rows(
                 raw_realized_minutes = round(
                     realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1,
                 )
+                if raw_realized_minutes <= 0:
+                    from .volume_horaire import _session_realise_minutes
+
+                    session_realized = round(_session_realise_minutes(session), 1)
+                    if session_realized > 0:
+                        raw_realized_minutes = session_realized
                 realized_minutes = _finance_realized_minutes(
                     raw_realized_minutes, duration_minutes,
                 )
@@ -1668,6 +1766,8 @@ def _finance_report_rows(
         }
         if include_sessions:
             row['sessions'] = sessions_data
+            row['recap_modules'] = _finance_recap_par_module(modules_list)
+            row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
         results.append(row)
     return results
 
@@ -1983,6 +2083,7 @@ def finance_settings_api(request):
             'updated_by': (
                 settings_obj.updated_by.get_full_name() or settings_obj.updated_by.username
             ) if settings_obj.updated_by else None,
+            **tolerance_settings_payload(settings_obj),
         }
 
     if request.method == 'GET':
@@ -2031,11 +2132,31 @@ def finance_settings_api(request):
             ref.save(update_fields=['prix_heure_realisee'])
         updated = True
 
-    export_bool_fields = ('afficher_montants_exports',)
+    export_bool_fields = ('afficher_montants_exports', 'tolerance_active')
     for field in export_bool_fields:
         if field in request.data:
             setattr(settings_obj, field, bool(request.data.get(field)))
             updated = True
+
+    if 'tolerance_minutes' in request.data:
+        try:
+            mins = int(request.data.get('tolerance_minutes'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'tolerance_minutes invalide.'}, status=400)
+        if mins < 0:
+            return Response({'detail': 'tolerance_minutes doit être positif ou nul.'}, status=400)
+        settings_obj.tolerance_minutes = mins
+        updated = True
+
+    if 'tolerance_pct' in request.data:
+        try:
+            pct = float(request.data.get('tolerance_pct'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'tolerance_pct invalide.'}, status=400)
+        if pct < 0:
+            return Response({'detail': 'tolerance_pct doit être positif ou nul.'}, status=400)
+        settings_obj.tolerance_pct = round(pct, 2)
+        updated = True
 
     export_text_fields = (
         'export_titre_document', 'export_entete_ligne1', 'export_entete_ligne2',
@@ -2060,10 +2181,135 @@ def finance_settings_api(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def finance_encadrants_api(request):
+    """Rapport volumes horaires par encadrant (superviseur de module)."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    period = _parse_finance_date_range(request)
+    if period.get('error'):
+        return Response({'detail': period['detail']}, status=400)
+
+    data = finance_encadrants_report(
+        date_debut=period.get('date_debut'),
+        date_fin=period.get('date_fin'),
+        secretariat_id=_finance_secretariat_id_from_request(request),
+    )
+    return Response(data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustements_api(request):
+    """Liste ou proposition d'ajustements horaires sur séances terminées."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    if request.method == 'GET':
+        qs = FinanceAjustement.objects.select_related(
+            'session',
+            'session__module',
+            'session__module__formation',
+            'formateur',
+            'proposed_by',
+            'validated_by',
+            'rejected_by',
+        ).order_by('-proposed_at')
+        statut = (request.query_params.get('statut') or '').strip()
+        if statut:
+            qs = qs.filter(statut=statut)
+        pending_count = FinanceAjustement.objects.filter(
+            statut=FinanceAjustement.Statut.EN_ATTENTE,
+        ).count()
+        return Response({
+            'items': [serialize_ajustement(a) for a in qs],
+            'pending_count': pending_count,
+        })
+
+    session_id_raw = request.data.get('session_id')
+    formateur_id_raw = request.data.get('formateur_id')
+    minutes_delta_raw = request.data.get('minutes_delta')
+    motif = request.data.get('motif')
+
+    try:
+        session = SessionModule.objects.select_related('module', 'module__formation').get(
+            pk=int(session_id_raw),
+        )
+    except (SessionModule.DoesNotExist, TypeError, ValueError):
+        return Response({'detail': 'Séance introuvable.'}, status=404)
+
+    try:
+        formateur = Formateur.objects.get(pk=int(formateur_id_raw))
+    except (Formateur.DoesNotExist, TypeError, ValueError):
+        return Response({'detail': 'Formateur introuvable.'}, status=404)
+
+    ajustement, errors = propose_ajustement(
+        session,
+        formateur,
+        minutes_delta_raw,
+        motif,
+        request.user,
+    )
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+
+    _log_finance_audit('FINANCE_AJUSTEMENT_PROPOSE', request, ajustement)
+    return Response(serialize_ajustement(ajustement), status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustement_valider_api(request, pk):
+    """Valide un ajustement en attente et applique l'impact sur la séance."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    try:
+        ajustement = FinanceAjustement.objects.select_related(
+            'session', 'session__module', 'formateur',
+        ).get(pk=pk)
+    except FinanceAjustement.DoesNotExist:
+        return Response({'detail': 'Ajustement introuvable.'}, status=404)
+
+    ajustement, errors = valider_ajustement(ajustement, request.user, request=request)
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+    return Response(serialize_ajustement(ajustement))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def finance_ajustement_rejeter_api(request, pk):
+    """Rejette un ajustement en attente sans modifier la séance."""
+    if not _check_finance_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    try:
+        ajustement = FinanceAjustement.objects.select_related(
+            'session', 'session__module', 'formateur',
+        ).get(pk=pk)
+    except FinanceAjustement.DoesNotExist:
+        return Response({'detail': 'Ajustement introuvable.'}, status=404)
+
+    motif = request.data.get('motif') or request.data.get('rejection_motif')
+    ajustement, errors = rejeter_ajustement(
+        ajustement, request.user, rejection_motif=motif, request=request,
+    )
+    if errors:
+        return Response({'detail': errors[0], 'errors': errors}, status=400)
+    return Response(serialize_ajustement(ajustement))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def formation_detail_api(request, pk):
     """
     Get formation details by ID.
     """
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
     try:
         formation = Formation.objects.prefetch_related(
             'modules__sessions',
@@ -2719,6 +2965,10 @@ def module_detail_api(request, formation_pk, module_pk):
 @permission_classes([IsAuthenticated])
 def module_full_detail_api(request, formation_pk, module_pk):
     """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
     try:
         formation = Formation.objects.get(pk=formation_pk)
         module = Module.objects.get(pk=module_pk, formation=formation)
@@ -3032,6 +3282,10 @@ def module_assign_superviseur(request, formation_pk, module_pk):
 @permission_classes([IsAuthenticated])
 def referentiels_api(request):
     """Retourne les référentiels prédéfinis pour les listes déroulantes."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
     formations_reelles = list(Formation.objects.order_by('formation').values('id', 'formation'))
     modules = list(RefModule.objects.filter(actif=True).values('id', 'intitule', 'volume_horaire', 'formation_id'))
@@ -3088,6 +3342,25 @@ def referentiels_api(request):
         'grades': grades,
         'types_secretariat': types_secretariat,
         'vagues': vagues,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def referentiels_gestion_api(request):
+    """Toutes les tables référentielles (actifs + inactifs) — page admin Référentiels."""
+    return Response({
+        'formations': list(RefFormation.objects.order_by('intitule').values('id', 'intitule', 'actif')),
+        'modules': list(RefModule.objects.order_by('intitule').values('id', 'intitule', 'volume_horaire', 'actif')),
+        'categories': list(RefCategorie.objects.order_by('libelle').values('id', 'libelle', 'actif')),
+        'grades': list(RefGrade.objects.order_by('libelle').values('id', 'libelle', 'categorie_id', 'actif')),
+        'vagues': list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')),
+        'sites': list(RefSite.objects.order_by('nom').values(
+            'id', 'nom', 'actif', 'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
+        )),
+        'batiments': list(RefBatiment.objects.order_by('nom').values('id', 'nom', 'site_id', 'actif')),
+        'salles': list(RefSalle.objects.order_by('nom').values('id', 'nom', 'site_id', 'batiment_id', 'actif')),
+        'types_secretariat': list(RefTypeSecretariat.objects.order_by('libelle').values('id', 'libelle', 'actif')),
     })
 
 

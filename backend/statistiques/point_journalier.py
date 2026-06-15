@@ -4,6 +4,7 @@ Point journalier — format CPFAE (fichiers « POINT JOURNALIER CAT … »).
 Optimisé : pré-chargement bulk des séances, inscriptions et pointages
 pour éviter les requêtes N+1 sur les filtres larges (année entière, etc.).
 """
+import re
 from collections import defaultdict
 from datetime import date
 
@@ -108,19 +109,49 @@ def _titre_ligne1(formation, categorie=None):
     return f"{name}_POINT DES PRÉSENCES_CPFAE"
 
 
-def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None, allowed_module_ids=None):
-    sm_q = filter_sessions(seulement_terminees=True).filter(date_journee__year=annee)
-    if mois:
-        sm_q = sm_q.filter(date_journee__month=mois)
-    if formation_id:
-        sm_q = sm_q.filter(module__formation_id=formation_id)
-    if secretariat_id:
-        sm_q = sm_q.filter(module__secretariat_id=secretariat_id)
+def _sessions_pj_queryset(
+    *,
+    module_ids=None,
+    annee=None,
+    mois=None,
+    formation_id=None,
+    secretariat_id=None,
+    allowed_module_ids=None,
+    jours=None,
+):
+    """
+    Séances éligibles au point journalier CPFAE.
+
+    Utilise ``filter_sessions`` (même règle que assiduité / bilans / KPI).
+    Les présences restent calculées à partir des pointages (0 si aucun badge).
+    """
+    scope_ids = module_ids
     if allowed_module_ids is not None:
-        sm_q = sm_q.filter(module_id__in=allowed_module_ids)
-    today = date.today()
+        if scope_ids is not None:
+            scope_ids = list(set(scope_ids) & set(allowed_module_ids))
+        else:
+            scope_ids = list(allowed_module_ids)
+
+    qs = filter_sessions(module_ids=scope_ids, annee=annee, mois=mois)
+    if formation_id:
+        qs = qs.filter(module__formation_id=formation_id)
+    if secretariat_id:
+        qs = qs.filter(module__secretariat_id=secretariat_id)
+    if jours:
+        qs = qs.filter(date_journee__in=jours)
+    return qs
+
+
+def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None, allowed_module_ids=None):
+    sm_q = _sessions_pj_queryset(
+        annee=annee,
+        mois=mois,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        allowed_module_ids=allowed_module_ids,
+    )
     dates = sorted(set(sm_q.values_list('date_journee', flat=True)))
-    return [d for d in dates if d <= today]
+    return dates
 
 
 def _liste_categories(formation_id=None, secretariat_id=None, allowed_module_ids=None):
@@ -215,9 +246,7 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
             cache['participants_by_mod_cat'][(mod_id, c.upper())].add(pid)
 
     sessions = list(
-        filter_sessions(module_ids=module_ids, seulement_terminees=True).filter(
-            date_journee__in=jours,
-        )
+        _sessions_pj_queryset(module_ids=module_ids, jours=jours)
     )
     session_ids = []
     for sess in sessions:
@@ -241,26 +270,64 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
     return cache
 
 
-def _stats_groupe_cached(module, jour, creneau, categorie, cache):
+def _participant_ids_for_module(module, categorie, cache):
     if categorie and categorie != '—':
         participant_ids = cache['participants_by_mod_cat'].get(
             (module.id, categorie.upper()), set(),
         )
         if not participant_ids:
-            # fallback case-insensitive
             participant_ids = {
                 pid for pid in cache['participants_by_mod'][module.id]
                 if cache['participant_cat'].get(pid, '').upper() == categorie.upper()
             }
-    else:
-        participant_ids = cache['participants_by_mod'][module.id]
+        return participant_ids
+    return cache['participants_by_mod'][module.id]
 
-    effectif = len(participant_ids)
-    sessions = [
-        s for s in cache['all_sessions_by_mod_day'].get((module.id, jour), [])
-        if _creneau(s) == creneau
-    ]
 
+def _groupe_bucket_key(module):
+    """Clé d'agrégation : grade + groupe physique (pas le module / matière)."""
+    gr = (module.grade or '').strip().upper()
+    g = (module.groupe or '').strip().upper()
+    if not g:
+        return (gr, f'__MOD_{module.id}')
+    return (gr, g)
+
+
+def _groupe_num_sort(value):
+    m = re.search(r'(\d+)', (value or ''))
+    return int(m.group(1)) if m else 9999
+
+
+def _groupe_bucket_sort_key(key):
+    gr, g = key
+    return (_groupe_num_sort(gr), gr, _groupe_num_sort(g), g)
+
+
+def _sessions_creneau(modules, jour, creneau, cache):
+    sessions = []
+    for mod in modules:
+        for sess in cache['all_sessions_by_mod_day'].get((mod.id, jour), []):
+            if _creneau(sess) == creneau:
+                sessions.append(sess)
+    return sessions
+
+
+def _stats_groupe_cached(module, jour, creneau, categorie, cache):
+    participant_ids = _participant_ids_for_module(module, categorie, cache)
+    sessions = _sessions_creneau([module], jour, creneau, cache)
+    return stats_creneau_module(
+        participant_ids,
+        sessions,
+        cache['presents_by_session'],
+    )
+
+
+def _stats_groupe_modules(modules, jour, creneau, categorie, cache):
+    """Stats agrégées pour un groupe physique (union auditeurs + séances du créneau)."""
+    participant_ids = set()
+    for mod in modules:
+        participant_ids |= _participant_ids_for_module(mod, categorie, cache)
+    sessions = _sessions_creneau(modules, jour, creneau, cache)
     return stats_creneau_module(
         participant_ids,
         sessions,
@@ -282,14 +349,21 @@ def _aggregate_total(groupes):
 
 
 def _bloc_creneau_cached(modules, jour, creneau, categorie, multi_grade, all_sessions, cache):
-    """Tous les modules du grade — y compris effectif 0 (colonnes vides du modèle CPFAE)."""
-    groupes = []
+    """Une colonne par groupe physique (G10, G11…), pas par module / matière."""
+    buckets = defaultdict(list)
     for mod in modules:
-        stats = _stats_groupe_cached(mod, jour, creneau, categorie, cache)
+        buckets[_groupe_bucket_key(mod)].append(mod)
+
+    groupes = []
+    for key in sorted(buckets.keys(), key=_groupe_bucket_sort_key):
+        mods = sorted(buckets[key], key=lambda m: m.id)
+        rep = mods[0]
+        stats = _stats_groupe_modules(mods, jour, creneau, categorie, cache)
         groupes.append({
-            'module_id': mod.id,
-            'label': _group_label(mod, multi_grade),
-            'salle': _salle_label(mod),
+            'module_id': rep.id,
+            'module_ids': [m.id for m in mods],
+            'label': _group_label(rep, multi_grade),
+            'salle': _salle_label(rep),
             **stats,
         })
     return {
@@ -485,15 +559,12 @@ def compute_point_journalier(
     categories = _liste_categories(formation_id, secretariat_id, module_ids)
     formations_idx = {t['formation_id']: t['formation'] for t in tableaux}
 
-    sm_q = SessionModule.objects.filter(
-        date_journee__year=annee, date_journee__lte=date.today(),
+    sm_q = _sessions_pj_queryset(
+        annee=annee,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        allowed_module_ids=module_ids,
     )
-    if formation_id:
-        sm_q = sm_q.filter(module__formation_id=formation_id)
-    if secretariat_id:
-        sm_q = sm_q.filter(module__secretariat_id=secretariat_id)
-    if module_ids is not None:
-        sm_q = sm_q.filter(module_id__in=module_ids)
     mois_avec_donnees = sorted(set(sm_q.values_list('date_journee__month', flat=True)))
 
     return {

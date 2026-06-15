@@ -512,10 +512,10 @@ Chaque carte affiche :
 |------|---------|------|
 | taux_presence | Taux de présence | Plus haut = mieux |
 | taux_absence | Taux d'absence | Plus bas = mieux (inverse) |
-| taux_abandon | Taux d'abandon | Plus bas = mieux (inverse) |
+| taux_abandon | Événements absence / suspect | Pointages ABSENT_NON_BADGE ou HORS_LIGNE_SUSPECT / inscrits — plus bas = mieux |
 | taux_execution_vh | Exécution volume horaire | Plus haut = mieux |
-| nb_absences_notoires | Absences notoires | Plus bas = mieux (inverse) |
-| saturation_groupe | Saturation des groupes | Plus bas = mieux (inverse) |
+| nb_absences_notoires | Auditeurs notoires | Inscrits sans pointage ou avec motif notoire — plus bas = mieux |
+| saturation_groupe | Saturation des groupes | Moy. inscrits/groupe ÷ 40 — plus bas = mieux |
 
 ### 13.3 Alertes déclenchées
 

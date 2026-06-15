@@ -66,9 +66,14 @@ urlpatterns = [
     path('formateurs/<int:pk>/donnees-sensibles/', api_views.formateur_donnees_sensibles_api, name='api-formateur-donnees-sensibles'),
     path('finance/dashboard/', api_views.finance_dashboard_api, name='api-finance-dashboard'),
     path('finance/settings/', api_views.finance_settings_api, name='api-finance-settings'),
+    path('finance/encadrants/', api_views.finance_encadrants_api, name='api-finance-encadrants'),
+    path('finance/ajustements/', api_views.finance_ajustements_api, name='api-finance-ajustements'),
+    path('finance/ajustements/<int:pk>/valider/', api_views.finance_ajustement_valider_api, name='api-finance-ajustement-valider'),
+    path('finance/ajustements/<int:pk>/rejeter/', api_views.finance_ajustement_rejeter_api, name='api-finance-ajustement-rejeter'),
     
     # Référentiels (listes déroulantes)
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
+    path('referentiels/gestion/', api_views.referentiels_gestion_api, name='api-referentiels-gestion'),
 
     # Référentiels CRUD
     path('ref/formations/', api_views.ref_formation_list, name='api-ref-formation-list'),

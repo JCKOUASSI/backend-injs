@@ -127,6 +127,8 @@ export function PointJournalierTableauCPFAE({ tb }) {
   )
   const sidebar = (tb.vague_sidebar || 'SECONDE VAGUE').trim()
   const bodyRows = 22
+  const dataCols = 1 + nGroups + 1 // libellés + groupes + TOTAL (hors bande jaune)
+  const orgColSpan = Math.max(1, dataCols - 4) // après DATE · jour · mois · année
 
   return (
     <div style={{
@@ -168,12 +170,20 @@ export function PointJournalierTableauCPFAE({ tb }) {
             </td>
           </tr>
           <tr>
-            <td colSpan={3} style={td({ fontWeight: 700, fontSize: '0.82rem', textAlign: 'left' })}>DATE</td>
+            <td style={td({ fontWeight: 700, fontSize: '0.82rem', textAlign: 'left' })}>DATE</td>
             <td style={td({ fontWeight: 700 })}>{tb.jour}</td>
             <td style={td({ fontWeight: 700 })}>{tb.mois_libelle}</td>
             <td style={td({ fontWeight: 700 })}>{tb.annee}</td>
-            {nGroups > 3 && <td colSpan={nGroups - 3} style={td()} />}
-            <td colSpan={2} style={td({ fontWeight: 700, fontSize: '0.72rem' })}>
+            <td
+              colSpan={orgColSpan}
+              style={td({
+                fontWeight: 700,
+                fontSize: '0.72rem',
+                lineHeight: 1.25,
+                textAlign: 'center',
+                whiteSpace: 'normal',
+              })}
+            >
               {tb.organisme}
             </td>
           </tr>

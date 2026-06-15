@@ -327,6 +327,16 @@ class ReferentielsAPITest(TestCase):
         for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
 
+    def test_referentiels_gestion(self):
+        res = self.client.get('/api/formations/referentiels/gestion/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in (
+            'formations', 'modules', 'categories', 'grades', 'vagues',
+            'sites', 'batiments', 'salles', 'types_secretariat',
+        ):
+            self.assertIn(key, res.data)
+            self.assertIsInstance(res.data[key], list)
+
 
 # ──────────────────────────────────────────
 # API — dispatch secrétariat par matricule
@@ -380,7 +390,7 @@ class DashboardVolumeHoraireTest(TestCase):
 
     def test_prevu_et_realise_par_seances(self):
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=99)
+        module = make_module(f, duree_prevue_heures=10)
         now = timezone.now()
         for num in range(1, 3):
             SessionModule.objects.create(
@@ -404,7 +414,7 @@ class DashboardVolumeHoraireTest(TestCase):
         from .volume_horaire import _accumulate_module_session_volumes
 
         f = make_formation()
-        module = make_module(f, duree_prevue_heures=12)
+        module = make_module(f, duree_prevue_heures=4)
         SessionModule.objects.create(
             module=module,
             date_journee=timezone.localdate(),

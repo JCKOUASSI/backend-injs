@@ -230,6 +230,54 @@ def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin
     return totals
 
 
+def compute_volume_horaire_per_module_ids(
+    module_ids, date_debut=None, date_fin=None, *, integer_hours=False,
+):
+    """VH prévu / réalisé par ``module_id`` (même logique que le dashboard)."""
+    module_ids = list(module_ids or [])
+    if not module_ids:
+        return {}
+
+    modules_by_id = {
+        m.id: m
+        for m in Module.objects.filter(id__in=module_ids).only('duree_prevue_heures')
+    }
+    sessions = SessionModule.objects.filter(module_id__in=module_ids).only(
+        'module_id',
+        'heure_debut_prevue',
+        'heure_fin_prevue',
+        'demarree_le',
+        'terminee_le',
+        'date_journee',
+    )
+    sessions_by_module = {}
+    for s in sessions:
+        sessions_by_module.setdefault(s.module_id, []).append(s)
+
+    out = {}
+    for mid in module_ids:
+        module_sessions = sessions_by_module.get(mid, [])
+        in_period = [
+            s for s in module_sessions
+            if session_in_date_range(s, date_debut, date_fin)
+        ]
+        prevu_min = module_planned_minutes_for_period(
+            modules_by_id.get(mid),
+            len(in_period),
+            len(module_sessions),
+            in_period,
+        )
+        agg = accumulate_sessions_volume(in_period)
+        totals = finalize_volume_totals(
+            prevu_min,
+            agg['realise_min'],
+            integer_hours=integer_hours,
+        )
+        totals['nb_sessions'] = agg['nb_sessions']
+        out[mid] = totals
+    return out
+
+
 def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=None, *, integer_hours=False):
     module_ids = list(modules_qs.values_list('pk', flat=True))
     return compute_volume_horaire_from_module_ids(

@@ -6,12 +6,18 @@ Structure préparée pour accueillir les tableaux CPFAE fournis progressivement.
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q, Sum
+from django.db.models import Q
 
 from formations.models import Formation, Module, RefCategorie, Participant, ModuleParticipant, SessionModule
 from presences.models import Pointage
 
-from .effectifs import effectifs_tableau_agrege, session_ids_for_scope
+from .effectifs import (
+    aggregation_seances_modules,
+    count_auditeurs_notoires,
+    effectifs_tableau_agrege,
+    participant_ids_notoires,
+    session_ids_for_scope,
+)
 
 User = get_user_model()
 
@@ -34,18 +40,27 @@ PERIODES_BILAN = [
 ]
 
 
-def _liste_categories(formation_id=None, secretariat_id=None):
+def _liste_categories(formation_id=None, secretariat_id=None, module_ids=None):
     cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
     pq = Participant.objects.exclude(categorie='')
     if secretariat_id:
         pq = pq.filter(secretariat_id=secretariat_id)
     if formation_id:
         pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
+    if module_ids is not None:
+        pq = pq.filter(modules_inscrits__module_id__in=module_ids).distinct()
     cats.update(pq.values_list('categorie', flat=True))
     return sorted(cats, key=lambda c: (len(c), c))
 
 
-def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, module_id=None):
+def _modules_queryset(
+    formation_id=None,
+    secretariat_id=None,
+    categorie=None,
+    module_id=None,
+    module_ids=None,
+    ref_module_id=None,
+):
     mq = Q()
     if formation_id:
         mq &= Q(formation_id=formation_id)
@@ -53,7 +68,11 @@ def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, mo
         mq &= Q(secretariat_id=secretariat_id)
     if module_id:
         mq &= Q(id=module_id)
-    qs = Module.objects.filter(mq).select_related('formation').order_by(
+    elif module_ids is not None:
+        mq &= Q(id__in=module_ids)
+    if ref_module_id:
+        mq &= Q(ref_module_id=ref_module_id)
+    qs = Module.objects.filter(mq).select_related('formation', 'ref_module').order_by(
         'formation__formation', 'grade', 'groupe', 'ordre', 'intitule',
     )
     if categorie:
@@ -63,12 +82,14 @@ def _modules_queryset(formation_id=None, secretariat_id=None, categorie=None, mo
     return qs
 
 
-def _formations_queryset(formation_id=None, secretariat_id=None):
+def _formations_queryset(formation_id=None, secretariat_id=None, module_ids=None):
     fq = Formation.objects.all()
     if formation_id:
         fq = fq.filter(id=formation_id)
     if secretariat_id:
         fq = fq.filter(modules__secretariat_id=secretariat_id).distinct()
+    if module_ids is not None:
+        fq = fq.filter(modules__id__in=module_ids).distinct()
     return fq.order_by('formation')
 
 
@@ -135,6 +156,7 @@ def compute_bilan_effectifs_categorie(
     mois=None,
     calendrier=None,
     periode=None,
+    module_ids=None,
 ):
     """
     Tableau CPFAE « Bilan des effectifs catégorie » :
@@ -149,6 +171,8 @@ def compute_bilan_effectifs_categorie(
         mq = mq.filter(formation_id=formation_id)
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
     module_ids = list(
         mq.filter(
             module_participants__participant__categorie__iexact=categorie,
@@ -182,19 +206,29 @@ def _date_inscrits_label(calendrier=None):
     return date.today().strftime('%d/%m/%Y')
 
 
-def _modules_formation_categorie(formation_id, categorie, grade=None, secretariat_id=None):
+def _modules_formation_categorie(
+    formation_id, categorie, grade=None, secretariat_id=None, module_ids=None,
+):
     mq = Module.objects.filter(formation_id=formation_id)
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
     if grade:
         mq = mq.filter(grade=grade)
-    return mq.filter(
-        module_participants__participant__categorie__iexact=categorie,
-    ).distinct()
+    if categorie:
+        mq = mq.filter(
+            module_participants__participant__categorie__iexact=categorie,
+        ).distinct()
+    return mq
 
 
-def _stats_ligne_formation(formation_id, categorie, grade, secretariat_id, annee, mois, calendrier):
-    mq = _modules_formation_categorie(formation_id, categorie, grade, secretariat_id)
+def _stats_ligne_formation(
+    formation_id, categorie, grade, secretariat_id, annee, mois, calendrier, scope_module_ids=None,
+):
+    mq = _modules_formation_categorie(
+        formation_id, categorie, grade, secretariat_id, scope_module_ids,
+    )
     module_ids = list(mq.values_list('id', flat=True))
 
     nb_groupes = mq.exclude(groupe='').values('groupe').distinct().count()
@@ -214,10 +248,13 @@ def _stats_ligne_formation(formation_id, categorie, grade, secretariat_id, annee
 
     ref_q = Participant.objects.filter(
         modules_inscrits__module__formation_id=formation_id,
-        categorie__iexact=categorie,
     ).distinct()
+    if categorie:
+        ref_q = ref_q.filter(categorie__iexact=categorie)
     if secretariat_id:
         ref_q = ref_q.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        ref_q = ref_q.filter(modules_inscrits__module_id__in=module_ids).distinct()
     if grade:
         ref_q = ref_q.filter(modules_inscrits__module__grade=grade).distinct()
     inscrits_reference = ref_q.count()
@@ -225,21 +262,13 @@ def _stats_ligne_formation(formation_id, categorie, grade, secretariat_id, annee
     inscrits_actifs = auditeurs_listes
     inscrits_reference = max(inscrits_reference, inscrits_actifs)
 
-    abs_q = Pointage.objects.filter(
-        statut=Pointage.Statut.ABSENT_NON_BADGE,
-        session__module_id__in=module_ids,
+    absents_notoires = count_auditeurs_notoires(
+        module_ids=module_ids,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        grade=grade,
+        categorie=categorie,
     )
-    if calendrier:
-        try:
-            abs_q = abs_q.filter(session__date_journee=date.fromisoformat(str(calendrier)))
-        except ValueError:
-            pass
-    else:
-        if annee:
-            abs_q = abs_q.filter(session__date_journee__year=annee)
-        if mois:
-            abs_q = abs_q.filter(session__date_journee__month=mois)
-    absents_notoires = abs_q.values('participant_id').distinct().count()
 
     return {
         'grade': grade or '',
@@ -265,13 +294,23 @@ def _somme_lignes(lignes, keys):
     return out
 
 
-def _ligne_categorie_formation(formation_id, categorie, secretariat_id, annee, mois, calendrier):
+def _ligne_categorie_formation(
+    formation_id, categorie, secretariat_id, annee, mois, calendrier, module_ids=None,
+):
     grades = sorted({
         g for g in Module.objects.filter(
             formation_id=formation_id,
             module_participants__participant__categorie__iexact=categorie,
         ).exclude(grade='').values_list('grade', flat=True)
     })
+    if module_ids is not None:
+        grades = sorted({
+            g for g in Module.objects.filter(
+                id__in=module_ids,
+                formation_id=formation_id,
+                module_participants__participant__categorie__iexact=categorie,
+            ).exclude(grade='').values_list('grade', flat=True)
+        })
 
     keys_sum = [
         'nb_groupes', 'nb_encadrants', 'effectif_secretariat',
@@ -280,12 +319,14 @@ def _ligne_categorie_formation(formation_id, categorie, secretariat_id, annee, m
 
     if len(grades) > 1:
         sous_lignes = [
-            _stats_ligne_formation(formation_id, categorie, g, secretariat_id, annee, mois, calendrier)
+            _stats_ligne_formation(
+                formation_id, categorie, g, secretariat_id, annee, mois, calendrier, module_ids,
+            )
             for g in grades
         ]
         totaux = _somme_lignes(sous_lignes, keys_sum)
         nb_enc = _stats_ligne_formation(
-            formation_id, categorie, None, secretariat_id, annee, mois, calendrier,
+            formation_id, categorie, None, secretariat_id, annee, mois, calendrier, module_ids,
         )
         totaux['nb_encadrants'] = nb_enc['nb_encadrants']
         totaux['effectif_secretariat'] = nb_enc['effectif_secretariat']
@@ -298,7 +339,7 @@ def _ligne_categorie_formation(formation_id, categorie, secretariat_id, annee, m
 
     grade = grades[0] if grades else None
     stats = _stats_ligne_formation(
-        formation_id, categorie, grade, secretariat_id, annee, mois, calendrier,
+        formation_id, categorie, grade, secretariat_id, annee, mois, calendrier, module_ids,
     )
     return {
         'categorie': categorie,
@@ -316,6 +357,7 @@ def compute_bilan_periode_formation(
     periode=None,
     secretariat_id=None,
     categorie_filter=None,
+    module_ids=None,
 ):
     """Tableau CPFAE « Bilan période » par formation (catégories A–D)."""
     try:
@@ -330,13 +372,15 @@ def compute_bilan_periode_formation(
     categories_ref = list(
         RefCategorie.objects.filter(actif=True).order_by('libelle').values_list('libelle', flat=True)
     )
-    cats_data = _liste_categories(formation_id, secretariat_id)
+    cats_data = _liste_categories(formation_id, secretariat_id, module_ids)
     categories = [c for c in categories_ref if c in cats_data] or sorted(cats_data)
     if categorie_filter:
         categories = [c for c in categories if c.upper() == categorie_filter.upper()]
 
     lignes = [
-        _ligne_categorie_formation(formation_id, cat, secretariat_id, annee, mois, calendrier)
+        _ligne_categorie_formation(
+            formation_id, cat, secretariat_id, annee, mois, calendrier, module_ids,
+        )
         for cat in categories
     ]
 
@@ -373,34 +417,166 @@ def _resume_module(module, categorie=None):
     }
 
 
+def _matiere_bucket(module):
+    """Clé d'agrégation matière : ref_module prioritaire, sinon intitulé normalisé."""
+    if module.ref_module_id:
+        label = (module.ref_module.intitule if module.ref_module else module.intitule or '').strip()
+        return ('ref', module.ref_module_id, label)
+    label = (module.intitule or f'Module {module.id}').strip()
+    return ('intitule', label.upper(), label)
+
+
+def _group_modules_by_matiere(modules):
+    """Regroupe les modules d'une formation par matière (tous groupes)."""
+    groups = {}
+    for mod in modules:
+        kind, key, label = _matiere_bucket(mod)
+        bucket = (mod.formation_id, kind, key)
+        if bucket not in groups:
+            groups[bucket] = {'label': label, 'modules': [], 'ref_module_id': key if kind == 'ref' else None}
+        groups[bucket]['modules'].append(mod)
+    return groups
+
+
+def _resume_matiere(module_ids, categorie=None):
+    """Inscrits uniques et pointages sur tous les modules d'une matière."""
+    mq = Q(module_id__in=module_ids)
+    if categorie:
+        mq &= Q(participant__categorie__iexact=categorie)
+    inscrits = ModuleParticipant.objects.filter(mq).values('participant').distinct().count()
+    sess_ids = session_ids_for_scope(module_ids)
+    return {
+        'inscrits': inscrits,
+        'nb_seances_terminees': len(sess_ids),
+        'nb_pointages': Pointage.objects.filter(session_id__in=sess_ids).count() if sess_ids else 0,
+    }
+
+
+def compute_bilan_effectifs_matiere(
+    formation_id,
+    ref_module_id=None,
+    matiere_intitule=None,
+    categorie=None,
+    secretariat_id=None,
+    annee=None,
+    mois=None,
+    calendrier=None,
+    periode=None,
+    module_ids=None,
+):
+    """
+    Tableau CPFAE « Bilan des effectifs matière » :
+    agrégation tous groupes pour une même matière (ref_module ou intitulé).
+    """
+    if not formation_id:
+        return None
+
+    mq = Q(formation_id=formation_id)
+    if secretariat_id:
+        mq &= Q(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq &= Q(id__in=module_ids)
+    if ref_module_id:
+        mq &= Q(ref_module_id=ref_module_id)
+    elif matiere_intitule:
+        mq &= Q(intitule__iexact=matiere_intitule.strip())
+    else:
+        return None
+
+    modules = list(Module.objects.filter(mq).select_related('formation', 'ref_module'))
+    if not modules:
+        return None
+
+    mod_ids = [m.id for m in modules]
+    mp_qs = ModuleParticipant.objects.filter(module_id__in=mod_ids).select_related('participant')
+    if categorie and categorie != '—':
+        mp_qs = mp_qs.filter(participant__categorie__iexact=categorie)
+
+    participants = {}
+    for mp in mp_qs:
+        participants[mp.participant_id] = mp.participant
+
+    session_ids = _session_ids_modules(mod_ids, annee, mois, calendrier)
+    stats = _effectifs_tableau(participants, session_ids, mod_ids)
+
+    formation = modules[0].formation
+    matiere_nom = (
+        (modules[0].ref_module.intitule if modules[0].ref_module else None)
+        or modules[0].intitule
+        or f'Matière {ref_module_id or matiere_intitule}'
+    ).strip().upper()
+
+    return {
+        'type': 'effectifs_matiere',
+        'titre': f'BILAN DES EFFECTIFS MATIÈRE {matiere_nom}',
+        'matiere': matiere_nom,
+        'ref_module_id': ref_module_id or modules[0].ref_module_id,
+        'nb_groupes': len(modules),
+        'module_ids': mod_ids,
+        'formation_id': formation.id,
+        'formation': str(formation),
+        **stats,
+        'periode_label': dict(PERIODES_BILAN).get(periode, '') if periode else '',
+    }
+
+
 def compute_bilans(
     annee=None,
     mois=None,
     categorie=None,
     module_id=None,
+    module_ids=None,
     formation_id=None,
     secretariat_id=None,
     periode=None,
     calendrier=None,
     dimension='formation',
+    ref_module_id=None,
 ):
     """
-    dimension : 'module' | 'categorie' | 'formation'
+    dimension : 'module' | 'matiere' | 'categorie' | 'formation'
     Retourne la liste des bilans disponibles + métadonnées filtres.
     """
     annee = annee or date.today().year
     dimension = (dimension or 'formation').lower()
-    if dimension not in ('module', 'categorie', 'formation'):
+    if dimension not in ('module', 'matiere', 'categorie', 'formation'):
         dimension = 'formation'
 
-    categories = _liste_categories(formation_id, secretariat_id)
-    modules_qs = _modules_queryset(formation_id, secretariat_id, categorie, module_id)
+    if dimension == 'matiere' and module_id and not ref_module_id:
+        try:
+            mod_filter = Module.objects.only('ref_module_id').get(pk=module_id)
+            if mod_filter.ref_module_id:
+                ref_module_id = mod_filter.ref_module_id
+                module_id = None
+        except Module.DoesNotExist:
+            pass
+
+    categories = _liste_categories(formation_id, secretariat_id, module_ids)
+    modules_qs = _modules_queryset(
+        formation_id, secretariat_id, categorie, module_id, module_ids, ref_module_id,
+    )
     modules_liste = [
         {'id': m.id, 'intitule': m.intitule, 'formation_id': m.formation_id, 'formation': str(m.formation)}
         for m in modules_qs[:500]
     ]
 
-    formations_qs = _formations_queryset(formation_id, secretariat_id)
+    matieres_liste = []
+    seen_matiere = set()
+    for m in modules_qs[:2000]:
+        kind, key, label = _matiere_bucket(m)
+        mat_key = (m.formation_id, kind, key)
+        if mat_key in seen_matiere:
+            continue
+        seen_matiere.add(mat_key)
+        matieres_liste.append({
+            'ref_module_id': key if kind == 'ref' else None,
+            'intitule': label,
+            'formation_id': m.formation_id,
+            'formation': str(m.formation),
+        })
+    matieres_liste.sort(key=lambda x: (x['formation'], x['intitule']))
+
+    formations_qs = _formations_queryset(formation_id, secretariat_id, module_ids)
     formations_liste = [{'id': f.id, 'formation': f.formation} for f in formations_qs[:200]]
 
     periode_label = dict(PERIODES_BILAN).get(periode, 'Toutes périodes') if periode else 'Toutes périodes'
@@ -409,12 +585,14 @@ def compute_bilans(
         'mois': mois,
         'categorie': categorie or '',
         'module_id': module_id,
+        'module_ids': module_ids,
         'formation_id': formation_id,
         'secretariat_id': secretariat_id,
         'periode': periode or '',
         'periode_label': periode_label,
         'calendrier': calendrier or '',
         'dimension': dimension,
+        'ref_module_id': ref_module_id,
     }
 
     bilans = []
@@ -462,7 +640,7 @@ def compute_bilans(
                 'tableau_pret': True,
             })
 
-    else:  # module
+    elif dimension == 'module':
         for m in modules_qs:
             resume = _resume_module(m, categorie)
             bilans.append({
@@ -480,6 +658,49 @@ def compute_bilans(
                 'periode': periode or '',
                 'periode_label': periode_label,
                 'calendrier': calendrier or '',
+                'grade': (m.grade or '').strip() or None,
+                'groupe': (m.groupe or '').strip() or None,
+                'inscrits': resume['inscrits'],
+                'nb_pointages': resume['nb_pointages'],
+                'tableau_pret': True,
+            })
+
+    elif dimension == 'matiere':
+        modules_all = list(modules_qs)
+        groups = _group_modules_by_matiere(modules_all)
+        for bucket, info in sorted(
+            groups.items(),
+            key=lambda x: (x[0][0], x[1]['label']),
+        ):
+            fid, kind, key = bucket
+            mods = info['modules']
+            mod_ids = [m.id for m in mods]
+            ref_id = info['ref_module_id']
+            label = info['label']
+            formation_nom = str(mods[0].formation)
+            resume = _resume_matiere(mod_ids, categorie)
+            nb_groupes = len(mods)
+            bilans.append({
+                'id': f'matiere-{ref_id or label}-{fid}-{annee}-{periode or "all"}',
+                'dimension': 'matiere',
+                'formation_id': fid,
+                'formation': formation_nom,
+                'ref_module_id': ref_id,
+                'matiere_intitule': label if not ref_id else None,
+                'module_id': None,
+                'module': label,
+                'categorie': categorie or '—',
+                'libelle': label,
+                'sous_titre': (
+                    f'{nb_groupes} groupe{"s" if nb_groupes > 1 else ""} · '
+                    f'{formation_nom} · {periode_label} · {annee}'
+                ),
+                'annee': annee,
+                'mois': mois,
+                'periode': periode or '',
+                'periode_label': periode_label,
+                'calendrier': calendrier or '',
+                'nb_groupes': nb_groupes,
                 'inscrits': resume['inscrits'],
                 'nb_pointages': resume['nb_pointages'],
                 'tableau_pret': True,
@@ -492,6 +713,7 @@ def compute_bilans(
         'total_bilans': len(bilans),
         'categories': categories,
         'modules': modules_liste,
+        'matieres': matieres_liste,
         'formations': formations_liste,
         'periodes': [{'value': v, 'label': l} for v, l in PERIODES_BILAN],
         'filtres_actifs': filtres_actifs,
@@ -499,7 +721,7 @@ def compute_bilans(
 
 
 def _tableau_pour_bilan(bilan, categorie=None, annee=None, mois=None, calendrier=None,
-                        periode=None, formation_id=None, secretariat_id=None):
+                        periode=None, formation_id=None, secretariat_id=None, module_ids=None):
     """Construit le tableau CPFAE détaillé pour une entrée de la liste bilans."""
     dim = bilan.get('dimension')
     cat = bilan.get('categorie')
@@ -515,6 +737,19 @@ def _tableau_pour_bilan(bilan, categorie=None, annee=None, mois=None, calendrier
             calendrier=calendrier,
             periode=periode,
         )
+    if dim == 'matiere' and bilan.get('formation_id'):
+        return compute_bilan_effectifs_matiere(
+            bilan['formation_id'],
+            ref_module_id=bilan.get('ref_module_id'),
+            matiere_intitule=bilan.get('matiere_intitule'),
+            categorie=cat,
+            secretariat_id=secretariat_id,
+            annee=annee,
+            mois=mois,
+            calendrier=calendrier,
+            periode=periode,
+            module_ids=module_ids,
+        )
     if dim == 'formation' and bilan.get('formation_id'):
         return compute_bilan_periode_formation(
             bilan['formation_id'],
@@ -524,6 +759,7 @@ def _tableau_pour_bilan(bilan, categorie=None, annee=None, mois=None, calendrier
             periode=periode,
             secretariat_id=secretariat_id,
             categorie_filter=cat if cat and cat != '—' else None,
+            module_ids=module_ids,
         )
     if dim == 'categorie' and cat and cat != '—':
         return compute_bilan_effectifs_categorie(
@@ -534,6 +770,7 @@ def _tableau_pour_bilan(bilan, categorie=None, annee=None, mois=None, calendrier
             mois=mois,
             calendrier=calendrier,
             periode=periode,
+            module_ids=module_ids,
         )
     return None
 
@@ -543,11 +780,13 @@ def compute_bilans_avec_tableaux(
     mois=None,
     categorie=None,
     module_id=None,
+    module_ids=None,
     formation_id=None,
     secretariat_id=None,
     periode=None,
     calendrier=None,
     dimension='formation',
+    ref_module_id=None,
 ):
     """Index bilans + tous les tableaux CPFAE correspondants (vue d'ensemble)."""
     data = compute_bilans(
@@ -555,11 +794,13 @@ def compute_bilans_avec_tableaux(
         mois=mois,
         categorie=categorie,
         module_id=module_id,
+        module_ids=module_ids,
         formation_id=formation_id,
         secretariat_id=secretariat_id,
         periode=periode,
         calendrier=calendrier,
         dimension=dimension,
+        ref_module_id=ref_module_id,
     )
     tableaux_complets = []
     for b in data['bilans']:
@@ -572,6 +813,7 @@ def compute_bilans_avec_tableaux(
             periode=periode,
             formation_id=formation_id,
             secretariat_id=secretariat_id,
+            module_ids=module_ids,
         )
         if tableau:
             tableaux_complets.append({
@@ -586,32 +828,27 @@ def compute_bilans_avec_tableaux(
 
 # ── Bilan FAC ─────────────────────────────────────────────────────────────────
 
-def _vh_grade_groupe(formation_id, grade, groupe=None, secretariat_id=None):
-    """VH prévu et épuisé pour un grade/groupe donné."""
+def _vh_grade_groupe(formation_id, grade, groupe=None, secretariat_id=None, module_ids=None):
+    """VH prévu et réalisé (aligné dashboard via volume_horaire)."""
+    from formations.volume_horaire import compute_volume_horaire_from_module_ids
+
     mq = Module.objects.filter(formation_id=formation_id, grade=grade)
-    if groupe:
-        mq = mq.filter(groupe=groupe)
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
 
-    vh_prevu = float(mq.aggregate(total=Sum('duree_prevue_heures'))['total'] or 0)
-    vh_epuise = float(
-        mq.filter(statut=Module.Statut.TERMINEE).aggregate(total=Sum('duree_prevue_heures'))['total'] or 0
-    )
-    if vh_epuise == 0 and vh_prevu > 0:
-        # Si aucun module terminé, on regarde les séances terminées
-        module_ids = list(mq.values_list('id', flat=True))
-        sessions_done = SessionModule.objects.filter(
-            module_id__in=module_ids,
-            terminee_le__isnull=False,
-        ).values('module_id').distinct()
-        done_ids = {s['module_id'] for s in sessions_done}
-        vh_epuise = float(
-            mq.filter(id__in=done_ids).aggregate(total=Sum('duree_prevue_heures'))['total'] or 0
-        )
-
+    # Filtrage côté Python pour tolérer les espaces dans la base
+    mod_ids_all = list(mq.values_list('id', 'groupe'))
+    if groupe:
+        mod_ids = [mid for mid, grp in mod_ids_all if grp and grp.strip() == groupe]
+    else:
+        mod_ids = [mid for mid, grp in mod_ids_all]
+    vh = compute_volume_horaire_from_module_ids(mod_ids, integer_hours=True)
+    vh_prevu = float(vh['prevu_heures'])
+    vh_epuise = float(vh['realise_heures'])
     vh_restant = max(0.0, vh_prevu - vh_epuise)
-    taux_execution = _pct(vh_epuise, vh_prevu, decimals=4) if vh_prevu else 100.0
+    taux_execution = float(vh['taux_pct']) if vh_prevu else 100.0
     taux_restant = _pct(vh_restant, vh_prevu, decimals=4) if vh_prevu else 0.0
     return {
         'vh_prevu': vh_prevu,
@@ -622,33 +859,32 @@ def _vh_grade_groupe(formation_id, grade, groupe=None, secretariat_id=None):
     }
 
 
-def _taux_presence_formation(formation_id, grade=None, secretariat_id=None, annee=None, mois=None, calendrier=None):
-    """Taux de présence et d'absence aux cours (via Pointage)."""
+def _taux_presence_formation(formation_id, grade=None, secretariat_id=None, annee=None, mois=None, calendrier=None, module_ids=None):
+    """Taux de présence aux cours (places présentes / places attendues)."""
     mq = Module.objects.filter(formation_id=formation_id)
     if grade:
         mq = mq.filter(grade=grade)
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
-    module_ids = list(mq.values_list('id', flat=True))
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
+    mod_ids = list(mq.values_list('id', flat=True))
 
-    session_ids = _session_ids_modules(module_ids, annee, mois, calendrier)
-    if not session_ids:
+    session_ids = _session_ids_modules(mod_ids, annee, mois, calendrier)
+    agg = aggregation_seances_modules(mod_ids, session_ids=session_ids or None)
+    places_attendues = agg['places_attendues']
+    places_presentes = agg['places_presentes']
+    places_absentes = agg['places_absentes']
+    if not places_attendues:
         return {'taux_presence': 0.0, 'taux_absence': 0.0, 'nb_presents': 0, 'nb_absents': 0}
 
-    nb_presents = Pointage.objects.filter(
-        session_id__in=session_ids, statut=Pointage.Statut.PRESENT,
-    ).values('participant_id').distinct().count()
-
-    nb_absents = Pointage.objects.filter(
-        session_id__in=session_ids, statut=Pointage.Statut.ABSENT_NON_BADGE,
-    ).values('participant_id').distinct().count()
-
-    total = nb_presents + nb_absents
+    taux_presence = places_presentes / places_attendues
+    taux_absence = places_absentes / places_attendues
     return {
-        'taux_presence': round(_pct(nb_presents, total), 4) if total else 0.0,
-        'taux_absence': round(_pct(nb_absents, total), 4) if total else 0.0,
-        'nb_presents': nb_presents,
-        'nb_absents': nb_absents,
+        'taux_presence': round(taux_presence, 4),
+        'taux_absence': round(taux_absence, 4),
+        'nb_presents': places_presentes,
+        'nb_absents': places_absentes,
     }
 
 
@@ -673,6 +909,7 @@ def compute_bilan_fac(
     categorie=None,
     secretariat_id=None,
     calendrier=None,
+    module_ids=None,
 ):
     """
     Bilan FAC complet reprenant le format du fichier Excel BILAN FAC :
@@ -700,24 +937,24 @@ def compute_bilan_fac(
     mq_base = Module.objects.filter(formation_id=formation_id)
     if secretariat_id:
         mq_base = mq_base.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq_base = mq_base.filter(id__in=module_ids)
     if categorie:
         mq_base = mq_base.filter(
             module_participants__participant__categorie__iexact=categorie,
         ).distinct()
 
-    # Grades disponibles (ex. A4, A3)
-    grades = sorted(
-        mq_base.exclude(grade='').values_list('grade', flat=True).distinct()
-    )
-    # Catégories principales (A, B, C, D)
-    cat_for_stats = categorie or 'A'
+    # Grades disponibles (ex. A4, A3) — nettoyage et déduplication stricte
+    grades_raw = mq_base.exclude(grade='').values_list('grade', flat=True).distinct()
+    grades = sorted({g.strip() for g in grades_raw if g and g.strip()})
+    cat_for_stats = categorie
 
     # ── Point global ──────────────────────────────────────────────────────────
     lignes_global = []
     for grade in grades:
         try:
             stats = _stats_ligne_formation(
-                formation_id, cat_for_stats, grade, secretariat_id, annee, None, calendrier,
+                formation_id, cat_for_stats, grade, secretariat_id, annee, None, calendrier, module_ids,
             )
         except Exception:
             stats = {
@@ -726,9 +963,11 @@ def compute_bilan_fac(
                 'auditeurs_listes': 0, 'absents_notoires': 0, 'pct_absents': 0,
             }
 
-        vh_data = _vh_grade_groupe(formation_id, grade, secretariat_id=secretariat_id)
+        vh_data = _vh_grade_groupe(
+            formation_id, grade, secretariat_id=secretariat_id, module_ids=module_ids,
+        )
         pres = _taux_presence_formation(
-            formation_id, grade, secretariat_id, annee, None, calendrier,
+            formation_id, grade, secretariat_id, annee, None, calendrier, module_ids,
         )
         nb_inscrits = stats['inscrits_actifs'] or 1
         taux_participation = round(
@@ -773,12 +1012,14 @@ def compute_bilan_fac(
     vh_par_grade = []
     for grade in grades:
         mq_g = mq_base.filter(grade=grade)
-        groupes_raw = sorted(
-            mq_g.exclude(groupe='').values_list('groupe', flat=True).distinct()
-        )
+        # Nettoyage et déduplication stricte des groupes
+        groupes_raw = mq_g.exclude(groupe='').values_list('groupe', flat=True).distinct()
+        groupes_clean = sorted({g.strip() for g in groupes_raw if g and g.strip()})
         lignes_vh = []
-        for grp in groupes_raw:
-            vh_data = _vh_grade_groupe(formation_id, grade, groupe=grp, secretariat_id=secretariat_id)
+        for grp in groupes_clean:
+            vh_data = _vh_grade_groupe(
+                formation_id, grade, groupe=grp, secretariat_id=secretariat_id, module_ids=module_ids,
+            )
             lignes_vh.append({'groupe': grp, **vh_data})
 
         recap_prevu = sum(l['vh_prevu'] for l in lignes_vh)
@@ -797,19 +1038,19 @@ def compute_bilan_fac(
         })
 
     # ── Absents notoires (liste nominative) ───────────────────────────────────
-    pq = Participant.objects.filter(
-        modules_inscrits__module__formation_id=formation_id,
-    ).distinct()
-    if secretariat_id:
-        pq = pq.filter(secretariat_id=secretariat_id)
-    if categorie:
-        pq = pq.filter(categorie__iexact=categorie)
-
-    pq_notoires = pq.exclude(motif_notoire='').order_by('groupe', 'nom').values(
+    scope_module_ids = list(mq_base.values_list('id', flat=True))
+    notoire_ids = participant_ids_notoires(
+        module_ids=scope_module_ids,
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        categorie=categorie,
+    )
+    pq_notoires = Participant.objects.filter(id__in=notoire_ids).order_by('groupe', 'nom').values(
         'matricule', 'nom', 'prenom', 'libelle_concours', 'telephone', 'groupe', 'grade', 'motif_notoire',
     )
     absents_notoires = []
     for i, p in enumerate(pq_notoires, 1):
+        motif = (p['motif_notoire'] or '').strip()
         absents_notoires.append({
             'numero': i,
             'matricule': p['matricule'],
@@ -819,13 +1060,20 @@ def compute_bilan_fac(
             'contacts': p['telephone'],
             'groupe': p['groupe'],
             'grade': p['grade'],
-            'observations': p['motif_notoire'],
+            'observations': motif or 'Jamais badgé',
         })
 
     # ── Résumé modules (état d'avancement) ───────────────────────────────────
+    from formations.volume_horaire import compute_volume_horaire_per_module_ids
+
     modules_qs = mq_base.select_related('formation').order_by('grade', 'groupe', 'intitule')
+    mod_ids_list = list(modules_qs.values_list('id', flat=True))
+    vh_by_module = compute_volume_horaire_per_module_ids(mod_ids_list, integer_hours=True)
     modules_statuts = []
     for m in modules_qs:
+        vh = vh_by_module.get(m.id, {})
+        vh_prevu = float(vh.get('prevu_heures', 0) or 0)
+        vh_realise = float(vh.get('realise_heures', 0) or 0)
         modules_statuts.append({
             'id': m.id,
             'intitule': m.intitule,
@@ -834,12 +1082,14 @@ def compute_bilan_fac(
             'statut': m.statut,
             'date_debut': m.date_debut.isoformat() if m.date_debut else None,
             'date_fin': m.date_fin.isoformat() if m.date_fin else None,
-            'vh_prevu': float(m.duree_prevue_heures or 0),
+            'vh_prevu': vh_prevu,
+            'vh_realise': vh_realise,
+            'vh_restant': max(0.0, vh_prevu - vh_realise),
         })
 
     return {
         'type': 'bilan_fac',
-        'titre': f'BILAN FAC {annee} — {formation_nom}',
+        'titre': f'BILAN {annee} — {formation_nom}',
         'formation_id': formation.id,
         'formation': formation.formation,
         'annee': annee,

@@ -166,6 +166,13 @@ class RefModule(models.Model):
         verbose_name = 'Référentiel – Module'
         verbose_name_plural = 'Référentiel – Modules'
 
+    @staticmethod
+    def normalize_intitule(value):
+        """Normalise un intitulé pour la recherche dans le référentiel (trim + espaces)."""
+        if value is None:
+            return ''
+        return ' '.join(str(value).split())
+
     def __str__(self):
         return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
 
@@ -447,6 +454,14 @@ class Module(models.Model):
         related_name='modules',
     )
     intitule = models.CharField(max_length=255, help_text="Intitulé du module/cours")
+    ref_module = models.ForeignKey(
+        RefModule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modules_instances',
+        help_text='Référentiel canonique du module (nomenclature unifiée)',
+    )
     # Colonne historique / contrainte SQL (NOT NULL) — alignée sur le titre de formation (cycle).
     cycle = models.CharField(
         max_length=255,
@@ -540,6 +555,14 @@ class Module(models.Model):
 
     def __str__(self):
         return f"{self.intitule} ({self.formation.formation})"
+
+    def canonical_intitule(self):
+        """Libellé canonique (référentiel matière si renseigné, sinon intitulé module)."""
+        if self.ref_module_id and self.ref_module:
+            ref_label = (self.ref_module.intitule or '').strip()
+            if ref_label:
+                return ref_label
+        return (self.intitule or '').strip()
 
 
 class SessionModule(models.Model):
@@ -741,6 +764,23 @@ class FinanceSettings(models.Model):
         default='',
         verbose_name='Fonction du signataire',
     )
+    tolerance_active = models.BooleanField(
+        default=False,
+        verbose_name='Activer la tolérance horaire',
+        help_text='Active la marge de tolérance sur les volumes réalisés inférieurs au planifié.',
+    )
+    tolerance_minutes = models.PositiveIntegerField(
+        default=30,
+        verbose_name='Tolérance (minutes)',
+        help_text='Marge absolue acceptée (minutes) entre planifié et réalisé.',
+    )
+    tolerance_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=5,
+        verbose_name='Tolérance (%)',
+        help_text='Marge relative (% du volume planifié). Le seuil retenu est le plus favorable des deux.',
+    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -759,5 +799,89 @@ class FinanceSettings(models.Model):
 
     @classmethod
     def get_solo(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                'tolerance_active': False,
+                'tolerance_minutes': 30,
+                'tolerance_pct': 5,
+            },
+        )
         return obj
+
+
+class FinanceAjustement(models.Model):
+    """Proposition d'ajustement horaire sur une séance terminée (workflow Finance / Direction)."""
+
+    class Statut(models.TextChoices):
+        EN_ATTENTE = 'EN_ATTENTE', 'En attente'
+        VALIDE = 'VALIDE', 'Validé'
+        REJETE = 'REJETE', 'Rejeté'
+
+    session = models.ForeignKey(
+        SessionModule,
+        on_delete=models.CASCADE,
+        related_name='finance_ajustements',
+    )
+    formateur = models.ForeignKey(
+        'Formateur',
+        on_delete=models.CASCADE,
+        related_name='finance_ajustements',
+    )
+    minutes_delta = models.IntegerField(
+        help_text='Minutes à ajouter (positif) ou retirer (négatif) du volume réalisé.',
+    )
+    motif = models.TextField()
+    statut = models.CharField(
+        max_length=20,
+        choices=Statut.choices,
+        default=Statut.EN_ATTENTE,
+        db_index=True,
+    )
+    realise_avant_minutes = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='Volume réalisé de la séance avant ajustement (snapshot).',
+    )
+    realise_apres_minutes = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='Volume réalisé attendu après validation.',
+    )
+    proposed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_proposes',
+    )
+    proposed_at = models.DateTimeField(auto_now_add=True)
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_valides',
+    )
+    validated_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='finance_ajustements_rejetes',
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_motif = models.TextField(blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Ajustement horaire finance'
+        verbose_name_plural = 'Ajustements horaires finance'
+        ordering = ['-proposed_at']
+        indexes = [
+            models.Index(fields=['statut', 'proposed_at']),
+            models.Index(fields=['session', 'statut']),
+        ]
+
+    def __str__(self):
+        return f'Ajustement {self.statut} — séance {self.session_id} ({self.minutes_delta} min)'

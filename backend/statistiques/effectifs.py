@@ -1,13 +1,15 @@
 """
 Calculs d'effectifs — source unique pour le module Statistiques.
 
-Règles alignées sur l'écran Présences (ModuleDetail) :
+Règles alignées sur l'écran Présences (ModuleDetail) et le point journalier :
 - Attendu : auditeur inscrit au module (ModuleParticipant).
-- Séance prise en compte : démarrée et terminée (demarree_le + terminee_le).
+- Séance comptabilisable : date atteinte (EDT / import), officiellement terminée,
+  ou avec au moins une présence enregistrée.
 - Présent : pointage entrée sur la séance, hors ABSENT_NON_BADGE, et
   (encore en salle OU sortie avec durée > 0).
 - Absent : inscrit sans présence valide sur la séance (agrégats : non présent sur
   au moins une séance du périmètre, ou créneau sans badge présent).
+- Auditeur notoire : inscrit au périmètre sans aucun pointage, ou motif_notoire renseigné.
 """
 from collections import defaultdict
 from datetime import date
@@ -36,12 +38,16 @@ def filter_sessions(
     annee=None,
     mois=None,
     calendrier=None,
+    date_debut=None,
+    date_fin=None,
     *,
     seulement_terminees=True,
 ):
     """
-    Séances du périmètre (par défaut : démarrées et comptabilisables).
-    Comptabilisable = terminée officiellement, jour passé, ou au moins une présence enregistrée.
+    Séances comptabilisables du périmètre (aligné point journalier / EDT importé).
+
+    Règle : date atteinte (``date_journee <= today``), séance officiellement terminée,
+    ou au moins une présence valide enregistrée — sans exiger ``demarree_le`` (import EDT).
     """
     qs = SessionModule.objects.all()
     if seulement_terminees:
@@ -49,9 +55,9 @@ def filter_sessions(
         present_sur_seance = Pointage.objects.filter(
             session_id=OuterRef('pk'),
         ).filter(q_pointage_present())
-        qs = qs.filter(demarree_le__isnull=False).filter(
-            Q(terminee_le__isnull=False)
-            | Q(date_journee__lt=today)
+        qs = qs.filter(
+            Q(date_journee__lte=today)
+            | Q(terminee_le__isnull=False)
             | Exists(present_sur_seance),
         )
     if session_ids is not None:
@@ -69,17 +75,125 @@ def filter_sessions(
             qs = qs.filter(date_journee__year=annee)
         if mois:
             qs = qs.filter(date_journee__month=mois)
+    if date_debut:
+        qs = qs.filter(date_journee__gte=date_debut)
+    if date_fin:
+        qs = qs.filter(date_journee__lte=date_fin)
     return qs
 
 
-def session_ids_for_scope(module_ids, annee=None, mois=None, calendrier=None):
+def _module_participant_qs(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+    categorie=None,
+):
+    q = ModuleParticipant.objects.all()
+    if module_ids is not None:
+        q = q.filter(module_id__in=module_ids)
+    if formation_id:
+        q = q.filter(module__formation_id=formation_id)
+    if secretariat_id:
+        q = q.filter(module__secretariat_id=secretariat_id)
+    if grade:
+        q = q.filter(module__grade=grade)
+    if categorie and categorie != '—':
+        q = q.filter(participant__categorie__iexact=categorie)
+    return q
+
+
+def participant_ids_inscrits(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+    categorie=None,
+):
+    """IDs des auditeurs inscrits au périmètre."""
+    return set(
+        _module_participant_qs(
+            module_ids, formation_id, secretariat_id, grade, categorie,
+        ).values_list('participant_id', flat=True).distinct()
+    )
+
+
+def participant_ids_notoires(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+    categorie=None,
+):
+    """
+    Auditeurs notoires : inscrits sans aucun pointage, ou avec motif_notoire renseigné.
+    Source unique pour dashboard, bilans et Bilan FAC.
+    """
+    inscrits = participant_ids_inscrits(
+        module_ids, formation_id, secretariat_id, grade, categorie,
+    )
+    if not inscrits:
+        return set()
+    avec_pointage = set(
+        Pointage.objects.filter(participant_id__in=inscrits)
+        .values_list('participant_id', flat=True)
+        .distinct()
+    )
+    jamais_badge = inscrits - avec_pointage
+    motif_ids = set(
+        Participant.objects.filter(id__in=inscrits)
+        .exclude(motif_notoire='')
+        .values_list('id', flat=True)
+    )
+    return jamais_badge | motif_ids
+
+
+def count_auditeurs_notoires(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+    categorie=None,
+):
+    return len(participant_ids_notoires(
+        module_ids, formation_id, secretariat_id, grade, categorie,
+    ))
+
+
+def session_ids_for_scope(
+    module_ids, annee=None, mois=None, calendrier=None, date_debut=None, date_fin=None,
+):
     if not module_ids:
         return []
     return list(
         filter_sessions(
-            module_ids=module_ids, annee=annee, mois=mois, calendrier=calendrier,
+            module_ids=module_ids,
+            annee=annee,
+            mois=mois,
+            calendrier=calendrier,
+            date_debut=date_debut,
+            date_fin=date_fin,
         ).values_list('id', flat=True)
     )
+
+
+def count_sessions_comptabilisables(
+    module_ids=None,
+    annee=None,
+    mois=None,
+    calendrier=None,
+    date_debut=None,
+    date_fin=None,
+):
+    """Nombre de séances comptabilisables (KPI, pédagogique, admin — même règle)."""
+    return filter_sessions(
+        module_ids=module_ids,
+        annee=annee,
+        mois=mois,
+        calendrier=calendrier,
+        date_debut=date_debut,
+        date_fin=date_fin,
+    ).count()
 
 
 def participants_par_module(module_ids, categorie=None):

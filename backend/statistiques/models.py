@@ -16,7 +16,7 @@ class ConfigAlerteSeuil(models.Model):
         TAUX_ABSENCE        = 'taux_absence',         'Taux d\'absence (%)'
         TAUX_ABANDON        = 'taux_abandon',          'Taux d\'abandon (%)'
         TAUX_EXECUTION_VH   = 'taux_execution_vh',    'Taux d\'exécution volume horaire (%)'
-        NB_ABSENCES_NOTOIRES= 'nb_absences_notoires', 'Absences notoires (nombre)'
+        NB_ABSENCES_NOTOIRES= 'nb_absences_notoires', 'Auditeurs notoires (nombre)'
         SATURATION_GROUPE   = 'saturation_groupe',    'Saturation du groupe (%)'
 
     indicateur         = models.CharField(max_length=50, choices=Indicateur.choices, unique=True)
@@ -67,6 +67,14 @@ class Rapport(models.Model):
         null=True, blank=True,
         related_name='rapports',
         help_text="Formation ciblée (null = toutes formations)",
+    )
+    secretariat    = models.ForeignKey(
+        'formations.Secretariat',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rapports',
+        help_text='Secrétariat ciblé (null = périmètre global)',
     )
     generateur     = models.ForeignKey(
         settings.AUTH_USER_MODEL,
