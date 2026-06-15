@@ -1,0 +1,9 @@
+{
+  "audio": "/Users/jckouassi/Movies/4K Video Downloader+/20260609-Seanxe CPFAE.mp3",
+  "start": 3600.0,
+  "duration": 3600.0,
+  "offset": 3600.0,
+  "segments": 431,
+  "chars": 15199,
+  "out": "docs/transcripts/reunion-cpfae-60-120min.txt"
+}
