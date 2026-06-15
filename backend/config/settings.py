@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'exports',
     'dashboard',
     'statistiques',
+    'suiviEvaluation',
 ]
 
 MIDDLEWARE = [
@@ -214,6 +215,13 @@ SIMPLE_JWT = {
 # QR Token settings
 QR_TOKEN_LIFETIME_HOURS = 24
 
+# Scan QR public (web badge) — désactivé par défaut en production.
+# Utiliser l'app mobile (/api/scan/secure/) ou activer explicitement via env.
+PUBLIC_QR_SCAN_ENABLED = os.environ.get(
+    'PUBLIC_QR_SCAN_ENABLED',
+    'True' if DEBUG else 'False',
+).lower() in ('true', '1', 'yes')
+
 # Délai avant marquage ABSENT_NON_BADGE (commande auto_close_pointages)
 AUTO_ABSENT_DELAI_MINUTES = int(os.environ.get('AUTO_ABSENT_DELAI_MINUTES', 60))
 
@@ -270,6 +278,7 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1',
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@qrbadge.local')
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None

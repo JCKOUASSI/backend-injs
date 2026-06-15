@@ -123,6 +123,14 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user and user.role in ALLOWED_WEB_ROLES:
             login(request, user)
+            _log_audit(
+                action=AuditLog.Action.USER_LOGIN,
+                request=request,
+                cible_type='user',
+                cible_numero=user.username,
+                cible_nom=user.get_full_name() or user.username,
+                extra={'role': user.role, 'via': 'web_legacy'},
+            )
             return redirect('web-dashboard')
         elif user:
             return render(request, 'dashboard/login.html', {
@@ -136,6 +144,15 @@ def login_view(request):
 
 
 def logout_view(request):
+    if request.user.is_authenticated:
+        _log_audit(
+            action=AuditLog.Action.USER_LOGOUT,
+            request=request,
+            cible_type='user',
+            cible_numero=request.user.username,
+            cible_nom=request.user.get_full_name() or request.user.username,
+            extra={'via': 'web_legacy'},
+        )
     logout(request)
     return redirect('web-login')
 
@@ -318,49 +335,52 @@ def formation_detail(request, pk):
 
     today = timezone.localdate()
     now = timezone.now()
-    current_time = timezone.localtime(now).time()
 
-    # ── Auto-démarrage : séances planifiées avec auto_demarrage=True ──
+    # ── Auto-démarrage : heure de début atteinte, encadrant n'a pas démarré ──
+    from formations.session_views import (
+        _session_debut_prevu_local,
+        _should_auto_start_session,
+    )
+
+    local_now = timezone.localtime(now)
     auto_start_qs = SessionModule.objects.filter(
         module__formation=formation,
         date_journee=today,
-        auto_demarrage=True,
         demarree_le__isnull=True,
+        terminee_le__isnull=True,
         heure_debut_prevue__isnull=False,
-        heure_debut_prevue__lte=current_time,
     )
     for sess in auto_start_qs:
+        if not _should_auto_start_session(sess, local_now):
+            continue
         # Fermer toute session ouverte avant d'en démarrer une nouvelle
         SessionModule.objects.filter(
             module__formation=formation, demarree_le__isnull=False, terminee_le__isnull=True,
         ).update(terminee_le=now)
-        sess.demarree_le = now
+        sess.demarree_le = _session_debut_prevu_local(sess)
         sess.save(update_fields=['demarree_le'])
         module = sess.module
         if module.statut != 'EN_COURS':
             module.statut = 'EN_COURS'
             module.save(update_fields=['statut'])
 
-    # ── Auto-arrêt : séances en cours dont l'heure de fin prévue est dépassée ──
-    # On pose ``terminee_le`` à la combinaison ``date_journee + heure_fin_prevue``
-    # (et non ``now``) afin que la durée effective de la séance reste bornée
-    # par la fenêtre planifiée, y compris en cas de clôture paresseuse tardive.
+    # ── Auto-arrêt : heure de fin dépassée, encadrant n'a pas fermé, délai écoulé ──
+    from formations.session_views import (
+        _session_fin_prevue_local,
+        _should_auto_close_session,
+    )
+
     auto_stopped = False
-    from datetime import datetime as _dt
-    from zoneinfo import ZoneInfo as _ZI
-    _tz_auto = _ZI('Africa/Abidjan')
     for sess in SessionModule.objects.filter(
         module__formation=formation,
         date_journee=today,
-        auto_demarrage=True,
         demarree_le__isnull=False,
         terminee_le__isnull=True,
         heure_fin_prevue__isnull=False,
-        heure_fin_prevue__lte=current_time,
     ):
-        sess.terminee_le = _dt.combine(
-            sess.date_journee, sess.heure_fin_prevue, tzinfo=_tz_auto,
-        )
+        if not _should_auto_close_session(sess, local_now):
+            continue
+        sess.terminee_le = _session_fin_prevue_local(sess)
         sess.save(update_fields=['terminee_le'])
         auto_stopped = True
     # Si plus aucune session ouverte après auto-arrêt, passer en SUSPENDUE

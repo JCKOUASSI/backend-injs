@@ -2,11 +2,14 @@ import Pagination from './Pagination'
 import { useClientPagination, TABLE_PAGE_SIZE } from '../hooks/useClientPagination'
 
 const fmtDuration = (minutes) => {
-  const value = Number(minutes || 0)
-  const h = Math.floor(value / 60)
-  const m = Math.round(value % 60)
+  const total = Math.round(Number(minutes || 0))
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (m === 0) return `${h}h`
   return `${h}h ${m}min`
 }
+
+const fmtHeures = (heures) => `${Math.round(Number(heures) || 0)}`
 
 const formatMoney = (value) => {
   const n = Number(value || 0)
@@ -147,4 +150,4 @@ export function FinanceModulesList({ modules, formatDuration }) {
   )
 }
 
-export { fmtDuration, formatMoney, STATUT_LABELS }
+export { fmtDuration, fmtHeures, formatMoney, STATUT_LABELS }

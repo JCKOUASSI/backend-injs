@@ -38,6 +38,12 @@ Le fichier **`.nojekyll`** à la racine de `docs/` évite que Jekyll ignore ou t
 | [Manuel utilisateur App Statistiques.md](./Manuel%20utilisateur%20App%20Statistiques.md) | Source Markdown (maintenue à jour par l'équipe / l'agent) |
 | [Manuel utilisateur App Statistiques.docx](./Manuel%20utilisateur%20App%20Statistiques.docx) | Version Word formatée |
 
+## API Backend
+
+| Fichier | Description |
+|---------|-------------|
+| [API_ENDPOINTS.md](./API_ENDPOINTS.md) | Référence des endpoints REST du backend SYGEPCPFAE |
+
 Régénérer le Word après modification du Markdown :
 
 ```bash

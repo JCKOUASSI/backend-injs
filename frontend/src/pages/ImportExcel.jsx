@@ -156,13 +156,23 @@ export default function ImportExcel() {
       const label = typeLabels[type] || type
 
       if (data.errors?.length > 0) {
-        showToast(`${label} — Import avec ${data.errors.length} erreur(s). ${data.created || 0} créé(s).`, 'error')
+        const detail = data.errors.slice(0, 2).join(' · ')
+        const suffix = data.errors.length > 2 ? '…' : ''
+        const counts = [`${data.created || 0} créé(s)`]
+        if (data.updated > 0) counts.push(`${data.updated} mis à jour`)
+        showToast(
+          `${label} — ${data.errors.length} erreur(s), ${counts.join(', ')}. ${detail}${suffix}`,
+          'error',
+        )
       } else {
         const parts = []
         if (data.created > 0) parts.push(`${data.created} créé(s)`)
         if (data.updated > 0) parts.push(`${data.updated} mis à jour`)
         const msg = parts.length > 0 ? parts.join(', ') : 'Aucun élément traité'
-        showToast(`${label} — Import réussi ! ${msg}`, 'success')
+        const accountsHint = data.accounts_deferred && (type === 'participants' || type === 'formateurs')
+          ? ' — Comptes badge : lancer create_auditeur_accounts sur le serveur.'
+          : ''
+        showToast(`${label} — Import réussi ! ${msg}${accountsHint}`, 'success')
       }
       if (resetFile) resetFile()
     } catch (err) {

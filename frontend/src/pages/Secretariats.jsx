@@ -10,6 +10,7 @@ import {
   readSecretariatsExpanded,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
+import { isAdminLevelRole } from '../utils/roles'
 
 const emptyForm = { nom: '', type: '', description: '' }
 
@@ -20,7 +21,7 @@ function membresEquipe(membres) {
 
 export default function Secretariats() {
   const { user: currentUser } = useAuth()
-  const isDFRC = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(currentUser?.role)
+  const isDFRC = isAdminLevelRole(currentUser?.role)
   const isSecretariat = currentUser?.role === 'SECRETARIAT'
   const [secretariats, setSecretariats] = useState([])
   const [typesSecretariat, setTypesSecretariat] = useState([])

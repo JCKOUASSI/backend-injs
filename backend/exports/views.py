@@ -17,40 +17,17 @@ from presences.models import Pointage, AuditLog
 
 def _calculer_duree_export(pointage):
     """
-    Recalcule la durée de présence à la volée pour l'export, en appliquant
-    le clamping aux heures prévues de la séance liée au pointage.
-    - Entrée avant heure_debut_prevue → ramenée à heure_debut_prevue
-    - Sortie après heure_fin_prevue   → ramenée à heure_fin_prevue
-    - Pointage en cours (sans sortie) → sortie = maintenant, clampée
-    Retourne (duree_minutes: float, heure_entree: str, heure_sortie: str).
+    Durée de présence pour l'export, via la règle commune ``presences.duree``
+    (clamp aux heures prévues de la séance ; pointage ouvert → sortie = maintenant).
+    Retourne (duree_minutes: float, duree_str, heure_entree: str, heure_sortie: str).
     """
-    from datetime import datetime as dt
-    seance = pointage.session
+    from presences.duree import pointage_bornes_clampees
 
-    entree = timezone.localtime(pointage.timestamp_entree)
-    if pointage.timestamp_sortie:
-        sortie = timezone.localtime(pointage.timestamp_sortie)
-    else:
-        sortie = timezone.localtime(timezone.now())
+    entree, sortie, en_cours = pointage_bornes_clampees(pointage)
+    entree = timezone.localtime(entree)
+    sortie = timezone.localtime(sortie)
 
-    # Clamp entrée
-    if seance and seance.heure_debut_prevue and entree.time() < seance.heure_debut_prevue:
-        entree = entree.replace(
-            hour=seance.heure_debut_prevue.hour,
-            minute=seance.heure_debut_prevue.minute,
-            second=0, microsecond=0,
-        )
-
-    # Clamp sortie
-    if seance and seance.heure_fin_prevue and sortie.time() > seance.heure_fin_prevue:
-        sortie = sortie.replace(
-            hour=seance.heure_fin_prevue.hour,
-            minute=seance.heure_fin_prevue.minute,
-            second=0, microsecond=0,
-        )
-
-    delta = sortie - entree
-    minutes = max(round(delta.total_seconds() / 60, 2), 0)
+    minutes = max(round((sortie - entree).total_seconds() / 60, 2), 0)
 
     h = int(minutes // 60)
     m = int(minutes % 60)
@@ -59,7 +36,7 @@ def _calculer_duree_export(pointage):
     heure_entree_str = entree.strftime('%H:%M')
     # Si la sortie n'est pas encore enregistrée, afficher explicitement "En cours"
     # plutôt qu'un tiret pour éviter l'ambiguïté dans les exports.
-    heure_sortie_str = sortie.strftime('%H:%M') if pointage.timestamp_sortie else 'En cours'
+    heure_sortie_str = 'En cours' if en_cours else sortie.strftime('%H:%M')
 
     return minutes, duree_str, heure_entree_str, heure_sortie_str
 
@@ -73,52 +50,147 @@ CI_ORANGE = '#F57C00'
 CI_LIGHT_GREEN = '#E8F5E9'
 CI_LIGHT_ORANGE = '#FFF3E0'
 
+# Modèle CPFAE — fiche de paie formateur
+CI_PAIE_BLUE = '#DDEBF7'
+CI_PAIE_ORANGE = '#FCD5B4'
+CI_PAIE_GREEN = '#A9D08E'
+
+_FINANCE_PAIE_HEADER_LEFT = [
+    "MINISTERE D'ETAT,",
+    "MINISTERE DE LA FONCTION PUBLIQUE ET DE LA MODERNISATION DE L'ADMINISTRATION",
+    "DIRECTION GENERALE DE LA FONCTION PUBLIQUE",
+    "DIRECTION DE LA FORMATION ET DU RENFORCEMENT DES CAPACITES",
+    "CENTRE DE PERFECTIONNEMENT DES FONCTIONNAIRES ET AGENTS DE L'ETAT AMADOU GON COULIBALY",
+]
+_FINANCE_PAIE_HEADER_RIGHT = [
+    "REPUBLIQUE DE COTE D'IVOIRE",
+    "Union – Discipline – Travail",
+]
+_FINANCE_PAIE_NB_NOTE = (
+    "NB : Le volume horaire indiqué ne tient pas compte des heures effectuées auprès "
+    "des groupes 1 à 9 de la catégorie C qui seront comptabilisées à la fin de la formation."
+)
+_FINANCE_PAIE_CONTACTS = [
+    "Pour toute information complémentaire, veuillez contacter :",
+    "KEITA née SERIFOU Aicha Danielle tel 0707478812 / 0505378392",
+    "Mme SIHOULOI née DJIKE Valérie tel 0707124247 / 0504422220",
+]
+_FINANCE_PAIE_PIED_ADRESSE = (
+    "MINISTERE D'ETAT, MINISTERE DE LA FONCTION PUBLIQUE ET DE LA MODERNISATION DE L'ADMINISTRATION "
+    "– DIRECTION GENERALE DE LA FONCTION PUBLIQUE – DIRECTION DE LA FORMATION ET DU RENFORCEMENT "
+    "DES CAPACITES – CENTRE DE PERFECTIONNEMENT DES FONCTIONNAIRES ET AGENTS DE L'ETAT "
+    "« AMADOU GON COULIBALY » Bouaké I.BP.V.20. Tel 20 21 34 08 / Abidjan : 10, Avenue ANGOUVANT "
+    "– Porte 2078 Croisement des Rues du Commerce et du Grand Marché – 05 B.P.784. Tel : 27.20.25.90.13"
+)
+_FINANCE_PAIE_GENERIC_TITRES = {
+    'FICHE DE PAIE DÉTAILLÉE',
+    'ÉTAT FINANCIER FORMATEUR',
+    'FICHE DE PAIE GLOBALE — FORMATEURS',
+    'FICHE DE PAIE GLOBALE',
+}
+
+
+def _finance_paie_volume_heures(minutes):
+    return int(round(float(minutes or 0) / 60))
+
+
+def _finance_paie_format_groupe(groupe):
+    if not groupe:
+        return '-'
+    g = str(groupe).strip()
+    upper = g.upper()
+    if upper.startswith('GROUPE'):
+        suffix = g[6:].strip()
+        return f'Groupe {suffix}' if suffix else 'Groupe'
+    return g
+
+
+def _finance_paie_formateur_label(fmt):
+    nom = (fmt.get('nom') or '').strip().upper()
+    prenom = (fmt.get('prenom') or '').strip().upper()
+    if nom and prenom:
+        return f'{nom} {prenom}'
+    return (nom or prenom or '-').strip()
+
+
+def _finance_paie_build_title(recap_modules, export_opts, periode):
+    custom = (export_opts.get('titre_document') or '').strip()
+    if custom and custom.upper() not in {t.upper() for t in _FINANCE_PAIE_GENERIC_TITRES}:
+        return custom.upper()
+
+    formations = [m.get('formation_intitule') for m in (recap_modules or []) if m.get('formation_intitule')]
+    formation = (formations[0] if formations else 'FORMATION').strip().upper()
+    if not formation.startswith('FORMATION'):
+        formation = f'FORMATION {formation}'
+
+    year = None
+    for key in ('date_fin', 'date_debut'):
+        val = (periode or {}).get(key)
+        if val:
+            try:
+                year = int(str(val)[:4])
+                break
+            except (TypeError, ValueError):
+                pass
+    if not year:
+        year = datetime.now().year
+
+    return (
+        f"ETAT RECAPITULATIF DES MODULES DISPENSES RELATIF AU PROGRAMME "
+        f"DE LA {formation}, SESSION {year}"
+    )
+
+
+def _finance_paie_nb_note(export_opts):
+    return (export_opts.get('mention_legale') or '').strip() or _FINANCE_PAIE_NB_NOTE
+
+
+def _finance_paie_pied_adresse(export_opts):
+    return (export_opts.get('adresse') or '').strip() or _FINANCE_PAIE_PIED_ADRESSE
+
+
+def _finance_paie_pied_de_page(export_opts):
+    """Pied de page officiel : mention confidentielle + coordonnées CPFAE."""
+    return 'DOCUMENT CONFIDENTIEL', _finance_paie_pied_adresse(export_opts)
+
 
 def _check_finance_export_access(request):
     user = request.user
     return bool(user and user.is_authenticated and user.role in ('FINANCE', 'DIRECTION'))
 
 
-def _session_planned_minutes(session):
-    if session.demarree_le and session.terminee_le:
-        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    if session.heure_debut_prevue and session.heure_fin_prevue:
-        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
-        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
-        elapsed = (end_dt - start_dt).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    return 0
-
-
 def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
+    from presences.duree import pointage_minutes_clampees
+
     now = now or timezone.now()
     total = 0.0
     qset = Pointage.objects.filter(
         formateur_id=formateur_id,
         session_id=session.id,
-    ).only('duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie')
+    ).select_related('session').only(
+        'duree_presence_minutes', 'timestamp_entree', 'timestamp_sortie',
+        'session__heure_debut_prevue', 'session__heure_fin_prevue',
+    )
     for pt in qset:
         if pt.duree_presence_minutes is not None:
             total += float(pt.duree_presence_minutes)
-        elif pt.timestamp_entree and pt.timestamp_sortie:
-            total += max((pt.timestamp_sortie - pt.timestamp_entree).total_seconds() / 60, 0)
-        elif pt.timestamp_entree and not pt.timestamp_sortie:
-            total += max((now - pt.timestamp_entree).total_seconds() / 60, 0)
+        else:
+            # Règle commune SYGEP : durée clampée au créneau de la séance.
+            total += pointage_minutes_clampees(pt, now=now)
     return round(total, 1)
 
 
 def _finance_formateur_summary_rows(formateur, request=None):
     """Lignes détail + totaux pour export fiche de paie (aligné sur le rapport finance API)."""
+    from formations.duration_format import format_duration_minutes, minutes_to_hours_minutes
+    from formations.period_filter import parse_period_from_request, periode_api_payload
     from formations.api_views import (
-        _parse_finance_date_range,
         _finance_secretariat_id_from_request,
         _finance_report_rows,
-        _finance_periode_payload,
         _finance_build_prix_map,
     )
 
-    period = _parse_finance_date_range(request) if request else {
+    period = parse_period_from_request(request) if request else {
         'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'},
     }
     if period.get('error'):
@@ -149,26 +221,31 @@ def _finance_formateur_summary_rows(formateur, request=None):
             return str(val)
 
     rows = []
+    session_rows_by_key = {}
     for s in sessions:
         realized = float(s.get('duree_realisee_minutes') or 0)
-        rows.append({
+        row = {
             'date': _fmt_date(s.get('date_journee')),
             'session': s.get('intitule') or f"Séance {s.get('numero', '')}",
-            'module': s.get('module_intitule') or '-',
+            'module': s.get('module_intitule') or s.get('module_intitule_brut') or '-',
             'formation': s.get('formation_intitule') or '-',
             'grade': s.get('grade') or '-',
             'groupe': s.get('groupe') or '-',
             'secretariat': '-',
             'duree_seance': float(s.get('duree_minutes') or 0),
             'temps_realise': realized,
-            'heures_planifiees': round(float(s.get('duree_minutes') or 0) / 60, 2),
-            'heures_realisees': round(realized / 60, 2),
+            'heures_planifiees': minutes_to_hours_minutes(s.get('duree_minutes'))[0],
+            'heures_realisees': minutes_to_hours_minutes(realized)[0],
+            'duree_planifiee_label': format_duration_minutes(s.get('duree_minutes')),
+            'duree_realisee_label': format_duration_minutes(realized),
             'montant': float(s.get('montant_realise') or 0),
             'prix_heure': s.get('prix_heure_realisee'),
-        })
+        }
+        rows.append(row)
+        session_rows_by_key[(s.get('date_journee'), s.get('numero'), s.get('session_id'))] = row
 
     stats = row.get('statistiques') or {}
-    periode_info = _finance_periode_payload(
+    periode_info = periode_api_payload(
         period['date_debut'], period['date_fin'], period['meta'],
         global_agg.get('date_min'), global_agg.get('date_max'),
     )
@@ -186,6 +263,12 @@ def _finance_formateur_summary_rows(formateur, request=None):
         'periode': periode_info,
         'sessions_count': int(row.get('sessions_count') or len(rows)),
         'modules': row.get('modules') or [],
+        'recap_modules': row.get('recap_modules') or [],
+        'sessions_by_groupe': row.get('sessions_by_groupe') or [],
+        'rows_grouped': _finance_sessions_grouped_export_rows(
+            row.get('sessions_by_groupe') or [],
+            session_rows_by_key,
+        ),
         'recap_formations': _finance_recap_par_formation(row.get('modules') or []),
         'formateur': {
             'numerobadge': formateur.numerobadge or '',
@@ -204,6 +287,129 @@ def _finance_formateur_summary_rows(formateur, request=None):
             'numero_compte_bancaire': formateur.numero_compte_bancaire or '',
         },
     }
+
+
+def _finance_groupe_header_label(grade, groupe):
+    parts = []
+    if grade:
+        parts.append(f'Grade {grade}')
+    if groupe:
+        parts.append(groupe)
+    return ' — '.join(parts) or 'Sans groupe'
+
+
+def _finance_append_recap_modules_pdf(elements, recap_modules, afficher_montants, _p, style_info, colors, CI_GREEN_DARK, CI_LIGHT_GREEN, cm):
+    """Section PDF : modules dispensés."""
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+
+    if not recap_modules:
+        return
+    elements.append(Spacer(1, 0.1 * cm))
+    elements.append(Paragraph('<b>Modules dispensés</b>', style_info))
+    headers = ['Module', 'Formation', 'Grade', 'Groupe', 'Séances', 'Planifié', 'Réalisé', 'Taux %']
+    if afficher_montants:
+        headers.append('Montant (FCFA)')
+    recap_data = [[_p(h, hdr=True) for h in headers]]
+    from formations.duration_format import format_duration_minutes
+    for item in recap_modules:
+        row = [
+            _p(item.get('module_intitule') or '-'),
+            _p(item.get('formation_intitule') or '-'),
+            _p(item.get('grade') or '-', center=True),
+            _p(item.get('groupe') or '-', center=True),
+            _p(item.get('sessions_count') or 0, center=True),
+            _p(format_duration_minutes(item.get('total_duree_minutes')), center=True),
+            _p(format_duration_minutes(item.get('total_duree_realisee_minutes')), center=True),
+            _p(f"{item.get('taux_realisation_pct') or 0}%", center=True),
+        ]
+        if afficher_montants:
+            row.append(_p(f"{float(item.get('montant_realise') or 0):,.0f}", center=True))
+        recap_data.append(row)
+    widths = [3.2, 3.2, 1.2, 1.6, 1.2, 1.6, 1.6, 1.2]
+    if afficher_montants:
+        widths.append(2.0)
+    table = Table(recap_data, colWidths=[w * cm for w in widths])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 0.2 * cm))
+
+
+def _finance_append_recap_modules_excel(ws, recap_modules, afficher_montants, row_idx, green_fill, header_font, thin_border, light_green_fill, Font, Alignment):
+    """Section Excel : modules dispensés."""
+    if not recap_modules:
+        return row_idx
+    from formations.duration_format import format_duration_minutes
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=10)
+    ws.cell(row=row_idx, column=1, value='Modules dispensés').font = Font(bold=True, size=10)
+    row_idx += 1
+    headers = ['Module', 'Formation', 'Grade', 'Groupe', 'Séances', 'Planifié', 'Réalisé', 'Taux %']
+    if afficher_montants:
+        headers.append('Montant (FCFA)')
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row_idx, column=col, value=h)
+        cell.font = header_font
+        cell.fill = green_fill
+        cell.border = thin_border
+    row_idx += 1
+    for i, item in enumerate(recap_modules, start=1):
+        values = [
+            item.get('module_intitule') or '-',
+            item.get('formation_intitule') or '-',
+            item.get('grade') or '-',
+            item.get('groupe') or '-',
+            item.get('sessions_count') or 0,
+            format_duration_minutes(item.get('total_duree_minutes')),
+            format_duration_minutes(item.get('total_duree_realisee_minutes')),
+            f"{item.get('taux_realisation_pct') or 0}%",
+        ]
+        if afficher_montants:
+            values.append(round(float(item.get('montant_realise') or 0), 2))
+        for col, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.border = thin_border
+            if i % 2 == 0:
+                cell.fill = light_green_fill
+        row_idx += 1
+    return row_idx + 1
+
+
+def _finance_sessions_grouped_export_rows(sessions_by_groupe, session_rows_by_key):
+    """Lignes export avec en-têtes de groupe et sous-totaux."""
+    from formations.duration_format import format_duration_minutes
+
+    grouped = []
+    for block in sessions_by_groupe or []:
+        header = _finance_groupe_header_label(block.get('grade'), block.get('groupe'))
+        grouped.append({
+            'row_type': 'groupe_header',
+            'label': header,
+        })
+        for session in block.get('sessions') or []:
+            key = (
+                session.get('date_journee'),
+                session.get('numero'),
+                session.get('session_id'),
+            )
+            row = session_rows_by_key.get(key)
+            if row:
+                grouped.append({'row_type': 'session', 'data': row})
+        st = block.get('sous_total') or {}
+        grouped.append({
+            'row_type': 'subtotal',
+            'label': f'Sous-total — {header}',
+            'creneau_label': format_duration_minutes(st.get('creneau_minutes')),
+            'realise_label': format_duration_minutes(st.get('realise_minutes')),
+            'montant': st.get('montant'),
+            'sessions_count': st.get('sessions_count'),
+        })
+    return grouped
 
 
 def _finance_recap_par_formation(modules):
@@ -348,15 +554,15 @@ def _finance_synthese_document_options(request):
 
 def _finance_synthese_export_context(request):
     from django.db.models import Q
+    from formations.period_filter import parse_period_from_request, periode_api_payload
     from formations.api_views import (
-        _parse_finance_date_range,
         _finance_secretariat_id_from_request,
         _finance_filter_formateur_queryset,
         _finance_report_rows,
-        _finance_periode_payload,
+        _finance_canonical_volume_kpis,
     )
 
-    period = _parse_finance_date_range(request)
+    period = parse_period_from_request(request)
     if period.get('error'):
         return None, period.get('detail') or 'Période invalide.'
 
@@ -386,18 +592,21 @@ def _finance_synthese_export_context(request):
             row.pop('numero_piece_identite', None)
             row.pop('numero_compte_bancaire', None)
 
+    vh_totals = _finance_canonical_volume_kpis(
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+    )
     totals = {
         'sessions_count': sum(int(r.get('sessions_count') or 0) for r in rows),
-        'total_planned': round(sum(float(r.get('total_duree_minutes') or 0) for r in rows), 1),
-        'total_realized': round(sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows), 1),
-        'total_heures_realisees': round(
-            sum(float(r.get('total_duree_realisee_minutes') or 0) for r in rows) / 60, 2,
-        ),
+        'total_planned': vh_totals['prevu_minutes'],
+        'total_realized': vh_totals['realise_minutes'],
+        'total_heures_realisees': vh_totals['realise_heures'],
         'montant_total': round(sum(float(r.get('montant_total_realise') or 0) for r in rows), 2),
         'formateurs_count': len(rows),
         'formateurs_actifs': sum(1 for r in rows if (r.get('sessions_count') or 0) > 0),
     }
-    periode_info = _finance_periode_payload(
+    periode_info = periode_api_payload(
         period['date_debut'],
         period['date_fin'],
         period['meta'],
@@ -2113,11 +2322,11 @@ def export_excel_session(request, session_pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_finance_formateur_pdf(request, formateur_pk):
-    """Export PDF état financier formateur (finance/direction)."""
+    """Export PDF — état récapitulatif des modules dispensés (modèle CPFAE)."""
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
@@ -2126,173 +2335,171 @@ def export_finance_formateur_pdf(request, formateur_pk):
 
     formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
     ctx = _finance_formateur_export_context(formateur, request)
-    rows = ctx['rows']
     export_opts = ctx['export']
-    afficher_montants = export_opts['afficher_montants']
     fmt = ctx.get('formateur') or {}
+    recap_modules = ctx.get('recap_modules') or []
+    periode = ctx.get('periode') or {}
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=landscape(A4),
-        leftMargin=1.0 * cm, rightMargin=1.0 * cm,
-        topMargin=1.0 * cm, bottomMargin=1.0 * cm,
+        buffer, pagesize=A4,
+        leftMargin=1.8 * cm, rightMargin=1.8 * cm,
+        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
     )
     styles = getSampleStyleSheet()
+    dash = '—' * 32
+
+    style_hdr_left = ParagraphStyle(
+        'PaieHdrL', parent=styles['Normal'],
+        fontSize=7.5, leading=10, alignment=TA_LEFT,
+    )
+    style_hdr_right = ParagraphStyle(
+        'PaieHdrR', parent=styles['Normal'],
+        fontSize=8.5, leading=11, alignment=TA_RIGHT,
+    )
     style_title = ParagraphStyle(
-        'FinFmtTitle', parent=styles['Title'],
-        fontSize=15, textColor=colors.HexColor(CI_GREEN_DARK),
-        alignment=TA_CENTER, spaceAfter=3,
+        'PaieTitle', parent=styles['Normal'],
+        fontSize=10, leading=13, alignment=TA_CENTER,
+        fontName='Helvetica-Bold', spaceAfter=8, spaceBefore=6,
     )
-    style_sub = ParagraphStyle(
-        'FinFmtSub', parent=styles['Normal'],
-        fontSize=9, textColor=colors.HexColor('#444444'),
-        alignment=TA_CENTER, spaceAfter=2,
+    style_body = ParagraphStyle(
+        'PaieBody', parent=styles['Normal'],
+        fontSize=9, leading=12, alignment=TA_LEFT,
     )
-    style_info = ParagraphStyle(
-        'FinFmtInfo', parent=styles['Normal'],
-        fontSize=8, textColor=colors.HexColor('#333333'), leading=11,
+    style_body_center = ParagraphStyle(
+        'PaieBodyC', parent=styles['Normal'],
+        fontSize=9, leading=12, alignment=TA_CENTER,
     )
-    style_stats = ParagraphStyle(
-        'FinFmtStats', parent=styles['Normal'],
-        fontSize=9, textColor=colors.HexColor(CI_GREEN_DARK), spaceAfter=6,
+    style_small = ParagraphStyle(
+        'PaieSmall', parent=styles['Normal'],
+        fontSize=7, leading=9, alignment=TA_LEFT, textColor=colors.HexColor('#333333'),
     )
-    cell_normal = ParagraphStyle('FinFmtCell', parent=styles['Normal'], fontSize=7, leading=9)
-    cell_center = ParagraphStyle('FinFmtCellC', parent=styles['Normal'], fontSize=7, leading=9, alignment=TA_CENTER)
-    cell_header = ParagraphStyle(
-        'FinFmtHdr', parent=styles['Normal'],
-        fontSize=8, leading=10, alignment=TA_CENTER,
-        textColor=colors.white, fontName='Helvetica-Bold',
+    style_confidentiel = ParagraphStyle(
+        'PaieConf', parent=styles['Normal'],
+        fontSize=9, leading=12, alignment=TA_LEFT, fontName='Helvetica-Bold',
+        spaceBefore=10,
     )
 
-    def _p(text, center=False, hdr=False):
-        s = cell_header if hdr else (cell_center if center else cell_normal)
-        return Paragraph(str(text).replace('&', '&amp;'), s)
+    def _esc(text):
+        return str(text or '').replace('&', '&amp;')
+
+    def _cell(text, *, bold=False, center=False, size=9):
+        content = _esc(text)
+        if bold:
+            content = f'<b>{content}</b>'
+        style = style_body_center if center else style_body
+        if size != 9:
+            style = ParagraphStyle(
+                f'PaieCell{size}', parent=style,
+                fontSize=size, leading=size + 2,
+            )
+        return Paragraph(content, style)
 
     elements = []
-    if export_opts.get('entete_ligne1'):
-        elements.append(Paragraph(export_opts['entete_ligne1'], style_sub))
-    if export_opts.get('entete_ligne2'):
-        elements.append(Paragraph(export_opts['entete_ligne2'], style_sub))
-    if export_opts.get('organisme'):
-        elements.append(Paragraph(f"<b>{export_opts['organisme']}</b>", style_sub))
-    if export_opts.get('adresse'):
-        elements.append(Paragraph(export_opts['adresse'].replace('\n', '<br/>'), style_sub))
 
-    elements.append(Spacer(1, 0.2 * cm))
-    elements.append(Paragraph(export_opts.get('titre_document') or 'FICHE DE PAIE DÉTAILLÉE', style_title))
-    elements.append(Paragraph(f"Réf. : <b>{export_opts.get('reference', '-')}</b>", style_sub))
-    elements.append(Paragraph(f"Période : <b>{ctx['periode_label']}</b>", style_sub))
-    elements.append(Spacer(1, 0.15 * cm))
-
-    identite_lines = [
-        f"<b>Formateur :</b> {fmt.get('prenom', '')} {fmt.get('nom', '')} — N° {fmt.get('numerobadge') or '-'}",
-        f"<b>Spécialité :</b> {fmt.get('specialite') or '-'} &nbsp;|&nbsp; <b>Organisation :</b> {fmt.get('organisation') or '-'}",
-        f"<b>Grade(s) :</b> {fmt.get('grades') or '-'} &nbsp;|&nbsp; <b>Groupe(s) :</b> {fmt.get('groupes') or '-'}",
-        f"<b>E-mail :</b> {fmt.get('email') or '-'} &nbsp;|&nbsp; <b>Tél. :</b> {fmt.get('telephone') or '-'}",
-        f"<b>Secrétariat(s) :</b> {', '.join(fmt.get('secretariats') or []) or '-'}",
-    ]
-    if fmt.get('numero_piece_identite'):
-        identite_lines.append(f"<b>N° pièce d'identité :</b> {fmt.get('numero_piece_identite')}")
-    if fmt.get('numero_compte_bancaire'):
-        identite_lines.append(f"<b>N° compte bancaire :</b> {fmt.get('numero_compte_bancaire')}")
-    for line in identite_lines:
-        elements.append(Paragraph(line, style_info))
-    elements.append(Spacer(1, 0.2 * cm))
-
-    stats_parts = [
-        f"Planifié : <b>{round(ctx['total_planned'], 1)}</b> min",
-        f"Réalisé : <b>{round(ctx['total_realized'], 1)}</b> min ({ctx.get('total_heures_realisees', 0)} h)",
-        f"Taux : <b>{ctx['taux_realisation_pct']}%</b>",
-        f"Séances : <b>{ctx['sessions_count']}</b>",
-    ]
-    if afficher_montants:
-        stats_parts.append(f"Tarif : <b>{ctx['prix_label']}</b>")
-        stats_parts.append(f"À verser : <b>{ctx['montant_total']:,.0f}</b> FCFA")
-    elements.append(Paragraph(' &nbsp;|&nbsp; '.join(stats_parts), style_stats))
-    elements.append(Paragraph(ctx.get('billing_label', ''), style_info))
-    elements.append(Spacer(1, 0.15 * cm))
-
-    recap = ctx.get('recap_formations') or []
-    if afficher_montants and recap:
-        elements.append(Paragraph('<b>Ventilation par type de formation</b>', style_info))
-        recap_headers = ['Formation (cycle)', 'Tarif / h', 'Heures réal.', 'Montant (FCFA)']
-        recap_data = [[_p(h, hdr=True) for h in recap_headers]]
-        for item in recap:
-            recap_data.append([
-                _p(item.get('formation') or '-'),
-                _p(f"{float(item.get('prix_heure') or 0):,.0f}", center=True),
-                _p(round(float(item.get('heures_realisees') or 0), 2), center=True),
-                _p(f"{float(item.get('montant') or 0):,.0f}", center=True),
-            ])
-        recap_table = Table(recap_data, colWidths=[6 * cm, 2.5 * cm, 2.5 * cm, 3 * cm])
-        recap_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(recap_table)
-        elements.append(Spacer(1, 0.2 * cm))
-        elements.append(Paragraph('<b>Détail par séance</b>', style_info))
-        elements.append(Spacer(1, 0.1 * cm))
-
-    headers = _finance_export_table_headers(afficher_montants)
-    data = [[_p(h, hdr=True) for h in headers]]
-    for r in rows:
-        row_vals = _finance_export_table_row(r, afficher_montants)
-        formatted = []
-        for i, val in enumerate(row_vals):
-            if afficher_montants and i == len(row_vals) - 1:
-                formatted.append(_p(f"{float(val or 0):,.0f}", center=True))
-            elif afficher_montants and i == len(row_vals) - 2 and val not in ('', None):
-                formatted.append(_p(f"{float(val):,.0f}", center=True))
-            elif i >= 7:
-                formatted.append(_p(val, center=True))
-            else:
-                formatted.append(_p(val))
-        data.append(formatted)
-
-    base_widths = [1.8, 2.4, 3.2, 3.6, 1.2, 1.6, 2.4, 1.5, 1.5, 1.6]
-    if afficher_montants:
-        base_widths.extend([1.8, 2.0])
-    col_widths = [w * cm for w in base_widths]
-    table = Table(data, repeatRows=1, colWidths=col_widths)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 7),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor(CI_LIGHT_GREEN)]),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    left_hdr = '<br/>'.join([
+        _esc(_FINANCE_PAIE_HEADER_LEFT[0]),
+        dash,
+        _esc(_FINANCE_PAIE_HEADER_LEFT[1]),
+        _esc(_FINANCE_PAIE_HEADER_LEFT[2]),
+        dash,
+        _esc(_FINANCE_PAIE_HEADER_LEFT[3]),
+        _esc(_FINANCE_PAIE_HEADER_LEFT[4]),
+    ])
+    right_hdr = '<br/>'.join([
+        f'<b>{_esc(_FINANCE_PAIE_HEADER_RIGHT[0])}</b>',
+        f'<i>{_esc(_FINANCE_PAIE_HEADER_RIGHT[1])}</i>',
+        dash,
+    ])
+    header_table = Table(
+        [[Paragraph(left_hdr, style_hdr_left), Paragraph(right_hdr, style_hdr_right)]],
+        colWidths=[10.5 * cm, 6.5 * cm],
+    )
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
-    elements.append(table)
+    elements.append(header_table)
     elements.append(Spacer(1, 0.35 * cm))
 
-    if export_opts.get('signataire_nom') or export_opts.get('signataire_fonction'):
-        sig_style = ParagraphStyle(
-            'FinFmtSig', parent=styles['Normal'], fontSize=9,
-            alignment=TA_RIGHT, textColor=colors.HexColor('#333333'),
-        )
-        sig_lines = []
-        if export_opts.get('signataire_fonction'):
-            sig_lines.append(export_opts['signataire_fonction'])
-        if export_opts.get('signataire_nom'):
-            sig_lines.append(f"<b>{export_opts['signataire_nom']}</b>")
-        elements.append(Paragraph('<br/>'.join(sig_lines), sig_style))
-        elements.append(Spacer(1, 0.2 * cm))
+    titre = _finance_paie_build_title(recap_modules, export_opts, periode)
+    elements.append(Paragraph(f'<u>{_esc(titre)}</u>', style_title))
+    elements.append(Spacer(1, 0.25 * cm))
 
-    foot_parts = [f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"]
-    if export_opts.get('mention_legale'):
-        foot_parts.append(export_opts['mention_legale'])
-    elements.append(Paragraph(
-        '<br/>'.join(foot_parts),
-        ParagraphStyle('FinFmtFoot', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999999')),
-    ))
+    col_widths = [1.0 * cm, 7.2 * cm, 3.0 * cm, 2.8 * cm, 2.5 * cm]
+    table_data = []
+    formateur_label = _finance_paie_formateur_label(fmt)
+    table_data.append([_cell(formateur_label, bold=True), '', '', '', ''])
+
+    table_data.append([
+        _cell('N°', bold=True, center=True),
+        _cell('MODULES', bold=True, center=True),
+        _cell('CATEGORIE/GRADE', bold=True, center=True),
+        _cell('GROUPES', bold=True, center=True),
+        _cell('VOLUME HORAIRE', bold=True, center=True),
+    ])
+
+    total_heures = 0
+    for idx, item in enumerate(recap_modules, start=1):
+        heures = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+        total_heures += heures
+        table_data.append([
+            _cell(idx, center=True),
+            _cell((item.get('module_intitule') or '-').upper()),
+            _cell(item.get('grade') or '-', center=True),
+            _cell(_finance_paie_format_groupe(item.get('groupe')), center=True),
+            _cell(heures, center=True),
+        ])
+
+    if not recap_modules:
+        table_data.append([
+            _cell('—', center=True),
+            _cell('Aucun module sur la période'),
+            _cell('—', center=True),
+            _cell('—', center=True),
+            _cell(0, center=True),
+        ])
+
+    table_data.append([
+        _cell('TOTAL VOLUME HORAIRE', bold=True, center=True),
+        '', '', '',
+        _cell(total_heures, bold=True, center=True),
+    ])
+
+    main_table = Table(table_data, colWidths=col_widths)
+    n_rows = len(table_data)
+    main_style = [
+        ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN', (0, 0), (-1, 0)),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_PAIE_BLUE)),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor(CI_PAIE_ORANGE)),
+        ('BACKGROUND', (0, n_rows - 1), (-1, n_rows - 1), colors.HexColor(CI_PAIE_GREEN)),
+        ('SPAN', (0, n_rows - 1), (3, n_rows - 1)),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 2), (1, n_rows - 2), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]
+    main_table.setStyle(TableStyle(main_style))
+    elements.append(main_table)
+    elements.append(Spacer(1, 0.5 * cm))
+
+    elements.append(Paragraph(_esc(_finance_paie_nb_note(export_opts)), style_body))
+    elements.append(Spacer(1, 0.35 * cm))
+    for line in _FINANCE_PAIE_CONTACTS:
+        elements.append(Paragraph(_esc(line), style_body))
+    elements.append(Spacer(1, 0.6 * cm))
+
+    pied_titre, pied_adresse = _finance_paie_pied_de_page(export_opts)
+    elements.append(Paragraph(f'<b>{_esc(pied_titre)}</b>', style_confidentiel))
+    elements.append(Spacer(1, 0.15 * cm))
+    elements.append(Paragraph(_esc(pied_adresse), style_small))
 
     doc.build(elements)
     buffer.seek(0)
@@ -2305,172 +2512,153 @@ def export_finance_formateur_pdf(request, formateur_pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_finance_formateur_excel(request, formateur_pk):
-    """Export Excel état financier formateur (finance/direction)."""
+    """Export Excel — état récapitulatif des modules dispensés (modèle CPFAE)."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
 
     if not _check_finance_export_access(request):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
     formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
     ctx = _finance_formateur_export_context(formateur, request)
-    rows = ctx['rows']
     export_opts = ctx['export']
-    afficher_montants = export_opts['afficher_montants']
     fmt = ctx.get('formateur') or {}
-    headers = _finance_export_table_headers(afficher_montants)
-    last_col = len(headers)
+    recap_modules = ctx.get('recap_modules') or []
+    periode = ctx.get('periode') or {}
+    last_col = 5
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "État financier"
+    ws.title = "Modules dispensés"
 
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
-    header_font = Font(bold=True, color='FFFFFF', size=10)
-    thin_border = Border(
-        left=Side(style='thin', color='CCCCCC'),
-        right=Side(style='thin', color='CCCCCC'),
-        top=Side(style='thin', color='CCCCCC'),
-        bottom=Side(style='thin', color='CCCCCC'),
+    blue_fill = PatternFill(start_color='DDEBF7', end_color='DDEBF7', fill_type='solid')
+    orange_fill = PatternFill(start_color='FCD5B4', end_color='FCD5B4', fill_type='solid')
+    green_fill = PatternFill(start_color='A9D08E', end_color='A9D08E', fill_type='solid')
+    black_border = Border(
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000'),
     )
-
+    dash = '—' * 28
     row_idx = 1
-    for line in (
-        export_opts.get('entete_ligne1'),
-        export_opts.get('entete_ligne2'),
-        export_opts.get('organisme'),
-    ):
-        if line:
-            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-            ws.cell(row=row_idx, column=1, value=line).alignment = Alignment(horizontal='center')
-            row_idx += 1
-    if export_opts.get('adresse'):
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        ws.cell(row=row_idx, column=1, value=export_opts['adresse']).alignment = Alignment(horizontal='center', wrap_text=True)
-        row_idx += 1
 
-    row_idx += 1
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document') or 'FICHE DE PAIE DÉTAILLÉE')
-    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
-    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
-    row_idx += 1
-
-    for label, value in (
-        ('Référence', export_opts.get('reference', '-')),
-        ('Période', ctx['periode_label']),
-        ('Formateur', f"{fmt.get('prenom', '')} {fmt.get('nom', '')}".strip()),
-        ('N° Badge', fmt.get('numerobadge') or '-'),
-        ('Spécialité', fmt.get('specialite') or '-'),
-        ('Grade(s)', fmt.get('grades') or '-'),
-        ('Groupe(s)', fmt.get('groupes') or '-'),
-        ('Organisation', fmt.get('organisation') or '-'),
-        ('E-mail', fmt.get('email') or '-'),
-        ('Téléphone', fmt.get('telephone') or '-'),
-        ('Secrétariat(s)', ', '.join(fmt.get('secretariats') or []) or '-'),
-        *(
-            [('N° pièce d\'identité', fmt.get('numero_piece_identite') or '-'),
-             ('N° compte bancaire', fmt.get('numero_compte_bancaire') or '-')]
-            if fmt.get('numero_piece_identite') or fmt.get('numero_compte_bancaire')
-            else []
-        ),
-    ):
-        ws.cell(row=row_idx, column=1, value=label).font = Font(bold=True, size=9)
-        ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=last_col)
-        ws.cell(row=row_idx, column=2, value=value)
-        row_idx += 1
-
-    row_idx += 1
-    synth_labels = ['Planifié (min)', 'Réalisé (min)', 'Heures réalisées', 'Taux %', 'Séances']
-    synth_values = [
-        round(ctx['total_planned'], 1),
-        round(ctx['total_realized'], 1),
-        ctx.get('total_heures_realisees', 0),
-        ctx['taux_realisation_pct'],
-        ctx['sessions_count'],
+    left_lines = [
+        _FINANCE_PAIE_HEADER_LEFT[0], dash,
+        _FINANCE_PAIE_HEADER_LEFT[1], _FINANCE_PAIE_HEADER_LEFT[2], dash,
+        _FINANCE_PAIE_HEADER_LEFT[3], _FINANCE_PAIE_HEADER_LEFT[4],
     ]
-    if afficher_montants:
-        synth_labels.extend(['Tarif horaire', 'À verser (FCFA)'])
-        synth_values.extend([ctx['prix_label'], ctx['montant_total']])
-    for col, (label, val) in enumerate(zip(synth_labels, synth_values), start=1):
-        cell_l = ws.cell(row=row_idx, column=col, value=label)
-        cell_v = ws.cell(row=row_idx + 1, column=col, value=val)
-        for cell in (cell_l, cell_v):
-            cell.fill = orange_fill
-            cell.font = Font(bold=True, color='FFFFFF', size=9)
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            cell.border = thin_border
-    row_idx += 3
+    right_lines = [
+        _FINANCE_PAIE_HEADER_RIGHT[0], _FINANCE_PAIE_HEADER_RIGHT[1], dash,
+    ]
+    max_hdr = max(len(left_lines), len(right_lines))
+    for i in range(max_hdr):
+        left_val = left_lines[i] if i < len(left_lines) else ''
+        right_val = right_lines[i] if i < len(right_lines) else ''
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=3)
+        ws.merge_cells(start_row=row_idx, start_column=4, end_row=row_idx, end_column=5)
+        c_left = ws.cell(row=row_idx, column=1, value=left_val)
+        c_left.font = Font(size=8)
+        c_left.alignment = Alignment(horizontal='left', wrap_text=True)
+        c_right = ws.cell(row=row_idx, column=4, value=right_val)
+        c_right.font = Font(size=9, bold=(i == 0))
+        c_right.alignment = Alignment(horizontal='right', wrap_text=True)
+        row_idx += 1
+
+    row_idx += 1
+    titre = _finance_paie_build_title(recap_modules, export_opts, periode)
     ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    ws.cell(row=row_idx, column=1, value=ctx.get('billing_label', ''))
-    ws.cell(row=row_idx, column=1).font = Font(size=9, italic=True)
+    title_cell = ws.cell(row=row_idx, column=1, value=titre)
+    title_cell.font = Font(bold=True, size=10, underline='single')
+    title_cell.alignment = Alignment(horizontal='center', wrap_text=True)
     row_idx += 2
 
-    recap = ctx.get('recap_formations') or []
-    if afficher_montants and recap:
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        ws.cell(row=row_idx, column=1, value='Ventilation par type de formation').font = Font(bold=True, size=10)
-        row_idx += 1
-        for col, h in enumerate(['Formation (cycle)', 'Tarif / h', 'Heures réal.', 'Montant (FCFA)'], start=1):
-            cell = ws.cell(row=row_idx, column=col, value=h)
-            cell.font = header_font
-            cell.fill = green_fill
-            cell.border = thin_border
-        row_idx += 1
-        for item in recap:
-            ws.cell(row=row_idx, column=1, value=item.get('formation') or '-').border = thin_border
-            ws.cell(row=row_idx, column=2, value=float(item.get('prix_heure') or 0)).border = thin_border
-            ws.cell(row=row_idx, column=3, value=round(float(item.get('heures_realisees') or 0), 2)).border = thin_border
-            ws.cell(row=row_idx, column=4, value=round(float(item.get('montant') or 0), 2)).border = thin_border
-            row_idx += 1
-        row_idx += 1
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        ws.cell(row=row_idx, column=1, value='Détail par séance').font = Font(bold=True, size=10)
-        row_idx += 1
+    formateur_label = _finance_paie_formateur_label(fmt)
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    name_cell = ws.cell(row=row_idx, column=1, value=formateur_label)
+    name_cell.font = Font(bold=True, size=10)
+    name_cell.fill = blue_fill
+    name_cell.border = black_border
+    name_cell.alignment = Alignment(horizontal='left')
+    row_idx += 1
 
-    start_row = row_idx
-    for idx, h in enumerate(headers, 1):
-        cell = ws.cell(row=start_row, column=idx, value=h)
-        cell.font = header_font
-        cell.fill = green_fill
+    headers = ['N°', 'MODULES', 'CATEGORIE/GRADE', 'GROUPES', 'VOLUME HORAIRE']
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row_idx, column=col, value=h)
+        cell.font = Font(bold=True, size=9)
+        cell.fill = orange_fill
+        cell.border = black_border
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        cell.border = thin_border
+    row_idx += 1
 
-    for i, r in enumerate(rows, start=1):
-        row_num = start_row + i
-        values = _finance_export_table_row(r, afficher_montants)
-        for col, val in enumerate(values, start=1):
-            cell = ws.cell(row=row_num, column=col, value=val)
-            cell.border = thin_border
-            cell.alignment = Alignment(vertical='center')
-            if col >= 8:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-            if i % 2 == 0:
-                cell.fill = light_green_fill
+    total_heures = 0
+    if recap_modules:
+        for idx, item in enumerate(recap_modules, start=1):
+            heures = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+            total_heures += heures
+            values = [
+                idx,
+                (item.get('module_intitule') or '-').upper(),
+                item.get('grade') or '-',
+                _finance_paie_format_groupe(item.get('groupe')),
+                heures,
+            ]
+            for col, val in enumerate(values, start=1):
+                cell = ws.cell(row=row_idx, column=col, value=val)
+                cell.border = black_border
+                cell.alignment = Alignment(
+                    horizontal='left' if col == 2 else 'center',
+                    vertical='center',
+                    wrap_text=True,
+                )
+            row_idx += 1
+    else:
+        for col, val in enumerate(['—', 'Aucun module sur la période', '—', '—', 0], start=1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.border = black_border
+        row_idx += 1
 
-    col_widths = [12, 18, 22, 24, 10, 14, 20, 14, 14, 14]
-    if afficher_montants:
-        col_widths.extend([14, 14])
-    for idx, width in enumerate(col_widths, start=1):
-        ws.column_dimensions[get_column_letter(idx)].width = width
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=4)
+    total_label = ws.cell(row=row_idx, column=1, value='TOTAL VOLUME HORAIRE')
+    total_label.font = Font(bold=True, size=9)
+    total_label.fill = green_fill
+    total_label.border = black_border
+    total_label.alignment = Alignment(horizontal='center')
+    total_val = ws.cell(row=row_idx, column=5, value=total_heures)
+    total_val.font = Font(bold=True, size=9)
+    total_val.fill = green_fill
+    total_val.border = black_border
+    total_val.alignment = Alignment(horizontal='center')
+    row_idx += 2
 
-    footer_row = start_row + len(rows) + 2
-    if export_opts.get('signataire_nom') or export_opts.get('signataire_fonction'):
-        ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
-        sig = ' — '.join(filter(None, [export_opts.get('signataire_fonction'), export_opts.get('signataire_nom')]))
-        ws.cell(row=footer_row, column=1, value=sig).alignment = Alignment(horizontal='right')
-        footer_row += 1
+    for text in (
+        _finance_paie_nb_note(export_opts),
+        *_FINANCE_PAIE_CONTACTS,
+    ):
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+        cell = ws.cell(row=row_idx, column=1, value=text)
+        cell.font = Font(size=9)
+        cell.alignment = Alignment(wrap_text=True, horizontal='left')
+        row_idx += 1
 
-    ws.merge_cells(start_row=footer_row, start_column=1, end_row=footer_row, end_column=last_col)
-    foot = f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
-    if export_opts.get('mention_legale'):
-        foot = f"{foot} — {export_opts['mention_legale']}"
-    ws.cell(row=footer_row, column=1, value=foot)
-    ws.cell(row=footer_row, column=1).font = Font(size=8, color='999999', italic=True)
-    ws.cell(row=footer_row, column=1).alignment = Alignment(horizontal='right', wrap_text=True)
+    row_idx += 1
+    pied_titre, pied_adresse = _finance_paie_pied_de_page(export_opts)
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    pied_title_cell = ws.cell(row=row_idx, column=1, value=pied_titre)
+    pied_title_cell.font = Font(bold=True, size=9)
+    pied_title_cell.alignment = Alignment(horizontal='left')
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    pied_addr_cell = ws.cell(row=row_idx, column=1, value=pied_adresse)
+    pied_addr_cell.font = Font(size=7)
+    pied_addr_cell.alignment = Alignment(wrap_text=True, horizontal='left')
+    row_idx += 1
+
+    ws.column_dimensions['A'].width = 5
+    ws.column_dimensions['B'].width = 42
+    ws.column_dimensions['C'].width = 16
+    ws.column_dimensions['D'].width = 14
+    ws.column_dimensions['E'].width = 14
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -2774,4 +2962,302 @@ def export_finance_synthese_excel(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="fiche_paie_globale.xlsx"'
+    return response
+
+
+def _finance_encadrants_export_context(request):
+    from formations.period_filter import parse_period_from_request, periode_api_payload
+    from formations.api_views import _finance_secretariat_id_from_request
+    from formations.finance_encadrants import finance_encadrants_report
+    from formations.duration_format import format_duration_minutes
+
+    period = parse_period_from_request(request)
+    if period.get('error'):
+        return None, period.get('detail') or 'Période invalide.'
+
+    secretariat_id = _finance_secretariat_id_from_request(request)
+    report = finance_encadrants_report(
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+    )
+    settings = _finance_export_settings()
+    prefix = (settings.export_reference_prefix or 'EFI').strip() or 'EFI'
+    ref_date = datetime.now().strftime('%Y%m%d')
+    export_opts = {
+        'titre_document': 'LISTE DES ENCADRANTS — VOLUMES HORAIRES',
+        'entete_ligne1': settings.export_entete_ligne1 or '',
+        'entete_ligne2': settings.export_entete_ligne2 or '',
+        'organisme': settings.export_organisme or '',
+        'adresse': settings.export_adresse or '',
+        'reference': f'{prefix}-ENC-{ref_date}',
+        'mention_legale': settings.export_mention_legale or '',
+        'signataire_nom': settings.export_signataire_nom or '',
+        'signataire_fonction': settings.export_signataire_fonction or '',
+    }
+    periode_label = periode_api_payload(
+        period['date_debut'], period['date_fin'], period['meta'], None, None,
+    ).get('periode_label') or 'Toutes périodes'
+
+    flat_rows = []
+    for block in report['encadrants']:
+        for ligne in block['lignes']:
+            flat_rows.append({
+                'encadrant': block['encadrant_label'] or block['encadrant_username'],
+                'groupe': ligne['groupe'],
+                'grade': ligne['grade'],
+                'module': ligne['module_intitule'],
+                'formation': ligne['formation_intitule'],
+                'planned_minutes': ligne['planned_minutes'],
+                'realized_minutes': ligne['realized_minutes'],
+                'planned_label': format_duration_minutes(ligne['planned_minutes']),
+                'realized_label': format_duration_minutes(ligne['realized_minutes']),
+                'is_subtotal': False,
+                'is_header': False,
+            })
+        flat_rows.append({
+            'encadrant': block['encadrant_label'] or block['encadrant_username'],
+            'groupe': 'Sous-total',
+            'grade': '',
+            'module': '',
+            'formation': '',
+            'planned_minutes': block['sous_total']['planned_minutes'],
+            'realized_minutes': block['sous_total']['realized_minutes'],
+            'planned_label': format_duration_minutes(block['sous_total']['planned_minutes']),
+            'realized_label': format_duration_minutes(block['sous_total']['realized_minutes']),
+            'is_subtotal': True,
+            'is_header': False,
+        })
+
+    totals = report['totaux']
+    totals['planned_label'] = format_duration_minutes(totals['planned_minutes'])
+    totals['realized_label'] = format_duration_minutes(totals['realized_minutes'])
+
+    return {
+        'rows': flat_rows,
+        'encadrants': report['encadrants'],
+        'totals': totals,
+        'export': export_opts,
+        'periode_label': periode_label,
+    }, None
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_encadrants_pdf(request):
+    """Export PDF : liste encadrants (groupe, volume planifié, volume réalisé)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    ctx, err = _finance_encadrants_export_context(request)
+    if err:
+        return Response({'detail': err}, status=400)
+
+    export_opts = ctx['export']
+    totals = ctx['totals']
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        leftMargin=0.8 * cm, rightMargin=0.8 * cm,
+        topMargin=1.0 * cm, bottomMargin=1.0 * cm,
+    )
+    styles = getSampleStyleSheet()
+    style_title = ParagraphStyle(
+        'EncTitle', parent=styles['Title'],
+        fontSize=14, textColor=colors.HexColor(CI_GREEN_DARK),
+        alignment=TA_CENTER, spaceAfter=3,
+    )
+    style_sub = ParagraphStyle(
+        'EncSub', parent=styles['Normal'],
+        fontSize=9, textColor=colors.HexColor('#444444'),
+        alignment=TA_CENTER, spaceAfter=2,
+    )
+    cell_normal = ParagraphStyle('EncCell', parent=styles['Normal'], fontSize=8, leading=10)
+    cell_header = ParagraphStyle(
+        'EncHdr', parent=styles['Normal'],
+        fontSize=9, leading=11, alignment=TA_CENTER,
+        textColor=colors.white, fontName='Helvetica-Bold',
+    )
+
+    def _p(text, hdr=False):
+        s = cell_header if hdr else cell_normal
+        return Paragraph(str(text).replace('&', '&amp;'), s)
+
+    elements = []
+    for line in (export_opts.get('entete_ligne1'), export_opts.get('entete_ligne2'), export_opts.get('organisme')):
+        if line:
+            elements.append(Paragraph(line, style_sub))
+    elements.append(Spacer(1, 0.15 * cm))
+    elements.append(Paragraph(export_opts.get('titre_document'), style_title))
+    elements.append(Paragraph(f"Réf. : <b>{export_opts.get('reference', '-')}</b>", style_sub))
+    elements.append(Paragraph(f"Période : <b>{ctx['periode_label']}</b>", style_sub))
+    elements.append(Spacer(1, 0.2 * cm))
+
+    headers = ['Encadrant', 'Groupe', 'Grade', 'Module', 'Planifié', 'Réalisé']
+    data = [[_p(h, hdr=True) for h in headers]]
+    for row in ctx['rows']:
+        data.append([
+            _p(row['encadrant']),
+            _p(row['groupe']),
+            _p(row['grade'] or '—'),
+            _p(row['module'] or '—'),
+            _p(row['planned_label']),
+            _p(row['realized_label']),
+        ])
+    data.append([
+        _p('TOTAL'),
+        _p(''),
+        _p(''),
+        _p(f"{totals['encadrants_count']} encadrant(s)"),
+        _p(totals['planned_label']),
+        _p(totals['realized_label']),
+    ])
+
+    col_widths = [3.5 * cm, 2.5 * cm, 1.5 * cm, 5.5 * cm, 2.2 * cm, 2.2 * cm]
+    table = Table(data, repeatRows=1, colWidths=col_widths)
+    row_styles = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_GREEN_DARK)),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(CI_LIGHT_ORANGE)),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]
+    for i, row in enumerate(ctx['rows'], start=1):
+        if row.get('is_subtotal'):
+            row_styles.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#E3F2FD')))
+            row_styles.append(('FONTNAME', (0, i), (-1, i), 'Helvetica-Bold'))
+    table.setStyle(TableStyle(row_styles))
+    elements.append(table)
+
+    foot = f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}"
+    elements.append(Spacer(1, 0.3 * cm))
+    elements.append(Paragraph(
+        foot,
+        ParagraphStyle('EncFoot', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#999999')),
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="liste_encadrants.pdf"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_finance_encadrants_excel(request):
+    """Export Excel : liste encadrants (groupe, volume planifié, volume réalisé)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    if not _check_finance_export_access(request):
+        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
+
+    ctx, err = _finance_encadrants_export_context(request)
+    if err:
+        return Response({'detail': err}, status=400)
+
+    export_opts = ctx['export']
+    totals = ctx['totals']
+    headers = ['Encadrant', 'Groupe', 'Grade', 'Module', 'Formation', 'Planifié (min)', 'Réalisé (min)', 'Planifié', 'Réalisé']
+    last_col = len(headers)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Encadrants'
+
+    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
+    subtotal_fill = PatternFill(start_color='E3F2FD', end_color='E3F2FD', fill_type='solid')
+    total_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF', size=10)
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+
+    row_idx = 1
+    for line in (export_opts.get('entete_ligne1'), export_opts.get('entete_ligne2'), export_opts.get('organisme')):
+        if line:
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+            ws.cell(row=row_idx, column=1, value=line).alignment = Alignment(horizontal='center')
+            row_idx += 1
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document'))
+    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
+    row_idx += 1
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=f"Période : {ctx['periode_label']}")
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
+    row_idx += 2
+
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row_idx, column=col, value=h)
+        cell.fill = green_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = thin_border
+    row_idx += 1
+
+    for row in ctx['rows']:
+        values = [
+            row['encadrant'],
+            row['groupe'],
+            row['grade'] or '—',
+            row['module'] or '—',
+            row['formation'] or '—',
+            row['planned_minutes'],
+            row['realized_minutes'],
+            row['planned_label'],
+            row['realized_label'],
+        ]
+        for col, val in enumerate(values, start=1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.border = thin_border
+            if row.get('is_subtotal'):
+                cell.fill = subtotal_fill
+                cell.font = Font(bold=True)
+        row_idx += 1
+
+    total_values = [
+        'TOTAL', '', '', f"{totals['encadrants_count']} encadrant(s)", '',
+        totals['planned_minutes'], totals['realized_minutes'],
+        totals['planned_label'], totals['realized_label'],
+    ]
+    for col, val in enumerate(total_values, start=1):
+        cell = ws.cell(row=row_idx, column=col, value=val)
+        cell.border = thin_border
+        cell.fill = total_fill
+        cell.font = Font(bold=True)
+    row_idx += 2
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+    ws.cell(row=row_idx, column=1, value=f"Exporté le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+    ws.cell(row=row_idx, column=1).font = Font(size=8, color='999999', italic=True)
+    ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='right')
+
+    col_widths = [22, 14, 8, 24, 22, 12, 12, 12, 12]
+    for idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = width
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="liste_encadrants.xlsx"'
     return response

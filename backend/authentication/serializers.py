@@ -1,6 +1,10 @@
+import logging
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .permissions import get_subordinate_roles, get_creatable_roles
+from .role_groups import get_creatable_roles, ROLE_LABELS
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -61,14 +65,48 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'password', 'role', 'grade', 'telephone', 'organisation', 'secretariat',
         ]
 
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            msg = f"L'identifiant « {value} » est déjà utilisé."
+            logger.warning('user_create_username_conflict username=%s', value)
+            raise serializers.ValidationError(msg)
+        return value
+
+    def validate_matricule(self, value):
+        if value in (None, ''):
+            return None
+        if User.objects.filter(matricule__iexact=value).exists():
+            msg = f"Le numéro de matricule « {value} » est déjà utilisé."
+            logger.warning('user_create_matricule_conflict matricule=%s', value)
+            raise serializers.ValidationError(msg)
+        return value
+
     def validate_role(self, value):
         request = self.context.get('request')
-        requester_role = getattr(getattr(request, 'user', None), 'role', None)
+        requester = getattr(request, 'user', None)
+        requester_role = getattr(requester, 'role', None)
         allowed = get_creatable_roles(requester_role)
         if value not in allowed:
-            raise serializers.ValidationError(
-                f"Vous ne pouvez pas attribuer le rôle « {value} »."
+            role_label = ROLE_LABELS.get(value, value)
+            requester_label = ROLE_LABELS.get(requester_role, requester_role)
+            allowed_labels = ', '.join(ROLE_LABELS.get(r, r) for r in allowed) or 'aucun'
+            if value == User.Role.ADMIN:
+                msg = (
+                    "Le rôle Administrateur système est unique et ne peut pas être "
+                    "créé depuis la plateforme."
+                )
+            else:
+                msg = (
+                    f"Vous ne pouvez pas attribuer le rôle « {role_label} » avec votre "
+                    f"compte ({requester_label}). Rôles autorisés : {allowed_labels}."
+                )
+            logger.warning(
+                'user_role_denied requester=%s requester_role=%s attempted_role=%s',
+                getattr(requester, 'username', None),
+                requester_role,
+                value,
             )
+            raise serializers.ValidationError(msg)
         return value
 
     def validate_secretariat(self, value):
@@ -76,6 +114,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         requester = getattr(request, 'user', None)
         if getattr(requester, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             if value is not None and value != requester.secretariat:
+                logger.warning(
+                    'user_create_secretariat_denied requester=%s requester_secretariat=%s attempted_secretariat=%s',
+                    getattr(requester, 'username', None),
+                    getattr(requester.secretariat, 'pk', None),
+                    getattr(value, 'pk', value),
+                )
                 raise serializers.ValidationError(
                     "Vous ne pouvez créer des utilisateurs que pour votre propre secrétariat."
                 )
@@ -84,10 +128,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role')
         secretariat = attrs.get('secretariat')
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE'):
+        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE', 'ENCADRANT'):
             attrs['secretariat'] = None
         if role == 'CHEF_CPFAE_ADMIN':
             if User.objects.filter(role='CHEF_CPFAE_ADMIN').exists():
+                logger.warning('user_create_chef_cpfae_admin_already_exists')
                 raise serializers.ValidationError(
                     {'role': "Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur toute la plateforme."}
                 )
@@ -96,6 +141,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
                 role='CHEF_SECRETARIAT', secretariat=secretariat
             ).exists()
             if already_exists:
+                logger.warning(
+                    'user_create_chef_secretariat_already_exists secretariat_id=%s',
+                    getattr(secretariat, 'pk', secretariat),
+                )
                 raise serializers.ValidationError(
                     {'role': "Ce secrétariat a déjà un Chef Secrétariat. Un seul Chef Secrétariat est autorisé par secrétariat."}
                 )
@@ -124,12 +173,30 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
     def validate_role(self, value):
         request = self.context.get('request')
-        requester_role = getattr(getattr(request, 'user', None), 'role', None)
+        requester = getattr(request, 'user', None)
+        requester_role = getattr(requester, 'role', None)
         allowed = get_creatable_roles(requester_role)
         if value not in allowed:
-            raise serializers.ValidationError(
-                f"Vous ne pouvez pas attribuer le rôle « {value} »."
+            role_label = ROLE_LABELS.get(value, value)
+            requester_label = ROLE_LABELS.get(requester_role, requester_role)
+            allowed_labels = ', '.join(ROLE_LABELS.get(r, r) for r in allowed) or 'aucun'
+            if value == User.Role.ADMIN:
+                msg = (
+                    "Le rôle Administrateur système est unique et ne peut pas être "
+                    "créé depuis la plateforme."
+                )
+            else:
+                msg = (
+                    f"Vous ne pouvez pas attribuer le rôle « {role_label} » avec votre "
+                    f"compte ({requester_label}). Rôles autorisés : {allowed_labels}."
+                )
+            logger.warning(
+                'user_role_denied requester=%s requester_role=%s attempted_role=%s',
+                getattr(requester, 'username', None),
+                requester_role,
+                value,
             )
+            raise serializers.ValidationError(msg)
         return value
 
     def validate_secretariat(self, value):
@@ -137,6 +204,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         requester = getattr(request, 'user', None)
         if getattr(requester, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             if value is not None and value != requester.secretariat:
+                logger.warning(
+                    'user_update_secretariat_denied requester=%s requester_secretariat=%s attempted_secretariat=%s',
+                    getattr(requester, 'username', None),
+                    getattr(requester.secretariat, 'pk', None),
+                    getattr(value, 'pk', value),
+                )
                 raise serializers.ValidationError(
                     "Vous ne pouvez modifier que les utilisateurs de votre propre secrétariat."
                 )
@@ -145,13 +218,14 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role', self.instance.role if self.instance else None)
         secretariat = attrs.get('secretariat', self.instance.secretariat if self.instance else None)
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE'):
+        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE', 'ENCADRANT'):
             attrs['secretariat'] = None
         if role == 'CHEF_CPFAE_ADMIN':
             already_exists = User.objects.filter(role='CHEF_CPFAE_ADMIN').exclude(
                 pk=self.instance.pk if self.instance else None
             ).exists()
             if already_exists:
+                logger.warning('user_update_chef_cpfae_admin_already_exists')
                 raise serializers.ValidationError(
                     {'role': "Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur toute la plateforme."}
                 )
@@ -160,6 +234,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                 role='CHEF_SECRETARIAT', secretariat=secretariat
             ).exclude(pk=self.instance.pk if self.instance else None).exists()
             if already_exists:
+                logger.warning(
+                    'user_update_chef_secretariat_already_exists secretariat_id=%s',
+                    getattr(secretariat, 'pk', secretariat),
+                )
                 raise serializers.ValidationError(
                     {'role': "Ce secrétariat a déjà un Chef Secrétariat. Un seul Chef Secrétariat est autorisé par secrétariat."}
                 )

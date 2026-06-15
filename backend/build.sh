@@ -23,5 +23,9 @@ else:
     print('Données existantes — seed ignoré.')
 "
 
-# Créer / mettre à jour les comptes mobile (mots de passe déterministes)
-python scripts/seed_mobile_users.py
+# Créer / mettre à jour les comptes mobile (opt-in — ne pas exécuter en prod par défaut)
+if [ "${SEED_MOBILE_USERS:-}" = "1" ]; then
+  python scripts/seed_mobile_users.py
+else
+  echo "Seed mobile ignoré (SEED_MOBILE_USERS≠1)."
+fi

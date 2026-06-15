@@ -8,8 +8,7 @@ import { formatMoney } from '../components/FinanceStatsGrid'
 import {
   buildFinanceListSearchParams,
   FINANCE_QUERY_STORAGE_KEY,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 
@@ -29,8 +28,7 @@ export default function FinanceParametrage() {
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
     () => {
-      const fromUrl = readFinanceStateFromSearchParams(searchParams)
-      return buildFinanceListSearchParams(fromUrl?.period ?? loadFinancePeriod(), {})
+      return buildFinanceListSearchParams(resolveFinancePeriod(), {})
     },
     [searchParams],
   )
@@ -39,6 +37,11 @@ export default function FinanceParametrage() {
   const [saving, setSaving] = useState(false)
   const [prix, setPrix] = useState('')
   const [tarifs, setTarifs] = useState([])
+  const [toleranceSettings, setToleranceSettings] = useState({
+    tolerance_active: false,
+    tolerance_minutes: 30,
+    tolerance_pct: 5,
+  })
   const [exportSettings, setExportSettings] = useState({
     afficher_montants_exports: true,
     export_titre_document: 'FICHE DE PAIE DÉTAILLÉE',
@@ -65,6 +68,11 @@ export default function FinanceParametrage() {
             prix_heure_realisee: t.prix_heure_realisee != null ? String(t.prix_heure_realisee) : '',
           })),
         )
+        setToleranceSettings({
+          tolerance_active: res.data?.tolerance_active === true,
+          tolerance_minutes: res.data?.tolerance_minutes ?? 30,
+          tolerance_pct: res.data?.tolerance_pct ?? 5,
+        })
         setExportSettings({
           afficher_montants_exports: res.data?.afficher_montants_exports !== false,
           export_titre_document: res.data?.export_titre_document || 'FICHE DE PAIE DÉTAILLÉE',
@@ -107,12 +115,6 @@ export default function FinanceParametrage() {
     e.preventDefault()
     if (!canEdit) return
 
-    const defaultPrix = parsePrix(prix)
-    if (Number.isNaN(defaultPrix)) {
-      showToast('Le tarif par défaut doit être un montant valide (≥ 0) ou vide (0).', 'error')
-      return
-    }
-
     const tarifsPayload = []
     for (const t of tarifs) {
       const value = parsePrix(t.prix_heure_realisee)
@@ -126,11 +128,12 @@ export default function FinanceParametrage() {
     setSaving(true)
     try {
       const res = await api.patch('/formations/finance/settings/', {
-        prix_heure_realisee: defaultPrix ?? 0,
         tarifs_formations: tarifsPayload,
+        ...toleranceSettings,
+        tolerance_minutes: Number(toleranceSettings.tolerance_minutes) || 0,
+        tolerance_pct: Number(toleranceSettings.tolerance_pct) || 0,
         ...exportSettings,
       })
-      setPrix(String(res.data?.prix_heure_realisee ?? defaultPrix))
       setTarifs(
         (res.data?.tarifs_formations ?? []).map((t) => ({
           ...t,
@@ -140,6 +143,11 @@ export default function FinanceParametrage() {
       setMeta({
         updated_at: res.data?.updated_at || null,
         updated_by: res.data?.updated_by || null,
+      })
+      setToleranceSettings({
+        tolerance_active: res.data?.tolerance_active === true,
+        tolerance_minutes: res.data?.tolerance_minutes ?? 30,
+        tolerance_pct: res.data?.tolerance_pct ?? 5,
       })
       setExportSettings({
         afficher_montants_exports: res.data?.afficher_montants_exports !== false,
@@ -163,6 +171,10 @@ export default function FinanceParametrage() {
 
   const setExportField = (key, value) => {
     setExportSettings((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const setToleranceField = (key, value) => {
+    setToleranceSettings((prev) => ({ ...prev, [key]: value }))
   }
 
   const prixNum = Number(prix) || 0
@@ -223,22 +235,6 @@ export default function FinanceParametrage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            <div className="form-group mb-4">
-              <label className="form-label fw-semibold">Tarif par défaut (FCFA / h)</label>
-              <div className="input-group input-group-lg" style={{ maxWidth: 420 }}>
-                <input
-                  type="number"
-                  className="form-control"
-                  min="0"
-                  step="0.01"
-                  value={prix}
-                  onChange={(e) => setPrix(e.target.value)}
-                  disabled={!canEdit || saving}
-                />
-                <span className="input-group-text fw-semibold">FCFA / h</span>
-              </div>
-            </div>
-
             <h6 className="fw-semibold mb-3">
               <i className="bi bi-journal-bookmark me-2"></i>
               Tarifs par formation
@@ -261,6 +257,66 @@ export default function FinanceParametrage() {
                     {tarifsInactifs.map(renderTarifRow)}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            <hr className="my-4" />
+
+            <h6 className="fw-semibold mb-3">
+              <i className="bi bi-shield-check me-2"></i>
+              Tolérance horaire
+            </h6>
+
+            <div className="form-check form-switch mb-3">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="tolerance_active"
+                checked={toleranceSettings.tolerance_active}
+                onChange={(e) => setToleranceField('tolerance_active', e.target.checked)}
+                disabled={!canEdit || saving}
+              />
+              <label className="form-check-label" htmlFor="tolerance_active">
+                Activer la marge de tolérance sur les volumes réalisés inférieurs au planifié
+              </label>
+            </div>
+
+            {toleranceSettings.tolerance_active && (
+              <div className="row g-3 mb-3">
+                <div className="col-md-4">
+                  <label className="form-label">Tolérance fixe (minutes)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    min="0"
+                    step="1"
+                    value={toleranceSettings.tolerance_minutes}
+                    onChange={(e) => setToleranceField('tolerance_minutes', e.target.value)}
+                    disabled={!canEdit || saving}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Tolérance relative (%)</label>
+                  <div className="input-group">
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={toleranceSettings.tolerance_pct}
+                      onChange={(e) => setToleranceField('tolerance_pct', e.target.value)}
+                      disabled={!canEdit || saving}
+                    />
+                    <span className="input-group-text">%</span>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <p className="text-muted small mb-0">
+                    Le seuil appliqué est le plus favorable entre la marge en minutes et le pourcentage du volume planifié.
+                    Les formateurs dans la tolérance sont signalés en orange ; hors tolérance en rouge.
+                  </p>
+                </div>
               </div>
             )}
 

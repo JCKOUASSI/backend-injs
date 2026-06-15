@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.test import APIClient
@@ -149,6 +149,7 @@ class SessionCreateAPITest(TestCase):
         self.assertIn(res.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_201_CREATED))
 
 
+@override_settings(PUBLIC_QR_SCAN_ENABLED=True)
 class ScanModuleExclusivityTest(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -378,6 +379,35 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertEqual(res.data.get('code'), 'SESSION_ALREADY_OPEN')
 
 
+@override_settings(PUBLIC_QR_SCAN_ENABLED=False)
+class PublicScanDisabledTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.today = timezone.localdate()
+        self.formation = Formation.objects.create(formation='Formation scan off')
+        self.module = Module.objects.create(
+            formation=self.formation, intitule='Module', statut='EN_COURS',
+        )
+        self.seance = SessionModule.objects.create(
+            module=self.module, date_journee=self.today, numero=1, demarree_le=timezone.now(),
+        )
+        self.token = QRToken.objects.create(
+            session=self.seance,
+            expire_at=timezone.now() + timedelta(hours=1),
+            actif=True,
+        )
+
+    def test_public_scan_returns_403_when_disabled(self):
+        res = self.client.post(
+            '/api/scan/',
+            {'token_qr': str(self.token.token), 'numero_participant': 'P0001'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data.get('code'), 'SCAN_DISABLED')
+
+
+@override_settings(PUBLIC_QR_SCAN_ENABLED=True)
 class ScanFormateurBadgeNormalizationTest(TestCase):
     def setUp(self):
         self.client = APIClient()

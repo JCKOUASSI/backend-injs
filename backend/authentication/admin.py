@@ -74,6 +74,7 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             User.Role.SECRETARIAT: ('#fff7e8', '#9a6700'),
             User.Role.FINANCE: ('#f0f4ff', '#3949ab'),
             User.Role.ENCADRANT: ('#e8f6f1', '#13624e'),
+            User.Role.SUPERVISEUR: ('#fef3c7', '#92400e'),
             User.Role.AUDITEUR: ('#f3f4f6', '#374151'),
         }
         bg, fg = colors.get(obj.role, ('#f3f4f6', '#374151'))

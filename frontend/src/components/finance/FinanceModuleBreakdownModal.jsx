@@ -1,4 +1,4 @@
-import { fmtDuration, formatMoney } from '../FinanceStatsGrid'
+import { fmtDuration, fmtHeures, formatMoney } from '../FinanceStatsGrid'
 
 const DRILL_CONFIG = {
   planifie: {
@@ -117,12 +117,12 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                         {formatDetailValue(m, cfg)}
                         {drillType === 'planifie' && (m.total_duree_heures ?? 0) > 0 && (
                           <div className="text-muted small fw-normal">
-                            {Number(m.total_duree_heures).toFixed(2)} h
+                            {fmtHeures(m.total_duree_heures)} h
                           </div>
                         )}
                         {drillType === 'realise' && (m.total_duree_realisee_heures ?? 0) > 0 && (
                           <div className="text-muted small fw-normal">
-                            {Number(m.total_duree_realisee_heures).toFixed(2)} h
+                            {fmtHeures(m.total_duree_realisee_heures)} h
                           </div>
                         )}
                       </td>

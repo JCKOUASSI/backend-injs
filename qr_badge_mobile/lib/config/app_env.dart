@@ -45,7 +45,7 @@ class AppEnv {
     if (_logoutFromDefine.isNotEmpty) {
       return _logoutFromDefine;
     }
-    return _dot('SUPERVISOR_LOGOUT_CODE') ?? '2026';
+    return _dot('SUPERVISOR_LOGOUT_CODE') ?? '';
   }
 
   /// Hôte LAN optionnel depuis .env (si pas de --dart-define).

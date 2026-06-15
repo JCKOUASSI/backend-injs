@@ -11,6 +11,13 @@ import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
+import {
+  canMutateFormations,
+  canPresenceAction,
+  canSuperviseSessions,
+  canViewPresences,
+} from '../utils/roles'
+import { formatApiErrors } from '../utils/apiErrors'
 
 export default function FormationDetail() {
   const { id } = useParams()
@@ -48,6 +55,8 @@ export default function FormationDetail() {
   const [superviseurs, setSuperviseurs] = useState([])
   const [selectedSup, setSelectedSup] = useState('')
   const [assignError, setAssignError] = useState('')
+  const [encadrantSearch, setEncadrantSearch] = useState('')
+  const [encadrantLoading, setEncadrantLoading] = useState(false)
 
   // Add participant to formation
   const [showAddParticipant, setShowAddParticipant] = useState(false)
@@ -83,6 +92,7 @@ export default function FormationDetail() {
   const formateursPager = useClientPagination(formateurs, TABLE_PAGE_SIZE, [id, formateurs.length])
   const participantPicker = usePickerPagination(showAddParticipant)
   const formateurPicker = usePickerPagination(showAddFormateur)
+  const encadrantPicker = usePickerPagination(showAssignModal)
 
   // Import séances Excel
   const [importingSeances, setImportingSeances] = useState(false)
@@ -114,7 +124,10 @@ export default function FormationDetail() {
     try {
       const res = await api.get(`/formations/${id}/formateurs/`)
       setFormateurs(Array.isArray(res.data) ? res.data : [])
-    } catch {}
+    } catch (err) {
+      console.error('Chargement formateurs formation:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les formateurs.' }), 'error')
+    }
   }
 
   useEffect(() => {
@@ -131,7 +144,10 @@ export default function FormationDetail() {
       const assigned = new Set(formateurs.map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setFormateurLoading(false) }
+    } catch (err) {
+      console.error('Chargement liste formateurs:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+    } finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
@@ -288,19 +304,39 @@ export default function FormationDetail() {
   }
 
   const loadSuperviseurs = async () => {
+    setEncadrantLoading(true)
     try {
-      const res = await api.get('/auth/users/?role=ENCADRANT')
+      const params = new URLSearchParams({
+        role: 'ENCADRANT',
+        page: encadrantPicker.page,
+      })
+      if (encadrantSearch) params.set('search', encadrantSearch)
+      const res = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setSuperviseurs(data)
-    } catch {}
+      encadrantPicker.applyResponse(res.data, data.length)
+    } catch (err) {
+      console.error('Chargement encadrants:', err)
+      setAssignError(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des encadrants.' }))
+    } finally { setEncadrantLoading(false) }
   }
 
   const openAssignModal = () => {
     setSelectedSup(formation?.superviseur || '')
     setAssignError('')
-    loadSuperviseurs()
+    setEncadrantSearch('')
     setShowAssignModal(true)
   }
+
+  useEffect(() => {
+    if (showAssignModal) encadrantPicker.resetPage()
+  }, [encadrantSearch])
+
+  useEffect(() => {
+    if (!showAssignModal) return
+    const t = setTimeout(() => loadSuperviseurs(), 300)
+    return () => clearTimeout(t)
+  }, [encadrantSearch, showAssignModal, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {
     if (!selectedSup) { setAssignError('Veuillez sélectionner un encadrant'); return }
@@ -309,7 +345,7 @@ export default function FormationDetail() {
       setShowAssignModal(false)
       loadFormationData()
     } catch (err) {
-      setAssignError(err.response?.data?.detail || 'Erreur lors de l\'assignation')
+      setAssignError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de l\'assignation de l\'encadrant.' }))
     }
   }
 
@@ -323,7 +359,10 @@ export default function FormationDetail() {
       const enrolled = new Set(participants.map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setAddLoading(false) }
+    } catch (err) {
+      console.error('Chargement auditeurs:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+    } finally { setAddLoading(false) }
   }
 
   const openAddParticipant = () => {
@@ -479,10 +518,10 @@ export default function FormationDetail() {
     }
     setSavingSession(true)
     try {
-      await api.patch(`/formations/${id}/sessions/${editSession.id}/update/`, editSessionForm)
+      const res = await api.patch(`/formations/${id}/sessions/${editSession.id}/update/`, editSessionForm)
       setEditSession(null)
       loadFormationData()
-      showToast('Séance modifiée')
+      showToast(res.data?.detail || 'Séance modifiée')
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur lors de la modification', 'error')
     } finally { setSavingSession(false) }
@@ -491,12 +530,11 @@ export default function FormationDetail() {
   const getStatutBadge = (s) => ({ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[s] || 'badge-info')
   const getStatutLabel = (s) => ({ 'PLANIFIEE': 'Planifié', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminé', 'SUSPENDUE': 'Suspendu' }[s] || s)
 
-  const canEdit = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canEdit = canMutateFormations(user?.role)
+  const canSupervise = canSuperviseSessions(user?.role)
+  const canManageSessions = canMutateFormations(user?.role)
   const canImport = user?.role === 'SECRETARIAT'
-  const isDFRC = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
-  const canViewPresences = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewPresencesTab = canViewPresences(user?.role)
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (error || !formation) return (
@@ -536,7 +574,7 @@ export default function FormationDetail() {
         <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', paddingLeft: '1rem', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {[
             { key: 'info', label: 'Informations', icon: 'bi-info-circle', show: true },
-            { key: 'presences', label: 'Présences', icon: 'bi-person-check', show: canViewPresences },
+            { key: 'presences', label: 'Présences', icon: 'bi-person-check', show: canViewPresencesTab },
             { key: 'seances', label: `Séances (${sessions.length})`, icon: 'bi-calendar3', show: true },
             { key: 'participants', label: `Auditeurs (${participants.length})`, icon: 'bi-people', show: true },
             { key: 'formateurs', label: `Formateurs (${formateurs.length})`, icon: 'bi-person-video3', show: true },
@@ -749,7 +787,7 @@ export default function FormationDetail() {
           {dashboardLoading && <div className="loading"><div className="spinner"></div></div>}
 
           {dashboard && !dashboardLoading && (() => {
-            const canAction = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT', 'SECRETARIAT', 'CHEF_SECRETARIAT'].includes(user?.role)
+            const canAction = canPresenceAction(user?.role)
             const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
             const fmtMin = (m) => m != null ? `${Math.round(m)} min` : '—'
             const matricule = (p) => p.matricule || p.numero_matricule || p.numero || '—'
@@ -1382,22 +1420,73 @@ export default function FormationDetail() {
       {/* ── MODAL: Assign superviseur ── */}
       {showAssignModal && (
         <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-person-badge me-2"></i>Assigner un encadrant</h5>
               <button className="btn-close" onClick={() => setShowAssignModal(false)}>&times;</button>
             </div>
             <div className="modal-body">
               {assignError && <div className="alert alert-danger">{assignError}</div>}
-              <div className="form-group">
-                <label className="form-label">Encadrant</label>
-                <select className="form-control" value={selectedSup} onChange={e => setSelectedSup(e.target.value)}>
-                  <option value="">-- Sélectionner --</option>
-                  {superviseurs.map(s => (
-                    <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.username})</option>
-                  ))}
-                </select>
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Rechercher par nom, identifiant, matricule…"
+                  value={encadrantSearch}
+                  onChange={e => setEncadrantSearch(e.target.value)}
+                  autoFocus
+                />
               </div>
+              {encadrantLoading && (
+                <div className="text-center text-muted py-2">
+                  <div className="spinner" style={{ width: 20, height: 20 }}></div>
+                </div>
+              )}
+              {!encadrantLoading && superviseurs.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun encadrant trouvé</p>
+              )}
+              {!encadrantLoading && superviseurs.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Identifiant</th>
+                        <th>Matricule</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {superviseurs.map(s => {
+                        const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || s.username
+                        const isSelected = String(selectedSup) === String(s.id)
+                        return (
+                          <tr
+                            key={s.id}
+                            onClick={() => setSelectedSup(String(s.id))}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                          >
+                            <td>{fullName}</td>
+                            <td>{s.username}</td>
+                            <td>{s.matricule || '—'}</td>
+                            <td>
+                              {isSelected && <i className="bi bi-check-circle-fill text-success"></i>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Pagination
+                page={encadrantPicker.page}
+                totalPages={encadrantPicker.totalPages}
+                onPageChange={encadrantPicker.setPage}
+                totalItems={encadrantPicker.totalCount}
+                pageSize={encadrantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAssignModal(false)}>Annuler</button>

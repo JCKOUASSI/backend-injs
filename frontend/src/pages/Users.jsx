@@ -14,25 +14,8 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import { formatApiErrors } from '../utils/apiErrors'
 
-const ROLE_HIERARCHY = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
-const ALL_ROLES = ['DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT', 'FORMATEUR', 'AUDITEUR']
-const BADGE_ACCOUNT_ROLES = ['AUDITEUR', 'FORMATEUR']
-
-function getSubordinateRoles(role) {
-  const idx = ROLE_HIERARCHY.indexOf(role)
-  if (idx === -1) return []
-  return ROLE_HIERARCHY.slice(idx + 1)
-}
-
-function getCreatableRoles(role) {
-  const subordinates = getSubordinateRoles(role)
-  if (role === 'CHEF_CPFAE_ADMIN' && !subordinates.includes('DIRECTION')) {
-    return ['DIRECTION', ...subordinates]
-  }
-  return subordinates
-}
-const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
 const TAB_CONFIG = {
   personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
   auditeurs: { title: 'Comptes auditeurs', icon: 'bi-person-badge', createLabel: 'Nouveau compte auditeur', modalTitle: 'Nouveau compte auditeur' },
@@ -43,11 +26,20 @@ const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', 
 
 export default function Users() {
   const { user: currentUser } = useAuth()
-  const creatableRoles = getCreatableRoles(currentUser?.role).filter(r => ALL_ROLES.includes(r))
-  const staffRoleOptions = creatableRoles.filter(r => !BADGE_ACCOUNT_ROLES.includes(r))
-  const canManageAuditeurAccounts = creatableRoles.includes('AUDITEUR') && currentUser?.role !== 'DIRECTION'
-  const canManageFormateurAccounts = creatableRoles.includes('FORMATEUR') && currentUser?.role !== 'DIRECTION'
-  const showStaffSection = staffRoleOptions.length > 0
+  const roleContext = currentUser?.role_context || {}
+  const roleLabels = roleContext.labels || {}
+  const badgeAccountRoles = roleContext.badge_account_roles || ['AUDITEUR', 'FORMATEUR']
+  const canManageUsers = Boolean(roleContext.can_mutate_users)
+  const creatableRoles = canManageUsers ? (roleContext.manageable_roles || []) : []
+  const staffRoleOptions = creatableRoles.filter(r => !badgeAccountRoles.includes(r))
+  const staffFilterRoles = roleContext.staff_filter_roles?.length
+    ? roleContext.staff_filter_roles
+    : staffRoleOptions
+  const canManageAuditeurAccounts = canManageUsers && creatableRoles.includes('AUDITEUR')
+  const canManageFormateurAccounts = canManageUsers && creatableRoles.includes('FORMATEUR')
+  const showStaffSection = canManageUsers
+    ? staffRoleOptions.length > 0
+    : staffFilterRoles.length > 0
   const showAuditeursSection = canManageAuditeurAccounts
   const showFormateursSection = canManageFormateurAccounts
   const availableTabs = [
@@ -97,7 +89,10 @@ export default function Users() {
   useEffect(() => {
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Chargement secrétariats:', err)
+        showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les secrétariats.' }), 'error')
+      })
   }, [])
 
   const setUserTabAndReset = (tab) => {
@@ -112,7 +107,7 @@ export default function Users() {
       const params = new URLSearchParams({ page })
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (userTab === 'personnel') {
-        params.set('exclude_role', BADGE_ACCOUNT_ROLES.join(','))
+        params.set('exclude_role', badgeAccountRoles.join(','))
         if (roleFilter) params.set('role', roleFilter)
       } else if (userTab === 'auditeurs') {
         params.set('role', 'AUDITEUR')
@@ -126,8 +121,8 @@ export default function Users() {
       setTotalCount(count)
       setTotalPages(pages)
     } catch (err) {
-      setError('Erreur lors du chargement des utilisateurs')
-      console.error(err)
+      console.error('Chargement utilisateurs:', err)
+      setError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors du chargement des utilisateurs.' }))
     } finally { setLoading(false) }
   }
 
@@ -158,13 +153,8 @@ export default function Users() {
           : 'Utilisateur créé'
       )
     } catch (err) {
-      const data = err.response?.data
-      if (data && typeof data === 'object') {
-        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-        setFormError(msgs.join('\n'))
-      } else {
-        setFormError('Erreur lors de la création')
-      }
+      console.error('Création utilisateur:', err)
+      setFormError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la création de l\'utilisateur.' }))
     } finally { setSaving(false) }
   }
 
@@ -173,8 +163,14 @@ export default function Users() {
       message: 'Supprimer cet utilisateur ?',
       detail: 'Cette action est définitive.',
       onConfirm: async () => {
-        try { await api.delete(`/auth/users/${id}/`); loadUsers(); showToast('Utilisateur supprimé') }
-        catch { showToast('Erreur lors de la suppression', 'error') }
+        try {
+          await api.delete(`/auth/users/${id}/`)
+          loadUsers()
+          showToast('Utilisateur supprimé')
+        } catch (err) {
+          console.error('Suppression utilisateur:', err)
+          showToast(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' }), 'error')
+        }
       }
     })
   }
@@ -210,13 +206,8 @@ export default function Users() {
       loadUsers()
       showToast('Utilisateur modifié')
     } catch (err) {
-      const data = err.response?.data
-      if (data && typeof data === 'object') {
-        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-        setEditError(msgs.join('\n'))
-      } else {
-        setEditError('Erreur lors de la modification')
-      }
+      console.error('Modification utilisateur:', err)
+      setEditError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la modification de l\'utilisateur.' }))
     } finally { setSaving(false) }
   }
 
@@ -228,11 +219,11 @@ export default function Users() {
   const tabMeta = TAB_CONFIG[userTab] || TAB_CONFIG.personnel
   const listTitle = tabMeta.title
   const listIcon = tabMeta.icon
-  const canCreateOnTab = userTab === 'personnel'
+  const canCreateOnTab = canManageUsers && (userTab === 'personnel'
     ? staffRoleOptions.length > 0
     : userTab === 'auditeurs'
       ? canManageAuditeurAccounts
-      : canManageFormateurAccounts
+      : canManageFormateurAccounts)
   const createRoleForTab = userTab === 'auditeurs' ? 'AUDITEUR' : userTab === 'formateurs' ? 'FORMATEUR' : staffRoleOptions[0]
   const matriculeLabel = userTab === 'formateurs'
     ? 'N° badge formateur'
@@ -272,11 +263,11 @@ export default function Users() {
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
             </div>
-            {userTab === 'personnel' && staffRoleOptions.length > 0 && (
+            {userTab === 'personnel' && staffFilterRoles.length > 0 && (
               <div>
                 <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
                   <option value="">Tous les rôles</option>
-                  {staffRoleOptions.map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                  {staffFilterRoles.map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
                 </select>
               </div>
             )}
@@ -329,7 +320,7 @@ export default function Users() {
                         <td>{u.matricule || '-'}</td>
                         <td>{u.email || '-'}</td>
                         <td>
-                          <span className={`badge ${getRoleBadge(u.role)}`}>{ROLE_LABELS[u.role] || u.role}</span>
+                          <span className={`badge ${getRoleBadge(u.role)}`}>{roleLabels[u.role] || u.role}</span>
                           {u.secretariat_nom && <><br/><small className="text-muted">{u.secretariat_nom}</small></>}
                         </td>
                         <td>{u.telephone || '-'}</td>
@@ -340,12 +331,12 @@ export default function Users() {
                         </td>
                         <td>
                           <div className="btn-group">
-                            {creatableRoles.includes(u.role) && (
+                            {canManageUsers && creatableRoles.includes(u.role) && (
                               <button onClick={() => openEdit(u)} className="btn btn-outline-primary btn-sm" title="Modifier">
                                 <i className="bi bi-pencil"></i>
                               </button>
                             )}
-                            {creatableRoles.includes(u.role) && (
+                            {canManageUsers && creatableRoles.includes(u.role) && (
                               <button onClick={() => handleDelete(u.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
                                 <i className="bi bi-trash"></i>
                               </button>
@@ -409,7 +400,7 @@ export default function Users() {
                   <div className="form-group">
                     <label className="form-label">Rôle *</label>
                     <select className="form-control" required value={form.role} onChange={e => setForm({...form, role: e.target.value, new_secretariat_nom: '', new_secretariat_type: ''})}>
-                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>)}
+                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
                     </select>
                     {form.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN') && (
                       <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
@@ -437,7 +428,7 @@ export default function Users() {
                   <label className="form-label">Mot de passe *</label>
                   <input type="password" className="form-control" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
                 </div>
-                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(form.role) && (
+                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(form.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={form.secretariat} onChange={e => setForm({...form, secretariat: e.target.value})}>
@@ -504,7 +495,7 @@ export default function Users() {
                     disabled={!creatableRoles.includes(editingUser?.role)}
                   >
                     {creatableRoles.map(r => (
-                      <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
+                      <option key={r} value={r}>{roleLabels[r] || r}</option>
                     ))}
                   </select>
                   {!creatableRoles.includes(editingUser?.role) && (
@@ -521,7 +512,7 @@ export default function Users() {
                     ) : null
                   })()}
                 </div>
-                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(editForm.role) && (
+                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(editForm.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={editForm.secretariat} onChange={e => setEditForm({...editForm, secretariat: e.target.value})}>

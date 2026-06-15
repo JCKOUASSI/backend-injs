@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
-import { formatMoney } from '../components/FinanceStatsGrid'
+import { formatMoney, fmtDuration } from '../components/FinanceStatsGrid'
 import FinancePageShell, { FinanceNavActions } from '../components/finance/FinancePageShell'
 import FinanceDetailModal from '../components/finance/FinanceDetailModal'
 import {
@@ -15,8 +15,7 @@ import {
   FINANCE_EXPORT_MONTANTS_KEY,
   FINANCE_QUERY_STORAGE_KEY,
   loadFinanceExportMontants,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
   saveFinanceExportMontants,
   saveFinancePeriod,
 } from '../utils/financePeriod'
@@ -29,6 +28,7 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import { canMutateFormations } from '../utils/roles'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
 
@@ -44,7 +44,6 @@ export default function Formateurs() {
   const canViewFinanceData = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canEditFormateurSensitive = user?.role === 'FINANCE'
   const [searchParams] = useSearchParams()
-  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const listExtras = readFormateursListExtras(searchParams)
   const [formateurs, setFormateurs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,15 +66,12 @@ export default function Formateurs() {
   const [financeDetailTab, setFinanceDetailTab] = useState('statistiques')
   const [exportAfficherMontants, setExportAfficherMontants] = useState(() => loadFinanceExportMontants(true))
   const [exportingSynthese, setExportingSynthese] = useState(false)
-  const [financePeriod, setFinancePeriod] = useState(
-    () => urlFinance?.period ?? loadFinancePeriod(),
-  )
+  const [exportingEncadrants, setExportingEncadrants] = useState(false)
+  const [financePeriod, setFinancePeriod] = useState(() => resolveFinancePeriod())
   const [financePeriodeInfo, setFinancePeriodeInfo] = useState(null)
 
   const debouncedSearch = useDebounce(search)
-  const [appliedFinancePeriod, setAppliedFinancePeriod] = useState(
-    () => urlFinance?.period ?? loadFinancePeriod(),
-  )
+  const [appliedFinancePeriod, setAppliedFinancePeriod] = useState(() => resolveFinancePeriod())
   const syncFormateursQuery = () => buildFormateursListSearchParams(
     page,
     debouncedSearch,
@@ -192,14 +188,8 @@ export default function Formateurs() {
     })
   }
 
-  const canEdit = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canDelete = !canViewFinanceData && ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const formatDuration = (minutes) => {
-    const value = Number(minutes || 0)
-    const hours = Math.floor(value / 60)
-    const remaining = Math.round(value % 60)
-    return `${hours}h ${remaining}min`
-  }
+  const canEdit = !canViewFinanceData && canMutateFormations(user?.role)
+  const canDelete = !canViewFinanceData && canMutateFormations(user?.role)
 
   const formatDate = (value) => {
     if (!value) return '-'
@@ -236,6 +226,25 @@ export default function Formateurs() {
     }
   }
 
+  const exportFinanceEncadrants = async (format) => {
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
+    const qs = buildFinanceQuery(appliedFinancePeriod).toString()
+    const base = format === 'pdf'
+      ? '/exports/finance/encadrants/pdf/'
+      : '/exports/finance/encadrants/excel/'
+    const path = qs ? `${base}?${qs}` : base
+    setExportingEncadrants(true)
+    try {
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || `liste_encadrants.${ext}`)
+      showToast(`Liste encadrants exportée (${ext.toUpperCase()})`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur export encadrants', 'error')
+    } finally {
+      setExportingEncadrants(false)
+    }
+  }
+
   const exportFinanceSynthese = async (format) => {
     const ext = format === 'pdf' ? 'pdf' : 'xlsx'
     const params = buildFinanceExportQuery(appliedFinancePeriod, exportAfficherMontants)
@@ -247,13 +256,32 @@ export default function Formateurs() {
     const path = qs ? `${base}?${qs}` : base
     setExportingSynthese(true)
     try {
-      const blob = await api.getBlob(path)
-      downloadBlob(blob, `fiche_paie_globale.${ext}`)
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || `fiche_paie_globale.${ext}`)
       showToast(`Fiche de paie globale (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export consolidé', 'error')
     } finally {
       setExportingSynthese(false)
+    }
+  }
+
+  const reloadFinanceDetail = async (formateurId = financeDetail?.id) => {
+    if (!formateurId) return
+    setFinanceDetailLoading(true)
+    try {
+      const periodQs = buildFinanceQuery(appliedFinancePeriod).toString()
+      const res = await api.get(
+        `/formations/formateurs/finance-report/?formateur_id=${formateurId}${periodQs ? `&${periodQs}` : ''}`
+      )
+      const rows = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      const row = rows[0]
+      if (row) setFinanceDetail(row)
+      if (res.data?.periode) setFinancePeriodeInfo(res.data.periode)
+    } catch {
+      showToast('Impossible de recharger le détail', 'error')
+    } finally {
+      setFinanceDetailLoading(false)
     }
   }
 
@@ -338,6 +366,26 @@ export default function Formateurs() {
                 <i className="bi bi-file-earmark-pdf me-1"></i>
                 {exportingSynthese ? 'Export…' : 'Paie globale PDF'}
               </button>
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm"
+                disabled={exportingEncadrants || loading}
+                onClick={() => exportFinanceEncadrants('excel')}
+                title="Liste encadrants : groupe, volumes planifié et réalisé"
+              >
+                <i className="bi bi-person-badge me-1"></i>
+                {exportingEncadrants ? 'Export…' : 'Encadrants Excel'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                disabled={exportingEncadrants || loading}
+                onClick={() => exportFinanceEncadrants('pdf')}
+                title="Liste encadrants PDF"
+              >
+                <i className="bi bi-file-earmark-pdf me-1"></i>
+                {exportingEncadrants ? 'Export…' : 'Encadrants PDF'}
+              </button>
             </div>
           </div>
         </div>
@@ -384,8 +432,8 @@ export default function Formateurs() {
                         <td className="small">{f.grades || '—'}</td>
                         <td className="small">{f.groupes || '—'}</td>
                         <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_minutes)}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{formatDuration(f.total_duree_realisee_minutes)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_minutes)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_realisee_minutes)}</td>
                         <td>
                           <div>{taux}%</div>
                           <div className="finance-taux-bar">
@@ -455,7 +503,7 @@ export default function Formateurs() {
             financeDetailTab={financeDetailTab}
             setFinanceDetailTab={setFinanceDetailTab}
             onClose={() => !financeDetailLoading && setFinanceDetail(null)}
-            formatDuration={formatDuration}
+            formatDuration={fmtDuration}
             formatDate={formatDate}
             exportFinanceSummary={exportFinanceSummary}
             exportAfficherMontants={exportAfficherMontants}
@@ -466,6 +514,8 @@ export default function Formateurs() {
               setFinanceDetail((prev) => prev ? { ...prev, ...data } : prev)
             }}
             financeStatsForGrid={financeStatsForGrid}
+            canProposeAjustement
+            onRefreshDetail={() => reloadFinanceDetail()}
           />
         )}
       </FinancePageShell>
@@ -541,10 +591,10 @@ export default function Formateurs() {
                           <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
                         )}
                         {canViewFinanceData && (
-                          <td><span className="badge-bg-info">{formatDuration(f.total_duree_minutes)}</span></td>
+                          <td><span className="badge-bg-info">{fmtDuration(f.total_duree_minutes)}</span></td>
                         )}
                         {canViewFinanceData && (
-                          <td><span className="badge-bg-success">{formatDuration(f.total_duree_realisee_minutes)}</span></td>
+                          <td><span className="badge-bg-success">{fmtDuration(f.total_duree_realisee_minutes)}</span></td>
                         )}
                         {canViewFinanceData && (
                           <td>{(f.statistiques?.taux_realisation_pct ?? 0)}%</td>

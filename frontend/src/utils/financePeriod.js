@@ -64,6 +64,9 @@ export const saveFinanceFilters = (filters) => {
   }
 }
 
+/** Période partagée (dashboard, finance, stats) — sessionStorage, pas l’URL (évite un ?preset= obsolète). */
+export const resolveFinancePeriod = () => loadFinancePeriod()
+
 export const loadFinancePeriod = () => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
@@ -118,6 +121,11 @@ export const buildFinancePeriodQuery = (period) => {
     if (period.dateFin) p.set('date_fin', period.dateFin)
   }
   return p
+}
+
+export const appendPeriodToSearchParams = (params, period) => {
+  const q = buildFinancePeriodQuery(period)
+  q.forEach((value, key) => params.set(key, value))
 }
 
 export const buildFinanceQuery = (period) => buildFinancePeriodQuery(period)

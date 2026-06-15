@@ -20,7 +20,6 @@ from formations.models import (
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
-from formations.session_views import _auto_manage_sessions
 from .models import Pointage, DeviceBinding, AuditLog, _log_audit
 from .serializers import (
     PointageSerializer,
@@ -279,23 +278,9 @@ def _check_fenetre_entree(seance):
 
 
 def _clamp_to_seance(ts, seance):
-    """
-    Borne un timestamp aux heures prévues de la séance.
-    - Si ts est avant heure_debut_prevue → retourne heure_debut_prevue
-    - Si ts est après heure_fin_prevue   → retourne heure_fin_prevue
-    - Sinon retourne ts tel quel.
-    """
-    if seance is None:
-        return ts
-    from datetime import datetime
-    local_ts = timezone.localtime(ts)
-    date = local_ts.date()
-    tz = local_ts.tzinfo
-    if seance.heure_debut_prevue and local_ts.time() < seance.heure_debut_prevue:
-        return timezone.make_aware(datetime.combine(date, seance.heure_debut_prevue), tz)
-    if seance.heure_fin_prevue and local_ts.time() > seance.heure_fin_prevue:
-        return timezone.make_aware(datetime.combine(date, seance.heure_fin_prevue), tz)
-    return ts
+    """Borne un timestamp aux heures prévues de la séance (règle commune ``presences.duree``)."""
+    from .duree import clamp_to_seance
+    return clamp_to_seance(ts, seance)
 
 
 def _resolve_authenticated_personne(user):
@@ -436,6 +421,19 @@ def _check_geofence(module, latitude, longitude, accuracy_m=None):
 # ENDPOINT /api/scan/ — Participants & Formateurs
 # ──────────────────────────────────────────────
 
+def _public_scan_disabled_response():
+    return Response(
+        {
+            'code': 'SCAN_DISABLED',
+            'detail': (
+                'Le badgeage public est désactivé. '
+                'Utilisez l\'application mobile QR Badge pour pointer.'
+            ),
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -445,7 +443,12 @@ def scan_view(request):
     Endpoint de scan QR — gère ENTREE et SORTIE pour participants (P0001) et formateurs (F0001).
 
     body: { token_qr, numero_participant, device_id }
+
+    Désactivé en production sauf PUBLIC_QR_SCAN_ENABLED=True (voir settings).
+    Préférer /api/scan/secure/ (JWT + profil lié + géofence).
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
     serializer = ScanSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
@@ -1403,18 +1406,42 @@ def _pointages_queryset_for_personne(personne, type_str, user=None):
 def _pointage_historique_item(pt):
     module = pt.session.module if pt.session_id else None
     formation = module.formation if module and module.formation_id else None
+    session = pt.session if pt.session_id else None
     return {
         'id': pt.id,
         'formation_id': formation.pk if formation else None,
         'formation_titre': formation.formation if formation else '',
         'module_intitule': module.intitule if module else '',
-        'seance_numero': pt.session.numero if pt.session_id else None,
-        'seance_intitule': pt.session.intitule if pt.session_id else '',
+        'seance_numero': session.numero if session else None,
+        'seance_intitule': session.intitule if session else '',
         'date_journee': str(pt.date_journee),
         'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
         'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
         'duree_presence_minutes': float(pt.duree_presence_minutes) if pt.duree_presence_minutes else None,
         'statut': pt.statut,
+        'statut_label': pt.get_statut_display(),
+        # ── Détails du badgeage ──
+        'device_id': pt.device_id or None,
+        'geolocalisation': {
+            'latitude': pt.last_latitude,
+            'longitude': pt.last_longitude,
+            'precision_m': pt.last_accuracy_m,
+        } if pt.last_latitude is not None else None,
+        'appareil': {
+            'batterie_pct': pt.last_battery_level,
+            'en_charge': pt.last_is_charging,
+        } if pt.last_battery_level is not None else None,
+        # ── Détails de présence ──
+        'last_heartbeat_at': pt.last_heartbeat_at.isoformat() if pt.last_heartbeat_at else None,
+        'sorties_geofence_count': pt.outside_geofence_count,
+        # ── Détails du temps de cours (séance) ──
+        'temps_cours': {
+            'heure_debut_prevue': session.heure_debut_prevue.isoformat() if session and session.heure_debut_prevue else None,
+            'heure_fin_prevue': session.heure_fin_prevue.isoformat() if session and session.heure_fin_prevue else None,
+            'demarree_le': session.demarree_le.isoformat() if session and session.demarree_le else None,
+            'terminee_le': session.terminee_le.isoformat() if session and session.terminee_le else None,
+            'auto_demarrage': session.auto_demarrage if session else None,
+        } if session else None,
     }
 
 
@@ -1639,8 +1666,6 @@ def formation_dashboard(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    _auto_manage_sessions(formation)
-
     date_str = request.GET.get('date')
     if date_str:
         try:
@@ -1736,9 +1761,8 @@ def formation_dashboard(request, pk):
         p_data['nb_sessions'] = len(sessions)
 
         if session_ouverte:
-            duree_session = round(
-                (now - session_ouverte.timestamp_entree).total_seconds() / 60, 2
-            )
+            from .duree import pointage_minutes_clampees
+            duree_session = pointage_minutes_clampees(session_ouverte, now=now)
             p_data['timestamp_entree'] = session_ouverte.timestamp_entree
             p_data['duree_actuelle_minutes'] = round(total_termine + duree_session, 2)
             return 'en_salle', p_data
@@ -2246,6 +2270,87 @@ def participant_historique(request, pk):
 
 
 # ──────────────────────────────────────────────
+# PARTICIPANT — Fiche complète (Secrétariat / Direction)
+# ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def participant_fiche_admin(request, pk):
+    """Fiche complète d'un participant avec historique détaillé (badgeage, présence, temps de cours).
+
+    Accès : ADMIN, SECRETARIAT, CHEF_SECRETARIAT, CPFAE_ADMIN, CHEF_CPFAE_ADMIN, ENCADRANT (complet).
+    Lecture seule : DIRECTION, FINANCE.
+    """
+    user = request.user
+    role = getattr(user, 'role', None)
+
+    # Permissions : accès complet ou lecture seule
+    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
+    read_only_roles = {'DIRECTION', 'FINANCE'}
+
+    if role not in full_access_roles and role not in read_only_roles:
+        return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Vérifier le périmètre pour les secrétariats
+    if role == 'SECRETARIAT' and getattr(user, 'secretariat', None):
+        from formations.models import Participant
+        try:
+            participant = Participant.objects.get(pk=pk, secretariat=user.secretariat)
+        except Participant.DoesNotExist:
+            return Response({'detail': 'Auditeur introuvable ou hors périmètre.'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        from formations.models import Participant
+        try:
+            participant = Participant.objects.get(pk=pk)
+        except Participant.DoesNotExist:
+            return Response({'detail': 'Auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Récupérer les modules inscrits
+    from formations.models import ModuleParticipant
+    inscriptions = (
+        ModuleParticipant.objects.filter(participant=participant)
+        .select_related('module__formation', 'module__secretariat', 'module__site')
+        .order_by('-inscrit_le')
+    )
+    modules_data = []
+    for ins in inscriptions:
+        module = ins.module
+        site_label = module.site.nom if module.site_id else (module.site_legacy or '')
+        modules_data.append({
+            'id': module.id,
+            'formation_id': module.formation_id,
+            'formation': module.formation.formation if module.formation_id else '',
+            'module': module.intitule,
+            'grade': module.grade or '',
+            'groupe': module.groupe or '',
+            'vague': module.vague or '',
+            'site': site_label,
+            'date_debut': str(module.date_debut) if module.date_debut else None,
+            'date_fin': str(module.date_fin) if module.date_fin else None,
+            'statut': module.statut,
+            'secretariat_nom': module.secretariat.nom if module.secretariat_id else None,
+            'inscrit_le': ins.inscrit_le.isoformat() if ins.inscrit_le else None,
+            'duree_prevue_heures': float(module.duree_prevue_heures or 0),
+        })
+
+    # Récupérer tous les pointages avec les détails complets
+    pointages_qs = Pointage.objects.filter(participant=participant).select_related('session__module__formation')
+    pointages_data = [_pointage_historique_item(pt) for pt in pointages_qs]
+
+    # Statistiques
+    stats = _compute_fiche_stats(pointages_qs)
+    stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
+    stats['nb_modules_inscrits'] = len(modules_data)
+
+    return Response({
+        'participant': ParticipantSerializer(participant).data,
+        'modules': modules_data,
+        'pointages': pointages_data,
+        'stats': stats,
+    })
+
+
+# ──────────────────────────────────────────────
 # PARTICIPANT — Lookup par numéro (pour app mobile R7)
 # ──────────────────────────────────────────────
 
@@ -2256,7 +2361,10 @@ def formation_offline_data(request, token):
     """
     Retourne les données d'une formation nécessaires au badgeage hors ligne.
     Authentification par token QR (pas besoin de login).
+    Désactivé si PUBLIC_QR_SCAN_ENABLED=False (aligné sur /api/scan/).
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
     try:
         qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
     except QRToken.DoesNotExist:
@@ -2579,7 +2687,11 @@ def check_badge_status(request):
     Retourne : { statut: 'ABSENT'|'EN_SALLE'|'TERMINE', action_suivante: 'ENTREE'|'SORTIE'|null,
                  nom, prenom, timestamp_entree, heure_entree }
     Endpoint public (lecture seule, pas de mutation).
+    Désactivé si PUBLIC_QR_SCAN_ENABLED=False.
     """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
+
     token_qr = request.GET.get('token_qr', '').strip()
     numero = request.GET.get('numero', '').strip()
 

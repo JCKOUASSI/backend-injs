@@ -18,9 +18,23 @@ import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
 import FinanceParametrage from './pages/FinanceParametrage'
+import FinanceAjustements from './pages/FinanceAjustements'
+import EvaluationList from './pages/EvaluationList'
+import EvaluationDetail from './pages/EvaluationDetail'
+import EvaluationDashboard from './pages/EvaluationDashboard'
+import AnalyseQualitative from './pages/AnalyseQualitative'
+import NotesModule from './pages/NotesModule'
 import ModulesListLink from './components/ModulesListLink'
-import { listHref, LIST_STORAGE_KEYS } from './utils/listFilters'
+import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
+import {
+  ADMIN_LEVEL_ROLES,
+  STATS_ALLOWED_ROLES,
+  STAFF_WEB_ROLES,
+  USERS_ALLOWED_ROLES,
+  IMPORT_ALLOWED_ROLES,
+  EVALUATION_ALLOWED_ROLES,
+} from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
 
@@ -36,6 +50,7 @@ function Layout({ children, breadcrumb }) {
   const { user } = useAuth()
   const location = useLocation()
   const path = location.pathname
+  const searchTab = new URLSearchParams(location.search).get('tab')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -55,18 +70,20 @@ function Layout({ children, breadcrumb }) {
   }
 
   const isFinanceRole = user?.role === 'FINANCE'
-  const canViewFinanceDashboard = ['FINANCE', 'DIRECTION'].includes(user?.role)
-  const canViewFinanceModule = canViewFinanceDashboard
-  const canViewParticipants = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
-  const canViewFormateurs = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const isSuperviseurRole = user?.role === 'SUPERVISEUR'
+  const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canViewFinanceDashboard = canViewFinanceModule
+  const canViewParticipants = [...STAFF_WEB_ROLES].includes(user?.role)
+  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
     || canViewFinanceModule
-  const canViewStatistiques = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT'].includes(user?.role)
-  const canViewUsers = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewSecretariats = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
-  const canViewImport = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewReferentiels = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
+  const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
+  const canViewImport = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canViewEvaluations = EVALUATION_ALLOWED_ROLES.includes(user?.role)
+  const canViewReferentiels = ADMIN_LEVEL_ROLES.includes(user?.role)
+  const canViewStatistiques = STATS_ALLOWED_ROLES.includes(user?.role)
 
-  const ROLE_LABELS = { DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
+  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
@@ -100,17 +117,23 @@ function Layout({ children, breadcrumb }) {
         )}
 
         <nav className="sidebar-nav">
-          {canViewFinanceDashboard && (
-            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard Finance</span></span>
-            </Link>
-          )}
-          {!isFinanceRole && (
+          
+          {!isFinanceRole && !isSuperviseurRole && (
             <Link to={listHref('/', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
           )}
-          {!isFinanceRole && (
+          {canViewFinanceDashboard && (
+            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
+            </Link>
+          )}
+          {canViewStatistiques && (
+            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
+            </Link>
+          )}
+          {!isFinanceRole && !isSuperviseurRole && (
             <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
@@ -148,6 +171,21 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-building"></i> <span className="nav-label">Secrétariats</span></span>
             </Link>
           )}
+          {isSuperviseurRole && (
+            <Link to="/evaluations?tab=dashboard" className={`nav-item ${isActive('/evaluations') && searchTab !== 'questionnaires' && !path.includes('/analyse') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard</span></span>
+            </Link>
+          )}
+          {isSuperviseurRole && (
+            <Link to="/evaluations?tab=questionnaires" className={`nav-item ${isActive('/evaluations') && searchTab === 'questionnaires' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
+            </Link>
+          )}
+          {canViewEvaluations && !isSuperviseurRole && (
+            <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
+            </Link>
+          )}
           {canViewImport && (
             <Link to="/import" className={`nav-item ${isActive('/import') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-file-earmark-excel"></i> <span className="nav-label">Import Excel</span></span>
@@ -156,11 +194,6 @@ function Layout({ children, breadcrumb }) {
           {canViewReferentiels && (
             <Link to={listHref('/referentiels', LIST_STORAGE_KEYS.referentiels)} className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-sliders"></i> <span className="nav-label">Référentiels</span></span>
-            </Link>
-          )}
-          {canViewStatistiques && (
-            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
         </nav>
@@ -205,9 +238,19 @@ function App() {
   function HomeRoute() {
     const { user } = useAuth()
     if (user?.role === 'FINANCE' || user?.role === 'DIRECTION') return <Navigate to="/finance-dashboard" replace />
+    if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
     return (
       <Layout breadcrumb={<li>Tableau de bord</li>}>
         <Dashboard />
+      </Layout>
+    )
+  }
+
+  function EvaluationRoute() {
+    const { user } = useAuth()
+    return (
+      <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Évaluations</li></>}>
+        {user?.role === 'SUPERVISEUR' ? <EvaluationDashboard /> : <EvaluationList />}
       </Layout>
     )
   }
@@ -231,42 +274,49 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/formations/:formationId/modules/:moduleId/notes" element={
+            <ProtectedRoute allowedRoles={[...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Notes</li></>}>
+                <NotesModule />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Détail</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/modules" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Cours</li></>}>
                 <Modules />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/participants" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formateurs" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'FINANCE']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
               </Layout>
@@ -274,8 +324,15 @@ function App() {
           } />
           <Route path="/finance-dashboard" element={
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Dashboard Finance</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord Finance</li></>}>
                 <FinanceDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance-ajustements" element={
+            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Ajustements Finance</li></>}>
+                <FinanceAjustements />
               </Layout>
             </ProtectedRoute>
           } />
@@ -287,35 +344,54 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/users" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={USERS_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Utilisateurs</li></>}>
                 <Users />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/secretariats" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']}>
+            <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Secrétariats</li></>}>
                 <Secretariats />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/import" element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={IMPORT_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Import Excel</li></>}>
                 <ImportExcel />
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/evaluations" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <EvaluationRoute />
+            </ProtectedRoute>
+          } />
+          <Route path="/evaluations/:id" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/evaluations">Évaluations</Link></li><li className="separator">/</li><li>Détail</li></>}>
+                <EvaluationDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/evaluations/:id/analyse" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/evaluations">Évaluations</Link></li><li className="separator">/</li><li>Analyse qualitative</li></>}>
+                <AnalyseQualitative />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/referentiels" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']}>
+            <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Référentiels</li></>}>
                 <Referentiels />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/statistiques" element={
-            <ProtectedRoute allowedRoles={['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ENCADRANT']}>
+            <ProtectedRoute allowedRoles={STATS_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Statistiques</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <Statistiques />

@@ -4,8 +4,10 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
+from django.db import IntegrityError
 from django.db.models import Q
 
 from .serializers import (
@@ -16,12 +18,21 @@ from .serializers import (
     LoginSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsDFRC, IsSecretariatOrDFRC, get_subordinate_roles, get_creatable_roles, ROLE_HIERARCHY
+from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, ROLE_HIERARCHY, get_creatable_roles
+from .role_groups import ALLOWED_WEB_ROLES, user_role_context
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
 from presences.models import DeviceBinding, AuditLog, _log_audit
 
 User = get_user_model()
+
+# Rôles sans rattachement secrétariat sur le compte User (aligné serializers UserCreate/Update).
+USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
+    User.Role.CHEF_CPFAE_ADMIN,
+    User.Role.CPFAE_ADMIN,
+    User.Role.FINANCE,
+    User.Role.ENCADRANT,
+})
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +81,21 @@ def login_view(request):
         )
 
     device_id = request.data.get('device_id', '').strip()
+
+    if not device_id and user.role not in ALLOWED_WEB_ROLES:
+        if user.role == User.Role.AUDITEUR:
+            detail = 'Les comptes auditeur sont réservés à l\'application mobile.'
+        elif user.role == User.Role.FORMATEUR:
+            detail = 'Les comptes formateur sont réservés à l\'application mobile.'
+        else:
+            detail = 'Ce compte n\'a pas accès à la plateforme web.'
+        logger.warning(
+            'login_web_forbidden role=%s username=%r ip=%s',
+            user.role,
+            user.username,
+            client_ip,
+        )
+        return Response({'detail': detail}, status=status.HTTP_403_FORBIDDEN)
 
     if user.role in ('AUDITEUR', 'FORMATEUR', 'ENCADRANT'):
         from .profile_sync import sync_user_profile_links
@@ -122,11 +148,20 @@ def login_view(request):
     refresh['role'] = user.role
     refresh['full_name'] = user.get_full_name()
     refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
+    _log_audit(
+        action=AuditLog.Action.USER_LOGIN,
+        request=request,
+        cible_type='user',
+        cible_numero=user.username,
+        cible_nom=user.get_full_name() or user.username,
+        extra={'role': user.role, 'device_id': bool(device_id)},
+    )
     return Response({
         'access': str(refresh.access_token),
         'refresh': str(refresh),
         'must_change_password': bool(getattr(user, 'must_change_password', False)),
         'user': UserSerializer(user).data,
+        'role_context': user_role_context(user),
     })
 
 
@@ -136,11 +171,30 @@ def me_view(request):
     """Profil de l'utilisateur connecté : lecture ou mise à jour partielle des données personnelles."""
     user = request.user
     if request.method == 'GET':
-        return Response(UserSerializer(user).data)
+        data = UserSerializer(user).data
+        data['role_context'] = user_role_context(user)
+        return Response(data)
     serializer = UserSelfProfileSerializer(user, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     serializer.save()
-    return Response(UserSerializer(user).data)
+    _log_audit(
+        action=AuditLog.Action.USER_UPDATE,
+        request=request,
+        cible_type='user',
+        cible_numero=user.username,
+        cible_nom=user.get_full_name() or user.username,
+        extra={'self_profile': True, 'champs_modifies': list(request.data.keys())},
+    )
+    data = UserSerializer(user).data
+    data['role_context'] = user_role_context(user)
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def roles_view(request):
+    """Hiérarchie et périmètre de gestion des rôles pour l'utilisateur connecté."""
+    return Response(user_role_context(request.user))
 
 
 @api_view(['POST'])
@@ -149,23 +203,84 @@ def change_password_view(request):
     """Permet à l'utilisateur connecté de changer son propre mot de passe."""
     serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
+    was_forced_change = bool(getattr(request.user, 'must_change_password', False))
     request.user.set_password(serializer.validated_data['new_password'])
     if getattr(request.user, 'must_change_password', False):
         request.user.must_change_password = False
     request.user.save()
+    _log_audit(
+        action=AuditLog.Action.USER_PASSWORD_CHANGE,
+        request=request,
+        cible_type='user',
+        cible_numero=request.user.username,
+        cible_nom=request.user.get_full_name() or request.user.username,
+        extra={'first_login_change': was_forced_change},
+    )
     return Response({'detail': 'Mot de passe modifié avec succès.'})
+
+
+def _staff_users_queryset(user):
+    """Utilisateurs visibles/gérables par un compte personnel (hors auto-gestion)."""
+    subordinates = get_creatable_roles(user.role)
+    qs = User.objects.filter(role__in=subordinates)
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        # Encadrants : assignables sur tout secrétariat, donc listés globalement.
+        qs = qs.filter(Q(role=User.Role.ENCADRANT) | Q(secretariat=user.secretariat))
+    return qs
 
 
 class UserListCreateView(generics.ListCreateAPIView):
     """DFRC/Secrétariat : lister et créer des utilisateurs."""
     permission_classes = [IsSecretariatOrDFRC]
 
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsUserMutationAllowed()]
+        return [IsSecretariatOrDFRC()]
+
+    def create(self, request, *args, **kwargs):
+        try:
+            response = super().create(request, *args, **kwargs)
+        except ValidationError as exc:
+            logger.warning(
+                'user_create_validation_failed actor=%s actor_role=%s detail=%s',
+                request.user.username,
+                request.user.role,
+                exc.detail,
+            )
+            raise
+        except IntegrityError as exc:
+            logger.error(
+                'user_create_integrity_failed actor=%s actor_role=%s payload=%s error=%s',
+                request.user.username,
+                request.user.role,
+                request.data,
+                exc,
+            )
+            raise ValidationError(
+                {'non_field_errors': ["Impossible de créer l'utilisateur : une contrainte d'unicité est violée (identifiant ou matricule déjà utilisé)."]}
+            ) from exc
+        except Exception as exc:
+            logger.exception(
+                'user_create_failed actor=%s actor_role=%s payload=%s',
+                request.user.username,
+                request.user.role,
+                request.data,
+            )
+            raise
+        logger.info(
+            'user_create_ok actor=%s actor_role=%s new_user_id=%s new_role=%s new_username=%s',
+            request.user.username,
+            request.user.role,
+            response.data.get('id'),
+            response.data.get('role'),
+            response.data.get('username'),
+        )
+        return response
+
     def get_queryset(self):
         user = self.request.user
-        subordinates = get_creatable_roles(user.role)
-        qs = User.objects.filter(role__in=subordinates).order_by('last_name', 'first_name')
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            qs = qs.filter(secretariat=user.secretariat)
+        qs = _staff_users_queryset(user).order_by('last_name', 'first_name')
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
@@ -195,11 +310,25 @@ class UserListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         plain_password = serializer.validated_data.get('password', '')
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and user.secretariat:
+        role = serializer.validated_data.get('role')
+        if (
+            user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT')
+            and user.secretariat
+            and role not in USER_ROLES_WITHOUT_SECRETARIAT
+        ):
             new_user = serializer.save(secretariat=user.secretariat)
         else:
             new_user = serializer.save()
-        send_welcome_email(new_user, plain_password)
+        try:
+            send_welcome_email(new_user, plain_password)
+        except Exception as exc:
+            logger.error(
+                'user_create_welcome_email_failed user_id=%s username=%s email=%s error=%s',
+                new_user.pk,
+                new_user.username,
+                new_user.email,
+                exc,
+            )
         _log_audit(
             action=AuditLog.Action.USER_CREATE,
             request=self.request,
@@ -214,12 +343,76 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """DFRC/Secrétariat : détail / modifier / supprimer un utilisateur."""
     permission_classes = [IsSecretariatOrDFRC]
 
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
+            return [IsUserMutationAllowed()]
+        return [IsSecretariatOrDFRC()]
+
+    def update(self, request, *args, **kwargs):
+        try:
+            response = super().update(request, *args, **kwargs)
+        except ValidationError as exc:
+            logger.warning(
+                'user_update_validation_failed actor=%s target_id=%s detail=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                exc.detail,
+            )
+            raise
+        except IntegrityError as exc:
+            logger.error(
+                'user_update_integrity_failed actor=%s target_id=%s payload=%s error=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                request.data,
+                exc,
+            )
+            raise ValidationError(
+                {'non_field_errors': ["Impossible de modifier l'utilisateur : une contrainte d'unicité est violée (identifiant ou matricule déjà utilisé)."]}
+            ) from exc
+        except Exception as exc:
+            logger.exception(
+                'user_update_failed actor=%s target_id=%s payload=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                request.data,
+            )
+            raise
+        logger.info(
+            'user_update_ok actor=%s target_id=%s role=%s username=%s',
+            request.user.username,
+            kwargs.get('pk'),
+            response.data.get('role'),
+            response.data.get('username'),
+        )
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        target_id = kwargs.get('pk')
+        try:
+            instance = self.get_object()
+            username = instance.username
+            role = instance.role
+            response = super().destroy(request, *args, **kwargs)
+        except Exception:
+            logger.exception(
+                'user_delete_failed actor=%s target_id=%s',
+                request.user.username,
+                target_id,
+            )
+            raise
+        logger.info(
+            'user_delete_ok actor=%s target_id=%s deleted_username=%s deleted_role=%s',
+            request.user.username,
+            target_id,
+            username,
+            role,
+        )
+        return response
+
     def get_queryset(self):
         user = self.request.user
-        subordinates = get_creatable_roles(user.role)
-        qs = User.objects.filter(role__in=subordinates)
-        if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            qs = qs.filter(secretariat=user.secretariat)
+        qs = _staff_users_queryset(user)
         if user.role == 'DIRECTION':
             qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
         return qs

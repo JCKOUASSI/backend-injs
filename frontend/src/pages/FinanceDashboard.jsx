@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
-import { fmtDuration, formatMoney } from '../components/FinanceStatsGrid'
+import { fmtDuration, fmtHeures, formatMoney } from '../components/FinanceStatsGrid'
 import FinancePageShell, { FinanceNavActions } from '../components/finance/FinancePageShell'
 import {
   buildFinanceListSearchParams,
   buildFinanceQuery,
   FINANCE_QUERY_STORAGE_KEY,
-  loadFinancePeriod,
-  readFinanceStateFromSearchParams,
+  resolveFinancePeriod,
   saveFinancePeriod,
 } from '../utils/financePeriod'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import FinanceModuleBreakdownModal from '../components/finance/FinanceModuleBreakdownModal'
+import FinanceToleranceBadge from '../components/finance/FinanceToleranceBadge'
 
 const maxActivite = (items) => Math.max(...items.map((i) => Number(i.minutes_realisees || 0)), 1)
 
@@ -28,7 +28,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_minutes',
-    sub: (kpis) => `${kpis.total_duree_heures ?? 0} h · ${kpis.total_sessions ?? 0} séance(s)`,
+    sub: (kpis) => `${fmtHeures(kpis.total_duree_heures)} h · ${kpis.total_sessions ?? 0} séance(s)`,
   },
   {
     id: 'realise',
@@ -38,7 +38,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_realisee_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_realisee_minutes',
-    sub: (kpis) => `${kpis.total_duree_realisee_heures ?? 0} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
+    sub: (kpis) => `${fmtHeures(kpis.total_duree_realisee_heures)} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
   },
   {
     id: 'taux',
@@ -104,7 +104,7 @@ function formatKpiValue(kpis, item) {
   const v = kpis[item.key]
   if (item.format === 'duration') return fmtDuration(v)
   if (item.format === 'money') return `${formatMoney(v)} FCFA`
-  if (item.format === 'hours') return `${v ?? 0} h`
+  if (item.format === 'hours') return `${fmtHeures(v)} h`
   return v ?? 0
 }
 
@@ -145,12 +145,11 @@ function EvolutionBadge({ evolution, kpiKey, format }) {
 
 export default function FinanceDashboard() {
   const [searchParams] = useSearchParams()
-  const urlFinance = readFinanceStateFromSearchParams(searchParams)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [period, setPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
-  const [appliedPeriod, setAppliedPeriod] = useState(() => urlFinance?.period ?? loadFinancePeriod())
+  const [period, setPeriod] = useState(() => resolveFinancePeriod())
+  const [appliedPeriod, setAppliedPeriod] = useState(() => resolveFinancePeriod())
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
   const [synthesePage, setSynthesePage] = useState(1)
   const [moduleDrill, setModuleDrill] = useState(null)
@@ -218,7 +217,7 @@ export default function FinanceDashboard() {
 
   return (
     <FinancePageShell
-      title="Dashboard Finance"
+      title="Tableau de Bord Finance"
       subtitle="Suivi des temps de cours et rémunération des formateurs"
       icon="bi-speedometer2"
       actions={<FinanceNavActions active="dashboard" />}
@@ -229,6 +228,19 @@ export default function FinanceDashboard() {
       periodeInfo={periode}
     >
       {error && <div className="error-message">{error}</div>}
+
+      {!loading && kpis.tolerance?.tolerance_active && (
+        <div className="alert alert-warning py-2 small mb-3">
+          <i className="bi bi-shield-check me-1"></i>
+          Tolérance active : {kpis.tolerance.tolerance_minutes} min ou {kpis.tolerance.tolerance_pct} % —
+          {' '}
+          <strong>{kpis.tolerance.formateurs_anomalie ?? 0}</strong> hors tolérance,
+          {' '}
+          <strong>{kpis.tolerance.formateurs_alerte ?? 0}</strong> dans la tolérance,
+          {' '}
+          <strong>{kpis.tolerance.formateurs_conformes ?? 0}</strong> conforme(s).
+        </div>
+      )}
 
       {!loading && kpis.tarifs_variables && (
         <div className="alert alert-info py-2 small mb-3">
@@ -419,6 +431,7 @@ export default function FinanceDashboard() {
                     <th>Mod.</th>
                     <th>Séances</th>
                     <th>Taux</th>
+                    <th>Statut</th>
                     <th>Planifié</th>
                     <th>Réalisé</th>
                     <th>Montant</th>
@@ -444,6 +457,9 @@ export default function FinanceDashboard() {
                             <div className="finance-taux-bar-fill" style={{ width: `${Math.min(100, taux)}%` }} />
                           </div>
                         </td>
+                        <td>
+                          <FinanceToleranceBadge tolerance={f.tolerance} showInactive />
+                        </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_realisee_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-green)' }}>
@@ -453,7 +469,7 @@ export default function FinanceDashboard() {
                     )
                   }) : (
                     <tr>
-                      <td colSpan="12">
+                      <td colSpan="13">
                         <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
                       </td>
                     </tr>

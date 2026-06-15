@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
@@ -11,6 +11,8 @@ import { useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
+import { canMutateFormations, canSuperviseSessions } from '../utils/roles'
+import { formatApiErrors } from '../utils/apiErrors'
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
@@ -40,6 +42,8 @@ export default function ModuleDetail() {
   const [selectedSup, setSelectedSup] = useState('')
   const [assignSupError, setAssignSupError] = useState('')
   const [assignSupSaving, setAssignSupSaving] = useState(false)
+  const [encadrantSearch, setEncadrantSearch] = useState('')
+  const [encadrantLoading, setEncadrantLoading] = useState(false)
 
   // Participants
   const [showAddParticipant, setShowAddParticipant] = useState(false)
@@ -59,6 +63,7 @@ export default function ModuleDetail() {
   const formateursPager = useClientPagination(formateursList, TABLE_PAGE_SIZE, [moduleId, formateursList.length])
   const participantPicker = usePickerPagination(showAddParticipant)
   const formateurPicker = usePickerPagination(showAddFormateur)
+  const encadrantPicker = usePickerPagination(showAssignSup)
 
   // Séances
   const [showNewSession, setShowNewSession] = useState(false)
@@ -79,9 +84,9 @@ export default function ModuleDetail() {
   const [bulkForceSaving, setBulkForceSaving] = useState(false)
   const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
 
-  const canSupervise = ['ENCADRANT', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageSessions = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canManageModule = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
+  const canSupervise = canSuperviseSessions(user?.role)
+  const canManageSessions = canMutateFormations(user?.role)
+  const canManageModule = canMutateFormations(user?.role)
 
   useEffect(() => { loadModule() }, [formationId, moduleId])
   useEffect(() => { api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {}) }, [])
@@ -94,12 +99,17 @@ export default function ModuleDetail() {
   }, [activeTab, formationId, moduleId])
 
   const loadModule = async (silent = false) => {
+    if (!formationId || !moduleId) {
+      if (!silent) setError('Formation ou module introuvable dans l\'URL.')
+      return
+    }
     if (!silent) setLoading(true)
     try {
       const res = await api.get(`/formations/${formationId}/modules/${moduleId}/full/`)
       setModule(res.data)
-    } catch {
-      if (!silent) setError('Erreur lors du chargement du module')
+    } catch (err) {
+      console.error('Chargement module:', err)
+      if (!silent) setError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors du chargement du module.' }))
     } finally {
       if (!silent) setLoading(false)
     }
@@ -154,8 +164,8 @@ export default function ModuleDetail() {
     if (!editSessionForm.date_journee) { showToast('La date est obligatoire.', 'error'); return }
     setSavingSession(true)
     try {
-      await api.patch(`/formations/${formationId}/sessions/${editSession.id}/update/`, editSessionForm)
-      setEditSession(null); loadModule(); showToast('Séance modifiée')
+      const res = await api.patch(`/formations/${formationId}/sessions/${editSession.id}/update/`, editSessionForm)
+      setEditSession(null); loadModule(); showToast(res.data?.detail || 'Séance modifiée')
     } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
     finally { setSavingSession(false) }
   }
@@ -170,7 +180,10 @@ export default function ModuleDetail() {
       const enrolled = new Set((module?.participants || []).map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setParticipantLoading(false) }
+    } catch (err) {
+      console.error('Chargement auditeurs module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+    } finally { setParticipantLoading(false) }
   }
 
   const openAddParticipant = () => {
@@ -221,7 +234,10 @@ export default function ModuleDetail() {
       const assigned = new Set((module?.formateurs || []).map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setFormateurLoading(false) }
+    } catch (err) {
+      console.error('Chargement formateurs module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+    } finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
@@ -391,19 +407,39 @@ export default function ModuleDetail() {
   }
 
   const loadEncadrants = async () => {
+    setEncadrantLoading(true)
     try {
-      const res = await api.get('/auth/users/?role=ENCADRANT')
+      const params = new URLSearchParams({
+        role: 'ENCADRANT',
+        page: encadrantPicker.page,
+      })
+      if (encadrantSearch) params.set('search', encadrantSearch)
+      const res = await api.get(`/auth/users/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setEncadrants(data)
-    } catch {}
+      encadrantPicker.applyResponse(res.data, data.length)
+    } catch (err) {
+      console.error('Chargement encadrants:', err)
+      setAssignSupError(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des encadrants.' }))
+    } finally { setEncadrantLoading(false) }
   }
 
   const openAssignSuperviseur = () => {
     setSelectedSup(module?.superviseur_id || '')
     setAssignSupError('')
-    loadEncadrants()
+    setEncadrantSearch('')
     setShowAssignSup(true)
   }
+
+  useEffect(() => {
+    if (showAssignSup) encadrantPicker.resetPage()
+  }, [encadrantSearch])
+
+  useEffect(() => {
+    if (!showAssignSup) return
+    const t = setTimeout(() => loadEncadrants(), 300)
+    return () => clearTimeout(t)
+  }, [encadrantSearch, showAssignSup, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {
     setAssignSupSaving(true)
@@ -417,7 +453,7 @@ export default function ModuleDetail() {
       loadModule()
       showToast(selectedSup ? 'Encadrant assigné' : 'Encadrant retiré')
     } catch (err) {
-      setAssignSupError(err.response?.data?.detail || "Erreur lors de l'assignation")
+      setAssignSupError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de l\'assignation de l\'encadrant.' }))
     } finally {
       setAssignSupSaving(false)
     }
@@ -463,6 +499,13 @@ export default function ModuleDetail() {
             <span className={`badge ${getStatutBadge(module.statut)}`}>{getStatutLabel(module.statut)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Link
+              to={`/formations/${formationId}/modules/${moduleId}/notes`}
+              className="btn btn-outline-primary btn-sm"
+              title="Saisir les notes des auditeurs"
+            >
+              <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
+            </Link>
             <button
               onClick={() => handleExportAllSeances('pdf')}
               className="btn btn-outline-danger btn-sm"
@@ -1629,7 +1672,7 @@ export default function ModuleDetail() {
       {/* ── MODAL: ASSIGNER ENCADRANT ── */}
       {showAssignSup && (
         <div className="modal-overlay" onClick={() => setShowAssignSup(false)}>
-          <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-person-gear me-2"></i>Assigner un encadrant</h5>
               <button className="btn-close" onClick={() => setShowAssignSup(false)}>&times;</button>
@@ -1638,22 +1681,76 @@ export default function ModuleDetail() {
               <p className="text-muted" style={{ fontSize: '0.88rem' }}>
                 Choisir l'encadrant superviseur pour le module « <strong>{module.intitule}</strong> ».
               </p>
-              <div className="form-group">
-                <label className="form-label">Encadrant</label>
-                <select
-                  className="form-control"
-                  value={selectedSup}
-                  onChange={e => setSelectedSup(e.target.value)}
-                >
-                  <option value="">-- Aucun (retirer l'encadrant) --</option>
-                  {encadrants.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.first_name} {u.last_name} {u.username ? `(${u.username})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
               {assignSupError && <div className="error-message">{assignSupError}</div>}
+              {module.superviseur_id && (
+                <button
+                  type="button"
+                  className={`btn btn-sm mb-3 ${!selectedSup ? 'btn-warning' : 'btn-outline-secondary'}`}
+                  onClick={() => setSelectedSup('')}
+                >
+                  <i className="bi bi-person-x me-1"></i>Retirer l'encadrant
+                </button>
+              )}
+              <div className="input-group mb-3">
+                <span className="input-group-text"><i className="bi bi-search"></i></span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Rechercher par nom, identifiant, matricule…"
+                  value={encadrantSearch}
+                  onChange={e => setEncadrantSearch(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              {encadrantLoading && (
+                <div className="text-center text-muted py-2">
+                  <div className="spinner" style={{ width: 20, height: 20 }}></div>
+                </div>
+              )}
+              {!encadrantLoading && encadrants.length === 0 && (
+                <p className="text-muted text-center py-2">Aucun encadrant trouvé</p>
+              )}
+              {!encadrantLoading && encadrants.length > 0 && (
+                <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Identifiant</th>
+                        <th>Matricule</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {encadrants.map(u => {
+                        const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
+                        const isSelected = String(selectedSup) === String(u.id)
+                        return (
+                          <tr
+                            key={u.id}
+                            onClick={() => setSelectedSup(String(u.id))}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                          >
+                            <td>{fullName}</td>
+                            <td>{u.username}</td>
+                            <td>{u.matricule || '—'}</td>
+                            <td>
+                              {isSelected && <i className="bi bi-check-circle-fill text-success"></i>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Pagination
+                page={encadrantPicker.page}
+                totalPages={encadrantPicker.totalPages}
+                onPageChange={encadrantPicker.setPage}
+                totalItems={encadrantPicker.totalCount}
+                pageSize={encadrantPicker.pageSize}
+              />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAssignSup(false)}>Annuler</button>

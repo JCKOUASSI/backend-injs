@@ -1,18 +1,35 @@
 """
 Session management views for the React frontend.
 """
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
+from presences.models import AuditLog, _log_audit, log_audit_system
 from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
+from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with_edt_balance
 
 
 REACTIVATION_GRACE_HOURS = 4
+AUTO_CLOSE_DELAY_MINUTES = 30
+TZ_LOCALE = ZoneInfo('Africa/Abidjan')
+
+
+def _session_audit_extra(session):
+    return {
+        'session_id': session.id,
+        'session_numero': session.numero,
+        'session_intitule': session.intitule or f'Séance {session.numero}',
+        'date_journee': str(session.date_journee),
+        'module_id': session.module_id,
+        'module_intitule': session.module.intitule,
+    }
 
 
 def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
@@ -120,62 +137,99 @@ def _has_unfinished_previous_session(session):
     ).exists()
 
 
+def _session_debut_prevu_local(session):
+    return datetime.combine(
+        session.date_journee, session.heure_debut_prevue, tzinfo=TZ_LOCALE,
+    )
+
+
+def _session_fin_prevue_local(session):
+    return datetime.combine(
+        session.date_journee, session.heure_fin_prevue, tzinfo=TZ_LOCALE,
+    )
+
+
+def _should_auto_start_session(session, local_now):
+    """
+    Démarrage auto si l'heure de début prévue est atteinte et que
+    l'encadrant n'a pas encore démarré la séance (``demarree_le`` encore vide).
+    """
+    if session.demarree_le is not None or session.terminee_le is not None:
+        return False
+    if not session.auto_demarrage or session.heure_debut_prevue is None:
+        return False
+    if session.date_journee != local_now.date():
+        return False
+    if local_now < _session_debut_prevu_local(session):
+        return False
+    return not _has_unfinished_previous_session(session)
+
+
+def _should_auto_close_session(session, local_now, *, delai_minutes=AUTO_CLOSE_DELAY_MINUTES):
+    """
+    Fermeture auto uniquement si l'heure de fin prévue est dépassée et que
+    l'encadrant n'a pas encore fermé la séance (``terminee_le`` encore vide).
+    Dans ce cas, on attend ``delai_minutes`` avant de clôturer automatiquement.
+    """
+    if (
+        session.demarree_le is None
+        or session.terminee_le is not None
+        or session.heure_fin_prevue is None
+    ):
+        return False
+    fin_prevue_local = _session_fin_prevue_local(session)
+    if local_now < fin_prevue_local:
+        return False
+    return local_now >= fin_prevue_local + timedelta(minutes=delai_minutes)
+
+
 def _auto_manage_sessions(formation):
     """
-    Auto-start sessions with auto_demarrage=True when heure_debut_prevue is reached.
-    Auto-close sessions when heure_fin_prevue is passed.
-    Called lazily whenever the session list is loaded.
+    Auto-start sessions when heure_debut_prevue is reached and the encadrant
+    has not started them yet. Auto-close sessions when heure_fin_prevue is
+    passed, the encadrant has not closed them yet, and AUTO_CLOSE_DELAY_MINUTES
+    has elapsed.
+
+    À appeler uniquement via la tâche planifiée ``manage.py auto_sessions``
+    (cron / service compose), jamais depuis un endpoint GET de lecture.
     """
     now = timezone.now()
     local_now = timezone.localtime(now)
-    today = local_now.date()
-    current_time = local_now.time()
 
-    sessions = SessionModule.objects.filter(module__formation=formation)
-    changed_formation = False
+    sessions = SessionModule.objects.filter(module__formation=formation).select_related('module__formation')
 
     modules_updated = set()
 
     for session in sessions:
         module = session.module
-        # Auto-start
-        if (
-            session.auto_demarrage
-            and session.demarree_le is None
-            and session.heure_debut_prevue is not None
-            and session.date_journee == today
-            and session.heure_debut_prevue <= current_time
-            and not _has_unfinished_previous_session(session)
-        ):
-            session.demarree_le = now
+        formation_obj = module.formation
+        # Auto-start si l'heure de début est passée et l'encadrant n'a pas démarré.
+        # ``demarree_le`` est posé à l'heure prévue (et non ``now``).
+        if _should_auto_start_session(session, local_now):
+            session.demarree_le = _session_debut_prevu_local(session)
             session.save(update_fields=['demarree_le'])
             if module.statut == 'PLANIFIEE':
                 module.statut = 'EN_COURS'
                 module.save(update_fields=['statut'])
                 modules_updated.add(module.pk)
+            log_audit_system(
+                AuditLog.Action.SEANCE_START,
+                formation=formation_obj,
+                extra={**_session_audit_extra(session), 'auto': True},
+            )
 
-        # Auto-close. ``terminee_le`` est borné à la fin prévue de la séance
-        # (combinaison ``date_journee`` + ``heure_fin_prevue``) pour éviter qu'une
-        # clôture tardive (chargement plusieurs heures après la fin) ne gonfle
-        # la durée effective utilisée par les statistiques de volume horaire.
-        if (
-            session.demarree_le is not None
-            and session.terminee_le is None
-            and session.heure_fin_prevue is not None
-            and (
-                session.date_journee < today
-                or (session.date_journee == today and session.heure_fin_prevue <= current_time)
-            )
-        ):
-            from datetime import datetime as _dt
-            from zoneinfo import ZoneInfo as _ZI
-            _tz = _ZI('Africa/Abidjan')
-            fin_prevue_local = _dt.combine(
-                session.date_journee, session.heure_fin_prevue, tzinfo=_tz,
-            )
-            session.terminee_le = fin_prevue_local
+        # Auto-close si l'heure de fin est passée, l'encadrant n'a pas fermé,
+        # et le délai de grâce est écoulé. ``terminee_le`` reste borné à la fin
+        # prévue pour ne pas gonfler la durée effective (volume horaire).
+        if _should_auto_close_session(session, local_now):
+            session.terminee_le = _session_fin_prevue_local(session)
             session.save(update_fields=['terminee_le'])
             QRToken.objects.filter(session=session, actif=True).update(actif=False)
+            log_audit_system(
+                AuditLog.Action.SEANCE_STOP,
+                formation=formation_obj,
+                extra={**_session_audit_extra(session), 'auto': True},
+            )
 
     # If all sessions of a module are terminated → mark module TERMINEE
     for module in formation.modules.all():
@@ -211,6 +265,12 @@ def session_start(request, formation_pk, session_pk):
         # Réouverture : ne pas fermer les séances des autres modules/groupes.
         reactiver_session_et_qr(session, close_other_open_sessions=False)
         session.refresh_from_db()
+        _log_audit(
+            action=AuditLog.Action.SEANCE_START,
+            request=request,
+            formation=formation,
+            extra={**_session_audit_extra(session), 'reactivation': True},
+        )
         return Response({
             'detail': 'Séance réactivée.',
             'session': SessionSerializer(session).data,
@@ -230,6 +290,13 @@ def session_start(request, formation_pk, session_pk):
     if module.statut == 'PLANIFIEE':
         module.statut = 'EN_COURS'
         module.save(update_fields=['statut'])
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_START,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
     
     return Response({
         'detail': 'Séance démarrée.',
@@ -264,6 +331,13 @@ def session_stop(request, formation_pk, session_pk):
     if remaining == 0:
         module.statut = 'TERMINEE'
         module.save(update_fields=['statut'])
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_STOP,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
     
     return Response({
         'detail': 'Séance terminée.',
@@ -316,6 +390,13 @@ def session_create(request, formation_pk, module_pk):
             status=400,
         )
 
+    _log_audit(
+        action=AuditLog.Action.SEANCE_CREATE,
+        request=request,
+        formation=formation,
+        extra=_session_audit_extra(session),
+    )
+
     return Response({
         'detail': 'Séance créée.',
         'session': SessionSerializer(session).data,
@@ -334,8 +415,16 @@ def session_delete(request, formation_pk, session_pk):
     
     if session.demarree_le:
         return Response({'detail': 'Impossible de supprimer une séance démarrée.'}, status=400)
-    
+
+    audit_extra = _session_audit_extra(session)
     session.delete()
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_DELETE,
+        request=request,
+        formation=formation,
+        extra=audit_extra,
+    )
     
     return Response({'detail': 'Séance supprimée.'}, status=204)
 
@@ -353,6 +442,10 @@ def session_update(request, formation_pk, session_pk):
     if session.terminee_le:
         return Response({'detail': 'Impossible de modifier une séance terminée.'}, status=400)
 
+    old_debut = session.heure_debut_prevue
+    old_fin = session.heure_fin_prevue
+    hours_changed = False
+
     if 'intitule' in request.data:
         session.intitule = request.data['intitule']
     if 'date_journee' in request.data:
@@ -362,18 +455,52 @@ def session_update(request, formation_pk, session_pk):
         session.date_journee = val
     if 'heure_debut_prevue' in request.data:
         session.heure_debut_prevue = request.data['heure_debut_prevue'] or None
+        hours_changed = True
     if 'heure_fin_prevue' in request.data:
         session.heure_fin_prevue = request.data['heure_fin_prevue'] or None
+        hours_changed = True
 
     try:
         session.full_clean()
-        session.save()
+        auto_adjustment = None
+        if hours_changed:
+            auto_adjustment = apply_session_edit_with_edt_balance(
+                session,
+                old_debut=old_debut,
+                old_fin=old_fin,
+            )
+        else:
+            session.save()
+    except SessionEdtBalanceError as e:
+        return Response({'detail': str(e)}, status=400)
     except Exception as e:
         return Response({'detail': str(e)}, status=400)
-    return Response({
-        'detail': 'Séance mise à jour.',
+
+    detail = 'Séance mise à jour.'
+    if auto_adjustment and auto_adjustment.get('message'):
+        detail = f"{detail} {auto_adjustment['message']}"
+
+    payload = {
+        'detail': detail,
         'session': SessionSerializer(session).data,
-    })
+    }
+    if auto_adjustment:
+        payload['auto_adjustment'] = {
+            'last_session_id': auto_adjustment.get('last_session_id'),
+            'delta_minutes': auto_adjustment.get('delta_minutes'),
+            'deleted_last': auto_adjustment.get('deleted_last', False),
+        }
+
+    _log_audit(
+        action=AuditLog.Action.SEANCE_UPDATE,
+        request=request,
+        formation=formation,
+        extra={
+            **_session_audit_extra(session),
+            'champs_modifies': list(request.data.keys()),
+        },
+    )
+    return Response(payload)
 
 
 @api_view(['GET'])
@@ -384,8 +511,6 @@ def session_list(request, formation_pk):
     formation = formation_accessible(request.user, formation_pk)
     if not formation:
         return Response({'detail': 'Formation introuvable ou non autorisée.'}, status=404)
-
-    _auto_manage_sessions(formation)
 
     # If module_id filter provided, return only that module's sessions
     module_id = request.query_params.get('module_id')

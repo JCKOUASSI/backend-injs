@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC, CanManageParticipant, CanManageModuleParticipant
@@ -13,6 +13,7 @@ from presences.models import AuditLog, _log_audit
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
+from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -44,10 +45,22 @@ def _participants_grade_filter(secretariat):
 
 
 def _secretariat_scope(user):
-    """Retourne le secrétariat de l'utilisateur si rôle SECRETARIAT, CHEF_SECRETARIAT ou ENCADRANT."""
-    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT'):
+    """Retourne le secrétariat de l'utilisateur si rôle SECRETARIAT ou CHEF_SECRETARIAT."""
+    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         return user.secretariat
     return None
+
+
+def _formations_queryset_for_user(user):
+    """Formations visibles selon le périmètre opérationnel de l'utilisateur."""
+    if user.role == 'ENCADRANT':
+        return Formation.objects.filter(modules__superviseur=user).distinct().order_by('id')
+    sec = _secretariat_scope(user)
+    if sec is not None:
+        if not sec:
+            return Formation.objects.none()
+        return Formation.objects.filter(modules__secretariat=sec).distinct().order_by('id')
+    return Formation.objects.all().order_by('id')
 
 
 def _secretariat_hint_from_matricule(matricule):
@@ -86,16 +99,16 @@ class FormationListCreateView(generics.ListCreateAPIView):
         return [IsSecretariatOrEncadrantOrDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            return Formation.objects.none() if not sec else Formation.objects.filter(
-                modules__secretariat=sec
-            ).distinct().order_by('id')
-        return Formation.objects.all().order_by('id')
+        return _formations_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save()
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATION_CREATE,
+            request=self.request,
+            formation=instance,
+            cible_nom=instance.formation,
+        )
 
 
 class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -108,13 +121,26 @@ class FormationDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [IsSecretariatOrEncadrantOrDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            return Formation.objects.none() if not sec else Formation.objects.filter(
-                modules__secretariat=sec
-            ).distinct().order_by('id')
-        return Formation.objects.all().order_by('id')
+        return _formations_queryset_for_user(self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATION_UPDATE,
+            request=self.request,
+            formation=instance,
+            cible_nom=instance.formation,
+        )
+
+    def perform_destroy(self, instance):
+        titre = instance.formation
+        _log_audit(
+            action=AuditLog.Action.FORMATION_DELETE,
+            request=self.request,
+            formation=instance,
+            cible_nom=titre,
+        )
+        instance.delete()
 
 
 # ──────────────────────────────────────────────
@@ -180,6 +206,8 @@ class ParticipantListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return participants_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
@@ -228,6 +256,8 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return participants_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
@@ -313,6 +343,24 @@ def add_participant_to_formation(request, pk):
         module = Module.objects.get(pk=module_pk, formation=formation)
     except Module.DoesNotExist:
         return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Vérification de compatibilité grade/catégorie
+    # Pour A : comparaison stricte du grade (A3≠A4). Pour B/C/D : comparaison par catégorie.
+    def _get_compat_key(g):
+        if not g:
+            return ''
+        g = g.strip().upper()
+        if g.startswith('A'):
+            return g  # A3, A4, A5... strict
+        return g[0] if g else ''  # B, C, D... par catégorie
+    p_compat = _get_compat_key(participant.grade)
+    mod_compat = _get_compat_key(module.grade)
+    if p_compat and mod_compat and p_compat != mod_compat:
+        return Response(
+            {'detail': f'Grade incompatible : le participant est {participant.grade}, '
+                      f'mais ce module est pour {module.grade}.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     fp, created = ModuleParticipant.objects.get_or_create(
         module=module,
@@ -491,9 +539,8 @@ def superviseur_formation_detail(request, pk):
 @permission_classes([IsDFRCOrEncadrant])
 def generate_qr(request, pk):
     """Superviseur : générer un QR code pour sa formation (R1)."""
-    try:
-        formation = Formation.objects.get(pk=pk, superviseur=request.user)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, pk)
+    if not formation:
         return Response(
             {'detail': 'Formation introuvable ou vous n\'êtes pas le superviseur assigné.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -546,6 +593,17 @@ def generate_qr(request, pk):
         expire_at=timezone.now() + delta,
     )
 
+    _log_audit(
+        action=AuditLog.Action.FORMATION_QR_GENERATE,
+        request=request,
+        formation=formation,
+        extra={
+            'session_id': session.id,
+            'session_numero': session.numero,
+            'token': str(qr_token.token),
+        },
+    )
+
     return Response({
         'detail': 'QR code généré avec succès.',
         'qr_token': QRTokenSerializer(qr_token).data,
@@ -556,9 +614,8 @@ def generate_qr(request, pk):
 @permission_classes([IsDFRCOrEncadrant])
 def get_active_qr(request, pk):
     """Superviseur : récupérer le QR token actif de sa formation."""
-    try:
-        formation = Formation.objects.get(pk=pk, superviseur=request.user)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, pk)
+    if not formation:
         return Response(
             {'detail': 'Formation introuvable ou non assignée.'},
             status=status.HTTP_404_NOT_FOUND,
@@ -582,30 +639,19 @@ def get_active_qr(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def qr_image(request, pk):
     """Génère l'image PNG du QR code actif d'une formation (A4 printable)."""
     import io
     import qrcode
     from django.http import HttpResponse
 
-    user_role = getattr(request.user, 'role', None)
-    if user_role == User.Role.ENCADRANT:
-        try:
-            formation = Formation.objects.get(pk=pk, superviseur=request.user)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-    else:
-        try:
-            formation = Formation.objects.get(pk=pk)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     qr_token = QRToken.objects.filter(
         session__module__formation=formation, actif=True
@@ -645,30 +691,19 @@ def qr_image(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def session_qr_image(request, pk, session_pk):
     """Génère l'image PNG du QR code actif d'une séance spécifique."""
     import io
     import qrcode
     from django.http import HttpResponse
 
-    user_role = getattr(request.user, 'role', None)
-    if user_role == User.Role.ENCADRANT:
-        try:
-            formation = Formation.objects.get(pk=pk, superviseur=request.user)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-    else:
-        try:
-            formation = Formation.objects.get(pk=pk)
-        except Formation.DoesNotExist:
-            return Response(
-                {'detail': 'Formation introuvable.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response(
+            {'detail': 'Formation introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     try:
         session = SessionModule.objects.get(pk=session_pk, module__formation=formation)
@@ -733,12 +768,24 @@ class FormateurListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return formateurs_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
                 return Formateur.objects.none()
             return Formateur.objects.filter(secretariats=sec).distinct()
         return Formateur.objects.all()
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_CREATE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
 
 
 class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -754,12 +801,34 @@ class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ENCADRANT':
+            return formateurs_queryset_for_user(user)
         sec = _secretariat_scope(user)
         if sec is not None:
             if not sec:
                 return Formateur.objects.none()
             return Formateur.objects.filter(secretariats=sec).distinct()
         return Formateur.objects.all()
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_UPDATE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.FORMATEUR_DELETE,
+            request=self.request,
+            cible_type='formateur',
+            cible_numero=instance.numerobadge,
+            cible_nom=f'{instance.nom} {instance.prenom}',
+        )
+        instance.delete()
 
 
 # ──────────────────────────────────────────────
@@ -772,12 +841,42 @@ class SecretariatListCreateView(generics.ListCreateAPIView):
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_CREATE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+
 
 class SecretariatDetailView(generics.RetrieveUpdateDestroyAPIView):
     """DFRC/Secrétariat : détail / modifier / supprimer un secrétariat."""
     queryset = Secretariat.objects.select_related('responsable').all()
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_UPDATE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+
+    def perform_destroy(self, instance):
+        _log_audit(
+            action=AuditLog.Action.SECRETARIAT_DELETE,
+            request=self.request,
+            cible_type='secretariat',
+            cible_numero=instance.numero or str(instance.pk),
+            cible_nom=instance.nom,
+        )
+        instance.delete()
 
 
 # ──────────────────────────────────────────────

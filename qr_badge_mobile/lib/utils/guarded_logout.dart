@@ -12,6 +12,16 @@ Future<bool> performGuardedLogout(BuildContext context) async {
   if (!context.mounted || entered == null) {
     return false;
   }
+  if (AppEnv.supervisorLogoutCode.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Code de déconnexion non configuré. Contactez un administrateur.',
+        ),
+      ),
+    );
+    return false;
+  }
   if (entered.trim() != AppEnv.supervisorLogoutCode) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

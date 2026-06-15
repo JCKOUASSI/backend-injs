@@ -1,4 +1,8 @@
 /* ═══ Module Finance — interface dédiée ═══ */
+.finance-ajustement-nested {
+  z-index: 1100;
+}
+
 .finance-page {
   --fin-green: #1b5e20;
   --fin-green-soft: #e8f5e9;
@@ -423,6 +427,29 @@
 }
 .finance-table tbody tr:last-child td {
   border-bottom: none;
+}
+.finance-groupe-header-row td {
+  background: #e3f2fd;
+  font-weight: 600;
+  border-bottom: 1px solid #bbdefb;
+}
+.finance-groupe-subtotal-row td {
+  background: #fff3e0;
+  border-bottom: 2px solid #ffe0b2;
+}
+.badge-bg-warning {
+  background: #f57c00;
+  color: #fff;
+  padding: 0.25em 0.5em;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+.badge-bg-danger {
+  background: #c62828;
+  color: #fff;
+  padding: 0.25em 0.5em;
+  border-radius: 6px;
+  font-size: 0.75rem;
 }
 .finance-rank-medal {
   display: inline-flex;
