@@ -8,7 +8,7 @@ from rest_framework import status
 from authentication.models import User
 from .models import (
     Formation, Module, Participant, Formateur,
-    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule, RefModule,
+    Secretariat, ModuleParticipant, ModuleFormateur, SessionModule, RefModule, RefFormation,
 )
 from .volume_horaire import compute_dashboard_volume_horaire
 
@@ -326,6 +326,18 @@ class ReferentielsAPITest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         for key in ('formations', 'modules', 'sites', 'batiments', 'salles', 'grades', 'groupes', 'grades_modules'):
             self.assertIn(key, res.data)
+
+    def test_referentiels_gestion(self):
+        RefFormation.objects.create(intitule='REF TEST', actif=True)
+        res = self.client.get('/api/formations/referentiels/gestion/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in (
+            'formations', 'modules', 'categories', 'grades', 'vagues',
+            'sites', 'batiments', 'salles', 'types_secretariat',
+        ):
+            self.assertIn(key, res.data)
+            self.assertIsInstance(res.data[key], list)
+        self.assertTrue(any(r['intitule'] == 'REF TEST' for r in res.data['formations']))
 
 
 # ──────────────────────────────────────────
