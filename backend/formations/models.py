@@ -937,3 +937,62 @@ class FinanceAjustement(models.Model):
             f"Ajustement {sign}{self.minutes_delta} min — "
             f"{self.formateur} / séance {self.session_id} ({self.get_statut_display()})"
         )
+
+
+class NoteModule(models.Model):
+    """Note obtenue par un auditeur (participant) pour un module donné."""
+
+    class Mention(models.TextChoices):
+        TRES_BIEN  = 'TRES_BIEN',  'Très bien'
+        BIEN       = 'BIEN',       'Bien'
+        ASSEZ_BIEN = 'ASSEZ_BIEN', 'Assez bien'
+        PASSABLE   = 'PASSABLE',   'Passable'
+        INSUFFISANT = 'INSUFFISANT', 'Insuffisant'
+
+    module = models.ForeignKey(
+        'Module',
+        on_delete=models.CASCADE,
+        related_name='notes',
+    )
+    participant = models.ForeignKey(
+        'Participant',
+        on_delete=models.CASCADE,
+        related_name='notes_modules',
+    )
+    note = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Note numérique (ex : 14.50)",
+    )
+    mention = models.CharField(
+        max_length=20,
+        choices=Mention.choices,
+        blank=True,
+        default='',
+        help_text="Mention calculée ou saisie manuellement",
+    )
+    observations = models.TextField(
+        blank=True,
+        default='',
+        help_text="Observations éventuelles du secrétariat",
+    )
+    saisie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notes_saisies',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('module', 'participant')
+        ordering = ['module', 'participant__nom', 'participant__prenom']
+        verbose_name = 'Note module'
+        verbose_name_plural = 'Notes modules'
+
+    def __str__(self):
+        return f"{self.participant} — {self.module.intitule} : {self.note}"

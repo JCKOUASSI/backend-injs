@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
@@ -99,12 +99,17 @@ export default function ModuleDetail() {
   }, [activeTab, formationId, moduleId])
 
   const loadModule = async (silent = false) => {
+    if (!formationId || !moduleId) {
+      if (!silent) setError('Formation ou module introuvable dans l\'URL.')
+      return
+    }
     if (!silent) setLoading(true)
     try {
       const res = await api.get(`/formations/${formationId}/modules/${moduleId}/full/`)
       setModule(res.data)
-    } catch {
-      if (!silent) setError('Erreur lors du chargement du module')
+    } catch (err) {
+      console.error('Chargement module:', err)
+      if (!silent) setError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors du chargement du module.' }))
     } finally {
       if (!silent) setLoading(false)
     }
@@ -494,6 +499,13 @@ export default function ModuleDetail() {
             <span className={`badge ${getStatutBadge(module.statut)}`}>{getStatutLabel(module.statut)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Link
+              to={`/formations/${formationId}/modules/${moduleId}/notes`}
+              className="btn btn-outline-primary btn-sm"
+              title="Saisir les notes des auditeurs"
+            >
+              <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
+            </Link>
             <button
               onClick={() => handleExportAllSeances('pdf')}
               className="btn btn-outline-danger btn-sm"
