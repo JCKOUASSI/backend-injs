@@ -1,11 +1,16 @@
+import logging
+
 from rest_framework.permissions import BasePermission
 
 from authentication.role_groups import (
     ROLE_GROUP_NAMES,
     ROLE_HIERARCHY,
+    USER_MUTATION_ROLES,
     get_subordinate_roles,
     get_creatable_roles,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     'ROLE_HIERARCHY',
@@ -26,6 +31,7 @@ __all__ = [
     'IsSecretariatOrEncadrant',
     'IsSecretariatOrDFRC',
     'IsSecretariatOrEncadrantOrDFRC',
+    'IsUserMutationAllowed',
 ]
 
 # Hiérarchie et helpers de création : source canonique authentication.role_groups
@@ -179,6 +185,31 @@ class IsSecretariatOrDFRC(BasePermission):
             request.user, 'DIRECTION', 'FINANCE', 'ENCADRANT',
         ) and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
+        return False
+
+
+class IsUserMutationAllowed(BasePermission):
+    """Création / modification / suppression de comptes utilisateurs."""
+
+    message = (
+        "Vous n'avez pas les droits pour créer ou modifier des comptes utilisateurs. "
+        "Réservé aux rôles : Administrateur, Chef CPFAE Admin, CPFAE Admin, "
+        "Chef Secrétariat et Secrétariat."
+    )
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        role = getattr(request.user, 'role', None)
+        if role in USER_MUTATION_ROLES:
+            return True
+        logger.warning(
+            'user_mutation_denied user=%s role=%s method=%s path=%s',
+            request.user.username,
+            role,
+            request.method,
+            getattr(request, 'path', ''),
+        )
         return False
 
 

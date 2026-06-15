@@ -14,6 +14,7 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import { formatApiErrors } from '../utils/apiErrors'
 
 const TAB_CONFIG = {
   personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
@@ -88,7 +89,10 @@ export default function Users() {
   useEffect(() => {
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch(() => {})
+      .catch((err) => {
+        console.error('Chargement secrétariats:', err)
+        showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les secrétariats.' }), 'error')
+      })
   }, [])
 
   const setUserTabAndReset = (tab) => {
@@ -117,8 +121,8 @@ export default function Users() {
       setTotalCount(count)
       setTotalPages(pages)
     } catch (err) {
-      setError('Erreur lors du chargement des utilisateurs')
-      console.error(err)
+      console.error('Chargement utilisateurs:', err)
+      setError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors du chargement des utilisateurs.' }))
     } finally { setLoading(false) }
   }
 
@@ -149,13 +153,8 @@ export default function Users() {
           : 'Utilisateur créé'
       )
     } catch (err) {
-      const data = err.response?.data
-      if (data && typeof data === 'object') {
-        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-        setFormError(msgs.join('\n'))
-      } else {
-        setFormError('Erreur lors de la création')
-      }
+      console.error('Création utilisateur:', err)
+      setFormError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la création de l\'utilisateur.' }))
     } finally { setSaving(false) }
   }
 
@@ -164,8 +163,14 @@ export default function Users() {
       message: 'Supprimer cet utilisateur ?',
       detail: 'Cette action est définitive.',
       onConfirm: async () => {
-        try { await api.delete(`/auth/users/${id}/`); loadUsers(); showToast('Utilisateur supprimé') }
-        catch { showToast('Erreur lors de la suppression', 'error') }
+        try {
+          await api.delete(`/auth/users/${id}/`)
+          loadUsers()
+          showToast('Utilisateur supprimé')
+        } catch (err) {
+          console.error('Suppression utilisateur:', err)
+          showToast(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' }), 'error')
+        }
       }
     })
   }
@@ -201,13 +206,8 @@ export default function Users() {
       loadUsers()
       showToast('Utilisateur modifié')
     } catch (err) {
-      const data = err.response?.data
-      if (data && typeof data === 'object') {
-        const msgs = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-        setEditError(msgs.join('\n'))
-      } else {
-        setEditError('Erreur lors de la modification')
-      }
+      console.error('Modification utilisateur:', err)
+      setEditError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la modification de l\'utilisateur.' }))
     } finally { setSaving(false) }
   }
 

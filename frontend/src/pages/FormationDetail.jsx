@@ -17,6 +17,7 @@ import {
   canSuperviseSessions,
   canViewPresences,
 } from '../utils/roles'
+import { formatApiErrors } from '../utils/apiErrors'
 
 export default function FormationDetail() {
   const { id } = useParams()
@@ -123,7 +124,10 @@ export default function FormationDetail() {
     try {
       const res = await api.get(`/formations/${id}/formateurs/`)
       setFormateurs(Array.isArray(res.data) ? res.data : [])
-    } catch {}
+    } catch (err) {
+      console.error('Chargement formateurs formation:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les formateurs.' }), 'error')
+    }
   }
 
   useEffect(() => {
@@ -140,7 +144,10 @@ export default function FormationDetail() {
       const assigned = new Set(formateurs.map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setFormateurLoading(false) }
+    } catch (err) {
+      console.error('Chargement liste formateurs:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+    } finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
@@ -308,7 +315,10 @@ export default function FormationDetail() {
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setSuperviseurs(data)
       encadrantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setEncadrantLoading(false) }
+    } catch (err) {
+      console.error('Chargement encadrants:', err)
+      setAssignError(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des encadrants.' }))
+    } finally { setEncadrantLoading(false) }
   }
 
   const openAssignModal = () => {
@@ -335,7 +345,7 @@ export default function FormationDetail() {
       setShowAssignModal(false)
       loadFormationData()
     } catch (err) {
-      setAssignError(err.response?.data?.detail || 'Erreur lors de l\'assignation')
+      setAssignError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de l\'assignation de l\'encadrant.' }))
     }
   }
 
@@ -349,7 +359,10 @@ export default function FormationDetail() {
       const enrolled = new Set(participants.map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setAddLoading(false) }
+    } catch (err) {
+      console.error('Chargement auditeurs:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+    } finally { setAddLoading(false) }
   }
 
   const openAddParticipant = () => {

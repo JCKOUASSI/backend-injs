@@ -37,6 +37,21 @@ def _empty_stats():
     }
 
 
+def _skip_account(entity_type, reason, *, entity_id=None, identifier=None, log=None):
+    """Journalise la raison d'un compte badge ignoré puis retourne 'skipped'."""
+    logger.warning(
+        'badge_account_skipped entity_type=%s entity_id=%s identifier=%s reason=%s',
+        entity_type,
+        entity_id,
+        identifier,
+        reason,
+    )
+    if log:
+        label = identifier or entity_id or '?'
+        log(f"  ⏭ Compte {entity_type} ignoré ({label}) : {reason}")
+    return 'skipped'
+
+
 def _find_user_by_badge(matricule):
     badge = (matricule or '').strip()
     if not badge:
@@ -67,13 +82,25 @@ def ensure_auditeur_account(
     send_email: bool = True,
     skip_existing: bool = False,
     reset_password: bool = False,
+    log=None,
 ) -> str:
     """Crée ou met à jour le compte User lié à un auditeur. Retourne created/updated/skipped."""
     if not participant.matricule:
-        return 'skipped'
+        return _skip_account(
+            'auditeur',
+            'matricule manquant',
+            entity_id=participant.pk,
+            log=log,
+        )
 
     if participant.user_id and skip_existing:
-        return 'skipped'
+        return _skip_account(
+            'auditeur',
+            'compte déjà lié (--skip-existing)',
+            entity_id=participant.pk,
+            identifier=participant.matricule,
+            log=log,
+        )
 
     user = participant.user
     if user is None:
@@ -81,7 +108,13 @@ def ensure_auditeur_account(
         if user is not None:
             linked = _participant_linked_to_user(user)
             if linked is not None and linked.pk != participant.pk:
-                return 'skipped'
+                return _skip_account(
+                    'auditeur',
+                    f'badge déjà lié à un autre auditeur (id={linked.pk})',
+                    entity_id=participant.pk,
+                    identifier=participant.matricule,
+                    log=log,
+                )
             participant.user = user
             participant.save(update_fields=['user'])
         else:
@@ -126,13 +159,25 @@ def ensure_formateur_account(
     send_email: bool = True,
     skip_existing: bool = False,
     reset_password: bool = False,
+    log=None,
 ) -> str:
     """Crée ou met à jour le compte User lié à un formateur. Retourne created/updated/skipped."""
     if not formateur.numerobadge:
-        return 'skipped'
+        return _skip_account(
+            'formateur',
+            'numéro de badge manquant',
+            entity_id=formateur.pk,
+            log=log,
+        )
 
     if formateur.user_id and skip_existing:
-        return 'skipped'
+        return _skip_account(
+            'formateur',
+            'compte déjà lié (--skip-existing)',
+            entity_id=formateur.pk,
+            identifier=formateur.numerobadge,
+            log=log,
+        )
 
     user = formateur.user
     if user is None:
@@ -140,7 +185,13 @@ def ensure_formateur_account(
         if user is not None:
             linked = _formateur_linked_to_user(user)
             if linked is not None and linked.pk != formateur.pk:
-                return 'skipped'
+                return _skip_account(
+                    'formateur',
+                    f'badge déjà lié à un autre formateur (id={linked.pk})',
+                    entity_id=formateur.pk,
+                    identifier=formateur.numerobadge,
+                    log=log,
+                )
             formateur.user = user
             formateur.save(update_fields=['user'])
         else:
@@ -201,6 +252,7 @@ def provision_auditeur_accounts(
                 password=password,
                 send_email=send_email,
                 reset_password=reset_password,
+                log=log,
             )
             stats[action] += 1
             if action == 'created' and send_email and participant.email:
@@ -248,6 +300,7 @@ def provision_formateur_accounts(
                 password=password,
                 send_email=send_email,
                 reset_password=reset_password,
+                log=log,
             )
             stats[action] += 1
             if action == 'created' and send_email and formateur.email:

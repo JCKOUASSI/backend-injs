@@ -1,8 +1,11 @@
 """Synchronisation des profils métier (auditeur, formateur, encadrant) liés aux comptes User."""
 
+import logging
+
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _user_matricule(user):
@@ -36,6 +39,11 @@ def _sync_formateur_user_link(user):
     badge = _ensure_user_matricule(user)
     if not badge:
         Formateur.objects.filter(user=user).update(user=None)
+        logger.warning(
+            'sync_formateur_skipped user_id=%s username=%s reason=missing_badge',
+            user.pk,
+            getattr(user, 'username', None),
+        )
         return
 
     Formateur.objects.filter(user=user).exclude(numerobadge__iexact=badge).update(user=None)
@@ -43,6 +51,13 @@ def _sync_formateur_user_link(user):
     formateur = Formateur.objects.filter(numerobadge__iexact=badge).first()
     if formateur:
         if formateur.user_id not in (None, user.id):
+            logger.warning(
+                'sync_formateur_skipped user_id=%s username=%s badge=%s reason=badge_linked_to_other_formateur other_formateur_id=%s',
+                user.pk,
+                getattr(user, 'username', None),
+                badge,
+                formateur.pk,
+            )
             return
         updates = []
         if formateur.user_id != user.id:
@@ -94,6 +109,11 @@ def _sync_auditeur_user_link(user):
     matricule = _ensure_user_matricule(user)
     if not matricule:
         Participant.objects.filter(user=user).update(user=None)
+        logger.warning(
+            'sync_auditeur_skipped user_id=%s username=%s reason=missing_matricule',
+            user.pk,
+            getattr(user, 'username', None),
+        )
         return
 
     Participant.objects.filter(user=user).exclude(matricule__iexact=matricule).update(user=None)
@@ -101,6 +121,13 @@ def _sync_auditeur_user_link(user):
     participant = Participant.objects.filter(matricule__iexact=matricule).first()
     if participant:
         if participant.user_id not in (None, user.id):
+            logger.warning(
+                'sync_auditeur_skipped user_id=%s username=%s matricule=%s reason=matricule_linked_to_other_participant other_participant_id=%s',
+                user.pk,
+                getattr(user, 'username', None),
+                matricule,
+                participant.pk,
+            )
             return
         updates = []
         if participant.user_id != user.id:
