@@ -12,6 +12,7 @@ import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
 import { canMutateFormations, canSuperviseSessions } from '../utils/roles'
+import { formatApiErrors } from '../utils/apiErrors'
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
@@ -174,7 +175,10 @@ export default function ModuleDetail() {
       const enrolled = new Set((module?.participants || []).map(p => p.id))
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setParticipantLoading(false) }
+    } catch (err) {
+      console.error('Chargement auditeurs module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+    } finally { setParticipantLoading(false) }
   }
 
   const openAddParticipant = () => {
@@ -225,7 +229,10 @@ export default function ModuleDetail() {
       const assigned = new Set((module?.formateurs || []).map(f => f.id))
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setFormateurLoading(false) }
+    } catch (err) {
+      console.error('Chargement formateurs module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+    } finally { setFormateurLoading(false) }
   }
 
   const openAddFormateur = () => {
@@ -406,7 +413,10 @@ export default function ModuleDetail() {
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setEncadrants(data)
       encadrantPicker.applyResponse(res.data, data.length)
-    } catch {} finally { setEncadrantLoading(false) }
+    } catch (err) {
+      console.error('Chargement encadrants:', err)
+      setAssignSupError(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des encadrants.' }))
+    } finally { setEncadrantLoading(false) }
   }
 
   const openAssignSuperviseur = () => {
@@ -438,7 +448,7 @@ export default function ModuleDetail() {
       loadModule()
       showToast(selectedSup ? 'Encadrant assigné' : 'Encadrant retiré')
     } catch (err) {
-      setAssignSupError(err.response?.data?.detail || "Erreur lors de l'assignation")
+      setAssignSupError(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de l\'assignation de l\'encadrant.' }))
     } finally {
       setAssignSupSaving(false)
     }

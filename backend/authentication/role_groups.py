@@ -1,8 +1,11 @@
+import logging
+
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 # Rôles pouvant accéder à l'admin Django ET à la plateforme web.
@@ -317,6 +320,12 @@ def sync_user_role_group(user):
     role_group_names = set(ROLE_GROUP_NAMES.values())
     target_group_name = ROLE_GROUP_NAMES.get(user.role)
     if not target_group_name:
+        logger.warning(
+            'sync_user_role_group_skipped user_id=%s username=%s reason=unknown_role role=%s',
+            user.pk,
+            getattr(user, 'username', None),
+            user.role,
+        )
         return
 
     current_role_groups = user.groups.filter(name__in=role_group_names)
@@ -325,6 +334,14 @@ def sync_user_role_group(user):
     target_group = Group.objects.filter(name=target_group_name).first()
     if target_group:
         user.groups.add(target_group)
+    else:
+        logger.error(
+            'sync_user_role_group_failed user_id=%s username=%s role=%s missing_group=%s',
+            user.pk,
+            getattr(user, 'username', None),
+            user.role,
+            target_group_name,
+        )
 
 
 def sync_user_staff_status(user):

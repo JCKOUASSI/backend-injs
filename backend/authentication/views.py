@@ -4,8 +4,10 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
+from django.db import IntegrityError
 from django.db.models import Q
 
 from .serializers import (
@@ -16,7 +18,7 @@ from .serializers import (
     LoginSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsDFRC, IsSecretariatOrDFRC, ROLE_HIERARCHY, get_creatable_roles
+from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, ROLE_HIERARCHY, get_creatable_roles
 from .role_groups import ALLOWED_WEB_ROLES, user_role_context
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
@@ -231,6 +233,51 @@ class UserListCreateView(generics.ListCreateAPIView):
     """DFRC/Secrétariat : lister et créer des utilisateurs."""
     permission_classes = [IsSecretariatOrDFRC]
 
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsUserMutationAllowed()]
+        return [IsSecretariatOrDFRC()]
+
+    def create(self, request, *args, **kwargs):
+        try:
+            response = super().create(request, *args, **kwargs)
+        except ValidationError as exc:
+            logger.warning(
+                'user_create_validation_failed actor=%s actor_role=%s detail=%s',
+                request.user.username,
+                request.user.role,
+                exc.detail,
+            )
+            raise
+        except IntegrityError as exc:
+            logger.error(
+                'user_create_integrity_failed actor=%s actor_role=%s payload=%s error=%s',
+                request.user.username,
+                request.user.role,
+                request.data,
+                exc,
+            )
+            raise ValidationError(
+                {'non_field_errors': ["Impossible de créer l'utilisateur : une contrainte d'unicité est violée (identifiant ou matricule déjà utilisé)."]}
+            ) from exc
+        except Exception as exc:
+            logger.exception(
+                'user_create_failed actor=%s actor_role=%s payload=%s',
+                request.user.username,
+                request.user.role,
+                request.data,
+            )
+            raise
+        logger.info(
+            'user_create_ok actor=%s actor_role=%s new_user_id=%s new_role=%s new_username=%s',
+            request.user.username,
+            request.user.role,
+            response.data.get('id'),
+            response.data.get('role'),
+            response.data.get('username'),
+        )
+        return response
+
     def get_queryset(self):
         user = self.request.user
         qs = _staff_users_queryset(user).order_by('last_name', 'first_name')
@@ -272,7 +319,16 @@ class UserListCreateView(generics.ListCreateAPIView):
             new_user = serializer.save(secretariat=user.secretariat)
         else:
             new_user = serializer.save()
-        send_welcome_email(new_user, plain_password)
+        try:
+            send_welcome_email(new_user, plain_password)
+        except Exception as exc:
+            logger.error(
+                'user_create_welcome_email_failed user_id=%s username=%s email=%s error=%s',
+                new_user.pk,
+                new_user.username,
+                new_user.email,
+                exc,
+            )
         _log_audit(
             action=AuditLog.Action.USER_CREATE,
             request=self.request,
@@ -286,6 +342,73 @@ class UserListCreateView(generics.ListCreateAPIView):
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """DFRC/Secrétariat : détail / modifier / supprimer un utilisateur."""
     permission_classes = [IsSecretariatOrDFRC]
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH', 'DELETE'):
+            return [IsUserMutationAllowed()]
+        return [IsSecretariatOrDFRC()]
+
+    def update(self, request, *args, **kwargs):
+        try:
+            response = super().update(request, *args, **kwargs)
+        except ValidationError as exc:
+            logger.warning(
+                'user_update_validation_failed actor=%s target_id=%s detail=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                exc.detail,
+            )
+            raise
+        except IntegrityError as exc:
+            logger.error(
+                'user_update_integrity_failed actor=%s target_id=%s payload=%s error=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                request.data,
+                exc,
+            )
+            raise ValidationError(
+                {'non_field_errors': ["Impossible de modifier l'utilisateur : une contrainte d'unicité est violée (identifiant ou matricule déjà utilisé)."]}
+            ) from exc
+        except Exception as exc:
+            logger.exception(
+                'user_update_failed actor=%s target_id=%s payload=%s',
+                request.user.username,
+                kwargs.get('pk'),
+                request.data,
+            )
+            raise
+        logger.info(
+            'user_update_ok actor=%s target_id=%s role=%s username=%s',
+            request.user.username,
+            kwargs.get('pk'),
+            response.data.get('role'),
+            response.data.get('username'),
+        )
+        return response
+
+    def destroy(self, request, *args, **kwargs):
+        target_id = kwargs.get('pk')
+        try:
+            instance = self.get_object()
+            username = instance.username
+            role = instance.role
+            response = super().destroy(request, *args, **kwargs)
+        except Exception:
+            logger.exception(
+                'user_delete_failed actor=%s target_id=%s',
+                request.user.username,
+                target_id,
+            )
+            raise
+        logger.info(
+            'user_delete_ok actor=%s target_id=%s deleted_username=%s deleted_role=%s',
+            request.user.username,
+            target_id,
+            username,
+            role,
+        )
+        return response
 
     def get_queryset(self):
         user = self.request.user

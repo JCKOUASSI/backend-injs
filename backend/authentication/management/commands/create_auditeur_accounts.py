@@ -87,6 +87,7 @@ class Command(BaseCommand):
                         send_email=True,
                         skip_existing=True,
                         reset_password=True,
+                        log=self.stdout.write,
                     )
                     if action == 'created':
                         created += 1
