@@ -93,13 +93,15 @@ def module_planned_minutes_for_period(
     total_sessions_count,
     sessions_in_period=None,
 ):
-    """Planifié période = RefModule.volume_horaire si renseigné, sinon Σ créneaux EDT période."""
+    """Planifié période = Σ créneaux EDT des séances de la période,
+    plafonné au volume_horaire du référentiel (RefModule) si renseigné."""
     if not sessions_in_period:
         return 0.0
+    edt_sum = sum(_session_prevu_minutes(s) for s in sessions_in_period)
     contractual = module_contractual_planned_minutes(module)
     if contractual > 0:
-        return contractual
-    return sum(_session_prevu_minutes(s) for s in sessions_in_period)
+        return min(edt_sum, contractual)
+    return edt_sum
 
 
 def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):
