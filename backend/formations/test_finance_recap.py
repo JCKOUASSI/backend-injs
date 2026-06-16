@@ -81,3 +81,68 @@ class FinanceRecapModulesTest(TestCase):
         self.assertEqual(len(row['sessions_by_groupe']), 1)
         self.assertEqual(row['sessions_by_groupe'][0]['groupe'], 'GROUPE 4')
         self.assertEqual(row['sessions_by_groupe'][0]['sous_total']['sessions_count'], 1)
+
+    def test_export_summary_preserves_recap_modules(self):
+        """L'export fiche formateur ne doit pas écraser la ligne rapport finance."""
+        from rest_framework.request import Request
+        from rest_framework.test import APIRequestFactory
+        from exports.views import _finance_formateur_summary_rows
+
+        f = _make_formation()
+        module = _make_module(
+            f, intitule='Déontologie', grade='A4', groupe='GROUPE 4', duree_prevue_heures=4,
+        )
+        formateur = _make_formateur()
+        ModuleFormateur.objects.create(module=module, formateur=formateur)
+        now = timezone.now()
+        SessionModule.objects.create(
+            module=module,
+            date_journee=timezone.localdate(),
+            numero=1,
+            demarree_le=now - timedelta(hours=2),
+            terminee_le=now,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(10, 0),
+        )
+        drf_req = Request(APIRequestFactory().get('/x/', {'preset': 'tout'}))
+        summary = _finance_formateur_summary_rows(formateur, drf_req)
+        self.assertEqual(len(summary['recap_modules']), 1)
+        self.assertEqual(summary['recap_modules'][0]['module_intitule'], 'Déontologie')
+        self.assertGreater(summary['total_planned'], 0)
+        self.assertEqual(len(summary['rows']), 1)
+
+    def test_export_contacts_from_settings(self):
+        from exports.views import _finance_paie_contacts, _finance_paie_parse_lines, _FINANCE_PAIE_CONTACTS
+        from .models import FinanceSettings
+
+        custom = _finance_paie_parse_lines(
+            'Ligne intro\nContact A tel 0102030405',
+            _FINANCE_PAIE_CONTACTS,
+        )
+        self.assertEqual(custom, ['Ligne intro', 'Contact A tel 0102030405'])
+        self.assertEqual(
+            _finance_paie_contacts({'contacts': custom}),
+            custom,
+        )
+        settings = FinanceSettings.get_solo()
+        settings.export_contacts = 'Service Finance\ntel 0700000000'
+        settings.save(update_fields=['export_contacts'])
+        parsed = _finance_paie_parse_lines(settings.export_contacts, _FINANCE_PAIE_CONTACTS)
+        self.assertEqual(parsed, ['Service Finance', 'tel 0700000000'])
+
+    def test_export_pied_page_from_settings(self):
+        from exports.views import (
+            _finance_paie_pied_de_page,
+            _FINANCE_PAIE_PIED_ADRESSE,
+        )
+
+        titre, texte = _finance_paie_pied_de_page({})
+        self.assertEqual(titre, 'DOCUMENT CONFIDENTIEL')
+        self.assertEqual(texte, _FINANCE_PAIE_PIED_ADRESSE)
+
+        titre, texte = _finance_paie_pied_de_page({
+            'pied_page_titre': 'DOCUMENT INTERNE',
+            'pied_page_texte': 'CPFAE Bouaké — Tel 20 21 34 08',
+        })
+        self.assertEqual(titre, 'DOCUMENT INTERNE')
+        self.assertEqual(texte, 'CPFAE Bouaké — Tel 20 21 34 08')

@@ -20,6 +20,7 @@ import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
 import FinanceParametrage from './pages/FinanceParametrage'
 import FinanceAjustements from './pages/FinanceAjustements'
+import FinanceEncadrants from './pages/FinanceEncadrants'
 import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
 import EvaluationDashboard from './pages/EvaluationDashboard'
@@ -155,6 +156,11 @@ function Layout({ children, breadcrumb }) {
                 {' '}
                 <span className="nav-label">{canViewFinanceModule ? 'Suivi Finance' : 'Formateurs'}</span>
               </span>
+            </Link>
+          )}
+          {canViewFinanceDashboard && (
+            <Link to={financeNavHref('/finance-encadrants')} className={`nav-item ${isActive('/finance-encadrants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-person-badge"></i> <span className="nav-label">Encadrants</span></span>
             </Link>
           )}
           {canViewFinanceDashboard && (
@@ -334,6 +340,13 @@ function App() {
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Ajustements Finance</li></>}>
                 <FinanceAjustements />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/finance-encadrants" element={
+            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Encadrants Finance</li></>}>
+                <FinanceEncadrants />
               </Layout>
             </ProtectedRoute>
           } />

@@ -417,6 +417,22 @@ class Command(BaseCommand):
                             )
                             if len(candidates) == 1:
                                 sec = candidates[0]
+                            elif len(candidates) > 1:
+                                # Contexte formation pour désambiguïser FAB vs FAC
+                                titre_upper = titre.upper()
+                                is_admin = 'ADMINISTRATION' in titre_upper or 'FAB' in titre_upper
+                                is_accomp = 'ACCOMPAGNEMENT' in titre_upper or 'CARRIERE' in titre_upper or 'FAC' in titre_upper
+                                for cand in candidates:
+                                    type_label = (cand.type.libelle if cand.type else '').upper()
+                                    if is_admin and type_label.startswith('FAB'):
+                                        sec = cand
+                                        break
+                                    if is_accomp and type_label.startswith('FAC'):
+                                        sec = cand
+                                        break
+                                # Fallback: premier trouvé si toujours pas de match
+                                if sec is None:
+                                    sec = candidates[0]
                         _secretariat_cache[cat_val] = sec
                         if sec:
                             self.stdout.write(f'  🗂  Catégorie {cat_val} → Secrétariat : {sec.nom}')

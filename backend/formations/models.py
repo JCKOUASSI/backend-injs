@@ -767,6 +767,25 @@ class FinanceSettings(models.Model):
         default='',
         verbose_name='Fonction du signataire',
     )
+    export_contacts = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Contacts (fiche récap formateur)',
+        help_text='Une ligne par contact ou phrase affichée sous la note NB des exports fiche formateur.',
+    )
+    export_pied_page_titre = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Titre pied de page (fiche récap)',
+        help_text='Ex. DOCUMENT CONFIDENTIEL — affiché en gras en bas de la fiche formateur.',
+    )
+    export_pied_page_texte = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Texte pied de page (fiche récap)',
+        help_text='Coordonnées institutionnelles affichées sous le titre en bas de la fiche formateur.',
+    )
     tolerance_active = models.BooleanField(
         default=False,
         verbose_name='Activer la tolérance horaire',

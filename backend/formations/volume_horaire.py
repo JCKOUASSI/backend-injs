@@ -1,7 +1,7 @@
 """Volume horaire : dashboard web et diagnostic admin (modules / séances).
 
-Prévu contractuel = ``Module.duree_prevue_heures`` (figé, indépendant de l'EDT).
-Prévu EDT (diagnostic) = Σ créneaux séances (heure_fin_prevue − heure_debut_prevue).
+Prévu période = Σ créneaux séances de la période (heure_fin_prevue − heure_debut_prevue).
+Prévu contractuel (diagnostic fiche) = ``Module.duree_prevue_heures`` / référentiel.
 Réalisé module = Σ min(durée réelle, durée prévue) par séance terminée.
 La durée réelle (terminee_le − demarree_le) est plafonnée au créneau planifié de chaque séance.
 Sans ``duree_prevue_heures``, repli sur le prévu EDT.
@@ -77,7 +77,7 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
 
 
 def module_contractual_planned_minutes(module):
-    """Volume horaire contractuel (minutes) : référentiel, fiche module, puis EDT type."""
+    """Volume horaire contractuel (minutes) : référentiel ou fiche module (info / diagnostic)."""
     if not module:
         return 0.0
     from .duree_prevue_resolve import resolve_module_duree_prevue_heures
@@ -92,19 +92,10 @@ def module_planned_minutes_for_period(
     total_sessions_count,
     sessions_in_period=None,
 ):
-    """Prorata contractuel sur la période ; repli créneaux EDT si pas de durée fiche."""
-    contractual = module_contractual_planned_minutes(module)
-    in_period = int(sessions_in_period_count or 0)
-    total = int(total_sessions_count or 0)
-    if contractual > 0:
-        if total > 0 and in_period > 0:
-            return contractual * (in_period / total)
-        if in_period > 0:
-            return contractual
+    """Planifié période = somme des créneaux horaires des séances de la période."""
+    if not sessions_in_period:
         return 0.0
-    if sessions_in_period:
-        return sum(_session_prevu_minutes(s) for s in sessions_in_period)
-    return 0.0
+    return sum(_session_prevu_minutes(s) for s in sessions_in_period)
 
 
 def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):
@@ -179,7 +170,7 @@ def finalize_volume_totals(prevu_min, realise_min, *, integer_hours=False):
 
 
 def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin=None, *, integer_hours=False):
-    """Volume horaire canonique : prévu contractuel / séances terminées plafonnées (réalisé)."""
+    """Volume horaire canonique : prévu = Σ créneaux EDT période ; réalisé plafonné."""
     module_ids = list(module_ids or [])
     if not module_ids:
         totals = finalize_volume_totals(0.0, 0.0, integer_hours=integer_hours)
@@ -289,7 +280,7 @@ def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=No
 
 
 def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None):
-    """Agrège prévu contractuel et réalisé (séances terminées) pour un module."""
+    """Agrège prévu (Σ créneaux EDT période) et réalisé (séances terminées) pour un module."""
     sessions = list(
         SessionModule.objects.filter(module=module).only(
             'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'date_journee',

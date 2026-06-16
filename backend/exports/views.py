@@ -141,17 +141,42 @@ def _finance_paie_build_title(recap_modules, export_opts, periode):
     )
 
 
+def _finance_paie_parse_lines(raw, default_lines):
+    """Découpe un texte multiligne ; retombe sur les valeurs par défaut si vide."""
+    if raw and str(raw).strip():
+        lines = [ln.strip() for ln in str(raw).splitlines() if ln.strip()]
+        if lines:
+            return lines
+    return list(default_lines)
+
+
+def _finance_paie_contacts(export_opts):
+    contacts = export_opts.get('contacts')
+    if contacts:
+        return contacts
+    return list(_FINANCE_PAIE_CONTACTS)
+
+
 def _finance_paie_nb_note(export_opts):
     return (export_opts.get('mention_legale') or '').strip() or _FINANCE_PAIE_NB_NOTE
 
 
-def _finance_paie_pied_adresse(export_opts):
-    return (export_opts.get('adresse') or '').strip() or _FINANCE_PAIE_PIED_ADRESSE
+def _finance_paie_pied_titre(export_opts):
+    titre = (export_opts.get('pied_page_titre') or '').strip()
+    return titre or 'DOCUMENT CONFIDENTIEL'
+
+
+def _finance_paie_pied_texte(export_opts):
+    for key in ('pied_page_texte', 'adresse'):
+        raw = (export_opts.get(key) or '').strip()
+        if raw:
+            return raw
+    return _FINANCE_PAIE_PIED_ADRESSE
 
 
 def _finance_paie_pied_de_page(export_opts):
     """Pied de page officiel : mention confidentielle + coordonnées CPFAE."""
-    return 'DOCUMENT CONFIDENTIEL', _finance_paie_pied_adresse(export_opts)
+    return _finance_paie_pied_titre(export_opts), _finance_paie_pied_texte(export_opts)
 
 
 def _check_finance_export_access(request):
@@ -204,8 +229,8 @@ def _finance_formateur_summary_rows(formateur, request=None):
         global_aggregates=global_agg,
         secretariat_id=secretariat_id,
     )
-    row = results[0] if results else {}
-    sessions = row.get('sessions') or []
+    finance_row = results[0] if results else {}
+    sessions = finance_row.get('sessions') or []
 
     def _fmt_date(val):
         if not val:
@@ -222,7 +247,7 @@ def _finance_formateur_summary_rows(formateur, request=None):
     session_rows_by_key = {}
     for s in sessions:
         realized = float(s.get('duree_realisee_minutes') or 0)
-        row = {
+        sess_row = {
             'date': _fmt_date(s.get('date_journee')),
             'session': s.get('intitule') or f"Séance {s.get('numero', '')}",
             'module': s.get('module_intitule') or s.get('module_intitule_brut') or '-',
@@ -239,34 +264,34 @@ def _finance_formateur_summary_rows(formateur, request=None):
             'montant': float(s.get('montant_realise') or 0),
             'prix_heure': s.get('prix_heure_realisee'),
         }
-        rows.append(row)
-        session_rows_by_key[(s.get('date_journee'), s.get('numero'), s.get('session_id'))] = row
+        rows.append(sess_row)
+        session_rows_by_key[(s.get('date_journee'), s.get('numero'), s.get('session_id'))] = sess_row
 
-    stats = row.get('statistiques') or {}
+    stats = finance_row.get('statistiques') or {}
     periode_info = periode_api_payload(
         period['date_debut'], period['date_fin'], period['meta'],
         global_agg.get('date_min'), global_agg.get('date_max'),
     )
     return {
         'rows': rows,
-        'total_planned': float(row.get('total_duree_minutes') or 0),
-        'total_realized': float(row.get('total_duree_realisee_minutes') or 0),
-        'total_heures_planifiees': float(row.get('total_duree_heures') or 0),
-        'total_heures_realisees': float(row.get('total_duree_realisee_heures') or 0),
-        'montant_total': float(row.get('montant_total_realise') or 0),
-        'prix_heure': row.get('prix_heure_realisee'),
+        'total_planned': float(finance_row.get('total_duree_minutes') or 0),
+        'total_realized': float(finance_row.get('total_duree_realisee_minutes') or 0),
+        'total_heures_planifiees': float(finance_row.get('total_duree_heures') or 0),
+        'total_heures_realisees': float(finance_row.get('total_duree_realisee_heures') or 0),
+        'montant_total': float(finance_row.get('montant_total_realise') or 0),
+        'prix_heure': finance_row.get('prix_heure_realisee'),
         'tarifs_variables': True,
         'taux_realisation_pct': stats.get('taux_realisation_pct', 0),
         'periode': periode_info,
-        'sessions_count': int(row.get('sessions_count') or len(rows)),
-        'modules': row.get('modules') or [],
-        'recap_modules': row.get('recap_modules') or [],
-        'sessions_by_groupe': row.get('sessions_by_groupe') or [],
+        'sessions_count': int(finance_row.get('sessions_count') or len(rows)),
+        'modules': finance_row.get('modules') or [],
+        'recap_modules': finance_row.get('recap_modules') or [],
+        'sessions_by_groupe': finance_row.get('sessions_by_groupe') or [],
         'rows_grouped': _finance_sessions_grouped_export_rows(
-            row.get('sessions_by_groupe') or [],
+            finance_row.get('sessions_by_groupe') or [],
             session_rows_by_key,
         ),
-        'recap_formations': _finance_recap_par_formation(row.get('modules') or []),
+        'recap_formations': _finance_recap_par_formation(finance_row.get('modules') or []),
         'formateur': {
             'numerobadge': formateur.numerobadge or '',
             'nom': formateur.nom or '',
@@ -275,9 +300,9 @@ def _finance_formateur_summary_rows(formateur, request=None):
             'telephone': formateur.telephone or '',
             'specialite': formateur.specialite or '',
             'organisation': formateur.organisation or '',
-            'grades': row.get('grades') or '-',
-            'groupes': row.get('groupes') or '-',
-            'secretariats': row.get('secretariats_noms') or [
+            'grades': finance_row.get('grades') or '-',
+            'groupes': finance_row.get('groupes') or '-',
+            'secretariats': finance_row.get('secretariats_noms') or [
                 f"{sec.nom} ({sec.numero})" for sec in formateur.secretariats.all()
             ],
             'numero_piece_identite': formateur.numero_piece_identite or '',
@@ -479,6 +504,9 @@ def _finance_export_document_options(request, formateur):
         'mention_legale': settings.export_mention_legale or '',
         'signataire_nom': settings.export_signataire_nom or '',
         'signataire_fonction': settings.export_signataire_fonction or '',
+        'contacts': _finance_paie_parse_lines(settings.export_contacts, _FINANCE_PAIE_CONTACTS),
+        'pied_page_titre': settings.export_pied_page_titre or '',
+        'pied_page_texte': settings.export_pied_page_texte or '',
     }
 
 
@@ -2433,7 +2461,7 @@ def export_finance_formateur_pdf(request, formateur_pk):
 
     total_heures = 0
     for idx, item in enumerate(recap_modules, start=1):
-        heures = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+        heures = _finance_paie_volume_heures(item.get('total_duree_minutes'))
         total_heures += heures
         table_data.append([
             _cell(idx, center=True),
@@ -2481,7 +2509,7 @@ def export_finance_formateur_pdf(request, formateur_pk):
 
     elements.append(Paragraph(_esc(_finance_paie_nb_note(export_opts)), style_body))
     elements.append(Spacer(1, 0.35 * cm))
-    for line in _FINANCE_PAIE_CONTACTS:
+    for line in _finance_paie_contacts(export_opts):
         elements.append(Paragraph(_esc(line), style_body))
     elements.append(Spacer(1, 0.6 * cm))
 
@@ -2583,7 +2611,7 @@ def export_finance_formateur_excel(request, formateur_pk):
     total_heures = 0
     if recap_modules:
         for idx, item in enumerate(recap_modules, start=1):
-            heures = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+            heures = _finance_paie_volume_heures(item.get('total_duree_minutes'))
             total_heures += heures
             values = [
                 idx,
@@ -2622,7 +2650,7 @@ def export_finance_formateur_excel(request, formateur_pk):
 
     for text in (
         _finance_paie_nb_note(export_opts),
-        *_FINANCE_PAIE_CONTACTS,
+        *_finance_paie_contacts(export_opts),
     ):
         ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
         cell = ws.cell(row=row_idx, column=1, value=text)
@@ -3158,7 +3186,7 @@ def export_finance_encadrants_excel(request):
 
     export_opts = ctx['export']
     totals = ctx['totals']
-    headers = ['Encadrant', 'Groupe', 'Grade', 'Module', 'Formation', 'Planifié (min)', 'Réalisé (min)', 'Planifié', 'Réalisé']
+    headers = ['Encadrant', 'Groupe', 'Grade', 'Module', 'Formation', 'Planifié', 'Réalisé']
     last_col = len(headers)
 
     wb = Workbook()
@@ -3208,8 +3236,6 @@ def export_finance_encadrants_excel(request):
             row['grade'] or '—',
             row['module'] or '—',
             row['formation'] or '—',
-            row['planned_minutes'],
-            row['realized_minutes'],
             row['planned_label'],
             row['realized_label'],
         ]
@@ -3223,7 +3249,6 @@ def export_finance_encadrants_excel(request):
 
     total_values = [
         'TOTAL', '', '', f"{totals['encadrants_count']} encadrant(s)", '',
-        totals['planned_minutes'], totals['realized_minutes'],
         totals['planned_label'], totals['realized_label'],
     ]
     for col, val in enumerate(total_values, start=1):
@@ -3237,7 +3262,7 @@ def export_finance_encadrants_excel(request):
     ws.cell(row=row_idx, column=1).font = Font(size=8, color='999999', italic=True)
     ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='right')
 
-    col_widths = [22, 14, 8, 24, 22, 12, 12, 12, 12]
+    col_widths = [22, 14, 8, 24, 22, 12, 12]
     for idx, width in enumerate(col_widths, start=1):
         ws.column_dimensions[get_column_letter(idx)].width = width
 

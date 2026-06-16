@@ -791,12 +791,7 @@ def _finance_session_slot_minutes(session):
 
 
 def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
-    """
-    Volume planifié contractuel du module sur la période.
-
-    Priorité : référentiel RefModule.volume_horaire → fiche module → prorata
-    sur les séances de la période ; repli créneaux EDT si pas de durée fiche.
-    """
+    """Volume planifié = somme des créneaux horaires des séances de la période."""
     from .volume_horaire import module_planned_minutes_for_period
 
     sessions_in_period = [
@@ -817,7 +812,7 @@ def _session_duration_minutes(session):
 
 
 def _finance_cap_module_realized(realized_minutes, planned_minutes):
-    """Le réalisé module ne peut pas dépasser le planifié contractuel."""
+    """Le réalisé module ne peut pas dépasser le planifié (Σ créneaux EDT de la période)."""
     realized = float(realized_minutes or 0)
     planned = float(planned_minutes or 0)
     if planned <= 0:
@@ -1620,14 +1615,13 @@ def _finance_report_rows(
                 s for s in module_sessions
                 if _finance_session_in_range(s, date_debut, date_fin)
             ]
-            if not sessions_in_period:
-                continue
 
-            module_planned = _finance_module_planned_minutes(
-                module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
+            module_planned = (
+                _finance_module_planned_minutes(
+                    module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
+                )
+                if sessions_in_period else 0.0
             )
-            total_minutes += module_planned
-            taux_planned_minutes += module_planned
             module_realized_sum = 0.0
 
             if module_obj:
@@ -1734,8 +1728,11 @@ def _finance_report_rows(
             module_realized_capped = _finance_cap_module_realized(
                 module_realized_sum, module_planned,
             )
-            total_realized_minutes += module_realized_capped
-            taux_realized_capped_minutes += module_realized_capped
+            if sessions_in_period:
+                total_minutes += module_planned
+                taux_planned_minutes += module_planned
+                total_realized_minutes += module_realized_capped
+                taux_realized_capped_minutes += module_realized_capped
             mod_entry['total_duree_minutes'] = module_planned
             mod_entry['total_duree_realisee_minutes'] = module_realized_capped
             mod_entry['taux_planned_minutes'] = module_planned
@@ -2022,12 +2019,12 @@ def finance_dashboard_api(request):
     periode_payload['description'] = (
         period['meta'].get('description')
         or (
-            'Le temps planifié repose sur le volume horaire contractuel du module '
-            '(référentiel matière, fiche module, proratisé sur les séances de la période). '
+            'Le temps planifié est la somme des créneaux horaires des séances de la période '
+            '(heure de fin − heure de début prévues sur l\'EDT). '
             'Le temps réalisé provient des pointages (badgeage), plafonné au créneau EDT '
-            'de chaque séance puis au planifié contractuel du module (le réalisé ne peut '
-            'pas dépasser le planifié). '
-            'Le taux de réalisation compare le réalisé au planifié contractuel du module. '
+            'de chaque séance puis au planifié du module (le réalisé ne peut pas dépasser '
+            'le planifié). '
+            'Le taux de réalisation compare le réalisé au planifié du module. '
             'Les montants sont calculés heure par heure selon le tarif du cycle de formation '
             'concerné (paramétrage Finance).'
         )
@@ -2127,6 +2124,9 @@ def finance_settings_api(request):
             'export_mention_legale': settings_obj.export_mention_legale or '',
             'export_signataire_nom': settings_obj.export_signataire_nom or '',
             'export_signataire_fonction': settings_obj.export_signataire_fonction or '',
+            'export_contacts': settings_obj.export_contacts or '',
+            'export_pied_page_titre': settings_obj.export_pied_page_titre or '',
+            'export_pied_page_texte': settings_obj.export_pied_page_texte or '',
             'updated_at': settings_obj.updated_at,
             'updated_by': (
                 settings_obj.updated_by.get_full_name() or settings_obj.updated_by.username
@@ -2197,6 +2197,7 @@ def finance_settings_api(request):
         'export_titre_document', 'export_entete_ligne1', 'export_entete_ligne2',
         'export_organisme', 'export_adresse', 'export_reference_prefix',
         'export_mention_legale', 'export_signataire_nom', 'export_signataire_fonction',
+        'export_contacts', 'export_pied_page_titre', 'export_pied_page_texte',
     )
     for field in export_text_fields:
         if field in request.data:

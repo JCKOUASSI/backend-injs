@@ -929,6 +929,8 @@ class FinanceSettingsAdmin(ModelAdmin):
                 'export_reference_prefix',
                 'export_mention_legale',
                 ('export_signataire_nom', 'export_signataire_fonction'),
+                'export_contacts',
+                ('export_pied_page_titre', 'export_pied_page_texte'),
             ),
         }),
         (_("Traçabilité"), {
