@@ -35,6 +35,7 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
   · docs/Manuel utilisateur App Statistiques.md — §12.4
   Fonctionnalité :
   · Colonnes GROUPES limitées aux groupes ayant une séance planifiée le jour (MATIN ou SOIR)
+  · Exports Excel/PDF/Word : même source `compute_point_journalier`, créneaux vides omis
 
 
 [16/06/2026] Règle absents notoires — module démarré + aucune présence

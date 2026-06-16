@@ -2,8 +2,8 @@
 
 Lorsqu'une séance (autre que la dernière) voit sa durée planifiée changer,
 la dernière séance du même module est compensée pour que le total EDT
-corresponde à ``Module.duree_prevue_heures`` (résolu depuis le référentiel
-ou la somme des séances si absent).
+(Σ durées réelles de chaque créneau, quelle que soit leur répartition)
+corresponde à ``Module.duree_prevue_heures`` (référentiel ou fiche module).
 """
 
 from datetime import datetime, timedelta

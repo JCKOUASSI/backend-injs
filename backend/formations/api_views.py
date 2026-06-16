@@ -2568,10 +2568,20 @@ def ref_formation_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
-        data = list(RefModule.objects.values('id', 'intitule', 'volume_horaire', 'actif'))
+        data = list(RefModule.objects.order_by('intitule').values(
+            'id', 'intitule', 'volume_horaire', 'actif', 'formation_id',
+        ))
         return Response(data)
+    intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
+    if not intitule:
+        return Response({'intitule': ['Intitulé obligatoire.']}, status=400)
+    if RefModule.objects.filter(intitule__iexact=intitule).exists():
+        return Response(
+            {'detail': f'Un module « {intitule} » existe déjà dans le référentiel.'},
+            status=400,
+        )
     obj = RefModule.objects.create(
-        intitule=request.data.get('intitule', ''),
+        intitule=intitule,
         volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
@@ -2585,7 +2595,16 @@ def ref_module_detail(request, pk):
     except RefModule.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
-        obj.intitule = request.data.get('intitule', obj.intitule)
+        if 'intitule' in request.data:
+            intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
+            if not intitule:
+                return Response({'intitule': ['Intitulé obligatoire.']}, status=400)
+            if RefModule.objects.filter(intitule__iexact=intitule).exclude(pk=obj.pk).exists():
+                return Response(
+                    {'detail': f'Un module « {intitule} » existe déjà dans le référentiel.'},
+                    status=400,
+                )
+            obj.intitule = intitule
         obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
@@ -2979,6 +2998,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
+    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
@@ -3092,10 +3112,24 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'username': sup.username,
         })
 
+    ref_h = _ref_module_volume_hours(module)
+    fiche_h = float(module.duree_prevue_heures or 0)
+    contractuelle = ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None)
+    planifiee = module_edt_raw_hours(module) or None
+    ecart = None
+    if contractuelle and planifiee is not None:
+        ecart = round(float(contractuelle) - float(planifiee), 2)
+        if abs(ecart) < 0.01:
+            ecart = 0
+
     return Response({
         'id': module.id,
         'intitule': module.intitule,
         'duree_prevue_heures': module.duree_prevue_heures,
+        'duree_contractuelle_heures': contractuelle,
+        'duree_planifiee_heures': planifiee,
+        'duree_ecart_heures': ecart,
+        'duree_totale_heures': planifiee,
         'ordre': module.ordre,
         'statut': module.statut,
         'statut_label': module.get_statut_display(),

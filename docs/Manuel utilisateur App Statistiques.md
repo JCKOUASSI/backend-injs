@@ -349,6 +349,8 @@ Compteur en tête de liste : `X bilans · Par Module` (ou Catégorie / Formation
 
 **Calcul :** un auditeur est « présent » s'il possède au moins un pointage au statut présent sur les séances filtrées (année, mois ou date calendrier).
 
+**Sans séance comptabilisable** sur la période filtrée : **aucun tableau d'effectifs** n'est généré (le module / la matière / la catégorie n'apparaît pas dans la liste des bilans).
+
 ---
 
 ### 11.5 Bilan des effectifs CATÉGORIE
@@ -578,6 +580,7 @@ Réservée aux **validateurs / administrateurs** :
 | 2.2.1 | 16/06/2026 | Terminologie unifiée « Absents notoires » (remplace « Auditeurs notoires ») — KPI, panneaux, alertes et seuils |
 | 2.2.2 | 16/06/2026 | Règle absents notoires : module démarré + aucune présence enregistrée (ou motif notoire) |
 | 2.2.3 | 16/06/2026 | Point journalier : colonnes GROUPES limitées aux groupes avec séance le jour J (MATIN/SOIR) |
+| 2.2.4 | 16/06/2026 | Bilans effectifs (module / catégorie / matière) : aucun tableau si aucune séance comptabilisable sur la période |
 
 ---
 

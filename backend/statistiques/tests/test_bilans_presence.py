@@ -83,7 +83,7 @@ class BilansPresenceTest(TestCase):
         data_vide = compute_bilan_effectifs_module(
             self.module.id, calendrier=autre_jour.isoformat(),
         )
-        self.assertEqual(data_vide['effectifs_presents'], 0)
+        self.assertIsNone(data_vide)
 
     def test_bilan_fac_taux_presence_aligne_places(self):
         pres = _taux_presence_formation(
@@ -93,7 +93,7 @@ class BilansPresenceTest(TestCase):
         self.assertEqual(pres['nb_absents'], 2)
         self.assertAlmostEqual(pres['taux_presence'], 1 / 3, places=4)
 
-    def test_bilan_sans_seance_comptabilisable_absences_non_calculees(self):
+    def test_bilan_sans_seance_comptabilisable_retourne_none(self):
         formation = Formation.objects.create(formation='FAB futur bilan')
         future = timezone.localdate() + timedelta(days=90)
         module = Module.objects.create(
@@ -110,6 +110,7 @@ class BilansPresenceTest(TestCase):
                 sexe=Participant.Sexe.MASCULIN if i < 2 else Participant.Sexe.FEMININ,
             )
             ModuleParticipant.objects.create(module=module, participant=p)
+
         SessionModule.objects.create(
             module=module,
             date_journee=future,
@@ -119,8 +120,4 @@ class BilansPresenceTest(TestCase):
         )
 
         data = compute_bilan_effectifs_module(module.id, annee=future.year)
-        self.assertEqual(data['effectifs_auditeurs'], 3)
-        self.assertEqual(data['effectifs_presents'], 0)
-        self.assertEqual(data['absents'], 0)
-        self.assertTrue(data.get('absences_non_calculees'))
-        self.assertEqual(data['nb_seances_terminees'], 0)
+        self.assertIsNone(data)

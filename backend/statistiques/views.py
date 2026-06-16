@@ -1622,7 +1622,9 @@ class BilansView(APIView):
                 module_ids=kw.get('module_ids'),
             )
             if not tableau:
-                return Response({'detail': 'Catégorie introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and dimension == 'matiere':
@@ -1642,7 +1644,9 @@ class BilansView(APIView):
                 module_ids=kw.get('module_ids'),
             )
             if not tableau:
-                return Response({'detail': 'Matière introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and module_id:
@@ -1651,7 +1655,9 @@ class BilansView(APIView):
                 calendrier=calendrier, periode=periode,
             )
             if not tableau:
-                return Response({'detail': 'Module introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and formation_id:

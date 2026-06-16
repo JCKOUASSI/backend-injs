@@ -4798,20 +4798,6 @@ function BilanEffectifsModuleTable({ data }) {
 
   return (
     <div style={{ overflowX: 'auto' }}>
-      {data.absences_non_calculees && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
-          padding: '0.65rem 0.85rem', marginBottom: '0.75rem',
-          background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8,
-          fontSize: '0.78rem', color: '#92400e', lineHeight: 1.45,
-        }}>
-          <i className="bi bi-info-circle-fill" style={{ marginTop: '0.1rem' }}/>
-          <span>
-            Aucune séance comptabilisable sur la période filtrée — les absences ne sont pas calculées
-            (0 présent ne signifie pas 100&nbsp;% d&apos;absents tant qu&apos;aucune séance n&apos;a eu lieu).
-          </span>
-        </div>
-      )}
       <h3 style={{
         textAlign: 'center', fontWeight: 700, fontSize: '0.88rem',
         textDecoration: 'underline', textTransform: 'uppercase',
@@ -4864,11 +4850,7 @@ function BilanEffectifsModuleTable({ data }) {
             </td>
             <td style={tdBase}>
               <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.absents)}</div>
-              <Soit>
-                {data.absences_non_calculees
-                  ? 'non calculé — aucune séance sur la période'
-                  : `${fmtPctFR(data.pct_absents_total)}% de l'effectif total`}
-              </Soit>
+              <Soit>{fmtPctFR(data.pct_absents_total)}% de l&apos;effectif total</Soit>
             </td>
           </tr>
         </tbody>
@@ -4879,6 +4861,17 @@ function BilanEffectifsModuleTable({ data }) {
 
 function BilanDetailPanel({ bilan, tableau, filtres }) {
   const dimLabel = RB_DIMENSIONS.find(d => d.id === bilan.dimension)?.label || bilan.dimension
+
+  if (['module', 'matiere', 'categorie'].includes(bilan.dimension) && !tableau) {
+    return (
+      <div style={{
+        background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+      }}>
+        <Empty label="Aucune séance comptabilisable sur la période filtrée — aucun tableau d'effectifs."/>
+      </div>
+    )
+  }
 
   if (bilan.dimension === 'formation' && tableau?.type === 'bilan_periode_formation') {
     return (
