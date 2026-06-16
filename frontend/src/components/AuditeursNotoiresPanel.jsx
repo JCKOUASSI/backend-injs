@@ -1,5 +1,5 @@
 /**
- * Auditeurs notoires — inscrits sans pointage ou avec motif_notoire (définition CPFAE unifiée).
+ * Absents notoires — inscrits sans pointage ou avec motif_notoire (définition CPFAE unifiée).
  * Données API : { total, inscrits, pct, liste[] }
  */
 
@@ -56,7 +56,7 @@ export function AuditeursNotoiresKpiStrip({ data }) {
         fontSize: '0.8rem', color: '#15803d',
       }}>
         <i className="bi bi-check-circle-fill" style={{ fontSize: '1.1rem' }}/>
-        Aucun auditeur notoire — tous les inscrits ont au moins un pointage.
+        Aucun absent notoire — tous les inscrits ont au moins une présence sur un module démarré.
       </div>
     )
   }
@@ -72,14 +72,14 @@ export function AuditeursNotoiresKpiStrip({ data }) {
         <i className="bi bi-person-x-fill" style={{ fontSize: '1.15rem', color: '#C62828' }}/>
         <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#C62828' }}>{total}</span>
         <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-          auditeur{total > 1 ? 's' : ''} notoire{total > 1 ? 's' : ''}
+          absent{total > 1 ? 's' : ''} notoire{total > 1 ? 's' : ''}
         </span>
       </div>
       <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
         <b style={{ color: '#C62828' }}>{pct}%</b> des inscrits ({inscrits})
       </div>
       <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginLeft: 'auto' }}>
-        Inscrits sans aucun pointage
+        Module démarré · aucune présence enregistrée
       </div>
     </div>
   )
@@ -100,7 +100,7 @@ export function AuditeursNotoiresPanel({ data, maxHeight = 360, compact = false 
     return (
       <div style={{ textAlign: 'center', padding: '1.75rem', color: '#43A047', fontSize: '0.85rem' }}>
         <i className="bi bi-check-circle" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}/>
-        Aucun auditeur notoire sur ce périmètre.
+        Aucun absent notoire sur ce périmètre.
       </div>
     )
   }
@@ -182,7 +182,7 @@ export function AuditeursNotoiresPanel({ data, maxHeight = 360, compact = false 
         </table>
       </div>
       <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'right' }}>
-        {liste.length} auditeur{liste.length > 1 ? 's' : ''} notoire{liste.length > 1 ? 's' : ''}
+        {liste.length} absent{liste.length > 1 ? 's' : ''} notoire{liste.length > 1 ? 's' : ''}
         {data.inscrits ? ` · ${Number(data.pct || 0).toFixed(1).replace('.', ',')}% des ${data.inscrits} inscrits` : ''}
       </div>
     </div>

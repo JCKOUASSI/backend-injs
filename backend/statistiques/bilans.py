@@ -16,6 +16,7 @@ from .effectifs import (
     count_auditeurs_notoires,
     effectifs_tableau_agrege,
     participant_ids_notoires,
+    q_pointage_present,
     session_ids_for_scope,
 )
 
@@ -404,16 +405,19 @@ def compute_bilan_periode_formation(
     }
 
 
-def _resume_module(module, categorie=None):
+def _resume_module(module, categorie=None, annee=None, mois=None, calendrier=None):
     mq = {'module': module}
     if categorie:
         mq['participant__categorie__iexact'] = categorie
     inscrits = ModuleParticipant.objects.filter(**mq).values('participant').distinct().count()
-    sess_ids = session_ids_for_scope([module.id])
+    sess_ids = session_ids_for_scope([module.id], annee, mois, calendrier)
     return {
         'inscrits': inscrits,
         'nb_seances_terminees': len(sess_ids),
-        'nb_pointages': Pointage.objects.filter(session_id__in=sess_ids).count() if sess_ids else 0,
+        'nb_pointages': (
+            Pointage.objects.filter(session_id__in=sess_ids).filter(q_pointage_present()).count()
+            if sess_ids else 0
+        ),
     }
 
 
@@ -438,17 +442,20 @@ def _group_modules_by_matiere(modules):
     return groups
 
 
-def _resume_matiere(module_ids, categorie=None):
-    """Inscrits uniques et pointages sur tous les modules d'une matière."""
+def _resume_matiere(module_ids, categorie=None, annee=None, mois=None, calendrier=None):
+    """Inscrits uniques et présences valides sur tous les modules d'une matière."""
     mq = Q(module_id__in=module_ids)
     if categorie:
         mq &= Q(participant__categorie__iexact=categorie)
     inscrits = ModuleParticipant.objects.filter(mq).values('participant').distinct().count()
-    sess_ids = session_ids_for_scope(module_ids)
+    sess_ids = session_ids_for_scope(module_ids, annee, mois, calendrier)
     return {
         'inscrits': inscrits,
         'nb_seances_terminees': len(sess_ids),
-        'nb_pointages': Pointage.objects.filter(session_id__in=sess_ids).count() if sess_ids else 0,
+        'nb_pointages': (
+            Pointage.objects.filter(session_id__in=sess_ids).filter(q_pointage_present()).count()
+            if sess_ids else 0
+        ),
     }
 
 
@@ -642,7 +649,7 @@ def compute_bilans(
 
     elif dimension == 'module':
         for m in modules_qs:
-            resume = _resume_module(m, categorie)
+            resume = _resume_module(m, categorie, annee, mois, calendrier)
             bilans.append({
                 'id': f'module-{m.id}-{annee}-{periode or "all"}',
                 'dimension': 'module',
@@ -678,7 +685,7 @@ def compute_bilans(
             ref_id = info['ref_module_id']
             label = info['label']
             formation_nom = str(mods[0].formation)
-            resume = _resume_matiere(mod_ids, categorie)
+            resume = _resume_matiere(mod_ids, categorie, annee, mois, calendrier)
             nb_groupes = len(mods)
             bilans.append({
                 'id': f'matiere-{ref_id or label}-{fid}-{annee}-{periode or "all"}',

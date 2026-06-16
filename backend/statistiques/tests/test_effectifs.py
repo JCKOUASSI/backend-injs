@@ -1,5 +1,5 @@
-"""Tests effectifs — séances comptabilisables et auditeurs notoires."""
-from datetime import time
+"""Tests effectifs — séances comptabilisables et absents notoires."""
+from datetime import time, timedelta
 
 from django.test import TestCase
 from django.utils import timezone
@@ -65,7 +65,7 @@ class FilterSessionsPlannedTest(TestCase):
         )
 
 
-class AuditeursNotoiresTest(TestCase):
+class AbsentsNotoiresTest(TestCase):
     def test_notoire_jamais_badge_et_motif_explicite(self):
         formation = Formation.objects.create(formation='FAB test')
         module = Module.objects.create(formation=formation, intitule='M1', grade='A3')
@@ -103,6 +103,42 @@ class AuditeursNotoiresTest(TestCase):
         self.assertIn(p_jamais.id, notoires)
         self.assertIn(p_motif.id, notoires)
         self.assertNotIn(p_present.id, notoires)
+
+    def test_pas_notoire_si_module_pas_demarre(self):
+        formation = Formation.objects.create(formation='FAB futur')
+        future = timezone.localdate() + timedelta(days=30)
+        module = Module.objects.create(
+            formation=formation,
+            intitule='M1 futur',
+            grade='A3',
+            date_debut=future,
+            statut=Module.Statut.PLANIFIEE,
+        )
+        participant = Participant.objects.create(
+            matricule='NOT-FUT', nom='Futur', prenom='Module', categorie='A',
+        )
+        ModuleParticipant.objects.create(module=module, participant=participant)
+
+        notoires = participant_ids_notoires(module_ids=[module.id])
+        self.assertNotIn(participant.id, notoires)
+
+    def test_notoire_des_que_module_demarre_sans_presence(self):
+        formation = Formation.objects.create(formation='FAB demarre')
+        today = timezone.localdate()
+        module = Module.objects.create(
+            formation=formation,
+            intitule='M1 demarre',
+            grade='A3',
+            date_debut=today - timedelta(days=1),
+            statut=Module.Statut.EN_COURS,
+        )
+        participant = Participant.objects.create(
+            matricule='NOT-DEM', nom='Sans', prenom='Presence', categorie='A',
+        )
+        ModuleParticipant.objects.create(module=module, participant=participant)
+
+        notoires = participant_ids_notoires(module_ids=[module.id])
+        self.assertIn(participant.id, notoires)
 
 
 class TauxPresenceFormationTest(TestCase):

@@ -53,12 +53,14 @@ Pointage **participant** avec :
 - `statut ≠ ABSENT_NON_BADGE`
 - entrée enregistrée **ou** sortie avec `duree_presence_minutes > 0`
 
-### Auditeur notoire (`participant_ids_notoires`)
+### Absent notoire (`participant_ids_notoires`)
 
-Inscrit au périmètre :
+Inscrit au périmètre, **inscrit à au moins un module démarré** :
 
-- **sans aucun pointage**, **ou**
+- **sans aucune présence enregistrée** (pointage valide), **ou**
 - avec `motif_notoire` non vide sur le profil.
+
+Un module est considéré **démarré** si : statut EN_COURS / SUSPENDUE / TERMINÉE, `date_debut` atteinte, au moins une séance avec `demarree_le`, ou au moins une séance comptabilisable.
 
 Utilisé par : dashboard, alertes `nb_absences_notoires`, bilans, Bilan FAC, liste nominative.
 

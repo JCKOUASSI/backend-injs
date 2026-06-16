@@ -348,8 +348,16 @@ def _aggregate_total(groupes):
     }
 
 
+def _modules_avec_cours_jour(modules, jour, cache):
+    """Modules ayant au moins une séance planifiée le jour donné."""
+    return [
+        m for m in modules
+        if cache['all_sessions_by_mod_day'].get((m.id, jour), [])
+    ]
+
+
 def _bloc_creneau_cached(modules, jour, creneau, categorie, multi_grade, all_sessions, cache):
-    """Une colonne par groupe physique (G10, G11…), pas par module / matière."""
+    """Une colonne par groupe physique (G10, G11…), uniquement si cours ce créneau."""
     buckets = defaultdict(list)
     for mod in modules:
         buckets[_groupe_bucket_key(mod)].append(mod)
@@ -357,6 +365,9 @@ def _bloc_creneau_cached(modules, jour, creneau, categorie, multi_grade, all_ses
     groupes = []
     for key in sorted(buckets.keys(), key=_groupe_bucket_sort_key):
         mods = sorted(buckets[key], key=lambda m: m.id)
+        sessions = _sessions_creneau(mods, jour, creneau, cache)
+        if not sessions:
+            continue
         rep = mods[0]
         stats = _stats_groupe_modules(mods, jour, creneau, categorie, cache)
         groupes.append({
@@ -404,6 +415,10 @@ def _compute_tableau_cached(formation, categorie, jour, cache, secretariat_id=No
     modules, multi_grade = _modules_for_tableau(
         formation, categorie, cache, secretariat_id, grade=grade,
     )
+    if not modules:
+        return None
+
+    modules = _modules_avec_cours_jour(modules, jour, cache)
     if not modules:
         return None
 
@@ -507,6 +522,8 @@ def compute_point_journalier(
     """
     Retourne les tableaux journaliers (1 par jour × catégorie × formation).
     index_only=True : métadonnées légères pour la liste (sans blocs MATIN/SOIR).
+
+    Seuls les groupes ayant au moins une séance le jour J apparaissent dans le tableau.
     """
     annee = annee or date.today().year
 
