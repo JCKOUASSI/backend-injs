@@ -791,12 +791,7 @@ def _finance_session_slot_minutes(session):
 
 
 def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
-    """
-    Volume planifié contractuel du module sur la période.
-
-    Priorité : référentiel RefModule.volume_horaire → fiche module → prorata
-    sur les séances de la période ; repli créneaux EDT si pas de durée fiche.
-    """
+    """Volume planifié = somme des créneaux horaires des séances de la période."""
     from .volume_horaire import module_planned_minutes_for_period
 
     sessions_in_period = [
@@ -2022,12 +2017,12 @@ def finance_dashboard_api(request):
     periode_payload['description'] = (
         period['meta'].get('description')
         or (
-            'Le temps planifié repose sur le volume horaire contractuel du module '
-            '(référentiel matière, fiche module, proratisé sur les séances de la période). '
+            'Le temps planifié est la somme des créneaux horaires des séances de la période '
+            '(heure de fin − heure de début prévues sur l\'EDT). '
             'Le temps réalisé provient des pointages (badgeage), plafonné au créneau EDT '
-            'de chaque séance puis au planifié contractuel du module (le réalisé ne peut '
-            'pas dépasser le planifié). '
-            'Le taux de réalisation compare le réalisé au planifié contractuel du module. '
+            'de chaque séance puis au planifié du module (le réalisé ne peut pas dépasser '
+            'le planifié). '
+            'Le taux de réalisation compare le réalisé au planifié du module. '
             'Les montants sont calculés heure par heure selon le tarif du cycle de formation '
             'concerné (paramétrage Finance).'
         )

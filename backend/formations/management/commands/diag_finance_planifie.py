@@ -1,7 +1,7 @@
 """
 Diagnostic du volume horaire planifié Finance (dashboard).
 
-Reproduit la règle Finance ``_finance_module_planned_minutes`` (référentiel + prorata)
+Reproduit la règle Finance ``_finance_module_planned_minutes`` (Σ créneaux EDT période)
 séance par séance, pour expliquer les totaux affichés dans
 « Volume horaire planifié par module ».
 

@@ -1,7 +1,7 @@
 """Volume horaire : dashboard web et diagnostic admin (modules / séances).
 
-Prévu contractuel = ``Module.duree_prevue_heures`` (figé, indépendant de l'EDT).
-Prévu EDT (diagnostic) = Σ créneaux séances (heure_fin_prevue − heure_debut_prevue).
+Prévu période = Σ créneaux séances de la période (heure_fin_prevue − heure_debut_prevue).
+Prévu contractuel (diagnostic fiche) = ``Module.duree_prevue_heures`` / référentiel.
 Réalisé module = Σ min(durée réelle, durée prévue) par séance terminée.
 La durée réelle (terminee_le − demarree_le) est plafonnée au créneau planifié de chaque séance.
 Sans ``duree_prevue_heures``, repli sur le prévu EDT.
@@ -92,19 +92,10 @@ def module_planned_minutes_for_period(
     total_sessions_count,
     sessions_in_period=None,
 ):
-    """Prorata contractuel sur la période ; repli créneaux EDT si pas de durée fiche."""
-    contractual = module_contractual_planned_minutes(module)
-    in_period = int(sessions_in_period_count or 0)
-    total = int(total_sessions_count or 0)
-    if contractual > 0:
-        if total > 0 and in_period > 0:
-            return contractual * (in_period / total)
-        if in_period > 0:
-            return contractual
+    """Planifié période = somme des créneaux horaires des séances de la période."""
+    if not sessions_in_period:
         return 0.0
-    if sessions_in_period:
-        return sum(_session_prevu_minutes(s) for s in sessions_in_period)
-    return 0.0
+    return sum(_session_prevu_minutes(s) for s in sessions_in_period)
 
 
 def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):

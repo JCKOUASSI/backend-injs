@@ -83,6 +83,12 @@ export function FinanceNavActions({ active, pendingAjustements = 0 }) {
         <i className="bi bi-people me-1"></i>Formateurs
       </Link>
       <Link
+        to={financeNavHref('/finance-encadrants')}
+        className={`btn btn-sm ${active === 'encadrants' ? 'btn-finance-accent' : ''}`}
+      >
+        <i className="bi bi-person-badge me-1"></i>Encadrants
+      </Link>
+      <Link
         to={financeNavHref('/finance-ajustements')}
         className={`btn btn-sm ${active === 'ajustements' ? 'btn-finance-accent' : ''}`}
       >

@@ -54,25 +54,24 @@ class FinancePlannedVolumeTest(TestCase):
             heure_fin_prevue=dt_time(18, 0),
         )
 
-    def test_module_planned_uses_referential_not_badge_duration(self):
+    def test_module_planned_sums_session_slots(self):
         sessions = list(SessionModule.objects.filter(module=self.module))
         planned = _finance_module_planned_minutes(self.module, sessions)
-        self.assertEqual(planned, 1800.0)  # 30 h référentiel, 2/2 séances en période
+        self.assertEqual(planned, 600.0)  # 2 × 5 h créneaux EDT
 
-    def test_report_rows_module_planned_from_referential(self):
+    def test_report_rows_module_planned_from_session_slots(self):
         rows = _finance_report_rows([self.formateur], include_sessions=True)
         self.assertEqual(len(rows), 1)
         mod = rows[0]['modules'][0]
-        self.assertEqual(mod['total_duree_minutes'], 1800.0)
-        self.assertEqual(rows[0]['total_duree_minutes'], 1800.0)
-        # Détail séance : créneau EDT, pas durée badge
+        self.assertEqual(mod['total_duree_minutes'], 600.0)
+        self.assertEqual(rows[0]['total_duree_minutes'], 600.0)
         self.assertEqual(mod['sessions_count'], 2)
         sess = rows[0]['sessions']
         self.assertEqual(len(sess), 2)
         self.assertEqual(sess[0]['duree_minutes'], 300.0)
 
     def test_realized_capped_at_module_planned(self):
-        """Somme séances > planifié contractuel → réalisé plafonné."""
+        """Somme réalisée séances plafonnée au planifié (Σ créneaux EDT)."""
         small = Module.objects.create(
             formation=self.formation,
             intitule='Petit module',
@@ -96,14 +95,15 @@ class FinancePlannedVolumeTest(TestCase):
             )
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         small_mod = next(m for m in rows[0]['modules'] if m['module_id'] == small.id)
-        self.assertEqual(small_mod['total_duree_minutes'], 120.0)  # 2 h contractuel
-        self.assertEqual(small_mod['total_duree_realisee_minutes'], 120.0)  # plafonné
+        self.assertEqual(small_mod['total_duree_minutes'], 600.0)  # 2 × 5 h EDT
+        self.assertEqual(small_mod['total_duree_realisee_minutes'], 240.0)  # 2 × 2 h badge
+        self.assertLessEqual(small_mod['total_duree_realisee_minutes'], small_mod['total_duree_minutes'])
 
-    def test_dashboard_breakdown_module_planned_from_referential(self):
+    def test_dashboard_breakdown_module_planned_from_session_slots(self):
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         breakdown = _finance_dashboard_modules_breakdown(rows, date_debut=None, date_fin=None)
         fin = next(b for b in breakdown if b['module_id'] == self.module.id)
-        self.assertEqual(fin['total_duree_minutes'], 1800.0)
+        self.assertEqual(fin['total_duree_minutes'], 600.0)
         self.assertEqual(fin['sessions_count'], 2)
         self.assertLessEqual(
             fin['total_duree_realisee_minutes'],
@@ -119,7 +119,7 @@ class FinancePlannedVolumeTest(TestCase):
                 row['total_duree_minutes'],
             )
 
-    def test_prorata_when_partial_period(self):
+    def test_partial_period_sums_only_sessions_in_range(self):
         future = timezone.localdate() + timedelta(days=30)
         SessionModule.objects.create(
             module=self.module,
@@ -133,5 +133,4 @@ class FinancePlannedVolumeTest(TestCase):
         planned = _finance_module_planned_minutes(
             self.module, sessions, date_debut=today, date_fin=today,
         )
-        # 2 séances sur 3 dans la période → 30 h × 2/3 = 20 h
-        self.assertEqual(planned, 1200.0)
+        self.assertEqual(planned, 600.0)  # 2 séances du jour, pas la séance future
