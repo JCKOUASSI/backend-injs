@@ -92,9 +92,13 @@ def module_planned_minutes_for_period(
     total_sessions_count,
     sessions_in_period=None,
 ):
-    """Planifié période = somme des créneaux horaires des séances de la période."""
+    """Planifié période = duree_prevue_heures (contractuelle) si disponible,
+    sinon somme des créneaux horaires des séances de la période."""
     if not sessions_in_period:
         return 0.0
+    contractual = module_contractual_planned_minutes(module)
+    if contractual > 0:
+        return contractual
     return sum(_session_prevu_minutes(s) for s in sessions_in_period)
 
 

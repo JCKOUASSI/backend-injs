@@ -791,7 +791,7 @@ def _finance_session_slot_minutes(session):
 
 
 def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
-    """Volume planifié = somme des créneaux horaires des séances de la période."""
+    """Volume planifié = duree_prevue_heures contractuelle si renseignée, sinon Σ créneaux EDT."""
     from .volume_horaire import module_planned_minutes_for_period
 
     sessions_in_period = [
@@ -1998,10 +1998,29 @@ def finance_dashboard_api(request):
         for mois, minutes in sorted(global_aggregates['activite_par_mois'].items())
     ]
 
+    # Unifier les spécialités en utilisant les intitulés canoniques de RefModule
+    from formations.models import RefModule as _RefModule
+    ref_modules_all = list(_RefModule.objects.values_list('intitule', flat=True))
+    _ref_lower_map = {intit.strip().lower(): intit for intit in ref_modules_all}
+
+    def _canonical_specialite(raw):
+        s = (raw or '').strip()
+        if not s:
+            return 'Non renseignée'
+        return _ref_lower_map.get(s.lower(), s)
+
     repartition_specialites = {}
     for r in rows:
-        key = (r.get('specialite') or '').strip() or 'Non renseignée'
-        repartition_specialites[key] = repartition_specialites.get(key, 0) + 1
+        key = _canonical_specialite(r.get('specialite'))
+        if key not in repartition_specialites:
+            repartition_specialites[key] = {'count': 0, 'formateurs': []}
+        repartition_specialites[key]['count'] += 1
+        repartition_specialites[key]['formateurs'].append({
+            'id': r.get('id'),
+            'nom': r.get('nom') or '',
+            'prenom': r.get('prenom') or '',
+            'numerobadge': r.get('numerobadge') or '',
+        })
 
     top_temps_planifie = sorted(rows, key=lambda r: float(r.get('total_duree_minutes') or 0), reverse=True)[:10]
     top_temps_realise = sorted(
@@ -2068,8 +2087,9 @@ def finance_dashboard_api(request):
         'top_montants': top_montants,
         'activite_par_mois': activite_par_mois,
         'repartition_specialites': [
-            {'specialite': k, 'count': v} for k, v in sorted(
-                repartition_specialites.items(), key=lambda x: -x[1],
+            {'specialite': k, 'count': v['count'], 'formateurs': v['formateurs']}
+            for k, v in sorted(
+                repartition_specialites.items(), key=lambda x: -x[1]['count'],
             )
         ],
         'synthese_formateurs': rows,

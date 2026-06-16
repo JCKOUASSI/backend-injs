@@ -150,6 +150,7 @@ export default function FinanceDashboard() {
   const [rankTab, setRankTab] = useState(() => searchParams.get('rank_tab') || 'realise')
   const [synthesePage, setSynthesePage] = useState(1)
   const [moduleDrill, setModuleDrill] = useState(null)
+  const [specialiteDrill, setSpecialiteDrill] = useState(null)
 
   usePersistedListQuery(
     FINANCE_QUERY_STORAGE_KEY,
@@ -330,13 +331,20 @@ export default function FinanceDashboard() {
                   <div className="finance-table-wrap">
                     <table className="finance-table">
                       <thead>
-                        <tr><th>Spécialité</th><th>Formateurs</th></tr>
+                        <tr><th>Spécialité</th><th style={{ textAlign: 'right' }}>Formateurs</th></tr>
                       </thead>
                       <tbody>
                         {specialites.map((s) => (
                           <tr key={s.specialite}>
                             <td>{s.specialite}</td>
-                            <td><span className="badge-bg-info">{s.count}</span></td>
+                            <td style={{ textAlign: 'right' }}>
+                              <span
+                                className="badge-bg-info"
+                                style={{ cursor: 'pointer' }}
+                                title="Voir les formateurs"
+                                onClick={() => setSpecialiteDrill(s)}
+                              >{s.count}</span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -498,6 +506,44 @@ export default function FinanceDashboard() {
               modules={volumesParModule}
               onClose={() => setModuleDrill(null)}
             />
+          )}
+
+          {specialiteDrill && (
+            <div className="modal-overlay" onClick={() => setSpecialiteDrill(null)}>
+              <div className="modal-content" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h5 style={{ margin: 0 }}>
+                    <i className="bi bi-people me-2"></i>
+                    {specialiteDrill.specialite}
+                    <span className="badge-bg-secondary ms-2" style={{ fontSize: '0.8rem' }}>{specialiteDrill.count}</span>
+                  </h5>
+                  <button className="btn-close" onClick={() => setSpecialiteDrill(null)}>&times;</button>
+                </div>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                  {(specialiteDrill.formateurs || []).length === 0 ? (
+                    <p className="text-muted">Aucun formateur.</p>
+                  ) : (
+                    <table className="finance-table">
+                      <thead>
+                        <tr><th>N°</th><th>Nom</th><th>Prénom</th></tr>
+                      </thead>
+                      <tbody>
+                        {(specialiteDrill.formateurs || []).map((f) => (
+                          <tr key={f.id}>
+                            <td><span className="badge-bg-info">{f.numerobadge || '—'}</span></td>
+                            <td><strong>{f.nom}</strong></td>
+                            <td>{f.prenom}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setSpecialiteDrill(null)}>Fermer</button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
