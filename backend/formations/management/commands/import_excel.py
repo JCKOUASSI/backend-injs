@@ -406,33 +406,51 @@ class Command(BaseCommand):
                 if cat_val:
                     if cat_val not in _secretariat_cache:
                         sec = SecretariatModel.objects.filter(type__libelle__iexact=cat_val).first()
-                        # Lettre seule (A/B/C) : tenter un match par suffixe sur le libellé
-                        # du type secrétariat (ex. 'FAB A', 'FAC A'). On ne sélectionne que
-                        # si un seul candidat correspond, pour éviter l'ambiguïté.
-                        if sec is None and len(cat_val) == 1 and cat_val in ('A', 'B', 'C'):
-                            candidates = list(
-                                SecretariatModel.objects.filter(
-                                    type__libelle__iendswith=f' {cat_val}'
-                                )[:2]
-                            )
-                            if len(candidates) == 1:
-                                sec = candidates[0]
-                            elif len(candidates) > 1:
-                                # Contexte formation pour désambiguïser FAB vs FAC
-                                titre_upper = titre.upper()
-                                is_admin = 'ADMINISTRATION' in titre_upper or 'FAB' in titre_upper
-                                is_accomp = 'ACCOMPAGNEMENT' in titre_upper or 'CARRIERE' in titre_upper or 'FAC' in titre_upper
-                                for cand in candidates:
-                                    type_label = (cand.type.libelle if cand.type else '').upper()
-                                    if is_admin and type_label.startswith('FAB'):
-                                        sec = cand
-                                        break
-                                    if is_accomp and type_label.startswith('FAC'):
-                                        sec = cand
-                                        break
-                                # Fallback: premier trouvé si toujours pas de match
-                                if sec is None:
+                        # Lettre seule (A/B/C/D) ou FAB/FAC sans lettre : tenter un match par suffixe/préfixe
+                        if sec is None:
+                            candidates = []
+                            # Cas 1: lettre seule -> match par suffixe (FAB A, FAC A, etc.)
+                            if len(cat_val) == 1 and cat_val in ('A', 'B', 'C', 'D'):
+                                candidates = list(
+                                    SecretariatModel.objects.filter(
+                                        type__libelle__iendswith=f' {cat_val}'
+                                    )[:4]
+                                )
+                            # Cas 2: FAB ou FAC seul -> match par préfixe
+                            elif cat_val in ('FAB', 'FAC'):
+                                candidates = list(
+                                    SecretariatModel.objects.filter(
+                                        type__libelle__istartswith=cat_val
+                                    )[:4]
+                                )
+                                # Tenter de désambiguïser avec le grade si présent
+                                grade_raw = self._str(data.get('grade'))
+                                if grade_raw:
+                                    g = grade_raw.strip().upper()
+                                    if len(g) >= 1 and g[0] in ('A', 'B', 'C', 'D'):
+                                        for cand in candidates:
+                                            type_label = (cand.type.libelle if cand.type else '').upper()
+                                            if type_label.endswith(f' {g[0]}'):
+                                                sec = cand
+                                                break
+                            # Désambiguïser avec le titre de formation si pas encore trouvé
+                            if not sec and candidates:
+                                if len(candidates) == 1:
                                     sec = candidates[0]
+                                else:
+                                    titre_upper = titre.upper()
+                                    is_admin = 'ADMINISTRATION' in titre_upper or 'FAB' in titre_upper
+                                    is_accomp = 'ACCOMPAGNEMENT' in titre_upper or 'CARRIERE' in titre_upper or 'FAC' in titre_upper
+                                    for cand in candidates:
+                                        type_label = (cand.type.libelle if cand.type else '').upper()
+                                        if is_admin and type_label.startswith('FAB'):
+                                            sec = cand
+                                            break
+                                        if is_accomp and type_label.startswith('FAC'):
+                                            sec = cand
+                                            break
+                                    if sec is None:
+                                        sec = candidates[0]
                         _secretariat_cache[cat_val] = sec
                         if sec:
                             self.stdout.write(f'  🗂  Catégorie {cat_val} → Secrétariat : {sec.nom}')
@@ -623,31 +641,53 @@ class Command(BaseCommand):
                     if cat:
                         if cat not in _secretariat_cache:
                             sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
-                            # Si pas de match exact, tenter par suffixe et résoudre ambiguïté FAB/FAC
-                            if sec is None and len(cat) == 1 and cat in ('A', 'B', 'C', 'D'):
-                                candidates = list(
-                                    SecretariatModel.objects.filter(
-                                        type__libelle__iendswith=f' {cat}'
-                                    )[:2]
-                                )
-                                if len(candidates) == 1:
-                                    sec = candidates[0]
-                                elif len(candidates) > 1:
-                                    # Par défaut : préférer FAB (Formation Administration Base)
-                                    # sauf si le matricule suggère FAC (FNCP*)
-                                    prefers_fab = True
-                                    if matricule and isinstance(matricule, str):
-                                        prefers_fab = not matricule.upper().startswith('FNCP')
-                                    for cand in candidates:
-                                        type_label = (cand.type.libelle if cand.type else '').upper()
-                                        if prefers_fab and type_label.startswith('FAB'):
-                                            sec = cand
-                                            break
-                                        if not prefers_fab and type_label.startswith('FAC'):
-                                            sec = cand
-                                            break
-                                    if sec is None:
+                            # Si pas de match exact, tenter par suffixe ou préfixe et résoudre ambiguïté FAB/FAC
+                            if sec is None:
+                                candidates = []
+                                # Cas 1: catégorie lettre seule (A, B, C, D) -> match par suffixe
+                                if len(cat) == 1 and cat in ('A', 'B', 'C', 'D'):
+                                    candidates = list(
+                                        SecretariatModel.objects.filter(
+                                            type__libelle__iendswith=f' {cat}'
+                                        )[:4]
+                                    )
+                                # Cas 2: catégorie sans lettre (FAB, FAC) -> match par préfixe
+                                elif cat in ('FAB', 'FAC'):
+                                    candidates = list(
+                                        SecretariatModel.objects.filter(
+                                            type__libelle__istartswith=cat
+                                        )[:4]
+                                    )
+                                    # Déterminer la lettre préférée depuis le grade si présent
+                                    grade_letter = ''
+                                    if fields.get('grade'):
+                                        g = fields['grade'].strip().upper()
+                                        if len(g) >= 1 and g[0] in ('A', 'B', 'C', 'D'):
+                                            grade_letter = g[0]
+                                    if grade_letter:
+                                        for cand in candidates:
+                                            type_label = (cand.type.libelle if cand.type else '').upper()
+                                            if type_label.endswith(f' {grade_letter}'):
+                                                sec = cand
+                                                break
+                                if not sec and candidates:
+                                    if len(candidates) == 1:
                                         sec = candidates[0]
+                                    else:
+                                        # Plusieurs candidats : résoudre ambiguïté
+                                        prefers_fab = True
+                                        if matricule and isinstance(matricule, str):
+                                            prefers_fab = not matricule.upper().startswith('FNCP')
+                                        for cand in candidates:
+                                            type_label = (cand.type.libelle if cand.type else '').upper()
+                                            if prefers_fab and type_label.startswith('FAB'):
+                                                sec = cand
+                                                break
+                                            if not prefers_fab and type_label.startswith('FAC'):
+                                                sec = cand
+                                                break
+                                        if sec is None:
+                                            sec = candidates[0]
                             _secretariat_cache[cat] = sec
                             if sec:
                                 self.stdout.write(
