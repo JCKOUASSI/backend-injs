@@ -2346,6 +2346,7 @@ def export_finance_formateur_pdf(request, formateur_pk):
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.utils import simpleSplit
 
     if not _check_finance_export_access(request):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
@@ -2361,7 +2362,7 @@ def export_finance_formateur_pdf(request, formateur_pk):
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         leftMargin=1.8 * cm, rightMargin=1.8 * cm,
-        topMargin=1.2 * cm, bottomMargin=1.2 * cm,
+        topMargin=1.2 * cm, bottomMargin=2.8 * cm,
     )
     styles = getSampleStyleSheet()
     dash = '—' * 32
@@ -2507,18 +2508,34 @@ def export_finance_formateur_pdf(request, formateur_pk):
     elements.append(main_table)
     elements.append(Spacer(1, 0.5 * cm))
 
-    elements.append(Paragraph(_esc(_finance_paie_nb_note(export_opts)), style_body))
-    elements.append(Spacer(1, 0.35 * cm))
     for line in _finance_paie_contacts(export_opts):
         elements.append(Paragraph(_esc(line), style_body))
     elements.append(Spacer(1, 0.6 * cm))
 
     pied_titre, pied_adresse = _finance_paie_pied_de_page(export_opts)
-    elements.append(Paragraph(f'<b>{_esc(pied_titre)}</b>', style_confidentiel))
-    elements.append(Spacer(1, 0.15 * cm))
-    elements.append(Paragraph(_esc(pied_adresse), style_small))
+    page_w, page_h = A4
+    left_m = 1.8 * cm
+    right_m = 1.8 * cm
+    usable_w = page_w - left_m - right_m
 
-    doc.build(elements)
+    def _draw_footer(canvas, doc):
+        canvas.saveState()
+        y_base = 1.0 * cm
+        # Adresse (petite police, multiligne)
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(colors.HexColor('#333333'))
+        addr_lines = simpleSplit(pied_adresse, 'Helvetica', 7, usable_w)
+        line_h = 9
+        for i, line in enumerate(reversed(addr_lines)):
+            canvas.drawString(left_m, y_base + i * line_h, line)
+        y_titre = y_base + len(addr_lines) * line_h + 3
+        # Titre confidentiel (gras)
+        canvas.setFont('Helvetica-Bold', 9)
+        canvas.setFillColor(colors.black)
+        canvas.drawString(left_m, y_titre, pied_titre)
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
     buffer.seek(0)
     filename = f"fiche_paie_{formateur.numerobadge or formateur.pk}.pdf"
     response = HttpResponse(buffer, content_type='application/pdf')
@@ -2648,10 +2665,7 @@ def export_finance_formateur_excel(request, formateur_pk):
     total_val.alignment = Alignment(horizontal='center')
     row_idx += 2
 
-    for text in (
-        _finance_paie_nb_note(export_opts),
-        *_finance_paie_contacts(export_opts),
-    ):
+    for text in _finance_paie_contacts(export_opts):
         ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
         cell = ws.cell(row=row_idx, column=1, value=text)
         cell.font = Font(size=9)
