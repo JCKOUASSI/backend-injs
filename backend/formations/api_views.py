@@ -100,6 +100,14 @@ def dashboard_stats(request):
                 status=400,
             )
 
+    from formations.period_filter import parse_period_from_request, periode_api_payload
+
+    period = parse_period_from_request(request)
+    if period['error']:
+        return Response({'detail': period['detail']}, status=400)
+    date_debut = period['date_debut']
+    date_fin = period['date_fin']
+
     total_formations = modules_qs.count()
     formations_actives = modules_qs.filter(statut='EN_COURS').count()
     formations_terminees = modules_qs.filter(statut='TERMINEE').count()
@@ -110,7 +118,7 @@ def dashboard_stats(request):
     from .volume_horaire import compute_dashboard_volume_horaire
 
     volume_horaire_effectue_heures, volume_horaire_total_heures, volume_horaire_effectue_taux = (
-        compute_dashboard_volume_horaire(modules_qs)
+        compute_dashboard_volume_horaire(modules_qs, date_debut=date_debut, date_fin=date_fin)
     )
 
     formateurs_qs = Formateur.objects.all()
@@ -396,6 +404,7 @@ def dashboard_stats(request):
         'retard_moyen_minutes': retard_moyen_minutes,
         'prochaines_seances': prochaines_seances,
         'derniers_pointages': derniers_pointages,
+        'periode': periode_api_payload(date_debut, date_fin, period['meta']),
     })
 
 

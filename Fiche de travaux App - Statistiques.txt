@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans — Lot 5
 ================================================================================
-Dernière mise à jour : 16/06/2026 12:00
+Dernière mise à jour : 16/06/2026 02:42
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,6 +28,9 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+
+[16/06/2026] Périmètre stats verrouillé pour comptes SECRETARIAT/CHEF_SECRETARIAT : filtre frontend imposé, secretariat_id systématique dans les requêtes API, scope_locked backend via user_stats_role.
+  · Enregistré automatiquement le 16/06/2026 02:42
 [16/06/2026] Point journalier — groupes avec cours le jour J uniquement
   Fichiers modifiés :
   · backend/statistiques/point_journalier.py — _modules_avec_cours_jour(), filtre par créneau

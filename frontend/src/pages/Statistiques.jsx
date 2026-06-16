@@ -13,7 +13,9 @@ import {
   saveFinancePeriod,
   isPeriodWhollyFuture,
   currentTrimestreParts,
+  financePeriodKey,
 } from '../utils/financePeriod'
+import { isSecretariatScopedRole, lockedSecretariatId } from '../utils/roles'
 import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
 import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
 
@@ -1097,9 +1099,10 @@ function Card({ title, icon, children, col }) {
 // ── Composant principal ────────────────────────────────────────────────────────
 export default function Statistiques() {
   const { user } = useAuth()
-  const isSecretariatScoped = ['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(user?.role)
+  const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const isEncadrantScoped = user?.role === 'ENCADRANT'
   const secretariatFilterLocked = isSecretariatScoped
+  const userLockedSecretariatId = lockedSecretariatId(user)
   const [onglet, setOnglet] = useState('overview')
   const [data, setData] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
@@ -1107,9 +1110,11 @@ export default function Statistiques() {
   const [error, setError] = useState(null)
   const [formationId, setFormationId] = useState('')
   const [secretariatId, setSecretariatId] = useState('')
+  const effectiveSecretariatId = userLockedSecretariatId || secretariatId
   const [lastRefresh, setLastRefresh] = useState(null)
   const [vhPeriod, setVhPeriod] = useState(() => loadFinancePeriod())
   const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => loadFinancePeriod())
+  const appliedPeriodKey = financePeriodKey(appliedVhPeriod)
 
   // Secrétariats — onglet dédié
   const [secStats, setSecStats] = useState(null)
@@ -1182,8 +1187,14 @@ export default function Statistiques() {
   const [showFacPanel, setShowFacPanel] = useState(false)
 
   const canValidate = VALIDATION_ROLES.includes(user?.role)
-  const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedVhPeriod })
+  const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedPeriodKey })
   const hasDataRef = useRef(false)
+
+  useEffect(() => {
+    if (userLockedSecretariatId) {
+      setSecretariatId(userLockedSecretariatId)
+    }
+  }, [userLockedSecretariatId])
 
   const fetchData = useCallback(async (sections, { silent = false, initial = false } = {}) => {
     const tabSections = sections?.length ? sections : (TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
@@ -1197,7 +1208,7 @@ export default function Statistiques() {
       const params = new URLSearchParams()
       params.set('sections', allSections.join(','))
       if (formationId) params.set('formation_id', formationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       appendPeriodToSearchParams(params, appliedVhPeriod)
       const res = await api.get(`/statistiques/?${params}`)
       setData(prev => ({ ...(prev || {}), ...res.data }))
@@ -1209,7 +1220,7 @@ export default function Statistiques() {
       setLoadingInitial(false)
       setLoadingTab(false)
     }
-  }, [formationId, secretariatId, onglet, appliedVhPeriod])
+  }, [formationId, effectiveSecretariatId, onglet, appliedVhPeriod])
 
   const fetchSecStats = useCallback(async () => {
     setLoadingSecStats(true)
@@ -1217,6 +1228,7 @@ export default function Statistiques() {
     try {
       const params = new URLSearchParams()
       if (formationId) params.set('formation_id', formationId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       appendPeriodToSearchParams(params, appliedVhPeriod)
       const qs = params.toString()
       const res = await api.get(`/statistiques/secretariats/${qs ? `?${qs}` : ''}`)
@@ -1232,7 +1244,7 @@ export default function Statistiques() {
     } finally {
       setLoadingSecStats(false)
     }
-  }, [formationId, appliedVhPeriod])
+  }, [formationId, effectiveSecretariatId, appliedVhPeriod])
 
   const fetchSecDetail = useCallback(async (secId) => {
     if (!secId) {
@@ -1260,7 +1272,7 @@ export default function Statistiques() {
     try {
       const params = new URLSearchParams()
       if (formationId) params.set('formation_id', formationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const res = await api.get(`/statistiques/alertes/seuils/?${params}`)
       const payload = Array.isArray(res.data)
         ? { seuils: res.data, indicateurs: [], synthese: {}, seuils_vides: !res.data.length }
@@ -1280,7 +1292,7 @@ export default function Statistiques() {
     try {
       const params = new URLSearchParams()
       if (formationId) params.set('formation_id', formationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       await api.post(`/statistiques/alertes/seuils/?${params}`)
       await fetchSeuils()
       fetchData()
@@ -1301,7 +1313,7 @@ export default function Statistiques() {
       if (pjMois) params.set('mois', pjMois)
       if (pjCategorie) params.set('categorie', pjCategorie)
       if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const res = await api.get(`/statistiques/point-journalier/?${params}`)
       setPjData(res.data)
       setPjAllTableaux(res.data.tableaux_complets || [])
@@ -1330,7 +1342,7 @@ export default function Statistiques() {
       if (pjMois) params.set('mois', pjMois)
       if (pjCategorie) params.set('categorie', pjCategorie)
       if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const res = await api.get(`/statistiques/point-journalier/?${params}`)
       setPjAllTableaux(res.data.tableaux_complets || [])
     } catch (err) {
@@ -1356,7 +1368,7 @@ export default function Statistiques() {
         categorie: tb.categorie || '—',
       })
       if (tb.grade) params.set('grade', tb.grade)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const res = await api.get(`/statistiques/point-journalier/?${params}`)
       setPjDetail(res.data.tableau)
     } catch {
@@ -1373,7 +1385,7 @@ export default function Statistiques() {
       if (pjMois) params.set('mois', pjMois)
       if (pjCategorie) params.set('categorie', pjCategorie)
       if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const { blob, fileName } = await api.getBlob(`/statistiques/point-journalier-export/?${params}`)
       const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
       const url = URL.createObjectURL(blob)
@@ -1410,7 +1422,7 @@ export default function Statistiques() {
         params.set('module_id', rbModuleId)
       }
       if (effFormation) params.set('formation_id', effFormation)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
       if (rbCalendrier) params.set('calendrier', rbCalendrier)
       const res = await api.get(`/statistiques/bilans/?${params}`)
@@ -1448,7 +1460,7 @@ export default function Statistiques() {
         params.set('module_id', rbModuleId)
       }
       if (effFormation) params.set('formation_id', effFormation)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
       if (rbCalendrier) params.set('calendrier', rbCalendrier)
       const res = await api.get(`/statistiques/bilans/?${params}`)
@@ -1467,7 +1479,7 @@ export default function Statistiques() {
     try {
       const params = new URLSearchParams({ formation_id: effFormation, annee: String(facAnnee) })
       if (facCategorie) params.set('categorie', facCategorie)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       const res = await api.get(`/statistiques/bilan-fac/?${params}`)
       setFacData(res.data)
     } catch {
@@ -1520,7 +1532,7 @@ export default function Statistiques() {
       if (rbMois) params.set('mois', rbMois)
       const cat = (bilan.categorie && bilan.categorie !== '—') ? bilan.categorie : rbCategorie
       if (cat) params.set('categorie', cat)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
       if (rbCalendrier) params.set('calendrier', rbCalendrier)
       const res = await api.get(`/statistiques/bilans/?${params}`)
@@ -1546,7 +1558,7 @@ export default function Statistiques() {
         params.set('module_id', rbModuleId)
       }
       if (effFormation) params.set('formation_id', effFormation)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       if (rbPeriode) params.set('periode', rbPeriode)
       if (rbCalendrier) params.set('calendrier', rbCalendrier)
       const bilan = rbSelection !== null && rbData?.bilans?.[rbSelection] ? rbData.bilans[rbSelection] : null
@@ -1571,10 +1583,12 @@ export default function Statistiques() {
     }
   }
 
-  const handleApplyVhPeriod = () => {
-    saveFinancePeriod(vhPeriod)
-    setAppliedVhPeriod({ ...vhPeriod })
-  }
+  const handleApplyVhPeriod = useCallback((periodOverride) => {
+    const p = periodOverride ?? vhPeriod
+    saveFinancePeriod(p)
+    setVhPeriod(p)
+    setAppliedVhPeriod({ ...p })
+  }, [vhPeriod])
 
   const handleRefreshAll = () => {
     fetchData(TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
@@ -1595,8 +1609,8 @@ export default function Statistiques() {
     const ongletChanged = prev.onglet !== onglet
     const filtreChanged = prev.formationId !== formationId
       || prev.secretariatId !== secretariatId
-      || prev.appliedVhPeriod !== appliedVhPeriod
-    prevLoadCtx.current = { onglet, formationId, secretariatId, appliedVhPeriod }
+      || prev.appliedPeriodKey !== appliedPeriodKey
+    prevLoadCtx.current = { onglet, formationId, secretariatId, appliedPeriodKey }
 
     const sections = TAB_SECTIONS[onglet] || TAB_SECTIONS.overview
     const isFirst = !hasDataRef.current
@@ -1604,7 +1618,7 @@ export default function Statistiques() {
       initial: isFirst,
       silent: !isFirst && ongletChanged && !filtreChanged,
     })
-  }, [formationId, secretariatId, onglet, appliedVhPeriod, fetchData])
+  }, [formationId, secretariatId, onglet, appliedPeriodKey, fetchData])
 
   useEffect(() => {
     setHistSelection(null)
@@ -1616,7 +1630,7 @@ export default function Statistiques() {
   useEffect(() => {
     if (onglet === 'alertes') fetchSeuils()
     if (onglet === 'secretariats') fetchSecStats()
-  }, [onglet, fetchSeuils, fetchSecStats])
+  }, [onglet, appliedPeriodKey, fetchSeuils, fetchSecStats])
 
   useEffect(() => {
     if (onglet !== 'secretariats' || secSelection === null || !secStats?.secretariats?.length) return
@@ -1687,7 +1701,7 @@ export default function Statistiques() {
     try {
       const params = new URLSearchParams()
       if (formationId) params.set('formation_id', formationId)
-      if (secretariatId) params.set('secretariat_id', secretariatId)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       await api.put(`/statistiques/alertes/seuils/?${params}`, seuilsForm)
       setEditSeuils(false)
       await fetchSeuils()
@@ -1788,8 +1802,15 @@ export default function Statistiques() {
               {(secretariats_liste||[])[0]?.nom || user?.secretariat_nom || 'Mon secrétariat'}
             </span>
           )}
-          {(formationId || secretariatId) && (
-            <button className="btn btn-sm btn-outline-danger" onClick={() => { setFormationId(''); setSecretariatId('') }} title="Effacer les filtres">
+          {(formationId || (!secretariatFilterLocked && secretariatId)) && (
+            <button
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => {
+                setFormationId('')
+                if (!secretariatFilterLocked) setSecretariatId('')
+              }}
+              title="Effacer les filtres"
+            >
               <i className="bi bi-x-lg"/>
             </button>
           )}

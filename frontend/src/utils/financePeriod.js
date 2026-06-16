@@ -123,6 +123,9 @@ export const buildFinancePeriodQuery = (period) => {
   return p
 }
 
+/** Clé stable pour détecter un changement de période (query string API). */
+export const financePeriodKey = (period) => buildFinancePeriodQuery(period).toString()
+
 export const appendPeriodToSearchParams = (params, period) => {
   const q = buildFinancePeriodQuery(period)
   q.forEach((value, key) => params.set(key, value))

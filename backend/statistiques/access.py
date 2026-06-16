@@ -46,6 +46,11 @@ def user_has_stats_access(user) -> bool:
     return user_stats_role(user) in STATS_ACCESS_ROLES
 
 
+def user_secretariat_scope_locked(user) -> bool:
+    """Compte limité aux statistiques de son secrétariat."""
+    return user_stats_role(user) in SECRETARIAT_ROLES
+
+
 @dataclass
 class StatsScope:
     formation_id: Optional[int] = None

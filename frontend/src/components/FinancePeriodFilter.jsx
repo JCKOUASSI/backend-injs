@@ -13,10 +13,9 @@ export default function FinancePeriodFilter({
   embedded,
   autoApplyOnSelect = false,
 }) {
-  const set = (patch) => onChange({ ...period, ...patch })
-
-  const maybeApply = () => {
-    if (autoApplyOnSelect && onApply) onApply()
+  const commit = (next) => {
+    onChange(next)
+    if (autoApplyOnSelect && onApply) onApply(next)
   }
 
   const handlePresetChange = (preset) => {
@@ -34,8 +33,7 @@ export default function FinancePeriodFilter({
       patch.trimestreQ = q
       patch.trimestre = trimestreKeyFromParts(annee, q)
     }
-    onChange({ ...period, ...patch })
-    maybeApply()
+    commit({ ...period, ...patch })
   }
 
   const content = (
@@ -60,7 +58,7 @@ export default function FinancePeriodFilter({
               type="month"
               className="form-control form-control-sm"
               value={period.mois || ''}
-              onChange={(e) => set({ mois: e.target.value })}
+              onChange={(e) => commit({ ...period, mois: e.target.value })}
             />
           </div>
         )}
@@ -77,7 +75,8 @@ export default function FinancePeriodFilter({
                 onChange={(e) => {
                   const y = e.target.value
                   const q = period.trimestreQ || 1
-                  set({
+                  commit({
+                    ...period,
                     trimestreAnnee: y,
                     trimestre: trimestreKeyFromParts(y, q),
                   })
@@ -95,12 +94,12 @@ export default function FinancePeriodFilter({
                     className={`finance-trimestre-pill${Number(period.trimestreQ) === q ? ' active' : ''}`}
                     onClick={() => {
                       const y = period.trimestreAnnee || String(new Date().getFullYear())
-                      set({
+                      commit({
+                        ...period,
                         trimestreQ: q,
                         trimestreAnnee: y,
                         trimestre: trimestreKeyFromParts(y, q),
                       })
-                      maybeApply()
                     }}
                   >
                     {label}
@@ -119,7 +118,7 @@ export default function FinancePeriodFilter({
               min="2020"
               max="2100"
               value={period.annee || ''}
-              onChange={(e) => set({ annee: e.target.value })}
+              onChange={(e) => commit({ ...period, annee: e.target.value })}
               style={{ width: '100px' }}
             />
           </div>
@@ -132,7 +131,7 @@ export default function FinancePeriodFilter({
                 type="date"
                 className="form-control form-control-sm"
                 value={period.dateDebut || ''}
-                onChange={(e) => set({ dateDebut: e.target.value })}
+                onChange={(e) => commit({ ...period, dateDebut: e.target.value })}
               />
             </div>
             <div className="finance-filter-field">
@@ -141,7 +140,7 @@ export default function FinancePeriodFilter({
                 type="date"
                 className="form-control form-control-sm"
                 value={period.dateFin || ''}
-                onChange={(e) => set({ dateFin: e.target.value })}
+                onChange={(e) => commit({ ...period, dateFin: e.target.value })}
               />
             </div>
           </>
@@ -150,7 +149,7 @@ export default function FinancePeriodFilter({
         <button
           type="button"
           className="btn btn-dfrc btn-sm"
-          onClick={onApply}
+          onClick={() => onApply?.(period)}
           disabled={applying || (period.preset === 'custom' && (!period.dateDebut || !period.dateFin))}
           style={{ marginBottom: '1px' }}
         >
