@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 
 from authentication.models import User
 from formations.models import Formation, Module, Secretariat
-from statistiques.access import resolve_stats_scope, rapport_accessible
+from statistiques.access import resolve_stats_scope, rapport_accessible, user_secretariat_scope_locked
 from statistiques.models import Rapport
 
 
@@ -37,6 +37,12 @@ class ResolveStatsScopeTests(TestCase):
         scope, err = resolve_stats_scope(user)
         self.assertIsNone(err)
         self.assertEqual(scope.secretariat_id, self.sec_a.id)
+
+    def test_user_secretariat_scope_locked(self):
+        sec = make_user('sec_lock', role='SECRETARIAT', secretariat=self.sec_a)
+        admin = make_user('admin_lock', role='CPFAE_ADMIN')
+        self.assertTrue(user_secretariat_scope_locked(sec))
+        self.assertFalse(user_secretariat_scope_locked(admin))
 
     def test_encadrant_limited_to_supervised_modules(self):
         enc = make_user('enc_user', role='ENCADRANT')

@@ -57,6 +57,7 @@ from .access import (
     rapports_queryset_for_user,
     rapport_accessible,
     user_has_stats_access,
+    user_secretariat_scope_locked,
     STATS_ACCESS_ROLES,
 )
 
@@ -995,7 +996,7 @@ def _build_dashboard_payload(scope: StatsScope, sections, user, period=None):
         payload['filtre_actif'] = {
             'formation_id': formation_id,
             'secretariat_id': secretariat_id,
-            'scope_locked': getattr(user, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'),
+            'scope_locked': user_secretariat_scope_locked(user),
         }
 
     return payload

@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
-import { hasAppRole } from '../utils/roles'
+import { hasAppRole, canFilterDashboardBySecretariat, isSecretariatScopedRole } from '../utils/roles'
 import { formatDate } from '../utils/dates'
 import {
   appendPeriodToSearchParams,
   resolveFinancePeriod,
   saveFinancePeriod,
+  isPeriodWhollyFuture,
+  currentTrimestreParts,
+  financePeriodKey,
 } from '../utils/financePeriod'
 import {
   buildDashboardSearchParams,
@@ -17,7 +20,6 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import { useListNavigationState } from '../hooks/useListReturn'
-import { canFilterDashboardBySecretariat } from '../utils/roles'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -26,6 +28,7 @@ export default function Dashboard() {
   const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
   const canFilterBySecretariat = canFilterDashboardBySecretariat(user?.role)
+  const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])
   const [secretariats, setSecretariats] = useState([])
@@ -37,6 +40,7 @@ export default function Dashboard() {
   const [loadingSecretariats, setLoadingSecretariats] = useState(false)
   const [vhPeriod, setVhPeriod] = useState(() => resolveFinancePeriod())
   const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => resolveFinancePeriod())
+  const appliedPeriodKey = financePeriodKey(appliedVhPeriod)
 
   usePersistedListQuery(
     LIST_STORAGE_KEYS.dashboard,
@@ -45,27 +49,10 @@ export default function Dashboard() {
       presence_period: presencePeriod,
       reference_date: referenceDate,
     }, appliedVhPeriod),
-    [selectedSecretariatId, presencePeriod, referenceDate, appliedVhPeriod],
+    [selectedSecretariatId, presencePeriod, referenceDate, appliedPeriodKey],
   )
 
-  useEffect(() => {
-    loadDashboardData()
-    // Rafraîchissement périodique des indicateurs "live"
-    const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
-    return () => clearInterval(intervalId)
-  }, [selectedSecretariatId, referenceDate, presencePeriod, appliedVhPeriod])
-
-  const handleApplyVhPeriod = () => {
-    saveFinancePeriod(vhPeriod)
-    setAppliedVhPeriod({ ...vhPeriod })
-  }
-
-  useEffect(() => {
-    if (!canFilterBySecretariat) return
-    loadSecretariats()
-  }, [canFilterBySecretariat])
-
-  const loadDashboardData = async ({ silent = false } = {}) => {
+  const loadDashboardData = useCallback(async ({ silent = false } = {}) => {
     const statsParams = new URLSearchParams()
     if (selectedSecretariatId) statsParams.set('secretariat', selectedSecretariatId)
     if (referenceDate) statsParams.set('reference_date', referenceDate)
@@ -108,7 +95,25 @@ export default function Dashboard() {
       }
       setLoading(false)
     }
-  }
+  }, [selectedSecretariatId, referenceDate, appliedVhPeriod])
+
+  useEffect(() => {
+    loadDashboardData()
+    const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
+    return () => clearInterval(intervalId)
+  }, [selectedSecretariatId, referenceDate, presencePeriod, appliedPeriodKey, loadDashboardData])
+
+  const handleApplyVhPeriod = useCallback((periodOverride) => {
+    const p = periodOverride ?? vhPeriod
+    saveFinancePeriod(p)
+    setVhPeriod(p)
+    setAppliedVhPeriod({ ...p })
+  }, [vhPeriod])
+
+  useEffect(() => {
+    if (!canFilterBySecretariat) return
+    loadSecretariats()
+  }, [canFilterBySecretariat])
 
   const loadSecretariats = async () => {
     setLoadingSecretariats(true)
@@ -269,6 +274,11 @@ export default function Dashboard() {
               • {selectedSecretariat ? `Vue: ${selectedSecretariat.nom}` : 'Vue: Tous les secrétariats'}
             </span>
           )}
+          {isSecretariatScoped && user?.secretariat_nom && (
+            <span style={{ marginLeft: '0.45rem' }}>
+              • Secrétariat : {user.secretariat_nom}
+            </span>
+          )}
           <span style={{ marginLeft: '0.45rem' }}>
             • Référence: {new Date(`${referenceDate}T00:00:00`).toLocaleDateString('fr-FR')}
           </span>
@@ -286,8 +296,34 @@ export default function Dashboard() {
             onApply={handleApplyVhPeriod}
             applying={loading}
             embedded
+            autoApplyOnSelect
           />
         </div>
+        {isPeriodWhollyFuture(appliedVhPeriod) && (
+          <div style={{
+            marginTop: '0.65rem', padding: '0.55rem 0.75rem', borderRadius: 8,
+            background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', fontSize: '0.82rem',
+          }}>
+            <i className="bi bi-info-circle me-1"/>
+            Cette période n&apos;a pas encore commencé — volume horaire réalisé à 0.
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 ms-1 align-baseline"
+              style={{ fontSize: '0.82rem', verticalAlign: 'baseline' }}
+              onClick={() => {
+                const now = new Date()
+                const next = {
+                  ...appliedVhPeriod,
+                  preset: 'mois',
+                  mois: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+                }
+                handleApplyVhPeriod(next)
+              }}
+            >
+              Voir ce mois
+            </button>
+          </div>
+        )}
         {stats?.periode?.label && (
           <div className="finance-period-badge">
             <i className="bi bi-calendar-check"></i>

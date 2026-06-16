@@ -335,6 +335,13 @@ class DashboardStatsAPITest(TestCase):
         self.assertEqual(res.data['modules_termines'], 1)
         self.assertEqual(res.data['groupes_en_cours'], 2)
 
+    def test_stats_periode_mois(self):
+        res = self.client.get('/api/formations/stats/?preset=mois&mois=2026-06')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('periode', res.data)
+        self.assertEqual(res.data['periode']['preset'], 'mois')
+        self.assertEqual(res.data['periode']['mois'], '2026-06')
+
 
 # ──────────────────────────────────────────
 # API — referentiels

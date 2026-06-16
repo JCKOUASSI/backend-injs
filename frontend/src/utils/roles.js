@@ -101,6 +101,9 @@ export const DASHBOARD_SECRETARIAT_FILTER_ROLES = [
   'DIRECTION',
 ]
 
+/** Comptes limités aux données de leur secrétariat (stats, dashboard opérationnel). */
+export const SECRETARIAT_SCOPED_ROLES = ['SECRETARIAT', 'CHEF_SECRETARIAT']
+
 export function isAdminLevelRole(role) {
   return ADMIN_LEVEL_ROLES.includes(role)
 }
@@ -135,6 +138,18 @@ export function canMutateUsers(role) {
 
 export function canFilterDashboardBySecretariat(role) {
   return DASHBOARD_SECRETARIAT_FILTER_ROLES.includes(role)
+}
+
+export function isSecretariatScopedRole(role) {
+  return SECRETARIAT_SCOPED_ROLES.includes(role)
+}
+
+/** ID secrétariat imposé pour un compte secrétariat (null si non applicable). */
+export function lockedSecretariatId(user) {
+  if (!isSecretariatScopedRole(user?.role) || user?.secretariat == null || user?.secretariat === '') {
+    return null
+  }
+  return String(user.secretariat)
 }
 
 export function isWebRoleAllowed(role) {
