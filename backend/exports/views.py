@@ -187,7 +187,6 @@ def _finance_formateur_summary_rows(formateur, request=None):
     from formations.api_views import (
         _finance_secretariat_id_from_request,
         _finance_report_rows,
-        _finance_build_prix_map,
     )
 
     period = parse_period_from_request(request) if request else {
@@ -196,7 +195,6 @@ def _finance_formateur_summary_rows(formateur, request=None):
     if period.get('error'):
         period = {'error': False, 'date_debut': None, 'date_fin': None, 'meta': {'preset': 'tout'}}
     secretariat_id = _finance_secretariat_id_from_request(request) if request else None
-    default_prix, _ = _finance_build_prix_map()
     global_agg = {'activite_par_mois': {}, 'activite_montant_par_mois': {}, 'date_min': None, 'date_max': None}
     results = _finance_report_rows(
         [formateur],
@@ -257,8 +255,7 @@ def _finance_formateur_summary_rows(formateur, request=None):
         'total_heures_realisees': float(row.get('total_duree_realisee_heures') or 0),
         'montant_total': float(row.get('montant_total_realise') or 0),
         'prix_heure': row.get('prix_heure_realisee'),
-        'tarifs_variables': bool(row.get('tarifs_variables')),
-        'prix_heure_defaut': default_prix,
+        'tarifs_variables': True,
         'taux_realisation_pct': stats.get('taux_realisation_pct', 0),
         'periode': periode_info,
         'sessions_count': int(row.get('sessions_count') or len(rows)),
@@ -432,10 +429,8 @@ def _finance_recap_par_formation(modules):
     return sorted(recap.values(), key=lambda x: x['formation'])
 
 
-def _finance_billing_mode_label(tarifs_variables, prix_label):
-    if tarifs_variables:
-        return 'Facturation : tarif horaire selon le type de formation (cycle)'
-    return f'Facturation : tarif unique {prix_label}'
+def _finance_billing_mode_label():
+    return 'Facturation : tarif horaire selon le type de formation (cycle)'
 
 
 def _finance_strip_formateur_sensitive(formateur_dict, request):
@@ -490,15 +485,9 @@ def _finance_export_document_options(request, formateur):
 def _finance_formateur_export_context(formateur, request):
     summary = _finance_formateur_summary_rows(formateur, request)
     options = _finance_export_document_options(request, formateur)
-    prix_heure = summary.get('prix_heure')
-    tarifs_variables = summary.get('tarifs_variables', False)
-    if tarifs_variables or prix_heure is None:
-        prix_label = 'Variable (selon formation)'
-    else:
-        prix_label = f'{float(prix_heure or 0):,.0f} FCFA / h'
     summary['export'] = options
-    summary['prix_label'] = prix_label
-    summary['billing_label'] = _finance_billing_mode_label(tarifs_variables, prix_label)
+    summary['prix_label'] = 'Selon la formation'
+    summary['billing_label'] = _finance_billing_mode_label()
     summary['periode_label'] = summary['periode'].get('periode_label') or 'Toutes périodes'
     summary['formateur'] = _finance_strip_formateur_sensitive(summary.get('formateur'), request)
     return summary

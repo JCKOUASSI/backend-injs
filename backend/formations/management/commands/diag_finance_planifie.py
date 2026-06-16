@@ -1,7 +1,7 @@
 """
 Diagnostic du volume horaire planifié Finance (dashboard).
 
-Reproduit la règle ``_session_duration_minutes`` + filtre période Finance,
+Reproduit la règle Finance ``_finance_module_planned_minutes`` (référentiel + prorata)
 séance par séance, pour expliquer les totaux affichés dans
 « Volume horaire planifié par module ».
 
@@ -18,8 +18,9 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from formations.api_views import (
+    _finance_module_planned_minutes,
     _finance_session_in_range,
-    _session_duration_minutes,
+    _finance_session_slot_minutes,
 )
 from formations.models import Module, SessionModule
 
@@ -173,7 +174,9 @@ class Command(BaseCommand):
                 s for s in sessions
                 if _finance_session_in_range(s, date_debut, date_fin)
             ]
-            planned = sum(_session_duration_minutes(s) for s in in_period)
+            planned = _finance_module_planned_minutes(
+                module, sessions, date_debut=date_debut, date_fin=date_fin,
+            )
             ranked.append((planned, module, sessions, in_period))
 
         if options['top']:
@@ -211,13 +214,13 @@ class Command(BaseCommand):
         total_edt = 0.0
         total_real = 0.0
         for session in in_period:
-            fin_min = _session_duration_minutes(session)
+            fin_min = _finance_session_slot_minutes(session)
             edt_min = _edt_minutes(session)
             real_min = _real_minutes(session)
             total_edt += edt_min
             total_real += real_min
             status = _session_status(session)
-            rule = 'durée réelle badge' if status == 'TERM' else 'créneau EDT'
+            rule = 'créneau EDT (détail séance)'
             line = (
                 f'  S#{session.numero:>2} {session.date_journee} [{status}] '
                 f'finance={_fmt_h(fin_min):>10} ({rule})'
@@ -245,7 +248,7 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'  TOTAL Finance planifié : {_fmt_h(planned)} '
+            f'  TOTAL Finance planifié (contractuel module) : {_fmt_h(planned)} '
             f'({planned / 60:.2f} h, arrondi UI ≈ {round(planned / 60)} h)'
         ))
         self.stdout.write(f'  Σ créneaux EDT (période) : {_fmt_h(total_edt)} ({total_edt / 60:.2f} h)')
