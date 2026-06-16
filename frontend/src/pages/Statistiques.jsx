@@ -11,6 +11,8 @@ import {
   appendPeriodToSearchParams,
   loadFinancePeriod,
   saveFinancePeriod,
+  isPeriodWhollyFuture,
+  currentTrimestreParts,
 } from '../utils/financePeriod'
 import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
 import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
@@ -1809,8 +1811,56 @@ export default function Statistiques() {
             onApply={handleApplyVhPeriod}
             applying={loadingInitial || loadingTab || loadingSecStats}
             embedded
+            autoApplyOnSelect
           />
         </div>
+        {isPeriodWhollyFuture(appliedVhPeriod) && (
+          <div style={{
+            marginTop: '0.65rem', padding: '0.55rem 0.75rem', borderRadius: 8,
+            background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', fontSize: '0.82rem',
+          }}>
+            <i className="bi bi-info-circle me-1"/>
+            Cette période n&apos;a pas encore commencé — aucune séance comptabilisable
+            (volume horaire et présences à 0).
+            {(() => {
+              const { annee, q } = currentTrimestreParts()
+              return (
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 ms-1 align-baseline"
+                  style={{ fontSize: '0.82rem', verticalAlign: 'baseline' }}
+                  onClick={() => {
+                    const next = {
+                      ...appliedVhPeriod,
+                      preset: 'trimestre',
+                      trimestreAnnee: annee,
+                      trimestreQ: q,
+                      trimestre: `${annee}-Q${q}`,
+                    }
+                    setVhPeriod(next)
+                    saveFinancePeriod(next)
+                    setAppliedVhPeriod({ ...next })
+                  }}
+                >
+                  Voir le trimestre en cours (T{q})
+                </button>
+              )
+            })()}
+          </div>
+        )}
+        {!isPeriodWhollyFuture(appliedVhPeriod)
+          && data?.periode?.filtre_actif
+          && data?.kpis?.sessions_terminees === 0
+          && appliedVhPeriod?.preset !== 'tout' && (
+          <div style={{
+            marginTop: '0.65rem', padding: '0.55rem 0.75rem', borderRadius: 8,
+            background: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.82rem',
+          }}>
+            <i className="bi bi-calendar-x me-1"/>
+            Aucune séance comptabilisable sur {data.periode.label || 'cette période'}
+            {data.periode.periode_label ? ` (${data.periode.periode_label})` : ''}.
+          </div>
+        )}
         {data?.periode?.label && (
           <div className="finance-period-badge">
             <i className="bi bi-calendar-check"></i>

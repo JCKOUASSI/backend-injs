@@ -2,6 +2,7 @@ import {
   FINANCE_PERIOD_PRESETS,
   TRIMESTRE_OPTIONS,
   trimestreKeyFromParts,
+  currentTrimestreParts,
 } from '../utils/financePeriod'
 
 export default function FinancePeriodFilter({
@@ -10,8 +11,13 @@ export default function FinancePeriodFilter({
   onApply,
   applying,
   embedded,
+  autoApplyOnSelect = false,
 }) {
   const set = (patch) => onChange({ ...period, ...patch })
+
+  const maybeApply = () => {
+    if (autoApplyOnSelect && onApply) onApply()
+  }
 
   const handlePresetChange = (preset) => {
     const now = new Date()
@@ -23,12 +29,13 @@ export default function FinancePeriodFilter({
       patch.annee = String(now.getFullYear())
     }
     if (preset === 'trimestre') {
-      const q = Math.floor(now.getMonth() / 3) + 1
-      patch.trimestreAnnee = String(now.getFullYear())
+      const { annee, q } = currentTrimestreParts(now)
+      patch.trimestreAnnee = annee
       patch.trimestreQ = q
-      patch.trimestre = trimestreKeyFromParts(now.getFullYear(), q)
+      patch.trimestre = trimestreKeyFromParts(annee, q)
     }
     onChange({ ...period, ...patch })
+    maybeApply()
   }
 
   const content = (
@@ -93,6 +100,7 @@ export default function FinancePeriodFilter({
                         trimestreAnnee: y,
                         trimestre: trimestreKeyFromParts(y, q),
                       })
+                      maybeApply()
                     }}
                   >
                     {label}

@@ -3,7 +3,7 @@ const STORAGE_FILTERS_KEY = 'finance_filters'
 
 export const FINANCE_PERIOD_PRESETS = [
   { id: 'mois', label: 'Ce mois' },
-  { id: 'trimestre', label: 'Ce trimestre' },
+  { id: 'trimestre', label: 'Trimestre' },
   { id: 'annee', label: 'Cette année' },
   { id: 'tout', label: 'Tout' },
   { id: 'custom', label: 'Personnalisé' },
@@ -127,6 +127,59 @@ export const appendPeriodToSearchParams = (params, period) => {
   const q = buildFinancePeriodQuery(period)
   q.forEach((value, key) => params.set(key, value))
 }
+
+/** Bornes inclusives de la période sélectionnée (null si « Tout »). */
+export const getPeriodBounds = (period) => {
+  if (!period?.preset || period.preset === 'tout') return null
+  const today = new Date()
+  const yNow = today.getFullYear()
+  const pad = (n) => String(n).padStart(2, '0')
+
+  if (period.preset === 'mois' && period.mois) {
+    const [y, m] = period.mois.split('-').map(Number)
+    if (!y || !m) return null
+    const last = new Date(y, m, 0).getDate()
+    return {
+      dateDebut: `${y}-${pad(m)}-01`,
+      dateFin: `${y}-${pad(m)}-${pad(last)}`,
+    }
+  }
+  if (period.preset === 'annee' && period.annee) {
+    const y = Number(period.annee)
+    if (!y) return null
+    return { dateDebut: `${y}-01-01`, dateFin: `${y}-12-31` }
+  }
+  if (period.preset === 'trimestre') {
+    const y = Number(period.trimestreAnnee || yNow)
+    const q = Number(period.trimestreQ || Math.floor(today.getMonth() / 3) + 1)
+    if (!y || q < 1 || q > 4) return null
+    const m0 = (q - 1) * 3 + 1
+    const m1 = m0 + 2
+    const last = new Date(y, m1, 0).getDate()
+    return {
+      dateDebut: `${y}-${pad(m0)}-01`,
+      dateFin: `${y}-${pad(m1)}-${pad(last)}`,
+    }
+  }
+  if (period.preset === 'custom' && period.dateDebut && period.dateFin) {
+    return { dateDebut: period.dateDebut, dateFin: period.dateFin }
+  }
+  return null
+}
+
+/** Vrai si le début de période est strictement après aujourd'hui. */
+export const isPeriodWhollyFuture = (period) => {
+  const bounds = getPeriodBounds(period)
+  if (!bounds?.dateDebut) return false
+  const start = bounds.dateDebut.slice(0, 10)
+  const today = new Date().toISOString().slice(0, 10)
+  return start > today
+}
+
+export const currentTrimestreParts = (d = new Date()) => ({
+  annee: String(d.getFullYear()),
+  q: Math.floor(d.getMonth() / 3) + 1,
+})
 
 export const buildFinanceQuery = (period) => buildFinancePeriodQuery(period)
 
