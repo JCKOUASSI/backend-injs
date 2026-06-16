@@ -623,6 +623,31 @@ class Command(BaseCommand):
                     if cat:
                         if cat not in _secretariat_cache:
                             sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
+                            # Si pas de match exact, tenter par suffixe et résoudre ambiguïté FAB/FAC
+                            if sec is None and len(cat) == 1 and cat in ('A', 'B', 'C', 'D'):
+                                candidates = list(
+                                    SecretariatModel.objects.filter(
+                                        type__libelle__iendswith=f' {cat}'
+                                    )[:2]
+                                )
+                                if len(candidates) == 1:
+                                    sec = candidates[0]
+                                elif len(candidates) > 1:
+                                    # Par défaut : préférer FAB (Formation Administration Base)
+                                    # sauf si le matricule suggère FAC (FNCP*)
+                                    prefers_fab = True
+                                    if matricule and isinstance(matricule, str):
+                                        prefers_fab = not matricule.upper().startswith('FNCP')
+                                    for cand in candidates:
+                                        type_label = (cand.type.libelle if cand.type else '').upper()
+                                        if prefers_fab and type_label.startswith('FAB'):
+                                            sec = cand
+                                            break
+                                        if not prefers_fab and type_label.startswith('FAC'):
+                                            sec = cand
+                                            break
+                                    if sec is None:
+                                        sec = candidates[0]
                             _secretariat_cache[cat] = sec
                             if sec:
                                 self.stdout.write(
