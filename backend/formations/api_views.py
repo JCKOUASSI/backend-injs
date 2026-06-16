@@ -783,17 +783,46 @@ def formateur_list_api(request):
     })
 
 
+def _finance_session_slot_minutes(session):
+    """Créneau EDT d'une séance (minutes) — plafond du réalisé, pas le planifié module."""
+    from .volume_horaire import _session_prevu_minutes
+
+    return round(float(_session_prevu_minutes(session) or 0), 1)
+
+
+def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
+    """
+    Volume planifié contractuel du module sur la période.
+
+    Priorité : référentiel RefModule.volume_horaire → fiche module → prorata
+    sur les séances de la période ; repli créneaux EDT si pas de durée fiche.
+    """
+    from .volume_horaire import module_planned_minutes_for_period
+
+    sessions_in_period = [
+        s for s in (all_sessions or [])
+        if _finance_session_in_range(s, date_debut, date_fin)
+    ]
+    return round(module_planned_minutes_for_period(
+        module,
+        len(sessions_in_period),
+        len(all_sessions or []),
+        sessions_in_period,
+    ), 1)
+
+
 def _session_duration_minutes(session):
-    """Durée d'une séance en minutes (réelle si terminée, sinon prévue)."""
-    if session.demarree_le and session.terminee_le:
-        elapsed = (session.terminee_le - session.demarree_le).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    if session.heure_debut_prevue and session.heure_fin_prevue:
-        start_dt = datetime.combine(session.date_journee, session.heure_debut_prevue)
-        end_dt = datetime.combine(session.date_journee, session.heure_fin_prevue)
-        elapsed = (end_dt - start_dt).total_seconds() / 60
-        return round(elapsed, 1) if elapsed > 0 else 0
-    return 0
+    """Alias conservé : créneau EDT (ne pas utiliser pour le planifié module)."""
+    return _finance_session_slot_minutes(session)
+
+
+def _finance_cap_module_realized(realized_minutes, planned_minutes):
+    """Le réalisé module ne peut pas dépasser le planifié contractuel."""
+    realized = float(realized_minutes or 0)
+    planned = float(planned_minutes or 0)
+    if planned <= 0:
+        return round(realized, 1)
+    return round(min(realized, planned), 1)
 
 
 def _finance_realized_minutes(realized_minutes, planned_minutes):
@@ -853,19 +882,14 @@ def _finance_normalize_label(label):
     return re.sub(r'\s+', ' ', s)
 
 
-def _finance_prix_heure():
-    return float(FinanceSettings.get_solo().prix_heure_realisee or 0)
-
-
 def _finance_build_prix_map():
-    """Retourne (tarif_par_défaut, dict intitulé_formation_normalisé → tarif)."""
-    default = _finance_prix_heure()
+    """Dict intitulé formation normalisé → tarif horaire RefFormation."""
     prix_map = {}
     for ref in RefFormation.objects.exclude(prix_heure_realisee__isnull=True):
         key = _finance_normalize_label(ref.intitule)
         if key:
             prix_map[key] = float(ref.prix_heure_realisee or 0)
-    return default, prix_map
+    return prix_map
 
 
 def _finance_formation_label_candidates(formation_label=None, module_obj=None):
@@ -891,16 +915,14 @@ def _finance_formation_label_candidates(formation_label=None, module_obj=None):
     return ordered
 
 
-def _finance_prix_heure_for_formation(formation_label, prix_map=None, default=None, module_obj=None):
-    if default is None:
-        default = _finance_prix_heure()
+def _finance_prix_heure_for_formation(formation_label, prix_map=None, module_obj=None):
     if prix_map is None:
-        _, prix_map = _finance_build_prix_map()
+        prix_map = _finance_build_prix_map()
     for raw in _finance_formation_label_candidates(formation_label, module_obj):
         key = _finance_normalize_label(raw)
         if key and key in prix_map:
             return prix_map[key]
-    return default
+    return 0.0
 
 
 def _finance_module_formation_label(module_obj):
@@ -913,11 +935,11 @@ def _finance_module_formation_label(module_obj):
     return (module_obj.cycle or '').strip()
 
 
-def _finance_resolve_prix_heure(formation_label, *, prix_heure_override=None, prix_map=None, default=None, module_obj=None):
+def _finance_resolve_prix_heure(formation_label, *, prix_heure_override=None, prix_map=None, module_obj=None):
     if prix_heure_override is not None:
         return float(prix_heure_override or 0)
     return _finance_prix_heure_for_formation(
-        formation_label, prix_map=prix_map, default=default, module_obj=module_obj,
+        formation_label, prix_map=prix_map, module_obj=module_obj,
     )
 
 
@@ -1215,7 +1237,7 @@ def _finance_previous_period(date_debut, date_fin, meta):
     return None
 
 
-def _finance_kpis_from_rows(rows, prix_heure):
+def _finance_kpis_from_rows(rows):
     """Agrège les KPI dashboard à partir des lignes rapport finance."""
     total_formateurs = len(rows)
     formateurs_actifs = sum(1 for r in rows if (r.get('sessions_count') or 0) > 0)
@@ -1238,16 +1260,12 @@ def _finance_kpis_from_rows(rows, prix_heure):
     sessions_avec_pointage = sum(
         int((r.get('statistiques') or {}).get('sessions_avec_pointage') or 0) for r in rows
     )
-    tarifs_variables = any(r.get('tarifs_variables') for r in rows)
     tarifs_appliques = set()
     for r in rows:
-        if r.get('tarifs_variables'):
-            for mod in r.get('modules') or []:
-                ph = mod.get('prix_heure_realisee')
-                if ph is not None:
-                    tarifs_appliques.add(float(ph))
-        elif r.get('prix_heure_realisee') is not None:
-            tarifs_appliques.add(float(r.get('prix_heure_realisee') or 0))
+        for mod in r.get('modules') or []:
+            ph = mod.get('prix_heure_realisee')
+            if ph is not None and float(ph) > 0:
+                tarifs_appliques.add(float(ph))
     prix_heure_moyen_effectif = round(
         total_montant_realise / (total_duree_realisee_minutes / 60), 2,
     ) if total_duree_realisee_minutes > 0 else 0
@@ -1262,9 +1280,8 @@ def _finance_kpis_from_rows(rows, prix_heure):
         'total_duree_realisee_minutes': total_duree_realisee_minutes,
         'total_duree_realisee_heures': total_duree_realisee_heures,
         'total_montant_realise': total_montant_realise,
-        'prix_heure_realisee': prix_heure,
-        'prix_heure_defaut': prix_heure,
-        'tarifs_variables': tarifs_variables,
+        'prix_heure_realisee': prix_heure_moyen_effectif if total_duree_realisee_minutes > 0 else None,
+        'tarifs_variables': True,
         'tarifs_appliques': sorted(tarifs_appliques),
         'prix_heure_moyen_effectif': prix_heure_moyen_effectif,
         'taux_realisation_global_pct': taux_realisation_global,
@@ -1315,7 +1332,9 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
 
     module_ids = list(meta_by_id.keys())
     modules_by_id = {
-        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related('formation', 'secretariat')
+        m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
+            'formation', 'secretariat', 'ref_module',
+        )
     }
     sessions_by_module = {}
     for session in SessionModule.objects.filter(module_id__in=module_ids).order_by('date_journee', 'numero'):
@@ -1326,20 +1345,26 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
         mod_obj = modules_by_id.get(mid)
         if secretariat_id and (not mod_obj or mod_obj.secretariat_id != secretariat_id):
             continue
-        planned = 0.0
-        sessions_count = 0
-        for session in sessions_by_module.get(mid, []):
-            if not _finance_session_in_range(session, date_debut, date_fin):
-                continue
-            sessions_count += 1
-            planned += _session_duration_minutes(session)
-        realized = round(realise_by_id.get(mid, 0.0), 1)
-        montant = round(montant_by_id.get(mid, 0.0), 2)
-        taux = _finance_taux_realisation_pct(
-            taux_realized_by_id.get(mid, 0.0),
-            taux_planned_by_id.get(mid, 0.0),
+        module_sessions = sessions_by_module.get(mid, [])
+        sessions_in_period = [
+            s for s in module_sessions
+            if _finance_session_in_range(s, date_debut, date_fin)
+        ]
+        sessions_count = len(sessions_in_period)
+        if not sessions_count:
+            continue
+        planned = _finance_module_planned_minutes(
+            mod_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
         )
         meta = meta_by_id[mid]
+        realized = _finance_cap_module_realized(realise_by_id.get(mid, 0.0), planned)
+        prix = meta.get('prix_heure_realisee')
+        montant = (
+            _finance_montant_from_minutes(realized, prix)
+            if prix is not None
+            else round(montant_by_id.get(mid, 0.0), 2)
+        )
+        taux = _finance_taux_realisation_pct(realized, planned)
         results.append({
             **meta,
             'sessions_count': sessions_count,
@@ -1503,7 +1528,8 @@ def _finance_report_rows(
     """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus)."""
     use_variable_rates = prix_heure is None
     if use_variable_rates:
-        default_prix, prix_map = _finance_build_prix_map()
+        prix_map = _finance_build_prix_map()
+        default_prix = 0.0
     else:
         default_prix = float(prix_heure or 0)
         prix_map = {}
@@ -1530,7 +1556,7 @@ def _finance_report_rows(
     modules_by_id = {}
     if all_module_ids:
         for module in Module.objects.filter(id__in=all_module_ids).select_related(
-            'formation', 'secretariat', 'site',
+            'formation', 'secretariat', 'site', 'ref_module',
         ):
             modules_by_id[module.id] = module
     sessions_by_module = {}
@@ -1587,15 +1613,63 @@ def _finance_report_rows(
                 module_formation_label,
                 prix_heure_override=None if use_variable_rates else default_prix,
                 prix_map=prix_map,
-                default=default_prix,
                 module_obj=module_obj,
             )
             module_sessions = sessions_by_module.get(module_id, [])
-            for session in module_sessions:
-                if not _finance_session_in_range(session, date_debut, date_fin):
-                    continue
+            sessions_in_period = [
+                s for s in module_sessions
+                if _finance_session_in_range(s, date_debut, date_fin)
+            ]
+            if not sessions_in_period:
+                continue
+
+            module_planned = _finance_module_planned_minutes(
+                module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
+            )
+            total_minutes += module_planned
+            taux_planned_minutes += module_planned
+            module_realized_sum = 0.0
+
+            if module_obj:
+                grade_val = (module_obj.grade or '').strip()
+                groupe_val = (module_obj.groupe or '').strip()
+                if grade_val:
+                    grades_seen.add(grade_val)
+                if groupe_val:
+                    groupes_seen.add(groupe_val)
+
+            mod_entry = modules_data.setdefault(module_id, {
+                'module_id': module_id,
+                'module_intitule': module_obj.intitule if module_obj else '',
+                'formation_intitule': (
+                    module_obj.formation.formation if module_obj and module_obj.formation_id else ''
+                ),
+                'grade': module_obj.grade if module_obj else '',
+                'groupe': module_obj.groupe if module_obj else '',
+                'statut': module_obj.statut if module_obj else '',
+                'site': (
+                    module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
+                    else (module_obj.site_legacy if module_obj else '')
+                ),
+                'salle': module_obj.salle if module_obj else '',
+                'date_debut': module_obj.date_debut if module_obj else None,
+                'date_fin': module_obj.date_fin if module_obj else None,
+                'secretariat_nom': (
+                    f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                    if module_obj and module_obj.secretariat_id else ''
+                ),
+                'sessions_count': 0,
+                'total_duree_minutes': 0.0,
+                'total_duree_realisee_minutes': 0.0,
+                'taux_planned_minutes': 0.0,
+                'taux_realized_capped_minutes': 0.0,
+                'montant_realise': 0.0,
+                'prix_heure_realisee': module_prix_heure,
+            })
+
+            for session in sessions_in_period:
                 session_count += 1
-                duration_minutes = _session_duration_minutes(session)
+                session_slot = _finance_session_slot_minutes(session)
                 raw_realized_minutes = round(
                     realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1,
                 )
@@ -1606,13 +1680,9 @@ def _finance_report_rows(
                     if session_realized > 0:
                         raw_realized_minutes = session_realized
                 realized_minutes = _finance_realized_minutes(
-                    raw_realized_minutes, duration_minutes,
+                    raw_realized_minutes, session_slot,
                 )
-                total_minutes += duration_minutes
-                total_realized_minutes += realized_minutes
-                if duration_minutes > 0:
-                    taux_planned_minutes += duration_minutes
-                    taux_realized_capped_minutes += realized_minutes
+                module_realized_sum += realized_minutes
                 if raw_realized_minutes > 0:
                     sessions_with_pointage += 1
                 if session.date_journee:
@@ -1632,56 +1702,13 @@ def _finance_report_rows(
                             global_aggregates['date_min'] = d
                         if cur_max is None or d > cur_max:
                             global_aggregates['date_max'] = d
-                if module_obj:
-                    grade_val = (module_obj.grade or '').strip()
-                    groupe_val = (module_obj.groupe or '').strip()
-                    if grade_val:
-                        grades_seen.add(grade_val)
-                    if groupe_val:
-                        groupes_seen.add(groupe_val)
-                mod_entry = modules_data.setdefault(module_id, {
-                    'module_id': module_id,
-                    'module_intitule': session.module.intitule if session.module else '',
-                    'formation_intitule': (
-                        session.module.formation.formation if session.module and session.module.formation else ''
-                    ),
-                    'grade': module_obj.grade if module_obj else '',
-                    'groupe': module_obj.groupe if module_obj else '',
-                    'statut': module_obj.statut if module_obj else '',
-                    'site': (
-                        module_obj.site.nom if module_obj and module_obj.site_id and module_obj.site
-                        else (module_obj.site_legacy if module_obj else '')
-                    ),
-                    'salle': module_obj.salle if module_obj else '',
-                    'date_debut': module_obj.date_debut if module_obj else None,
-                    'date_fin': module_obj.date_fin if module_obj else None,
-                    'secretariat_nom': (
-                        f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
-                        if module_obj and module_obj.secretariat_id else ''
-                    ),
-                    'sessions_count': 0,
-                    'total_duree_minutes': 0.0,
-                    'total_duree_realisee_minutes': 0.0,
-                    'taux_planned_minutes': 0.0,
-                    'taux_realized_capped_minutes': 0.0,
-                    'montant_realise': 0.0,
-                    'prix_heure_realisee': module_prix_heure,
-                })
                 mod_entry['sessions_count'] += 1
-                mod_entry['total_duree_minutes'] += duration_minutes
-                mod_entry['total_duree_realisee_minutes'] += realized_minutes
-                if duration_minutes > 0:
-                    mod_entry['taux_planned_minutes'] += duration_minutes
-                    mod_entry['taux_realized_capped_minutes'] += realized_minutes
-                mod_entry['montant_realise'] = _finance_montant_from_minutes(
-                    mod_entry['total_duree_realisee_minutes'], module_prix_heure,
-                )
                 if use_variable_rates and module_prix_heure is not None:
                     rates_used.add(module_prix_heure)
                 if include_sessions:
                     taux_sess = (
-                        _finance_taux_realisation_pct(realized_minutes, duration_minutes)
-                        if duration_minutes > 0 else 0
+                        _finance_taux_realisation_pct(realized_minutes, session_slot)
+                        if session_slot > 0 else 0
                     )
                     sessions_data.append({
                         'session_id': session.id,
@@ -1696,13 +1723,26 @@ def _finance_report_rows(
                         ),
                         'grade': module_obj.grade if module_obj else '',
                         'groupe': module_obj.groupe if module_obj else '',
-                        'duree_minutes': duration_minutes,
+                        'duree_minutes': session_slot,
                         'duree_realisee_minutes': realized_minutes,
                         'montant_realise': _finance_montant_from_minutes(realized_minutes, module_prix_heure),
                         'prix_heure_realisee': module_prix_heure,
                         'taux_realisation_pct': taux_sess,
                         'a_pointage': raw_realized_minutes > 0,
                     })
+
+            module_realized_capped = _finance_cap_module_realized(
+                module_realized_sum, module_planned,
+            )
+            total_realized_minutes += module_realized_capped
+            taux_realized_capped_minutes += module_realized_capped
+            mod_entry['total_duree_minutes'] = module_planned
+            mod_entry['total_duree_realisee_minutes'] = module_realized_capped
+            mod_entry['taux_planned_minutes'] = module_planned
+            mod_entry['taux_realized_capped_minutes'] = module_realized_capped
+            mod_entry['montant_realise'] = _finance_montant_from_minutes(
+                module_realized_capped, module_prix_heure,
+            )
         modules_list = []
         for mid in module_ids:
             entry = modules_data.get(mid)
@@ -1725,14 +1765,12 @@ def _finance_report_rows(
             entry['taux_realized_capped_minutes'] = round(float(entry.get('taux_realized_capped_minutes') or 0), 1)
             modules_list.append(entry)
         montant_total = round(sum(float(m.get('montant_realise') or 0) for m in modules_list), 2)
-        row_prix_heure = default_prix
-        tarifs_variables = False
         if use_variable_rates:
-            if len(rates_used) == 1:
-                row_prix_heure = next(iter(rates_used))
-            elif len(rates_used) > 1:
-                row_prix_heure = None
-                tarifs_variables = True
+            row_prix_heure = None
+            tarifs_variables = bool(modules_list)
+        else:
+            row_prix_heure = default_prix
+            tarifs_variables = False
         statistiques = _finance_build_statistiques(
             total_minutes=total_minutes,
             total_realized_minutes=total_realized_minutes,
@@ -1949,8 +1987,7 @@ def finance_dashboard_api(request):
     date_min = global_aggregates.get('date_min')
     date_max = global_aggregates.get('date_max')
 
-    prix_heure = _finance_prix_heure()
-    kpis = _finance_kpis_from_rows(rows, prix_heure)
+    kpis = _finance_kpis_from_rows(rows)
 
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
@@ -1985,9 +2022,12 @@ def finance_dashboard_api(request):
     periode_payload['description'] = (
         period['meta'].get('description')
         or (
-            'Le temps réalisé provient des pointages (badgeage), plafonné à la durée planifiée '
-            'de chaque séance (0 si la séance n’a pas d’horaire). '
-            'Le taux de réalisation exclut les séances sans horaire. '
+            'Le temps planifié repose sur le volume horaire contractuel du module '
+            '(référentiel matière, fiche module, proratisé sur les séances de la période). '
+            'Le temps réalisé provient des pointages (badgeage), plafonné au créneau EDT '
+            'de chaque séance puis au planifié contractuel du module (le réalisé ne peut '
+            'pas dépasser le planifié). '
+            'Le taux de réalisation compare le réalisé au planifié contractuel du module. '
             'Les montants sont calculés heure par heure selon le tarif du cycle de formation '
             'concerné (paramétrage Finance).'
         )
@@ -2006,7 +2046,7 @@ def finance_dashboard_api(request):
                 date_fin=prev_period['date_fin'],
                 secretariat_id=secretariat_id,
             )
-            prev_kpis = _finance_kpis_from_rows(prev_rows, prix_heure)
+            prev_kpis = _finance_kpis_from_rows(prev_rows)
             comparaison = {
                 'periode': _finance_periode_payload(
                     prev_period['date_debut'],
@@ -2054,7 +2094,7 @@ def finance_dashboard_api(request):
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def finance_settings_api(request):
-    """Paramètres finance : tarif horaire par défaut et tarifs par formation (référentiel)."""
+    """Paramètres finance : tarifs horaires par formation (référentiel) et exports."""
     if not _check_finance_access(request):
         return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
 
@@ -2076,7 +2116,6 @@ def finance_settings_api(request):
 
     def _settings_payload():
         return {
-            'prix_heure_realisee': float(settings_obj.prix_heure_realisee or 0),
             'tarifs_formations': _serialize_tarifs(),
             'afficher_montants_exports': bool(settings_obj.afficher_montants_exports),
             'export_titre_document': settings_obj.export_titre_document or '',
@@ -2102,19 +2141,6 @@ def finance_settings_api(request):
         return Response({'detail': 'Seul le service Finance peut modifier les paramètres.'}, status=403)
 
     updated = False
-
-    if 'prix_heure_realisee' in request.data:
-        raw = request.data.get('prix_heure_realisee')
-        if raw is None or raw == '':
-            return Response({'detail': 'prix_heure_realisee invalide.'}, status=400)
-        try:
-            prix = float(raw)
-        except (TypeError, ValueError):
-            return Response({'detail': 'prix_heure_realisee invalide.'}, status=400)
-        if prix < 0:
-            return Response({'detail': 'Le prix doit être positif ou nul.'}, status=400)
-        settings_obj.prix_heure_realisee = round(prix, 2)
-        updated = True
 
     tarifs = request.data.get('tarifs_formations')
     if tarifs is not None:

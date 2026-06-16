@@ -35,7 +35,6 @@ export default function FinanceParametrage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [prix, setPrix] = useState('')
   const [tarifs, setTarifs] = useState([])
   const [toleranceSettings, setToleranceSettings] = useState({
     tolerance_active: false,
@@ -61,7 +60,6 @@ export default function FinanceParametrage() {
       setLoading(true)
       try {
         const res = await api.get('/formations/finance/settings/')
-        setPrix(String(res.data?.prix_heure_realisee ?? 0))
         setTarifs(
           (res.data?.tarifs_formations ?? []).map((t) => ({
             ...t,
@@ -177,12 +175,11 @@ export default function FinanceParametrage() {
     setToleranceSettings((prev) => ({ ...prev, [key]: value }))
   }
 
-  const prixNum = Number(prix) || 0
   const tarifsActifs = tarifs.filter((t) => t.actif !== false)
   const tarifsInactifs = tarifs.filter((t) => t.actif === false)
 
   const renderTarifRow = (t) => {
-    const effective = t.prix_heure_realisee !== '' ? Number(t.prix_heure_realisee) : prixNum
+    const hasTarif = t.prix_heure_realisee !== '' && t.prix_heure_realisee != null
     return (
       <tr key={t.id} className={t.actif === false ? 'text-muted' : ''}>
         <td>
@@ -198,7 +195,7 @@ export default function FinanceParametrage() {
               className="form-control"
               min="0"
               step="0.01"
-              placeholder={String(prixNum)}
+              placeholder="—"
               value={t.prix_heure_realisee}
               onChange={(e) => handleTarifChange(t.id, e.target.value)}
               disabled={!canEdit || saving}
@@ -207,9 +204,9 @@ export default function FinanceParametrage() {
           </div>
         </td>
         <td className="text-muted small">
-          {t.prix_heure_realisee === ''
-            ? `Défaut (${formatMoney(prixNum)} FCFA / h)`
-            : `${formatMoney(effective)} FCFA / h`}
+          {hasTarif
+            ? `${formatMoney(Number(t.prix_heure_realisee))} FCFA / h`
+            : <span className="text-warning">Non défini</span>}
         </td>
       </tr>
     )

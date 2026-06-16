@@ -239,9 +239,7 @@ export default function FinanceDetailModal({
                       <div>
                         <small className="text-muted">Tarif horaire</small>
                         <div style={{ fontWeight: 600 }}>
-                          {financeDetail.tarifs_variables
-                            ? 'Variable (selon la formation)'
-                            : `${formatMoney(financeDetail.prix_heure_realisee ?? 0)} FCFA / h`}
+                          Selon la formation
                         </div>
                       </div>
                       <div>
@@ -260,10 +258,10 @@ export default function FinanceDetailModal({
                     </div>
                   </div>
 
-                  {!financeDetail.tarifs_variables && (financeDetail.prix_heure_realisee ?? 0) <= 0 && (
+                  {(financeDetail.modules ?? []).some((m) => !(Number(m.prix_heure_realisee) > 0)) && (
                     <div className="alert alert-warning py-2 small">
                       <i className="bi bi-exclamation-triangle me-1"></i>
-                      Tarif non défini — <Link to="/finance-parametrage">Paramétrage Finance</Link>
+                      Tarif non défini pour une ou plusieurs formations — <Link to="/finance-parametrage">Paramétrage Finance</Link>
                     </div>
                   )}
 

@@ -62,13 +62,10 @@ const HERO_KPIS = [
     format: 'money',
     evolutionKey: 'total_montant_realise',
     sub: (kpis) => {
-      if (kpis.tarifs_variables) {
-        const n = Array.isArray(kpis.tarifs_appliques) ? kpis.tarifs_appliques.length : 0
-        return n > 1
-          ? `Facturation selon le tarif de chaque formation (${n} tarifs appliqués)`
-          : 'Facturation selon le tarif de chaque formation'
-      }
-      return `Tarif unique ${formatMoney(kpis.prix_heure_realisee)} FCFA / h`
+      const n = Array.isArray(kpis.tarifs_appliques) ? kpis.tarifs_appliques.length : 0
+      return n > 1
+        ? `Facturation selon le tarif de chaque formation (${n} tarifs appliqués)`
+        : 'Facturation selon le tarif de chaque formation'
     },
   },
 ]
@@ -242,7 +239,7 @@ export default function FinanceDashboard() {
         </div>
       )}
 
-      {!loading && kpis.tarifs_variables && (
+      {!loading && (
         <div className="alert alert-info py-2 small mb-3">
           <i className="bi bi-info-circle me-1"></i>
           Les montants sont calculés avec le <strong>tarif horaire propre à chaque type de formation</strong>

@@ -59,7 +59,7 @@ def finance_encadrants_report(*, date_debut=None, date_fin=None, secretariat_id=
         )
         realized = round(float(vol['realise_min'] or 0), 1)
         if planned > 0:
-            realized = min(realized, planned)
+            realized = round(min(realized, planned), 1)
 
         enc = module.superviseur
         enc_key = enc.id
