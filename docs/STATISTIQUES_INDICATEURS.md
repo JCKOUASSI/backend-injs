@@ -84,7 +84,7 @@ _taux(a, b) = round(a / b × 100, 1)   si b > 0, sinon 0
 | `sessions_terminees` | `count_sessions_comptabilisables` | Séances comptabilisables + **filtre période** |
 | `sessions_en_cours` | `SessionModule` | `demarree_le` présent, `terminee_le` absent |
 | `pointages` | `Pointage` | Tous statuts, périmètre filtré |
-| `vh_prevu_heures` | `compute_volume_horaire_from_module_ids` | Prévu contractuel (`duree_prevue_heures` proratisé) + période |
+| `vh_prevu_heures` | `compute_volume_horaire_from_module_ids` | Σ créneaux EDT des séances de la période |
 | `vh_realise_heures` | idem | Réalisé sur séances terminées (durée plafonnée au créneau) |
 | `taux_execution_vh` | idem | `min(réalisé, prévu) / prévu × 100` |
 

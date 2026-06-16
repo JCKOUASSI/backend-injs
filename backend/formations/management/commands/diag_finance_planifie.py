@@ -248,7 +248,7 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'  TOTAL Finance planifié (contractuel module) : {_fmt_h(planned)} '
+            f'  TOTAL Finance planifié (Σ créneaux EDT période) : {_fmt_h(planned)} '
             f'({planned / 60:.2f} h, arrondi UI ≈ {round(planned / 60)} h)'
         ))
         self.stdout.write(f'  Σ créneaux EDT (période) : {_fmt_h(total_edt)} ({total_edt / 60:.2f} h)')

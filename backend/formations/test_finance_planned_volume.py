@@ -134,3 +134,26 @@ class FinancePlannedVolumeTest(TestCase):
             self.module, sessions, date_debut=today, date_fin=today,
         )
         self.assertEqual(planned, 600.0)  # 2 séances du jour, pas la séance future
+
+    def test_assigned_module_visible_even_without_sessions_in_period(self):
+        """Module rattaché au formateur : visible même si aucune séance dans la période."""
+        future = timezone.localdate() + timedelta(days=60)
+        SessionModule.objects.filter(module=self.module).update(date_journee=future)
+        today = timezone.localdate()
+        rows = _finance_report_rows(
+            [self.formateur],
+            include_sessions=True,
+            date_debut=today,
+            date_fin=today,
+        )
+        self.assertEqual(len(rows[0]['recap_modules']), 1)
+        self.assertEqual(rows[0]['recap_modules'][0]['module_intitule'], 'Finances Publiques')
+        self.assertEqual(rows[0]['recap_modules'][0]['total_duree_minutes'], 0.0)
+        self.assertEqual(rows[0]['sessions_count'], 0)
+
+    def test_canonical_volume_horaire_uses_session_slots(self):
+        from .volume_horaire import compute_volume_horaire_from_module_ids
+
+        totals = compute_volume_horaire_from_module_ids([self.module.id])
+        self.assertEqual(totals['prevu_minutes'], 600.0)
+        self.assertEqual(totals['prevu_heures'], 10.0)

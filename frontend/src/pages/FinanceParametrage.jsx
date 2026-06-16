@@ -52,6 +52,9 @@ export default function FinanceParametrage() {
     export_mention_legale: '',
     export_signataire_nom: '',
     export_signataire_fonction: '',
+    export_contacts: '',
+    export_pied_page_titre: '',
+    export_pied_page_texte: '',
   })
   const [meta, setMeta] = useState({ updated_at: null, updated_by: null })
 
@@ -82,6 +85,9 @@ export default function FinanceParametrage() {
           export_mention_legale: res.data?.export_mention_legale || '',
           export_signataire_nom: res.data?.export_signataire_nom || '',
           export_signataire_fonction: res.data?.export_signataire_fonction || '',
+          export_contacts: res.data?.export_contacts || '',
+          export_pied_page_titre: res.data?.export_pied_page_titre || '',
+          export_pied_page_texte: res.data?.export_pied_page_texte || '',
         })
         setMeta({
           updated_at: res.data?.updated_at || null,
@@ -158,6 +164,9 @@ export default function FinanceParametrage() {
         export_mention_legale: res.data?.export_mention_legale || '',
         export_signataire_nom: res.data?.export_signataire_nom || '',
         export_signataire_fonction: res.data?.export_signataire_fonction || '',
+        export_contacts: res.data?.export_contacts || '',
+        export_pied_page_titre: res.data?.export_pied_page_titre || '',
+        export_pied_page_texte: res.data?.export_pied_page_texte || '',
       })
       showToast('Paramètres enregistrés')
     } catch (err) {
@@ -404,13 +413,14 @@ export default function FinanceParametrage() {
                 />
               </div>
               <div className="col-12">
-                <label className="form-label">Adresse / coordonnées</label>
+                <label className="form-label">Coordonnées en-tête (synthèse globale)</label>
                 <textarea
                   className="form-control"
                   rows={2}
                   value={exportSettings.export_adresse}
                   onChange={(e) => setExportField('export_adresse', e.target.value)}
                   disabled={!canEdit || saving}
+                  placeholder="Optionnel — affiché en haut des exports synthèse / paie globale"
                 />
               </div>
               <div className="col-md-6">
@@ -424,14 +434,61 @@ export default function FinanceParametrage() {
                 />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Mention légale (pied de page)</label>
+                <label className="form-label">Note NB (sous le tableau modules)</label>
                 <textarea
                   className="form-control"
                   rows={2}
                   value={exportSettings.export_mention_legale}
                   onChange={(e) => setExportField('export_mention_legale', e.target.value)}
                   disabled={!canEdit || saving}
+                  placeholder="NB : Le volume horaire indiqué ne tient pas compte des heures…"
                 />
+              </div>
+              <div className="col-12">
+                <label className="form-label">Contacts (fiche récap formateur)</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={exportSettings.export_contacts}
+                  onChange={(e) => setExportField('export_contacts', e.target.value)}
+                  disabled={!canEdit || saving}
+                  placeholder={'Pour toute information complémentaire, veuillez contacter :\nNom et téléphone du contact 1\nNom et téléphone du contact 2'}
+                />
+                <p className="text-muted small mb-0 mt-1">
+                  Une ligne par phrase ou contact. Laissez vide pour conserver les contacts par défaut du CPFAE.
+                </p>
+              </div>
+            </div>
+
+            <h6 className="fw-semibold mb-3 mt-2">
+              <i className="bi bi-layout-text-window-reverse me-2"></i>
+              Pied de page (fiche récap formateur)
+            </h6>
+            <div className="row g-3 mb-3">
+              <div className="col-md-6">
+                <label className="form-label">Titre</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={exportSettings.export_pied_page_titre}
+                  onChange={(e) => setExportField('export_pied_page_titre', e.target.value)}
+                  disabled={!canEdit || saving}
+                  placeholder="DOCUMENT CONFIDENTIEL"
+                />
+              </div>
+              <div className="col-12">
+                <label className="form-label">Texte institutionnel</label>
+                <textarea
+                  className="form-control"
+                  rows={5}
+                  value={exportSettings.export_pied_page_texte}
+                  onChange={(e) => setExportField('export_pied_page_texte', e.target.value)}
+                  disabled={!canEdit || saving}
+                  placeholder="MINISTERE D'ETAT, MINISTERE DE LA FONCTION PUBLIQUE… Bouaké / Abidjan : coordonnées"
+                />
+                <p className="text-muted small mb-0 mt-1">
+                  Affiché en bas de la fiche PDF/Excel formateur (sous les contacts). Laissez vide pour le texte CPFAE par défaut.
+                </p>
               </div>
             </div>
 
