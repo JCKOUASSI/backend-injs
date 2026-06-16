@@ -77,12 +77,13 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
 
 
 def module_contractual_planned_minutes(module):
-    """Volume horaire contractuel (minutes) : référentiel ou fiche module (info / diagnostic)."""
+    """Volume horaire contractuel (minutes) : référentiel uniquement (RefModule.volume_horaire).
+    Ignore Module.duree_prevue_heures car souvent rempli à tort à la somme brute EDT à l'import."""
     if not module:
         return 0.0
-    from .duree_prevue_resolve import resolve_module_duree_prevue_heures
+    from .duree_prevue_resolve import _ref_module_volume_hours
 
-    heures, _ = resolve_module_duree_prevue_heures(module, include_current=True)
+    heures = _ref_module_volume_hours(module)
     return heures * 60 if heures > 0 else 0.0
 
 
@@ -92,8 +93,7 @@ def module_planned_minutes_for_period(
     total_sessions_count,
     sessions_in_period=None,
 ):
-    """Planifié période = duree_prevue_heures (contractuelle) si disponible,
-    sinon somme des créneaux horaires des séances de la période."""
+    """Planifié période = RefModule.volume_horaire si renseigné, sinon Σ créneaux EDT période."""
     if not sessions_in_period:
         return 0.0
     contractual = module_contractual_planned_minutes(module)
@@ -183,7 +183,7 @@ def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin
 
     modules_by_id = {
         m.id: m
-        for m in Module.objects.filter(id__in=module_ids).only('duree_prevue_heures')
+        for m in Module.objects.filter(id__in=module_ids).select_related('ref_module')
     }
     sessions = SessionModule.objects.filter(module_id__in=module_ids).only(
         'module_id',
@@ -235,7 +235,7 @@ def compute_volume_horaire_per_module_ids(
 
     modules_by_id = {
         m.id: m
-        for m in Module.objects.filter(id__in=module_ids).only('duree_prevue_heures')
+        for m in Module.objects.filter(id__in=module_ids).select_related('ref_module')
     }
     sessions = SessionModule.objects.filter(module_id__in=module_ids).only(
         'module_id',

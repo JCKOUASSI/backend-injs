@@ -366,26 +366,6 @@ export default function Formateurs() {
                 <i className="bi bi-file-earmark-pdf me-1"></i>
                 {exportingSynthese ? 'Export…' : 'Paie globale PDF'}
               </button>
-              <button
-                type="button"
-                className="btn btn-outline-primary btn-sm"
-                disabled={exportingEncadrants || loading}
-                onClick={() => exportFinanceEncadrants('excel')}
-                title="Liste encadrants : groupe, volumes planifié et réalisé"
-              >
-                <i className="bi bi-person-badge me-1"></i>
-                {exportingEncadrants ? 'Export…' : 'Encadrants Excel'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline-secondary btn-sm"
-                disabled={exportingEncadrants || loading}
-                onClick={() => exportFinanceEncadrants('pdf')}
-                title="Liste encadrants PDF"
-              >
-                <i className="bi bi-file-earmark-pdf me-1"></i>
-                {exportingEncadrants ? 'Export…' : 'Encadrants PDF'}
-              </button>
             </div>
           </div>
         </div>

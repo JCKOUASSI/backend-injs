@@ -22,13 +22,29 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
+
+        # Étape 1 : normaliser tous les intitulés existants (majuscules + espaces)
+        normalized = 0
+        for ref in RefModule.objects.all():
+            normalized_val = RefModule.normalize_intitule(ref.intitule)
+            if ref.intitule != normalized_val:
+                self.stdout.write(f'  Normalisation : « {ref.intitule} » → « {normalized_val} »')
+                if not dry_run:
+                    ref.intitule = normalized_val
+                    ref.save(update_fields=['intitule'])
+                normalized += 1
+        if normalized:
+            self.stdout.write(self.style.WARNING(
+                f'{"[dry-run] " if dry_run else ""}{normalized} intitulé(s) normalisé(s).'
+            ))
+
         seen = {}
         merged = 0
 
         for ref in RefModule.objects.annotate(
             intitule_norm=Lower('intitule'),
         ).order_by('id'):
-            key = RefModule.normalize_intitule(ref.intitule).upper()
+            key = RefModule.normalize_intitule(ref.intitule)
             if not key:
                 continue
             if key not in seen:

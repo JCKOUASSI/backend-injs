@@ -172,10 +172,14 @@ class RefModule(models.Model):
 
     @staticmethod
     def normalize_intitule(value):
-        """Normalise un intitulé pour la recherche dans le référentiel (trim + espaces)."""
+        """Normalise un intitulé : trim, espaces multiples → un seul, majuscules."""
         if value is None:
             return ''
-        return ' '.join(str(value).split())
+        return ' '.join(str(value).split()).upper()
+
+    def save(self, *args, **kwargs):
+        self.intitule = RefModule.normalize_intitule(self.intitule)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
