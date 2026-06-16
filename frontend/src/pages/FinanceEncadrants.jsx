@@ -111,7 +111,7 @@ export default function FinanceEncadrants() {
               onClick={() => exportEncadrants('excel')}
             >
               <i className="bi bi-file-earmark-spreadsheet me-1"></i>
-              {exporting ? 'Export…' : 'Excel'}
+              {exporting ? 'Export…' : 'Encadrants Excel'}
             </button>
             <button
               type="button"
@@ -120,7 +120,7 @@ export default function FinanceEncadrants() {
               onClick={() => exportEncadrants('pdf')}
             >
               <i className="bi bi-file-earmark-pdf me-1"></i>
-              {exporting ? 'Export…' : 'PDF'}
+              {exporting ? 'Export…' : 'Encadrants PDF'}
             </button>
           </div>
         </div>

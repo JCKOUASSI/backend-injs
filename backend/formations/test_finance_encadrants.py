@@ -53,7 +53,7 @@ class FinanceEncadrantsTest(TestCase):
         self.assertEqual(len(block['lignes']), 1)
         ligne = block['lignes'][0]
         self.assertEqual(ligne['groupe'], 'GROUPE 4')
-        self.assertEqual(ligne['planned_minutes'], 120.0)  # créneau EDT 8h–10h
+        self.assertEqual(ligne['planned_minutes'], 120.0)  # pas de RefModule → fallback créneau EDT 8h–10h
         self.assertEqual(ligne['realized_minutes'], 120.0)
         self.assertEqual(data['totaux']['lignes_count'], 1)
 

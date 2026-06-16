@@ -54,24 +54,24 @@ class FinancePlannedVolumeTest(TestCase):
             heure_fin_prevue=dt_time(18, 0),
         )
 
-    def test_module_planned_sums_session_slots(self):
+    def test_module_planned_uses_contractual_duree_prevue(self):
         sessions = list(SessionModule.objects.filter(module=self.module))
         planned = _finance_module_planned_minutes(self.module, sessions)
-        self.assertEqual(planned, 600.0)  # 2 × 5 h créneaux EDT
+        self.assertEqual(planned, 1800.0)  # duree_prevue_heures=30 prioritaire sur Σ EDT
 
-    def test_report_rows_module_planned_from_session_slots(self):
+    def test_report_rows_module_planned_from_contractual_duree(self):
         rows = _finance_report_rows([self.formateur], include_sessions=True)
         self.assertEqual(len(rows), 1)
         mod = rows[0]['modules'][0]
-        self.assertEqual(mod['total_duree_minutes'], 600.0)
-        self.assertEqual(rows[0]['total_duree_minutes'], 600.0)
+        self.assertEqual(mod['total_duree_minutes'], 1800.0)  # duree_prevue_heures=30
+        self.assertEqual(rows[0]['total_duree_minutes'], 1800.0)
         self.assertEqual(mod['sessions_count'], 2)
         sess = rows[0]['sessions']
         self.assertEqual(len(sess), 2)
-        self.assertEqual(sess[0]['duree_minutes'], 300.0)
+        self.assertEqual(sess[0]['duree_minutes'], 300.0)  # créneau EDT session inchangé
 
     def test_realized_capped_at_module_planned(self):
-        """Somme réalisée séances plafonnée au planifié (Σ créneaux EDT)."""
+        """Somme réalisée séances plafonnée au planifié contractuel (duree_prevue_heures)."""
         small = Module.objects.create(
             formation=self.formation,
             intitule='Petit module',
@@ -95,15 +95,15 @@ class FinancePlannedVolumeTest(TestCase):
             )
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         small_mod = next(m for m in rows[0]['modules'] if m['module_id'] == small.id)
-        self.assertEqual(small_mod['total_duree_minutes'], 600.0)  # 2 × 5 h EDT
-        self.assertEqual(small_mod['total_duree_realisee_minutes'], 240.0)  # 2 × 2 h badge
+        self.assertEqual(small_mod['total_duree_minutes'], 120.0)  # duree_prevue_heures=2 → 120 min
+        self.assertEqual(small_mod['total_duree_realisee_minutes'], 120.0)  # 2 × 2 h badge plafonnés à 120 min
         self.assertLessEqual(small_mod['total_duree_realisee_minutes'], small_mod['total_duree_minutes'])
 
-    def test_dashboard_breakdown_module_planned_from_session_slots(self):
+    def test_dashboard_breakdown_module_planned_from_contractual_duree(self):
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         breakdown = _finance_dashboard_modules_breakdown(rows, date_debut=None, date_fin=None)
         fin = next(b for b in breakdown if b['module_id'] == self.module.id)
-        self.assertEqual(fin['total_duree_minutes'], 600.0)
+        self.assertEqual(fin['total_duree_minutes'], 1800.0)  # duree_prevue_heures=30
         self.assertEqual(fin['sessions_count'], 2)
         self.assertLessEqual(
             fin['total_duree_realisee_minutes'],
@@ -119,7 +119,9 @@ class FinancePlannedVolumeTest(TestCase):
                 row['total_duree_minutes'],
             )
 
-    def test_partial_period_sums_only_sessions_in_range(self):
+    def test_partial_period_contractual_planned_ignores_period_filter(self):
+        """Quand duree_prevue_heures est renseigné, le planifié contractuel s'applique
+        dès qu'il y a au moins une séance dans la période (pas de prorata)."""
         future = timezone.localdate() + timedelta(days=30)
         SessionModule.objects.create(
             module=self.module,
@@ -133,7 +135,7 @@ class FinancePlannedVolumeTest(TestCase):
         planned = _finance_module_planned_minutes(
             self.module, sessions, date_debut=today, date_fin=today,
         )
-        self.assertEqual(planned, 600.0)  # 2 séances du jour, pas la séance future
+        self.assertEqual(planned, 1800.0)  # duree_prevue_heures=30 prioritaire
 
     def test_assigned_module_visible_even_without_sessions_in_period(self):
         """Module rattaché au formateur : visible même si aucune séance dans la période."""
@@ -151,9 +153,9 @@ class FinancePlannedVolumeTest(TestCase):
         self.assertEqual(rows[0]['recap_modules'][0]['total_duree_minutes'], 0.0)
         self.assertEqual(rows[0]['sessions_count'], 0)
 
-    def test_canonical_volume_horaire_uses_session_slots(self):
+    def test_canonical_volume_horaire_uses_contractual_duree(self):
         from .volume_horaire import compute_volume_horaire_from_module_ids
 
         totals = compute_volume_horaire_from_module_ids([self.module.id])
-        self.assertEqual(totals['prevu_minutes'], 600.0)
-        self.assertEqual(totals['prevu_heures'], 10.0)
+        self.assertEqual(totals['prevu_minutes'], 1800.0)  # duree_prevue_heures=30
+        self.assertEqual(totals['prevu_heures'], 30.0)
