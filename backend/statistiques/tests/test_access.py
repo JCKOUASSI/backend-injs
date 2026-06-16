@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 from authentication.models import User
 from formations.models import Formation, Module, Secretariat
 from statistiques.access import resolve_stats_scope, rapport_accessible, user_secretariat_scope_locked
-from statistiques.models import Rapport
+from statistiques.models import ConfigAlerteSeuil, Rapport
 
 
 def make_user(username, role='CPFAE_ADMIN', **kwargs):
@@ -113,6 +113,33 @@ class StatistiquesAPIAccessTests(TestCase):
         self.client.force_authenticate(user)
         res = self.client.get('/api/statistiques/?sections=kpis')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_put_alertes_seuils_accepts_list_body(self):
+        admin = make_user('admin_seuils', role='CPFAE_ADMIN')
+        ConfigAlerteSeuil.objects.create(
+            indicateur='taux_presence',
+            seuil_avertissement=75,
+            seuil_critique=60,
+            actif=True,
+        )
+        self.client.force_authenticate(admin)
+        res = self.client.put(
+            '/api/statistiques/alertes/seuils/',
+            [
+                {
+                    'indicateur': 'taux_presence',
+                    'seuil_avertissement': 80,
+                    'seuil_critique': 65,
+                    'actif': True,
+                },
+            ],
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['detail'], 'Seuils mis à jour.')
+        seuil = ConfigAlerteSeuil.objects.get(indicateur='taux_presence')
+        self.assertEqual(seuil.seuil_avertissement, 80)
+        self.assertEqual(seuil.seuil_critique, 65)
 
 
 class RapportAccessTests(TestCase):

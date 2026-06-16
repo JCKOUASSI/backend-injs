@@ -147,8 +147,10 @@ def _scope_from_request(request, *, parse_module_id=False):
     def _int_key(key):
         v = request.query_params.get(key)
         if v is None and hasattr(request, 'data'):
-            raw = request.data.get(key)
-            v = raw if raw is not None else None
+            data = request.data
+            if isinstance(data, dict):
+                raw = data.get(key)
+                v = raw if raw is not None else None
         return int(v) if v is not None and str(v).isdigit() else None
 
     scope, err = resolve_stats_scope(
