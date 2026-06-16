@@ -161,6 +161,32 @@ class ModuleAPITest(TestCase):
         self.assertIn('participants', data)
         self.assertIn('formateurs', data)
         self.assertIn('presences', data)
+        self.assertIn('duree_totale_heures', data)
+        self.assertIn('duree_contractuelle_heures', data)
+        self.assertIn('duree_planifiee_heures', data)
+
+    def test_module_full_duree_totale_somme_seances(self):
+        SessionModule.objects.create(
+            module=self.m,
+            numero=1,
+            date_journee=timezone.localdate(),
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(12, 0),
+        )
+        SessionModule.objects.create(
+            module=self.m,
+            numero=2,
+            date_journee=timezone.localdate() + timedelta(days=1),
+            heure_debut_prevue=dt_time(14, 0),
+            heure_fin_prevue=dt_time(18, 0),
+        )
+        self.m.duree_prevue_heures = 28
+        self.m.save(update_fields=['duree_prevue_heures'])
+
+        res = self.client.get(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/full/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(float(res.data['duree_totale_heures']), 8.0)
+        self.assertEqual(float(res.data['duree_prevue_heures']), 28)
 
     def test_patch_module(self):
         res = self.client.patch(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/', {

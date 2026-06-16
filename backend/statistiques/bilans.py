@@ -16,6 +16,7 @@ from .effectifs import (
     count_auditeurs_notoires,
     effectifs_tableau_agrege,
     participant_ids_notoires,
+    q_pointage_present,
     session_ids_for_scope,
 )
 
@@ -107,7 +108,36 @@ def _session_ids_modules(module_ids, annee=None, mois=None, calendrier=None):
 
 def _effectifs_tableau(participants, session_ids, module_ids):
     """Calcule auditeurs inscrits, présents/absents et H/F (inscrits + présents) sur séances terminées."""
+    if not session_ids:
+        return None
     return effectifs_tableau_agrege(participants, session_ids, module_ids)
+
+
+def _has_seances_comptabilisables(module_ids, annee=None, mois=None, calendrier=None):
+    """Au moins une séance comptabilisable sur le périmètre et la période filtrée."""
+    if not module_ids:
+        return False
+    return bool(_session_ids_modules(module_ids, annee, mois, calendrier))
+
+
+def _module_ids_categorie(
+    categorie,
+    formation_id=None,
+    secretariat_id=None,
+    module_ids=None,
+):
+    mq = Module.objects.all()
+    if formation_id:
+        mq = mq.filter(formation_id=formation_id)
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
+    return list(
+        mq.filter(
+            module_participants__participant__categorie__iexact=categorie,
+        ).distinct().values_list('id', flat=True)
+    )
 
 
 def compute_bilan_effectifs_module(
@@ -134,6 +164,8 @@ def compute_bilan_effectifs_module(
     participants = {mp.participant_id: mp.participant for mp in mp_qs}
     session_ids = _session_ids_module(module_id, annee, mois, calendrier)
     stats = _effectifs_tableau(participants, session_ids, [module_id])
+    if stats is None:
+        return None
 
     module_nom = (module.intitule or f'Module {module.id}').strip().upper()
 
@@ -187,6 +219,8 @@ def compute_bilan_effectifs_categorie(
 
     session_ids = _session_ids_modules(module_ids, annee, mois, calendrier)
     stats = _effectifs_tableau(participants, session_ids, module_ids)
+    if stats is None:
+        return None
 
     return {
         'type': 'effectifs_categorie',
@@ -404,16 +438,19 @@ def compute_bilan_periode_formation(
     }
 
 
-def _resume_module(module, categorie=None):
+def _resume_module(module, categorie=None, annee=None, mois=None, calendrier=None):
     mq = {'module': module}
     if categorie:
         mq['participant__categorie__iexact'] = categorie
     inscrits = ModuleParticipant.objects.filter(**mq).values('participant').distinct().count()
-    sess_ids = session_ids_for_scope([module.id])
+    sess_ids = session_ids_for_scope([module.id], annee, mois, calendrier)
     return {
         'inscrits': inscrits,
         'nb_seances_terminees': len(sess_ids),
-        'nb_pointages': Pointage.objects.filter(session_id__in=sess_ids).count() if sess_ids else 0,
+        'nb_pointages': (
+            Pointage.objects.filter(session_id__in=sess_ids).filter(q_pointage_present()).count()
+            if sess_ids else 0
+        ),
     }
 
 
@@ -438,17 +475,20 @@ def _group_modules_by_matiere(modules):
     return groups
 
 
-def _resume_matiere(module_ids, categorie=None):
-    """Inscrits uniques et pointages sur tous les modules d'une matière."""
+def _resume_matiere(module_ids, categorie=None, annee=None, mois=None, calendrier=None):
+    """Inscrits uniques et présences valides sur tous les modules d'une matière."""
     mq = Q(module_id__in=module_ids)
     if categorie:
         mq &= Q(participant__categorie__iexact=categorie)
     inscrits = ModuleParticipant.objects.filter(mq).values('participant').distinct().count()
-    sess_ids = session_ids_for_scope(module_ids)
+    sess_ids = session_ids_for_scope(module_ids, annee, mois, calendrier)
     return {
         'inscrits': inscrits,
         'nb_seances_terminees': len(sess_ids),
-        'nb_pointages': Pointage.objects.filter(session_id__in=sess_ids).count() if sess_ids else 0,
+        'nb_pointages': (
+            Pointage.objects.filter(session_id__in=sess_ids).filter(q_pointage_present()).count()
+            if sess_ids else 0
+        ),
     }
 
 
@@ -498,6 +538,8 @@ def compute_bilan_effectifs_matiere(
 
     session_ids = _session_ids_modules(mod_ids, annee, mois, calendrier)
     stats = _effectifs_tableau(participants, session_ids, mod_ids)
+    if stats is None:
+        return None
 
     formation = modules[0].formation
     matiere_nom = (
@@ -622,6 +664,11 @@ def compute_bilans(
         if not cats:
             cats = ['—']
         for cat in cats:
+            if not _has_seances_comptabilisables(
+                _module_ids_categorie(cat, formation_id, secretariat_id, module_ids),
+                annee, mois, calendrier,
+            ):
+                continue
             bilans.append({
                 'id': f'categorie-{cat}-{annee}-{periode or "all"}',
                 'dimension': 'categorie',
@@ -642,7 +689,9 @@ def compute_bilans(
 
     elif dimension == 'module':
         for m in modules_qs:
-            resume = _resume_module(m, categorie)
+            if not _has_seances_comptabilisables([m.id], annee, mois, calendrier):
+                continue
+            resume = _resume_module(m, categorie, annee, mois, calendrier)
             bilans.append({
                 'id': f'module-{m.id}-{annee}-{periode or "all"}',
                 'dimension': 'module',
@@ -675,10 +724,12 @@ def compute_bilans(
             fid, kind, key = bucket
             mods = info['modules']
             mod_ids = [m.id for m in mods]
+            if not _has_seances_comptabilisables(mod_ids, annee, mois, calendrier):
+                continue
             ref_id = info['ref_module_id']
             label = info['label']
             formation_nom = str(mods[0].formation)
-            resume = _resume_matiere(mod_ids, categorie)
+            resume = _resume_matiere(mod_ids, categorie, annee, mois, calendrier)
             nb_groupes = len(mods)
             bilans.append({
                 'id': f'matiere-{ref_id or label}-{fid}-{annee}-{periode or "all"}',

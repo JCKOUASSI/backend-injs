@@ -6,6 +6,7 @@ import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
+import { fmtHeuresLabel, fmtEdtVsObjectif, sessionDureeHeures, sommeSeancesHeures } from '../utils/duree'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
@@ -543,7 +544,11 @@ export default function ModuleDetail() {
       </div>
 
       {/* ── TAB: SÉANCES ── */}
-      {activeTab === 'seances' && (
+      {activeTab === 'seances' && (() => {
+        const objectifHeures = module.duree_contractuelle_heures ?? module.duree_prevue_heures
+        const planifieHeures = module.duree_planifiee_heures ?? sommeSeancesHeures(sessions)
+        const edtResume = fmtEdtVsObjectif(objectifHeures, planifieHeures)
+        return (
         <div className="card">
           <div className="card-header-bar" style={{ background: '#f0fdf4' }}>
             <span style={{ fontWeight: 600, color: 'var(--ci-green-dark)' }}>
@@ -551,6 +556,11 @@ export default function ModuleDetail() {
               <span className="badge ms-2" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
                 {sessions.length} séance{sessions.length > 1 ? 's' : ''}
               </span>
+              {planifieHeures != null && objectifHeures && (
+                <span className="badge ms-2" style={{ background: '#ecfdf5', color: '#047857', fontSize: '0.78rem', fontWeight: 500 }}>
+                  Σ {fmtHeuresLabel(planifieHeures)} / {fmtHeuresLabel(objectifHeures)}
+                </span>
+              )}
             </span>
             {canManageSessions && (
               <button onClick={() => setShowNewSession(true)} className="btn btn-dfrc btn-sm">
@@ -558,18 +568,27 @@ export default function ModuleDetail() {
               </button>
             )}
           </div>
+          {edtResume && (
+            <div style={{ padding: '0.55rem 1rem', borderBottom: '1px solid #ecfdf5', fontSize: '0.84rem', color: '#64748b' }}>
+              <i className="bi bi-clock-history me-1"></i>{edtResume}
+              <span style={{ marginLeft: '0.35rem', color: '#94a3b8' }}>
+                (Σ durées de chaque séance)
+              </span>
+            </div>
+          )}
           <div className="card-body-flush">
             {sessions.length > 0 ? (
               <div className="table-container">
                 <table className="table">
                   <thead>
-                    <tr><th>Date</th><th>Horaire</th><th>Statut</th><th>Présences</th><th>Exports</th><th>Actions</th></tr>
+                    <tr><th>Date</th><th>Horaire</th><th>Durée</th><th>Statut</th><th>Présences</th><th>Exports</th><th>Actions</th></tr>
                   </thead>
                   <tbody>
                     {sessions.map(s => (
                       <tr key={s.id}>
                         <td>{s.date ? formatDate(s.date) : '—'}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{s.heure_debut || '—'} — {s.heure_fin || '—'}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtHeuresLabel(sessionDureeHeures(s)) || '—'}</td>
                         <td>
                           <span className={`badge ${s.en_cours ? 'badge-en-cours' : s.terminee ? 'badge-terminee' : 'badge-planifiee'}`}>
                             {s.en_cours ? 'En cours' : s.terminee ? 'Terminée' : 'Planifiée'}
@@ -631,16 +650,24 @@ export default function ModuleDetail() {
             )}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── TAB: INFO ── */}
       {activeTab === 'info' && (() => {
         const nbTerminees = sessions.filter(s => s.statut === 'TERMINEE' || s.statut === 'TERMINÉE').length
-        const infoRow = (icon, label, value, iconColor = 'var(--ci-orange)') => (
+        const dureeContractuelle = module.duree_contractuelle_heures ?? module.duree_prevue_heures
+        const dureePlanifiee = module.duree_planifiee_heures ?? sommeSeancesHeures(sessions)
+        const dureeAffichee = fmtHeuresLabel(dureeContractuelle ?? dureePlanifiee)
+        const dureeDetail = fmtEdtVsObjectif(dureeContractuelle, dureePlanifiee)
+        const infoRow = (icon, label, value, iconColor = 'var(--ci-orange)', extra = null) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid #f1f5f9', gap: '0.75rem' }}>
             <i className={`bi ${icon}`} style={{ width: 18, color: iconColor, flexShrink: 0, fontSize: '1rem' }}></i>
             <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.86rem', color: '#64748b' }}>{label}</span>
-            <span style={{ fontSize: '0.92rem', color: '#1e293b' }}>{value || <span style={{ color: '#cbd5e1' }}>—</span>}</span>
+            <span style={{ fontSize: '0.92rem', color: '#1e293b' }}>
+              {value || <span style={{ color: '#cbd5e1' }}>—</span>}
+              {extra && <small style={{ display: 'block', color: '#94a3b8', fontSize: '0.78rem', marginTop: '0.15rem' }}>{extra}</small>}
+            </span>
           </div>
         )
         return (
@@ -662,7 +689,7 @@ export default function ModuleDetail() {
                   {infoRow('bi-layout-text-window-reverse', 'Salle', module.salle)}
                   {infoRow('bi-calendar',         'Début',   formatDate(module.date_debut))}
                   {infoRow('bi-calendar-check',   'Fin',     formatDate(module.date_fin))}
-                  {infoRow('bi-clock',            'Durée',   module.duree_prevue_heures ? `${module.duree_prevue_heures}h` : null)}
+                  {infoRow('bi-clock',            'Durée',   dureeAffichee, 'var(--ci-orange)', dureeDetail)}
                 </div>
               </div>
 

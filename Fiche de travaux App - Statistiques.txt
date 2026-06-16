@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans — Lot 5
 ================================================================================
-Dernière mise à jour : 13/06/2026 12:00
+Dernière mise à jour : 16/06/2026 12:00
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -27,6 +27,37 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
 ────────────────────────────────────────────────────────────────────────────────
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
+
+[16/06/2026] Point journalier — groupes avec cours le jour J uniquement
+  Fichiers modifiés :
+  · backend/statistiques/point_journalier.py — _modules_avec_cours_jour(), filtre par créneau
+  · backend/statistiques/tests/test_point_journalier.py — tests G10/G11 et MATIN/SOIR
+  · docs/Manuel utilisateur App Statistiques.md — §12.4
+  Fonctionnalité :
+  · Colonnes GROUPES limitées aux groupes ayant une séance planifiée le jour (MATIN ou SOIR)
+  · Exports Excel/PDF/Word : même source `compute_point_journalier`, créneaux vides omis
+
+
+[16/06/2026] Règle absents notoires — module démarré + aucune présence
+  Fichiers modifiés :
+  · backend/statistiques/effectifs.py — module_ids_demarres(), participant_ids_notoires()
+  · backend/statistiques/views.py — aide alerte nb_absences_notoires
+  · backend/statistiques/tests/test_effectifs.py — tests module non démarré / démarré
+  · frontend/src/pages/Statistiques.jsx, AuditeursNotoiresPanel.jsx — infobulles
+  · docs/Manuel utilisateur App Statistiques.md, docs/STATISTIQUES_INDICATEURS.md
+  Fonctionnalité :
+  · Absent notoire = inscrit à ≥1 module démarré sans présence enregistrée (ou motif notoire)
+
+
+[16/06/2026] Terminologie « Absents notoires » (remplace « Auditeurs notoires »)
+  Fichiers modifiés :
+  · frontend/src/components/AuditeursNotoiresPanel.jsx — libellés KPI et listes
+  · frontend/src/pages/Statistiques.jsx — constante AUDITEURS_NOTOIRES, KPI, tableaux, bilans FAC
+  · backend/statistiques/views.py — libellé alerte nb_absences_notoires
+  · docs/Manuel utilisateur App Statistiques.md — §13.2 seuils, journal v2.2.1
+  Fonctionnalité :
+  · Alignement terminologie CPFAE : « Absent notoire » / « Absents notoires » partout dans l'UI Statistiques
+
 
 [11/06/2026] Point journalier CPFAE — alignement modèle Excel FAC 2025 (POINT JOURNALIER CAT A)
   Fichiers modifiés :

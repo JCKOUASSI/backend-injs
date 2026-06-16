@@ -128,7 +128,7 @@ L'onglet actif est souligné en **vert** (#43A047).
 | **Séance / Session** | Créneau daté (MATIN ou SOIR) avec pointages |
 | **Pointage** | Enregistrement de présence/absence (badge, saisie…) |
 | **Présent** | Statuts : Terminé, Forcé DFRC, Sortie automatique |
-| **Absent notoire** | Absent non badgé, suivi spécifique CPFAE |
+| **Absent notoire** | Inscrit à un module démarré, sans aucune présence enregistrée (ou motif notoire renseigné) |
 | **Volume horaire (VH)** | Heures prévues vs réalisées sur la période |
 | **Point journalier** | Tableau journalier par catégorie × formation × jour |
 | **Bilan** | Tableau de synthèse des effectifs sur une période |
@@ -349,6 +349,8 @@ Compteur en tête de liste : `X bilans · Par Module` (ou Catégorie / Formation
 
 **Calcul :** un auditeur est « présent » s'il possède au moins un pointage au statut présent sur les séances filtrées (année, mois ou date calendrier).
 
+**Sans séance comptabilisable** sur la période filtrée : **aucun tableau d'effectifs** n'est généré (le module / la matière / la catégorie n'apparaît pas dans la liste des bilans).
+
 ---
 
 ### 11.5 Bilan des effectifs CATÉGORIE
@@ -453,7 +455,7 @@ Boutons sur la **même ligne** : **Actualiser**, **Excel**, **PDF**, **Word**.
 
 ### 12.4 Contenu d'un point journalier
 
-Pour chaque créneau (MATIN / SOIR) :
+Pour chaque créneau (MATIN / SOIR), **seuls les groupes ayant une séance planifiée ce jour-là** apparaissent en colonne (un groupe sans cours le matin n'est pas listé au MATIN, etc.).
 
 | Ligne | Signification |
 |-------|---------------|
@@ -514,7 +516,7 @@ Chaque carte affiche :
 | taux_absence | Taux d'absence | Plus bas = mieux (inverse) |
 | taux_abandon | Événements absence / suspect | Pointages ABSENT_NON_BADGE ou HORS_LIGNE_SUSPECT / inscrits — plus bas = mieux |
 | taux_execution_vh | Exécution volume horaire | Plus haut = mieux |
-| nb_absences_notoires | Auditeurs notoires | Inscrits sans pointage ou avec motif notoire — plus bas = mieux |
+| nb_absences_notoires | Absents notoires | Inscrits à un module démarré sans présence, ou avec motif notoire — plus bas = mieux |
 | saturation_groupe | Saturation des groupes | Moy. inscrits/groupe ÷ 40 — plus bas = mieux |
 
 ### 13.3 Alertes déclenchées
@@ -575,6 +577,10 @@ Réservée aux **validateurs / administrateurs** :
 | 2.0.1 | 05/06/2026 | Vue d'ensemble : retrait des widgets Pointages et Pointages par statut |
 | 2.1.0 | 08/06/2026 | Harmonisation des libellés (assiduité séance, couverture auditeurs, événements absence/suspect, avancement VH), bandeau explicatif sous les filtres, infobulles KPI, champ API `taux_couverture_auditeurs`, §5.1 « Comment lire les chiffres » |
 | 2.2.0 | 11/06/2026 | Point journalier aligné modèle Excel FAC 2025 : titre par catégorie, feuille par grade, visuel web CPFAE (orange/jaune), colonne TOTAL et bande vague |
+| 2.2.1 | 16/06/2026 | Terminologie unifiée « Absents notoires » (remplace « Auditeurs notoires ») — KPI, panneaux, alertes et seuils |
+| 2.2.2 | 16/06/2026 | Règle absents notoires : module démarré + aucune présence enregistrée (ou motif notoire) |
+| 2.2.3 | 16/06/2026 | Point journalier : colonnes GROUPES limitées aux groupes avec séance le jour J (MATIN/SOIR) |
+| 2.2.4 | 16/06/2026 | Bilans effectifs (module / catégorie / matière) : aucun tableau si aucune séance comptabilisable sur la période |
 
 ---
 

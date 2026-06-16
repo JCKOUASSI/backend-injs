@@ -16,7 +16,7 @@ class ConfigAlerteSeuil(models.Model):
         TAUX_ABSENCE        = 'taux_absence',         'Taux d\'absence (%)'
         TAUX_ABANDON        = 'taux_abandon',          'Taux d\'abandon (%)'
         TAUX_EXECUTION_VH   = 'taux_execution_vh',    'Taux d\'exécution volume horaire (%)'
-        NB_ABSENCES_NOTOIRES= 'nb_absences_notoires', 'Auditeurs notoires (nombre)'
+        NB_ABSENCES_NOTOIRES= 'nb_absences_notoires', 'Absences notoires (nombre)'
         SATURATION_GROUPE   = 'saturation_groupe',    'Saturation du groupe (%)'
 
     indicateur         = models.CharField(max_length=50, choices=Indicateur.choices, unique=True)

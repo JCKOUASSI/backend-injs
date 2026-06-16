@@ -170,6 +170,8 @@ def _write_bloc_creneau(ws, start_row, bloc, label_creneau, styles):
     from openpyxl.utils import get_column_letter
 
     groupes = (bloc.get('groupes') or [])[:MAX_GROUP_COLS]
+    if not groupes:
+        return start_row
     n_groups = len(groupes)
     last_group_col = COL_GROUP_START + max(n_groups, 1) - 1
     data_end_col = COL_TOTAL - 1
@@ -465,6 +467,8 @@ def export_pdf(tableaux, annee):
         elements.append(Spacer(1, 0.15 * cm))
 
         for bloc_name, bloc in [('MATIN', tb['matin']), ('SOIR', tb['soir'])]:
+            if not (bloc.get('groupes')):
+                continue
             n_g = len(bloc.get('groupes') or [])
             suffix = ''
             if n_g > PDF_GROUPES_PAR_TABLE:
@@ -565,6 +569,8 @@ def export_word(tableaux, annee):
             ).alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             for bloc_name, bloc in [('MATIN', tb['matin']), ('SOIR', tb['soir'])]:
+                if not (bloc.get('groupes')):
+                    continue
                 _word_add_bloc(doc, bloc_name, bloc, WD_ALIGN_PARAGRAPH, WD_TABLE_ALIGNMENT)
 
             doc.add_paragraph(
@@ -585,6 +591,8 @@ def export_word(tableaux, annee):
             parts.append(f"<h2>{tb['titre_ligne1']}</h2>")
             parts.append(f"<p>DATE {tb['jour']} {tb['mois_libelle']} {tb['annee']}</p>")
             for name, bloc in [('MATIN', tb['matin']), ('SOIR', tb['soir'])]:
+                if not (bloc.get('groupes')):
+                    continue
                 parts.append(f"<h3>{name}: {bloc['horaire']}</h3><table border='1'>")
                 parts.append('<tr><td></td><td>GROUPES</td>' +
                              ''.join(f"<td>{g['label']}</td>" for g in bloc['groupes']) +

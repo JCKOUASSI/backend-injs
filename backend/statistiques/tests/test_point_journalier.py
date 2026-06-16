@@ -146,3 +146,76 @@ class PointJournalierPlannedSessionsTest(TestCase):
         self.assertEqual(matin_groupes[0]['label'], 'G10')
         self.assertEqual(matin_groupes[0]['effectif'], 1)
         self.assertEqual(len(matin_groupes[0]['module_ids']), 3)
+
+    def test_seuls_groupes_avec_cours_le_jour(self):
+        """Un groupe sans séance le jour J n'apparaît pas dans le point journalier."""
+        formation = Formation.objects.create(formation='Formation en Administration de Base')
+        jour = timezone.localdate()
+        participant = Participant.objects.create(
+            matricule='PJ-003', nom='Test', prenom='Groupe', categorie='A',
+        )
+
+        mod_cours = Module.objects.create(
+            formation=formation, intitule='DEONTOLOGIE', grade='A4',
+            groupe='GROUPE 10', salle='SALLE A',
+        )
+        mod_sans = Module.objects.create(
+            formation=formation, intitule='CULTURE CIVIQUE', grade='A4',
+            groupe='GROUPE 11', salle='SALLE B',
+        )
+        for mod in (mod_cours, mod_sans):
+            ModuleParticipant.objects.create(module=mod, participant=participant)
+        SessionModule.objects.create(
+            module=mod_cours,
+            date_journee=jour,
+            numero=1,
+            intitule='Matin',
+            heure_debut_prevue=time(8, 0),
+            heure_fin_prevue=time(12, 0),
+        )
+
+        detail = compute_point_journalier(
+            annee=jour.year,
+            mois=jour.month,
+            categorie='A',
+            formation_id=formation.id,
+            jour=jour.isoformat(),
+            index_only=False,
+        )
+        tb = detail['tableaux'][0]
+        labels = [g['label'] for g in tb['matin']['groupes']]
+        self.assertIn('G10', labels)
+        self.assertNotIn('G11', labels)
+        self.assertEqual(len(tb['matin']['groupes']), 1)
+
+    def test_groupe_matin_uniquement_absent_du_bloc_soir(self):
+        """Groupe avec séance MATIN seulement : colonne MATIN oui, SOIR non."""
+        formation = Formation.objects.create(formation='FAB test creneau')
+        jour = timezone.localdate()
+        participant = Participant.objects.create(
+            matricule='PJ-004', nom='Matin', prenom='Seul', categorie='A',
+        )
+        mod = Module.objects.create(
+            formation=formation, intitule='MODULE TEST', grade='A3',
+            groupe='GROUPE 9',
+        )
+        ModuleParticipant.objects.create(module=mod, participant=participant)
+        SessionModule.objects.create(
+            module=mod,
+            date_journee=jour,
+            numero=1,
+            intitule='Matin',
+            heure_debut_prevue=time(8, 0),
+            heure_fin_prevue=time(12, 0),
+        )
+
+        detail = compute_point_journalier(
+            annee=jour.year,
+            categorie='A',
+            formation_id=formation.id,
+            jour=jour.isoformat(),
+            index_only=False,
+        )
+        tb = detail['tableaux'][0]
+        self.assertEqual(len(tb['matin']['groupes']), 1)
+        self.assertEqual(len(tb['soir']['groupes']), 0)

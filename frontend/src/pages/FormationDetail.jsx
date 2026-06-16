@@ -6,6 +6,7 @@ import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
+import { fmtHeuresLabel, sommeSeancesHeures } from '../utils/duree'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
@@ -601,7 +602,7 @@ export default function FormationDetail() {
                   { icon: 'bi-grid-1x2',         label: 'Salle',     value: formation.salle },
                   { icon: 'bi-calendar',         label: 'Début',     value: formatDate(formation.date_debut) },
                   { icon: 'bi-calendar-check',   label: 'Fin',       value: formatDate(formation.date_fin) },
-                  { icon: 'bi-clock',            label: 'Durée',     value: formation.duree_prevue_heures ? `${formation.duree_prevue_heures}h` : null },
+                  { icon: 'bi-clock',            label: 'Durée',     value: fmtHeuresLabel(sommeSeancesHeures(sessions)) },
                 ].map(({ icon, label, value }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid #f1f5f9' }}>
                     <i className={`bi ${icon} me-2`} style={{ width: 18, color: 'var(--ci-orange)', flexShrink: 0 }}></i>

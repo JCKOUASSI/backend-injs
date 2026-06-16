@@ -9,14 +9,15 @@ Règles alignées sur l'écran Présences (ModuleDetail) et le point journalier 
   (encore en salle OU sortie avec durée > 0).
 - Absent : inscrit sans présence valide sur la séance (agrégats : non présent sur
   au moins une séance du périmètre, ou créneau sans badge présent).
-- Auditeur notoire : inscrit au périmètre sans aucun pointage, ou motif_notoire renseigné.
+- Absent notoire : inscrit à au moins un module démarré du périmètre, sans aucune
+  présence enregistrée, ou avec motif_notoire renseigné (sur module démarré).
 """
 from collections import defaultdict
 from datetime import date
 
 from django.db.models import Q, Exists, OuterRef
 
-from formations.models import ModuleParticipant, SessionModule, Participant
+from formations.models import Module, ModuleParticipant, SessionModule, Participant
 from presences.models import Pointage
 
 
@@ -103,6 +104,55 @@ def _module_participant_qs(
     return q
 
 
+def _module_qs_for_scope(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+):
+    q = Module.objects.all()
+    if module_ids is not None:
+        q = q.filter(id__in=module_ids)
+    if formation_id:
+        q = q.filter(formation_id=formation_id)
+    if secretariat_id:
+        q = q.filter(secretariat_id=secretariat_id)
+    if grade:
+        q = q.filter(grade=grade)
+    return q
+
+
+def module_ids_demarres(
+    module_ids=None,
+    formation_id=None,
+    secretariat_id=None,
+    grade=None,
+):
+    """
+    Modules du périmètre considérés comme démarrés :
+    statut EN_COURS / SUSPENDUE / TERMINEE, date_debut atteinte,
+    au moins une séance démarrée, ou au moins une séance comptabilisable.
+    """
+    today = date.today()
+    mq = _module_qs_for_scope(module_ids, formation_id, secretariat_id, grade)
+    scoped_ids = list(mq.values_list('id', flat=True))
+    if not scoped_ids:
+        return set()
+
+    started = set()
+    started |= set(mq.filter(
+        statut__in=[Module.Statut.EN_COURS, Module.Statut.SUSPENDUE, Module.Statut.TERMINEE],
+    ).values_list('id', flat=True))
+    started |= set(mq.filter(date_debut__lte=today).values_list('id', flat=True))
+    started |= set(
+        mq.filter(sessions__demarree_le__isnull=False).values_list('id', flat=True).distinct()
+    )
+    started |= set(
+        filter_sessions(module_ids=scoped_ids).values_list('module_id', flat=True).distinct()
+    )
+    return started
+
+
 def participant_ids_inscrits(
     module_ids=None,
     formation_id=None,
@@ -126,7 +176,8 @@ def participant_ids_notoires(
     categorie=None,
 ):
     """
-    Auditeurs notoires : inscrits sans aucun pointage, ou avec motif_notoire renseigné.
+    Absents notoires : inscrits à au moins un module démarré du périmètre,
+    sans aucune présence enregistrée, ou avec motif_notoire renseigné.
     Source unique pour dashboard, bilans et Bilan FAC.
     """
     inscrits = participant_ids_inscrits(
@@ -134,18 +185,35 @@ def participant_ids_notoires(
     )
     if not inscrits:
         return set()
-    avec_pointage = set(
-        Pointage.objects.filter(participant_id__in=inscrits)
+
+    demarres = module_ids_demarres(
+        module_ids, formation_id, secretariat_id, grade,
+    )
+    if not demarres:
+        return set()
+
+    inscrits_module_demarre = set(
+        ModuleParticipant.objects.filter(
+            participant_id__in=inscrits,
+            module_id__in=demarres,
+        ).values_list('participant_id', flat=True).distinct()
+    )
+    if not inscrits_module_demarre:
+        return set()
+
+    avec_presence = set(
+        Pointage.objects.filter(participant_id__in=inscrits_module_demarre)
+        .filter(q_pointage_present())
         .values_list('participant_id', flat=True)
         .distinct()
     )
-    jamais_badge = inscrits - avec_pointage
+    sans_presence = inscrits_module_demarre - avec_presence
     motif_ids = set(
-        Participant.objects.filter(id__in=inscrits)
+        Participant.objects.filter(id__in=inscrits_module_demarre)
         .exclude(motif_notoire='')
         .values_list('id', flat=True)
     )
-    return jamais_badge | motif_ids
+    return sans_presence | motif_ids
 
 
 def count_auditeurs_notoires(
@@ -279,8 +347,25 @@ def effectifs_tableau_agrege(participants, session_ids, module_ids):
     if not effectif_total:
         return _empty_effectifs_tableau()
 
-    if not session_ids and module_ids:
-        session_ids = session_ids_for_scope(module_ids)
+    if not session_ids:
+        m_insc, f_insc = repartition_hf(participants)
+        return {
+            'effectifs_auditeurs': effectif_total,
+            'effectifs_presents': 0,
+            'pct_presents_total': 0.0,
+            'masculin_inscrits': m_insc,
+            'feminin_inscrits': f_insc,
+            'pct_masculin_inscrits': _pct(m_insc, effectif_total),
+            'pct_feminin_inscrits': _pct(f_insc, effectif_total),
+            'masculin': 0,
+            'feminin': 0,
+            'pct_masculin_presents': 0.0,
+            'pct_feminin_presents': 0.0,
+            'absents': 0,
+            'pct_absents_total': 0.0,
+            'nb_seances_terminees': 0,
+            'absences_non_calculees': True,
+        }
 
     present_pids = set()
     if session_ids:
@@ -309,6 +394,7 @@ def effectifs_tableau_agrege(participants, session_ids, module_ids):
         'absents': absents,
         'pct_absents_total': _pct(absents, effectif_total),
         'nb_seances_terminees': len(session_ids),
+        'absences_non_calculees': False,
     }
 
 
@@ -383,4 +469,5 @@ def _empty_effectifs_tableau():
         'absents': 0,
         'pct_absents_total': 0.0,
         'nb_seances_terminees': 0,
+        'absences_non_calculees': False,
     }

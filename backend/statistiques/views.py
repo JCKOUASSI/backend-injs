@@ -229,7 +229,8 @@ def _charge_formateurs(formation_id=None, secretariat_id=None, module_ids=None, 
 
 def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None):
     """
-    Auditeurs notoires : inscrits au périmètre sans aucun pointage, ou motif_notoire renseigné.
+    Absents notoires : inscrits à au moins un module démarré du périmètre,
+    sans aucune présence enregistrée, ou motif_notoire renseigné.
     """
     mf, _, _, _, _ = _filtres(formation_id, secretariat_id, module_ids)
 
@@ -758,7 +759,7 @@ INDICATEUR_META = {
         'couleur': '#F57C00',
         'aide': (
             'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits. '
-            'Distinct des auditeurs notoires (jamais badgés).'
+            'Distinct des absents notoires (jamais badgés).'
         ),
         'echelle_max': 100,
     },
@@ -775,14 +776,14 @@ INDICATEUR_META = {
         'echelle_max': 100,
     },
     'nb_absences_notoires': {
-        'libelle': 'Auditeurs notoires',
+        'libelle': 'Absents notoires',
         'unite': '',
         'inverse': True,
         'icone': 'bi-exclamation-triangle',
         'couleur': '#AD1457',
         'aide': (
-            'Nombre d\'auditeurs inscrits sans aucun pointage, ou avec motif notoire renseigné. '
-            'Aligné dashboard, bilans et Bilan FAC.'
+            'Nombre d\'inscrits à au moins un module démarré, sans aucune présence enregistrée, '
+            'ou avec motif notoire renseigné. Aligné dashboard, bilans et Bilan FAC.'
         ),
         'echelle_max': None,
     },
@@ -1621,7 +1622,9 @@ class BilansView(APIView):
                 module_ids=kw.get('module_ids'),
             )
             if not tableau:
-                return Response({'detail': 'Catégorie introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and dimension == 'matiere':
@@ -1641,7 +1644,9 @@ class BilansView(APIView):
                 module_ids=kw.get('module_ids'),
             )
             if not tableau:
-                return Response({'detail': 'Matière introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and module_id:
@@ -1650,7 +1655,9 @@ class BilansView(APIView):
                 calendrier=calendrier, periode=periode,
             )
             if not tableau:
-                return Response({'detail': 'Module introuvable.'}, status=404)
+                return Response({
+                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+                }, status=404)
             return Response({'tableau': tableau})
 
         if detail and formation_id:

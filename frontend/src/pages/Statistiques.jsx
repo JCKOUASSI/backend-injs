@@ -47,7 +47,7 @@ const TAUX_PEDAGOGIE = {
   },
   evenements: {
     label: 'Événements absence / suspect',
-    help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits (événements, pas auditeurs notoires).',
+    help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits (événements, pas absents notoires).',
     color: '#F57C00',
     getValue: (ped) => ped?.taux_abandon ?? 0,
   },
@@ -64,9 +64,9 @@ const KPI_SESSIONS_COMPT = {
 
 /** Définition métier unifiée (dashboard, bilans, FAC, alertes). */
 const AUDITEURS_NOTOIRES = {
-  label: 'Auditeurs notoires',
-  cardTitle: 'Auditeurs notoires',
-  help: 'Inscrits sans aucun pointage, ou avec motif notoire renseigné sur le profil auditeur.',
+  label: 'Absents notoires',
+  cardTitle: 'Absents notoires',
+  help: 'Inscrit à au moins un module démarré, sans aucune présence enregistrée, ou avec motif notoire renseigné.',
 }
 
 /** Onglets où le filtre période (VH + séances comptabilisées) s\'applique. */
@@ -1036,11 +1036,11 @@ function PedagogieTauxPrincipaux({ ped, auditeursNotoires }) {
       {an != null && (
         <Kpi
           icon="bi-person-x-fill"
-          label="Auditeurs notoires"
+          label="Absents notoires"
           value={an.total ?? 0}
           color="#C62828"
           sub={`${Number(an.pct || 0).toFixed(1).replace('.', ',')}% des inscrits`}
-          help="Inscrits sans aucun pointage ou avec motif notoire renseigné."
+          help="Inscrit à au moins un module démarré, sans présence enregistrée ou avec motif notoire."
         />
       )}
     </div>
@@ -3546,7 +3546,7 @@ function BilanFACAbsentsNotoiresTable({ absents }) {
   if (!absents?.length) return (
     <div style={{ textAlign: 'center', padding: '2rem', color: '#43A047', fontSize: '0.85rem' }}>
       <i className="bi bi-check-circle" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}/>
-      Aucun auditeur absent notoire enregistré.
+      Aucun absent notoire enregistré.
     </div>
   )
 
@@ -3585,7 +3585,7 @@ function BilanFACAbsentsNotoiresTable({ absents }) {
         </tbody>
       </table>
       <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.5rem', textAlign: 'right' }}>
-        {absents.length} auditeur{absents.length > 1 ? 's' : ''} absent{absents.length > 1 ? 's' : ''} notoire{absents.length > 1 ? 's' : ''}
+        {absents.length} absent{absents.length > 1 ? 's' : ''} notoire{absents.length > 1 ? 's' : ''}
       </div>
     </div>
   )
@@ -3791,7 +3791,7 @@ function buildOverviewSections(alertesItems) {
     sub: def.id === 'alertes' ? alertesSub
       : def.id === 'kpis' ? 'Formations, modules, auditeurs, séances…'
       : def.id === 'pedagogie' ? 'Assiduité séance, couverture auditeurs, absences'
-      : def.id === 'operationnel' ? 'Répartition H/F, charge formateurs, auditeurs notoires'
+      : def.id === 'operationnel' ? 'Répartition H/F, charge formateurs, absents notoires'
       : '',
   }))
 }
@@ -4459,7 +4459,7 @@ function HistoriqueMoisPanel({ historique, monthIndex, auditeursNotoires }) {
 
 const SEC_TABLE_HEADERS = [
   'N°', 'Secrétariat', 'Responsable', 'Modules', 'Auditeurs', 'Formateurs', 'Séances',
-  'Inscrits', 'Présents', 'Assiduité séance', 'Absences', 'Aud. notoires', 'Vol.H. prévu', 'Avancement VH', 'Hommes', 'Femmes', '',
+  'Inscrits', 'Présents', 'Assiduité séance', 'Absences', 'Abs. notoires', 'Vol.H. prévu', 'Avancement VH', 'Hommes', 'Femmes', '',
 ]
 
 function SecretariatsComparatifTable({ secretariats, onRowClick }) {
@@ -4549,7 +4549,7 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
           <Kpi icon="bi-people" label="Auditeurs total" value={secretariats.reduce((s, r) => s + r.nb_participants, 0)} color="#F57C00"/>
           <Kpi icon="bi-book" label="Modules total" value={secretariats.reduce((s, r) => s + r.nb_modules, 0)} color="#43A047"/>
           <Kpi icon="bi-qr-code-scan" label="Pointages total" value={secretariats.reduce((s, r) => s + r.nb_pointages, 0)} color="#C62828"/>
-          <Kpi icon="bi-person-x-fill" label="Auditeurs notoires" value={secStats.auditeurs_notoires?.total ?? secretariats.reduce((s, r) => s + (r.nb_auditeurs_notoires || 0), 0)} color="#C62828"
+          <Kpi icon="bi-person-x-fill" label="Absents notoires" value={secStats.auditeurs_notoires?.total ?? secretariats.reduce((s, r) => s + (r.nb_auditeurs_notoires || 0), 0)} color="#C62828"
             sub={secStats.auditeurs_notoires ? `${Number(secStats.auditeurs_notoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}/>
         </div>
 
@@ -4631,7 +4631,7 @@ function SecretariatDetailPanel({ row, detail }) {
         <Kpi icon="bi-qr-code-scan" label="Pointages" value={kpis.pointages} color="#C62828"/>
         <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${pedagogiques.taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-percent" label="Taux absence" value={`${pedagogiques.taux_absence}%`} color="#C62828"/>
-        <Kpi icon="bi-person-x-fill" label="Auditeurs notoires" value={adm.auditeurs_notoires?.total ?? 0} color="#C62828"
+        <Kpi icon="bi-person-x-fill" label="Absents notoires" value={adm.auditeurs_notoires?.total ?? 0} color="#C62828"
           sub={adm.auditeurs_notoires ? `${Number(adm.auditeurs_notoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}/>
         <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
       </div>
@@ -4861,6 +4861,17 @@ function BilanEffectifsModuleTable({ data }) {
 
 function BilanDetailPanel({ bilan, tableau, filtres }) {
   const dimLabel = RB_DIMENSIONS.find(d => d.id === bilan.dimension)?.label || bilan.dimension
+
+  if (['module', 'matiere', 'categorie'].includes(bilan.dimension) && !tableau) {
+    return (
+      <div style={{
+        background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+      }}>
+        <Empty label="Aucune séance comptabilisable sur la période filtrée — aucun tableau d'effectifs."/>
+      </div>
+    )
+  }
 
   if (bilan.dimension === 'formation' && tableau?.type === 'bilan_periode_formation') {
     return (
