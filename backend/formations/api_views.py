@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .formateur_privacy import (
@@ -63,6 +63,36 @@ def _groupe_sort_key(value):
     if match:
         return (0, int(match.group(1)))
     return (1, value)
+
+
+def _mention_from_note(note):
+    """Calcule la mention à partir d'une note /20."""
+    if note is None:
+        return ''
+    try:
+        n = float(note)
+    except (TypeError, ValueError):
+        return ''
+    if n >= 16:
+        return NoteModule.Mention.TRES_BIEN
+    if n >= 14:
+        return NoteModule.Mention.BIEN
+    if n >= 12:
+        return NoteModule.Mention.ASSEZ_BIEN
+    if n >= 10:
+        return NoteModule.Mention.PASSABLE
+    return NoteModule.Mention.INSUFFISANT
+
+
+def _get_module_in_formation(formation_pk, module_pk):
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+        return formation, module, None
+    except Formation.DoesNotExist:
+        return None, None, Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return None, None, Response({'detail': 'Module introuvable.'}, status=404)
 
 
 @api_view(['GET'])
@@ -3424,6 +3454,137 @@ def module_full_detail_api(request, formation_pk, module_pk):
             for mf in formateurs_assignes
         ],
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsSecretariatOrDFRC])
+def module_notes_list_api(request, formation_pk, module_pk):
+    """Liste les auditeurs inscrits au module avec leurs notes (saisie secrétariat)."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    inscriptions = (
+        ModuleParticipant.objects.filter(module=module)
+        .select_related('participant')
+        .order_by('participant__nom', 'participant__prenom')
+    )
+    notes_map = {
+        n.participant_id: n
+        for n in NoteModule.objects.filter(module=module).select_related('saisie_par')
+    }
+
+    rows = []
+    for mp in inscriptions:
+        p = mp.participant
+        note_obj = notes_map.get(p.id)
+        saisie_par = None
+        if note_obj and note_obj.saisie_par:
+            u = note_obj.saisie_par
+            saisie_par = u.get_full_name() or u.username
+        rows.append({
+            'participant_id': p.id,
+            'nom': p.nom,
+            'prenom': p.prenom,
+            'matricule': p.matricule or '',
+            'grade': p.grade or '',
+            'note': float(note_obj.note) if note_obj and note_obj.note is not None else None,
+            'mention': note_obj.mention if note_obj else '',
+            'observations': note_obj.observations if note_obj else '',
+            'saisie_par': saisie_par,
+            'updated_at': note_obj.updated_at.isoformat() if note_obj else None,
+        })
+    return Response(rows)
+
+
+@api_view(['POST'])
+@permission_classes([IsSecretariatOrDFRC])
+def module_notes_bulk_api(request, formation_pk, module_pk):
+    """Sauvegarde en masse les notes des auditeurs d'un module."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    items = request.data.get('notes')
+    if not isinstance(items, list):
+        return Response({'detail': 'Le champ "notes" (liste) est requis.'}, status=400)
+
+    enrolled_ids = set(
+        ModuleParticipant.objects.filter(module=module).values_list('participant_id', flat=True)
+    )
+
+    saved = 0
+    errors = []
+
+    with transaction.atomic():
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                errors.append({'index': idx, 'detail': 'Entrée invalide.'})
+                continue
+
+            participant_id = item.get('participant_id')
+            if not participant_id:
+                errors.append({'index': idx, 'detail': 'participant_id requis.'})
+                continue
+
+            try:
+                participant_id = int(participant_id)
+            except (TypeError, ValueError):
+                errors.append({'index': idx, 'detail': 'participant_id invalide.'})
+                continue
+
+            if participant_id not in enrolled_ids:
+                errors.append({'index': idx, 'detail': 'Auditeur non inscrit à ce module.'})
+                continue
+
+            note_raw = item.get('note')
+            note_val = None
+            if note_raw is not None and note_raw != '':
+                try:
+                    note_val = float(note_raw)
+                except (TypeError, ValueError):
+                    errors.append({'index': idx, 'detail': 'Note invalide.'})
+                    continue
+                if note_val < 0 or note_val > 20:
+                    errors.append({'index': idx, 'detail': 'La note doit être entre 0 et 20.'})
+                    continue
+
+            mention = (item.get('mention') or '').strip()
+            observations = (item.get('observations') or '').strip()
+
+            if note_val is not None and not mention:
+                mention = _mention_from_note(note_val)
+
+            if note_val is None and not mention and not observations:
+                NoteModule.objects.filter(module=module, participant_id=participant_id).delete()
+                saved += 1
+                continue
+
+            if mention and mention not in dict(NoteModule.Mention.choices):
+                errors.append({'index': idx, 'detail': 'Mention invalide.'})
+                continue
+
+            NoteModule.objects.update_or_create(
+                module=module,
+                participant_id=participant_id,
+                defaults={
+                    'note': note_val,
+                    'mention': mention,
+                    'observations': observations,
+                    'saisie_par': request.user,
+                },
+            )
+            saved += 1
+
+    return Response({'saved': saved, 'errors': errors})
 
 
 @api_view(['POST'])
