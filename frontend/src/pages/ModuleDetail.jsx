@@ -507,6 +507,13 @@ export default function ModuleDetail() {
             >
               <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
             </Link>
+            <Link
+              to={`/formations/${formationId}/modules/${moduleId}/evaluation`}
+              className="btn btn-outline-primary btn-sm"
+              title="Épreuves, notes pondérées et moyennes"
+            >
+              <i className="bi bi-clipboard-data me-1"></i>Évaluation académique
+            </Link>
             <button
               onClick={() => handleExportAllSeances('pdf')}
               className="btn btn-outline-danger btn-sm"

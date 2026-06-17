@@ -29,6 +29,23 @@ export const EVALUATION_ALLOWED_ROLES = [
   'SUPERVISEUR',
 ]
 
+/** Gestion des notes/épreuves/moyennes (aligné IsGestionNotes). */
+export const NOTE_GESTION_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+  'ENCADRANT',
+  'SUPERVISEUR',
+]
+
+/** Validation des décisions pédagogiques (aligné IsDecisionValidator). */
+export const DECISION_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'ENCADRANT',
+]
+
 /** FINANCE n'est pas du personnel opérationnel — module finance dédié uniquement. */
 export const FINANCE_MODULE_ROLES = ['FINANCE', 'DIRECTION']
 

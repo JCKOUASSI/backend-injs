@@ -126,9 +126,14 @@ export default function EvaluationList() {
             Gérez les questionnaires d'évaluation des cours et formateurs
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <i className="bi bi-plus-lg me-1"></i> Nouveau questionnaire
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-outline-secondary" onClick={() => navigate('/quiz')}>
+            <i className="bi bi-question-square me-1"></i> Quiz manuels
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <i className="bi bi-plus-lg me-1"></i> Nouveau questionnaire
+          </button>
+        </div>
       </div>
 
       {/* Filtres */}

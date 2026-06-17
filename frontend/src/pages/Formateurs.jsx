@@ -61,6 +61,7 @@ export default function Formateurs() {
   const { showToast } = useToast()
 
   const [secretariats, setSecretariats] = useState([])
+  const [refModules, setRefModules] = useState([])
   const [financeDetail, setFinanceDetail] = useState(null)
   const [financeDetailLoading, setFinanceDetailLoading] = useState(false)
   const [financeDetailTab, setFinanceDetailTab] = useState('statistiques')
@@ -91,6 +92,12 @@ export default function Formateurs() {
   useEffect(() => {
     api.get('/formations/secretariats/')
       .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    api.get('/formations/ref/modules/')
+      .then(res => setRefModules(Array.isArray(res.data) ? res.data.filter(m => m.actif !== false) : []))
       .catch(() => {})
   }, [])
 
@@ -666,7 +673,12 @@ export default function Formateurs() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Spécialité</label>
-                  <input type="text" className="form-control" value={form.specialite} onChange={e => setForm({...form, specialite: e.target.value})} />
+                  <select className="form-control" value={form.specialite} onChange={e => setForm({...form, specialite: e.target.value})}>
+                    <option value="">— Sélectionner une spécialité —</option>
+                    {refModules.map(m => (
+                      <option key={m.id} value={m.intitule}>{m.intitule}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid-2">
                   <div className="form-group">

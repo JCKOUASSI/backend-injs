@@ -17,6 +17,7 @@ import {
   canPresenceAction,
   canSuperviseSessions,
   canViewPresences,
+  DECISION_ROLES,
 } from '../utils/roles'
 import { formatApiErrors } from '../utils/apiErrors'
 
@@ -562,6 +563,11 @@ export default function FormationDetail() {
             <span className={`badge ${getStatutBadge(formation.statut)}`}>{getStatutLabel(formation.statut)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {DECISION_ROLES.includes(user?.role) && (
+              <Link to={`/formations/${id}/decisions`} className="btn btn-outline-primary btn-sm" title="Décisions pédagogiques (admis / ajourné / exclusion)">
+                <i className="bi bi-clipboard-check me-1"></i>Décisions pédagogiques
+              </Link>
+            )}
             <button onClick={() => handleExport('pdf')} className="btn btn-outline-danger btn-sm" title="Exporter PDF (toutes les séances)">
               <i className="bi bi-file-earmark-pdf me-1"></i>PDF — Toutes séances
             </button>

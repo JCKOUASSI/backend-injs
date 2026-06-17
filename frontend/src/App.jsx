@@ -23,9 +23,15 @@ import FinanceAjustements from './pages/FinanceAjustements'
 import FinanceEncadrants from './pages/FinanceEncadrants'
 import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
+import FicheAuditeur from './pages/FicheAuditeur'
+import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
+import QuizList from './pages/QuizList'
+import QuizTake from './pages/QuizTake'
 import NotesModule from './pages/NotesModule'
+import EvaluationAcademique from './pages/EvaluationAcademique'
+import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -36,6 +42,8 @@ import {
   USERS_ALLOWED_ROLES,
   IMPORT_ALLOWED_ROLES,
   EVALUATION_ALLOWED_ROLES,
+  NOTE_GESTION_ROLES,
+  DECISION_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -189,9 +197,14 @@ function Layout({ children, breadcrumb }) {
             </Link>
           )}
           {canViewEvaluations && !isSuperviseurRole && (
-            <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
-            </Link>
+            <>
+              <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
+              </Link>
+              <Link to="/quiz" className={`nav-item ${isActive('/quiz') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-question-square"></i> <span className="nav-label">Quiz</span></span>
+              </Link>
+            </>
           )}
           {canViewImport && (
             <Link to="/import" className={`nav-item ${isActive('/import') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
@@ -294,10 +307,38 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/formations/:formationId/modules/:moduleId/evaluation" element={
+            <ProtectedRoute allowedRoles={NOTE_GESTION_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Évaluation académique</li></>}>
+                <EvaluationAcademique />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formations/:formationId/decisions" element={
+            <ProtectedRoute allowedRoles={DECISION_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Décisions pédagogiques</li></>}>
+                <DecisionsPedagogiques />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
             <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/auditeurs/:participantId/formations/:formationId/fiche" element={
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche auditeur</li></>}>
+                <FicheAuditeur />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formateurs/:formateurId/modules/:moduleId/fiche" element={
+            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche formateur</li></>}>
+                <FicheFormateur />
               </Layout>
             </ProtectedRoute>
           } />
@@ -381,6 +422,20 @@ function App() {
           <Route path="/evaluations" element={
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
               <EvaluationRoute />
+            </ProtectedRoute>
+          } />
+          <Route path="/quiz" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
+                <QuizList />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/quiz/:id" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
+                <QuizTake />
+              </Layout>
             </ProtectedRoute>
           } />
           <Route path="/evaluations/:id" element={

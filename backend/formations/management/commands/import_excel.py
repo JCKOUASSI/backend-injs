@@ -291,16 +291,60 @@ class Command(BaseCommand):
             return 'FAC'
         return ''
 
-    def _resolve_secretariat(self, SecretariatModel, hint):
-        """Résout un secrétariat depuis un hint (nom ou type libellé)."""
+    def _resolve_secretariat(self, SecretariatModel, hint, grade='', matricule='', categorie=''):
+        """Résout un secrétariat depuis un hint (nom ou type libellé).
+
+        Gère le cas où le hint est une famille (ex. « FAB ») correspondant à
+        plusieurs secrétariats par grade (FAB A, FAB B…) : on désambiguïse
+        d'abord avec la lettre du grade (ou, si le grade est absent, avec la
+        catégorie), puis avec le préfixe du matricule.
+        """
         if not hint:
             return None
         h = hint.strip()
-        return (
+        # 1) Correspondance exacte (nom ou type)
+        sec = (
             SecretariatModel.objects.filter(nom__iexact=h).first()
             or SecretariatModel.objects.filter(type__libelle__iexact=h).first()
             or SecretariatModel.objects.filter(nom__istartswith=f'{h} ').first()
         )
+        if sec:
+            return sec
+        # 2) Correspondance par préfixe (ex. « FAB » -> « FAB A », « FAB B »…)
+        candidates = list(
+            SecretariatModel.objects.filter(type__libelle__istartswith=h)[:8]
+        )
+        if not candidates:
+            candidates = list(
+                SecretariatModel.objects.filter(nom__istartswith=h)[:8]
+            )
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        # 3) Désambiguïsation par la lettre du grade (A/B/C/D), ou à défaut
+        #    par la catégorie (ex. « A », « FAB A » -> A).
+        g = (grade or '').strip().upper()
+        grade_letter = g[0] if g and g[0] in ('A', 'B', 'C', 'D') else ''
+        if not grade_letter and categorie:
+            c = self._normalize_categorie(categorie)
+            if c and c[-1] in ('A', 'B', 'C', 'D'):
+                grade_letter = c[-1]
+        if grade_letter:
+            for cand in candidates:
+                label = (cand.type.libelle if cand.type else '').upper()
+                if label.endswith(f' {grade_letter}') or cand.nom.upper().endswith(f' {grade_letter}'):
+                    return cand
+        # 4) Désambiguïsation FAB/FAC par le préfixe du matricule
+        m = (matricule or '').strip().upper()
+        prefers_fab = not m.startswith('FNCP')
+        for cand in candidates:
+            label = (cand.type.libelle if cand.type else '').upper()
+            if prefers_fab and label.startswith('FAB'):
+                return cand
+            if not prefers_fab and label.startswith('FAC'):
+                return cand
+        return candidates[0]
 
     def _resolve_ref_site(self, site_name):
         """
@@ -572,6 +616,27 @@ class Command(BaseCommand):
         inscriptions = 0
         # Cache secretariat par categorie pour éviter une requête DB par ligne
         _secretariat_cache = {}
+        # Cache des recherches de modules pour éviter de re-requêter la DB
+        # pour des grades/groupes/vagues identiques d'une ligne à l'autre.
+        _module_match_cache = {}
+        # Inscriptions à créer en masse (bulk_create) à la fin, au lieu d'un
+        # get_or_create par ligne. dédoublonnées via _queued_pairs.
+        _pending_inscriptions = []
+        _queued_pairs = set()
+
+        def _queue_inscription(_mod, participant, log_msg):
+            pair = (_mod.id, participant.id)
+            if pair in _queued_pairs:
+                return
+            _queued_pairs.add(pair)
+            _pending_inscriptions.append(
+                ModuleParticipant(
+                    module=_mod,
+                    participant=participant,
+                    inscrit_le=timezone.now(),
+                )
+            )
+            self.stdout.write(log_msg)
 
         for row_idx, data in self._rows(ws):
             nom = self._str(data.get('nom'))
@@ -613,9 +678,15 @@ class Command(BaseCommand):
                 # Si aucun match, on conserve la règle historique par catégorie/grade.
                 forced_hint = self._secretariat_hint_from_matricule(matricule)
                 if forced_hint:
-                    cache_key = f'prefix:{forced_hint}'
+                    grade_letter = (fields.get('grade') or '').strip().upper()[:1]
+                    cat_key = (fields.get('categorie') or '').strip().upper()
+                    cache_key = f'prefix:{forced_hint}:{grade_letter}:{cat_key}'
                     if cache_key not in _secretariat_cache:
-                        sec = self._resolve_secretariat(SecretariatModel, forced_hint)
+                        sec = self._resolve_secretariat(
+                            SecretariatModel, forced_hint,
+                            grade=fields.get('grade', ''), matricule=matricule,
+                            categorie=fields.get('categorie', ''),
+                        )
                         _secretariat_cache[cache_key] = sec
                         if sec:
                             self.stdout.write(
@@ -728,33 +799,33 @@ class Command(BaseCommand):
                 p_vague  = self._str(data.get('vague'))
                 titres = [t.strip() for t in formations_str.split('|') if t.strip()]
                 for titre in titres:
-                    mod_qs = Module.objects.filter(formation__formation__iexact=titre)
-                    if p_grade:
-                        mod_qs_g = mod_qs.filter(grade__iexact=p_grade)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
-                    if p_groupe:
-                        mod_qs_g = mod_qs.filter(groupe__iexact=p_groupe)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
-                    if p_vague:
-                        mod_qs_g = mod_qs.filter(vague__iexact=p_vague)
-                        if mod_qs_g.exists():
-                            mod_qs = mod_qs_g
-                    matched_mods = list(mod_qs.order_by('ordre'))
+                    cache_key = ('titre', titre.lower(), p_grade.lower(), p_groupe.lower(), p_vague.lower())
+                    if cache_key not in _module_match_cache:
+                        mod_qs = Module.objects.filter(formation__formation__iexact=titre)
+                        if p_grade:
+                            mod_qs_g = mod_qs.filter(grade__iexact=p_grade)
+                            if mod_qs_g.exists():
+                                mod_qs = mod_qs_g
+                        if p_groupe:
+                            mod_qs_g = mod_qs.filter(groupe__iexact=p_groupe)
+                            if mod_qs_g.exists():
+                                mod_qs = mod_qs_g
+                        if p_vague:
+                            mod_qs_g = mod_qs.filter(vague__iexact=p_vague)
+                            if mod_qs_g.exists():
+                                mod_qs = mod_qs_g
+                        _module_match_cache[cache_key] = list(
+                            mod_qs.select_related('formation').order_by('ordre')
+                        )
+                    matched_mods = _module_match_cache[cache_key]
                     if not matched_mods:
                         errors.append(f'Participants ligne {row_idx}: formation "{titre}" introuvable')
                         continue
                     for _mod in matched_mods:
-                        try:
-                            _, insc_created = ModuleParticipant.objects.get_or_create(
-                                module=_mod, participant=obj,
-                            )
-                            if insc_created:
-                                inscriptions += 1
-                                self.stdout.write(f'    ↳ Inscrit à : {_mod.formation.formation} / {_mod.intitule} ({_mod.groupe})')
-                        except Exception as e:
-                            errors.append(f'Participants ligne {row_idx}: inscription impossible à "{titre}" ({e})')
+                        _queue_inscription(
+                            _mod, obj,
+                            f'    ↳ Inscrit à : {_mod.formation.formation} / {_mod.intitule} ({_mod.groupe})',
+                        )
             else:
                 # Cas 2 : colonne Formation(s) vide
                 # Auto-match strict : catégorie + grade + groupe tous les 3 requis
@@ -764,13 +835,18 @@ class Command(BaseCommand):
                 groupe = self._str(data.get('groupe'))
                 vague = self._str(data.get('vague'))
                 if grade and groupe:
-                    mod_qs = Module.objects.filter(
-                        grade__iexact=grade,
-                        groupe__iexact=groupe,
-                    )
-                    if vague:
-                        mod_qs = mod_qs.filter(vague__iexact=vague)
-                    matched_mods = list(mod_qs)
+                    cache_key = ('auto', grade.lower(), groupe.lower(), vague.lower())
+                    if cache_key not in _module_match_cache:
+                        mod_qs = Module.objects.filter(
+                            grade__iexact=grade,
+                            groupe__iexact=groupe,
+                        )
+                        if vague:
+                            mod_qs = mod_qs.filter(vague__iexact=vague)
+                        _module_match_cache[cache_key] = list(
+                            mod_qs.select_related('formation')
+                        )
+                    matched_mods = _module_match_cache[cache_key]
                     if not matched_mods:
                         crit = f'grade={grade} groupe={groupe}'
                         if vague:
@@ -782,20 +858,10 @@ class Command(BaseCommand):
                         )
                     else:
                         for _mod in matched_mods:
-                            try:
-                                _, insc_created = ModuleParticipant.objects.get_or_create(
-                                    module=_mod, participant=obj,
-                                )
-                                if insc_created:
-                                    inscriptions += 1
-                                    self.stdout.write(
-                                        f'    ↳ Auto-inscrit → {_mod.formation.formation} / {_mod.intitule}'
-                                    )
-                            except Exception as e:
-                                errors.append(
-                                    f'Participants ligne {row_idx}: auto-inscription impossible '
-                                    f'à "{_mod.formation.formation}" ({e})'
-                                )
+                            _queue_inscription(
+                                _mod, obj,
+                                f'    ↳ Auto-inscrit → {_mod.formation.formation} / {_mod.intitule}',
+                            )
                 elif not (grade or groupe):
                     errors.append(
                         f'Participants ligne {row_idx}: {nom} {prenom} '
@@ -807,6 +873,22 @@ class Command(BaseCommand):
                         f'auto-match incomplet (grade={grade!r} groupe={groupe!r}) '
                         f'— les 2 critères grade+groupe sont requis'
                     )
+
+        # Création en masse des inscriptions : on filtre celles déjà existantes
+        # en une seule requête, puis bulk_create (ignore_conflicts par sécurité).
+        if _pending_inscriptions:
+            module_ids = {mp.module_id for mp in _pending_inscriptions}
+            existing_pairs = set(
+                ModuleParticipant.objects.filter(module_id__in=module_ids)
+                .values_list('module_id', 'participant_id')
+            )
+            to_create = [
+                mp for mp in _pending_inscriptions
+                if (mp.module_id, mp.participant_id) not in existing_pairs
+            ]
+            if to_create:
+                ModuleParticipant.objects.bulk_create(to_create, ignore_conflicts=True)
+            inscriptions = len(to_create)
 
         if inscriptions:
             self.stdout.write(f'  📌 {inscriptions} inscription(s) créée(s)')

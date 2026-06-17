@@ -1,5 +1,5 @@
 """
-Modèles de l'app Statistiques & Bilans — Lot 5 SYGEP-CPFAE.
+Modèles de l'app Statistiques & Bilans — SYGEP-CPFAE.
 """
 import hashlib
 import json
