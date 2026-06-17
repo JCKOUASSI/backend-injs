@@ -7,6 +7,8 @@ from .api_views import (
     module_add_participant, module_remove_participant,
     module_add_formateur, module_remove_formateur,
     module_assign_superviseur,
+    module_notes_list_api, module_notes_bulk_api,
+    module_notes_colonnes_api, module_notes_colonne_delete_api,
     ref_type_secretariat_list, ref_type_secretariat_detail,
 )
 
@@ -107,6 +109,10 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/add/', module_add_formateur, name='api-module-add-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/<int:formateur_id>/remove/', module_remove_formateur, name='api-module-remove-formateur'),
     path('<int:formation_pk>/modules/<int:module_pk>/assign-superviseur/', module_assign_superviseur, name='api-module-assign-superviseur'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/', module_notes_list_api, name='api-module-notes-list'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/bulk/', module_notes_bulk_api, name='api-module-notes-bulk'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/', module_notes_colonnes_api, name='api-module-notes-colonnes'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/<int:colonne_pk>/', module_notes_colonne_delete_api, name='api-module-notes-colonne-delete'),
 
     # Session management (via module)
     path('<int:formation_pk>/sessions/', session_views.session_list, name='api-session-list'),

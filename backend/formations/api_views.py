@@ -14,12 +14,13 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
+from suiviEvaluation.permissions import IsGestionNotes
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .formateur_privacy import (
@@ -63,6 +64,79 @@ def _groupe_sort_key(value):
     if match:
         return (0, int(match.group(1)))
     return (1, value)
+
+
+def _mention_from_note(note):
+    """Calcule la mention à partir d'une note /20."""
+    if note is None:
+        return ''
+    try:
+        n = float(note)
+    except (TypeError, ValueError):
+        return ''
+    if n >= 16:
+        return NoteModuleSynthese.Mention.TRES_BIEN
+    if n >= 14:
+        return NoteModuleSynthese.Mention.BIEN
+    if n >= 12:
+        return NoteModuleSynthese.Mention.ASSEZ_BIEN
+    if n >= 10:
+        return NoteModuleSynthese.Mention.PASSABLE
+    return NoteModuleSynthese.Mention.INSUFFISANT
+
+
+def _mention_from_notes(notes):
+    """Mention à partir de la moyenne de plusieurs notes."""
+    vals = []
+    for n in notes:
+        if n is None or n == '':
+            continue
+        try:
+            vals.append(float(n))
+        except (TypeError, ValueError):
+            continue
+    if not vals:
+        return ''
+    return _mention_from_note(sum(vals) / len(vals))
+
+
+def _user_display(user):
+    if not user:
+        return None
+    return user.get_full_name() or user.username
+
+
+def _ensure_colonnes(module):
+    colonnes = list(NoteModuleColonne.objects.filter(module=module).order_by('ordre', 'id'))
+    if colonnes:
+        return colonnes
+    colonne = NoteModuleColonne.objects.create(
+        module=module,
+        libelle='Note /20',
+        ordre=0,
+        note_max=20,
+    )
+    return [colonne]
+
+
+def _serialize_colonne(colonne):
+    return {
+        'id': colonne.id,
+        'libelle': colonne.libelle,
+        'ordre': colonne.ordre,
+        'note_max': float(colonne.note_max),
+    }
+
+
+def _get_module_in_formation(formation_pk, module_pk):
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+        return formation, module, None
+    except Formation.DoesNotExist:
+        return None, None, Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return None, None, Response({'detail': 'Module introuvable.'}, status=404)
 
 
 @api_view(['GET'])
@@ -3424,6 +3498,307 @@ def module_full_detail_api(request, formation_pk, module_pk):
             for mf in formateurs_assignes
         ],
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsGestionNotes])
+def module_notes_list_api(request, formation_pk, module_pk):
+    """Liste les auditeurs inscrits au module avec leurs notes par colonne."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    colonnes = _ensure_colonnes(module)
+    colonne_ids = [c.id for c in colonnes]
+
+    inscriptions = (
+        ModuleParticipant.objects.filter(module=module)
+        .select_related('participant')
+        .order_by('participant__nom', 'participant__prenom')
+    )
+    valeurs = NoteModule.objects.filter(
+        colonne_id__in=colonne_ids,
+    ).select_related('saisie_par', 'colonne')
+    valeurs_map = {}
+    for v in valeurs:
+        valeurs_map.setdefault(v.participant_id, {})[v.colonne_id] = v
+
+    syntheses_map = {
+        s.participant_id: s
+        for s in NoteModuleSynthese.objects.filter(module=module).select_related('saisie_par')
+    }
+
+    from suiviEvaluation.services import resume_module_participant, _get_parametres
+
+    criteres = _get_parametres(module.formation)
+
+    rows = []
+    for mp in inscriptions:
+        p = mp.participant
+        synthese = syntheses_map.get(p.id)
+        resume = resume_module_participant(module, p)
+        notes_by_colonne = {}
+        for cid in colonne_ids:
+            val = valeurs_map.get(p.id, {}).get(cid)
+            if val and val.note is not None:
+                notes_by_colonne[str(cid)] = {
+                    'note': float(val.note),
+                    'saisie_par': _user_display(val.saisie_par),
+                    'updated_at': val.updated_at.isoformat(),
+                }
+            else:
+                notes_by_colonne[str(cid)] = {
+                    'note': None,
+                    'saisie_par': _user_display(val.saisie_par) if val else None,
+                    'updated_at': val.updated_at.isoformat() if val else None,
+                }
+        rows.append({
+            'participant_id': p.id,
+            'nom': p.nom,
+            'prenom': p.prenom,
+            'matricule': p.matricule or '',
+            'grade': p.grade or '',
+            'notes': notes_by_colonne,
+            'mention': synthese.mention if synthese else '',
+            'observations': synthese.observations if synthese else '',
+            'saisie_par': _user_display(synthese.saisie_par) if synthese else None,
+            'updated_at': synthese.updated_at.isoformat() if synthese else None,
+            'moyenne': resume['moyenne'],
+            'heures_presence': resume['heures_presence'],
+            'heures_prevues': resume['heures_prevues'],
+            'taux_presence': resume['taux_presence'],
+            'admissible': resume['admissible'],
+        })
+
+    return Response({
+        'colonnes': [_serialize_colonne(c) for c in colonnes],
+        'criteres': criteres,
+        'rows': rows,
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsGestionNotes])
+def module_notes_colonnes_api(request, formation_pk, module_pk):
+    """Liste ou ajoute une colonne de notes pour le module."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    if request.method == 'GET':
+        colonnes = _ensure_colonnes(module)
+        return Response([_serialize_colonne(c) for c in colonnes])
+
+    libelle = (request.data.get('libelle') or '').strip()
+    if not libelle:
+        return Response({'detail': 'Le libellé de la colonne est requis.'}, status=400)
+
+    note_max_raw = request.data.get('note_max', 20)
+    try:
+        note_max = float(note_max_raw)
+    except (TypeError, ValueError):
+        return Response({'detail': 'note_max invalide.'}, status=400)
+    if note_max <= 0 or note_max > 100:
+        return Response({'detail': 'note_max doit être entre 0 et 100.'}, status=400)
+
+    last_ordre = (
+        NoteModuleColonne.objects.filter(module=module)
+        .order_by('-ordre')
+        .values_list('ordre', flat=True)
+        .first()
+    ) or 0
+    colonne = NoteModuleColonne.objects.create(
+        module=module,
+        libelle=libelle,
+        ordre=last_ordre + 1,
+        note_max=note_max,
+    )
+    return Response(_serialize_colonne(colonne), status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsGestionNotes])
+def module_notes_colonne_delete_api(request, formation_pk, module_pk, colonne_pk):
+    """Supprime une colonne de notes (au moins une colonne doit rester)."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    try:
+        colonne = NoteModuleColonne.objects.get(pk=colonne_pk, module=module)
+    except NoteModuleColonne.DoesNotExist:
+        return Response({'detail': 'Colonne introuvable.'}, status=404)
+
+    if NoteModuleColonne.objects.filter(module=module).count() <= 1:
+        return Response({'detail': 'Impossible de supprimer la dernière colonne.'}, status=400)
+
+    colonne.delete()
+    return Response(status=204)
+
+
+@api_view(['POST'])
+@permission_classes([IsGestionNotes])
+def module_notes_bulk_api(request, formation_pk, module_pk):
+    """Sauvegarde en masse les notes des auditeurs d'un module."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(formation_pk, module_pk)
+    if err:
+        return err
+
+    colonnes = {c.id: c for c in _ensure_colonnes(module)}
+    items = request.data.get('notes')
+    if not isinstance(items, list):
+        return Response({'detail': 'Le champ "notes" (liste) est requis.'}, status=400)
+
+    syntheses_items = request.data.get('syntheses')
+    if syntheses_items is not None and not isinstance(syntheses_items, list):
+        return Response({'detail': 'Le champ "syntheses" doit être une liste.'}, status=400)
+
+    enrolled_ids = set(
+        ModuleParticipant.objects.filter(module=module).values_list('participant_id', flat=True)
+    )
+
+    saved = 0
+    errors = []
+    participant_notes_for_mention = {}
+
+    with transaction.atomic():
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                errors.append({'index': idx, 'detail': 'Entrée invalide.'})
+                continue
+
+            participant_id = item.get('participant_id')
+            colonne_id = item.get('colonne_id')
+            if not participant_id or not colonne_id:
+                errors.append({'index': idx, 'detail': 'participant_id et colonne_id requis.'})
+                continue
+
+            try:
+                participant_id = int(participant_id)
+                colonne_id = int(colonne_id)
+            except (TypeError, ValueError):
+                errors.append({'index': idx, 'detail': 'participant_id ou colonne_id invalide.'})
+                continue
+
+            if participant_id not in enrolled_ids:
+                errors.append({'index': idx, 'detail': 'Auditeur non inscrit à ce module.'})
+                continue
+
+            colonne = colonnes.get(colonne_id)
+            if not colonne:
+                errors.append({'index': idx, 'detail': 'Colonne introuvable.'})
+                continue
+
+            note_max = float(colonne.note_max)
+            note_raw = item.get('note')
+            note_val = None
+            if note_raw is not None and note_raw != '':
+                try:
+                    note_val = float(note_raw)
+                except (TypeError, ValueError):
+                    errors.append({'index': idx, 'detail': 'Note invalide.'})
+                    continue
+                if note_val < 0 or note_val > note_max:
+                    errors.append({'index': idx, 'detail': f'La note doit être entre 0 et {note_max}.'})
+                    continue
+
+            if note_val is None:
+                NoteModule.objects.filter(colonne=colonne, participant_id=participant_id).delete()
+            else:
+                NoteModule.objects.update_or_create(
+                    colonne=colonne,
+                    participant_id=participant_id,
+                    defaults={
+                        'note': note_val,
+                        'saisie_par': request.user,
+                    },
+                )
+                note_max = float(colonne.note_max or 20)
+                if note_max <= 0:
+                    note_max = 20
+                participant_notes_for_mention.setdefault(participant_id, []).append(
+                    float(note_val) * 20 / note_max
+                )
+            saved += 1
+
+        if syntheses_items:
+            for idx, item in enumerate(syntheses_items):
+                if not isinstance(item, dict):
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'Entrée invalide.'})
+                    continue
+
+                participant_id = item.get('participant_id')
+                if not participant_id:
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'participant_id requis.'})
+                    continue
+
+                try:
+                    participant_id = int(participant_id)
+                except (TypeError, ValueError):
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'participant_id invalide.'})
+                    continue
+
+                if participant_id not in enrolled_ids:
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'Auditeur non inscrit.'})
+                    continue
+
+                observations = (item.get('observations') or '').strip()
+                mention = (item.get('mention') or '').strip()
+
+                if not mention:
+                    existing_notes = list(participant_notes_for_mention.get(participant_id, []))
+                    if not existing_notes:
+                        for v in NoteModule.objects.filter(
+                            colonne__module=module,
+                            participant_id=participant_id,
+                            note__isnull=False,
+                        ).select_related('colonne'):
+                            note_max = float(v.colonne.note_max or 20)
+                            if note_max <= 0:
+                                note_max = 20
+                            existing_notes.append(float(v.note) * 20 / note_max)
+                    mention = _mention_from_notes(existing_notes)
+
+                if not mention and not observations:
+                    NoteModuleSynthese.objects.filter(module=module, participant_id=participant_id).delete()
+                    saved += 1
+                    continue
+
+                if mention and mention not in dict(NoteModuleSynthese.Mention.choices):
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'Mention invalide.'})
+                    continue
+
+                NoteModuleSynthese.objects.update_or_create(
+                    module=module,
+                    participant_id=participant_id,
+                    defaults={
+                        'mention': mention,
+                        'observations': observations,
+                        'saisie_par': request.user,
+                    },
+                )
+                saved += 1
+
+    from suiviEvaluation.services import calculer_moyennes_module_tous
+    calculer_moyennes_module_tous(module)
+
+    return Response({'saved': saved, 'errors': errors})
 
 
 @api_view(['POST'])
