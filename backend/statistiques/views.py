@@ -1,5 +1,5 @@
 """
-Vues API — Module Statistiques & Bilans (Lot 5 SYGEP-CPFAE).
+Vues API — Module Statistiques & Bilans (SYGEP-CPFAE).
 
 Filtres disponibles sur GET /api/statistiques/ :
   ?formation_id=<id>     → stats pour une formation précise

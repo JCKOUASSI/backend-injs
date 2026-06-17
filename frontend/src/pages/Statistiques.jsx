@@ -1,5 +1,5 @@
 /**
- * Statistiques.jsx — Lot 5 SYGEP-CPFAE
+ * Statistiques.jsx — SYGEP-CPFAE
  * Dashboard multi-onglets : Vue d'ensemble · Pédagogique · Administratif · Historique · Secrétariats · Rapports · Alertes
  */
 import { useState, useEffect, useCallback, useRef } from 'react'

@@ -1,6 +1,6 @@
 ================================================================================
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
-  Module Statistiques & Bilans — Lot 5
+  Module Statistiques & Bilans
 ================================================================================
 Dernière mise à jour : 16/06/2026 02:42
 Statut global         : EN COURS — fonctionnel, enrichissements continus
@@ -112,7 +112,7 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
 
 [03/06/2026] Onglet Alertes enrichi : jauges visuelles, guide, synthèse KPI, init seuils CPFAE depuis l'interface
   · Enregistré automatiquement le 03/06/2026 14:00
-[02/06/2026] Lot 5 — Module Statistiques & Bilans (version initiale complète)
+[02/06/2026] Module Statistiques & Bilans (version initiale complète)
 
   BACKEND
   · App Django statistiques créée (models, views, urls, admin, migrations)
