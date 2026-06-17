@@ -2,7 +2,6 @@ from rest_framework import serializers
 from .models import (
     Questionnaire, Question, ChoixQuestion,
     ReponseQuestionnaire, ReponseQuestion,
-    QuizManuel, QuestionQuiz, ReponseQuiz,
 )
 
 class ChoixQuestionSerializer(serializers.ModelSerializer):
@@ -185,67 +184,3 @@ class ResultatsSerializer(serializers.ModelSerializer):
             result.append(item)
         return result
 
-
-# ─────────────────────────────────────────────────────────────
-# QUIZ MANUELS
-# ─────────────────────────────────────────────────────────────
-
-class QuestionQuizSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = QuestionQuiz
-        fields = ['id', 'quiz', 'question', 'type_question', 'reponse_correcte', 'options', 'points', 'ordre']
-        read_only_fields = ['id']
-
-
-class QuestionQuizPublicSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = QuestionQuiz
-        fields = ['id', 'question', 'type_question', 'options', 'points', 'ordre']
-
-
-class QuizManuelSerializer(serializers.ModelSerializer):
-    module_intitule = serializers.CharField(source='module.intitule', read_only=True)
-    nb_questions_reelles = serializers.SerializerMethodField()
-
-    class Meta:
-        model = QuizManuel
-        fields = [
-            'id', 'module', 'module_intitule', 'titre', 'description',
-            'chapitre', 'categories', 'grades', 'nb_questions', 'nb_questions_reelles',
-            'seuil_reussite', 'duree_max_minutes', 'actif',
-            'date_ouverture', 'date_fermeture', 'created_by', 'created_at',
-        ]
-        read_only_fields = ['id', 'created_by', 'created_at']
-
-    def get_nb_questions_reelles(self, obj):
-        return obj.questions.count()
-
-
-class QuizManuelDetailSerializer(QuizManuelSerializer):
-    questions = QuestionQuizSerializer(many=True, read_only=True)
-
-    class Meta(QuizManuelSerializer.Meta):
-        fields = QuizManuelSerializer.Meta.fields + ['questions']
-
-
-class QuizManuelPublicSerializer(QuizManuelSerializer):
-    questions = QuestionQuizPublicSerializer(many=True, read_only=True)
-
-    class Meta(QuizManuelSerializer.Meta):
-        fields = QuizManuelSerializer.Meta.fields + ['questions']
-
-
-class ReponseQuizSerializer(serializers.ModelSerializer):
-    participant_nom = serializers.SerializerMethodField()
-    quiz_titre = serializers.CharField(source='quiz.titre', read_only=True)
-
-    class Meta:
-        model = ReponseQuiz
-        fields = [
-            'id', 'quiz', 'quiz_titre', 'participant', 'participant_nom',
-            'date_soumission', 'score', 'reussi', 'temps_pris_minutes', 'reponses_detail',
-        ]
-        read_only_fields = ['id', 'date_soumission', 'score', 'reussi']
-
-    def get_participant_nom(self, obj):
-        return f"{obj.participant.nom} {obj.participant.prenom}"
