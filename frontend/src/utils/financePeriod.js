@@ -117,8 +117,14 @@ export const buildFinancePeriodQuery = (period) => {
     if (tk) p.set('trimestre', tk)
   }
   if (period.preset === 'custom') {
-    if (period.dateDebut) p.set('date_debut', period.dateDebut)
-    if (period.dateFin) p.set('date_fin', period.dateFin)
+    if (period.dateDebut && period.dateFin) {
+      p.set('date_debut', period.dateDebut)
+      p.set('date_fin', period.dateFin)
+    } else {
+      // Si dates manquantes, ne pas envoyer preset=custom, utiliser tout
+      p.delete('preset')
+      p.set('preset', 'tout')
+    }
   }
   return p
 }
