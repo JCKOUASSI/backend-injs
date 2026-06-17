@@ -959,20 +959,40 @@ class FinanceAjustement(models.Model):
         return f'Ajustement {self.statut} — séance {self.session_id} ({self.minutes_delta} min)'
 
 
-class NoteModule(models.Model):
-    """Note / mention d'un participant sur un module (saisie secrétariat)."""
-
-    class Mention(models.TextChoices):
-        TRES_BIEN = 'TRES_BIEN', 'Très bien'
-        BIEN = 'BIEN', 'Bien'
-        ASSEZ_BIEN = 'ASSEZ_BIEN', 'Assez bien'
-        PASSABLE = 'PASSABLE', 'Passable'
-        INSUFFISANT = 'INSUFFISANT', 'Insuffisant'
+class NoteModuleColonne(models.Model):
+    """Colonne de saisie de notes /20 (ou autre barème) pour un module."""
 
     module = models.ForeignKey(
         Module,
         on_delete=models.CASCADE,
-        related_name='notes',
+        related_name='colonnes_notes',
+    )
+    libelle = models.CharField(max_length=120, help_text='Intitulé affiché en en-tête de colonne')
+    ordre = models.PositiveSmallIntegerField(default=0)
+    note_max = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=20,
+        help_text='Note maximale (ex : 20)',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Colonne de note module'
+        verbose_name_plural = 'Colonnes de notes module'
+        ordering = ['module', 'ordre', 'id']
+
+    def __str__(self):
+        return f'{self.libelle} — {self.module}'
+
+
+class NoteModule(models.Model):
+    """Valeur de note d'un auditeur pour une colonne donnée."""
+
+    colonne = models.ForeignKey(
+        NoteModuleColonne,
+        on_delete=models.CASCADE,
+        related_name='valeurs',
     )
     participant = models.ForeignKey(
         Participant,
@@ -985,6 +1005,46 @@ class NoteModule(models.Model):
         null=True,
         blank=True,
         help_text='Note numérique (ex : 14.50)',
+    )
+    saisie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notes_saisies',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Note module'
+        verbose_name_plural = 'Notes modules'
+        ordering = ['colonne', 'participant__nom', 'participant__prenom']
+        unique_together = [('colonne', 'participant')]
+
+    def __str__(self):
+        return f'{self.participant} — {self.colonne}: {self.note}'
+
+
+class NoteModuleSynthese(models.Model):
+    """Mention et observations globales par auditeur et module."""
+
+    class Mention(models.TextChoices):
+        TRES_BIEN = 'TRES_BIEN', 'Très bien'
+        BIEN = 'BIEN', 'Bien'
+        ASSEZ_BIEN = 'ASSEZ_BIEN', 'Assez bien'
+        PASSABLE = 'PASSABLE', 'Passable'
+        INSUFFISANT = 'INSUFFISANT', 'Insuffisant'
+
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.CASCADE,
+        related_name='syntheses_notes',
+    )
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name='syntheses_notes_modules',
     )
     mention = models.CharField(
         max_length=20,
@@ -1003,13 +1063,16 @@ class NoteModule(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='notes_saisies',
+        related_name='syntheses_notes_saisies',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Note module'
-        verbose_name_plural = 'Notes modules'
+        verbose_name = 'Synthèse notes module'
+        verbose_name_plural = 'Synthèses notes module'
         ordering = ['module', 'participant__nom', 'participant__prenom']
         unique_together = [('module', 'participant')]
+
+    def __str__(self):
+        return f'{self.participant} — {self.module}'

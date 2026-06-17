@@ -3,9 +3,8 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     """
-    Drop all academic evaluation tables on production servers that ran the old migration 0004.
-    On fresh databases these tables don't exist, so we use IF EXISTS.
-    No state changes — these models were never in the current migration state.
+    Supprime les tables d'évaluation académique legacy (migration 0004) sur les
+    bases qui les ont encore, et nettoie l'état Django (modèles absents de models.py).
     """
 
     dependencies = [
@@ -33,6 +32,18 @@ class Migration(migrations.Migration):
                     reverse_sql=migrations.RunSQL.noop,
                 ),
             ],
-            state_operations=[],
+            state_operations=[
+                migrations.DeleteModel(name='HistoriqueNoteModification'),
+                migrations.DeleteModel(name='NoteEpreuve'),
+                migrations.DeleteModel(name='MoyenneModule'),
+                migrations.DeleteModel(name='SuiviModuleAuditeur'),
+                migrations.DeleteModel(name='FicheAuditeurAcademique'),
+                migrations.DeleteModel(name='FicheFormateur'),
+                migrations.DeleteModel(name='ExportRapport'),
+                migrations.DeleteModel(name='ParametresEvaluation'),
+                migrations.DeleteModel(name='DecisionPedagogique'),
+                migrations.DeleteModel(name='Epreuve'),
+                migrations.DeleteModel(name='TypeEpreuve'),
+            ],
         ),
     ]

@@ -12,7 +12,7 @@ import { useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
-import { canMutateFormations, canSuperviseSessions } from '../utils/roles'
+import { canMutateFormations, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROLES } from '../utils/roles'
 import { formatApiErrors } from '../utils/apiErrors'
 
 export default function ModuleDetail() {
@@ -20,6 +20,7 @@ export default function ModuleDetail() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const backToModulesList = useListReturn('/modules', LIST_STORAGE_KEYS.modules)
+  const canManageNotes = hasAppRole(user, NOTE_GESTION_ROLES)
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -500,6 +501,7 @@ export default function ModuleDetail() {
             <span className={`badge ${getStatutBadge(module.statut)}`}>{getStatutLabel(module.statut)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
+            {canManageNotes && (
             <Link
               to={`/formations/${formationId}/modules/${moduleId}/notes`}
               className="btn btn-outline-primary btn-sm"
@@ -507,6 +509,7 @@ export default function ModuleDetail() {
             >
               <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
             </Link>
+            )}
             <button
               onClick={() => handleExportAllSeances('pdf')}
               className="btn btn-outline-danger btn-sm"

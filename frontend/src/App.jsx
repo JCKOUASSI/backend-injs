@@ -28,6 +28,7 @@ import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
+import NotesModule from './pages/NotesModule'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -38,6 +39,7 @@ import {
   USERS_ALLOWED_ROLES,
   IMPORT_ALLOWED_ROLES,
   EVALUATION_ALLOWED_ROLES,
+  NOTE_GESTION_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -299,6 +301,13 @@ function App() {
             <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formations/:formationId/modules/:moduleId/notes" element={
+            <ProtectedRoute allowedRoles={NOTE_GESTION_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Notes</li></>}>
+                <NotesModule />
               </Layout>
             </ProtectedRoute>
           } />
