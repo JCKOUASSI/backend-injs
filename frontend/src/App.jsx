@@ -29,6 +29,7 @@ import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
 import NotesModule from './pages/NotesModule'
+import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -40,6 +41,7 @@ import {
   IMPORT_ALLOWED_ROLES,
   EVALUATION_ALLOWED_ROLES,
   NOTE_GESTION_ROLES,
+  DECISION_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -308,6 +310,13 @@ function App() {
             <ProtectedRoute allowedRoles={NOTE_GESTION_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Notes</li></>}>
                 <NotesModule />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formations/:formationId/decisions" element={
+            <ProtectedRoute allowedRoles={NOTE_GESTION_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Décisions pédagogiques</li></>}>
+                <DecisionsPedagogiques />
               </Layout>
             </ProtectedRoute>
           } />

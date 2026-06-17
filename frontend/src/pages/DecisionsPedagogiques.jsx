@@ -22,6 +22,7 @@ export default function DecisionsPedagogiques() {
 
   const [formation, setFormation] = useState(null)
   const [decisions, setDecisions] = useState([])
+  const [criteres, setCriteres] = useState({ seuil_admission: 12, taux_presence_min: 80 })
   const [loading, setLoading] = useState(true)
   const [recalc, setRecalc] = useState(false)
   const [filter, setFilter] = useState('')
@@ -35,7 +36,9 @@ export default function DecisionsPedagogiques() {
         api.get(`/evaluations/formations/${formationId}/decisions/`),
       ])
       setFormation(formRes.data)
-      setDecisions(decRes.data)
+      const payload = decRes.data
+      setDecisions(Array.isArray(payload) ? payload : (payload.decisions || []))
+      if (payload.criteres) setCriteres(payload.criteres)
     } catch {
       showToast('Erreur lors du chargement', 'error')
     } finally {
@@ -80,6 +83,7 @@ export default function DecisionsPedagogiques() {
           <h2 style={{ margin: 0, fontWeight: 700 }}>Décisions pédagogiques</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
             {formation?.formation} · {decisions.length} auditeur{decisions.length !== 1 ? 's' : ''}
+            · Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et cours effectué ≥ <strong>{criteres.taux_presence_min}%</strong>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -132,12 +136,21 @@ export default function DecisionsPedagogiques() {
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{d.participant_matricule}</div>
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
-                    <strong style={{ color: d.moyenne_generale >= 10 ? '#2e7d32' : '#b71c1c' }}>
+                    <strong style={{ color: d.moyenne_generale >= criteres.seuil_admission ? '#2e7d32' : '#b71c1c' }}>
                       {d.moyenne_generale !== null ? `${d.moyenne_generale}/20` : '—'}
                     </strong>
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
-                    {d.taux_presence !== null ? `${d.taux_presence}%` : '—'}
+                    {d.taux_presence !== null ? (
+                      <span style={{ color: d.taux_presence >= criteres.taux_presence_min ? '#2e7d32' : '#b71c1c', fontWeight: 600 }}>
+                        {d.taux_presence}%
+                      </span>
+                    ) : '—'}
+                    {d.total_heures_prevues > 0 && (
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        {d.total_heures_presence}h / {d.total_heures_prevues}h
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                     {editing === d.id ? (

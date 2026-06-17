@@ -72,6 +72,7 @@ export default function NotesModule() {
   const [module, setModule] = useState(null)
   const [colonnes, setColonnes] = useState([])
   const [rows, setRows] = useState([])
+  const [criteres, setCriteres] = useState({ seuil_admission: 12, taux_presence_min: 80 })
   const [draft, setDraft] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -96,6 +97,7 @@ export default function NotesModule() {
       const dataRows = notesRes.data.rows || []
       setColonnes(cols)
       setRows(dataRows)
+      if (notesRes.data.criteres) setCriteres(notesRes.data.criteres)
       const init = {}
       dataRows.forEach(r => {
         const notes = {}
@@ -305,9 +307,19 @@ export default function NotesModule() {
             {rows.length} auditeur{rows.length !== 1 ? 's' : ''} inscrits · {nbSaisies} avec note{nbSaisies !== 1 ? 's' : ''}
             {colonnes.length > 1 && <> · {colonnes.length} colonnes</>}
             {moyenne && <> · Moyenne&nbsp;<strong>{moyenne}/20</strong></>}
+            <span style={{ display: 'block', marginTop: 4 }}>
+              Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et temps de cours effectué ≥ <strong>{criteres.taux_presence_min}%</strong>
+            </span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link
+            to={`/formations/${formationId}/decisions`}
+            className="btn btn-outline-secondary btn-sm"
+            title="Décisions pédagogiques de la formation"
+          >
+            <i className="bi bi-clipboard-check me-1"></i>Décisions
+          </Link>
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"
@@ -410,6 +422,9 @@ export default function NotesModule() {
                   </th>
                 ))}
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Mention</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Moy. /20</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Cours effectué</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Admis</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700 }}>Observations</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.78rem' }}>Saisi par</th>
               </tr>
@@ -418,6 +433,18 @@ export default function NotesModule() {
               {filtered.map((n, idx) => {
                 const d = draft[n.participant_id] || emptyDraftRow(colonnes)
                 const rowMention = mentionFromNotes(Object.entries(d.notes || {}), colonnesById)
+                const liveMoy = (() => {
+                  const vals = Object.entries(d.notes || {})
+                    .map(([cid, val]) => normalizeTo20(val, colonnesById[cid]?.note_max ?? 20))
+                    .filter(v => v !== null)
+                  if (!vals.length) return n.moyenne
+                  return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)
+                })()
+                const moyNum = liveMoy !== null && liveMoy !== undefined && liveMoy !== '' ? parseFloat(liveMoy) : null
+                const taux = n.taux_presence
+                const admis = moyNum !== null && taux !== null
+                  && moyNum >= criteres.seuil_admission
+                  && taux >= criteres.taux_presence_min
                 return (
                   <tr key={n.participant_id} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'var(--bg-secondary, #fafafa)' }}>
                     <td style={{ padding: '0.65rem 1rem', whiteSpace: 'nowrap' }}>
@@ -470,6 +497,31 @@ export default function NotesModule() {
                     })}
                     <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                       <MentionBadge mention={rowMention} />
+                    </td>
+                    <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontWeight: 700,
+                      color: moyNum !== null ? (moyNum >= criteres.seuil_admission ? '#2e7d32' : '#b71c1c') : 'var(--text-muted)' }}>
+                      {moyNum !== null && !isNaN(moyNum) ? `${moyNum.toFixed(2)}` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                      {taux !== null && taux !== undefined ? (
+                        <>
+                          <span style={{ fontWeight: 600, color: taux >= criteres.taux_presence_min ? '#2e7d32' : '#b71c1c' }}>
+                            {taux}%
+                          </span>
+                          {n.heures_prevues > 0 && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              {n.heures_presence}h / {n.heures_prevues}h
+                            </div>
+                          )}
+                        </>
+                      ) : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                      {moyNum !== null && taux !== null && taux !== undefined ? (
+                        admis
+                          ? <span style={{ color: '#2e7d32', fontWeight: 700 }}><i className="bi bi-check-circle-fill"></i> Oui</span>
+                          : <span style={{ color: '#b71c1c', fontWeight: 600 }}><i className="bi bi-x-circle"></i> Non</span>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>
                     <td style={{ padding: '0.65rem 0.5rem', minWidth: 180 }}>
                       <input

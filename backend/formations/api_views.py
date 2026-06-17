@@ -3532,10 +3532,15 @@ def module_notes_list_api(request, formation_pk, module_pk):
         for s in NoteModuleSynthese.objects.filter(module=module).select_related('saisie_par')
     }
 
+    from suiviEvaluation.services import resume_module_participant, _get_parametres
+
+    criteres = _get_parametres(module.formation)
+
     rows = []
     for mp in inscriptions:
         p = mp.participant
         synthese = syntheses_map.get(p.id)
+        resume = resume_module_participant(module, p)
         notes_by_colonne = {}
         for cid in colonne_ids:
             val = valeurs_map.get(p.id, {}).get(cid)
@@ -3562,10 +3567,16 @@ def module_notes_list_api(request, formation_pk, module_pk):
             'observations': synthese.observations if synthese else '',
             'saisie_par': _user_display(synthese.saisie_par) if synthese else None,
             'updated_at': synthese.updated_at.isoformat() if synthese else None,
+            'moyenne': resume['moyenne'],
+            'heures_presence': resume['heures_presence'],
+            'heures_prevues': resume['heures_prevues'],
+            'taux_presence': resume['taux_presence'],
+            'admissible': resume['admissible'],
         })
 
     return Response({
         'colonnes': [_serialize_colonne(c) for c in colonnes],
+        'criteres': criteres,
         'rows': rows,
     })
 
@@ -3783,6 +3794,9 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                     },
                 )
                 saved += 1
+
+    from suiviEvaluation.services import calculer_moyennes_module_tous
+    calculer_moyennes_module_tous(module)
 
     return Response({'saved': saved, 'errors': errors})
 

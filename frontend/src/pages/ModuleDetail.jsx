@@ -21,6 +21,7 @@ export default function ModuleDetail() {
   const { showToast } = useToast()
   const backToModulesList = useListReturn('/modules', LIST_STORAGE_KEYS.modules)
   const canManageNotes = hasAppRole(user, NOTE_GESTION_ROLES)
+  const canViewDecisions = hasAppRole(user, NOTE_GESTION_ROLES)
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -508,6 +509,15 @@ export default function ModuleDetail() {
               title="Saisir les notes des auditeurs"
             >
               <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
+            </Link>
+            )}
+            {canViewDecisions && (
+            <Link
+              to={`/formations/${formationId}/decisions`}
+              className="btn btn-outline-secondary btn-sm"
+              title="Décisions pédagogiques (moyenne + assiduité)"
+            >
+              <i className="bi bi-clipboard-check me-1"></i>Décisions
             </Link>
             )}
             <button
