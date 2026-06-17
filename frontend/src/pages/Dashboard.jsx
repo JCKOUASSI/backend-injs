@@ -106,7 +106,11 @@ export default function Dashboard() {
   const handleApplyVhPeriod = useCallback((periodOverride) => {
     const p = periodOverride ?? vhPeriod
     saveFinancePeriod(p)
-    setVhPeriod(p)
+    // Ne pas appeler setVhPeriod ici car onChange l'a déjà fait si periodOverride vient du filter
+    // Mais si on appelle handleApplyVhPeriod sans argument (bouton Appliquer), il faut le faire
+    if (!periodOverride) {
+      setVhPeriod(p)
+    }
     setAppliedVhPeriod({ ...p })
   }, [vhPeriod])
 
