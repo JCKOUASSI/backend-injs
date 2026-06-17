@@ -1838,6 +1838,10 @@ def _finance_report_rows(
 
     # Traiter les modules sans formateur (si include_all_modules=True)
     if include_all_modules and additional_module_ids and global_aggregates is not None:
+        # Initialiser les compteurs pour les modules sans formateur
+        additional_sessions_count = 0
+        additional_planned_minutes = 0.0
+
         for module_id in additional_module_ids:
             module_obj = modules_by_id.get(module_id)
             if not module_obj:
@@ -1858,6 +1862,10 @@ def _finance_report_rows(
                 module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
             )
 
+            # Accumuler les totaux
+            additional_sessions_count += len(sessions_in_period)
+            additional_planned_minutes += module_planned
+
             # Agréger les données pour les KPIs globaux
             for session in sessions_in_period:
                 if session.date_journee:
@@ -1874,6 +1882,10 @@ def _finance_report_rows(
                         global_aggregates['date_min'] = d
                     if cur_max is None or d > cur_max:
                         global_aggregates['date_max'] = d
+
+        # Stocker les totaux des modules sans formateur dans global_aggregates
+        global_aggregates['additional_sessions_count'] = additional_sessions_count
+        global_aggregates['additional_planned_minutes'] = additional_planned_minutes
 
     return results
 
@@ -2048,6 +2060,20 @@ def finance_dashboard_api(request):
     date_max = global_aggregates.get('date_max')
 
     kpis = _finance_kpis_from_rows(rows)
+
+    # Ajouter les volumes des modules sans formateur aux KPIs
+    additional_sessions_count = global_aggregates.get('additional_sessions_count', 0)
+    additional_planned_minutes = global_aggregates.get('additional_planned_minutes', 0.0)
+
+    if additional_sessions_count > 0:
+        kpis['total_sessions'] += additional_sessions_count
+        kpis['total_duree_minutes'] += round(additional_planned_minutes, 1)
+        kpis['total_duree_heures'] = round(kpis['total_duree_minutes'] / 60, 2)
+        # Recalculer le taux avec les nouveaux totaux
+        if kpis['total_duree_minutes'] > 0:
+            kpis['taux_realisation_global_pct'] = _finance_taux_realisation_pct(
+                kpis['total_duree_realisee_minutes'], kpis['total_duree_minutes']
+            )
 
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
