@@ -1523,8 +1523,13 @@ def _finance_report_rows(
     date_debut=None,
     date_fin=None,
     secretariat_id=None,
+    include_all_modules=False,
 ):
-    """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus)."""
+    """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus).
+
+    Si include_all_modules=True, inclut aussi tous les modules du secrétariat
+    (même ceux sans formateur assigné) dans les calculs de volume horaire.
+    """
     use_variable_rates = prix_heure is None
     if use_variable_rates:
         prix_map = _finance_build_prix_map()
@@ -1533,25 +1538,38 @@ def _finance_report_rows(
         default_prix = float(prix_heure or 0)
         prix_map = {}
     formateur_ids = [f.id for f in formateurs]
-    if not formateur_ids:
-        return []
 
     module_formateur_map = {}
-    for module_id, formateur_id in ModuleFormateur.objects.filter(
-        formateur_id__in=formateur_ids
-    ).values_list('module_id', 'formateur_id'):
-        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+    if formateur_ids:
+        for module_id, formateur_id in ModuleFormateur.objects.filter(
+            formateur_id__in=formateur_ids
+        ).values_list('module_id', 'formateur_id'):
+            module_formateur_map.setdefault(formateur_id, set()).add(module_id)
 
-    for module_id, formateur_id in Module.objects.filter(
-        formateur_id__in=formateur_ids
-    ).values_list('id', 'formateur_id'):
-        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+        for module_id, formateur_id in Module.objects.filter(
+            formateur_id__in=formateur_ids
+        ).values_list('id', 'formateur_id'):
+            module_formateur_map.setdefault(formateur_id, set()).add(module_id)
 
+    # Récupérer tous les modules avec formateurs
     all_module_ids = sorted({
         mid
         for module_ids in module_formateur_map.values()
         for mid in module_ids
     })
+
+    # Si demandé, ajouter tous les modules du secrétariat (même sans formateur)
+    additional_module_ids = set()
+    if include_all_modules:
+        modules_qs = Module.objects.all()
+        if secretariat_id:
+            modules_qs = modules_qs.filter(secretariat_id=secretariat_id)
+        # Exclure les modules déjà récupérés via les formateurs
+        existing_ids = set(all_module_ids)
+        additional_module_ids = set(
+            modules_qs.exclude(id__in=existing_ids).values_list('id', flat=True)
+        )
+        all_module_ids = sorted(set(all_module_ids) | additional_module_ids)
     modules_by_id = {}
     if all_module_ids:
         for module in Module.objects.filter(id__in=all_module_ids).select_related(
@@ -1817,6 +1835,46 @@ def _finance_report_rows(
             row['recap_modules'] = _finance_recap_par_module(modules_list)
             row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
         results.append(row)
+
+    # Traiter les modules sans formateur (si include_all_modules=True)
+    if include_all_modules and additional_module_ids and global_aggregates is not None:
+        for module_id in additional_module_ids:
+            module_obj = modules_by_id.get(module_id)
+            if not module_obj:
+                continue
+            if secretariat_id and module_obj.secretariat_id != secretariat_id:
+                continue
+
+            module_sessions = sessions_by_module.get(module_id, [])
+            sessions_in_period = [
+                s for s in module_sessions
+                if _finance_session_in_range(s, date_debut, date_fin)
+            ]
+            if not sessions_in_period:
+                continue
+
+            # Calculer le volume pour ce module (sans formateur)
+            module_planned = _finance_module_planned_minutes(
+                module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
+            )
+
+            # Agréger les données pour les KPIs globaux
+            for session in sessions_in_period:
+                if session.date_journee:
+                    d = session.date_journee
+                    month_key = d.strftime('%Y-%m')
+                    # Pour le volume planifié (pas de réalisé car pas de formateur)
+                    session_slot = _finance_session_slot_minutes(session)
+                    global_aggregates['activite_par_mois'][month_key] = (
+                        global_aggregates['activite_par_mois'].get(month_key, 0.0) + session_slot
+                    )
+                    cur_min = global_aggregates.get('date_min')
+                    cur_max = global_aggregates.get('date_max')
+                    if cur_min is None or d < cur_min:
+                        global_aggregates['date_min'] = d
+                    if cur_max is None or d > cur_max:
+                        global_aggregates['date_max'] = d
+
     return results
 
 
@@ -1983,6 +2041,7 @@ def finance_dashboard_api(request):
         date_debut=period['date_debut'],
         date_fin=period['date_fin'],
         secretariat_id=secretariat_id,
+        include_all_modules=True,
     )
 
     date_min = global_aggregates.get('date_min')
