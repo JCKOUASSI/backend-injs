@@ -1296,8 +1296,11 @@ def _finance_kpis_from_rows(rows):
     }
 
 
-def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None):
-    """Ventilation dashboard par module (planifié unique, réalisé/coût cumulés formateurs)."""
+def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None, additional_modules=None):
+    """Ventilation dashboard par module (planifié unique, réalisé/coût cumulés formateurs).
+
+    Si additional_modules est fourni, inclut aussi ces modules sans formateur.
+    """
     meta_by_id = {}
     realise_by_id = {}
     montant_by_id = {}
@@ -1325,6 +1328,27 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
             taux_realized_by_id[mid] = taux_realized_by_id.get(mid, 0.0) + float(
                 mod.get('taux_realized_capped_minutes') or 0
             )
+
+    # Ajouter les modules sans formateur (pas de réalisé, pas de montant)
+    if additional_modules:
+        for mod in additional_modules:
+            mid = mod.get('module_id')
+            if not mid or mid in meta_by_id:
+                continue
+            meta_by_id[mid] = {
+                'module_id': mid,
+                'module_intitule': mod.get('module_intitule') or '',
+                'formation_intitule': mod.get('formation_intitule') or '',
+                'grade': mod.get('grade') or '',
+                'groupe': mod.get('groupe') or '',
+                'secretariat_nom': mod.get('secretariat_nom') or '',
+                'prix_heure_realisee': None,  # Pas de tarif car pas de formateur
+            }
+            # Pas de réalisé, pas de montant pour les modules sans formateur
+            realise_by_id[mid] = 0.0
+            montant_by_id[mid] = 0.0
+            taux_planned_by_id[mid] = 0.0
+            taux_realized_by_id[mid] = 0.0
 
     if not meta_by_id:
         return []
@@ -1841,6 +1865,7 @@ def _finance_report_rows(
         # Initialiser les compteurs pour les modules sans formateur
         additional_sessions_count = 0
         additional_planned_minutes = 0.0
+        additional_modules_list = []
 
         for module_id in additional_module_ids:
             module_obj = modules_by_id.get(module_id)
@@ -1866,6 +1891,19 @@ def _finance_report_rows(
             additional_sessions_count += len(sessions_in_period)
             additional_planned_minutes += module_planned
 
+            # Stocker les infos du module pour le détail
+            additional_modules_list.append({
+                'module_id': module_id,
+                'module_intitule': module_obj.intitule or '',
+                'formation_intitule': module_obj.formation.formation if module_obj.formation_id else '',
+                'grade': module_obj.grade or '',
+                'groupe': module_obj.groupe or '',
+                'secretariat_nom': (
+                    f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                    if module_obj.secretariat_id else ''
+                ),
+            })
+
             # Agréger les données pour les KPIs globaux
             for session in sessions_in_period:
                 if session.date_journee:
@@ -1883,9 +1921,10 @@ def _finance_report_rows(
                     if cur_max is None or d > cur_max:
                         global_aggregates['date_max'] = d
 
-        # Stocker les totaux des modules sans formateur dans global_aggregates
+        # Stocker les totaux et la liste des modules sans formateur dans global_aggregates
         global_aggregates['additional_sessions_count'] = additional_sessions_count
         global_aggregates['additional_planned_minutes'] = additional_planned_minutes
+        global_aggregates['additional_modules'] = additional_modules_list
 
     return results
 
@@ -2170,6 +2209,7 @@ def finance_dashboard_api(request):
             date_debut=period['date_debut'],
             date_fin=period['date_fin'],
             secretariat_id=secretariat_id,
+            additional_modules=global_aggregates.get('additional_modules'),
         ),
         'top_formateurs': top_temps_planifie,
         'top_temps_realise': top_temps_realise,
