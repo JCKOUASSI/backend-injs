@@ -103,6 +103,11 @@ export default function Dashboard() {
     return () => clearInterval(intervalId)
   }, [selectedSecretariatId, referenceDate, presencePeriod, appliedPeriodKey, loadDashboardData])
 
+  // Rechargement explicite quand la période de volume horaire change
+  useEffect(() => {
+    loadDashboardData()
+  }, [appliedVhPeriod, loadDashboardData])
+
   const handleApplyVhPeriod = useCallback((periodOverride) => {
     const p = periodOverride ?? vhPeriod
     saveFinancePeriod(p)
