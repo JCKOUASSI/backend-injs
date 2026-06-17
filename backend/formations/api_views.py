@@ -2624,9 +2624,20 @@ def ref_formation_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
-        data = list(RefModule.objects.order_by('intitule').values(
-            'id', 'intitule', 'volume_horaire', 'actif', 'formation_id',
-        ))
+        data = []
+        for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
+            volumes_par_categorie = [
+                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+                for v in m.volumes_horaires.all()
+            ]
+            data.append({
+                'id': m.id,
+                'intitule': m.intitule,
+                'volume_horaire': m.volume_horaire,
+                'volumes_par_categorie': volumes_par_categorie,
+                'actif': m.actif,
+                'formation_id': m.formation_id,
+            })
         return Response(data)
     intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
     if not intitule:
@@ -2641,13 +2652,31 @@ def ref_module_list(request):
         volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
-    return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif}, status=201)
+    # Créer les volumes horaires par catégorie si fournis
+    volumes_par_categorie = request.data.get('volumes_par_categorie', [])
+    if volumes_par_categorie:
+        for v in volumes_par_categorie:
+            if v.get('categorie_id') and v.get('volume_horaire') is not None:
+                obj.volumes_horaires.create(
+                    categorie_id=v['categorie_id'],
+                    volume_horaire=v['volume_horaire'],
+                )
+    return Response({
+        'id': obj.id,
+        'intitule': obj.intitule,
+        'volume_horaire': obj.volume_horaire,
+        'volumes_par_categorie': [
+            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+            for v in obj.volumes_horaires.all()
+        ],
+        'actif': obj.actif,
+    }, status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def ref_module_detail(request, pk):
     try:
-        obj = RefModule.objects.get(pk=pk)
+        obj = RefModule.objects.prefetch_related('volumes_horaires', 'volumes_horaires__categorie').get(pk=pk)
     except RefModule.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
@@ -2664,7 +2693,29 @@ def ref_module_detail(request, pk):
         obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif})
+
+        # Mettre à jour les volumes horaires par catégorie si fournis
+        volumes_par_categorie = request.data.get('volumes_par_categorie')
+        if volumes_par_categorie is not None:
+            # Supprimer les anciens volumes et créer les nouveaux
+            obj.volumes_horaires.all().delete()
+            for v in volumes_par_categorie:
+                if v.get('categorie_id') and v.get('volume_horaire') is not None:
+                    obj.volumes_horaires.create(
+                        categorie_id=v['categorie_id'],
+                        volume_horaire=v['volume_horaire'],
+                    )
+
+        return Response({
+            'id': obj.id,
+            'intitule': obj.intitule,
+            'volume_horaire': obj.volume_horaire,
+            'volumes_par_categorie': [
+                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+                for v in obj.volumes_horaires.all()
+            ],
+            'actif': obj.actif,
+        })
     obj.delete()
     return Response(status=204)
 
@@ -3439,9 +3490,25 @@ def referentiels_api(request):
 @permission_classes([IsAuthenticated])
 def referentiels_gestion_api(request):
     """Toutes les tables référentielles (actifs + inactifs) — page admin Référentiels."""
+    # Récupérer les modules avec leurs volumes horaires par catégorie
+    modules_data = []
+    for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
+        volumes_par_categorie = [
+            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+            for v in m.volumes_horaires.all()
+        ]
+        modules_data.append({
+            'id': m.id,
+            'intitule': m.intitule,
+            'volume_horaire': m.volume_horaire,
+            'volumes_par_categorie': volumes_par_categorie,
+            'actif': m.actif,
+            'formation_id': m.formation_id,
+        })
+
     return Response({
         'formations': list(RefFormation.objects.order_by('intitule').values('id', 'intitule', 'actif')),
-        'modules': list(RefModule.objects.order_by('intitule').values('id', 'intitule', 'volume_horaire', 'actif')),
+        'modules': modules_data,
         'categories': list(RefCategorie.objects.order_by('libelle').values('id', 'libelle', 'actif')),
         'grades': list(RefGrade.objects.order_by('libelle').values('id', 'libelle', 'categorie_id', 'actif')),
         'vagues': list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')),
