@@ -22,6 +22,8 @@ def noop(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    atomic = False
+
     dependencies = [
         ('formations', '0075_financesettings_export_pied_page'),
     ]
