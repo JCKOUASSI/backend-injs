@@ -790,8 +790,11 @@ def _finance_session_slot_minutes(session):
     return round(float(_session_prevu_minutes(session) or 0), 1)
 
 
-def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
-    """Volume planifié = duree_prevue_heures contractuelle si renseignée, sinon Σ créneaux EDT."""
+def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None, categorie_code=None):
+    """Volume planifié = duree_prevue_heures contractuelle si renseignée, sinon Σ créneaux EDT.
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants."""
     from .volume_horaire import module_planned_minutes_for_period
 
     sessions_in_period = [
@@ -803,6 +806,7 @@ def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, da
         len(sessions_in_period),
         len(all_sessions or []),
         sessions_in_period,
+        categorie_code,
     ), 1)
 
 
@@ -3105,11 +3109,18 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
-    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours
+    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours, _get_module_participants_categories
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
     formateurs_assignes = module.module_formateurs.select_related('formateur').all()
+
+    # Calculer les volumes horaires par catégorie
+    cat_counts = _get_module_participants_categories(module)
+    volumes_par_categorie = {}
+    for cat in cat_counts.keys():
+        vol = _ref_module_volume_hours(module, cat)
+        volumes_par_categorie[cat] = vol if vol > 0 else None
 
     formateur_nom = None
     if module.formateur:
@@ -3219,9 +3230,13 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'username': sup.username,
         })
 
+    # Volume horaire selon la catégorie majoritaire (pour affichage principal)
     ref_h = _ref_module_volume_hours(module)
+    ref_h_majoritaire = _ref_module_volume_hours(module, max(cat_counts, key=cat_counts.get) if cat_counts else None)
     fiche_h = float(module.duree_prevue_heures or 0)
-    contractuelle = ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None)
+
+    # Utiliser le volume de la catégorie majoritaire si disponible, sinon le volume global, sinon la fiche
+    contractuelle = ref_h_majoritaire if ref_h_majoritaire > 0 else (ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None))
     planifiee = module_edt_raw_hours(module) or None
     ecart = None
     if contractuelle and planifiee is not None:
@@ -3234,6 +3249,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
         'intitule': module.intitule,
         'duree_prevue_heures': module.duree_prevue_heures,
         'duree_contractuelle_heures': contractuelle,
+        'duree_contractuelle_par_categorie': volumes_par_categorie if len(volumes_par_categorie) > 1 else None,
         'duree_planifiee_heures': planifiee,
         'duree_ecart_heures': ecart,
         'duree_totale_heures': planifiee,
