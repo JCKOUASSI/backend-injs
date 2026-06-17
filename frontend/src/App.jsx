@@ -128,7 +128,13 @@ function Layout({ children, breadcrumb }) {
         <nav className="sidebar-nav">
           
           {!isFinanceRole && !isSuperviseurRole && (
-            <Link to={listHref('/', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
+            </Link>
+          )}
+          {/* DIRECTION voit aussi le tableau de bord normal en plus du finance */}
+          {user?.role === 'DIRECTION' && (
+            <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
           )}
@@ -253,8 +259,18 @@ function Layout({ children, breadcrumb }) {
 function App() {
   function HomeRoute() {
     const { user } = useAuth()
-    if (user?.role === 'FINANCE' || user?.role === 'DIRECTION') return <Navigate to="/finance-dashboard" replace />
+    // FINANCE est redirigé vers finance-dashboard par défaut
+    if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
+    // DIRECTION peut choisir entre les deux dashboards
     if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
+    return (
+      <Layout breadcrumb={<li>Tableau de bord</li>}>
+        <Dashboard />
+      </Layout>
+    )
+  }
+
+  function DashboardRoute() {
     return (
       <Layout breadcrumb={<li>Tableau de bord</li>}>
         <Dashboard />
@@ -364,6 +380,11 @@ function App() {
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
               </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'DIRECTION', 'FINANCE']}>
+              <DashboardRoute />
             </ProtectedRoute>
           } />
           <Route path="/finance-dashboard" element={
