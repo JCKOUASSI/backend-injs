@@ -20,7 +20,7 @@ from admin_mixins import (
 )
 from .models import (
     Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur,
-    Formateur, QRToken, RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
+    Formateur, QRToken, RefFormation, RefModule, RefModuleVolumeHoraire, RefSite, RefBatiment, RefSalle,
     RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, SessionModule,
     FinanceSettings,
 )
@@ -192,20 +192,21 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
     list_display = [
         'matricule', 'nom', 'prenom', 'sexe',
         'categorie', 'grade', 'groupe', 'vague',
-        'email', 'telephone', 'secretariat',
+        'secretariat',
     ]
     list_display_links = ['matricule', 'nom']
     search_fields = [
-        'matricule', 'nom', 'prenom', 'email', 'telephone',
-        'grade', 'groupe', 'vague', 'libelle_concours',
+        'matricule', 'nom', 'prenom',
+        'grade', 'groupe', 'vague',
     ]
     list_filter = [
-        'sexe', 'categorie', 'grade', 'groupe', 'vague', 'secretariat',
+        'grade', 'groupe', 'vague', 'categorie', 'sexe', 'secretariat',
     ]
     autocomplete_fields = ['secretariat', 'user']
     list_select_related = ['secretariat']
     ordering = ['nom', 'prenom']
-    list_per_page = 50
+    list_per_page = 100
+    show_full_result_count = False  # Évite le COUNT(*) lent sur gros volumes
     readonly_fields = ['created_at']
     fieldsets = (
         ("Identification", {
@@ -859,14 +860,28 @@ class RefFormationAdmin(ModelAdmin):
     list_filter = ['actif']
 
 
+class RefModuleVolumeHoraireInline(admin.TabularInline):
+    model = RefModuleVolumeHoraire
+    extra = 1
+    autocomplete_fields = ['categorie']
+
+
 @admin.register(RefModule)
 class RefModuleAdmin(ModelAdmin):
-    list_display = ['intitule', 'formation', 'volume_horaire', 'actif']
+    list_display = ['intitule', 'formation', 'volume_horaire', 'volumes_par_categorie_display', 'actif']
     search_fields = ['intitule', 'formation__intitule']
     list_filter = ['actif', 'formation']
     autocomplete_fields = ['formation']
     list_select_related = ['formation']
     ordering = ['formation__intitule', 'intitule']
+    inlines = [RefModuleVolumeHoraireInline]
+
+    @admin.display(description='Volumes par catégorie')
+    def volumes_par_categorie_display(self, obj):
+        volumes = obj.volumes_horaires.select_related('categorie').all()
+        if not volumes:
+            return '—'
+        return ', '.join([f"{v.categorie.libelle}: {v.volume_horaire}h" for v in volumes])
 
 
 class RefBatimentInline(admin.TabularInline):
@@ -909,6 +924,16 @@ class RefSalleAdmin(AdminSidebarHiddenMixin, ModelAdmin):
     autocomplete_fields = ['site', 'batiment']
     list_select_related = ['site', 'batiment']
     ordering = ['site__nom', 'batiment__nom', 'nom']
+
+
+@admin.register(RefModuleVolumeHoraire)
+class RefModuleVolumeHoraireAdmin(ModelAdmin):
+    list_display = ['module', 'categorie', 'volume_horaire']
+    search_fields = ['module__intitule', 'categorie__libelle']
+    list_filter = ['categorie']
+    autocomplete_fields = ['module', 'categorie']
+    list_select_related = ['module', 'categorie']
+    ordering = ['module__intitule', 'categorie__libelle']
 
 
 @admin.register(FinanceSettings)

@@ -76,14 +76,21 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
     return True
 
 
-def module_contractual_planned_minutes(module):
+def module_contractual_planned_minutes(module, categorie_code=None):
     """Volume horaire contractuel (minutes) : référentiel uniquement (RefModule.volume_horaire).
-    Ignore Module.duree_prevue_heures car souvent rempli à tort à la somme brute EDT à l'import."""
+    Ignore Module.duree_prevue_heures car souvent rempli à tort à la somme brute EDT à l'import.
+
+    Si categorie_code est fourni, utilise le volume spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants du module."""
     if not module:
         return 0.0
-    from .duree_prevue_resolve import _ref_module_volume_hours
+    from .duree_prevue_resolve import _ref_module_volume_hours, _get_majoritaire_categorie
 
-    heures = _ref_module_volume_hours(module)
+    # Déterminer la catégorie à utiliser
+    if not categorie_code:
+        categorie_code = _get_majoritaire_categorie(module)
+
+    heures = _ref_module_volume_hours(module, categorie_code)
     return heures * 60 if heures > 0 else 0.0
 
 
@@ -92,13 +99,17 @@ def module_planned_minutes_for_period(
     sessions_in_period_count,
     total_sessions_count,
     sessions_in_period=None,
+    categorie_code=None,
 ):
     """Planifié période = Σ créneaux EDT des séances de la période,
-    plafonné au volume_horaire du référentiel (RefModule) si renseigné."""
+    plafonné au volume_horaire du référentiel (RefModule) si renseigné.
+
+    Si categorie_code est fourni, utilise le volume spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants."""
     if not sessions_in_period:
         return 0.0
     edt_sum = sum(_session_prevu_minutes(s) for s in sessions_in_period)
-    contractual = module_contractual_planned_minutes(module)
+    contractual = module_contractual_planned_minutes(module, categorie_code)
     if contractual > 0:
         return min(edt_sum, contractual)
     return edt_sum
@@ -175,10 +186,17 @@ def finalize_volume_totals(prevu_min, realise_min, *, integer_hours=False):
     }
 
 
-def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin=None, *, integer_hours=False):
-    """Volume horaire canonique : prévu = Σ créneaux EDT période ; réalisé plafonné."""
+def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin=None, *, integer_hours=False, group_by_categorie=False):
+    """Volume horaire canonique : prévu = Σ créneaux EDT période ; réalisé plafonné.
+
+    Si group_by_categorie=True, retourne un dict par catégorie {categorie: {prevu_heures, realise_heures, ...}}.
+    Sinon, retourne les totaux agrégés en utilisant la catégorie majoritaire de chaque module."""
+    from .duree_prevue_resolve import _get_module_participants_categories
+
     module_ids = list(module_ids or [])
     if not module_ids:
+        if group_by_categorie:
+            return {}
         totals = finalize_volume_totals(0.0, 0.0, integer_hours=integer_hours)
         totals['nb_sessions'] = 0
         return totals
@@ -199,6 +217,44 @@ def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin
     for s in sessions:
         sessions_by_module.setdefault(s.module_id, []).append(s)
 
+    if group_by_categorie:
+        # Calculer par catégorie
+        volumes_by_cat = {}
+        for mid in module_ids:
+            module = modules_by_id.get(mid)
+            if not module:
+                continue
+            module_sessions = sessions_by_module.get(mid, [])
+            in_period = [
+                s for s in module_sessions
+                if session_in_date_range(s, date_debut, date_fin)
+            ]
+            # Obtenir les catégories des participants de ce module
+            cat_counts = _get_module_participants_categories(module)
+            for cat, count in cat_counts.items():
+                if cat not in volumes_by_cat:
+                    volumes_by_cat[cat] = {'prevu_min': 0.0, 'realise_min': 0.0, 'nb_sessions': 0, 'participants': 0}
+                prevu_min = module_planned_minutes_for_period(
+                    module, len(in_period), len(module_sessions), in_period, cat
+                )
+                agg = accumulate_sessions_volume(in_period)
+                volumes_by_cat[cat]['prevu_min'] += prevu_min
+                volumes_by_cat[cat]['realise_min'] += agg['realise_min']
+                volumes_by_cat[cat]['nb_sessions'] += agg['nb_sessions']
+                volumes_by_cat[cat]['participants'] += count
+
+        # Convertir en résultats finaux
+        result = {}
+        for cat, data in volumes_by_cat.items():
+            totals = finalize_volume_totals(
+                data['prevu_min'], data['realise_min'], integer_hours=integer_hours
+            )
+            totals['nb_sessions'] = data['nb_sessions']
+            totals['participants'] = data['participants']
+            result[cat] = totals
+        return result
+
+    # Calcul agrégé (comportement par défaut)
     prevu_min = 0.0
     realise_min = 0.0
     nb_sessions = 0
@@ -228,9 +284,13 @@ def compute_volume_horaire_from_module_ids(module_ids, date_debut=None, date_fin
 
 
 def compute_volume_horaire_per_module_ids(
-    module_ids, date_debut=None, date_fin=None, *, integer_hours=False,
+    module_ids, date_debut=None, date_fin=None, *, integer_hours=False, include_categories=False,
 ):
-    """VH prévu / réalisé par ``module_id`` (même logique que le dashboard)."""
+    """VH prévu / réalisé par ``module_id`` (même logique que le dashboard).
+
+    Si include_categories=True, ajoute les volumes par catégorie dans le résultat."""
+    from .duree_prevue_resolve import _get_module_participants_categories
+
     module_ids = list(module_ids or [])
     if not module_ids:
         return {}
@@ -253,13 +313,14 @@ def compute_volume_horaire_per_module_ids(
 
     out = {}
     for mid in module_ids:
+        module = modules_by_id.get(mid)
         module_sessions = sessions_by_module.get(mid, [])
         in_period = [
             s for s in module_sessions
             if session_in_date_range(s, date_debut, date_fin)
         ]
         prevu_min = module_planned_minutes_for_period(
-            modules_by_id.get(mid),
+            module,
             len(in_period),
             len(module_sessions),
             in_period,
@@ -271,22 +332,45 @@ def compute_volume_horaire_per_module_ids(
             integer_hours=integer_hours,
         )
         totals['nb_sessions'] = agg['nb_sessions']
+
+        # Si demandé, ajouter les volumes par catégorie
+        if include_categories and module:
+            cat_counts = _get_module_participants_categories(module)
+            volumes_by_cat = {}
+            for cat in cat_counts.keys():
+                cat_prevu_min = module_planned_minutes_for_period(
+                    module, len(in_period), len(module_sessions), in_period, cat
+                )
+                cat_totals = finalize_volume_totals(
+                    cat_prevu_min, agg['realise_min'], integer_hours=integer_hours
+                )
+                cat_totals['participants'] = cat_counts[cat]
+                volumes_by_cat[cat] = cat_totals
+            totals['volumes_par_categorie'] = volumes_by_cat
+            totals['categories'] = list(cat_counts.keys())
+
         out[mid] = totals
     return out
 
 
-def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=None, *, integer_hours=False):
+def compute_volume_horaire_from_modules(modules_qs, date_debut=None, date_fin=None, *, integer_hours=False, group_by_categorie=False):
     module_ids = list(modules_qs.values_list('pk', flat=True))
     return compute_volume_horaire_from_module_ids(
         module_ids,
         date_debut=date_debut,
         date_fin=date_fin,
         integer_hours=integer_hours,
+        group_by_categorie=group_by_categorie,
     )
 
 
-def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None):
-    """Agrège prévu (Σ créneaux EDT période) et réalisé (séances terminées) pour un module."""
+def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None, categorie_code=None):
+    """Agrège prévu (Σ créneaux EDT période) et réalisé (séances terminées) pour un module.
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants."""
+    from .duree_prevue_resolve import _get_majoritaire_categorie
+
     sessions = list(
         SessionModule.objects.filter(module=module).only(
             'heure_debut_prevue', 'heure_fin_prevue', 'demarree_le', 'terminee_le', 'date_journee',
@@ -298,11 +382,17 @@ def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None
     ]
     agg_edt = accumulate_sessions_volume(sessions, date_debut=date_debut, date_fin=date_fin)
     agg = accumulate_sessions_volume(in_period)
+
+    # Déterminer la catégorie à utiliser
+    if not categorie_code:
+        categorie_code = _get_majoritaire_categorie(module)
+
     prevu_min = module_planned_minutes_for_period(
         module,
         len(in_period),
         len(sessions),
         in_period,
+        categorie_code,
     )
     prevu_edt_min = agg_edt['prevu_min']
     prevu_h = round(prevu_min / 60, 1)
@@ -328,6 +418,7 @@ def _accumulate_module_session_volumes(module, *, date_debut=None, date_fin=None
         'taux_realise_pct': (
             round(realise_h / prevu_h * 100, 1) if prevu_h > 0 else None
         ),
+        'categorie_utilisee': categorie_code,
     }
 
 

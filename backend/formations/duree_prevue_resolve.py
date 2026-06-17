@@ -14,8 +14,12 @@ from .models import RefModule, SessionModule
 from .volume_horaire import _session_prevu_minutes, accumulate_sessions_volume
 
 
-def _ref_module_volume_hours(module):
-    """Volume horaire du référentiel module, si disponible."""
+def _ref_module_volume_hours(module, categorie_code=None):
+    """Volume horaire du référentiel module, si disponible.
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie
+    (RefModuleVolumeHoraire), sinon utilise le volume global du module.
+    """
     ref = None
     if getattr(module, 'ref_module_id', None) and getattr(module, 'ref_module', None):
         ref = module.ref_module
@@ -25,8 +29,47 @@ def _ref_module_volume_hours(module):
             ref = RefModule.objects.filter(intitule__iexact=intitule).first()
     if not ref:
         return 0.0
-    heures = float(ref.volume_horaire or 0)
+
+    # Si une catégorie est spécifiée, utiliser le volume spécifique à cette catégorie
+    if categorie_code:
+        heures = float(ref.get_volume_horaire_for_categorie(categorie_code) or 0)
+    else:
+        heures = float(ref.volume_horaire or 0)
+
     return heures if heures > 0 else 0.0
+
+
+def _get_module_participants_categories(module):
+    """Retourne un dict {categorie: count} des participants du module."""
+    from collections import Counter
+
+    categories = module.module_participants.select_related('participant').values_list(
+        'participant__categorie', flat=True
+    )
+    # Filtrer les valeurs vides
+    categories = [c for c in categories if c]
+    return dict(Counter(categories))
+
+
+def _get_majoritaire_categorie(module):
+    """Retourne la catégorie majoritaire des participants du module, ou None."""
+    cat_counts = _get_module_participants_categories(module)
+    if not cat_counts:
+        return None
+    return max(cat_counts, key=cat_counts.get)
+
+
+def _ref_module_volume_hours_for_module(module, use_majoritaire=True):
+    """Volume horaire du référentiel en tenant compte des catégories des participants.
+
+    Si use_majoritaire=True, utilise la catégorie majoritaire des participants.
+    Sinon, utilise le volume global.
+    """
+    if use_majoritaire:
+        cat_majoritaire = _get_majoritaire_categorie(module)
+        if cat_majoritaire:
+            return _ref_module_volume_hours(module, cat_majoritaire)
+    return _ref_module_volume_hours(module)
 
 
 def _session_durations_hours(module):
@@ -85,15 +128,22 @@ def module_edt_planned_hours(module):
     return module_edt_typical_hours(module)
 
 
-def resolve_module_duree_prevue_heures(module, *, include_current=True):
+def resolve_module_duree_prevue_heures(module, *, include_current=True, categorie_code=None):
     """
     Retourne ``(heures, source)`` avec source parmi
     ``ref_module``, ``module``, ``sessions_edt`` ou ``None``.
 
     Le référentiel ``RefModule.volume_horaire`` est prioritaire sur la fiche
     module (souvent remplie à tort par la somme brute de l'EDT à l'import).
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants du module.
     """
-    ref_h = _ref_module_volume_hours(module)
+    # Déterminer la catégorie à utiliser
+    if not categorie_code:
+        categorie_code = _get_majoritaire_categorie(module)
+
+    ref_h = _ref_module_volume_hours(module, categorie_code)
     if ref_h > 0:
         return ref_h, 'ref_module'
 
@@ -126,17 +176,25 @@ def _should_overwrite_duree(current, raw_edt, canonical, ref_h):
     return False
 
 
-def ensure_module_duree_prevue(module, *, save=True):
+def ensure_module_duree_prevue(module, *, save=True, categorie_code=None):
     """
     Renseigne ou corrige ``duree_prevue_heures`` sur le module.
 
     Retourne ``(heures_effectives, source_utilisee)`` ;
     ``source_utilisee`` vaut ``None`` si la valeur en base est déjà correcte.
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants.
     """
     current = float(module.duree_prevue_heures or 0)
     raw_edt = module_edt_raw_hours(module)
-    ref_h = _ref_module_volume_hours(module)
-    canonical, source = resolve_module_duree_prevue_heures(module, include_current=False)
+
+    # Déterminer la catégorie à utiliser
+    if not categorie_code:
+        categorie_code = _get_majoritaire_categorie(module)
+
+    ref_h = _ref_module_volume_hours(module, categorie_code)
+    canonical, source = resolve_module_duree_prevue_heures(module, include_current=False, categorie_code=categorie_code)
 
     if ref_h > 0:
         canonical, source = ref_h, 'ref_module'

@@ -790,8 +790,11 @@ def _finance_session_slot_minutes(session):
     return round(float(_session_prevu_minutes(session) or 0), 1)
 
 
-def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None):
-    """Volume planifié = duree_prevue_heures contractuelle si renseignée, sinon Σ créneaux EDT."""
+def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, date_fin=None, categorie_code=None):
+    """Volume planifié = duree_prevue_heures contractuelle si renseignée, sinon Σ créneaux EDT.
+
+    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie.
+    Sinon, utilise la catégorie majoritaire des participants."""
     from .volume_horaire import module_planned_minutes_for_period
 
     sessions_in_period = [
@@ -803,6 +806,7 @@ def _finance_module_planned_minutes(module, all_sessions, *, date_debut=None, da
         len(sessions_in_period),
         len(all_sessions or []),
         sessions_in_period,
+        categorie_code,
     ), 1)
 
 
@@ -1292,8 +1296,11 @@ def _finance_kpis_from_rows(rows):
     }
 
 
-def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None):
-    """Ventilation dashboard par module (planifié unique, réalisé/coût cumulés formateurs)."""
+def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretariat_id=None, additional_modules=None):
+    """Ventilation dashboard par module (planifié unique, réalisé/coût cumulés formateurs).
+
+    Si additional_modules est fourni, inclut aussi ces modules sans formateur.
+    """
     meta_by_id = {}
     realise_by_id = {}
     montant_by_id = {}
@@ -1321,6 +1328,27 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
             taux_realized_by_id[mid] = taux_realized_by_id.get(mid, 0.0) + float(
                 mod.get('taux_realized_capped_minutes') or 0
             )
+
+    # Ajouter les modules sans formateur (pas de réalisé, pas de montant)
+    if additional_modules:
+        for mod in additional_modules:
+            mid = mod.get('module_id')
+            if not mid or mid in meta_by_id:
+                continue
+            meta_by_id[mid] = {
+                'module_id': mid,
+                'module_intitule': mod.get('module_intitule') or '',
+                'formation_intitule': mod.get('formation_intitule') or '',
+                'grade': mod.get('grade') or '',
+                'groupe': mod.get('groupe') or '',
+                'secretariat_nom': mod.get('secretariat_nom') or '',
+                'prix_heure_realisee': None,  # Pas de tarif car pas de formateur
+            }
+            # Pas de réalisé, pas de montant pour les modules sans formateur
+            realise_by_id[mid] = 0.0
+            montant_by_id[mid] = 0.0
+            taux_planned_by_id[mid] = 0.0
+            taux_realized_by_id[mid] = 0.0
 
     if not meta_by_id:
         return []
@@ -1519,8 +1547,13 @@ def _finance_report_rows(
     date_debut=None,
     date_fin=None,
     secretariat_id=None,
+    include_all_modules=False,
 ):
-    """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus)."""
+    """Construit les lignes rapport finance pour une liste de Formateur (déjà résolus).
+
+    Si include_all_modules=True, inclut aussi tous les modules du secrétariat
+    (même ceux sans formateur assigné) dans les calculs de volume horaire.
+    """
     use_variable_rates = prix_heure is None
     if use_variable_rates:
         prix_map = _finance_build_prix_map()
@@ -1529,25 +1562,38 @@ def _finance_report_rows(
         default_prix = float(prix_heure or 0)
         prix_map = {}
     formateur_ids = [f.id for f in formateurs]
-    if not formateur_ids:
-        return []
 
     module_formateur_map = {}
-    for module_id, formateur_id in ModuleFormateur.objects.filter(
-        formateur_id__in=formateur_ids
-    ).values_list('module_id', 'formateur_id'):
-        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+    if formateur_ids:
+        for module_id, formateur_id in ModuleFormateur.objects.filter(
+            formateur_id__in=formateur_ids
+        ).values_list('module_id', 'formateur_id'):
+            module_formateur_map.setdefault(formateur_id, set()).add(module_id)
 
-    for module_id, formateur_id in Module.objects.filter(
-        formateur_id__in=formateur_ids
-    ).values_list('id', 'formateur_id'):
-        module_formateur_map.setdefault(formateur_id, set()).add(module_id)
+        for module_id, formateur_id in Module.objects.filter(
+            formateur_id__in=formateur_ids
+        ).values_list('id', 'formateur_id'):
+            module_formateur_map.setdefault(formateur_id, set()).add(module_id)
 
+    # Récupérer tous les modules avec formateurs
     all_module_ids = sorted({
         mid
         for module_ids in module_formateur_map.values()
         for mid in module_ids
     })
+
+    # Si demandé, ajouter tous les modules du secrétariat (même sans formateur)
+    additional_module_ids = set()
+    if include_all_modules:
+        modules_qs = Module.objects.all()
+        if secretariat_id:
+            modules_qs = modules_qs.filter(secretariat_id=secretariat_id)
+        # Exclure les modules déjà récupérés via les formateurs
+        existing_ids = set(all_module_ids)
+        additional_module_ids = set(
+            modules_qs.exclude(id__in=existing_ids).values_list('id', flat=True)
+        )
+        all_module_ids = sorted(set(all_module_ids) | additional_module_ids)
     modules_by_id = {}
     if all_module_ids:
         for module in Module.objects.filter(id__in=all_module_ids).select_related(
@@ -1813,6 +1859,73 @@ def _finance_report_rows(
             row['recap_modules'] = _finance_recap_par_module(modules_list)
             row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
         results.append(row)
+
+    # Traiter les modules sans formateur (si include_all_modules=True)
+    if include_all_modules and additional_module_ids and global_aggregates is not None:
+        # Initialiser les compteurs pour les modules sans formateur
+        additional_sessions_count = 0
+        additional_planned_minutes = 0.0
+        additional_modules_list = []
+
+        for module_id in additional_module_ids:
+            module_obj = modules_by_id.get(module_id)
+            if not module_obj:
+                continue
+            if secretariat_id and module_obj.secretariat_id != secretariat_id:
+                continue
+
+            module_sessions = sessions_by_module.get(module_id, [])
+            sessions_in_period = [
+                s for s in module_sessions
+                if _finance_session_in_range(s, date_debut, date_fin)
+            ]
+            if not sessions_in_period:
+                continue
+
+            # Calculer le volume pour ce module (sans formateur)
+            module_planned = _finance_module_planned_minutes(
+                module_obj, module_sessions, date_debut=date_debut, date_fin=date_fin,
+            )
+
+            # Accumuler les totaux
+            additional_sessions_count += len(sessions_in_period)
+            additional_planned_minutes += module_planned
+
+            # Stocker les infos du module pour le détail
+            additional_modules_list.append({
+                'module_id': module_id,
+                'module_intitule': module_obj.intitule or '',
+                'formation_intitule': module_obj.formation.formation if module_obj.formation_id else '',
+                'grade': module_obj.grade or '',
+                'groupe': module_obj.groupe or '',
+                'secretariat_nom': (
+                    f"{module_obj.secretariat.nom} ({module_obj.secretariat.numero})"
+                    if module_obj.secretariat_id else ''
+                ),
+            })
+
+            # Agréger les données pour les KPIs globaux
+            for session in sessions_in_period:
+                if session.date_journee:
+                    d = session.date_journee
+                    month_key = d.strftime('%Y-%m')
+                    # Pour le volume planifié (pas de réalisé car pas de formateur)
+                    session_slot = _finance_session_slot_minutes(session)
+                    global_aggregates['activite_par_mois'][month_key] = (
+                        global_aggregates['activite_par_mois'].get(month_key, 0.0) + session_slot
+                    )
+                    cur_min = global_aggregates.get('date_min')
+                    cur_max = global_aggregates.get('date_max')
+                    if cur_min is None or d < cur_min:
+                        global_aggregates['date_min'] = d
+                    if cur_max is None or d > cur_max:
+                        global_aggregates['date_max'] = d
+
+        # Stocker les totaux et la liste des modules sans formateur dans global_aggregates
+        global_aggregates['additional_sessions_count'] = additional_sessions_count
+        global_aggregates['additional_planned_minutes'] = additional_planned_minutes
+        global_aggregates['additional_modules'] = additional_modules_list
+
     return results
 
 
@@ -1979,12 +2092,27 @@ def finance_dashboard_api(request):
         date_debut=period['date_debut'],
         date_fin=period['date_fin'],
         secretariat_id=secretariat_id,
+        include_all_modules=True,
     )
 
     date_min = global_aggregates.get('date_min')
     date_max = global_aggregates.get('date_max')
 
     kpis = _finance_kpis_from_rows(rows)
+
+    # Ajouter les volumes des modules sans formateur aux KPIs
+    additional_sessions_count = global_aggregates.get('additional_sessions_count', 0)
+    additional_planned_minutes = global_aggregates.get('additional_planned_minutes', 0.0)
+
+    if additional_sessions_count > 0:
+        kpis['total_sessions'] += additional_sessions_count
+        kpis['total_duree_minutes'] += round(additional_planned_minutes, 1)
+        kpis['total_duree_heures'] = round(kpis['total_duree_minutes'] / 60, 2)
+        # Recalculer le taux avec les nouveaux totaux
+        if kpis['total_duree_minutes'] > 0:
+            kpis['taux_realisation_global_pct'] = _finance_taux_realisation_pct(
+                kpis['total_duree_realisee_minutes'], kpis['total_duree_minutes']
+            )
 
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
@@ -2081,6 +2209,7 @@ def finance_dashboard_api(request):
             date_debut=period['date_debut'],
             date_fin=period['date_fin'],
             secretariat_id=secretariat_id,
+            additional_modules=global_aggregates.get('additional_modules'),
         ),
         'top_formateurs': top_temps_planifie,
         'top_temps_realise': top_temps_realise,
@@ -2624,9 +2753,20 @@ def ref_formation_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
-        data = list(RefModule.objects.order_by('intitule').values(
-            'id', 'intitule', 'volume_horaire', 'actif', 'formation_id',
-        ))
+        data = []
+        for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
+            volumes_par_categorie = [
+                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+                for v in m.volumes_horaires.all()
+            ]
+            data.append({
+                'id': m.id,
+                'intitule': m.intitule,
+                'volume_horaire': m.volume_horaire,
+                'volumes_par_categorie': volumes_par_categorie,
+                'actif': m.actif,
+                'formation_id': m.formation_id,
+            })
         return Response(data)
     intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
     if not intitule:
@@ -2641,13 +2781,31 @@ def ref_module_list(request):
         volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
-    return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif}, status=201)
+    # Créer les volumes horaires par catégorie si fournis
+    volumes_par_categorie = request.data.get('volumes_par_categorie', [])
+    if volumes_par_categorie:
+        for v in volumes_par_categorie:
+            if v.get('categorie_id') and v.get('volume_horaire') is not None:
+                obj.volumes_horaires.create(
+                    categorie_id=v['categorie_id'],
+                    volume_horaire=v['volume_horaire'],
+                )
+    return Response({
+        'id': obj.id,
+        'intitule': obj.intitule,
+        'volume_horaire': obj.volume_horaire,
+        'volumes_par_categorie': [
+            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+            for v in obj.volumes_horaires.all()
+        ],
+        'actif': obj.actif,
+    }, status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def ref_module_detail(request, pk):
     try:
-        obj = RefModule.objects.get(pk=pk)
+        obj = RefModule.objects.prefetch_related('volumes_horaires', 'volumes_horaires__categorie').get(pk=pk)
     except RefModule.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
@@ -2664,7 +2822,29 @@ def ref_module_detail(request, pk):
         obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
-        return Response({'id': obj.id, 'intitule': obj.intitule, 'volume_horaire': obj.volume_horaire, 'actif': obj.actif})
+
+        # Mettre à jour les volumes horaires par catégorie si fournis
+        volumes_par_categorie = request.data.get('volumes_par_categorie')
+        if volumes_par_categorie is not None:
+            # Supprimer les anciens volumes et créer les nouveaux
+            obj.volumes_horaires.all().delete()
+            for v in volumes_par_categorie:
+                if v.get('categorie_id') and v.get('volume_horaire') is not None:
+                    obj.volumes_horaires.create(
+                        categorie_id=v['categorie_id'],
+                        volume_horaire=v['volume_horaire'],
+                    )
+
+        return Response({
+            'id': obj.id,
+            'intitule': obj.intitule,
+            'volume_horaire': obj.volume_horaire,
+            'volumes_par_categorie': [
+                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+                for v in obj.volumes_horaires.all()
+            ],
+            'actif': obj.actif,
+        })
     obj.delete()
     return Response(status=204)
 
@@ -3054,11 +3234,18 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
-    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours
+    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours, _get_module_participants_categories
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
     formateurs_assignes = module.module_formateurs.select_related('formateur').all()
+
+    # Calculer les volumes horaires par catégorie
+    cat_counts = _get_module_participants_categories(module)
+    volumes_par_categorie = {}
+    for cat in cat_counts.keys():
+        vol = _ref_module_volume_hours(module, cat)
+        volumes_par_categorie[cat] = vol if vol > 0 else None
 
     formateur_nom = None
     if module.formateur:
@@ -3168,9 +3355,13 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'username': sup.username,
         })
 
+    # Volume horaire selon la catégorie majoritaire (pour affichage principal)
     ref_h = _ref_module_volume_hours(module)
+    ref_h_majoritaire = _ref_module_volume_hours(module, max(cat_counts, key=cat_counts.get) if cat_counts else None)
     fiche_h = float(module.duree_prevue_heures or 0)
-    contractuelle = ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None)
+
+    # Utiliser le volume de la catégorie majoritaire si disponible, sinon le volume global, sinon la fiche
+    contractuelle = ref_h_majoritaire if ref_h_majoritaire > 0 else (ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None))
     planifiee = module_edt_raw_hours(module) or None
     ecart = None
     if contractuelle and planifiee is not None:
@@ -3183,6 +3374,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
         'intitule': module.intitule,
         'duree_prevue_heures': module.duree_prevue_heures,
         'duree_contractuelle_heures': contractuelle,
+        'duree_contractuelle_par_categorie': volumes_par_categorie if len(volumes_par_categorie) > 1 else None,
         'duree_planifiee_heures': planifiee,
         'duree_ecart_heures': ecart,
         'duree_totale_heures': planifiee,
@@ -3439,9 +3631,25 @@ def referentiels_api(request):
 @permission_classes([IsAuthenticated])
 def referentiels_gestion_api(request):
     """Toutes les tables référentielles (actifs + inactifs) — page admin Référentiels."""
+    # Récupérer les modules avec leurs volumes horaires par catégorie
+    modules_data = []
+    for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
+        volumes_par_categorie = [
+            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
+            for v in m.volumes_horaires.all()
+        ]
+        modules_data.append({
+            'id': m.id,
+            'intitule': m.intitule,
+            'volume_horaire': m.volume_horaire,
+            'volumes_par_categorie': volumes_par_categorie,
+            'actif': m.actif,
+            'formation_id': m.formation_id,
+        })
+
     return Response({
         'formations': list(RefFormation.objects.order_by('intitule').values('id', 'intitule', 'actif')),
-        'modules': list(RefModule.objects.order_by('intitule').values('id', 'intitule', 'volume_horaire', 'actif')),
+        'modules': modules_data,
         'categories': list(RefCategorie.objects.order_by('libelle').values('id', 'libelle', 'actif')),
         'grades': list(RefGrade.objects.order_by('libelle').values('id', 'libelle', 'categorie_id', 'actif')),
         'vagues': list(RefVague.objects.order_by('ordre', 'libelle').values('id', 'libelle', 'ordre', 'actif')),

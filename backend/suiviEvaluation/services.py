@@ -13,11 +13,6 @@ from django.utils import timezone
 from formations.models import Module, Participant, Formateur, Formation
 from presences.models import Pointage
 
-from .models import (
-    Epreuve, NoteEpreuve, MoyenneModule, ParametresEvaluation,
-    DecisionPedagogique, FicheAuditeurAcademique, SuiviModuleAuditeur,
-    FicheFormateur,
-)
 
 
 def _get_parametres(formation):

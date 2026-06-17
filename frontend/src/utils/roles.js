@@ -18,6 +18,7 @@ export const STAFF_WEB_ROLES = [
   'CHEF_SECRETARIAT',
   'SECRETARIAT',
   'ENCADRANT',
+  'SUPERVISEUR',
 ]
 
 /** Module suivi-évaluation (questionnaires). */
@@ -44,6 +45,7 @@ export const DECISION_ROLES = [
   ...ADMIN_LEVEL_ROLES,
   'DIRECTION',
   'ENCADRANT',
+  'SUPERVISEUR',
 ]
 
 /** FINANCE n'est pas du personnel opérationnel — module finance dédié uniquement. */

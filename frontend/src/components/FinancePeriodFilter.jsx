@@ -33,6 +33,14 @@ export default function FinancePeriodFilter({
       patch.trimestreQ = q
       patch.trimestre = trimestreKeyFromParts(annee, q)
     }
+    if (preset === 'custom') {
+      // Dates par défaut : début et fin du mois en cours
+      const year = now.getFullYear()
+      const month = now.getMonth() + 1
+      const lastDay = new Date(year, month, 0).getDate()
+      patch.dateDebut = `${year}-${String(month).padStart(2, '0')}-01`
+      patch.dateFin = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    }
     commit({ ...period, ...patch })
   }
 

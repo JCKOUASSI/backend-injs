@@ -23,12 +23,11 @@ import FinanceAjustements from './pages/FinanceAjustements'
 import FinanceEncadrants from './pages/FinanceEncadrants'
 import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
+import EvaluationTake from './pages/EvaluationTake'
 import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
-import QuizList from './pages/QuizList'
-import QuizTake from './pages/QuizTake'
 import NotesModule from './pages/NotesModule'
 import EvaluationAcademique from './pages/EvaluationAcademique'
 import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
@@ -84,7 +83,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canViewFinanceDashboard = canViewFinanceModule
   const canViewParticipants = [...STAFF_WEB_ROLES].includes(user?.role)
-  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
     || canViewFinanceModule
   const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
@@ -129,10 +128,11 @@ function Layout({ children, breadcrumb }) {
         <nav className="sidebar-nav">
           
           {!isFinanceRole && !isSuperviseurRole && (
-            <Link to={listHref('/', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/') && path === '/' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+            <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
           )}
+
           {canViewFinanceDashboard && (
             <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
@@ -143,7 +143,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
-          {!isFinanceRole && !isSuperviseurRole && (
+          {!isFinanceRole && (
             <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
@@ -201,9 +201,6 @@ function Layout({ children, breadcrumb }) {
               <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
                 <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
               </Link>
-              <Link to="/quiz" className={`nav-item ${isActive('/quiz') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-question-square"></i> <span className="nav-label">Quiz</span></span>
-              </Link>
             </>
           )}
           {canViewImport && (
@@ -257,8 +254,18 @@ function Layout({ children, breadcrumb }) {
 function App() {
   function HomeRoute() {
     const { user } = useAuth()
-    if (user?.role === 'FINANCE' || user?.role === 'DIRECTION') return <Navigate to="/finance-dashboard" replace />
+    // FINANCE est redirigé vers finance-dashboard par défaut
+    if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
+    // DIRECTION peut choisir entre les deux dashboards
     if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
+    return (
+      <Layout breadcrumb={<li>Tableau de bord</li>}>
+        <Dashboard />
+      </Layout>
+    )
+  }
+
+  function DashboardRoute() {
     return (
       <Layout breadcrumb={<li>Tableau de bord</li>}>
         <Dashboard />
@@ -370,6 +377,11 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'DIRECTION', 'FINANCE']}>
+              <DashboardRoute />
+            </ProtectedRoute>
+          } />
           <Route path="/finance-dashboard" element={
             <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord Finance</li></>}>
@@ -424,17 +436,10 @@ function App() {
               <EvaluationRoute />
             </ProtectedRoute>
           } />
-          <Route path="/quiz" element={
+          <Route path="/evaluations/repondre/:id" element={
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
-                <QuizList />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz/:id" element={
-            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
-                <QuizTake />
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/evaluations">Évaluations</Link></li><li className="separator">/</li><li>Répondre</li></>}>
+                <EvaluationTake />
               </Layout>
             </ProtectedRoute>
           } />

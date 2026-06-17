@@ -34,10 +34,15 @@ class Command(BaseCommand):
             '--dry-run', action='store_true',
             help='Simuler l\'import sans écrire en base',
         )
+        parser.add_argument(
+            '--disable-auto-inscription', action='store_true',
+            help='Désactiver l\'auto-inscription : force l\'utilisation explicite de la colonne Formation(s)',
+        )
 
     def handle(self, *args, **options):
         filepath = options['file']
         dry_run = options['dry_run']
+        self.disable_auto_inscription = options.get('disable_auto_inscription', False)
 
         is_csv = filepath.lower().endswith('.csv')
         stats = {}
@@ -63,39 +68,87 @@ class Command(BaseCommand):
                     except Exception as e:
                         raise CommandError(f"Impossible d'ouvrir le fichier : {e}")
 
+                    # Mapping des feuilles par nom standard
+                    sheet_mapping = {
+                        'formations': None,
+                        'participants': None,
+                        'seances': None,
+                        'formateurs': None,
+                        'inscriptions': None,
+                        'formateurs_formations': None,
+                        'emploi_du_temps': None,
+                    }
+
+                    # 1. Recherche par noms standards
                     if 'Formations' in wb.sheetnames:
-                        stats['formations'] = self._import_formations(wb['Formations'], errors)  # tuple (created, updated)
+                        sheet_mapping['formations'] = wb['Formations']
                     if 'Formateurs' in wb.sheetnames:
-                        stats['formateurs'] = self._import_formateurs(wb['Formateurs'], errors)
+                        sheet_mapping['formateurs'] = wb['Formateurs']
                     if 'Participants' in wb.sheetnames:
-                        stats['participants'] = self._import_participants(wb['Participants'], errors)
+                        sheet_mapping['participants'] = wb['Participants']
                     elif 'Auditeurs' in wb.sheetnames:
-                        # Alias d'export epdtcpfae : l'onglet « Auditeurs » correspond aux participants.
-                        stats['participants'] = self._import_participants(wb['Auditeurs'], errors)
+                        sheet_mapping['participants'] = wb['Auditeurs']
                     if 'Inscriptions' in wb.sheetnames:
-                        stats['inscriptions'] = self._import_inscriptions(wb['Inscriptions'], errors)
+                        sheet_mapping['inscriptions'] = wb['Inscriptions']
                     if 'Formateurs_Formations' in wb.sheetnames:
-                        stats['formateurs_formations'] = self._import_formateurs_formations(
-                            wb['Formateurs_Formations'], errors
-                        )
+                        sheet_mapping['formateurs_formations'] = wb['Formateurs_Formations']
                     if 'Emploi du temps' in wb.sheetnames:
-                        stats['seances'] = self._import_emploi_du_temps(wb['Emploi du temps'], errors)
+                        sheet_mapping['emploi_du_temps'] = wb['Emploi du temps']
                     for sheet_name in ('Séances', 'Seances'):
                         if sheet_name in wb.sheetnames:
-                            ws_s = wb[sheet_name]
-                            # Détecter le format : emploi du temps (pas de module_titre/groupe)
-                            # vs séances multi-modules (avec module_titre ou grade/groupe)
-                            first_row = next(ws_s.iter_rows(values_only=True), ())
-                            headers_lower = [str(h).lower().strip() if h else '' for h in first_row]
-                            has_module = any('module' in h or 'grade' in h for h in headers_lower)
-                            if has_module:
-                                created, updated = self._import_seances(ws_s, errors)
-                            else:
-                                created = self._import_emploi_du_temps(ws_s, errors)
-                                updated = 0
-                            stats['seances'] = created
-                            if updated: stats['seances_mises_a_jour'] = updated
+                            sheet_mapping['seances'] = wb[sheet_name]
                             break
+
+                    # 2. Détection automatique par contenu pour les feuilles non reconnues
+                    for sheet_name in wb.sheetnames:
+                        # Ignorer les feuilles déjà assignées
+                        already_assigned = any(
+                            sheet_mapping.get(k) == wb[sheet_name]
+                            for k in sheet_mapping
+                        )
+                        if already_assigned:
+                            continue
+
+                        ws = wb[sheet_name]
+                        detected_type = self._detect_sheet_type(ws)
+                        if detected_type and not sheet_mapping.get(detected_type):
+                            self.stdout.write(f"  ℹ️  Feuille '{sheet_name}' détectée comme : {detected_type}")
+                            sheet_mapping[detected_type] = ws
+
+                    # 3. Exécution des imports
+                    if sheet_mapping['formations']:
+                        stats['formations'] = self._import_formations(sheet_mapping['formations'], errors)
+                    if sheet_mapping['formateurs']:
+                        stats['formateurs'] = self._import_formateurs(sheet_mapping['formateurs'], errors)
+                    if sheet_mapping['participants']:
+                        stats['participants'] = self._import_participants(sheet_mapping['participants'], errors)
+                    if sheet_mapping['inscriptions']:
+                        stats['inscriptions'] = self._import_inscriptions(sheet_mapping['inscriptions'], errors)
+                    if sheet_mapping['formateurs_formations']:
+                        stats['formateurs_formations'] = self._import_formateurs_formations(
+                            sheet_mapping['formateurs_formations'], errors
+                        )
+
+                    # Gestion des séances vs emploi du temps
+                    if sheet_mapping['seances']:
+                        ws_s = sheet_mapping['seances']
+                        first_row = next(ws_s.iter_rows(values_only=True), ())
+                        headers_lower = [str(h).lower().strip() if h else '' for h in first_row]
+                        has_module = any('module' in h or 'grade' in h for h in headers_lower)
+                        if has_module:
+                            created, updated = self._import_seances(ws_s, errors)
+                        else:
+                            created = self._import_emploi_du_temps(ws_s, errors)
+                            updated = 0
+                        stats['seances'] = created
+                        if updated:
+                            stats['seances_mises_a_jour'] = updated
+                    elif sheet_mapping['emploi_du_temps']:
+                        stats['seances'] = self._import_emploi_du_temps(sheet_mapping['emploi_du_temps'], errors)
+
+                    # Avertissement si aucune feuille détectée
+                    if not any(sheet_mapping.values()):
+                        errors.append("Aucune feuille reconnue dans le fichier Excel")
 
                     wb.close()
 
@@ -261,6 +314,91 @@ class Command(BaseCommand):
         if val is None:
             return default
         return str(val).strip()
+
+    def _normalize_field(self, val, default='', uppercase=True):
+        """Normalise un champ texte : strip, espaces multiples -> un seul, optionnellement majuscules.
+
+        Utilisé pour grade, groupe, vague afin d'éviter les doublons dus aux espaces
+        ou différences de casse (ex: 'Groupe 1' vs 'GROUPE 1' vs 'Groupe  1').
+        """
+        if val is None:
+            return default
+        result = str(val).strip()
+        # Réduire les espaces multiples à un seul
+        result = ' '.join(result.split())
+        if uppercase:
+            result = result.upper()
+        return result
+
+    def _normalize_grade(self, val, default=''):
+        """Normalise un grade : extrait la lettre (B, C, D) si format B1, B2, C3...
+
+        Règle métier : B1, B2, B3 -> B | C1, C2 -> C | D1, D2 -> D
+        La différenciation se fait par groupe + vague, pas par sous-grade.
+        """
+        result = self._normalize_field(val, default)
+        if not result:
+            return default
+        # Si format Lettre+Chiffre (B1, B2, C3...), retourner juste la lettre
+        import re
+        match = re.match(r'^([BCD])\d+$', result)
+        if match:
+            return match.group(1)
+        return result
+
+    def _detect_sheet_type(self, ws):
+        """Détecte le type de feuille par analyse de ses headers.
+
+        Retourne : 'formations', 'participants', 'seances', 'formateurs', 'inscriptions', 'emploi_du_temps' ou None
+        """
+        first_row = next(ws.iter_rows(values_only=True), ())
+        if not first_row:
+            return None
+
+        headers = [str(h).lower().strip() if h else '' for h in first_row]
+        headers_set = set(headers)
+
+        # Détection Formations : doit avoir Module + Grade + Groupe
+        has_module = any('module' in h for h in headers)
+        has_grade = 'grade' in headers_set
+        has_groupe = 'groupe' in headers_set
+        if has_module and has_grade and has_groupe:
+            # Vérifier qu'il a des champs de formation (date début/fin ou volume horaire)
+            # Gère les accents et les différentes variantes
+            has_date_fields = any(
+                'date' in h and ('debut' in h or 'début' in h or 'fin' in h)
+                for h in headers
+            )
+            has_volume = any('volume' in h or 'horaire' in h for h in headers)
+            if has_date_fields or has_volume:
+                return 'formations'
+
+        # Détection Participants : doit avoir NOM + GRADE + GROUPE
+        participant_markers = {'nom', 'prenom', 'prenoms', 'grade', 'groupe', 'matricule', "n° d'inscription"}
+        has_nom = any(h in headers_set for h in ['nom', 'nom'])
+        has_grade = 'grade' in headers_set
+        has_groupe = 'groupe' in headers_set
+        if has_nom and has_grade and has_groupe:
+            return 'participants'
+
+        # Détection Séances : doit avoir module_titre/module + grade + groupe + vague + date
+        # ET des champs spécifiques aux séances (numero, date_journee, heure_debut...)
+        has_module = any('module' in h or 'module_titre' in h for h in headers)
+        has_grade_groupe = 'grade' in headers_set and 'groupe' in headers_set
+        has_seance_fields = any(h in headers_set for h in ['numero', 'date_journee', 'heure_debut', 'heure_fin'])
+        if has_module and has_grade_groupe and has_seance_fields:
+            return 'seances'
+
+        # Détection Emploi du temps : a date/heure mais pas de module/groupe spécifique
+        if 'date' in headers_set or 'heure' in headers_set:
+            if not any('module' in h or 'groupe' in h for h in headers):
+                return 'emploi_du_temps'
+
+        # Détection Formateurs
+        if 'formateur' in headers_set or 'nom formateur' in headers_set:
+            return 'formateurs'
+
+        return None
 
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
@@ -528,9 +666,9 @@ class Command(BaseCommand):
 
             module_defaults = {
                 'ordre': _module_order[obj.id],
-                'grade': self._str(data.get('grade')),
-                'groupe': self._str(data.get('groupe')),
-                'vague': self._str(data.get('vague')),
+                'grade': self._normalize_grade(data.get('grade')),
+                'groupe': self._normalize_field(data.get('groupe')),
+                'vague': self._normalize_field(data.get('vague')),
                 'date_debut': date_debut.date() if hasattr(date_debut, 'date') else date_debut,
                 'date_fin': date_fin.date() if hasattr(date_fin, 'date') else date_fin,
                 'statut': self._str(data.get('statut')) or 'PLANIFIEE',
@@ -556,8 +694,8 @@ class Command(BaseCommand):
 
             # Lookup Module : formation + intitule + grade + groupe (unicité)
             module_lookup = {'formation': obj, 'intitule': module_val}
-            grade_key = self._str(data.get('grade'))
-            groupe_key = self._str(data.get('groupe'))
+            grade_key = self._normalize_grade(data.get('grade'))
+            groupe_key = self._normalize_field(data.get('groupe'))
             if grade_key: module_lookup['grade'] = grade_key
             if groupe_key: module_lookup['groupe'] = groupe_key
 
@@ -644,7 +782,12 @@ class Command(BaseCommand):
             if not nom or not prenom:
                 errors.append(f'Participants ligne {row_idx}: nom ou prénom manquant')
                 continue
-            matricule = self._str(data.get('matricule') or data.get('numero'))
+            matricule = self._str(
+                data.get('matricule')
+                or data.get('numero')
+                or data.get("n° d'inscription")
+                or data.get("n°d'inscription")
+            )
 
             date_naissance = self._parse_date(data.get('date_naissance'))
 
@@ -660,10 +803,10 @@ class Command(BaseCommand):
                 'type_concours': self._str(data.get('type_concours') or data.get('type')),
                 'libelle_concours': self._str(data.get('libelle_concours')),
                 'categorie': self._str(data.get('categorie')),
-                'grade': self._str(data.get('grade')),
-                'groupe': self._str(data.get('groupe')),
+                'grade': self._normalize_grade(data.get('grade')),
+                'groupe': self._normalize_field(data.get('groupe')),
                 'grade_groupe': self._str(data.get('grade_groupe')),
-                'vague': self._str(data.get('vague')),
+                'vague': self._normalize_field(data.get('vague')),
                 'motif_notoire': self._str(
                     data.get('motif_notoire') or data.get('motif') or data.get('motif_absence')
                 ),
@@ -794,32 +937,42 @@ class Command(BaseCommand):
             if formations_str:
                 # Cas 1 : colonne Formation(s) renseignée → inscription par titre
                 # Filtre par groupe + grade + vague pour identifier la bonne formation
-                p_groupe = self._str(data.get('groupe'))
-                p_grade  = self._str(data.get('grade'))
-                p_vague  = self._str(data.get('vague'))
+                p_groupe = self._normalize_field(data.get('groupe'))
+                p_grade  = self._normalize_grade(data.get('grade'))
+                p_vague  = self._normalize_field(data.get('vague'))
                 titres = [t.strip() for t in formations_str.split('|') if t.strip()]
                 for titre in titres:
                     cache_key = ('titre', titre.lower(), p_grade.lower(), p_groupe.lower(), p_vague.lower())
                     if cache_key not in _module_match_cache:
                         mod_qs = Module.objects.filter(formation__formation__iexact=titre)
+                        # Filtres stricts : si grade/groupe/vague sont fournis, on filtre TOUJOURS
                         if p_grade:
-                            mod_qs_g = mod_qs.filter(grade__iexact=p_grade)
-                            if mod_qs_g.exists():
-                                mod_qs = mod_qs_g
+                            mod_qs = mod_qs.filter(grade__iexact=p_grade)
                         if p_groupe:
-                            mod_qs_g = mod_qs.filter(groupe__iexact=p_groupe)
-                            if mod_qs_g.exists():
-                                mod_qs = mod_qs_g
+                            mod_qs = mod_qs.filter(groupe__iexact=p_groupe)
+                        # Filtre vague : supporte les formats différents
+                        # Ex: fichier a "VAGUE 2", module a "SESSION 2026 VAGUE 2"
                         if p_vague:
-                            mod_qs_g = mod_qs.filter(vague__iexact=p_vague)
-                            if mod_qs_g.exists():
-                                mod_qs = mod_qs_g
+                            # Essayer match exact d'abord
+                            exact_match = mod_qs.filter(vague__iexact=p_vague)
+                            if exact_match.exists():
+                                mod_qs = exact_match
+                            else:
+                                # Sinon recherche partielle (vague du fichier contenue dans vague du module)
+                                mod_qs = mod_qs.filter(vague__icontains=p_vague)
                         _module_match_cache[cache_key] = list(
                             mod_qs.select_related('formation').order_by('ordre')
                         )
                     matched_mods = _module_match_cache[cache_key]
                     if not matched_mods:
-                        errors.append(f'Participants ligne {row_idx}: formation "{titre}" introuvable')
+                        crit = f'formation={titre}'
+                        if p_grade:
+                            crit += f' grade={p_grade}'
+                        if p_groupe:
+                            crit += f' groupe={p_groupe}'
+                        if p_vague:
+                            crit += f' vague={p_vague}'
+                        errors.append(f'Participants ligne {row_idx}: aucun module trouvé pour ({crit})')
                         continue
                     for _mod in matched_mods:
                         _queue_inscription(
@@ -828,51 +981,78 @@ class Command(BaseCommand):
                         )
             else:
                 # Cas 2 : colonne Formation(s) vide
-                # Auto-match strict : catégorie + grade + groupe tous les 3 requis
-                # Filtre optionnel supplémentaire : vague
-                cat = self._str(data.get('categorie'))
-                grade = self._str(data.get('grade'))
-                groupe = self._str(data.get('groupe'))
-                vague = self._str(data.get('vague'))
-                if grade and groupe:
-                    cache_key = ('auto', grade.lower(), groupe.lower(), vague.lower())
-                    if cache_key not in _module_match_cache:
-                        mod_qs = Module.objects.filter(
-                            grade__iexact=grade,
-                            groupe__iexact=groupe,
-                        )
-                        if vague:
-                            mod_qs = mod_qs.filter(vague__iexact=vague)
-                        _module_match_cache[cache_key] = list(
-                            mod_qs.select_related('formation')
-                        )
-                    matched_mods = _module_match_cache[cache_key]
-                    if not matched_mods:
-                        crit = f'grade={grade} groupe={groupe}'
-                        if vague:
-                            crit += f' vague={vague}'
-                        errors.append(
-                            f'Participants ligne {row_idx}: '
-                            f'aucun module trouvé pour {nom} {prenom} '
-                            f'({crit})'
-                        )
-                    else:
-                        for _mod in matched_mods:
+                # Protection 1 : --disable-auto-inscription force l'utilisation explicite de Formation(s)
+                if getattr(self, 'disable_auto_inscription', False):
+                    errors.append(
+                        f'Participants ligne {row_idx}: {nom} {prenom} '
+                        f'— colonne Formation(s) obligatoire (auto-inscription désactivée)'
+                    )
+                else:
+                    # Auto-match strict avec protections supplémentaires
+                    cat = self._str(data.get('categorie'))
+                    grade = self._normalize_grade(data.get('grade'))
+                    groupe = self._normalize_field(data.get('groupe'))
+                    vague = self._normalize_field(data.get('vague'))
+                    # Protection 2 : prendre en compte la formation/cycle si disponible
+                    p_formation = self._str(data.get('formation') or data.get('cycle') or data.get('formation_cycle'))
+
+                    if grade and groupe:
+                        cache_key = ('auto', grade.lower(), groupe.lower(), vague.lower(), p_formation.lower())
+                        if cache_key not in _module_match_cache:
+                            mod_qs = Module.objects.filter(
+                                grade__iexact=grade,
+                                groupe__iexact=groupe,
+                            )
+                            if vague:
+                                mod_qs = mod_qs.filter(vague__iexact=vague)
+                            # Filtre par formation/cycle si spécifié
+                            if p_formation:
+                                mod_qs = mod_qs.filter(formation__formation__iexact=p_formation)
+                            _module_match_cache[cache_key] = list(
+                                mod_qs.select_related('formation')
+                            )
+                        matched_mods = _module_match_cache[cache_key]
+
+                        if not matched_mods:
+                            crit = f'grade={grade} groupe={groupe}'
+                            if vague:
+                                crit += f' vague={vague}'
+                            if p_formation:
+                                crit += f' formation={p_formation}'
+                            errors.append(
+                                f'Participants ligne {row_idx}: '
+                                f'aucun module trouvé pour {nom} {prenom} '
+                                f'({crit})'
+                            )
+                        # Protection 3 : bloquer si plusieurs modules matchent
+                        elif len(matched_mods) > 1:
+                            mod_list = ', '.join([f"{_mod.intitule} ({_mod.formation.formation})" for _mod in matched_mods[:3]])
+                            if len(matched_mods) > 3:
+                                mod_list += f' et {len(matched_mods) - 3} autres'
+                            errors.append(
+                                f'Participants ligne {row_idx}: {nom} {prenom} — '
+                                f'{len(matched_mods)} modules correspondent au critère {grade}/{groupe}'
+                                f"{f'/{vague}' if vague else ''}: {mod_list}. "
+                                f"Précisez la colonne Formation(s) pour désambiguïser."
+                            )
+                        else:
+                            # Un seul module matche → inscription unique
+                            _mod = matched_mods[0]
                             _queue_inscription(
                                 _mod, obj,
                                 f'    ↳ Auto-inscrit → {_mod.formation.formation} / {_mod.intitule}',
                             )
-                elif not (grade or groupe):
-                    errors.append(
-                        f'Participants ligne {row_idx}: {nom} {prenom} '
-                        f'sans Formation(s) ni grade/groupe — pas inscrit'
-                    )
-                else:
-                    errors.append(
-                        f'Participants ligne {row_idx}: {nom} {prenom} '
-                        f'auto-match incomplet (grade={grade!r} groupe={groupe!r}) '
-                        f'— les 2 critères grade+groupe sont requis'
-                    )
+                    elif not (grade or groupe):
+                        errors.append(
+                            f'Participants ligne {row_idx}: {nom} {prenom} '
+                            f'sans Formation(s) ni grade/groupe — pas inscrit'
+                        )
+                    else:
+                        errors.append(
+                            f'Participants ligne {row_idx}: {nom} {prenom} '
+                            f'auto-match incomplet (grade={grade!r} groupe={groupe!r}) '
+                            f'— les 2 critères grade+groupe sont requis'
+                        )
 
         # Création en masse des inscriptions : on filtre celles déjà existantes
         # en une seule requête, puis bulk_create (ignore_conflicts par sécurité).

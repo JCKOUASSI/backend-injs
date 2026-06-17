@@ -160,7 +160,14 @@ export default function Referentiels() {
 
   const openEdit = (row) => {
     setEditingRow(row)
-    setForm({ ...row })
+    // Transformer volumes_par_categorie en objet pour le formulaire
+    const volumesMap = {}
+    if (row.volumes_par_categorie) {
+      row.volumes_par_categorie.forEach(v => {
+        volumesMap[v.categorie_id] = v.volume_horaire
+      })
+    }
+    setForm({ ...row, volumes_par_categorie: volumesMap })
     setShowModal(true)
   }
 
@@ -169,11 +176,21 @@ export default function Referentiels() {
     setSaving(true)
     try {
       const url = URL_MAP[tab]
+      // Préparer les données avec volumes_par_categorie au bon format
+      const submitData = { ...form }
+      if (tab === 'modules' && form.volumes_par_categorie) {
+        submitData.volumes_par_categorie = Object.entries(form.volumes_par_categorie)
+          .filter(([_, val]) => val && val !== '')
+          .map(([catId, val]) => ({
+            categorie_id: parseInt(catId),
+            volume_horaire: parseFloat(val)
+          }))
+      }
       if (editingRow) {
-        await api.put(`${url}${editingRow.id}/`, form)
+        await api.put(`${url}${editingRow.id}/`, submitData)
         showToast('Modifié avec succès')
       } else {
-        await api.post(url, form)
+        await api.post(url, submitData)
         showToast('Ajouté avec succès')
       }
       setShowModal(false)
@@ -208,7 +225,7 @@ export default function Referentiels() {
 
   const defaultForm = (t) => {
     if (t === 'formations') return { intitule: '', actif: true }
-    if (t === 'modules') return { intitule: '', volume_horaire: '', actif: true }
+    if (t === 'modules') return { intitule: '', volumes_par_categorie: {}, actif: true }
     if (t === 'categories') return { libelle: '', actif: true }
     if (t === 'grades') return { libelle: '', categorie_id: '', actif: true }
     if (t === 'sites') return { nom: '', actif: true }
@@ -223,7 +240,10 @@ export default function Referentiels() {
     formations: [{ key: 'intitule', label: 'Intitulé' }],
     modules: [
       { key: 'intitule', label: 'Intitulé' },
-      { key: 'volume_horaire', label: 'Volume horaire (h)', render: r => r.volume_horaire ?? '—' },
+      { key: 'volumes_par_categorie', label: 'Volumes horaires (h)', render: r => {
+        if (!r.volumes_par_categorie || r.volumes_par_categorie.length === 0) return '—'
+        return r.volumes_par_categorie.map(v => `${v.categorie_libelle}: ${v.volume_horaire}h`).join(', ')
+      }},
     ],
     categories: [
       { key: 'libelle', label: 'Libellé' },
@@ -280,8 +300,33 @@ export default function Referentiels() {
         <input className="form-control" required value={form.intitule || ''} onChange={f('intitule')} placeholder="Ex: Déontologie de la Fonction Publique" />
       </div>
       <div className="form-group">
-        <label className="form-label">Volume horaire (h)</label>
-        <input type="number" className="form-control" min="0" step="0.5" value={form.volume_horaire || ''} onChange={f('volume_horaire')} placeholder="Ex: 30" />
+        <label className="form-label">Volumes horaires par catégorie</label>
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          {data.categories.filter(c => c.actif).map(cat => (
+            <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ minWidth: '100px' }}>{cat.libelle}:</span>
+              <input
+                type="number"
+                className="form-control"
+                min="0"
+                step="0.5"
+                placeholder="h"
+                value={form.volumes_par_categorie?.[cat.id] || ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setForm(prev => ({
+                    ...prev,
+                    volumes_par_categorie: {
+                      ...prev.volumes_par_categorie,
+                      [cat.id]: val
+                    }
+                  }))
+                }}
+                style={{ width: '100px' }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </>)
 
