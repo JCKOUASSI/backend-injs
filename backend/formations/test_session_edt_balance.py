@@ -18,10 +18,10 @@ def _make_formation():
     return Formation.objects.create(formation='Cycle test EDT')
 
 
-def _make_module(formation, *, duree_prevue_heures=30):
+def _make_module(formation, *, intitule='Module EDT', duree_prevue_heures=30):
     return Module.objects.create(
         formation=formation,
-        intitule='Module EDT',
+        intitule=intitule,
         duree_prevue_heures=duree_prevue_heures,
     )
 
@@ -79,7 +79,9 @@ class SessionEdtBalanceTest(TestCase):
         self.assertEqual(self._total_edt_minutes(), 30 * 60)
 
     def test_delete_last_session_when_compensation_exceeds_duration(self):
-        module = _make_module(self.formation, duree_prevue_heures=30)
+        module = _make_module(
+            self.formation, intitule='Module EDT compensation', duree_prevue_heures=30,
+        )
         s1 = _make_session(
             module, day_offset=0, debut=time(8, 0), fin=time(20, 0), numero=1,
         )

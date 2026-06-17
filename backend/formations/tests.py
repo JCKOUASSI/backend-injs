@@ -73,7 +73,7 @@ class ModuleModelTest(TestCase):
 
     def test_statut_choices(self):
         for s in ('PLANIFIEE', 'EN_COURS', 'SUSPENDUE', 'TERMINEE'):
-            m = make_module(self.f, statut=s)
+            m = make_module(self.f, intitule=f'Module {s}', statut=s)
             self.assertEqual(m.statut, s)
 
     def test_module_participant_unique(self):
@@ -314,10 +314,10 @@ class DashboardStatsAPITest(TestCase):
         self.admin = make_user('admin_stats', role='CPFAE_ADMIN')
         self.client.force_authenticate(self.admin)
         f = make_formation()
-        make_module(f, statut='EN_COURS', groupe='GROUPE 1')
-        make_module(f, statut='EN_COURS', groupe='GROUPE 2')
-        make_module(f, statut='PLANIFIEE')
-        make_module(f, statut='TERMINEE')
+        make_module(f, intitule='Module en cours 1', statut='EN_COURS', groupe='GROUPE 1')
+        make_module(f, intitule='Module en cours 2', statut='EN_COURS', groupe='GROUPE 2')
+        make_module(f, intitule='Module planifié', statut='PLANIFIEE')
+        make_module(f, intitule='Module terminé', statut='TERMINEE')
 
     def test_stats_keys(self):
         res = self.client.get('/api/formations/stats/')

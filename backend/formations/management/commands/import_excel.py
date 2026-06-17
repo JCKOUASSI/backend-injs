@@ -692,12 +692,17 @@ class Command(BaseCommand):
             if duree_renseignee and duree > 0:
                 module_defaults['duree_prevue_heures'] = duree
 
-            # Lookup Module : formation + intitule + grade + groupe (unicité)
-            module_lookup = {'formation': obj, 'intitule': module_val}
+            # Lookup Module : aligné sur unique_together (formation, intitule, grade, groupe, vague)
             grade_key = self._normalize_grade(data.get('grade'))
             groupe_key = self._normalize_field(data.get('groupe'))
-            if grade_key: module_lookup['grade'] = grade_key
-            if groupe_key: module_lookup['groupe'] = groupe_key
+            vague_key = self._normalize_field(data.get('vague'))
+            module_lookup = {
+                'formation': obj,
+                'intitule': module_val,
+                'grade': grade_key,
+                'groupe': groupe_key,
+                'vague': vague_key,
+            }
 
             _mod, mod_created = Module.objects.update_or_create(
                 **module_lookup,
@@ -1400,9 +1405,9 @@ class Command(BaseCommand):
                 errors.append(f'Séances ligne {row_idx}: numero de séance manquant')
                 continue
 
-            groupe = self._str(data.get('groupe'))
-            grade = self._str(data.get('grade'))
-            vague = self._str(data.get('vague'))
+            groupe = self._normalize_field(data.get('groupe'))
+            grade = self._normalize_grade(data.get('grade'))
+            vague = self._normalize_field(data.get('vague'))
 
             missing = [label for label, val in (
                 ('grade', grade), ('groupe', groupe), ('vague', vague),
