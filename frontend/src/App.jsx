@@ -132,12 +132,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
           )}
-          {/* DIRECTION voit aussi le tableau de bord normal en plus du finance */}
-          {user?.role === 'DIRECTION' && (
-            <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
-            </Link>
-          )}
+
           {canViewFinanceDashboard && (
             <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
