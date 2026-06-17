@@ -192,20 +192,21 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
     list_display = [
         'matricule', 'nom', 'prenom', 'sexe',
         'categorie', 'grade', 'groupe', 'vague',
-        'email', 'telephone', 'secretariat',
+        'secretariat',
     ]
     list_display_links = ['matricule', 'nom']
     search_fields = [
-        'matricule', 'nom', 'prenom', 'email', 'telephone',
-        'grade', 'groupe', 'vague', 'libelle_concours',
+        'matricule', 'nom', 'prenom',
+        'grade', 'groupe', 'vague',
     ]
     list_filter = [
-        'sexe', 'categorie', 'grade', 'groupe', 'vague', 'secretariat',
+        'grade', 'groupe', 'vague', 'categorie', 'sexe', 'secretariat',
     ]
     autocomplete_fields = ['secretariat', 'user']
     list_select_related = ['secretariat']
     ordering = ['nom', 'prenom']
-    list_per_page = 50
+    list_per_page = 100
+    show_full_result_count = False  # Évite le COUNT(*) lent sur gros volumes
     readonly_fields = ['created_at']
     fieldsets = (
         ("Identification", {

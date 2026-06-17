@@ -8,11 +8,10 @@ from formations.models import Module, Participant, Formation
 
 from .models import (
     Questionnaire, Question, ChoixQuestion, ReponseQuestionnaire, ReponseQuestion,
-    QuizManuel, QuestionQuiz, ReponseQuiz,
 )
 
 from .permissions import (
-    IsSuperviseur, IsAuditeur, IsGestionNotes, IsGestionNotesOrReadOnly,
+    IsSuperviseur, IsAuditeur,
 )
 from .serializers import (
     QuestionnaireListSerializer,
@@ -20,8 +19,6 @@ from .serializers import (
     QuestionWriteSerializer,
     SoumissionSerializer,
     ResultatsSerializer,
-    QuizManuelSerializer, QuizManuelDetailSerializer, QuizManuelPublicSerializer,
-    QuestionQuizSerializer, ReponseQuizSerializer,
 )
 
 
@@ -352,151 +349,3 @@ def analyse_qualitative(request, pk):
         'questions': questions_data,
     })
 
-
-# ─────────────────────────────────────────────────────────────
-# QUIZ MANUELS — Gestion (superviseurs)
-# ─────────────────────────────────────────────────────────────
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsGestionNotesOrReadOnly])
-def quiz_list_create(request):
-    if request.method == 'GET':
-        qs = QuizManuel.objects.select_related('module').all()
-        module_id = request.query_params.get('module_id')
-        if module_id:
-            qs = qs.filter(module_id=module_id)
-        return Response(QuizManuelSerializer(qs, many=True).data)
-    serializer = QuizManuelSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(created_by=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['GET', 'PATCH', 'DELETE'])
-@permission_classes([IsGestionNotesOrReadOnly])
-def quiz_detail(request, pk):
-    obj = get_object_or_404(QuizManuel, pk=pk)
-    if request.method == 'GET':
-        return Response(QuizManuelDetailSerializer(obj).data)
-    if request.method == 'PATCH':
-        serializer = QuizManuelSerializer(obj, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    obj.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@api_view(['POST'])
-@permission_classes([IsGestionNotes])
-def quiz_question_create(request, quiz_pk):
-    quiz = get_object_or_404(QuizManuel, pk=quiz_pk)
-    data = {**request.data, 'quiz': quiz.pk}
-    serializer = QuestionQuizSerializer(data=data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['PATCH', 'DELETE'])
-@permission_classes([IsGestionNotes])
-def quiz_question_detail(request, quiz_pk, pk):
-    question = get_object_or_404(QuestionQuiz, pk=pk, quiz_id=quiz_pk)
-    if request.method == 'PATCH':
-        serializer = QuestionQuizSerializer(question, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    question.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@api_view(['GET'])
-@permission_classes([IsGestionNotesOrReadOnly])
-def quiz_resultats(request, pk):
-    quiz = get_object_or_404(QuizManuel, pk=pk)
-    reponses = quiz.reponses.select_related('participant')
-    nb = reponses.count()
-    nb_reussis = reponses.filter(reussi=True).count()
-    scores = [float(r.score) for r in reponses if r.score is not None]
-    score_moyen = round(sum(scores) / len(scores), 2) if scores else None
-    return Response({
-        'quiz': QuizManuelSerializer(quiz).data,
-        'nb_participations': nb,
-        'nb_reussis': nb_reussis,
-        'taux_reussite': round((nb_reussis / nb) * 100, 2) if nb else None,
-        'score_moyen': score_moyen,
-        'reponses': ReponseQuizSerializer(reponses, many=True).data,
-    })
-
-
-# ─────────────────────────────────────────────────────────────
-# QUIZ MANUELS — Auditeurs
-# ─────────────────────────────────────────────────────────────
-
-@api_view(['GET'])
-@permission_classes([IsAuditeur])
-def quiz_disponibles(request):
-    try:
-        participant = request.user.participant_profile
-    except Exception:
-        return Response({'detail': 'Profil auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    qs = QuizManuel.objects.filter(actif=True)
-    deja_faits = ReponseQuiz.objects.filter(participant=participant).values_list('quiz_id', flat=True)
-    qs = qs.exclude(id__in=deja_faits)
-    grade = (participant.grade or '').strip().upper()
-    categorie = grade[0] if grade else ''
-    result = []
-    for q in qs:
-        cats = q.categories or []
-        grades = q.grades or []
-        if not cats and not grades:
-            result.append(q)
-            continue
-        if categorie and categorie in cats:
-            result.append(q)
-            continue
-        if grade and grade in grades:
-            result.append(q)
-    return Response(QuizManuelPublicSerializer(result, many=True).data)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuditeur])
-def quiz_soumettre(request, quiz_pk):
-    try:
-        participant = request.user.participant_profile
-    except Exception:
-        return Response({'detail': 'Profil auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    quiz = get_object_or_404(QuizManuel, pk=quiz_pk)
-    if not quiz.actif:
-        return Response({'detail': "Ce quiz n'est pas ouvert."}, status=status.HTTP_400_BAD_REQUEST)
-    if ReponseQuiz.objects.filter(quiz=quiz, participant=participant).exists():
-        return Response({'detail': 'Vous avez déjà répondu à ce quiz.'}, status=status.HTTP_400_BAD_REQUEST)
-    reponses = request.data.get('reponses', {})
-    questions = quiz.questions.all()
-    total_points = 0.0
-    points_obtenus = 0.0
-    detail = {}
-    for q in questions:
-        total_points += float(q.points)
-        reponse_donnee = reponses.get(str(q.id), '')
-        correcte = str(reponse_donnee).strip().lower() == str(q.reponse_correcte).strip().lower()
-        if correcte:
-            points_obtenus += float(q.points)
-        detail[str(q.id)] = {'reponse_donnee': reponse_donnee, 'correcte': correcte}
-    score = round((points_obtenus / total_points) * 100, 2) if total_points > 0 else 0
-    reussi = score >= float(quiz.seuil_reussite)
-    obj = ReponseQuiz.objects.create(
-        quiz=quiz, participant=participant, score=score, reussi=reussi,
-        temps_pris_minutes=request.data.get('temps_pris_minutes'),
-        reponses_detail=detail,
-    )
-    return Response(
-        {'detail': 'Quiz soumis.', 'score': score, 'reussi': reussi, 'id': obj.pk},
-        status=status.HTTP_201_CREATED,
-    )

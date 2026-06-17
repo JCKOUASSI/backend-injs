@@ -559,6 +559,7 @@ class Module(models.Model):
         ordering = ['ordre', 'intitule']
         verbose_name = 'Module'
         verbose_name_plural = 'Modules'
+        unique_together = [('formation', 'intitule', 'grade', 'groupe', 'vague')]
 
     def __str__(self):
         return f"{self.intitule} ({self.formation.formation})"

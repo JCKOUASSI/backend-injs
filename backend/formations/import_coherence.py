@@ -119,6 +119,55 @@ def check_workbook(wb) -> CoherenceReport:
             report.stats['modules_distincts'] = len(modules)
             report.stats['combos_grade_groupe'] = len(combos_fg)
 
+            # ── Validation : groupes présents dans plusieurs formations ─────────
+            # Un même groupe ne devrait apparaître que dans un seul cycle
+            groupe_to_cycles: dict[str, set[str]] = {}
+            for row_idx, row in enumerate(rows[1:], 2):
+                if not row or all(v is None or _norm(v) == '' for v in row):
+                    break
+                data = _row_dict(headers, row)
+                groupe = _norm(data.get(c_groupe)) if c_groupe else ''
+                cycle = _norm(data.get(c_cycle)) if c_cycle else ''
+                if groupe and cycle:
+                    if groupe not in groupe_to_cycles:
+                        groupe_to_cycles[groupe] = set()
+                    groupe_to_cycles[groupe].add(cycle)
+
+            for groupe, cycles_set in groupe_to_cycles.items():
+                if len(cycles_set) > 1:
+                    report.warnings.append(
+                        f"Formations : groupe « {groupe} » présent dans {len(cycles_set)} formations différentes : "
+                        f"{', '.join(sorted(cycles_set))}"
+                    )
+
+            # ── Validation : combos grade/groupe/vague avec plusieurs modules ──
+            # Un même combo (grade, groupe, vague) ne devrait matcher qu'un seul module
+            # dans un contexte donné (sinon auto-inscription ambiguë)
+            combo_ggv_to_modules: dict[tuple[str, str, str], list[tuple[str, str]]] = {}
+            for row_idx, row in enumerate(rows[1:], 2):
+                if not row or all(v is None or _norm(v) == '' for v in row):
+                    break
+                data = _row_dict(headers, row)
+                module = _norm(data.get(c_module)) if c_module else ''
+                grade = _norm(data.get(c_grade)) if c_grade else ''
+                groupe = _norm(data.get(c_groupe)) if c_groupe else ''
+                vague = _norm(data.get(c_vague)) if c_vague else ''
+                cycle = _norm(data.get(c_cycle)) if c_cycle else ''
+                if grade and groupe and vague:
+                    key = (grade, groupe, vague)
+                    if key not in combo_ggv_to_modules:
+                        combo_ggv_to_modules[key] = []
+                    combo_ggv_to_modules[key].append((module, cycle))
+
+            for (grade, groupe, vague), mods in combo_ggv_to_modules.items():
+                unique_mods = set(mods)
+                if len(unique_mods) > 1:
+                    mod_list = ', '.join([f"« {m[0]} » ({m[1]})" for m in unique_mods])
+                    report.warnings.append(
+                        f"Formations : combo {grade}/{groupe}/{vague} matche {len(unique_mods)} modules différents : "
+                        f"{mod_list} — risque d'auto-inscription multiple"
+                    )
+
     else:
         report.errors.append('Feuille « Formations » absente')
 

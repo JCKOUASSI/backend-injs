@@ -28,8 +28,6 @@ import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
-import QuizList from './pages/QuizList'
-import QuizTake from './pages/QuizTake'
 import NotesModule from './pages/NotesModule'
 import EvaluationAcademique from './pages/EvaluationAcademique'
 import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
@@ -197,18 +195,10 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
             </Link>
           )}
-          {isSuperviseurRole && (
-            <Link to="/quiz" className={`nav-item ${isActive('/quiz') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-question-square"></i> <span className="nav-label">Quiz</span></span>
-            </Link>
-          )}
           {canViewEvaluations && !isSuperviseurRole && (
             <>
               <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
                 <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
-              </Link>
-              <Link to="/quiz" className={`nav-item ${isActive('/quiz') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-question-square"></i> <span className="nav-label">Quiz</span></span>
               </Link>
             </>
           )}
@@ -428,20 +418,6 @@ function App() {
           <Route path="/evaluations" element={
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
               <EvaluationRoute />
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz" element={
-            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
-                <QuizList />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/quiz/:id" element={
-            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
-                <QuizTake />
-              </Layout>
             </ProtectedRoute>
           } />
           <Route path="/evaluations/repondre/:id" element={

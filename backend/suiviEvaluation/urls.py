@@ -19,16 +19,5 @@ urlpatterns = [
     # ── Auditeurs ─────────────────────────────────────────────────────
     path('mes-questionnaires/', views.questionnaires_disponibles, name='eval-mes-questionnaires'),
     path('soumettre/', views.soumettre_evaluation, name='eval-soumettre'),
-
-    # ── Quiz manuels (gestion) ──
-    path('quiz/', views.quiz_list_create, name='eval-quiz-list'),
-    path('quiz/<int:pk>/', views.quiz_detail, name='eval-quiz-detail'),
-    path('quiz/<int:pk>/resultats/', views.quiz_resultats, name='eval-quiz-resultats'),
-    path('quiz/<int:quiz_pk>/questions/', views.quiz_question_create, name='eval-quiz-question-create'),
-    path('quiz/<int:quiz_pk>/questions/<int:pk>/', views.quiz_question_detail, name='eval-quiz-question-detail'),
-
-    # ── Quiz manuels (auditeurs) ──
-    path('mes-quiz/', views.quiz_disponibles, name='eval-mes-quiz'),
-    path('quiz/<int:quiz_pk>/soumettre/', views.quiz_soumettre, name='eval-quiz-soumettre'),
 ]
 
