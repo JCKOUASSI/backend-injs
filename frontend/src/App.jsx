@@ -23,6 +23,7 @@ import FinanceAjustements from './pages/FinanceAjustements'
 import FinanceEncadrants from './pages/FinanceEncadrants'
 import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
+import EvaluationTake from './pages/EvaluationTake'
 import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
@@ -84,7 +85,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
   const canViewFinanceDashboard = canViewFinanceModule
   const canViewParticipants = [...STAFF_WEB_ROLES].includes(user?.role)
-  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT'].includes(user?.role)
+  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
     || canViewFinanceModule
   const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
@@ -143,7 +144,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
-          {!isFinanceRole && !isSuperviseurRole && (
+          {!isFinanceRole && (
             <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
@@ -194,6 +195,11 @@ function Layout({ children, breadcrumb }) {
           {isSuperviseurRole && (
             <Link to="/evaluations?tab=questionnaires" className={`nav-item ${isActive('/evaluations') && searchTab === 'questionnaires' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
+            </Link>
+          )}
+          {isSuperviseurRole && (
+            <Link to="/quiz" className={`nav-item ${isActive('/quiz') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-question-square"></i> <span className="nav-label">Quiz</span></span>
             </Link>
           )}
           {canViewEvaluations && !isSuperviseurRole && (
@@ -435,6 +441,13 @@ function App() {
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Quiz</li></>}>
                 <QuizTake />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/evaluations/repondre/:id" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/evaluations">Évaluations</Link></li><li className="separator">/</li><li>Répondre</li></>}>
+                <EvaluationTake />
               </Layout>
             </ProtectedRoute>
           } />

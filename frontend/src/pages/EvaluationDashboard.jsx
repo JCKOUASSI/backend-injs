@@ -4,7 +4,6 @@ import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 
-const CIBLE_LABELS = { COURS: 'Évaluation du cours', FORMATEUR: 'Évaluation du formateur' }
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS = {
   BROUILLON: { background: '#fff3e0', color: '#e65100' },
@@ -65,14 +64,14 @@ export default function EvaluationDashboard() {
   // ── State questionnaires ─────────────────────────────────────────────────
   const [questionnaires, setQuestionnaires] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({ cible: '', statut: '', categorie: '' })
+  const [filters, setFilters] = useState({ statut: '', categorie: '' })
   const [refModules, setRefModules] = useState([])
   const [refCategories, setRefCategories] = useState([])
   const [refGrades, setRefGrades] = useState([])
   const [titreSearch, setTitreSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
-  const EMPTY_FORM = { titres: [], cible: 'COURS', categories: [], grades: [], date_ouverture: '', date_fermeture: '' }
+  const EMPTY_FORM = { titres: [], categories: [], grades: [], date_ouverture: '', date_fermeture: '' }
   const [form, setForm] = useState(EMPTY_FORM)
 
   const toggleItem = (field, value) =>
@@ -82,7 +81,6 @@ export default function EvaluationDashboard() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (filters.cible) params.append('cible', filters.cible)
       if (filters.statut) params.append('statut', filters.statut)
       if (filters.categorie) params.append('categorie', filters.categorie)
       const q = params.toString() ? `?${params}` : ''
@@ -114,8 +112,6 @@ export default function EvaluationDashboard() {
     brouillon:  allQuestionnaires.filter(q => q.statut === 'BROUILLON').length,
     publie:     allQuestionnaires.filter(q => q.statut === 'PUBLIE').length,
     ferme:      allQuestionnaires.filter(q => q.statut === 'FERME').length,
-    cours:      allQuestionnaires.filter(q => q.cible === 'COURS').length,
-    formateur:  allQuestionnaires.filter(q => q.cible === 'FORMATEUR').length,
     questions:  allQuestionnaires.reduce((s, q) => s + (q.nb_questions || 0), 0),
   }
   const recents = [...allQuestionnaires].sort((a, b) => b.id - a.id).slice(0, 5)
@@ -130,7 +126,6 @@ export default function EvaluationDashboard() {
     try {
       const payload = {
         titres: form.titres,
-        cible: form.cible,
         categories: form.categories,
         grades: form.grades,
         ...(form.date_ouverture ? { date_ouverture: form.date_ouverture } : {}),
@@ -218,29 +213,13 @@ export default function EvaluationDashboard() {
                   )}
                 </div>
 
-                {/* Répartition par cible */}
                 <div className="card" style={{ padding: '1.25rem' }}>
                   <h6 style={{ fontWeight: 700, marginBottom: '1rem', color: 'var(--text-primary)' }}>
-                    <i className="bi bi-bullseye me-2" style={{ color: 'var(--primary)' }}></i>
-                    Répartition par cible
+                    <i className="bi bi-question-circle me-2" style={{ color: 'var(--primary)' }}></i>
+                    Questions au total
                   </h6>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {[
-                      { label: 'Évaluation du cours',      val: kpis.cours,     icon: 'bi-book',         color: '#1565c0', bg: '#e3f2fd' },
-                      { label: 'Évaluation du formateur',  val: kpis.formateur, icon: 'bi-person-video3', color: '#6a1b9a', bg: '#f3e5f5' },
-                    ].map(({ label, val, icon, color, bg }) => (
-                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '20px', background: bg, color, fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          <i className={`bi ${icon} me-1`}></i>{label}
-                        </span>
-                        <span style={{ fontWeight: 700, fontSize: '1.15rem', marginLeft: 'auto' }}>{val}</span>
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Questions au total</span>
-                      <span style={{ fontWeight: 700, fontSize: '1.1rem', marginLeft: 'auto', color: 'var(--primary)' }}>{kpis.questions}</span>
-                    </div>
-                  </div>
+                  <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>{kpis.questions}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>2 sections par questionnaire : cours + formateur</div>
                 </div>
               </div>
 
@@ -312,12 +291,6 @@ export default function EvaluationDashboard() {
         <div>
           {/* Filtres */}
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '160px' }}
-              value={filters.cible} onChange={e => setFilters(f => ({ ...f, cible: e.target.value }))}>
-              <option value="">Toutes les cibles</option>
-              <option value="COURS">Cours</option>
-              <option value="FORMATEUR">Formateur</option>
-            </select>
             <select className="form-select form-select-sm" style={{ width: 'auto', minWidth: '140px' }}
               value={filters.statut} onChange={e => setFilters(f => ({ ...f, statut: e.target.value }))}>
               <option value="">Tous les statuts</option>
@@ -351,10 +324,6 @@ export default function EvaluationDashboard() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
                         <span style={{ ...STATUT_COLORS[q.statut], fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', letterSpacing: '0.04em' }}>
                           {STATUT_LABELS[q.statut]}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', background: '#e3f2fd', color: '#1565c0', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>
-                          <i className={`bi bi-${q.cible === 'COURS' ? 'book' : 'person-video3'} me-1`}></i>
-                          {CIBLE_LABELS[q.cible]}
                         </span>
                         {(q.categories || []).map(c => (
                           <span key={c} style={{ fontSize: '0.72rem', background: '#f3e5f5', color: '#6a1b9a', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{c}</span>
@@ -435,15 +404,6 @@ export default function EvaluationDashboard() {
                       <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', padding: '4px' }}>Aucun module trouvé</span>
                     )}
                   </div>
-                </div>
-
-                {/* Cible */}
-                <div>
-                  <label className="form-label" style={{ fontWeight: 600 }}>Cible <span style={{ color: 'red' }}>*</span></label>
-                  <select className="form-select" value={form.cible} onChange={e => setForm(f => ({ ...f, cible: e.target.value }))}>
-                    <option value="COURS">Cours</option>
-                    <option value="FORMATEUR">Formateur</option>
-                  </select>
                 </div>
 
                 {/* Catégories */}

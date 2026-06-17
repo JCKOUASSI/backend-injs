@@ -11,7 +11,7 @@ ROLES_GESTION_NOTES = {
 
 # Rôles autorisés à valider les décisions pédagogiques
 ROLES_DECISION = {
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT',
+    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT', 'SUPERVISEUR',
 }
 
 # Rôles ayant accès en lecture aux fiches/tableaux de bord

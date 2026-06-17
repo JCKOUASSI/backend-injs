@@ -9,11 +9,15 @@ const STATUT_COLORS  = {
   PUBLIE:    { background: '#e8f5e9', color: '#2e7d32' },
   FERME:     { background: '#f5f5f5', color: '#616161' },
 }
-const CIBLE_LABELS   = { COURS: 'Évaluation du cours', FORMATEUR: 'Évaluation du formateur' }
+const SECTION_LABELS = { COURS: 'Cours', FORMATEUR: 'Formateur' }
+const SECTION_COLORS = {
+  COURS:     { bg: '#e3f2fd', color: '#1565c0', icon: 'bi-book' },
+  FORMATEUR: { bg: '#f3e5f5', color: '#6a1b9a', icon: 'bi-person-video3' },
+}
 const TYPE_LABELS    = { NOTE: 'Note (1 à 5)', CHOIX_UN: 'Choix unique', CHOIX_MUL: 'Choix multiple', TEXTE: 'Texte libre' }
 const TYPE_ICONS     = { NOTE: 'bi-star', CHOIX_UN: 'bi-ui-radios', CHOIX_MUL: 'bi-ui-checks', TEXTE: 'bi-chat-left-text' }
 
-const EMPTY_QUESTION = { intitule: '', type_question: 'NOTE', ordre: 1, obligatoire: true, choix: [] }
+const EMPTY_QUESTION = { intitule: '', type_question: 'NOTE', section: 'COURS', ordre: 1, obligatoire: true, choix: [] }
 
 function StarBar({ moyenne, total }) {
   const pct = moyenne ? (moyenne / 5) * 100 : 0
@@ -114,6 +118,7 @@ export default function EvaluationDetail() {
     setQForm({
       intitule: q.intitule,
       type_question: q.type_question,
+      section: q.section || 'COURS',
       ordre: q.ordre,
       obligatoire: q.obligatoire,
       choix: q.choix ? q.choix.map(c => ({ ...c })) : [],
@@ -184,9 +189,8 @@ export default function EvaluationDetail() {
               <span style={{ ...STATUT_COLORS[questionnaire.statut], fontSize: '0.72rem', fontWeight: 700, padding: '2px 10px', borderRadius: '20px', letterSpacing: '0.04em' }}>
                 {STATUT_LABELS[questionnaire.statut]}
               </span>
-              <span style={{ fontSize: '0.72rem', background: '#e3f2fd', color: '#1565c0', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
-                <i className={`bi bi-${questionnaire.cible === 'COURS' ? 'book' : 'person-video3'} me-1`}></i>
-                {CIBLE_LABELS[questionnaire.cible]}
+              <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
+                <i className="bi bi-layers me-1"></i>2 sections : Cours + Formateur
               </span>
               {(questionnaire.categories || []).map(c => (
                 <span key={c} style={{ fontSize: '0.72rem', background: '#f3e5f5', color: '#6a1b9a', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>{c}</span>
@@ -272,41 +276,67 @@ export default function EvaluationDetail() {
           {(!questionnaire.questions || questionnaire.questions.length === 0) ? (
             <div className="empty-state">
               <i className="bi bi-question-circle" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }}></i>
-              <p>Aucune question — {isLocked ? 'publiez en brouillon pour éditer' : 'ajoutez votre première question'}</p>
+              <p>Aucune question — {isLocked ? 'repassez en brouillon pour éditer' : 'ajoutez votre première question'}</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {questionnaire.questions.map((q, idx) => (
-                <div key={q.id} className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                  <div style={{ minWidth: '28px', height: '28px', borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
-                    {idx + 1}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.72rem', background: '#f5f5f5', color: '#616161', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>
-                        <i className={`bi ${TYPE_ICONS[q.type_question]} me-1`}></i>{TYPE_LABELS[q.type_question]}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {['COURS', 'FORMATEUR'].map(section => {
+                const sqs = questionnaire.questions.filter(q => (q.section || 'COURS') === section)
+                const sc = SECTION_COLORS[section]
+                return (
+                  <div key={section}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                      <span style={{ background: sc.bg, color: sc.color, padding: '3px 12px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 700 }}>
+                        <i className={`bi ${sc.icon} me-1`}></i>{SECTION_LABELS[section]}
                       </span>
-                      {!q.obligatoire && <span style={{ fontSize: '0.72rem', background: '#fff8e1', color: '#f57f17', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>Optionnel</span>}
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{sqs.length} question{sqs.length !== 1 ? 's' : ''}</span>
+                      {!isLocked && (
+                        <button className="btn btn-sm btn-outline-primary" style={{ padding: '1px 8px', fontSize: '0.78rem', marginLeft: 'auto' }}
+                          onClick={() => { const nextOrdre = sqs.length ? Math.max(...sqs.map(q => q.ordre)) + 1 : 1; setEditingQ(null); setQForm({ ...EMPTY_QUESTION, section, ordre: nextOrdre }); setNewChoixLabel(''); setShowQForm(true) }}>
+                          <i className="bi bi-plus-lg me-1"></i>Ajouter
+                        </button>
+                      )}
                     </div>
-                    <p style={{ margin: 0, fontWeight: 500 }}>{q.intitule}</p>
-                    {q.choix && q.choix.length > 0 && (
-                      <ul style={{ margin: '0.4rem 0 0 0', paddingLeft: '1.2rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
-                        {q.choix.map(c => <li key={c.id}>{c.libelle}</li>)}
-                      </ul>
+                    {sqs.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', paddingLeft: '0.5rem' }}>Aucune question dans cette section.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {sqs.map((q, idx) => (
+                          <div key={q.id} className="card" style={{ padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                            <div style={{ minWidth: '28px', height: '28px', borderRadius: '50%', background: sc.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
+                              {idx + 1}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.72rem', background: '#f5f5f5', color: '#616161', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>
+                                  <i className={`bi ${TYPE_ICONS[q.type_question]} me-1`}></i>{TYPE_LABELS[q.type_question]}
+                                </span>
+                                {!q.obligatoire && <span style={{ fontSize: '0.72rem', background: '#fff8e1', color: '#f57f17', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>Optionnel</span>}
+                              </div>
+                              <p style={{ margin: 0, fontWeight: 500 }}>{q.intitule}</p>
+                              {q.choix && q.choix.length > 0 && (
+                                <ul style={{ margin: '0.4rem 0 0 0', paddingLeft: '1.2rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+                                  {q.choix.map(c => <li key={c.id}>{c.libelle}</li>)}
+                                </ul>
+                              )}
+                            </div>
+                            {!isLocked && (
+                              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                                <button className="btn btn-sm btn-outline-secondary" onClick={() => openEditQuestion(q)} title="Modifier">
+                                  <i className="bi bi-pencil"></i>
+                                </button>
+                                <button className="btn btn-sm btn-outline-danger" onClick={() => deleteQuestion(q.id)} title="Supprimer">
+                                  <i className="bi bi-trash"></i>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {!isLocked && (
-                    <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                      <button className="btn btn-sm btn-outline-secondary" onClick={() => openEditQuestion(q)} title="Modifier">
-                        <i className="bi bi-pencil"></i>
-                      </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => deleteQuestion(q.id)} title="Supprimer">
-                        <i className="bi bi-trash"></i>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -395,7 +425,14 @@ export default function EvaluationDetail() {
                     placeholder="Ex: Comment évaluez-vous la clarté du cours ?"
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label className="form-label">Section <span style={{ color: 'red' }}>*</span></label>
+                    <select className="form-select" value={qForm.section} onChange={e => setQForm(f => ({ ...f, section: e.target.value }))}>
+                      <option value="COURS">Cours</option>
+                      <option value="FORMATEUR">Formateur</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="form-label">Type</label>
                     <select className="form-select" value={qForm.type_question} onChange={e => setQForm(f => ({ ...f, type_question: e.target.value, choix: [] }))}>
@@ -405,6 +442,8 @@ export default function EvaluationDetail() {
                       <option value="TEXTE">Texte libre</option>
                     </select>
                   </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label className="form-label">Ordre</label>
                     <input type="number" min={1} className="form-control" value={qForm.ordre} onChange={e => setQForm(f => ({ ...f, ordre: parseInt(e.target.value) || 1 }))} />

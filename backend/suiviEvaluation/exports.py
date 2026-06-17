@@ -1,8 +1,6 @@
 """Exports helpers for suiviEvaluation: PDF & Excel for fiches auditeur/formateur."""
 import io
 from django.core.files.base import ContentFile
-from .models import ExportRapport
-
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm

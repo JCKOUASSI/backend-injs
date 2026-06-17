@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +12,81 @@ const STATUT_COLORS = {
   FERME:     { background: '#f5f5f5', color: '#616161' },
 }
 
+
+const SECTION_COLORS = {
+  COURS:     { bg: '#e3f2fd', color: '#1565c0', icon: 'bi-book' },
+  FORMATEUR: { bg: '#f3e5f5', color: '#6a1b9a', icon: 'bi-person-video3' },
+}
+
+function AuditeurEvaluationList() {
+  const { showToast } = useToast()
+  const [questionnaires, setQuestionnaires] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchMesQuestionnaires = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await api.get('/evaluations/mes-questionnaires/')
+      setQuestionnaires(data)
+    } catch {
+      showToast('Erreur lors du chargement des évaluations', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast])
+
+  useEffect(() => { fetchMesQuestionnaires() }, [fetchMesQuestionnaires])
+
+  if (loading) return <div className="loading"><div className="spinner"></div></div>
+
+  return (
+    <div>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <h2 style={{ margin: 0, fontWeight: 700 }}>Mes évaluations</h2>
+        <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          Questionnaires disponibles pour vous
+        </p>
+      </div>
+      {questionnaires.length === 0 ? (
+        <div className="empty-state">
+          <i className="bi bi-clipboard-check" style={{ fontSize: '3rem', color: 'var(--text-muted)' }}></i>
+          <p>Aucune évaluation disponible pour le moment.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {questionnaires.map(q => {
+            const sections = [...new Set((q.questions || []).map(qu => qu.section || 'COURS'))]
+            return (
+              <div key={q.id} style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.3rem' }}>
+                    {(q.titres || []).join(' · ')}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {sections.map(s => {
+                      const sc = SECTION_COLORS[s]
+                      return (
+                        <span key={s} style={{ fontSize: '0.75rem', background: sc.bg, color: sc.color, padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
+                          <i className={`bi ${sc.icon} me-1`}></i>{s === 'COURS' ? 'Cours' : 'Formateur'}
+                        </span>
+                      )
+                    })}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {(q.questions || []).length} question{(q.questions || []).length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+                <Link to={`/evaluations/repondre/${q.id}`} className="btn btn-primary btn-sm">
+                  <i className="bi bi-pencil-square me-1"></i>Répondre
+                </Link>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function EvaluationList() {
   const { user } = useAuth()
@@ -27,7 +102,6 @@ export default function EvaluationList() {
   const [titreSearch, setTitreSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
-
   const EMPTY_FORM = { titres: [], cible: 'COURS', categories: [], grades: [], date_ouverture: '', date_fermeture: '' }
   const [form, setForm] = useState(EMPTY_FORM)
 
@@ -39,6 +113,7 @@ export default function EvaluationList() {
   }
 
   const fetchQuestionnaires = useCallback(async () => {
+    if (user?.role === 'AUDITEUR') return
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -53,19 +128,22 @@ export default function EvaluationList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, showToast])
+  }, [filters, showToast, user?.role])
 
   const fetchRefModules = useCallback(async () => {
+    if (user?.role === 'AUDITEUR') return
     try {
       const { data } = await api.get('/formations/referentiels/')
       setRefModules((data.modules || []).filter(m => m.actif !== false))
       setRefCategories((data.categories || []).filter(c => c.actif !== false))
       setRefGrades((data.grades || []).filter(g => g.actif !== false))
     } catch { /* silencieux */ }
-  }, [])
+  }, [user?.role])
 
   useEffect(() => { fetchQuestionnaires() }, [fetchQuestionnaires])
   useEffect(() => { fetchRefModules() }, [fetchRefModules])
+
+  if (user?.role === 'AUDITEUR') return <AuditeurEvaluationList />
 
   const closeCreate = () => { setShowCreate(false); setTitreSearch(''); setForm(EMPTY_FORM) }
 
