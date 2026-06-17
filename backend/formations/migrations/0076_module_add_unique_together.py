@@ -3,6 +3,23 @@
 from django.db import migrations
 
 
+def deduplicate_modules(apps, schema_editor):
+    """Keep the row with the highest pk for each (formation, intitule, grade, groupe, vague) tuple."""
+    Module = apps.get_model('formations', 'Module')
+    from django.db.models import Max
+
+    keys = Module.objects.values(
+        'formation_id', 'intitule', 'grade', 'groupe', 'vague'
+    ).annotate(max_id=Max('id')).filter()
+
+    keep_ids = {row['max_id'] for row in keys}
+    Module.objects.exclude(id__in=keep_ids).delete()
+
+
+def noop(apps, schema_editor):
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +27,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(deduplicate_modules, noop),
         migrations.AlterUniqueTogether(
             name='module',
             unique_together={('formation', 'intitule', 'grade', 'groupe', 'vague')},

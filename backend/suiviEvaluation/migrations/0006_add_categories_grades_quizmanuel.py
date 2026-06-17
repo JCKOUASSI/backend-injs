@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -7,15 +7,4 @@ class Migration(migrations.Migration):
         ('suiviEvaluation', '0005_seed_types_epreuves'),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name='quizmanuel',
-            name='categories',
-            field=models.JSONField(default=list, blank=True, help_text='Liste des catégories autorisées'),
-        ),
-        migrations.AddField(
-            model_name='quizmanuel',
-            name='grades',
-            field=models.JSONField(default=list, blank=True, help_text='Liste des grades autorisés'),
-        ),
-    ]
+    operations = []
