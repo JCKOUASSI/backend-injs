@@ -252,47 +252,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='QuizManuel',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('titre', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, default='')),
-                ('chapitre', models.CharField(blank=True, default='', max_length=255)),
-                ('nb_questions', models.PositiveSmallIntegerField(default=5)),
-                ('seuil_reussite', models.DecimalField(decimal_places=2, default=70.0, help_text='Seuil de réussite (%)', max_digits=5)),
-                ('duree_max_minutes', models.PositiveSmallIntegerField(blank=True, help_text='Durée maximale en minutes', null=True)),
-                ('actif', models.BooleanField(default=True)),
-                ('date_ouverture', models.DateTimeField(blank=True, null=True)),
-                ('date_fermeture', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
-                ('module', models.ForeignKey(help_text='Module concerné', on_delete=django.db.models.deletion.CASCADE, related_name='quiz_manuels', to='formations.module')),
-            ],
-            options={
-                'verbose_name': 'Quiz manuel',
-                'verbose_name_plural': 'Quiz manuels',
-                'ordering': ['module', 'titre'],
-            },
-        ),
-        migrations.CreateModel(
-            name='QuestionQuiz',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('question', models.TextField()),
-                ('type_question', models.CharField(choices=[('QCM', 'QCM'), ('VRAI_FAUX', 'Vrai/Faux'), ('OUVERTE', 'Réponse ouverte')], default='QCM', max_length=20)),
-                ('reponse_correcte', models.TextField(help_text='Réponse correcte')),
-                ('options', models.JSONField(default=list, help_text='Options pour QCM (liste de choix)')),
-                ('points', models.DecimalField(decimal_places=2, default=1.0, help_text='Points attribués', max_digits=4)),
-                ('ordre', models.PositiveSmallIntegerField(default=1)),
-                ('quiz', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='questions', to='suiviEvaluation.quizmanuel')),
-            ],
-            options={
-                'verbose_name': 'Question de quiz',
-                'verbose_name_plural': 'Questions de quiz',
-                'ordering': ['ordre'],
-            },
-        ),
-        migrations.CreateModel(
             name='SuiviModuleAuditeur',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -335,25 +294,6 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'Moyennes modules',
                 'ordering': ['module', 'participant__nom'],
                 'unique_together': {('module', 'participant')},
-            },
-        ),
-        migrations.CreateModel(
-            name='ReponseQuiz',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date_soumission', models.DateTimeField(auto_now_add=True)),
-                ('score', models.DecimalField(blank=True, decimal_places=2, help_text='Score obtenu (%)', max_digits=5, null=True)),
-                ('reussi', models.BooleanField(blank=True, null=True)),
-                ('temps_pris_minutes', models.PositiveSmallIntegerField(blank=True, null=True)),
-                ('reponses_detail', models.JSONField(default=dict, help_text='Détail des réponses')),
-                ('participant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reponses_quiz', to='formations.participant')),
-                ('quiz', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='reponses', to='suiviEvaluation.quizmanuel')),
-            ],
-            options={
-                'verbose_name': 'Réponse au quiz',
-                'verbose_name_plural': 'Réponses aux quiz',
-                'ordering': ['-date_soumission'],
-                'unique_together': {('quiz', 'participant')},
             },
         ),
         migrations.AlterUniqueTogether(
