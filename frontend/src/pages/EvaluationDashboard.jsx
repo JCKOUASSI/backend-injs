@@ -68,10 +68,11 @@ export default function EvaluationDashboard() {
   const [refModules, setRefModules] = useState([])
   const [refCategories, setRefCategories] = useState([])
   const [refGrades, setRefGrades] = useState([])
+  const [refGroupes, setRefGroupes] = useState([])
   const [titreSearch, setTitreSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
-  const EMPTY_FORM = { titres: [], categories: [], grades: [], date_ouverture: '', date_fermeture: '' }
+  const EMPTY_FORM = { titres: [], categories: [], grades: [], groupes: [], date_ouverture: '', date_fermeture: '' }
   const [form, setForm] = useState(EMPTY_FORM)
 
   const toggleItem = (field, value) =>
@@ -99,6 +100,7 @@ export default function EvaluationDashboard() {
       setRefModules((data.modules || []).filter(m => m.actif !== false))
       setRefCategories((data.categories || []).filter(c => c.actif !== false))
       setRefGrades((data.grades || []).filter(g => g.actif !== false))
+      setRefGroupes(data.groupes || [])
     } catch { /* silencieux */ }
   }, [])
 
@@ -128,6 +130,7 @@ export default function EvaluationDashboard() {
         titres: form.titres,
         categories: form.categories,
         grades: form.grades,
+        groupes: form.groupes,
         ...(form.date_ouverture ? { date_ouverture: form.date_ouverture } : {}),
         ...(form.date_fermeture ? { date_fermeture: form.date_fermeture } : {}),
       }
@@ -331,6 +334,9 @@ export default function EvaluationDashboard() {
                         {(q.grades || []).map(g => (
                           <span key={g} style={{ fontSize: '0.72rem', background: '#e8eaf6', color: '#283593', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
                         ))}
+                        {(q.groupes || []).map(g => (
+                          <span key={g} style={{ fontSize: '0.72rem', background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
+                        ))}
                       </div>
                       <h4 style={{ margin: 0, fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', color: 'var(--primary)' }}
                         onClick={() => navigate(`/evaluations/${q.id}`)}>
@@ -377,13 +383,13 @@ export default function EvaluationDashboard() {
       {/* ── Modal création ─────────────────────────────────────────────── */}
       {showCreate && (
         <div className="modal-overlay" onClick={closeCreate}>
-          <div className="modal-content" style={{ maxWidth: '580px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '580px', maxHeight: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h4 className="modal-title">Nouveau questionnaire</h4>
               <button className="btn-close" onClick={closeCreate}>&times;</button>
             </div>
-            <form onSubmit={handleCreate}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1, overflowY: 'auto', minHeight: 0 }}>
 
                 {/* Titres (modules) */}
                 <div>
@@ -435,6 +441,26 @@ export default function EvaluationDashboard() {
                         {g.libelle}
                       </label>
                     ))}
+                  </div>
+                </div>
+
+                {/* Groupes */}
+                <div>
+                  <label className="form-label" style={{ fontWeight: 600 }}>
+                    Groupes
+                    {form.groupes.length > 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 400 }}>{form.groupes.length} sélectionné{form.groupes.length > 1 ? 's' : ''}</span>}
+                    {form.groupes.length === 0 && <span style={{ marginLeft: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400 }}>Tous les groupes</span>}
+                  </label>
+                  <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignContent: 'flex-start', padding: '0.25rem' }}>
+                    {refGroupes.map(g => (
+                      <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: form.groupes.includes(g) ? '#e65100' : 'var(--border)', background: form.groupes.includes(g) ? '#fff3e0' : 'transparent', color: form.groupes.includes(g) ? '#e65100' : 'inherit', fontSize: '0.85rem', fontWeight: form.groupes.includes(g) ? 700 : 400, transition: 'all .15s' }}>
+                        <input type="checkbox" style={{ display: 'none' }} checked={form.groupes.includes(g)} onChange={() => toggleItem('groupes', g)} />
+                        {g}
+                      </label>
+                    ))}
+                    {refGroupes.length === 0 && (
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Aucun groupe disponible</span>
+                    )}
                   </div>
                 </div>
 

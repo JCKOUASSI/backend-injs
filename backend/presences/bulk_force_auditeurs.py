@@ -160,6 +160,153 @@ def force_entree_personne(
     return pointage, None
 
 
+def force_sortie_pointage(
+    formation,
+    pointage,
+    seance,
+    personne,
+    type_personne,
+    motif,
+    *,
+    request=None,
+    timestamp_sortie=None,
+):
+    """Clôture un pointage ouvert (sortie forcée DFRC)."""
+    if pointage.timestamp_sortie:
+        return pointage, None
+
+    v = _views()
+    ts_sortie_raw = timestamp_sortie or seance.terminee_le or timezone.now()
+    pointage.timestamp_sortie = v._clamp_to_seance(ts_sortie_raw, seance)
+    pointage.statut = Pointage.Statut.FORCE_DFRC
+    pointage.calculer_duree()
+    pointage.save(update_fields=['timestamp_sortie', 'statut', 'duree_presence_minutes', 'updated_at'])
+
+    numero = (
+        getattr(personne, 'matricule', None)
+        or getattr(personne, 'numerobadge', None)
+        or getattr(personne, 'username', '')
+        or ''
+    )
+    nom = (
+        f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
+        or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
+        or getattr(personne, 'username', '—')
+    )
+    _log_audit(
+        action=AuditLog.Action.FORCE_SORTIE,
+        request=request,
+        cible_type=type_personne,
+        cible_numero=numero,
+        cible_nom=nom,
+        formation=formation,
+        pointage=pointage,
+        extra={
+            'acteur_role': getattr(getattr(request, 'user', None), 'role', 'SYSTEM'),
+            'motif': motif,
+            'duree_minutes': float(pointage.duree_presence_minutes or 0),
+            'rattrapage_badgeage': True,
+        },
+    )
+    return pointage, None
+
+
+def _prepare_seance_for_rattrapage(seance):
+    """Assure un démarrage pour le clamp horaire sans effacer une clôture existante."""
+    if seance.demarree_le:
+        return
+    from datetime import datetime
+
+    day = seance.date_journee
+    if day and seance.heure_debut_prevue:
+        dt = datetime.combine(day, seance.heure_debut_prevue)
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
+        seance.demarree_le = dt
+    else:
+        seance.demarree_le = timezone.now()
+    seance.save(update_fields=['demarree_le'])
+
+
+def run_rattrapage_badgeage(
+    participants,
+    session,
+    *,
+    motif,
+    request=None,
+    with_sortie=True,
+    skip_existing=True,
+    ignore_constraints=True,
+):
+    """
+    Badge explicitement une liste d'auditeurs sur une séance (rattrapage admin).
+    Retourne un dict avec created, sorties, skipped, errors.
+    """
+    formation = session.module.formation
+    seance_date = session.date_journee
+    _prepare_seance_for_rattrapage(session)
+
+    base_ts = session.demarree_le or timezone.now()
+    offset = 0
+    counts = {'created': 0, 'sorties': 0, 'skipped': 0, 'errors': []}
+
+    with transaction.atomic():
+        for participant in participants:
+            if skip_existing and Pointage.objects.filter(
+                session=session,
+                participant=participant,
+            ).exists():
+                counts['skipped'] += 1
+                continue
+
+            ts_entree = base_ts + timedelta(seconds=offset)
+            offset += 2
+
+            pointage, err = force_entree_personne(
+                formation,
+                session,
+                participant,
+                'participant',
+                seance_date,
+                motif,
+                request=request,
+                timestamp_entree=ts_entree,
+                ignore_constraints=ignore_constraints,
+            )
+            if err:
+                counts['errors'].append({
+                    'matricule': getattr(participant, 'matricule', ''),
+                    'nom': f'{participant.nom} {participant.prenom}'.strip(),
+                    'detail': err,
+                })
+                continue
+
+            counts['created'] += 1
+
+            if with_sortie and pointage:
+                ts_sortie = session.terminee_le or (ts_entree + timedelta(hours=4))
+                _, err_sortie = force_sortie_pointage(
+                    formation,
+                    pointage,
+                    session,
+                    participant,
+                    'participant',
+                    motif,
+                    request=request,
+                    timestamp_sortie=ts_sortie,
+                )
+                if err_sortie:
+                    counts['errors'].append({
+                        'matricule': getattr(participant, 'matricule', ''),
+                        'nom': f'{participant.nom} {participant.prenom}'.strip(),
+                        'detail': err_sortie,
+                    })
+                else:
+                    counts['sorties'] += 1
+
+    return counts
+
+
 def attendus_formateurs_module(module):
     """Formateurs attendus sur le module (principal + assignés, sans doublon)."""
     seen = set()

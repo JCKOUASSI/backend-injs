@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
+import {
+  DonutChart, HistogramChart, HorizontalBarChart, TrendChart,
+  NoteHistogram, NoteDonut, ChartEmpty, CHART_COLORS,
+} from '../components/evaluation/EvaluationCharts'
 
 const STATUT_COLORS = {
   BROUILLON: { background: '#fff3e0', color: '#e65100' },
@@ -11,8 +15,6 @@ const STATUT_COLORS = {
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const TYPE_LABELS   = { NOTE: 'Note (1 à 5)', CHOIX_UN: 'Choix unique', CHOIX_MUL: 'Choix multiple', TEXTE: 'Texte libre' }
 const TYPE_ICONS    = { NOTE: 'bi-star', CHOIX_UN: 'bi-ui-radios', CHOIX_MUL: 'bi-ui-checks', TEXTE: 'bi-chat-left-text' }
-
-const NOTE_COLORS = ['#ef5350', '#ff8f00', '#fdd835', '#66bb6a', '#26a69a']
 
 // ── Composants utilitaires ───────────────────────────────────────────────────
 
@@ -45,44 +47,6 @@ function ScoreGauge({ score }) {
   )
 }
 
-function NoteDistribution({ distribution, total }) {
-  const max = Math.max(...Object.values(distribution), 1)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      {[5, 4, 3, 2, 1].map(note => {
-        const nb = distribution[String(note)] || 0
-        const pct = total > 0 ? Math.round((nb / total) * 100) : 0
-        return (
-          <div key={note} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ width: 16, textAlign: 'right', fontSize: '0.82rem', fontWeight: 600, color: NOTE_COLORS[note - 1] }}>{note}</span>
-            <i className="bi bi-star-fill" style={{ fontSize: '0.65rem', color: NOTE_COLORS[note - 1] }}></i>
-            <div style={{ flex: 1, height: '10px', borderRadius: '5px', background: '#eee', overflow: 'hidden' }}>
-              <div style={{ width: `${(nb / max) * 100}%`, height: '100%', background: NOTE_COLORS[note - 1], borderRadius: '5px', transition: 'width .4s' }} />
-            </div>
-            <span style={{ width: 28, textAlign: 'right', fontSize: '0.82rem', fontWeight: 600 }}>{nb}</span>
-            <span style={{ width: 36, textAlign: 'right', fontSize: '0.78rem', color: 'var(--text-muted)' }}>{pct}%</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function ChoixBar({ libelle, nb, total }) {
-  const pct = total > 0 ? Math.round((nb / total) * 100) : 0
-  return (
-    <div style={{ marginBottom: '0.6rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '0.85rem' }}>
-        <span>{libelle}</span>
-        <span style={{ fontWeight: 600 }}>{nb} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({pct}%)</span></span>
-      </div>
-      <div style={{ height: '8px', borderRadius: '4px', background: '#e0e0e0', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: 'var(--primary)', borderRadius: '4px', transition: 'width .4s' }} />
-      </div>
-    </div>
-  )
-}
-
 function StarMini({ value }) {
   return (
     <span>
@@ -101,26 +65,77 @@ export default function AnalyseQualitative() {
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const activeTab = searchParams.get('tab') || 'global'
-  const setTab = (t) => setSearchParams({ tab: t }, { replace: true })
+  const activeTab = searchParams.get('tab') || 'graphiques'
+  const setTab = (t) => {
+    const params = { tab: t }
+    if (filterGroupe) params.groupe = filterGroupe
+    setSearchParams(params, { replace: true })
+  }
+
+  const selectGroupe = (g) => {
+    setFilterGroupe(g)
+    const params = { tab: activeTab }
+    if (g) params.groupe = g
+    setSearchParams(params, { replace: true })
+  }
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExport = async (fmt, { tous = false } = {}) => {
+    if (!tous && !filterGroupe) {
+      showToast('Sélectionnez un groupe à exporter', 'error')
+      return
+    }
+    try {
+      const params = new URLSearchParams()
+      if (tous) params.set('tous', '1')
+      else params.set('groupe', filterGroupe)
+      const q = params.toString() ? `?${params}` : ''
+      const { blob, fileName } = await api.getBlob(`/evaluations/questionnaires/${id}/export/${fmt}/${q}`)
+      const ext = fmt === 'pdf' ? 'pdf' : 'xlsx'
+      const safeGroupe = (filterGroupe || 'tous_groupes').replace(/\s+/g, '_')
+      downloadBlob(blob, fileName || `evaluation_${id}_${safeGroupe}.${ext}`)
+      showToast('Export téléchargé', 'success')
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur lors de l\'export', 'error')
+    }
+  }
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState('')
+  const [filterGroupe, setFilterGroupe] = useState(searchParams.get('groupe') || '')
 
   const fetchAnalyse = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: d } = await api.get(`/evaluations/questionnaires/${id}/analyse/`)
+      const { data: d } = await api.get(`/evaluations/questionnaires/${id}/analyse/`, {
+        params: filterGroupe ? { groupe: filterGroupe } : {},
+      })
       setData(d)
     } catch {
       showToast('Erreur lors du chargement de l\'analyse', 'error')
     } finally {
       setLoading(false)
     }
-  }, [id, showToast])
+  }, [id, filterGroupe, showToast])
 
   useEffect(() => { fetchAnalyse() }, [fetchAnalyse])
+
+  useEffect(() => {
+    if (!data || filterGroupe) return
+    const groupes = Object.keys(data.distribution_groupes || {})
+    if (!groupes.length) return
+    const avecReponses = groupes.find(g => (data.distribution_groupes[g] || 0) > 0)
+    setFilterGroupe(avecReponses || groupes[0])
+  }, [data, filterGroupe])
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (!data) return null
@@ -133,6 +148,53 @@ export default function AnalyseQualitative() {
   const cats = [...new Set(allVerbatims.map(v => v.categorie).filter(Boolean))].sort()
 
   const totalGrades = Object.values(data.distribution_grades).reduce((a, b) => a + b, 0) || 1
+  const totalGroupes = Object.values(data.distribution_groupes || {}).reduce((a, b) => a + b, 0) || 1
+  const groupesDisponibles = [
+    ...new Set([
+      ...(data.groupes || []),
+      ...Object.keys(data.distribution_groupes || {}),
+    ]),
+  ].sort()
+
+  const comparaisonGroupes = (data.comparaison_groupes || []).map(g => ({
+    label: g.groupe,
+    value: g.nb_soumissions,
+    color: g.groupe === filterGroupe ? '#e65100' : '#4f46e5',
+  }))
+
+  const scoresParGroupe = (data.comparaison_groupes || [])
+    .filter(g => g.score_global != null)
+    .map(g => ({
+      label: g.groupe,
+      value: g.score_global,
+      color: g.groupe === filterGroupe ? '#26a69a' : '#66bb6a',
+    }))
+
+  const moyennesChart = (data.moyennes_par_question || []).map((q, i) => ({
+    label: `Q${i + 1}`,
+    value: q.moyenne,
+    color: q.moyenne >= 4 ? '#26a69a' : q.moyenne >= 3 ? '#66bb6a' : q.moyenne >= 2 ? '#fdd835' : '#ef5350',
+  }))
+
+  const gradesChart = Object.entries(data.distribution_grades || {}).map(([grade, nb], i) => ({
+    label: grade,
+    value: nb,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }))
+
+  const categoriesChart = Object.entries(data.distribution_categories || {}).map(([cat, nb], i) => ({
+    label: `Cat. ${cat}`,
+    value: nb,
+    color: CHART_COLORS[(i + 2) % CHART_COLORS.length],
+  }))
+
+  const choixToDonut = (choixStats) => (choixStats || [])
+    .filter(c => c.nb_reponses > 0)
+    .map((c, i) => ({
+      label: c.libelle,
+      value: c.nb_reponses,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    }))
 
   return (
     <div>
@@ -152,20 +214,85 @@ export default function AnalyseQualitative() {
             <h2 style={{ margin: 0, fontWeight: 700 }}>{(data.titres || []).join(' · ')}</h2>
             <p style={{ margin: '0.3rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
               Analyse qualitative · {data.nb_soumissions} soumission{data.nb_soumissions !== 1 ? 's' : ''}
+              {filterGroupe && data.nb_soumissions_total != null && data.nb_soumissions_total !== data.nb_soumissions && (
+                <span> sur {data.nb_soumissions_total} au total</span>
+              )}
+              {filterGroupe && (
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.78rem', background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>
+                  {filterGroupe}
+                </span>
+              )}
             </p>
           </div>
-          <Link to={`/evaluations/${id}`} className="btn btn-sm btn-outline-secondary">
-            <i className="bi bi-arrow-left me-1"></i>Retour au questionnaire
-          </Link>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {filterGroupe && (
+              <>
+                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => handleExport('pdf')} title={`Tirer PDF — ${filterGroupe}`}>
+                  <i className="bi bi-file-earmark-pdf me-1"></i>PDF
+                </button>
+                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => handleExport('excel')} title={`Tirer Excel — ${filterGroupe}`}>
+                  <i className="bi bi-file-earmark-excel me-1"></i>Excel
+                </button>
+              </>
+            )}
+            {groupesDisponibles.length > 1 && (
+              <button type="button" className="btn btn-sm btn-outline-success" onClick={() => handleExport('excel', { tous: true })} title="Tirer Excel — tous les groupes (une feuille par groupe)">
+                <i className="bi bi-files me-1"></i>Excel tous
+              </button>
+            )}
+            {groupesDisponibles.length > 0 && (
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto', minWidth: 160 }}
+                value={filterGroupe}
+                onChange={e => selectGroupe(e.target.value)}
+              >
+                <option value="">Tous les groupes</option>
+                {groupesDisponibles.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            )}
+            <Link to={`/evaluations/${id}`} className="btn btn-sm btn-outline-secondary">
+              <i className="bi bi-arrow-left me-1"></i>Retour au questionnaire
+            </Link>
+          </div>
         </div>
       </div>
+
+      {/* Sélecteur groupes */}
+      {groupesDisponibles.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+          {groupesDisponibles.map(g => {
+            const nb = data.distribution_groupes?.[g] || 0
+            const actif = filterGroupe === g
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => selectGroupe(g)}
+                style={{
+                  padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem',
+                  fontWeight: actif ? 700 : 500,
+                  border: actif ? '2px solid #e65100' : '1px solid var(--border)',
+                  background: actif ? '#fff3e0' : 'transparent',
+                  color: actif ? '#e65100' : 'inherit',
+                }}
+              >
+                {g} <span style={{ opacity: 0.75 }}>({nb})</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Onglets ── */}
       <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: '1.75rem' }}>
         {[
-          { key: 'global',    label: 'Vue globale',    icon: 'bi-speedometer2' },
-          { key: 'questions', label: 'Par question',   icon: 'bi-bar-chart-line' },
-          { key: 'verbatims', label: `Verbatims (${allVerbatims.length})`, icon: 'bi-chat-left-quote' },
+          { key: 'global',      label: 'Vue globale',    icon: 'bi-speedometer2' },
+          { key: 'graphiques',  label: 'Graphiques',     icon: 'bi-graph-up' },
+          { key: 'questions',   label: 'Par question',   icon: 'bi-bar-chart-line' },
+          { key: 'verbatims',   label: `Verbatims (${allVerbatims.length})`, icon: 'bi-chat-left-quote' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             border: 'none', background: 'none', padding: '0.6rem 1.25rem',
@@ -265,6 +392,37 @@ export default function AnalyseQualitative() {
               </div>
             )}
 
+            {/* Participation par groupe */}
+            {Object.keys(data.distribution_groupes || {}).length > 0 && (
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '1rem' }}>
+                  <i className="bi bi-people me-2" style={{ color: '#e65100' }}></i>
+                  Participation par groupe
+                </h6>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  {Object.entries(data.distribution_groupes).map(([groupe, nb]) => (
+                    <button
+                      key={groupe}
+                      type="button"
+                      onClick={() => selectGroupe(filterGroupe === groupe ? groupesDisponibles[0] || '' : groupe)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                        border: filterGroupe === groupe ? '2px solid #e65100' : '1px solid var(--border)',
+                        borderRadius: '8px', padding: '0.35rem 0.5rem', background: filterGroupe === groupe ? '#fff3e0' : 'transparent',
+                        cursor: 'pointer', width: '100%', textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ width: 90, fontWeight: 700, fontSize: '0.82rem', color: '#e65100' }}>{groupe}</span>
+                      <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: '#eee', overflow: 'hidden' }}>
+                        <div style={{ width: `${(nb / totalGroupes) * 100}%`, height: '100%', background: '#e65100', borderRadius: '4px', transition: 'width .4s' }} />
+                      </div>
+                      <span style={{ width: 24, textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>{nb}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Classement questions NOTE */}
             {questionsNote.length > 0 && (
               <div className="card" style={{ padding: '1.25rem', gridColumn: Object.keys(data.distribution_grades).length === 0 ? 'span 2' : '' }}>
@@ -302,6 +460,122 @@ export default function AnalyseQualitative() {
         </div>
       )}
 
+      {/* ══════════════════════════ GRAPHIQUES ══════════════════════════ */}
+      {activeTab === 'graphiques' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {!filterGroupe && (
+            <div className="alert alert-info" style={{ fontSize: '0.85rem', margin: 0 }}>
+              <i className="bi bi-info-circle me-1"></i>
+              Sélectionnez un groupe pour l&apos;analyse détaillée, ou consultez la comparaison entre groupes ci-dessous.
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            {/* Comparaison nb réponses par groupe */}
+            <div className="card" style={{ padding: '1.25rem' }}>
+              <h6 style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
+                <i className="bi bi-people me-2" style={{ color: '#e65100' }}></i>
+                Nombre de réponses par groupe
+              </h6>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Comparaison de la participation entre groupes
+              </p>
+              {comparaisonGroupes.length > 0 ? (
+                <HistogramChart data={comparaisonGroupes} color="#e65100" height={140} />
+              ) : (
+                <ChartEmpty />
+              )}
+            </div>
+
+            {/* Score moyen par groupe */}
+            <div className="card" style={{ padding: '1.25rem' }}>
+              <h6 style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
+                <i className="bi bi-trophy me-2" style={{ color: '#26a69a' }}></i>
+                Score moyen par groupe
+              </h6>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Moyenne des questions notées (/5) — tendance par groupe
+              </p>
+              {scoresParGroupe.length > 0 ? (
+                <HistogramChart data={scoresParGroupe} color="#26a69a" height={140} unit="" />
+              ) : (
+                <ChartEmpty label="Pas encore de notes" />
+              )}
+            </div>
+
+            {/* Tendance soumissions groupe sélectionné */}
+            {filterGroupe && (
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <i className="bi bi-graph-up-arrow me-2" style={{ color: '#1565c0' }}></i>
+                  Tendance des réponses — {filterGroupe}
+                </h6>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Soumissions par jour
+                </p>
+                <TrendChart data={data.tendance || []} color="#1565c0" />
+              </div>
+            )}
+
+            {/* Disque distribution notes */}
+            {filterGroupe && (
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <i className="bi bi-pie-chart me-2" style={{ color: '#ff8f00' }}></i>
+                  Répartition des notes — {filterGroupe}
+                </h6>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Distribution globale (1 à 5)
+                </p>
+                <NoteDonut distribution={data.distribution_notes || {}} />
+              </div>
+            )}
+
+            {/* Histogramme moyennes par question */}
+            {filterGroupe && moyennesChart.length > 0 && (
+              <div className="card" style={{ padding: '1.25rem', gridColumn: '1 / -1' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '0.35rem' }}>
+                  <i className="bi bi-bar-chart me-2" style={{ color: '#4f46e5' }}></i>
+                  Moyenne par question — {filterGroupe}
+                </h6>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Tendance des satisfactions question par question (/5)
+                </p>
+                <HistogramChart data={moyennesChart} height={160} unit="" />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  {(data.moyennes_par_question || []).map((q, i) => (
+                    <span key={q.id} style={{ fontSize: '0.72rem', background: '#f5f5f5', padding: '2px 8px', borderRadius: '6px' }}>
+                      <b>Q{i + 1}</b> {q.intitule.length > 40 ? `${q.intitule.slice(0, 40)}…` : q.intitule}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Grades / catégories du groupe */}
+            {filterGroupe && gradesChart.length > 0 && (
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '1rem' }}>
+                  <i className="bi bi-pie-chart me-2" style={{ color: '#283593' }}></i>
+                  Réponses par grade
+                </h6>
+                <DonutChart data={gradesChart} />
+              </div>
+            )}
+
+            {filterGroupe && categoriesChart.length > 0 && (
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h6 style={{ fontWeight: 700, marginBottom: '1rem' }}>
+                  <i className="bi bi-pie-chart me-2" style={{ color: '#6a1b9a' }}></i>
+                  Réponses par catégorie
+                </h6>
+                <DonutChart data={categoriesChart} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ══════════════════════════ PAR QUESTION ══════════════════════════ */}
       {activeTab === 'questions' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -330,30 +604,49 @@ export default function AnalyseQualitative() {
 
               {/* Contenu selon le type */}
               {q.type_question === 'NOTE' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1.5rem', alignItems: 'start' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 800, color: q.moyenne >= 4 ? '#26a69a' : q.moyenne >= 3 ? '#66bb6a' : q.moyenne != null ? '#ef5350' : 'var(--text-muted)', lineHeight: 1 }}>
-                      {q.moyenne ?? '—'}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Moyenne · {q.total_reponses} rép.</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                      <div style={{ fontSize: '2.5rem', fontWeight: 800, color: q.moyenne >= 4 ? '#26a69a' : q.moyenne >= 3 ? '#66bb6a' : q.moyenne != null ? '#ef5350' : 'var(--text-muted)', lineHeight: 1 }}>
+                        {q.moyenne ?? '—'}
+                      </div>
+                      {q.moyenne && <StarMini value={q.moyenne} />}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>/ 5 · {q.total_reponses} rép.</div>
-                    {q.moyenne && <StarMini value={q.moyenne} />}
+                    <NoteHistogram distribution={q.distribution || {}} total={q.total_reponses || 0} />
                   </div>
-                  <NoteDistribution distribution={q.distribution || {}} total={q.total_reponses || 0} />
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Répartition (disque)</div>
+                    <NoteDonut distribution={q.distribution || {}} />
+                  </div>
                 </div>
               )}
 
               {(q.type_question === 'CHOIX_UN' || q.type_question === 'CHOIX_MUL') && (
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                    {q.total_reponses} réponse{q.total_reponses !== 1 ? 's' : ''} au total
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      {q.total_reponses} réponse{q.total_reponses !== 1 ? 's' : ''} · histogramme
+                    </div>
+                    {(q.choix_stats || []).length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Aucune réponse</p>
+                    ) : (
+                      <HorizontalBarChart
+                        data={(q.choix_stats || []).sort((a, b) => b.nb_reponses - a.nb_reponses).map(c => ({
+                          label: c.libelle,
+                          value: c.nb_reponses,
+                        }))}
+                      />
+                    )}
                   </div>
-                  {(q.choix_stats || []).length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Aucune réponse</p>
-                  ) : (
-                    (q.choix_stats || []).sort((a, b) => b.nb_reponses - a.nb_reponses).map(c => (
-                      <ChoixBar key={c.id} libelle={c.libelle} nb={c.nb_reponses} total={q.total_reponses} />
-                    ))
-                  )}
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Répartition (disque)</div>
+                    {(q.choix_stats || []).some(c => c.nb_reponses > 0) ? (
+                      <DonutChart data={choixToDonut(q.choix_stats)} />
+                    ) : (
+                      <ChartEmpty label="Aucune réponse" />
+                    )}
+                  </div>
                 </div>
               )}
 
