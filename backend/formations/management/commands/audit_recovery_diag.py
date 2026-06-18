@@ -141,6 +141,9 @@ class Command(BaseCommand):
                 '(redémarrer les séances, refaire les badgeages si nécessaire).'
             )
         self.stdout.write(
+            '\nReconstitution : python manage.py recover_from_audit --dry-run --intitule DEONTOLOGIE'
+        )
+        self.stdout.write(
             '\nMettre en place des dumps quotidiens : '
             'pg_dump -Fc qr_badge > /backups/qr_badge_$(date +%F).dump'
         )
