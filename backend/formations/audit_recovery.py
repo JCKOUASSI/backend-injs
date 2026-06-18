@@ -493,7 +493,62 @@ def _resolve_session(module, date_j, numero, events_for_day):
     return None
 
 
-def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
+def _merge_session_events(sessions_by_id):
+    """Fusionne les événements audit par (date_journee, numero)."""
+    merged = defaultdict(dict)
+    for event in sessions_by_id.values():
+        date_j = event.get('date_journee')
+        numero = event.get('numero')
+        if not date_j:
+            continue
+        key = (date_j, numero)
+        if event.get('start'):
+            merged[key]['start'] = event['start']
+        if event.get('stop'):
+            merged[key]['stop'] = event['stop']
+        merged[key]['date_journee'] = date_j
+        merged[key]['numero'] = numero
+    return dict(merged)
+
+
+def ensure_audit_edt_slots(module, merged, *, dry_run=False):
+    """
+    Crée les créneaux EDT (date, numéro) absents du survivant mais présents dans l'audit.
+    Copie horaires prévus depuis un module parallèle (#372…) si disponible.
+    """
+    stats = {'created': 0}
+    intitule = module.intitule
+    formation_id = module.formation_id
+
+    for (date_j, numero) in merged:
+        if _resolve_session(module, date_j, numero, {}):
+            continue
+
+        template = SessionModule.objects.filter(
+            module__formation_id=formation_id,
+            module__intitule__iexact=intitule,
+            date_journee=date_j,
+            numero=numero,
+        ).first()
+
+        stats['created'] += 1
+        if dry_run:
+            continue
+
+        SessionModule.objects.create(
+            module=module,
+            date_journee=date_j,
+            numero=numero,
+            intitule=(template.intitule if template else '') or f'Séance {numero}',
+            heure_debut_prevue=template.heure_debut_prevue if template else None,
+            heure_fin_prevue=template.heure_fin_prevue if template else None,
+            auto_demarrage=template.auto_demarrage if template else True,
+        )
+
+    return stats
+
+
+def apply_session_recovery(module, sessions_by_id, *, dry_run=False, create_missing_edt=True):
     """Repose demarree_le / terminee_le sur les séances EDT du module conservé."""
     stats = {
         'updated': 0,
@@ -501,29 +556,26 @@ def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
         'missing': 0,
         'already_complete': 0,
         'no_slot': 0,
+        'edt_created': 0,
     }
 
-    # Fusionner par (date, numero) au cas où START/STOP portent sur des session_id distincts.
-    merged = defaultdict(dict)
-    for event in sessions_by_id.values():
-        date_j = event.get('date_journee')
-        numero = event.get('numero')
-        key = (date_j, numero)
-        if not date_j:
-            stats['no_slot'] += 1
-            continue
-        if event.get('start'):
-            merged[key]['start'] = event['start']
-        if event.get('stop'):
-            merged[key]['stop'] = event['stop']
-        merged[key]['date_journee'] = date_j
-        merged[key]['numero'] = numero
+    merged = _merge_session_events(sessions_by_id)
+    stats['no_slot'] = sum(
+        1 for event in sessions_by_id.values() if not event.get('date_journee')
+    )
+
+    if create_missing_edt and merged:
+        edt_stats = ensure_audit_edt_slots(module, merged, dry_run=dry_run)
+        stats['edt_created'] = edt_stats['created']
 
     for key, event in merged.items():
         date_j, numero = key
         session = _resolve_session(module, date_j, numero, event)
         if not session:
-            stats['missing'] += 1
+            if create_missing_edt and dry_run:
+                stats['updated'] += 1
+            else:
+                stats['missing'] += 1
             continue
 
         if session.demarree_le and session.terminee_le:
@@ -574,7 +626,13 @@ def recover_sessions_from_audit(audit_qs, *, dry_run=False, explicit_mapping=Non
     )
 
     results = []
-    totals = {'modules': 0, 'sessions_updated': 0, 'sessions_missing': 0, 'unmapped': 0}
+    totals = {
+        'modules': 0,
+        'sessions_updated': 0,
+        'sessions_missing': 0,
+        'edt_created': 0,
+        'unmapped': 0,
+    }
 
     for mid, sessions in deleted_by_module.items():
         survivor = mapping.get(mid)
@@ -597,6 +655,7 @@ def recover_sessions_from_audit(audit_qs, *, dry_run=False, explicit_mapping=Non
         totals['modules'] += 1
         totals['sessions_updated'] += stats['updated']
         totals['sessions_missing'] += stats['missing']
+        totals['edt_created'] += stats.get('edt_created', 0)
         results.append({
             'deleted_module_id': mid,
             'survivor': survivor,
