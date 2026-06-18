@@ -1,6 +1,6 @@
 """Reconstitution partielle depuis AuditLog (post-migration 0076, sans dump)."""
 
-import re
+import json
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 
@@ -29,12 +29,6 @@ def _parse_numero(val):
         return int(val)
     except (TypeError, ValueError):
         return None
-
-
-def _groupe_sort_key(module):
-    g = (module.groupe or '').upper()
-    nums = re.findall(r'\d+', g)
-    return int(nums[0]) if nums else 0
 
 
 def collect_orphan_session_events(audit_qs, existing_session_ids, existing_module_ids):
@@ -99,23 +93,6 @@ def _event_dates(events):
     return frozenset(
         e['date_journee'] for e in events.values() if e.get('date_journee')
     )
-
-
-def _first_start(events):
-    starts = [e['start'] for e in events.values() if e.get('start')]
-    return min(starts) if starts else timezone.make_aware(datetime(1970, 1, 1))
-
-
-def _overlap_score(deleted_slots, module):
-    if not deleted_slots:
-        deleted_dates = set()
-    else:
-        deleted_dates = {d for d, _ in deleted_slots}
-    surv_slots = _session_slot_set(module)
-    if deleted_slots:
-        return len(deleted_slots & surv_slots)
-    # Secours : chevauchement par dates seules.
-    return len(deleted_dates & {d for d, _ in surv_slots})
 
 
 def _stop_time_fingerprint(events):
@@ -236,102 +213,133 @@ def _exit_scan_module_scores(formation_id, intitule, events, survivors, inscript
     return scores
 
 
+def _audit_slot_covered(module, day, numero):
+    """Créneau audit couvert si (date, numéro) exact ou séance unique ce jour-là."""
+    if SessionModule.objects.filter(
+        module=module, date_journee=day, numero=numero,
+    ).exists():
+        return True
+    return SessionModule.objects.filter(module=module, date_journee=day).count() == 1
+
+
 def _edt_slot_score(events, module):
-    """Nombre de créneaux EDT présents pour les dates/numéros audit."""
+    """Nombre de créneaux audit présents dans l'EDT du survivant."""
     slots = _event_slot_set(events)
+    if slots:
+        return sum(1 for day, numero in slots if _audit_slot_covered(module, day, numero))
+    dates = _event_dates(events)
+    if not dates:
+        return 0
     return sum(
-        1 for day, numero in slots
-        if SessionModule.objects.filter(
-            module=module, date_journee=day, numero=numero,
-        ).exists()
+        1 for day in dates
+        if SessionModule.objects.filter(module=module, date_journee=day).exists()
     )
 
 
 def _empty_slot_score(events, module):
     slots = _event_slot_set(events)
-    return sum(
-        1 for day, numero in slots
+    count = 0
+    for day, numero in slots:
         if SessionModule.objects.filter(
-            module=module,
-            date_journee=day,
-            numero=numero,
-            demarree_le__isnull=True,
-        ).exists()
+            module=module, date_journee=day, numero=numero, demarree_le__isnull=True,
+        ).exists():
+            count += 1
+            continue
+        day_sessions = list(
+            SessionModule.objects.filter(module=module, date_journee=day)
+        )
+        if len(day_sessions) == 1 and not day_sessions[0].demarree_le:
+            count += 1
+    return count
+
+
+def _session_for_audit_day(module, day, numeros):
+    """Séance EDT pour un jour audit (numéro exact ou séance unique)."""
+    for numero in numeros:
+        try:
+            return SessionModule.objects.get(
+                module=module, date_journee=day, numero=numero,
+            )
+        except SessionModule.DoesNotExist:
+            continue
+    day_sessions = list(
+        SessionModule.objects.filter(module=module, date_journee=day).order_by('numero')
     )
+    if len(day_sessions) == 1:
+        return day_sessions[0]
+    return None
 
 
-def _stop_delta_rank(events, module):
-    """(matches ≤10min, créneaux vides, créneaux trouvés, -delta secondes)."""
+# Seuil d'écart terminee_le ↔ audit (secondes) pour l'appariement phase 1.
+TERMINEE_MATCH_MAX_SECONDS = 120
+
+
+def _best_terminee_delta(events, module):
+    """Écart minimal en secondes entre un stop audit et terminee_le, ou None."""
     fp_stop = _stop_time_fingerprint(events)
-    fp_start = _start_time_fingerprint(events)
     numeros = _event_numeros(events)
-    matched = 0
-    slots_found = 0
-    delta_sum = 0
-
+    best = None
     for day, stop_ts in fp_stop.items():
-        for numero in numeros:
-            session = SessionModule.objects.filter(
-                module=module, date_journee=day, numero=numero,
-            ).first()
-            if not session:
-                delta_sum += 86400
-                continue
-            slots_found += 1
-            if session.terminee_le:
-                d = abs((session.terminee_le - stop_ts).total_seconds())
-                delta_sum += d
-                if d <= 600:
-                    matched += 1
-            else:
-                delta_sum += 7200
-
-    for day, start_ts in fp_start.items():
-        for numero in numeros:
-            session = SessionModule.objects.filter(
-                module=module, date_journee=day, numero=numero,
-            ).first()
-            if not session:
-                continue
-            if session.demarree_le:
-                d = abs((session.demarree_le - start_ts).total_seconds())
-                if d <= 600:
-                    matched += 1
-                delta_sum += min(d, 7200)
-
-    empty = _empty_slot_score(events, module)
-    return (matched, empty, slots_found, -delta_sum)
+        session = _session_for_audit_day(module, day, numeros)
+        if not session or not session.terminee_le:
+            continue
+        delta = abs((session.terminee_le - stop_ts).total_seconds())
+        if best is None or delta < best:
+            best = delta
+    return best
 
 
-def _pair_rank(deleted_id, events, module, exit_scans, meta):
-    """
-    Clé de tri (plus grand = meilleur) pour appariement 1:1.
-    Priorité : couverture EDT complète, horaires terminee, créneaux vides, badgeages.
-    """
+def _edt_is_full(events, module):
     required = _required_slot_count(events)
-    matched, empty, slots_found, neg_delta = _stop_delta_rank(events, module)
-    edt = _edt_slot_score(events, module)
-    edt_full = 1 if required and edt >= required else 0
-    scan_hits = exit_scans.get(module.id, 0)
-    id_gap = (module.id - deleted_id) if module.id > deleted_id else 99999
-    id_proximity = -id_gap
-    return (edt_full, edt, matched, empty, scan_hits, id_proximity, neg_delta)
+    return required > 0 and _edt_slot_score(events, module) >= required
 
 
-def _rank_to_score(rank):
-    """Score affiché dans la commande de reconstitution."""
-    return (
-        rank[0] * 10000 + rank[1] * 1000 + rank[2] * 100
-        + rank[3] * 10 + rank[4] + rank[5] * 0.01
-    )
+def _record_mapping(mapping, used_survivors, mid, mod, meta_by_module, sessions, method, **extra):
+    mapping[mid] = mod
+    used_survivors.add(mod.id)
+    req = _required_slot_count(sessions)
+    edt = _edt_slot_score(sessions, mod)
+    meta = meta_by_module.setdefault(mid, {})
+    meta['inferred_groupe'] = mod.groupe
+    meta['edt_coverage'] = f'{edt}/{req}'
+    meta['match_method'] = method
+    meta.update(extra)
 
 
-def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
+def _parse_explicit_mapping(raw):
+    """Format : « 321:327,312:372 » ou JSON objet."""
+    if not raw:
+        return {}
+    raw = raw.strip()
+    if raw.startswith('{'):
+        data = json.loads(raw)
+        return {int(k): int(v) for k, v in data.items()}
+    out = {}
+    for part in raw.split(','):
+        part = part.strip()
+        if not part or ':' not in part:
+            continue
+        deleted, survivor = part.split(':', 1)
+        out[int(deleted.strip())] = int(survivor.strip())
+    return out
+
+
+def match_deleted_modules_to_survivors(
+    deleted_by_module, meta_by_module, *, explicit_mapping=None,
+):
     """
-    Appariement 1:1 glouton : meilleure paire (module supprimé, survivant) à chaque étape.
+    Appariement 1:1 déterministe (post-migration 0076).
+
+    1. Mapping explicite (--mapping), validé contre l'EDT.
+    2. terminee_le à ±120 s (données déjà en base sur le survivant).
+    3. Règle 0076 : plus petit survivant.id > supprimé.id avec EDT complet.
+
+    Les étapes 2 et 3 ne rivalisent plus via un score glouton global.
     """
     if not deleted_by_module:
         return {}
+
+    explicit = explicit_mapping or {}
 
     by_scope = defaultdict(dict)
     for mid, sessions in deleted_by_module.items():
@@ -350,77 +358,114 @@ def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
                 intitule__iexact=intitule_key,
             ).prefetch_related('sessions')
         )
+        survivors_by_id = {m.id: m for m in survivors}
         if not survivors:
             continue
 
-        inscriptions = _inscriptions_by_matricule([m.id for m in survivors], intitule_key)
-        pending = list(modules_dict.keys())
-        used_mods = set()
+        pending = set(modules_dict.keys())
+        used_survivors = set()
 
-        while pending:
-            best = None
-            best_rank = None
-            for mid in pending:
-                sessions = modules_dict[mid]
-                exit_scans = _exit_scan_module_scores(
-                    formation_id, intitule_key, sessions, survivors, inscriptions,
+        # Étape 0 — mapping explicite (prioritaire, stable en prod).
+        for mid in list(pending):
+            survivor_id = explicit.get(mid)
+            if not survivor_id:
+                continue
+            mod = survivors_by_id.get(survivor_id)
+            sessions = modules_dict[mid]
+            if not mod:
+                meta_by_module.setdefault(mid, {})['match_error'] = (
+                    f'survivant #{survivor_id} introuvable'
                 )
-                for mod in survivors:
-                    if mod.id in used_mods:
-                        continue
-                    rank = _pair_rank(mid, sessions, mod, exit_scans, meta_by_module.get(mid, {}))
-                    if rank[1] == 0 and rank[2] == 0 and rank[3] == 0:
-                        continue
-                    if best_rank is None or rank > best_rank:
-                        best_rank = rank
-                        best = (mid, mod, rank)
+                continue
+            if not _edt_is_full(sessions, mod):
+                meta_by_module.setdefault(mid, {})['match_warning'] = (
+                    f'EDT incomplet sur #{survivor_id} '
+                    f'({_edt_slot_score(sessions, mod)}/{_required_slot_count(sessions)})'
+                )
+            _record_mapping(
+                mapping, used_survivors, mid, mod, meta_by_module, sessions,
+                'explicit', match_score=0,
+            )
+            pending.discard(mid)
 
-            if not best:
-                break
-
-            mid, mod, rank = best
-            mapping[mid] = mod
-            used_mods.add(mod.id)
-            pending.remove(mid)
-            meta_by_module[mid]['match_score'] = round(_rank_to_score(rank), 1)
-            meta_by_module[mid]['inferred_groupe'] = mod.groupe
-            meta_by_module[mid]['match_rank'] = rank
-            req = _required_slot_count(modules_dict[mid])
-            meta_by_module[mid]['edt_coverage'] = f'{_edt_slot_score(modules_dict[mid], mod)}/{req}'
-
-        # Secours : meilleure couverture EDT parmi les survivants restants.
+        # Étape 1 — terminee_le proche (survivant qui a déjà les horaires).
+        terminee_edges = []
         for mid in pending:
             sessions = modules_dict[mid]
-            required = _required_slot_count(sessions)
+            for mod in survivors:
+                if mod.id in used_survivors:
+                    continue
+                if _edt_slot_score(sessions, mod) == 0:
+                    continue
+                delta = _best_terminee_delta(sessions, mod)
+                if delta is None or delta > TERMINEE_MATCH_MAX_SECONDS:
+                    continue
+                edt_full = 1 if _edt_is_full(sessions, mod) else 0
+                id_gap = mod.id - mid if mod.id > mid else 99999
+                terminee_edges.append((delta, -edt_full, id_gap, mid, mod))
+        terminee_edges.sort()
+        for delta, _neg_full, _gap, mid, mod in terminee_edges:
+            if mid not in pending or mod.id in used_survivors:
+                continue
+            _record_mapping(
+                mapping, used_survivors, mid, mod, meta_by_module,
+                modules_dict[mid], 'terminee',
+                match_score=round(delta, 1),
+            )
+            pending.discard(mid)
+
+        # Étape 2 — migration 0076 : min(survivant.id - supprimé.id), EDT complet.
+        for mid in sorted(pending):
+            sessions = modules_dict[mid]
+            best_mod = None
+            best_gap = None
+            for mod in survivors:
+                if mod.id in used_survivors or mod.id <= mid:
+                    continue
+                if not _edt_is_full(sessions, mod):
+                    continue
+                gap = mod.id - mid
+                if best_gap is None or gap < best_gap:
+                    best_gap = gap
+                    best_mod = mod
+            if best_mod:
+                _record_mapping(
+                    mapping, used_survivors, mid, best_mod, meta_by_module,
+                    sessions, 'dedup_0076', match_score=best_gap,
+                )
+                pending.discard(mid)
+
+        # Étape 3 — secours : meilleure couverture EDT (affichage d'avertissement).
+        for mid in sorted(pending):
+            sessions = modules_dict[mid]
             best_mod = None
             best_rank = None
             for mod in survivors:
-                if mod.id in used_mods:
+                if mod.id in used_survivors:
                     continue
                 edt = _edt_slot_score(sessions, mod)
-                empty = _empty_slot_score(sessions, mod)
-                if edt <= 0 and empty <= 0:
+                if edt <= 0:
                     continue
-                edt_full = 1 if required and edt >= required else 0
+                edt_full = 1 if _edt_is_full(sessions, mod) else 0
                 id_gap = (mod.id - mid) if mod.id > mid else 99999
-                rank = (edt_full, edt, empty, -id_gap)
+                rank = (edt_full, edt, -id_gap)
                 if best_rank is None or rank > best_rank:
                     best_rank = rank
                     best_mod = mod
             if best_mod:
-                mapping[mid] = best_mod
-                used_mods.add(best_mod.id)
-                meta_by_module[mid]['match_score'] = best_rank[1] * 100 + best_rank[2]
-                meta_by_module[mid]['inferred_groupe'] = best_mod.groupe
-                meta_by_module[mid]['match_rank'] = best_rank
-                req = _required_slot_count(sessions)
-                meta_by_module[mid]['edt_coverage'] = f'{_edt_slot_score(sessions, best_mod)}/{req}'
+                _record_mapping(
+                    mapping, used_survivors, mid, best_mod, meta_by_module,
+                    sessions, 'edt_partial',
+                    match_score=best_rank[1],
+                    match_warning='EDT incomplet — vérifier manuellement',
+                )
+                pending.discard(mid)
 
     return mapping
 
 
 def _resolve_session(module, date_j, numero, events_for_day):
-    """Retrouve la séance EDT cible (numero exact, sinon séance unique du jour)."""
+    """Retrouve la séance EDT cible (numéro exact, sinon séance unique du jour)."""
     if date_j is None:
         return None
 
@@ -440,15 +485,10 @@ def _resolve_session(module, date_j, numero, events_for_day):
     if len(day_sessions) == 1:
         return day_sessions[0]
 
-    # Plusieurs séances le même jour : préférer celle sans démarrage.
     if numero is not None:
-        for s in day_sessions:
-            if s.numero == numero:
-                return s
-
-    empty = [s for s in day_sessions if not s.demarree_le]
-    if len(empty) == 1:
-        return empty[0]
+        for session in day_sessions:
+            if session.numero == numero:
+                return session
 
     return None
 
@@ -523,13 +563,15 @@ def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
     return stats
 
 
-def recover_sessions_from_audit(audit_qs, *, dry_run=False):
+def recover_sessions_from_audit(audit_qs, *, dry_run=False, explicit_mapping=None):
     existing_session_ids = set(SessionModule.objects.values_list('id', flat=True))
     existing_module_ids = set(Module.objects.values_list('id', flat=True))
     deleted_by_module, meta_by_module = collect_orphan_session_events(
         audit_qs, existing_session_ids, existing_module_ids,
     )
-    mapping = match_deleted_modules_to_survivors(deleted_by_module, meta_by_module)
+    mapping = match_deleted_modules_to_survivors(
+        deleted_by_module, meta_by_module, explicit_mapping=explicit_mapping,
+    )
 
     results = []
     totals = {'modules': 0, 'sessions_updated': 0, 'sessions_missing': 0, 'unmapped': 0}
