@@ -104,8 +104,15 @@ class AuditRecoveryMatchingTest(TestCase):
     def test_apply_recovery_on_empty_survivor(self):
         mapping = match_deleted_modules_to_survivors(self.deleted, self.meta)
         stats = apply_session_recovery(
-            mapping[321], self.deleted[321], dry_run=True,
+            mapping[321], self.deleted[321], dry_run=False, create_missing_edt=True,
         )
+        self.assertEqual(stats['edt_created'], 2)
         self.assertEqual(stats['updated'], 2)
         self.assertEqual(stats['missing'], 0)
+        self.assertEqual(
+            SessionModule.objects.filter(
+                module=self.surv_327, demarree_le__isnull=False,
+            ).count(),
+            2,
+        )
 

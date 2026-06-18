@@ -127,6 +127,7 @@ class Command(BaseCommand):
                     f'{warn_suffix} '
                     f'[formation_id={meta.get("formation_id")}] : '
                     f'{st["updated"]} mise(s) à jour, '
+                    f'{st.get("edt_created", 0)} créneau(x) EDT créé(s), '
                     f'{st["missing"]} EDT manquant(s), '
                     f'{st.get("already_complete", 0)} déjà complète(s)'
                 )
@@ -134,6 +135,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f'\n{prefix}Modules appariés : {totals["modules"]}, '
                 f'séances mises à jour : {totals["sessions_updated"]}, '
+                f'créneaux EDT créés : {totals.get("edt_created", 0)}, '
                 f'non appariés : {totals["unmapped"]}'
             )
 
