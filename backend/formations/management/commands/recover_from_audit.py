@@ -41,10 +41,21 @@ class Command(BaseCommand):
             help='Ne reconstituer que les badgeages (séances déjà récupérées).',
         )
 
+        parser.add_argument(
+            '--mapping',
+            type=str,
+            help=(
+                'Appariement manuel supprimé:survivant, ex: '
+                '"321:327,312:372,330:336,357:363" (prioritaire, stable).'
+            ),
+        )
+
     def handle(self, *args, **options):
         dry_run = options['dry_run']
         since = options['since']
         intitule = (options.get('intitule') or '').strip()
+        from formations.audit_recovery import _parse_explicit_mapping
+        explicit_mapping = _parse_explicit_mapping(options.get('mapping') or '')
 
         audit_qs = AuditLog.objects.filter(
             action__in=(
@@ -79,7 +90,7 @@ class Command(BaseCommand):
                 )
 
             results, totals, mapping = recover_sessions_from_audit(
-                session_audit, dry_run=dry_run,
+                session_audit, dry_run=dry_run, explicit_mapping=explicit_mapping or None,
             )
             module_mapping = mapping
             from formations.audit_recovery import collect_orphan_session_events
@@ -107,9 +118,13 @@ class Command(BaseCommand):
                 inferred = meta.get('inferred_groupe') or '?'
                 score = meta.get('match_score', '?')
                 edt_cov = meta.get('edt_coverage', '?')
+                method = meta.get('match_method', '?')
+                warning = meta.get('match_warning') or meta.get('match_error') or ''
+                warn_suffix = f' ⚠ {warning}' if warning else ''
                 self.stdout.write(
                     f'  #{mid} → module #{surv.id} '
-                    f'({surv.intitule} / {surv.groupe}, score={score}, EDT={edt_cov}) '
+                    f'({surv.intitule} / {surv.groupe}, {method}, score={score}, EDT={edt_cov})'
+                    f'{warn_suffix} '
                     f'[formation_id={meta.get("formation_id")}] : '
                     f'{st["updated"]} mise(s) à jour, '
                     f'{st["missing"]} EDT manquant(s), '
@@ -157,6 +172,7 @@ class Command(BaseCommand):
                 )
                 module_mapping = match_deleted_modules_to_survivors(
                     deleted_by_module, meta_by_module,
+                    explicit_mapping=explicit_mapping or None,
                 )
 
             pt_stats = recover_pointages_from_audit(
