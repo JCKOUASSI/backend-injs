@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from formations.models import Formateur, Module, Participant, SessionModule
-from presences.models import Pointage
+from presences.models import AuditLog, Pointage
 
 
 def _parse_date(val):
