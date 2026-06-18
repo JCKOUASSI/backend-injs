@@ -65,6 +65,9 @@ class Command(BaseCommand):
         run_sessions = not options['pointages_only']
         run_pointages = not options['sessions_only']
 
+        module_mapping = {}
+        deleted_by_module = {}
+
         if run_sessions:
             session_audit = audit_qs.filter(action__in=(
                 AuditLog.Action.SEANCE_START,
@@ -77,6 +80,14 @@ class Command(BaseCommand):
 
             results, totals, mapping = recover_sessions_from_audit(
                 session_audit, dry_run=dry_run,
+            )
+            module_mapping = mapping
+            from formations.audit_recovery import collect_orphan_session_events
+            from formations.models import Module, SessionModule
+            existing_session_ids = set(SessionModule.objects.values_list('id', flat=True))
+            existing_module_ids = set(Module.objects.values_list('id', flat=True))
+            deleted_by_module, _ = collect_orphan_session_events(
+                session_audit, existing_session_ids, existing_module_ids,
             )
 
             self.stdout.write(self.style.HTTP_INFO('--- Séances ---'))
@@ -118,15 +129,39 @@ class Command(BaseCommand):
                 AuditLog.Action.FORCE_SORTIE,
             ))
             if intitule:
-                # Filtrer via modules de l'intitulé (formation variable).
                 from formations.models import Module
                 formation_ids = Module.objects.filter(
                     intitule__iexact=intitule,
                 ).values_list('formation_id', flat=True).distinct()
                 pt_audit = pt_audit.filter(formation_id__in=formation_ids)
 
+            if options['pointages_only'] and not module_mapping:
+                from formations.audit_recovery import (
+                    collect_orphan_session_events,
+                    match_deleted_modules_to_survivors,
+                )
+                from formations.models import Module, SessionModule
+                session_audit = audit_qs.filter(action__in=(
+                    AuditLog.Action.SEANCE_START,
+                    AuditLog.Action.SEANCE_STOP,
+                ))
+                if intitule:
+                    session_audit = session_audit.filter(
+                        extra__module_intitule__iexact=intitule,
+                    )
+                existing_session_ids = set(SessionModule.objects.values_list('id', flat=True))
+                existing_module_ids = set(Module.objects.values_list('id', flat=True))
+                deleted_by_module, meta_by_module = collect_orphan_session_events(
+                    session_audit, existing_session_ids, existing_module_ids,
+                )
+                module_mapping = match_deleted_modules_to_survivors(
+                    deleted_by_module, meta_by_module,
+                )
+
             pt_stats = recover_pointages_from_audit(
                 pt_audit, dry_run=dry_run, intitule_hint=intitule,
+                module_mapping=module_mapping or None,
+                deleted_by_module=deleted_by_module or None,
             )
             self.stdout.write(self.style.HTTP_INFO('\n--- Badgeages ---'))
             self.stdout.write(

@@ -1,13 +1,13 @@
 """Reconstitution partielle depuis AuditLog (post-migration 0076, sans dump)."""
 
 import re
-from collections import defaultdict
-from datetime import datetime
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.utils import timezone
 
-from formations.models import Formateur, Module, Participant, SessionModule
+from formations.models import Formateur, Module, ModuleParticipant, Participant, SessionModule
 from presences.models import AuditLog, Pointage
 
 
@@ -145,51 +145,85 @@ def _event_numeros(events):
     return nums or {2}
 
 
-def _pair_score(events, module):
+_SCAN_ACTIONS = (
+    AuditLog.Action.SCAN_SECURE_ENTREE,
+    AuditLog.Action.SCAN_SECURE_SORTIE,
+    AuditLog.Action.FORCE_ENTREE,
+    AuditLog.Action.FORCE_SORTIE,
+)
+
+
+def _session_windows(events):
+    """Fenêtres (début, fin) par séance orpheline."""
+    windows = []
+    for event in events.values():
+        start = event.get('start')
+        stop = event.get('stop')
+        if start and stop:
+            windows.append((start, stop))
+        elif start:
+            windows.append((start, start + timedelta(hours=10)))
+        elif stop:
+            windows.append((stop - timedelta(hours=4), stop))
+    return windows
+
+
+def _inscriptions_by_matricule(survivor_ids, intitule):
+    """Matricule participant → ids de modules survivants où il est inscrit."""
+    by_matricule = defaultdict(set)
+    if not survivor_ids:
+        return by_matricule
+    rows = ModuleParticipant.objects.filter(
+        module_id__in=survivor_ids,
+        module__intitule__iexact=intitule,
+    ).values_list('participant__matricule', 'module_id')
+    for matricule, module_id in rows:
+        if matricule:
+            by_matricule[matricule].add(module_id)
+    return by_matricule
+
+
+def _exit_scan_module_scores(formation_id, intitule, events, survivors, inscriptions=None):
     """
-    Score d'appariement module supprimé ↔ survivant.
-    Priorité aux terminee_le / demarree_le déjà en base (±2 min), puis créneaux vides.
+    Compte les badgeages participants inscrits par module survivant,
+    dans une fenêtre autour de la dernière fin de séance audit (sorties).
     """
-    fp_stop = _stop_time_fingerprint(events)
-    fp_start = _start_time_fingerprint(events)
-    numeros = _event_numeros(events)
-    score = 0
+    if inscriptions is None:
+        inscriptions = _inscriptions_by_matricule([m.id for m in survivors], intitule)
 
-    for day, stop_ts in fp_stop.items():
-        for numero in numeros:
-            session = SessionModule.objects.filter(
-                module=module, date_journee=day, numero=numero,
-            ).first()
-            if not session:
-                continue
-            if session.terminee_le:
-                delta = abs((session.terminee_le - stop_ts).total_seconds())
-                if delta <= 120:
-                    score += 100
-                elif delta <= 600:
-                    score += 20
-            elif session.demarree_le:
-                score += 5
-            elif not session.demarree_le:
-                score += 2
+    stops = [e.get('stop') for e in events.values() if e.get('stop')]
+    if not stops or not formation_id:
+        return Counter()
 
-    for day, start_ts in fp_start.items():
-        for numero in numeros:
-            session = SessionModule.objects.filter(
-                module=module, date_journee=day, numero=numero,
-            ).first()
-            if not session:
-                continue
-            if session.demarree_le:
-                delta = abs((session.demarree_le - start_ts).total_seconds())
-                if delta <= 120:
-                    score += 80
-                elif delta <= 600:
-                    score += 15
-            elif not session.demarree_le:
-                score += 3
+    last_stop = max(stops)
+    window_start = last_stop - timedelta(minutes=20)
+    window_end = last_stop + timedelta(minutes=3)
 
-    return score
+    scores = Counter()
+    scans = AuditLog.objects.filter(
+        formation_id=formation_id,
+        action__in=_SCAN_ACTIONS,
+        timestamp__gte=window_start,
+        timestamp__lte=window_end,
+        cible_type='participant',
+    ).exclude(cible_numero='')
+
+    for log in scans:
+        for module_id in inscriptions.get(log.cible_numero, ()):
+            scores[module_id] += 1
+
+    return scores
+
+
+def _edt_slot_score(events, module):
+    """Nombre de créneaux EDT présents pour les dates/numéros audit."""
+    slots = _event_slot_set(events)
+    return sum(
+        1 for day, numero in slots
+        if SessionModule.objects.filter(
+            module=module, date_journee=day, numero=numero,
+        ).exists()
+    )
 
 
 def _empty_slot_score(events, module):
@@ -205,11 +239,73 @@ def _empty_slot_score(events, module):
     )
 
 
+def _stop_delta_rank(events, module):
+    """(matches ≤10min, créneaux vides, créneaux trouvés, -delta secondes)."""
+    fp_stop = _stop_time_fingerprint(events)
+    fp_start = _start_time_fingerprint(events)
+    numeros = _event_numeros(events)
+    matched = 0
+    slots_found = 0
+    delta_sum = 0
+
+    for day, stop_ts in fp_stop.items():
+        for numero in numeros:
+            session = SessionModule.objects.filter(
+                module=module, date_journee=day, numero=numero,
+            ).first()
+            if not session:
+                delta_sum += 86400
+                continue
+            slots_found += 1
+            if session.terminee_le:
+                d = abs((session.terminee_le - stop_ts).total_seconds())
+                delta_sum += d
+                if d <= 600:
+                    matched += 1
+            else:
+                delta_sum += 7200
+
+    for day, start_ts in fp_start.items():
+        for numero in numeros:
+            session = SessionModule.objects.filter(
+                module=module, date_journee=day, numero=numero,
+            ).first()
+            if not session:
+                continue
+            if session.demarree_le:
+                d = abs((session.demarree_le - start_ts).total_seconds())
+                if d <= 600:
+                    matched += 1
+                delta_sum += min(d, 7200)
+
+    empty = _empty_slot_score(events, module)
+    return (matched, empty, slots_found, -delta_sum)
+
+
+def _pair_rank(deleted_id, events, module, exit_scans, meta):
+    """
+    Clé de tri (plus grand = meilleur) pour appariement 1:1.
+    Priorité : badgeages sortie inscrits, horaires terminee/demarree, créneaux vides.
+    """
+    matched, empty, slots_found, neg_delta = _stop_delta_rank(events, module)
+    scan_hits = exit_scans.get(module.id, 0)
+    edt = _edt_slot_score(events, module)
+    # Proximité d'id post-dédoublonnage (0076 garde le pk le plus élevé).
+    id_bonus = 1 if module.id > deleted_id else 0
+    return (scan_hits, matched, empty, edt, slots_found, id_bonus, neg_delta)
+
+
+def _rank_to_score(rank):
+    """Score affiché dans la commande de reconstitution."""
+    return (
+        rank[0] * 1000 + rank[1] * 100 + rank[2] * 10
+        + rank[3] + rank[4] * 0.1 + rank[5]
+    )
+
+
 def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
     """
-    Appariement 1:1 par horaires de fin/début (groupes parallèles même heure).
-    Les badgeages ne sont pas utilisés si plusieurs modules supprimés partagent
-    la même formation (fenêtres horaires identiques).
+    Appariement 1:1 glouton : meilleure paire (module supprimé, survivant) à chaque étape.
     """
     if not deleted_by_module:
         return {}
@@ -234,47 +330,61 @@ def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
         if not survivors:
             continue
 
-        pairs = []
-        for mid, sessions in modules_dict.items():
-            for mod in survivors:
-                sc = _pair_score(sessions, mod)
-                if sc > 0:
-                    pairs.append((sc, mid, mod))
-
-        pairs.sort(key=lambda x: (-x[0], _groupe_sort_key(x[2])))
-        used_mids = set()
+        inscriptions = _inscriptions_by_matricule([m.id for m in survivors], intitule_key)
+        pending = list(modules_dict.keys())
         used_mods = set()
 
-        for sc, mid, mod in pairs:
-            if mid in used_mids or mod.id in used_mods:
-                continue
-            mapping[mid] = mod
-            used_mids.add(mid)
-            used_mods.add(mod.id)
-            meta_by_module[mid]['match_score'] = sc
-            meta_by_module[mid]['inferred_groupe'] = mod.groupe
-
-        # Secours : survivants avec créneaux vides, tri par 1ère fin audit.
-        unmapped = [mid for mid in modules_dict if mid not in mapping]
-        free_mods = [m for m in survivors if m.id not in used_mods]
-        if unmapped and free_mods:
-            unmapped.sort(key=lambda mid: _first_start(modules_dict[mid]))
-            free_mods.sort(key=lambda m: (-_empty_slot_score(modules_dict[unmapped[0]], m), _groupe_sort_key(m)))
-            for mid in unmapped:
-                best_mod = None
-                best_empty = 0
-                for mod in free_mods:
+        while pending:
+            best = None
+            best_rank = None
+            for mid in pending:
+                sessions = modules_dict[mid]
+                exit_scans = _exit_scan_module_scores(
+                    formation_id, intitule_key, sessions, survivors, inscriptions,
+                )
+                for mod in survivors:
                     if mod.id in used_mods:
                         continue
-                    es = _empty_slot_score(modules_dict[mid], mod)
-                    if es > best_empty:
-                        best_empty = es
-                        best_mod = mod
-                if best_mod and best_empty > 0:
-                    mapping[mid] = best_mod
-                    used_mods.add(best_mod.id)
-                    meta_by_module[mid]['match_score'] = best_empty
-                    meta_by_module[mid]['inferred_groupe'] = best_mod.groupe
+                    rank = _pair_rank(mid, sessions, mod, exit_scans, meta_by_module.get(mid, {}))
+                    if rank[0] == 0 and rank[1] == 0 and rank[2] == 0 and rank[3] == 0:
+                        continue
+                    if best_rank is None or rank > best_rank:
+                        best_rank = rank
+                        best = (mid, mod, rank)
+
+            if not best:
+                break
+
+            mid, mod, rank = best
+            mapping[mid] = mod
+            used_mods.add(mod.id)
+            pending.remove(mid)
+            meta_by_module[mid]['match_score'] = round(_rank_to_score(rank), 1)
+            meta_by_module[mid]['inferred_groupe'] = mod.groupe
+            meta_by_module[mid]['match_rank'] = rank
+
+        # Secours : créneaux EDT vides restants (modules jamais démarrés).
+        for mid in pending:
+            sessions = modules_dict[mid]
+            best_mod = None
+            best_rank = None
+            for mod in survivors:
+                if mod.id in used_mods:
+                    continue
+                empty = _empty_slot_score(sessions, mod)
+                edt = _edt_slot_score(sessions, mod)
+                if empty <= 0 and edt <= 0:
+                    continue
+                rank = (empty, edt, 1 if mod.id > mid else 0)
+                if best_rank is None or rank > best_rank:
+                    best_rank = rank
+                    best_mod = mod
+            if best_mod:
+                mapping[mid] = best_mod
+                used_mods.add(best_mod.id)
+                meta_by_module[mid]['match_score'] = best_rank[0] * 10 + best_rank[1]
+                meta_by_module[mid]['inferred_groupe'] = best_mod.groupe
+                meta_by_module[mid]['match_rank'] = best_rank
 
     return mapping
 
@@ -433,9 +543,17 @@ def _resolve_personne(cible_type, cible_numero):
     return None, cible_type
 
 
-def _find_module_for_scan(log, personne, type_personne, *, intitule_hint=''):
+def _find_module_for_scan(log, personne, type_personne, *, intitule_hint='', module_mapping=None,
+                          deleted_by_module=None, inscriptions_by_matricule=None):
     if not log.formation_id or not personne:
         return None
+
+    if module_mapping and deleted_by_module:
+        hit = _find_module_from_audit_windows(
+            log, module_mapping, deleted_by_module, inscriptions_by_matricule,
+        )
+        if hit:
+            return hit
 
     def _candidates(qs):
         modules = list(qs.prefetch_related('sessions'))
@@ -454,6 +572,24 @@ def _find_module_for_scan(log, personne, type_personne, *, intitule_hint=''):
         qs = qs.filter(intitule__iexact=intitule_hint)
 
     if type_personne == 'participant':
+        insc_modules = list(
+            Module.objects.filter(
+                formation_id=log.formation_id,
+                module_participants__participant=personne,
+            ).distinct().prefetch_related('sessions')
+        )
+        if intitule_hint:
+            insc_modules = [m for m in insc_modules if m.intitule.upper() == intitule_hint.upper()]
+        if len(insc_modules) == 1:
+            return insc_modules[0]
+        if insc_modules:
+            day = timezone.localtime(log.timestamp).date()
+            started = [m for m in insc_modules if m.sessions.filter(
+                date_journee=day, demarree_le__isnull=False,
+            ).exists()]
+            if len(started) == 1:
+                return started[0]
+
         grade = getattr(personne, 'grade', '') or ''
         groupe = getattr(personne, 'groupe', '') or ''
         vague = getattr(personne, 'vague', '') or ''
@@ -470,23 +606,65 @@ def _find_module_for_scan(log, personne, type_personne, *, intitule_hint=''):
     return _candidates(qs)
 
 
+def _find_module_from_audit_windows(log, module_mapping, deleted_by_module, inscriptions=None):
+    """Retrouve le module survivant via fenêtres séance audit + inscriptions."""
+    ts = log.timestamp
+    matricule = log.cible_numero if log.cible_type == 'participant' else ''
+    hits = []
+
+    for deleted_id, survivor in module_mapping.items():
+        events = deleted_by_module.get(deleted_id, {})
+        in_window = False
+        for event in events.values():
+            start = event.get('start')
+            stop = event.get('stop')
+            if start and stop and start <= ts <= stop:
+                in_window = True
+                break
+            if stop and abs((stop - ts).total_seconds()) <= 1200:
+                in_window = True
+                break
+        if not in_window:
+            continue
+        if matricule and inscriptions is not None:
+            if survivor.id in inscriptions.get(matricule, ()):
+                hits.append(survivor)
+        else:
+            hits.append(survivor)
+
+    unique = {m.id: m for m in hits}
+    if len(unique) == 1:
+        return next(iter(unique.values()))
+    return None
+
+
 def _find_session_for_scan(module, ts):
     day = timezone.localtime(ts).date()
     sessions = list(
         module.sessions.filter(
             date_journee=day,
-            demarree_le__isnull=False,
         ).order_by('numero')
     )
-    for s in sessions:
+    started = [s for s in sessions if s.demarree_le]
+    for s in started:
         start = s.demarree_le
         end = s.terminee_le or ts
         if start <= ts <= end:
             return s
-    return sessions[0] if len(sessions) == 1 else None
+    if len(started) == 1:
+        return started[0]
+    if len(sessions) == 1:
+        return sessions[0]
+    empty = [s for s in sessions if not s.demarree_le]
+    if len(empty) == 1:
+        return empty[0]
+    return None
 
 
-def recover_pointages_from_audit(audit_qs, *, dry_run=False, intitule_hint=''):
+def recover_pointages_from_audit(
+    audit_qs, *, dry_run=False, intitule_hint='',
+    module_mapping=None, deleted_by_module=None,
+):
     """
     Recrée les pointages dont l'audit existe mais le lien pointage_id est mort.
     """
@@ -517,10 +695,19 @@ def recover_pointages_from_audit(audit_qs, *, dry_run=False, intitule_hint=''):
 
     stats = {'created': 0, 'skipped': 0, 'no_module': 0, 'no_session': 0}
 
+    inscriptions = None
+    if module_mapping:
+        survivor_ids = [m.id for m in module_mapping.values()]
+        inscriptions = _inscriptions_by_matricule(survivor_ids, intitule_hint)
+
     for entree in entrees:
         personne, type_personne = _resolve_personne(entree.cible_type, entree.cible_numero)
         module = _find_module_for_scan(
-            entree, personne, type_personne, intitule_hint=intitule_hint,
+            entree, personne, type_personne,
+            intitule_hint=intitule_hint,
+            module_mapping=module_mapping,
+            deleted_by_module=deleted_by_module,
+            inscriptions_by_matricule=inscriptions,
         )
         if not module:
             stats['no_module'] += 1
