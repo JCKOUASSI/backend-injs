@@ -118,78 +118,6 @@ def _overlap_score(deleted_slots, module):
     return len(deleted_dates & {d for d, _ in surv_slots})
 
 
-def _session_windows(events):
-    """Fenêtres (début, fin) de chaque séance orpheline."""
-    from datetime import timedelta
-
-    windows = []
-    for event in events.values():
-        start = event.get('start')
-        stop = event.get('stop')
-        if start and stop:
-            windows.append((start, stop))
-        elif start:
-            windows.append((start, start + timedelta(hours=10)))
-    return windows
-
-
-def infer_groupe_from_scans(formation_id, windows):
-    """Déduit le GROUPE majoritaire via les badgeages pendant les séances."""
-    from collections import Counter
-
-    if not formation_id or not windows:
-        return None
-
-    scan_actions = (
-        AuditLog.Action.SCAN_SECURE_ENTREE,
-        AuditLog.Action.SCAN_SECURE_SORTIE,
-        AuditLog.Action.FORCE_ENTREE,
-        AuditLog.Action.FORCE_SORTIE,
-    )
-    counts = Counter()
-    for start, stop in windows:
-        scans = AuditLog.objects.filter(
-            formation_id=formation_id,
-            action__in=scan_actions,
-            timestamp__gte=start,
-            timestamp__lte=stop,
-        ).exclude(cible_numero='').filter(cible_type='participant')
-        for scan in scans:
-            participant = Participant.objects.filter(matricule=scan.cible_numero).first()
-            if participant and participant.groupe:
-                counts[participant.groupe.strip().upper()] += 1
-
-    if not counts:
-        return None
-    return counts.most_common(1)[0][0]
-
-
-def _pick_survivor_for_groupe(formation_id, intitule, groupe, audit_dates):
-    """Choisit le survivant le plus « vide » pour ce groupe (souvent le doublon post-0076)."""
-    candidates = list(
-        Module.objects.filter(
-            formation_id=formation_id,
-            intitule__iexact=intitule,
-            groupe__iexact=groupe,
-        ).prefetch_related('sessions')
-    )
-    if not candidates:
-        return None
-
-    def _incomplete_score(module):
-        score = 0
-        for day in audit_dates:
-            for session in module.sessions.filter(date_journee=day):
-                if not session.demarree_le:
-                    score += 2
-                elif not session.terminee_le:
-                    score += 1
-        return score
-
-    candidates.sort(key=lambda m: (-_incomplete_score(m), -m.id))
-    return candidates[0]
-
-
 def _stop_time_fingerprint(events):
     """Empreinte date → heure de fin (UTC) pour distinguer les groupes parallèles."""
     fp = {}
@@ -201,96 +129,152 @@ def _stop_time_fingerprint(events):
     return fp
 
 
-def _match_by_stop_fingerprint(events, survivors, used_ids):
-    """Apparie via terminee_le déjà présents en base (±2 min)."""
-    fp = _stop_time_fingerprint(events)
-    if not fp:
-        return None
+def _start_time_fingerprint(events):
+    """Empreinte date → heure de début (UTC)."""
+    fp = {}
+    for event in events.values():
+        day = event.get('date_journee')
+        start = event.get('start')
+        if day and start:
+            fp[day] = start
+    return fp
 
-    best = None
-    best_score = 0
-    numeros = {e.get('numero') for e in events.values() if e.get('numero') is not None}
 
-    for mod in survivors:
-        if mod.id in used_ids:
-            continue
-        score = 0
-        for day, stop_ts in fp.items():
-            for numero in numeros or {None}:
-                qs = SessionModule.objects.filter(module=mod, date_journee=day)
-                if numero is not None:
-                    qs = qs.filter(numero=numero)
-                for session in qs:
-                    if session.terminee_le:
-                        delta = abs((session.terminee_le - stop_ts).total_seconds())
-                        if delta <= 120:
-                            score += 1
-        if score > best_score:
-            best_score = score
-            best = mod
+def _event_numeros(events):
+    nums = {e.get('numero') for e in events.values() if e.get('numero') is not None}
+    return nums or {2}
 
-    return best if best_score >= 1 else None
+
+def _pair_score(events, module):
+    """
+    Score d'appariement module supprimé ↔ survivant.
+    Priorité aux terminee_le / demarree_le déjà en base (±2 min), puis créneaux vides.
+    """
+    fp_stop = _stop_time_fingerprint(events)
+    fp_start = _start_time_fingerprint(events)
+    numeros = _event_numeros(events)
+    score = 0
+
+    for day, stop_ts in fp_stop.items():
+        for numero in numeros:
+            session = SessionModule.objects.filter(
+                module=module, date_journee=day, numero=numero,
+            ).first()
+            if not session:
+                continue
+            if session.terminee_le:
+                delta = abs((session.terminee_le - stop_ts).total_seconds())
+                if delta <= 120:
+                    score += 100
+                elif delta <= 600:
+                    score += 20
+            elif session.demarree_le:
+                score += 5
+            elif not session.demarree_le:
+                score += 2
+
+    for day, start_ts in fp_start.items():
+        for numero in numeros:
+            session = SessionModule.objects.filter(
+                module=module, date_journee=day, numero=numero,
+            ).first()
+            if not session:
+                continue
+            if session.demarree_le:
+                delta = abs((session.demarree_le - start_ts).total_seconds())
+                if delta <= 120:
+                    score += 80
+                elif delta <= 600:
+                    score += 15
+            elif not session.demarree_le:
+                score += 3
+
+    return score
+
+
+def _empty_slot_score(events, module):
+    slots = _event_slot_set(events)
+    return sum(
+        1 for day, numero in slots
+        if SessionModule.objects.filter(
+            module=module,
+            date_journee=day,
+            numero=numero,
+            demarree_le__isnull=True,
+        ).exists()
+    )
 
 
 def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
     """
-    Associe chaque module supprimé à un survivant :
-    1) GROUPE déduit des badgeages pendant les séances
-    2) Empreinte des heures de fin (terminee_le)
-    3) Secours : chevauchement EDT + tri groupe
+    Appariement 1:1 par horaires de fin/début (groupes parallèles même heure).
+    Les badgeages ne sont pas utilisés si plusieurs modules supprimés partagent
+    la même formation (fenêtres horaires identiques).
     """
     if not deleted_by_module:
         return {}
 
-    mapping = {}
-    used_ids = set()
-
+    by_scope = defaultdict(dict)
     for mid, sessions in deleted_by_module.items():
         meta = meta_by_module.get(mid, {})
         formation_id = meta.get('formation_id')
         intitule = (meta.get('intitule') or '').strip()
         if not intitule:
             continue
+        by_scope[(formation_id, intitule.upper())][mid] = sessions
 
-        audit_dates = _event_dates(sessions)
+    mapping = {}
+    for (formation_id, intitule_key), modules_dict in by_scope.items():
         survivors = list(
             Module.objects.filter(
                 formation_id=formation_id,
-                intitule__iexact=intitule,
+                intitule__iexact=intitule_key,
             ).prefetch_related('sessions')
         )
         if not survivors:
             continue
 
-        chosen = None
-        inferred_groupe = infer_groupe_from_scans(formation_id, _session_windows(sessions))
-        if inferred_groupe:
-            chosen = _pick_survivor_for_groupe(
-                formation_id, intitule, inferred_groupe, audit_dates,
-            )
-            if chosen and chosen.id in used_ids:
-                chosen = None
-
-        if not chosen:
-            chosen = _match_by_stop_fingerprint(sessions, survivors, used_ids)
-
-        if not chosen:
-            slots = _event_slot_set(sessions)
-            scored = []
+        pairs = []
+        for mid, sessions in modules_dict.items():
             for mod in survivors:
-                if mod.id in used_ids:
-                    continue
-                score = _overlap_score(slots, mod)
-                if score > 0:
-                    scored.append((score, _groupe_sort_key(mod), mod))
-            if scored:
-                scored.sort(key=lambda x: (-x[0], x[1]))
-                chosen = scored[0][2]
+                sc = _pair_score(sessions, mod)
+                if sc > 0:
+                    pairs.append((sc, mid, mod))
 
-        if chosen:
-            mapping[mid] = chosen
-            used_ids.add(chosen.id)
-            meta_by_module[mid]['inferred_groupe'] = inferred_groupe
+        pairs.sort(key=lambda x: (-x[0], _groupe_sort_key(x[2])))
+        used_mids = set()
+        used_mods = set()
+
+        for sc, mid, mod in pairs:
+            if mid in used_mids or mod.id in used_mods:
+                continue
+            mapping[mid] = mod
+            used_mids.add(mid)
+            used_mods.add(mod.id)
+            meta_by_module[mid]['match_score'] = sc
+            meta_by_module[mid]['inferred_groupe'] = mod.groupe
+
+        # Secours : survivants avec créneaux vides, tri par 1ère fin audit.
+        unmapped = [mid for mid in modules_dict if mid not in mapping]
+        free_mods = [m for m in survivors if m.id not in used_mods]
+        if unmapped and free_mods:
+            unmapped.sort(key=lambda mid: _first_start(modules_dict[mid]))
+            free_mods.sort(key=lambda m: (-_empty_slot_score(modules_dict[unmapped[0]], m), _groupe_sort_key(m)))
+            for mid in unmapped:
+                best_mod = None
+                best_empty = 0
+                for mod in free_mods:
+                    if mod.id in used_mods:
+                        continue
+                    es = _empty_slot_score(modules_dict[mid], mod)
+                    if es > best_empty:
+                        best_empty = es
+                        best_mod = mod
+                if best_mod and best_empty > 0:
+                    mapping[mid] = best_mod
+                    used_mods.add(best_mod.id)
+                    meta_by_module[mid]['match_score'] = best_empty
+                    meta_by_module[mid]['inferred_groupe'] = best_mod.groupe
 
     return mapping
 

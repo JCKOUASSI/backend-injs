@@ -94,9 +94,10 @@ class Command(BaseCommand):
                 st = row['stats']
                 meta = row.get('meta') or {}
                 inferred = meta.get('inferred_groupe') or '?'
+                score = meta.get('match_score', '?')
                 self.stdout.write(
                     f'  #{mid} → module #{surv.id} '
-                    f'({surv.intitule} / {surv.groupe}, groupe audit≈{inferred}) '
+                    f'({surv.intitule} / {surv.groupe}, score={score}) '
                     f'[formation_id={meta.get("formation_id")}] : '
                     f'{st["updated"]} mise(s) à jour, '
                     f'{st["missing"]} EDT manquant(s), '
