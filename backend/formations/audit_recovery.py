@@ -183,10 +183,17 @@ def _inscriptions_by_matricule(survivor_ids, intitule):
     return by_matricule
 
 
+def _required_slot_count(events):
+    slots = _event_slot_set(events)
+    if slots:
+        return len(slots)
+    return len(_event_dates(events))
+
+
 def _exit_scan_module_scores(formation_id, intitule, events, survivors, inscriptions=None):
     """
-    Compte les badgeages participants inscrits par module survivant,
-    dans une fenêtre autour de la dernière fin de séance audit (sorties).
+    Badgeages participants inscrits sur un seul module (ou groupe concordant),
+    fenêtre autour de la dernière fin de séance audit.
     """
     if inscriptions is None:
         inscriptions = _inscriptions_by_matricule([m.id for m in survivors], intitule)
@@ -196,9 +203,10 @@ def _exit_scan_module_scores(formation_id, intitule, events, survivors, inscript
         return Counter()
 
     last_stop = max(stops)
-    window_start = last_stop - timedelta(minutes=20)
-    window_end = last_stop + timedelta(minutes=3)
+    window_start = last_stop - timedelta(minutes=8)
+    window_end = last_stop + timedelta(minutes=2)
 
+    survivors_by_id = {m.id: m for m in survivors}
     scores = Counter()
     scans = AuditLog.objects.filter(
         formation_id=formation_id,
@@ -209,8 +217,21 @@ def _exit_scan_module_scores(formation_id, intitule, events, survivors, inscript
     ).exclude(cible_numero='')
 
     for log in scans:
-        for module_id in inscriptions.get(log.cible_numero, ()):
-            scores[module_id] += 1
+        mods = inscriptions.get(log.cible_numero, ())
+        if len(mods) == 1:
+            scores[next(iter(mods))] += 1
+            continue
+        if len(mods) < 2:
+            continue
+        participant = Participant.objects.filter(matricule=log.cible_numero).first()
+        if not participant:
+            continue
+        pg = (participant.groupe or '').strip().upper()
+        for module_id in mods:
+            mod = survivors_by_id.get(module_id)
+            if mod and (mod.groupe or '').strip().upper() == pg:
+                scores[module_id] += 1
+                break
 
     return scores
 
@@ -285,21 +306,23 @@ def _stop_delta_rank(events, module):
 def _pair_rank(deleted_id, events, module, exit_scans, meta):
     """
     Clé de tri (plus grand = meilleur) pour appariement 1:1.
-    Priorité : badgeages sortie inscrits, horaires terminee/demarree, créneaux vides.
+    Priorité : couverture EDT complète, horaires terminee, créneaux vides, badgeages.
     """
+    required = _required_slot_count(events)
     matched, empty, slots_found, neg_delta = _stop_delta_rank(events, module)
-    scan_hits = exit_scans.get(module.id, 0)
     edt = _edt_slot_score(events, module)
-    # Proximité d'id post-dédoublonnage (0076 garde le pk le plus élevé).
-    id_bonus = 1 if module.id > deleted_id else 0
-    return (scan_hits, matched, empty, edt, slots_found, id_bonus, neg_delta)
+    edt_full = 1 if required and edt >= required else 0
+    scan_hits = exit_scans.get(module.id, 0)
+    id_gap = (module.id - deleted_id) if module.id > deleted_id else 99999
+    id_proximity = -id_gap
+    return (edt_full, edt, matched, empty, scan_hits, id_proximity, neg_delta)
 
 
 def _rank_to_score(rank):
     """Score affiché dans la commande de reconstitution."""
     return (
-        rank[0] * 1000 + rank[1] * 100 + rank[2] * 10
-        + rank[3] + rank[4] * 0.1 + rank[5]
+        rank[0] * 10000 + rank[1] * 1000 + rank[2] * 100
+        + rank[3] * 10 + rank[4] + rank[5] * 0.01
     )
 
 
@@ -346,7 +369,7 @@ def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
                     if mod.id in used_mods:
                         continue
                     rank = _pair_rank(mid, sessions, mod, exit_scans, meta_by_module.get(mid, {}))
-                    if rank[0] == 0 and rank[1] == 0 and rank[2] == 0 and rank[3] == 0:
+                    if rank[1] == 0 and rank[2] == 0 and rank[3] == 0:
                         continue
                     if best_rank is None or rank > best_rank:
                         best_rank = rank
@@ -362,29 +385,36 @@ def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
             meta_by_module[mid]['match_score'] = round(_rank_to_score(rank), 1)
             meta_by_module[mid]['inferred_groupe'] = mod.groupe
             meta_by_module[mid]['match_rank'] = rank
+            req = _required_slot_count(modules_dict[mid])
+            meta_by_module[mid]['edt_coverage'] = f'{_edt_slot_score(modules_dict[mid], mod)}/{req}'
 
-        # Secours : créneaux EDT vides restants (modules jamais démarrés).
+        # Secours : meilleure couverture EDT parmi les survivants restants.
         for mid in pending:
             sessions = modules_dict[mid]
+            required = _required_slot_count(sessions)
             best_mod = None
             best_rank = None
             for mod in survivors:
                 if mod.id in used_mods:
                     continue
-                empty = _empty_slot_score(sessions, mod)
                 edt = _edt_slot_score(sessions, mod)
-                if empty <= 0 and edt <= 0:
+                empty = _empty_slot_score(sessions, mod)
+                if edt <= 0 and empty <= 0:
                     continue
-                rank = (empty, edt, 1 if mod.id > mid else 0)
+                edt_full = 1 if required and edt >= required else 0
+                id_gap = (mod.id - mid) if mod.id > mid else 99999
+                rank = (edt_full, edt, empty, -id_gap)
                 if best_rank is None or rank > best_rank:
                     best_rank = rank
                     best_mod = mod
             if best_mod:
                 mapping[mid] = best_mod
                 used_mods.add(best_mod.id)
-                meta_by_module[mid]['match_score'] = best_rank[0] * 10 + best_rank[1]
+                meta_by_module[mid]['match_score'] = best_rank[1] * 100 + best_rank[2]
                 meta_by_module[mid]['inferred_groupe'] = best_mod.groupe
                 meta_by_module[mid]['match_rank'] = best_rank
+                req = _required_slot_count(sessions)
+                meta_by_module[mid]['edt_coverage'] = f'{_edt_slot_score(sessions, best_mod)}/{req}'
 
     return mapping
 
