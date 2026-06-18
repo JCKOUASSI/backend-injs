@@ -767,15 +767,7 @@ class FormateurListCreateView(generics.ListCreateAPIView):
         return [IsDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        if user.role == 'ENCADRANT':
-            return formateurs_queryset_for_user(user)
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            if not sec:
-                return Formateur.objects.none()
-            return Formateur.objects.filter(secretariats=sec).distinct()
-        return Formateur.objects.all()
+        return formateurs_queryset_for_user(self.request.user)
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -800,15 +792,7 @@ class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [IsDFRC()]
 
     def get_queryset(self):
-        user = self.request.user
-        if user.role == 'ENCADRANT':
-            return formateurs_queryset_for_user(user)
-        sec = _secretariat_scope(user)
-        if sec is not None:
-            if not sec:
-                return Formateur.objects.none()
-            return Formateur.objects.filter(secretariats=sec).distinct()
-        return Formateur.objects.all()
+        return formateurs_queryset_for_user(self.request.user)
 
     def perform_update(self, serializer):
         instance = serializer.save()

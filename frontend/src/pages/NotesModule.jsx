@@ -85,12 +85,13 @@ export default function NotesModule() {
 
   const colonnesById = Object.fromEntries(colonnes.map(c => [c.id, c]))
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     setLoading(true)
     try {
+      const opts = signal ? { signal } : {}
       const [modRes, notesRes] = await Promise.all([
-        api.get(`/formations/${formationId}/modules/${moduleId}/`),
-        api.get(`/formations/${formationId}/modules/${moduleId}/notes/`),
+        api.get(`/formations/${formationId}/modules/${moduleId}/`, opts),
+        api.get(`/formations/${formationId}/modules/${moduleId}/notes/`, opts),
       ])
       setModule(modRes.data)
       const cols = notesRes.data.colonnes || []
@@ -112,14 +113,20 @@ export default function NotesModule() {
       })
       setDraft(init)
       setDirty(false)
-    } catch {
-      showToast('Erreur lors du chargement', 'error')
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        showToast('Erreur lors du chargement', 'error')
+      }
     } finally {
       setLoading(false)
     }
   }, [formationId, moduleId, showToast])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    const ac = new AbortController()
+    fetchData(ac.signal)
+    return () => ac.abort()
+  }, [fetchData])
 
   const updateDraftNote = (pid, colonneId, value) => {
     setDraft(d => {

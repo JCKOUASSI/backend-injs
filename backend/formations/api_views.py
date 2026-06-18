@@ -23,6 +23,7 @@ from presences.models import Pointage, SessionModule as PresenceSessionModule, A
 from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
+from .access import formateurs_queryset_for_user
 from .formateur_privacy import (
     can_view_formateur_sensitive_data,
     can_edit_formateur_sensitive_data,
@@ -828,7 +829,7 @@ def formateur_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
     
-    queryset = Formateur.objects.all()
+    queryset = formateurs_queryset_for_user(request.user)
     
     # Apply search
     search = request.query_params.get('search')
