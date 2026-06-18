@@ -93,14 +93,14 @@ class Command(BaseCommand):
                     continue
                 st = row['stats']
                 meta = row.get('meta') or {}
+                inferred = meta.get('inferred_groupe') or '?'
                 self.stdout.write(
                     f'  #{mid} → module #{surv.id} '
-                    f'({surv.intitule} / {surv.groupe}) '
+                    f'({surv.intitule} / {surv.groupe}, groupe audit≈{inferred}) '
                     f'[formation_id={meta.get("formation_id")}] : '
                     f'{st["updated"]} mise(s) à jour, '
                     f'{st["missing"]} EDT manquant(s), '
-                    f'{st.get("already_complete", 0)} déjà complète(s), '
-                    f'{st.get("no_slot", 0)} sans date/numéro audit'
+                    f'{st.get("already_complete", 0)} déjà complète(s)'
                 )
 
             self.stdout.write(

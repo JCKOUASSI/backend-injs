@@ -118,74 +118,179 @@ def _overlap_score(deleted_slots, module):
     return len(deleted_dates & {d for d, _ in surv_slots})
 
 
+def _session_windows(events):
+    """Fenêtres (début, fin) de chaque séance orpheline."""
+    from datetime import timedelta
+
+    windows = []
+    for event in events.values():
+        start = event.get('start')
+        stop = event.get('stop')
+        if start and stop:
+            windows.append((start, stop))
+        elif start:
+            windows.append((start, start + timedelta(hours=10)))
+    return windows
+
+
+def infer_groupe_from_scans(formation_id, windows):
+    """Déduit le GROUPE majoritaire via les badgeages pendant les séances."""
+    from collections import Counter
+
+    if not formation_id or not windows:
+        return None
+
+    scan_actions = (
+        AuditLog.Action.SCAN_SECURE_ENTREE,
+        AuditLog.Action.SCAN_SECURE_SORTIE,
+        AuditLog.Action.FORCE_ENTREE,
+        AuditLog.Action.FORCE_SORTIE,
+    )
+    counts = Counter()
+    for start, stop in windows:
+        scans = AuditLog.objects.filter(
+            formation_id=formation_id,
+            action__in=scan_actions,
+            timestamp__gte=start,
+            timestamp__lte=stop,
+        ).exclude(cible_numero='').filter(cible_type='participant')
+        for scan in scans:
+            participant = Participant.objects.filter(matricule=scan.cible_numero).first()
+            if participant and participant.groupe:
+                counts[participant.groupe.strip().upper()] += 1
+
+    if not counts:
+        return None
+    return counts.most_common(1)[0][0]
+
+
+def _pick_survivor_for_groupe(formation_id, intitule, groupe, audit_dates):
+    """Choisit le survivant le plus « vide » pour ce groupe (souvent le doublon post-0076)."""
+    candidates = list(
+        Module.objects.filter(
+            formation_id=formation_id,
+            intitule__iexact=intitule,
+            groupe__iexact=groupe,
+        ).prefetch_related('sessions')
+    )
+    if not candidates:
+        return None
+
+    def _incomplete_score(module):
+        score = 0
+        for day in audit_dates:
+            for session in module.sessions.filter(date_journee=day):
+                if not session.demarree_le:
+                    score += 2
+                elif not session.terminee_le:
+                    score += 1
+        return score
+
+    candidates.sort(key=lambda m: (-_incomplete_score(m), -m.id))
+    return candidates[0]
+
+
+def _stop_time_fingerprint(events):
+    """Empreinte date → heure de fin (UTC) pour distinguer les groupes parallèles."""
+    fp = {}
+    for event in events.values():
+        day = event.get('date_journee')
+        stop = event.get('stop')
+        if day and stop:
+            fp[day] = stop
+    return fp
+
+
+def _match_by_stop_fingerprint(events, survivors, used_ids):
+    """Apparie via terminee_le déjà présents en base (±2 min)."""
+    fp = _stop_time_fingerprint(events)
+    if not fp:
+        return None
+
+    best = None
+    best_score = 0
+    numeros = {e.get('numero') for e in events.values() if e.get('numero') is not None}
+
+    for mod in survivors:
+        if mod.id in used_ids:
+            continue
+        score = 0
+        for day, stop_ts in fp.items():
+            for numero in numeros or {None}:
+                qs = SessionModule.objects.filter(module=mod, date_journee=day)
+                if numero is not None:
+                    qs = qs.filter(numero=numero)
+                for session in qs:
+                    if session.terminee_le:
+                        delta = abs((session.terminee_le - stop_ts).total_seconds())
+                        if delta <= 120:
+                            score += 1
+        if score > best_score:
+            best_score = score
+            best = mod
+
+    return best if best_score >= 1 else None
+
+
 def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
     """
-    Associe chaque module supprimé à un survivant (même formation + intitulé,
-    score de chevauchement EDT maximal).
+    Associe chaque module supprimé à un survivant :
+    1) GROUPE déduit des badgeages pendant les séances
+    2) Empreinte des heures de fin (terminee_le)
+    3) Secours : chevauchement EDT + tri groupe
     """
     if not deleted_by_module:
         return {}
 
-    by_scope = defaultdict(dict)
+    mapping = {}
+    used_ids = set()
+
     for mid, sessions in deleted_by_module.items():
         meta = meta_by_module.get(mid, {})
         formation_id = meta.get('formation_id')
-        intitule = (meta.get('intitule') or '').upper()
+        intitule = (meta.get('intitule') or '').strip()
         if not intitule:
             continue
-        by_scope[(formation_id, intitule)][mid] = sessions
 
-    mapping = {}
-    for (formation_id, intitule_key), modules_dict in by_scope.items():
-        survivors_qs = Module.objects.filter(intitule__iexact=intitule_key)
-        if formation_id:
-            survivors_qs = survivors_qs.filter(formation_id=formation_id)
-        survivors = list(survivors_qs.prefetch_related('sessions'))
+        audit_dates = _event_dates(sessions)
+        survivors = list(
+            Module.objects.filter(
+                formation_id=formation_id,
+                intitule__iexact=intitule,
+            ).prefetch_related('sessions')
+        )
         if not survivors:
             continue
 
-        deleted_items = []
-        for mid, sessions in modules_dict.items():
+        chosen = None
+        inferred_groupe = infer_groupe_from_scans(formation_id, _session_windows(sessions))
+        if inferred_groupe:
+            chosen = _pick_survivor_for_groupe(
+                formation_id, intitule, inferred_groupe, audit_dates,
+            )
+            if chosen and chosen.id in used_ids:
+                chosen = None
+
+        if not chosen:
+            chosen = _match_by_stop_fingerprint(sessions, survivors, used_ids)
+
+        if not chosen:
             slots = _event_slot_set(sessions)
-            dates = _event_dates(sessions)
-            if not slots and not dates:
-                continue
-            deleted_items.append((mid, sessions, slots, dates, _first_start(sessions)))
-
-        deleted_items.sort(key=lambda x: (-len(x[2]) or -len(x[3]), x[4]))
-        used_ids = set()
-
-        for mid, sessions, slots, dates, first_start in deleted_items:
             scored = []
             for mod in survivors:
                 if mod.id in used_ids:
                     continue
                 score = _overlap_score(slots, mod)
-                if not score and dates:
-                    surv_dates = {s.date_journee for s in mod.sessions.all()}
-                    score = len(dates & surv_dates)
                 if score > 0:
                     scored.append((score, _groupe_sort_key(mod), mod))
-            if not scored:
-                continue
-            scored.sort(key=lambda x: (-x[0], x[1]))
-            chosen = scored[0][2]
+            if scored:
+                scored.sort(key=lambda x: (-x[0], x[1]))
+                chosen = scored[0][2]
+
+        if chosen:
             mapping[mid] = chosen
             used_ids.add(chosen.id)
-
-        # Second passage : appariement par ordre chronologique si même score.
-        unmapped = [mid for mid in modules_dict if mid not in mapping]
-        free_survivors = [m for m in survivors if m.id not in used_ids]
-        if unmapped and free_survivors:
-            unmapped_items = [
-                (mid, modules_dict[mid], _first_start(modules_dict[mid]))
-                for mid in unmapped
-            ]
-            unmapped_items.sort(key=lambda x: x[2])
-            free_survivors.sort(key=_groupe_sort_key)
-            for (mid, _, _), surv in zip(unmapped_items, free_survivors):
-                mapping[mid] = surv
-                used_ids.add(surv.id)
+            meta_by_module[mid]['inferred_groupe'] = inferred_groupe
 
     return mapping
 
