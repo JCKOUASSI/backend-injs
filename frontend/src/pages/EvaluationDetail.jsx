@@ -65,6 +65,12 @@ export default function EvaluationDetail() {
   const [savingQ, setSavingQ]       = useState(false)
   const [newChoixLabel, setNewChoixLabel] = useState('')
 
+  const [refGroupes, setRefGroupes] = useState([])
+  const [editGroupes, setEditGroupes] = useState(false)
+  const [groupesDraft, setGroupesDraft] = useState([])
+  const [savingGroupes, setSavingGroupes] = useState(false)
+  const [filterGroupeRes, setFilterGroupeRes] = useState('')
+
   const fetchQuestionnaire = useCallback(async () => {
     setLoading(true)
     try {
@@ -83,6 +89,13 @@ export default function EvaluationDetail() {
     try {
       const { data } = await api.get(`/evaluations/questionnaires/${id}/resultats/`)
       setResultats(data)
+      const groupes = Object.keys(data.par_groupe || {})
+      if (groupes.length) {
+        const avecReponses = groupes.find(g => (data.par_groupe[g]?.nb_soumissions || 0) > 0)
+        setFilterGroupeRes(prev => (prev && groupes.includes(prev) ? prev : (avecReponses || groupes[0])))
+      } else {
+        setFilterGroupeRes('')
+      }
     } catch {
       showToast('Erreur chargement résultats', 'error')
     } finally {
@@ -92,6 +105,18 @@ export default function EvaluationDetail() {
 
   useEffect(() => { fetchQuestionnaire() }, [fetchQuestionnaire])
   useEffect(() => { if (tab === 'resultats') fetchResultats() }, [tab, fetchResultats])
+
+  useEffect(() => {
+    api.get('/formations/referentiels/')
+      .then(({ data }) => setRefGroupes(data.groupes || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (questionnaire && !editGroupes) {
+      setGroupesDraft(questionnaire.groupes || [])
+    }
+  }, [questionnaire, editGroupes])
 
   // ── Statut ──────────────────────────────────────────────────────────────────
   const handleStatut = async (statut) => {
@@ -172,12 +197,64 @@ export default function EvaluationDetail() {
     }
   }
 
+  const toggleGroupeDraft = (groupe) => {
+    setGroupesDraft(prev =>
+      prev.includes(groupe) ? prev.filter(g => g !== groupe) : [...prev, groupe]
+    )
+  }
+
+  const saveGroupes = async () => {
+    setSavingGroupes(true)
+    try {
+      await api.patch(`/evaluations/questionnaires/${id}/`, { groupes: groupesDraft })
+      showToast('Groupes mis à jour', 'success')
+      setEditGroupes(false)
+      fetchQuestionnaire()
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur lors de la mise à jour des groupes', 'error')
+    } finally {
+      setSavingGroupes(false)
+    }
+  }
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportGroupe = async (fmt, groupe, { tous = false } = {}) => {
+    const g = groupe || filterGroupeRes
+    if (!tous && !g) {
+      showToast('Sélectionnez un groupe à exporter', 'error')
+      return
+    }
+    try {
+      const params = new URLSearchParams()
+      if (tous) params.set('tous', '1')
+      else params.set('groupe', g)
+      const q = params.toString() ? `?${params}` : ''
+      const { blob, fileName } = await api.getBlob(`/evaluations/questionnaires/${id}/export/${fmt}/${q}`)
+      const ext = fmt === 'pdf' ? 'pdf' : 'xlsx'
+      downloadBlob(blob, fileName || `evaluation_${id}_${(g || 'tous_groupes').replace(/\s+/g, '_')}.${ext}`)
+      showToast('Export téléchargé', 'success')
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur lors de l\'export', 'error')
+    }
+  }
+
   const isLocked = questionnaire?.statut === 'PUBLIE'
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (!questionnaire) return null
 
-  const totalReponses = resultats?.nb_soumissions ?? 0
+  const groupesResultats = Object.keys(resultats?.par_groupe || {}).sort()
+  const statsGroupe = filterGroupeRes ? resultats?.par_groupe?.[filterGroupeRes] : null
+  const questionsResultats = statsGroupe?.questions || resultats?.questions || []
+  const totalReponses = statsGroupe?.nb_soumissions ?? resultats?.nb_soumissions ?? 0
 
   return (
     <div>
@@ -224,12 +301,62 @@ export default function EvaluationDetail() {
               </button>
             )}
             {questionnaire.statut !== 'BROUILLON' && (
-              <Link to={`/evaluations/${id}/analyse`} className="btn btn-outline-primary btn-sm">
-                <i className="bi bi-graph-up-arrow me-1"></i>Analyse qualitative
+              <Link to={`/evaluations/${id}/analyse?tab=graphiques`} className="btn btn-outline-primary btn-sm">
+                <i className="bi bi-graph-up-arrow me-1"></i>Analyse & graphiques
               </Link>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Ciblage groupes — modifiable même une fois publié */}
+      <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: editGroupes ? '0.75rem' : 0 }}>
+          <div>
+            <h6 style={{ margin: 0, fontWeight: 700 }}>
+              <i className="bi bi-people me-2" style={{ color: '#e65100' }}></i>
+              Groupes ciblés
+            </h6>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Ajoutez un groupe pour ouvrir le questionnaire à de nouveaux auditeurs. Les réponses existantes sont conservées.
+            </p>
+          </div>
+          {!editGroupes ? (
+            <button className="btn btn-sm btn-outline-primary" onClick={() => { setGroupesDraft(questionnaire.groupes || []); setEditGroupes(true) }}>
+              <i className="bi bi-pencil me-1"></i>Modifier les groupes
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setEditGroupes(false)} disabled={savingGroupes}>Annuler</button>
+              <button type="button" className="btn btn-sm btn-primary" onClick={saveGroupes} disabled={savingGroupes}>
+                {savingGroupes ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          )}
+        </div>
+        {editGroupes ? (
+          <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignContent: 'flex-start', padding: '0.25rem' }}>
+            {refGroupes.map(g => (
+              <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: groupesDraft.includes(g) ? '#e65100' : 'var(--border)', background: groupesDraft.includes(g) ? '#fff3e0' : 'transparent', color: groupesDraft.includes(g) ? '#e65100' : 'inherit', fontSize: '0.85rem', fontWeight: groupesDraft.includes(g) ? 700 : 400 }}>
+                <input type="checkbox" style={{ display: 'none' }} checked={groupesDraft.includes(g)} onChange={() => toggleGroupeDraft(g)} />
+                {g}
+              </label>
+            ))}
+            {refGroupes.length === 0 && (
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Aucun groupe disponible</span>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+            {(questionnaire.groupes || []).length === 0 ? (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Tous les groupes (aucune restriction)</span>
+            ) : (
+              (questionnaire.groupes || []).map(g => (
+                <span key={g} style={{ fontSize: '0.82rem', background: '#fff3e0', color: '#e65100', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* Onglets */}
@@ -349,21 +476,71 @@ export default function EvaluationDetail() {
             <div className="loading"><div className="spinner"></div></div>
           ) : (
             <>
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              {groupesResultats.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+                  {groupesResultats.map(g => {
+                    const nb = resultats.par_groupe[g]?.nb_soumissions || 0
+                    const actif = filterGroupeRes === g
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setFilterGroupeRes(g)}
+                        style={{
+                          padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: actif ? 700 : 500,
+                          border: actif ? '2px solid #e65100' : '1px solid var(--border)',
+                          background: actif ? '#fff3e0' : 'transparent',
+                          color: actif ? '#e65100' : 'inherit',
+                        }}
+                      >
+                        {g}
+                        <span style={{ marginLeft: '0.4rem', opacity: 0.75 }}>({nb})</span>
+                      </button>
+                    )
+                  })}
+                  </div>
+                  {filterGroupeRes && (
+                    <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                      <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => handleExportGroupe('pdf')} title={`Tirer PDF — ${filterGroupeRes}`}>
+                        <i className="bi bi-file-earmark-pdf"></i>
+                      </button>
+                      <button type="button" className="btn btn-sm btn-outline-success" onClick={() => handleExportGroupe('excel')} title={`Tirer Excel — ${filterGroupeRes}`}>
+                        <i className="bi bi-file-earmark-excel"></i>
+                      </button>
+                      {groupesResultats.length > 1 && (
+                        <button type="button" className="btn btn-sm btn-outline-success" onClick={() => handleExportGroupe('excel', null, { tous: true })} title="Tirer Excel — tous les groupes">
+                          <i className="bi bi-files"></i>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div className="card" style={{ padding: '1rem 1.5rem', flex: '0 0 auto' }}>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>{totalReponses}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>soumission{totalReponses !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                    soumission{totalReponses !== 1 ? 's' : ''}
+                    {filterGroupeRes && <span> · {filterGroupeRes}</span>}
+                  </div>
                 </div>
+                {filterGroupeRes && resultats?.nb_soumissions_total > totalReponses && (
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {resultats.nb_soumissions_total} soumissions au total (tous groupes)
+                  </span>
+                )}
               </div>
 
-              {!resultats?.questions?.length ? (
+              {!questionsResultats.length ? (
                 <div className="empty-state">
                   <i className="bi bi-inbox" style={{ fontSize: '2.5rem', color: 'var(--text-muted)' }}></i>
-                  <p>Aucune réponse encore</p>
+                  <p>{filterGroupeRes ? `Aucune réponse pour ${filterGroupeRes}` : 'Aucune réponse encore'}</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {resultats.questions.map((q, idx) => (
+                  {questionsResultats.map((q, idx) => (
                     <div key={q.id} className="card" style={{ padding: '1.25rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'baseline' }}>
                         <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.9rem' }}>Q{idx + 1}</span>

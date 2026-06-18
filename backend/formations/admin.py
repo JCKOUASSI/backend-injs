@@ -25,6 +25,7 @@ from .models import (
     FinanceSettings,
 )
 from presences.models import AuditLog
+from presences.admin_rattrapage_badgeage import AdminRattrapageBadgeageMixin
 FormationFormateur = ModuleFormateur
 
 
@@ -185,10 +186,16 @@ class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
 
 
 @admin.register(Participant)
-class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
+class ParticipantAdmin(
+    AdminRattrapageBadgeageMixin,
+    ParticipantAdminScopeMixin,
+    AuditLogAdminMixin,
+    ModelAdmin,
+):
     audit_action_create = AuditLog.Action.PARTICIPANT_CREATE
     audit_action_update = AuditLog.Action.PARTICIPANT_UPDATE
     audit_action_delete = AuditLog.Action.PARTICIPANT_DELETE
+    actions = ['forcer_badgeage_rattrapage']
     list_display = [
         'matricule', 'nom', 'prenom', 'sexe',
         'categorie', 'grade', 'groupe', 'vague',
@@ -242,9 +249,16 @@ class ParticipantAdmin(ParticipantAdminScopeMixin, AuditLogAdminMixin, ModelAdmi
 
 
 @admin.register(ModuleParticipant)
-class ModuleParticipantAdmin(AdminSidebarHiddenMixin, AdminScopeMixin, ModelAdmin):
+class ModuleParticipantAdmin(
+    AdminRattrapageBadgeageMixin,
+    AdminSidebarHiddenMixin,
+    AdminScopeMixin,
+    ModelAdmin,
+):
     admin_scope_secretariat_field = 'module__secretariat'
     admin_scope_superviseur_field = 'module__superviseur'
+    rattrapage_participant_id_field = 'participant_id'
+    actions = ['forcer_badgeage_rattrapage']
     list_display = [
         'module', 'formation_label', 'grade_module', 'groupe_module',
         'participant', 'matricule_participant', 'inscrit_le',
@@ -545,7 +559,7 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
     ordering = ['-date_journee', '-heure_debut_prevue', 'numero']
     list_per_page = 50
     date_hierarchy = 'date_journee'
-    actions = ['reactiver_sessions']
+    actions = ['reactiver_sessions', 'rattrapage_badgeage_seance']
     fieldsets = (
         ("Rattachement", {
             'fields': ('module',),
@@ -679,6 +693,21 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, ModelAdmin):
                 f"{skipped} séance(s) ignorée(s) (non terminées ou jamais démarrées).",
                 level='warning',
             )
+
+    @admin.action(description='Rattrapage badgeage (présents / absents)')
+    def rattrapage_badgeage_seance(self, request, queryset):
+        if queryset.count() != 1:
+            self.message_user(
+                request,
+                _('Sélectionnez une seule séance.'),
+                level='warning',
+            )
+            return None
+        session = queryset.select_related('module').first()
+        url = reverse('admin:formations_participant_rattrapage_badgeage')
+        return HttpResponseRedirect(
+            f'{url}?module={session.module_id}&session={session.id}',
+        )
 
 
 @admin.register(Formateur)

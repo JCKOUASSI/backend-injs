@@ -49,6 +49,11 @@ class Questionnaire(models.Model):
         blank=True,
         help_text="Liste des grades ciblés (A3, A4, B1…). Vide = tous.",
     )
+    groupes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Liste des groupes ciblés (GROUPE 1, GROUPE 2…). Vide = tous.",
+    )
     createur = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

@@ -9,6 +9,7 @@ urlpatterns = [
     path('questionnaires/<int:pk>/statut/', views.questionnaire_publier, name='eval-questionnaire-statut'),
     path('questionnaires/<int:pk>/resultats/', views.resultats_questionnaire, name='eval-questionnaire-resultats'),
     path('questionnaires/<int:pk>/analyse/', views.analyse_qualitative, name='eval-questionnaire-analyse'),
+    path('questionnaires/<int:pk>/export/<str:fmt>/', views.export_questionnaire_analyse, name='eval-questionnaire-export'),
 
     # ── Questions (superviseurs) ──────────────────────────────────────
     path('questionnaires/<int:questionnaire_pk>/questions/', views.question_create, name='eval-question-create'),

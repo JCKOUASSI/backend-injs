@@ -26,7 +26,7 @@ class QuestionnaireListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Questionnaire
         fields = [
-            'id', 'titres', 'cible', 'statut', 'categories', 'grades',
+            'id', 'titres', 'cible', 'statut', 'categories', 'grades', 'groupes',
             'module', 'module_intitule',
             'createur', 'createur_nom',
             'date_ouverture', 'date_fermeture',
@@ -52,7 +52,7 @@ class QuestionnaireDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Questionnaire
         fields = [
-            'id', 'titres', 'cible', 'statut', 'categories', 'grades',
+            'id', 'titres', 'cible', 'statut', 'categories', 'grades', 'groupes',
             'module', 'module_intitule',
             'createur', 'createur_nom',
             'date_ouverture', 'date_fermeture',
@@ -145,7 +145,7 @@ class ResultatsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Questionnaire
-        fields = ['id', 'titres', 'cible', 'statut', 'categories', 'grades', 'nb_soumissions', 'questions']
+        fields = ['id', 'titres', 'cible', 'statut', 'categories', 'grades', 'groupes', 'nb_soumissions', 'questions']
 
     def get_questions(self, obj):
         from django.db.models import Avg, Count

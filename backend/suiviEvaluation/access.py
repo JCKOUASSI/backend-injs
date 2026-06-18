@@ -1,10 +1,50 @@
 """Périmètre d'accès aux questionnaires d'évaluation."""
+import re
+
 from django.db.models import Q
 
 from authentication.role_groups import GLOBAL_ACCESS_ROLES, SECRETARIAT_ROLES
 from formations.access import modules_queryset_for_user
 
 from .models import Questionnaire
+
+
+def _normalize_groupe_value(value):
+    """Normalise les variantes de groupe (1, 01, GROUPE 1) vers GROUPE N."""
+    if not value:
+        return ''
+    compact = str(value).strip().upper()
+    match = re.fullmatch(r'(?:GROUPE\s*)?0*(\d+)', compact, flags=re.IGNORECASE)
+    if match:
+        return f"GROUPE {int(match.group(1))}"
+    return compact
+
+
+def questionnaire_accessible_to_participant(questionnaire, participant):
+    """
+    True si le questionnaire publié est destiné à cet auditeur
+    (filtres catégories / grades / groupes).
+    """
+    grade = (participant.grade or '').strip().upper()
+    categorie = grade[0] if grade else ''
+    participant_groupe = _normalize_groupe_value(participant.groupe)
+
+    cats = questionnaire.categories or []
+    grades = questionnaire.grades or []
+    groupes = questionnaire.groupes or []
+
+    if groupes:
+        groupes_norm = {_normalize_groupe_value(g) for g in groupes}
+        if not participant_groupe or participant_groupe not in groupes_norm:
+            return False
+
+    if not cats and not grades:
+        return True
+    if categorie and categorie in cats:
+        return True
+    if grade and grade in grades:
+        return True
+    return False
 
 
 def _scoped_module_intitules(user):
