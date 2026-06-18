@@ -84,16 +84,23 @@ class Command(BaseCommand):
                 mid = row['deleted_module_id']
                 surv = row['survivor']
                 if not surv:
+                    meta = row.get('meta') or {}
                     self.stdout.write(self.style.WARNING(
-                        f'  module supprimé #{mid} : aucun survivant apparié'
+                        f'  module supprimé #{mid} '
+                        f'(formation_id={meta.get("formation_id")}) : '
+                        f'aucun survivant apparié'
                     ))
                     continue
                 st = row['stats']
+                meta = row.get('meta') or {}
                 self.stdout.write(
                     f'  #{mid} → module #{surv.id} '
-                    f'({surv.intitule} / {surv.groupe}) : '
-                    f'{st["updated"]} séance(s) mises à jour, '
-                    f'{st["missing"]} créneau(x) EDT manquant(s)'
+                    f'({surv.intitule} / {surv.groupe}) '
+                    f'[formation_id={meta.get("formation_id")}] : '
+                    f'{st["updated"]} mise(s) à jour, '
+                    f'{st["missing"]} EDT manquant(s), '
+                    f'{st.get("already_complete", 0)} déjà complète(s), '
+                    f'{st.get("no_slot", 0)} sans date/numéro audit'
                 )
 
             self.stdout.write(
@@ -117,7 +124,9 @@ class Command(BaseCommand):
                 ).values_list('formation_id', flat=True).distinct()
                 pt_audit = pt_audit.filter(formation_id__in=formation_ids)
 
-            pt_stats = recover_pointages_from_audit(pt_audit, dry_run=dry_run)
+            pt_stats = recover_pointages_from_audit(
+                pt_audit, dry_run=dry_run, intitule_hint=intitule,
+            )
             self.stdout.write(self.style.HTTP_INFO('\n--- Badgeages ---'))
             self.stdout.write(
                 f'{prefix}Créés : {pt_stats["created"]}, '

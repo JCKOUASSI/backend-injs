@@ -22,6 +22,15 @@ def _parse_date(val):
         return None
 
 
+def _parse_numero(val):
+    if val is None or val == '':
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _groupe_sort_key(module):
     g = (module.groupe or '').upper()
     nums = re.findall(r'\d+', g)
@@ -31,9 +40,11 @@ def _groupe_sort_key(module):
 def collect_orphan_session_events(audit_qs, existing_session_ids, existing_module_ids):
     """
     Regroupe les événements SEANCE_START/STOP dont session_id n'existe plus.
-    Retourne {deleted_module_id: {session_id: {start, stop, date, numero, intitule}}}.
+
+    Retourne (events_by_module, meta_by_module) où meta contient formation_id et intitulé.
     """
     by_module = defaultdict(lambda: defaultdict(dict))
+    meta_by_module = {}
 
     for log in audit_qs.filter(action__in=(
         AuditLog.Action.SEANCE_START,
@@ -50,13 +61,23 @@ def collect_orphan_session_events(audit_qs, existing_session_ids, existing_modul
         slot = by_module[mid][sid]
         slot['intitule'] = extra.get('module_intitule') or ''
         slot['date_journee'] = _parse_date(extra.get('date_journee'))
-        slot['numero'] = extra.get('session_numero')
+        slot['numero'] = _parse_numero(
+            extra.get('session_numero') if extra.get('session_numero') is not None
+            else extra.get('numero')
+        )
+        slot['formation_id'] = log.formation_id
         if log.action == AuditLog.Action.SEANCE_START:
             slot['start'] = log.timestamp
         else:
             slot['stop'] = log.timestamp
 
-    return by_module
+        if mid not in meta_by_module:
+            meta_by_module[mid] = {
+                'formation_id': log.formation_id,
+                'intitule': (extra.get('module_intitule') or '').strip(),
+            }
+
+    return by_module, meta_by_module
 
 
 def _session_slot_set(module):
@@ -74,95 +95,170 @@ def _event_slot_set(events):
     )
 
 
+def _event_dates(events):
+    return frozenset(
+        e['date_journee'] for e in events.values() if e.get('date_journee')
+    )
+
+
 def _first_start(events):
     starts = [e['start'] for e in events.values() if e.get('start')]
     return min(starts) if starts else timezone.make_aware(datetime(1970, 1, 1))
 
 
-def match_deleted_modules_to_survivors(deleted_by_module):
+def _overlap_score(deleted_slots, module):
+    if not deleted_slots:
+        deleted_dates = set()
+    else:
+        deleted_dates = {d for d, _ in deleted_slots}
+    surv_slots = _session_slot_set(module)
+    if deleted_slots:
+        return len(deleted_slots & surv_slots)
+    # Secours : chevauchement par dates seules.
+    return len(deleted_dates & {d for d, _ in surv_slots})
+
+
+def match_deleted_modules_to_survivors(deleted_by_module, meta_by_module):
     """
-    Associe chaque module supprimé (id) à un module encore présent
-    ayant le même intitulé et les mêmes créneaux EDT.
+    Associe chaque module supprimé à un survivant (même formation + intitulé,
+    score de chevauchement EDT maximal).
     """
     if not deleted_by_module:
         return {}
 
-    by_intitule = defaultdict(dict)
+    by_scope = defaultdict(dict)
     for mid, sessions in deleted_by_module.items():
-        label = (next(iter(sessions.values())).get('intitule') or '').strip()
-        if label:
-            by_intitule[label.upper()][mid] = sessions
+        meta = meta_by_module.get(mid, {})
+        formation_id = meta.get('formation_id')
+        intitule = (meta.get('intitule') or '').upper()
+        if not intitule:
+            continue
+        by_scope[(formation_id, intitule)][mid] = sessions
 
     mapping = {}
-    for intitule_key, modules_dict in by_intitule.items():
-        survivors = list(
-            Module.objects.filter(intitule__iexact=intitule_key)
-            .prefetch_related('sessions')
-        )
+    for (formation_id, intitule_key), modules_dict in by_scope.items():
+        survivors_qs = Module.objects.filter(intitule__iexact=intitule_key)
+        if formation_id:
+            survivors_qs = survivors_qs.filter(formation_id=formation_id)
+        survivors = list(survivors_qs.prefetch_related('sessions'))
         if not survivors:
             continue
 
         deleted_items = []
         for mid, sessions in modules_dict.items():
             slots = _event_slot_set(sessions)
-            if slots:
-                deleted_items.append((mid, sessions, slots, _first_start(sessions)))
+            dates = _event_dates(sessions)
+            if not slots and not dates:
+                continue
+            deleted_items.append((mid, sessions, slots, dates, _first_start(sessions)))
 
-        if not deleted_items:
-            continue
+        deleted_items.sort(key=lambda x: (-len(x[2]) or -len(x[3]), x[4]))
+        used_ids = set()
 
-        # Regrouper par signature EDT identique (groupes parallèles).
-        by_slots = defaultdict(list)
-        for item in deleted_items:
-            by_slots[item[2]].append(item)
+        for mid, sessions, slots, dates, first_start in deleted_items:
+            scored = []
+            for mod in survivors:
+                if mod.id in used_ids:
+                    continue
+                score = _overlap_score(slots, mod)
+                if not score and dates:
+                    surv_dates = {s.date_journee for s in mod.sessions.all()}
+                    score = len(dates & surv_dates)
+                if score > 0:
+                    scored.append((score, _groupe_sort_key(mod), mod))
+            if not scored:
+                continue
+            scored.sort(key=lambda x: (-x[0], x[1]))
+            chosen = scored[0][2]
+            mapping[mid] = chosen
+            used_ids.add(chosen.id)
 
-        for slots, group in by_slots.items():
-            used_ids = {v.id for v in mapping.values()}
-            candidates = [
-                m for m in survivors
-                if slots <= _session_slot_set(m) and m.id not in used_ids
+        # Second passage : appariement par ordre chronologique si même score.
+        unmapped = [mid for mid in modules_dict if mid not in mapping]
+        free_survivors = [m for m in survivors if m.id not in used_ids]
+        if unmapped and free_survivors:
+            unmapped_items = [
+                (mid, modules_dict[mid], _first_start(modules_dict[mid]))
+                for mid in unmapped
             ]
-            if not candidates:
-                continue
-
-            group.sort(key=lambda x: x[3])
-            candidates.sort(key=_groupe_sort_key)
-
-            if len(group) != len(candidates):
-                # Appariement partiel : au moins le premier de chaque côté.
-                for (mid, sessions, _, _), surv in zip(group, candidates):
-                    mapping[mid] = surv
-                continue
-
-            for (mid, sessions, _, _), surv in zip(group, candidates):
+            unmapped_items.sort(key=lambda x: x[2])
+            free_survivors.sort(key=_groupe_sort_key)
+            for (mid, _, _), surv in zip(unmapped_items, free_survivors):
                 mapping[mid] = surv
+                used_ids.add(surv.id)
 
     return mapping
 
 
-def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
-    """Repose demarree_le / terminee_le sur les séances EDT du module conservé."""
-    stats = {'updated': 0, 'skipped': 0, 'missing': 0}
+def _resolve_session(module, date_j, numero, events_for_day):
+    """Retrouve la séance EDT cible (numero exact, sinon séance unique du jour)."""
+    if date_j is None:
+        return None
 
-    for _sid, event in sessions_by_id.items():
-        date_j = event.get('date_journee')
-        numero = event.get('numero')
-        if not date_j or numero is None:
-            stats['skipped'] += 1
-            continue
-
+    if numero is not None:
         try:
-            session = SessionModule.objects.get(
+            return SessionModule.objects.get(
                 module=module,
                 date_journee=date_j,
                 numero=numero,
             )
         except SessionModule.DoesNotExist:
+            pass
+
+    day_sessions = list(
+        SessionModule.objects.filter(module=module, date_journee=date_j).order_by('numero')
+    )
+    if len(day_sessions) == 1:
+        return day_sessions[0]
+
+    # Plusieurs séances le même jour : préférer celle sans démarrage.
+    if numero is not None:
+        for s in day_sessions:
+            if s.numero == numero:
+                return s
+
+    empty = [s for s in day_sessions if not s.demarree_le]
+    if len(empty) == 1:
+        return empty[0]
+
+    return None
+
+
+def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
+    """Repose demarree_le / terminee_le sur les séances EDT du module conservé."""
+    stats = {
+        'updated': 0,
+        'skipped': 0,
+        'missing': 0,
+        'already_complete': 0,
+        'no_slot': 0,
+    }
+
+    # Fusionner par (date, numero) au cas où START/STOP portent sur des session_id distincts.
+    merged = defaultdict(dict)
+    for event in sessions_by_id.values():
+        date_j = event.get('date_journee')
+        numero = event.get('numero')
+        key = (date_j, numero)
+        if not date_j:
+            stats['no_slot'] += 1
+            continue
+        if event.get('start'):
+            merged[key]['start'] = event['start']
+        if event.get('stop'):
+            merged[key]['stop'] = event['stop']
+        merged[key]['date_journee'] = date_j
+        merged[key]['numero'] = numero
+
+    for key, event in merged.items():
+        date_j, numero = key
+        session = _resolve_session(module, date_j, numero, event)
+        if not session:
             stats['missing'] += 1
             continue
 
         if session.demarree_le and session.terminee_le:
-            stats['skipped'] += 1
+            stats['already_complete'] += 1
             continue
 
         updates = []
@@ -201,10 +297,10 @@ def apply_session_recovery(module, sessions_by_id, *, dry_run=False):
 def recover_sessions_from_audit(audit_qs, *, dry_run=False):
     existing_session_ids = set(SessionModule.objects.values_list('id', flat=True))
     existing_module_ids = set(Module.objects.values_list('id', flat=True))
-    deleted_by_module = collect_orphan_session_events(
+    deleted_by_module, meta_by_module = collect_orphan_session_events(
         audit_qs, existing_session_ids, existing_module_ids,
     )
-    mapping = match_deleted_modules_to_survivors(deleted_by_module)
+    mapping = match_deleted_modules_to_survivors(deleted_by_module, meta_by_module)
 
     results = []
     totals = {'modules': 0, 'sessions_updated': 0, 'sessions_missing': 0, 'unmapped': 0}
@@ -217,6 +313,7 @@ def recover_sessions_from_audit(audit_qs, *, dry_run=False):
                 'deleted_module_id': mid,
                 'survivor': None,
                 'stats': None,
+                'meta': meta_by_module.get(mid),
             })
             continue
 
@@ -233,6 +330,7 @@ def recover_sessions_from_audit(audit_qs, *, dry_run=False):
             'deleted_module_id': mid,
             'survivor': survivor,
             'stats': stats,
+            'meta': meta_by_module.get(mid),
         })
 
     return results, totals, mapping
@@ -246,33 +344,41 @@ def _resolve_personne(cible_type, cible_numero):
     return None, cible_type
 
 
-def _find_module_for_scan(log, personne, type_personne):
+def _find_module_for_scan(log, personne, type_personne, *, intitule_hint=''):
     if not log.formation_id or not personne:
         return None
 
+    def _candidates(qs):
+        modules = list(qs.prefetch_related('sessions'))
+        day = timezone.localtime(log.timestamp).date()
+        started = [m for m in modules if m.sessions.filter(
+            date_journee=day, demarree_le__isnull=False,
+        ).exists()]
+        if len(started) == 1:
+            return started[0]
+        if len(modules) == 1:
+            return modules[0]
+        return None
+
     qs = Module.objects.filter(formation_id=log.formation_id)
+    if intitule_hint:
+        qs = qs.filter(intitule__iexact=intitule_hint)
+
     if type_personne == 'participant':
         grade = getattr(personne, 'grade', '') or ''
         groupe = getattr(personne, 'groupe', '') or ''
         vague = getattr(personne, 'vague', '') or ''
-        if grade:
-            qs = qs.filter(grade__iexact=grade)
-        if groupe:
-            qs = qs.filter(groupe__iexact=groupe)
-        if vague:
-            qs = qs.filter(vague__iexact=vague)
-    modules = list(qs.prefetch_related('sessions'))
-    if len(modules) == 1:
-        return modules[0]
-    # Plusieurs modules : celui avec une séance démarrée ce jour-là.
-    day = timezone.localtime(log.timestamp).date()
-    started = [
-        m for m in modules
-        if m.sessions.filter(date_journee=day, demarree_le__isnull=False).exists()
-    ]
-    if len(started) == 1:
-        return started[0]
-    return None
+        for filters in (
+            {'grade__iexact': grade, 'groupe__iexact': groupe, 'vague__iexact': vague},
+            {'grade__iexact': grade, 'groupe__iexact': groupe},
+            {'grade__iexact': grade},
+            {},
+        ):
+            filt = {k: v for k, v in filters.items() if v}
+            hit = _candidates(qs.filter(**filt) if filt else qs)
+            if hit:
+                return hit
+    return _candidates(qs)
 
 
 def _find_session_for_scan(module, ts):
@@ -291,10 +397,9 @@ def _find_session_for_scan(module, ts):
     return sessions[0] if len(sessions) == 1 else None
 
 
-def recover_pointages_from_audit(audit_qs, *, dry_run=False):
+def recover_pointages_from_audit(audit_qs, *, dry_run=False, intitule_hint=''):
     """
     Recrée les pointages dont l'audit existe mais le lien pointage_id est mort.
-    Apparie ENTREE → SORTIE par matricule + séance.
     """
     entree_actions = (
         AuditLog.Action.SCAN_SECURE_ENTREE,
@@ -325,7 +430,9 @@ def recover_pointages_from_audit(audit_qs, *, dry_run=False):
 
     for entree in entrees:
         personne, type_personne = _resolve_personne(entree.cible_type, entree.cible_numero)
-        module = _find_module_for_scan(entree, personne, type_personne)
+        module = _find_module_for_scan(
+            entree, personne, type_personne, intitule_hint=intitule_hint,
+        )
         if not module:
             stats['no_module'] += 1
             continue
