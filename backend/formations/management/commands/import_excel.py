@@ -664,6 +664,7 @@ class Command(BaseCommand):
                 _module_order[obj.id] = existing_max
             _module_order[obj.id] += 1
 
+            statut_excel = self._str(data.get('statut'))
             module_defaults = {
                 'ordre': _module_order[obj.id],
                 'grade': self._normalize_grade(data.get('grade')),
@@ -671,10 +672,11 @@ class Command(BaseCommand):
                 'vague': self._normalize_field(data.get('vague')),
                 'date_debut': date_debut.date() if hasattr(date_debut, 'date') else date_debut,
                 'date_fin': date_fin.date() if hasattr(date_fin, 'date') else date_fin,
-                'statut': self._str(data.get('statut')) or 'PLANIFIEE',
                 # Champ `cycle` (NOT NULL sur certaines bases) : libellé du cycle = formation parente.
                 'cycle': titre,
             }
+            if statut_excel:
+                module_defaults['statut'] = statut_excel
             _site_name = self._str(data.get('site'))
             _bat  = self._str(data.get('batiment'))
             _sal  = self._str(data.get('salle'))
@@ -704,10 +706,22 @@ class Command(BaseCommand):
                 'vague': vague_key,
             }
 
-            _mod, mod_created = Module.objects.update_or_create(
-                **module_lookup,
-                defaults=module_defaults,
-            )
+            existing_mod = Module.objects.filter(**module_lookup).first()
+            if existing_mod:
+                for field, value in module_defaults.items():
+                    setattr(existing_mod, field, value)
+                if statut_excel:
+                    existing_mod.statut = statut_excel
+                existing_mod.save()
+                _mod = existing_mod
+                mod_created = False
+            else:
+                _mod = Module.objects.create(
+                    **module_lookup,
+                    statut=statut_excel or 'PLANIFIEE',
+                    **module_defaults,
+                )
+                mod_created = True
 
             if mod_created:
                 count += 1
