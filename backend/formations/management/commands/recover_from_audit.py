@@ -50,6 +50,12 @@ class Command(BaseCommand):
             ),
         )
 
+        parser.add_argument(
+            '--relink-pointages-only',
+            action='store_true',
+            help='Rattache les pointages existants aux séances du mapping (sans recréer).',
+        )
+
     def handle(self, *args, **options):
         dry_run = options['dry_run']
         since = options['since']
@@ -73,8 +79,8 @@ class Command(BaseCommand):
         prefix = '[dry-run] ' if dry_run else ''
         self.stdout.write(self.style.HTTP_INFO(f'\n{prefix}Reconstitution depuis l\'audit\n'))
 
-        run_sessions = not options['pointages_only']
-        run_pointages = not options['sessions_only']
+        run_sessions = not options['pointages_only'] and not options['relink_pointages_only']
+        run_pointages = not options['sessions_only'] or options['relink_pointages_only']
 
         module_mapping = {}
         deleted_by_module = {}
@@ -177,18 +183,56 @@ class Command(BaseCommand):
                     explicit_mapping=explicit_mapping or None,
                 )
 
-            pt_stats = recover_pointages_from_audit(
-                pt_audit, dry_run=dry_run, intitule_hint=intitule,
-                module_mapping=module_mapping or None,
-                deleted_by_module=deleted_by_module or None,
-            )
+            if options['relink_pointages_only']:
+                from formations.audit_recovery import (
+                    collect_orphan_session_events,
+                    relink_recovered_pointages,
+                )
+                from formations.models import Module, SessionModule
+                if not module_mapping and explicit_mapping:
+                    module_mapping = {
+                        deleted: Module.objects.get(pk=survivor_id)
+                        for deleted, survivor_id in explicit_mapping.items()
+                    }
+                if not deleted_by_module:
+                    session_audit = audit_qs.filter(action__in=(
+                        AuditLog.Action.SEANCE_START,
+                        AuditLog.Action.SEANCE_STOP,
+                    ))
+                    if intitule:
+                        session_audit = session_audit.filter(
+                            extra__module_intitule__iexact=intitule,
+                        )
+                    existing_session_ids = set(SessionModule.objects.values_list('id', flat=True))
+                    existing_module_ids = set(Module.objects.values_list('id', flat=True))
+                    deleted_by_module, _ = collect_orphan_session_events(
+                        session_audit, existing_session_ids, existing_module_ids,
+                    )
+                pt_stats = relink_recovered_pointages(
+                    pt_audit, module_mapping, deleted_by_module, dry_run=dry_run,
+                )
+            else:
+                pt_stats = recover_pointages_from_audit(
+                    pt_audit, dry_run=dry_run, intitule_hint=intitule,
+                    module_mapping=module_mapping or None,
+                    deleted_by_module=deleted_by_module or None,
+                )
             self.stdout.write(self.style.HTTP_INFO('\n--- Badgeages ---'))
-            self.stdout.write(
-                f'{prefix}Créés : {pt_stats["created"]}, '
-                f'ignorés (déjà là) : {pt_stats["skipped"]}, '
-                f'sans module : {pt_stats["no_module"]}, '
-                f'sans séance : {pt_stats["no_session"]}'
-            )
+            if options['relink_pointages_only']:
+                self.stdout.write(
+                    f'{prefix}Rattachés : {pt_stats.get("relinked", 0)}, '
+                    f'déjà corrects : {pt_stats.get("unchanged", 0)}, '
+                    f'sans cible : {pt_stats.get("no_target", 0)}, '
+                    f'sans pointage : {pt_stats.get("no_pointage", 0)}'
+                )
+            else:
+                self.stdout.write(
+                    f'{prefix}Créés : {pt_stats["created"]}, '
+                    f'rattachés : {pt_stats.get("relinked", 0)}, '
+                    f'ignorés (déjà là) : {pt_stats["skipped"]}, '
+                    f'sans module : {pt_stats["no_module"]}, '
+                    f'sans séance : {pt_stats["no_session"]}'
+                )
 
         if dry_run:
             self.stdout.write(self.style.WARNING(

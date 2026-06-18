@@ -737,6 +737,53 @@ def _find_module_for_scan(log, personne, type_personne, *, intitule_hint='', mod
     return _candidates(qs)
 
 
+def _find_scan_target(log, personne, type_personne, module_mapping, deleted_by_module):
+    """
+    Cible (module, séance) d'un badgeage via mapping explicite + groupe participant.
+    Stable même quand plusieurs groupes ont des séances parallèles le même jour.
+    """
+    if not module_mapping or not deleted_by_module or not personne:
+        return None, None
+
+    ts = log.timestamp
+    pg = ''
+    if type_personne == 'participant':
+        pg = (getattr(personne, 'groupe', None) or '').strip().upper()
+
+    best = None
+    for deleted_id, survivor in module_mapping.items():
+        if pg and (survivor.groupe or '').strip().upper() != pg:
+            continue
+        events = deleted_by_module.get(deleted_id, {})
+        for event in events.values():
+            start = event.get('start')
+            stop = event.get('stop')
+            in_window = False
+            if start and stop and start <= ts <= stop:
+                in_window = True
+            elif stop and abs((stop - ts).total_seconds()) <= 900:
+                in_window = True
+            elif start and not stop and abs((start - ts).total_seconds()) <= 900:
+                in_window = True
+            if not in_window:
+                continue
+            date_j = event.get('date_journee')
+            numero = event.get('numero')
+            session = _resolve_session(survivor, date_j, numero, event)
+            if not session:
+                continue
+            dist = 0
+            if start:
+                dist = abs((start - ts).total_seconds())
+            rank = (dist, deleted_id)
+            if best is None or rank < best[0]:
+                best = (rank, survivor, session)
+
+    if not best:
+        return None, None
+    return best[1], best[2]
+
+
 def _find_module_from_audit_windows(log, module_mapping, deleted_by_module, inscriptions=None):
     """Retrouve le module survivant via fenêtres séance audit + inscriptions."""
     ts = log.timestamp
@@ -792,6 +839,67 @@ def _find_session_for_scan(module, ts):
     return None
 
 
+def relink_recovered_pointages(
+    audit_qs, module_mapping, deleted_by_module, *, dry_run=False,
+):
+    """Rattache les pointages existants à la bonne séance (post-recover)."""
+    entree_actions = (
+        AuditLog.Action.SCAN_SECURE_ENTREE,
+        AuditLog.Action.FORCE_ENTREE,
+    )
+    survivor_ids = {m.id for m in module_mapping.values()}
+    stats = {'relinked': 0, 'unchanged': 0, 'no_target': 0, 'no_pointage': 0}
+
+    for log in audit_qs.filter(action__in=entree_actions).exclude(cible_numero=''):
+        personne, type_personne = _resolve_personne(log.cible_type, log.cible_numero)
+        if not personne:
+            stats['no_target'] += 1
+            continue
+
+        _module, session = _find_scan_target(
+            log, personne, type_personne, module_mapping, deleted_by_module,
+        )
+        if not session:
+            stats['no_target'] += 1
+            continue
+
+        lookup = {
+            'date_journee': session.date_journee,
+            'session__module_id__in': survivor_ids,
+        }
+        if type_personne == 'participant':
+            lookup['participant'] = personne
+        elif type_personne == 'formateur':
+            lookup['formateur'] = personne
+        else:
+            stats['no_target'] += 1
+            continue
+
+        candidates = Pointage.objects.filter(**lookup)
+        on_target = candidates.filter(session=session).exists()
+        if on_target:
+            stats['unchanged'] += 1
+            continue
+
+        wrong = list(candidates.exclude(session=session))
+        if not wrong:
+            stats['no_pointage'] += 1
+            continue
+
+        pt = min(
+            wrong,
+            key=lambda p: abs((p.timestamp_entree - log.timestamp).total_seconds()),
+        )
+
+        if not dry_run:
+            pt.session = session
+            pt.date_journee = session.date_journee
+            pt.save(update_fields=['session', 'date_journee', 'updated_at'])
+        stats['relinked'] += 1
+
+    return stats
+
+
 def recover_pointages_from_audit(
     audit_qs, *, dry_run=False, intitule_hint='',
     module_mapping=None, deleted_by_module=None,
@@ -824,27 +932,39 @@ def recover_pointages_from_audit(
         key = (log.cible_numero, log.cible_type, log.formation_id)
         sorties_by_key[key].append(log)
 
-    stats = {'created': 0, 'skipped': 0, 'no_module': 0, 'no_session': 0}
+    stats = {'created': 0, 'skipped': 0, 'no_module': 0, 'no_session': 0, 'relinked': 0}
 
     inscriptions = None
     if module_mapping:
         survivor_ids = [m.id for m in module_mapping.values()]
         inscriptions = _inscriptions_by_matricule(survivor_ids, intitule_hint)
 
+    use_mapping = bool(module_mapping and deleted_by_module)
+
     for entree in entrees:
         personne, type_personne = _resolve_personne(entree.cible_type, entree.cible_numero)
-        module = _find_module_for_scan(
-            entree, personne, type_personne,
-            intitule_hint=intitule_hint,
-            module_mapping=module_mapping,
-            deleted_by_module=deleted_by_module,
-            inscriptions_by_matricule=inscriptions,
-        )
+        module = None
+        session = None
+
+        if use_mapping:
+            module, session = _find_scan_target(
+                entree, personne, type_personne, module_mapping, deleted_by_module,
+            )
+
+        if not module:
+            module = _find_module_for_scan(
+                entree, personne, type_personne,
+                intitule_hint=intitule_hint,
+                module_mapping=module_mapping,
+                deleted_by_module=deleted_by_module,
+                inscriptions_by_matricule=inscriptions,
+            )
         if not module:
             stats['no_module'] += 1
             continue
 
-        session = _find_session_for_scan(module, entree.timestamp)
+        if not session:
+            session = _find_session_for_scan(module, entree.timestamp)
         if not session:
             stats['no_session'] += 1
             continue
@@ -856,7 +976,7 @@ def recover_pointages_from_audit(
                 sortie_log = candidate
                 break
 
-        lookup = {'session': session, 'date_journee': timezone.localtime(entree.timestamp).date()}
+        lookup = {'session': session, 'date_journee': session.date_journee}
         if type_personne == 'participant':
             lookup['participant'] = personne
         elif type_personne == 'formateur':
@@ -873,7 +993,7 @@ def recover_pointages_from_audit(
         with transaction.atomic():
             pt = Pointage(
                 session=session,
-                date_journee=lookup['date_journee'],
+                date_journee=session.date_journee,
                 timestamp_entree=entree.timestamp,
                 timestamp_sortie=sortie_log.timestamp if sortie_log else None,
                 device_id=entree.device_id or '',
@@ -887,5 +1007,13 @@ def recover_pointages_from_audit(
                 pt.calculer_duree()
             pt.save()
             stats['created'] += 1
+
+    if use_mapping:
+        relink_stats = relink_recovered_pointages(
+            audit_qs, module_mapping, deleted_by_module, dry_run=dry_run,
+        )
+        stats['relinked'] = relink_stats['relinked']
+        stats['relink_unchanged'] = relink_stats['unchanged']
+        stats['relink_no_target'] = relink_stats['no_target']
 
     return stats
