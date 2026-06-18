@@ -178,14 +178,14 @@ ROLE_POLICY = {
         "actions": ("view",),
     },
     User.Role.CHEF_SECRETARIAT: {
-        "apps": ("formations", "presences"),
+        "apps": ("formations", "presences", "suiviEvaluation"),
         "actions": ("view", "add", "change", "delete"),
         # Interdit uniquement la création de nouvelles fiches auditeur.
         # Toutes les autres actions (y compris suppression) restent autorisées.
         "exclude_codenames": ("add_participant",),
     },
     User.Role.SECRETARIAT: {
-        "apps": ("formations", "presences"),
+        "apps": ("formations", "presences", "suiviEvaluation"),
         "actions": ("view", "add", "change", "delete"),
         "exclude_codenames": ("add_participant",),
     },
@@ -194,8 +194,8 @@ ROLE_POLICY = {
         "actions": ("view",),
     },
     User.Role.ENCADRANT: {
-        "apps": ("formations", "presences"),
-        "actions": ("view", "change"),
+        "apps": ("formations", "presences", "suiviEvaluation"),
+        "actions": ("view", "add", "change", "delete"),
     },
     User.Role.SUPERVISEUR: {
         "apps": ("suiviEvaluation",),

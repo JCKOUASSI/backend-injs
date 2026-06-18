@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from formations.models import Module, Participant, Formation
+from formations.access import modules_queryset_for_user
 
 from .models import (
     Questionnaire, Question, ChoixQuestion, ReponseQuestionnaire, ReponseQuestion,
@@ -12,6 +13,10 @@ from .models import (
 
 from .permissions import (
     IsSuperviseur, IsAuditeur,
+)
+from .access import (
+    questionnaires_queryset_for_user,
+    titres_dans_perimetre,
 )
 from .serializers import (
     QuestionnaireListSerializer,
@@ -35,7 +40,10 @@ def questionnaire_list_create(request):
     POST : créer un nouveau questionnaire
     """
     if request.method == 'GET':
-        qs = Questionnaire.objects.select_related('module', 'createur').all()
+        qs = questionnaires_queryset_for_user(
+            request.user,
+            Questionnaire.objects.select_related('module', 'createur'),
+        )
 
         module_id = request.query_params.get('module_id')
         if module_id:
@@ -53,6 +61,12 @@ def questionnaire_list_create(request):
         return Response(serializer.data)
 
     # POST
+    titres = request.data.get('titres') or []
+    if not titres_dans_perimetre(request.user, titres):
+        return Response(
+            {'detail': 'Un ou plusieurs modules ciblés sont hors de votre périmètre.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     data = request.data.copy()
     data['createur'] = request.user.pk
     serializer = QuestionnaireListSerializer(data=data)
@@ -66,7 +80,7 @@ def questionnaire_list_create(request):
 @permission_classes([IsSuperviseur])
 def questionnaire_detail(request, pk):
     """Détail, modification ou suppression d'un questionnaire."""
-    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=pk)
 
     if request.method == 'GET':
         serializer = QuestionnaireDetailSerializer(questionnaire)
@@ -93,7 +107,7 @@ def questionnaire_detail(request, pk):
 @permission_classes([IsSuperviseur])
 def questionnaire_publier(request, pk):
     """Publier ou fermer un questionnaire."""
-    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=pk)
     nouveau_statut = request.data.get('statut')
     if nouveau_statut not in (Questionnaire.Statut.PUBLIE, Questionnaire.Statut.FERME, Questionnaire.Statut.BROUILLON):
         return Response({'detail': 'statut invalide.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -110,7 +124,7 @@ def questionnaire_publier(request, pk):
 @permission_classes([IsSuperviseur])
 def question_create(request, questionnaire_pk):
     """Ajouter une question à un questionnaire."""
-    questionnaire = get_object_or_404(Questionnaire, pk=questionnaire_pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=questionnaire_pk)
     if questionnaire.statut == Questionnaire.Statut.PUBLIE:
         return Response(
             {'detail': 'Impossible de modifier un questionnaire publié.'},
@@ -127,7 +141,7 @@ def question_create(request, questionnaire_pk):
 @permission_classes([IsSuperviseur])
 def question_detail(request, questionnaire_pk, pk):
     """Modifier ou supprimer une question."""
-    questionnaire = get_object_or_404(Questionnaire, pk=questionnaire_pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=questionnaire_pk)
     question = get_object_or_404(Question, pk=pk, questionnaire=questionnaire)
 
     if questionnaire.statut == Questionnaire.Statut.PUBLIE:
@@ -231,7 +245,7 @@ def soumettre_evaluation(request):
 @permission_classes([IsSuperviseur])
 def resultats_questionnaire(request, pk):
     """Résultats agrégés d'un questionnaire."""
-    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=pk)
     serializer = ResultatsSerializer(questionnaire)
     return Response(serializer.data)
 
@@ -240,7 +254,7 @@ def resultats_questionnaire(request, pk):
 @permission_classes([IsSuperviseur])
 def resultats_par_module(request, module_pk):
     """Résultats de tous les questionnaires d'un module."""
-    module = get_object_or_404(Module, pk=module_pk)
+    module = get_object_or_404(modules_queryset_for_user(request.user), pk=module_pk)
     questionnaires = Questionnaire.objects.filter(module=module)
     serializer = ResultatsSerializer(questionnaires, many=True)
     return Response(serializer.data)
@@ -258,7 +272,7 @@ def analyse_qualitative(request, pk):
     from django.db.models import Avg, Count
     from collections import defaultdict
 
-    questionnaire = get_object_or_404(Questionnaire, pk=pk)
+    questionnaire = get_object_or_404(questionnaires_queryset_for_user(request.user), pk=pk)
 
     soumissions = questionnaire.reponses.select_related('participant').prefetch_related(
         'reponses_questions__question',

@@ -3,6 +3,11 @@ from rest_framework.permissions import BasePermission
 
 ROLES_SUPERVISEUR = {'SUPERVISEUR', 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'}
 
+# Aligné sur frontend EVALUATION_ALLOWED_ROLES
+ROLES_GESTION_QUESTIONNAIRES = ROLES_SUPERVISEUR | {
+    'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT',
+}
+
 # Rôles autorisés à saisir/gérer les notes et épreuves
 ROLES_GESTION_NOTES = {
     'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
@@ -19,9 +24,9 @@ ROLES_CONSULTATION = ROLES_GESTION_NOTES | {'FINANCE'}
 
 
 class IsSuperviseur(BasePermission):
-    """Encadrants, CPFAE_ADMIN et au-dessus peuvent gérer les questionnaires."""
+    """Secrétariat, encadrants, superviseurs et admins peuvent gérer les questionnaires."""
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ROLES_SUPERVISEUR
+        return request.user.is_authenticated and request.user.role in ROLES_GESTION_QUESTIONNAIRES
 
 
 class IsAuditeur(BasePermission):
@@ -36,7 +41,7 @@ class IsSuperviseurOrReadOnly(BasePermission):
             return False
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
-        return request.user.role in ROLES_SUPERVISEUR
+        return request.user.role in ROLES_GESTION_QUESTIONNAIRES
 
 
 class IsGestionNotes(BasePermission):

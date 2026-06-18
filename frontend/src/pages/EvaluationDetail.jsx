@@ -407,7 +407,7 @@ export default function EvaluationDetail() {
       {/* ── Modal question ──────────────────────────────────────────────────── */}
       {showQForm && (
         <div className="modal-overlay" onClick={() => setShowQForm(false)}>
-          <div className="modal-box" style={{ maxWidth: '540px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '540px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h4 className="modal-title">{editingQ ? 'Modifier la question' : 'Nouvelle question'}</h4>
               <button className="modal-close" onClick={() => setShowQForm(false)}><i className="bi bi-x-lg"></i></button>
