@@ -1778,6 +1778,7 @@ def _finance_report_rows(
                 'total_duree_realisee_minutes': 0.0,
                 'taux_planned_minutes': 0.0,
                 'taux_realized_capped_minutes': 0.0,
+                'montant_prevu': 0.0,
                 'montant_realise': 0.0,
                 'prix_heure_realisee': module_prix_heure,
             })
@@ -1858,6 +1859,9 @@ def _finance_report_rows(
             mod_entry['total_duree_realisee_minutes'] = module_realized_capped
             mod_entry['taux_planned_minutes'] = module_planned
             mod_entry['taux_realized_capped_minutes'] = module_realized_capped
+            mod_entry['montant_prevu'] = _finance_montant_from_minutes(
+                module_planned, module_prix_heure,
+            )
             mod_entry['montant_realise'] = _finance_montant_from_minutes(
                 module_realized_capped, module_prix_heure,
             )
