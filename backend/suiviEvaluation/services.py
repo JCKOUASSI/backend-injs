@@ -39,18 +39,12 @@ def _get_parametres(formation):
     }
 
 
-def _heures_prevues_module(module):
-    """Volume horaire prévu du module (heures)."""
-    if module.duree_prevue_heures and float(module.duree_prevue_heures) > 0:
-        return float(module.duree_prevue_heures)
-    total_min = 0.0
-    for s in module.sessions.all():
-        if s.heure_debut_prevue and s.heure_fin_prevue:
-            debut = s.heure_debut_prevue.hour * 60 + s.heure_debut_prevue.minute
-            fin = s.heure_fin_prevue.hour * 60 + s.heure_fin_prevue.minute
-            if fin > debut:
-                total_min += fin - debut
-    return round(total_min / 60.0, 2)
+def _heures_prevues_module(module, participant=None):
+    """Volume horaire contractuel du module (référentiel / fiche, pas l'EDT)."""
+    from formations.duree_prevue_resolve import resolve_module_volume_contractuel_heures
+
+    heures, _ = resolve_module_volume_contractuel_heures(module, participant=participant)
+    return heures
 
 
 def calculer_presence_module(module, participant):
@@ -58,7 +52,7 @@ def calculer_presence_module(module, participant):
     Retourne (heures_presence, heures_prevues, taux_presence).
     Le temps effectué est plafonné au temps prévu du module.
     """
-    heures_prevues = _heures_prevues_module(module)
+    heures_prevues = _heures_prevues_module(module, participant)
     cap_minutes = heures_prevues * 60 if heures_prevues > 0 else 0.0
 
     agg = Pointage.objects.filter(

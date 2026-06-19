@@ -13,7 +13,7 @@ import {
   readParticipantsFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
-import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES } from '../utils/roles'
+import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES, NOTE_GESTION_ROLES, hasAppRole } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import ParticipantDetailModal from '../components/ParticipantDetailModal'
@@ -64,6 +64,7 @@ export default function Participants() {
   const [detailFormationsLoading, setDetailFormationsLoading] = useState(false)
   const [detailPointages, setDetailPointages] = useState([])
   const [detailStats, setDetailStats] = useState(null)
+  const [detailNotesFiche, setDetailNotesFiche] = useState(null)
   const [detailPointagesLoading, setDetailPointagesLoading] = useState(false)
 
   const debouncedSearch = useDebounce(search)
@@ -114,27 +115,35 @@ export default function Participants() {
       setDetailFormations([])
       setDetailPointages([])
       setDetailStats(null)
+      setDetailNotesFiche(null)
       return
     }
-    setDetailFormationsLoading(true)
-    api.get(`/formations/participants/${showDetail.id}/formations/`)
-      .then(res => setDetailFormations(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch(() => setDetailFormations([]))
-      .finally(() => setDetailFormationsLoading(false))
-
-    // Charger les pointages si l'utilisateur a les permissions
     if (canViewPresences) {
+      setDetailFormationsLoading(true)
       setDetailPointagesLoading(true)
       api.get(`/participant/${showDetail.id}/fiche-admin/`)
         .then(res => {
+          setDetailFormations(res.data.modules || [])
           setDetailPointages(res.data.pointages || [])
           setDetailStats(res.data.stats || null)
+          setDetailNotesFiche(res.data.notes_fiche || null)
         })
         .catch(() => {
+          setDetailFormations([])
           setDetailPointages([])
           setDetailStats(null)
+          setDetailNotesFiche(null)
         })
-        .finally(() => setDetailPointagesLoading(false))
+        .finally(() => {
+          setDetailFormationsLoading(false)
+          setDetailPointagesLoading(false)
+        })
+    } else {
+      setDetailFormationsLoading(true)
+      api.get(`/formations/participants/${showDetail.id}/formations/`)
+        .then(res => setDetailFormations(Array.isArray(res.data) ? res.data : (res.data.results || [])))
+        .catch(() => setDetailFormations([]))
+        .finally(() => setDetailFormationsLoading(false))
     }
   }, [showDetail, canViewPresences])
 
@@ -406,8 +415,10 @@ export default function Participants() {
           modules={detailFormations}
           pointages={detailPointages}
           stats={detailStats}
+          initialNotesFiche={detailNotesFiche}
           onClose={() => setShowDetail(null)}
           loading={detailFormationsLoading || detailPointagesLoading}
+          canManageNotes={hasAppRole(user, NOTE_GESTION_ROLES)}
         />
       )}
 

@@ -73,8 +73,8 @@ class StatistiquesAPIAccessTests(TestCase):
         cls.sec_a = Secretariat.objects.create(nom='Sec API A')
         cls.sec_b = Secretariat.objects.create(nom='Sec API B')
         cls.formation = Formation.objects.create(formation='Cycle API')
-        Module.objects.create(formation=cls.formation, intitule='M A', secretariat=cls.sec_a)
-        Module.objects.create(formation=cls.formation, intitule='M B', secretariat=cls.sec_b)
+        cls.module_a = Module.objects.create(formation=cls.formation, intitule='M A', secretariat=cls.sec_a)
+        cls.module_b = Module.objects.create(formation=cls.formation, intitule='M B', secretariat=cls.sec_b)
 
     def setUp(self):
         self.client = APIClient()
@@ -100,6 +100,64 @@ class StatistiquesAPIAccessTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['total'], 1)
         self.assertEqual(res.data['secretariats'][0]['secretariat_id'], self.sec_a.id)
+
+    def test_secretariat_point_journalier_scoped_to_own_modules(self):
+        from formations.models import SessionModule
+        from datetime import date
+
+        user = make_user('sec_pj', role='SECRETARIAT', secretariat=self.sec_a)
+        self.client.force_authenticate(user)
+        jour = date.today()
+        SessionModule.objects.create(
+            module=self.module_a,
+            date_journee=jour,
+            numero=1,
+            intitule='Séance PJ A',
+        )
+        SessionModule.objects.create(
+            module=self.module_b,
+            date_journee=jour,
+            numero=1,
+            intitule='Séance PJ B',
+        )
+        res = self.client.get(
+            f'/api/statistiques/point-journalier/?annee={jour.year}&mois={jour.month}&tous_tableaux=1',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        mod_ids = set()
+        for tb in res.data.get('tableaux_complets') or res.data.get('tableaux') or []:
+            payload = tb.get('tableau', tb)
+            for creneau in ('matin', 'soir'):
+                bloc = payload.get(creneau) or {}
+                for grp in bloc.get('groupes') or []:
+                    mod_ids.update(grp.get('module_ids') or [])
+        if mod_ids:
+            self.assertTrue(mod_ids.issubset({self.module_a.id}))
+        res_other = self.client.get(
+            f'/api/statistiques/point-journalier/?annee={jour.year}&secretariat_id={self.sec_b.id}',
+        )
+        self.assertEqual(res_other.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_secretariat_bilans_scoped_to_own_modules(self):
+        from formations.models import SessionModule
+        from datetime import date
+
+        user = make_user('sec_bl', role='CHEF_SECRETARIAT', secretariat=self.sec_a)
+        self.client.force_authenticate(user)
+        jour = date.today()
+        SessionModule.objects.create(module=self.module_a, date_journee=jour, numero=1, intitule='Séance BL A')
+        SessionModule.objects.create(module=self.module_b, date_journee=jour, numero=1, intitule='Séance BL B')
+        res = self.client.get(
+            f'/api/statistiques/bilans/?annee={jour.year}&mois={jour.month}&dimension=module',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        mod_ids = {b['module_id'] for b in res.data.get('bilans', []) if b.get('module_id')}
+        if mod_ids:
+            self.assertTrue(mod_ids.issubset({self.module_a.id}))
+        res_other = self.client.get(
+            f'/api/statistiques/bilans/?annee={jour.year}&secretariat_id={self.sec_b.id}&dimension=module',
+        )
+        self.assertEqual(res_other.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_encadrant_without_modules_can_open_dashboard(self):
         enc = make_user('enc_empty', role='ENCADRANT')

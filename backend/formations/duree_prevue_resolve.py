@@ -128,6 +128,34 @@ def module_edt_planned_hours(module):
     return module_edt_typical_hours(module)
 
 
+def resolve_module_volume_contractuel_heures(module, *, categorie_code=None, participant=None):
+    """
+    Volume contractuel pour assiduité / notes / fiche auditeur.
+
+    Ordre : référentiel (catégorie auditeur ou majoritaire) → référentiel global
+    → fiche module. N'utilise pas l'EDT planifié.
+    """
+    if categorie_code is None and participant is not None:
+        categorie_code = (getattr(participant, 'categorie', None) or '').strip() or None
+    if categorie_code is None:
+        categorie_code = _get_majoritaire_categorie(module)
+
+    if categorie_code:
+        ref_cat = _ref_module_volume_hours(module, categorie_code)
+        if ref_cat > 0:
+            return ref_cat, 'ref_module_categorie'
+
+    ref_h = _ref_module_volume_hours(module)
+    if ref_h > 0:
+        return ref_h, 'ref_module'
+
+    fiche_h = float(module.duree_prevue_heures or 0)
+    if fiche_h > 0:
+        return fiche_h, 'module'
+
+    return 0.0, None
+
+
 def resolve_module_duree_prevue_heures(module, *, include_current=True, categorie_code=None):
     """
     Retourne ``(heures, source)`` avec source parmi

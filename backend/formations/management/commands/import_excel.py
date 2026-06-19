@@ -9,7 +9,9 @@ Usage :
 """
 import csv
 import io
+import re
 from datetime import datetime, date
+from difflib import SequenceMatcher
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
@@ -230,6 +232,9 @@ class Command(BaseCommand):
                         if clean in ('module_titre', 'module titre', 'formation_titre', 'formation titre'):
                             headers.append('module_titre')
                             continue
+                        if clean in ('formation(s)', 'formations'):
+                            headers.append('formation(s)')
+                            continue
                         if clean in (
                             'formation (cycle)', 'formation(cycle)', 'cycle de formation', 'cycle',
                             'formation',
@@ -345,6 +350,66 @@ class Command(BaseCommand):
         if match:
             return match.group(1)
         return result
+
+    def _normalize_module_title(self, val, default=''):
+        return self._normalize_field(val, default=default)
+
+    def _module_title_match_ratio(self, left, right):
+        a = self._normalize_module_title(left)
+        b = self._normalize_module_title(right)
+        if not a or not b:
+            return 0.0
+        if a == b:
+            return 1.0
+        return SequenceMatcher(None, a, b).ratio()
+
+    def _resolve_modules_for_seance(self, titre, grade, groupe, vague):
+        """Retrouve le(s) module(s) cible(s) pour une ligne de séance.
+
+        Stratégie :
+        1. correspondance exacte (titre + grade + groupe + vague)
+        2. titre + groupe + vague si un seul module correspond (grade Excel parfois erroné)
+        3. rapprochement flou du titre (coquilles : MUTTE/LUTTE, etc.) sur le même groupe/vague
+        """
+        titre_n = self._normalize_module_title(titre)
+        if not titre_n:
+            return [], None
+
+        base_qs = Module.objects.filter(
+            groupe__iexact=groupe,
+            vague__iexact=vague,
+        ).select_related('formation')
+
+        def _title_matches(module):
+            return self._module_title_match_ratio(titre_n, module.intitule) >= 0.92
+
+        if grade:
+            exact = [m for m in base_qs.filter(grade__iexact=grade) if _title_matches(m)]
+            if exact:
+                return exact, None
+
+        by_combo = [m for m in base_qs if _title_matches(m)]
+        if len(by_combo) == 1:
+            module = by_combo[0]
+            if grade and module.grade and module.grade.upper() != grade.upper():
+                return [module], (
+                    f'grade Excel {grade!r} ignoré, module trouvé avec grade {module.grade!r}'
+                )
+            return [module], None
+
+        fuzzy = []
+        best_ratio = 0.92
+        for module in base_qs:
+            ratio = self._module_title_match_ratio(titre_n, module.intitule)
+            if ratio >= best_ratio:
+                if ratio > best_ratio:
+                    fuzzy = [module]
+                    best_ratio = ratio
+                elif ratio == best_ratio:
+                    fuzzy.append(module)
+        if len(fuzzy) == 1:
+            return fuzzy, f'titre rapproché de {fuzzy[0].intitule!r}'
+        return [], None
 
     def _detect_sheet_type(self, ws):
         """Détecte le type de feuille par analyse de ses headers.
@@ -504,6 +569,23 @@ class Command(BaseCommand):
         except (ValueError, TypeError):
             return default
 
+    def _has_value(self, val):
+        if val is None:
+            return False
+        return str(val).strip().lower() not in ('', '-', '—', 'n/a', 'na', 'none')
+
+    def _normalize_date_string(self, val_str):
+        """Corrige les dates Excel mal saisies (espaces, slash manquant)."""
+        val_str = str(val_str).strip()
+        if not val_str:
+            return val_str
+        val_str = re.sub(r'\s+', '', val_str)
+        # 03/072026 → 03/07/2026
+        m = re.match(r'^(\d{1,2})/(\d{2})(\d{4})$', val_str)
+        if m:
+            return f'{int(m.group(1)):02d}/{int(m.group(2)):02d}/{m.group(3)}'
+        return val_str
+
     def _parse_datetime(self, val):
         if val is None:
             return None
@@ -511,14 +593,65 @@ class Command(BaseCommand):
             if timezone.is_naive(val):
                 return timezone.make_aware(val)
             return val
-        val = str(val).strip()
-        for fmt in ('%Y-%m-%d %H:%M', '%d/%m/%Y %H:%M', '%Y-%m-%dT%H:%M',
-                     '%Y-%m-%d', '%d/%m/%Y'):
+        if isinstance(val, date):
+            return timezone.make_aware(datetime.combine(val, datetime.min.time()))
+        if isinstance(val, (int, float)):
             try:
-                dt = datetime.strptime(val, fmt)
+                from openpyxl.utils.datetime import from_excel
+                dt = from_excel(float(val))
+                if isinstance(dt, datetime):
+                    return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
+                if isinstance(dt, date):
+                    return timezone.make_aware(datetime.combine(dt, datetime.min.time()))
+            except (ValueError, OverflowError, TypeError):
+                pass
+
+        val_str = self._normalize_date_string(val)
+        if not self._has_value(val_str):
+            return None
+
+        formats = (
+            '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
+            '%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M',
+            '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M',
+            '%Y-%m-%d', '%d/%m/%Y', '%d/%m/%y',
+            '%d-%m-%Y', '%d-%m-%y', '%d.%m.%Y', '%d.%m.%y',
+        )
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(val_str, fmt)
                 return timezone.make_aware(dt)
             except ValueError:
                 continue
+
+        m = re.match(
+            r'^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$',
+            val_str,
+        )
+        if m:
+            day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if year < 100:
+                year += 2000
+            hour = int(m.group(4) or 0)
+            minute = int(m.group(5) or 0)
+            second = int(m.group(6) or 0)
+            try:
+                dt = datetime(year, month, day, hour, minute, second)
+                return timezone.make_aware(dt)
+            except ValueError:
+                pass
+
+        parsed_date = self._parse_date(val_str.split()[0] if ' ' in val_str else val_str)
+        if parsed_date:
+            if ' ' in val_str:
+                time_part = val_str.split(maxsplit=1)[1]
+                for tfmt in ('%H:%M:%S', '%H:%M'):
+                    try:
+                        t = datetime.strptime(time_part, tfmt).time()
+                        return timezone.make_aware(datetime.combine(parsed_date, t))
+                    except ValueError:
+                        continue
+            return timezone.make_aware(datetime.combine(parsed_date, datetime.min.time()))
         return None
 
     def _parse_date(self, val):
@@ -526,13 +659,33 @@ class Command(BaseCommand):
             return None
         if isinstance(val, (datetime, date)):
             return val if isinstance(val, date) else val.date()
-        val = str(val).strip()
-        for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
+        if isinstance(val, (int, float)):
+            parsed = self._parse_datetime(val)
+            return parsed.date() if parsed else None
+        val = self._normalize_date_string(val)
+        if not self._has_value(val):
+            return None
+        for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d', '%d-%m-%Y', '%d-%m-%y', '%d.%m.%Y', '%d.%m.%y'):
             try:
                 return datetime.strptime(val, fmt).date()
             except ValueError:
                 continue
+        m = re.match(r'^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$', val)
+        if m:
+            day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if year < 100:
+                year += 2000
+            try:
+                return date(year, month, day)
+            except ValueError:
+                pass
         return None
+
+    def _parse_optional_datetime(self, val):
+        if not self._has_value(val):
+            return None, False
+        parsed = self._parse_datetime(val)
+        return parsed, parsed is None
 
     # ─── Import Formations ───────────────────────────
 
@@ -548,10 +701,19 @@ class Command(BaseCommand):
                 errors.append(f'Formations ligne {row_idx}: formation (module) manquante')
                 continue
 
-            date_debut = self._parse_datetime(data.get('date_debut'))
-            date_fin = self._parse_datetime(data.get('date_fin'))
-            if not date_debut or not date_fin:
-                errors.append(f'Formations ligne {row_idx}: date_debut ou date_fin invalide')
+            raw_debut = data.get('date_debut')
+            raw_fin = data.get('date_fin')
+            date_debut, debut_invalide = self._parse_optional_datetime(raw_debut)
+            date_fin, fin_invalide = self._parse_optional_datetime(raw_fin)
+            if debut_invalide or fin_invalide:
+                details = []
+                if debut_invalide:
+                    details.append(f'date_debut={raw_debut!r}')
+                if fin_invalide:
+                    details.append(f'date_fin={raw_fin!r}')
+                errors.append(
+                    f'Formations ligne {row_idx}: date_debut ou date_fin invalide ({", ".join(details)})'
+                )
                 continue
 
             # ``duree_prevue_heures`` est facultative dans le fichier source.
@@ -670,8 +832,8 @@ class Command(BaseCommand):
                 'grade': self._normalize_grade(data.get('grade')),
                 'groupe': self._normalize_field(data.get('groupe')),
                 'vague': self._normalize_field(data.get('vague')),
-                'date_debut': date_debut.date() if hasattr(date_debut, 'date') else date_debut,
-                'date_fin': date_fin.date() if hasattr(date_fin, 'date') else date_fin,
+                'date_debut': date_debut.date() if date_debut and hasattr(date_debut, 'date') else date_debut,
+                'date_fin': date_fin.date() if date_fin and hasattr(date_fin, 'date') else date_fin,
                 # Champ `cycle` (NOT NULL sur certaines bases) : libellé du cycle = formation parente.
                 'cycle': titre,
             }
@@ -716,10 +878,14 @@ class Command(BaseCommand):
                 _mod = existing_mod
                 mod_created = False
             else:
+                create_fields = {
+                    k: v for k, v in module_defaults.items()
+                    if k not in module_lookup and k != 'statut'
+                }
                 _mod = Module.objects.create(
                     **module_lookup,
                     statut=statut_excel or 'PLANIFIEE',
-                    **module_defaults,
+                    **create_fields,
                 )
                 mod_created = True
 
@@ -952,7 +1118,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'  ~ Participant mis à jour : {matricule}')
 
             # Inscrire le participant aux formations
-            formations_str = self._str(data.get('formation(s)') or data.get('formations'))
+            formations_str = self._str(
+                data.get('formation(s)') or data.get('formations') or data.get('formation')
+            )
             if formations_str:
                 # Cas 1 : colonne Formation(s) renseignée → inscription par titre
                 # Filtre par groupe + grade + vague pour identifier la bonne formation
@@ -1023,12 +1191,16 @@ class Command(BaseCommand):
                                 groupe__iexact=groupe,
                             )
                             if vague:
-                                mod_qs = mod_qs.filter(vague__iexact=vague)
+                                exact_match = mod_qs.filter(vague__iexact=vague)
+                                if exact_match.exists():
+                                    mod_qs = exact_match
+                                else:
+                                    mod_qs = mod_qs.filter(vague__icontains=vague)
                             # Filtre par formation/cycle si spécifié
                             if p_formation:
                                 mod_qs = mod_qs.filter(formation__formation__iexact=p_formation)
                             _module_match_cache[cache_key] = list(
-                                mod_qs.select_related('formation')
+                                mod_qs.select_related('formation').order_by('ordre')
                             )
                         matched_mods = _module_match_cache[cache_key]
 
@@ -1043,24 +1215,12 @@ class Command(BaseCommand):
                                 f'aucun module trouvé pour {nom} {prenom} '
                                 f'({crit})'
                             )
-                        # Protection 3 : bloquer si plusieurs modules matchent
-                        elif len(matched_mods) > 1:
-                            mod_list = ', '.join([f"{_mod.intitule} ({_mod.formation.formation})" for _mod in matched_mods[:3]])
-                            if len(matched_mods) > 3:
-                                mod_list += f' et {len(matched_mods) - 3} autres'
-                            errors.append(
-                                f'Participants ligne {row_idx}: {nom} {prenom} — '
-                                f'{len(matched_mods)} modules correspondent au critère {grade}/{groupe}'
-                                f"{f'/{vague}' if vague else ''}: {mod_list}. "
-                                f"Précisez la colonne Formation(s) pour désambiguïser."
-                            )
                         else:
-                            # Un seul module matche → inscription unique
-                            _mod = matched_mods[0]
-                            _queue_inscription(
-                                _mod, obj,
-                                f'    ↳ Auto-inscrit → {_mod.formation.formation} / {_mod.intitule}',
-                            )
+                            for _mod in matched_mods:
+                                _queue_inscription(
+                                    _mod, obj,
+                                    f'    ↳ Auto-inscrit → {_mod.formation.formation} / {_mod.intitule}',
+                                )
                     elif not (grade or groupe):
                         errors.append(
                             f'Participants ligne {row_idx}: {nom} {prenom} '
@@ -1398,6 +1558,7 @@ class Command(BaseCommand):
         """
         count = 0
         updated = 0
+        last_ctx = {'grade': '', 'groupe': '', 'vague': ''}
         for row_idx, data in self._rows(ws):
             titre = self._str(
                 data.get('module_titre')
@@ -1419,9 +1580,19 @@ class Command(BaseCommand):
                 errors.append(f'Séances ligne {row_idx}: numero de séance manquant')
                 continue
 
-            groupe = self._normalize_field(data.get('groupe'))
-            grade = self._normalize_grade(data.get('grade'))
-            vague = self._normalize_field(data.get('vague'))
+            raw_groupe = data.get('groupe')
+            raw_grade = data.get('grade')
+            raw_vague = data.get('vague')
+            groupe = self._normalize_field(raw_groupe) or last_ctx['groupe']
+            grade = self._normalize_grade(raw_grade) or last_ctx['grade']
+            vague = self._normalize_field(raw_vague) or last_ctx['vague']
+
+            if self._has_value(raw_groupe):
+                last_ctx['groupe'] = groupe
+            if self._has_value(raw_grade):
+                last_ctx['grade'] = grade
+            if self._has_value(raw_vague):
+                last_ctx['vague'] = vague
 
             missing = [label for label, val in (
                 ('grade', grade), ('groupe', groupe), ('vague', vague),
@@ -1433,13 +1604,8 @@ class Command(BaseCommand):
                 )
                 continue
 
-            modules_matched = list(
-                Module.objects.filter(
-                    intitule__iexact=titre,
-                    grade__iexact=grade,
-                    groupe__iexact=groupe,
-                    vague__iexact=vague,
-                ).select_related('formation')
+            modules_matched, resolve_hint = self._resolve_modules_for_seance(
+                titre, grade, groupe, vague,
             )
 
             if not modules_matched:
@@ -1448,6 +1614,9 @@ class Command(BaseCommand):
                     f'(grade={grade!r}, groupe={groupe!r}, vague={vague!r})'
                 )
                 continue
+
+            if resolve_hint:
+                self.stdout.write(f'  ↪ Ligne {row_idx}: {resolve_hint}')
 
             heure_debut = self._parse_time(data.get('heure_debut'))
             heure_fin = self._parse_time(data.get('heure_fin'))

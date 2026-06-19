@@ -13,6 +13,8 @@ from .views import (
     BilansView,
     bilans_export,
     BilanFACView,
+    BilanFACPerimetreView,
+    bilan_fac_export,
 )
 
 urlpatterns = [
@@ -29,4 +31,6 @@ urlpatterns = [
     path('bilans/',                                   BilansView.as_view(),             name='statistiques-bilans'),
     path('bilans-export/',                            bilans_export,                    name='statistiques-bilans-export'),
     path('bilan-fac/',                                BilanFACView.as_view(),           name='statistiques-bilan-fac'),
+    path('bilan-fac/perimetre/',                      BilanFACPerimetreView.as_view(),  name='statistiques-bilan-fac-perimetre'),
+    path('bilan-fac-export/',                         bilan_fac_export,                 name='statistiques-bilan-fac-export'),
 ]

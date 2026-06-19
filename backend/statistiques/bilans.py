@@ -12,6 +12,7 @@ from formations.models import Formation, Module, RefCategorie, Participant, Modu
 from presences.models import Pointage
 
 from .effectifs import (
+    categories_for_scope,
     aggregation_seances_modules,
     count_auditeurs_notoires,
     effectifs_tableau_agrege,
@@ -21,14 +22,6 @@ from .effectifs import (
 )
 
 User = get_user_model()
-
-JUSTIFICATIFS_ABSENCES = [
-    'Report de formation',
-    'Injoignable',
-    'Déficit d\'information',
-    'Maladie',
-    'Accouchement',
-]
 
 PERIODES_BILAN = [
     ('QUOTIDIEN', 'Quotidien'),
@@ -42,16 +35,11 @@ PERIODES_BILAN = [
 
 
 def _liste_categories(formation_id=None, secretariat_id=None, module_ids=None):
-    cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
-    pq = Participant.objects.exclude(categorie='')
-    if secretariat_id:
-        pq = pq.filter(secretariat_id=secretariat_id)
-    if formation_id:
-        pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
-    if module_ids is not None:
-        pq = pq.filter(modules_inscrits__module_id__in=module_ids).distinct()
-    cats.update(pq.values_list('categorie', flat=True))
-    return sorted(cats, key=lambda c: (len(c), c))
+    return categories_for_scope(
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        module_ids=module_ids,
+    )
 
 
 def _modules_queryset(
@@ -331,20 +319,17 @@ def _somme_lignes(lignes, keys):
 def _ligne_categorie_formation(
     formation_id, categorie, secretariat_id, annee, mois, calendrier, module_ids=None,
 ):
-    grades = sorted({
-        g for g in Module.objects.filter(
-            formation_id=formation_id,
-            module_participants__participant__categorie__iexact=categorie,
-        ).exclude(grade='').values_list('grade', flat=True)
-    })
+    mq = Module.objects.filter(
+        formation_id=formation_id,
+        module_participants__participant__categorie__iexact=categorie,
+    )
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
     if module_ids is not None:
-        grades = sorted({
-            g for g in Module.objects.filter(
-                id__in=module_ids,
-                formation_id=formation_id,
-                module_participants__participant__categorie__iexact=categorie,
-            ).exclude(grade='').values_list('grade', flat=True)
-        })
+        mq = mq.filter(id__in=module_ids)
+    grades = sorted({
+        g for g in mq.exclude(grade='').values_list('grade', flat=True)
+    })
 
     keys_sum = [
         'nb_groupes', 'nb_encadrants', 'effectif_secretariat',
@@ -432,7 +417,7 @@ def compute_bilan_periode_formation(
         'annee': annee,
         'date_inscrits': _date_inscrits_label(calendrier),
         'periode_label': dict(PERIODES_BILAN).get(periode, '') if periode else '',
-        'justificatifs': JUSTIFICATIFS_ABSENCES,
+        'justificatifs': '',
         'lignes': lignes,
         'total': total,
     }
@@ -879,6 +864,91 @@ def compute_bilans_avec_tableaux(
 
 # ── Bilan FAC ─────────────────────────────────────────────────────────────────
 
+def _mq_bilan_fac_base(formation_id, categorie=None, secretariat_id=None, module_ids=None):
+    mq = Module.objects.filter(formation_id=formation_id)
+    if secretariat_id:
+        mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
+    if categorie:
+        mq = mq.filter(
+            module_participants__participant__categorie__iexact=categorie,
+        ).distinct()
+    return mq
+
+
+def _parse_groupes_filter(groupes_filter):
+    """['A4|G1', 'A4:G2'] → {(grade, groupe), …}"""
+    pairs = set()
+    for raw in groupes_filter or []:
+        if not raw:
+            continue
+        sep = '|' if '|' in raw else (':' if ':' in raw else None)
+        if not sep:
+            continue
+        gr, grp = raw.split(sep, 1)
+        gr_s, grp_s = gr.strip(), grp.strip()
+        if gr_s and grp_s:
+            pairs.add((gr_s, grp_s))
+    return pairs
+
+
+def _apply_bilan_fac_perimetre_filters(mq_base, grades_filter=None, groupes_filter=None):
+    """Restreint le queryset aux grades / groupes cochés."""
+    if grades_filter:
+        grades_norm = {g.strip() for g in grades_filter if g and str(g).strip()}
+        if grades_norm:
+            rows = list(mq_base.values_list('id', 'grade'))
+            ids = [mid for mid, gr in rows if gr and gr.strip() in grades_norm]
+            mq_base = mq_base.filter(id__in=ids) if ids else mq_base.none()
+
+    pairs = _parse_groupes_filter(groupes_filter)
+    if pairs:
+        rows = list(mq_base.values_list('id', 'grade', 'groupe'))
+        ids = [
+            mid for mid, gr, grp in rows
+            if gr and grp and (gr.strip(), grp.strip()) in pairs
+        ]
+        mq_base = mq_base.filter(id__in=ids) if ids else mq_base.none()
+
+    return mq_base
+
+
+def list_bilan_fac_perimetre(
+    formation_id,
+    categorie=None,
+    secretariat_id=None,
+    module_ids=None,
+):
+    """Grades et groupes disponibles pour le Bilan FAC (cases à cocher)."""
+    mq = _mq_bilan_fac_base(
+        formation_id, categorie=categorie, secretariat_id=secretariat_id, module_ids=module_ids,
+    )
+    grades_set = set()
+    groupes = []
+    seen = set()
+    for gr, grp in mq.exclude(grade='').values_list('grade', 'groupe').distinct():
+        gr_s = (gr or '').strip()
+        grp_s = (grp or '').strip()
+        if not gr_s:
+            continue
+        grades_set.add(gr_s)
+        if grp_s:
+            key = (gr_s, grp_s)
+            if key not in seen:
+                seen.add(key)
+                groupes.append({
+                    'grade': gr_s,
+                    'groupe': grp_s,
+                    'id': f'{gr_s}|{grp_s}',
+                })
+    groupes.sort(key=lambda x: (x['grade'], x['groupe']))
+    return {
+        'grades': sorted(grades_set),
+        'groupes': groupes,
+    }
+
+
 def _vh_grade_groupe(formation_id, grade, groupe=None, secretariat_id=None, module_ids=None):
     """VH prévu et réalisé (aligné dashboard via volume_horaire)."""
     from formations.volume_horaire import compute_volume_horaire_from_module_ids
@@ -939,11 +1009,13 @@ def _taux_presence_formation(formation_id, grade=None, secretariat_id=None, anne
     }
 
 
-def _groupes_termines_count(formation_id, grade, secretariat_id=None):
+def _groupes_termines_count(formation_id, grade, secretariat_id=None, module_ids=None):
     """Nombre de groupes pour lesquels tous les modules sont TERMINEE."""
     mq = Module.objects.filter(formation_id=formation_id, grade=grade)
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
+    if module_ids is not None:
+        mq = mq.filter(id__in=module_ids)
     groupes = mq.exclude(groupe='').values_list('groupe', flat=True).distinct()
     termines = 0
     for grp in groupes:
@@ -961,6 +1033,8 @@ def compute_bilan_fac(
     secretariat_id=None,
     calendrier=None,
     module_ids=None,
+    grades_filter=None,
+    groupes_filter=None,
 ):
     """
     Bilan FAC complet reprenant le format du fichier Excel BILAN FAC :
@@ -985,15 +1059,13 @@ def compute_bilan_fac(
     formation_nom = (formation.formation or f'Formation {formation.id}').strip().upper()
 
     # Modules de base
-    mq_base = Module.objects.filter(formation_id=formation_id)
-    if secretariat_id:
-        mq_base = mq_base.filter(secretariat_id=secretariat_id)
-    if module_ids is not None:
-        mq_base = mq_base.filter(id__in=module_ids)
-    if categorie:
-        mq_base = mq_base.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct()
+    mq_base = _mq_bilan_fac_base(
+        formation_id, categorie=categorie, secretariat_id=secretariat_id, module_ids=module_ids,
+    )
+    mq_base = _apply_bilan_fac_perimetre_filters(
+        mq_base, grades_filter=grades_filter, groupes_filter=groupes_filter,
+    )
+    scope_module_ids = list(mq_base.values_list('id', flat=True))
 
     # Grades disponibles (ex. A4, A3) — nettoyage et déduplication stricte
     grades_raw = mq_base.exclude(grade='').values_list('grade', flat=True).distinct()
@@ -1005,7 +1077,7 @@ def compute_bilan_fac(
     for grade in grades:
         try:
             stats = _stats_ligne_formation(
-                formation_id, cat_for_stats, grade, secretariat_id, annee, None, calendrier, module_ids,
+                formation_id, cat_for_stats, grade, secretariat_id, annee, None, calendrier, scope_module_ids,
             )
         except Exception:
             stats = {
@@ -1015,16 +1087,18 @@ def compute_bilan_fac(
             }
 
         vh_data = _vh_grade_groupe(
-            formation_id, grade, secretariat_id=secretariat_id, module_ids=module_ids,
+            formation_id, grade, secretariat_id=secretariat_id, module_ids=scope_module_ids,
         )
         pres = _taux_presence_formation(
-            formation_id, grade, secretariat_id, annee, None, calendrier, module_ids,
+            formation_id, grade, secretariat_id, annee, None, calendrier, scope_module_ids,
         )
         nb_inscrits = stats['inscrits_actifs'] or 1
         taux_participation = round(
             _pct(nb_inscrits - stats['absents_notoires'], nb_inscrits, decimals=4), 4
         )
-        groupes_termines = _groupes_termines_count(formation_id, grade, secretariat_id)
+        groupes_termines = _groupes_termines_count(
+            formation_id, grade, secretariat_id, module_ids=scope_module_ids,
+        )
 
         lignes_global.append({
             'grade': grade,
@@ -1034,7 +1108,7 @@ def compute_bilan_fac(
             'effectif_auditeurs': stats['inscrits_actifs'],
             'absents_notoires': stats['absents_notoires'],
             'groupes_termines': groupes_termines,
-            'justificatifs': JUSTIFICATIFS_ABSENCES,
+            'justificatifs': '',
             'taux_participation': taux_participation,
             'taux_absents_notoires': round(stats['pct_absents'], 4),
             'vh_total': vh_data['vh_prevu'],
@@ -1069,7 +1143,7 @@ def compute_bilan_fac(
         lignes_vh = []
         for grp in groupes_clean:
             vh_data = _vh_grade_groupe(
-                formation_id, grade, groupe=grp, secretariat_id=secretariat_id, module_ids=module_ids,
+                formation_id, grade, groupe=grp, secretariat_id=secretariat_id, module_ids=scope_module_ids,
             )
             lignes_vh.append({'groupe': grp, **vh_data})
 
@@ -1089,7 +1163,6 @@ def compute_bilan_fac(
         })
 
     # ── Absents notoires (liste nominative) ───────────────────────────────────
-    scope_module_ids = list(mq_base.values_list('id', flat=True))
     notoire_ids = participant_ids_notoires(
         module_ids=scope_module_ids,
         formation_id=formation_id,
@@ -1146,7 +1219,8 @@ def compute_bilan_fac(
         'annee': annee,
         'date_generation': date.today().strftime('%d/%m/%Y'),
         'grades': grades,
-        'justificatifs': JUSTIFICATIFS_ABSENCES,
+        'groupes_filtres': list(_parse_groupes_filter(groupes_filter)) if groupes_filter else [],
+        'justificatifs': '',
         'point_global': {
             'lignes': lignes_global,
             'totaux': totaux,

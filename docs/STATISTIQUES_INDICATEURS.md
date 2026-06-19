@@ -24,11 +24,13 @@
 | `secretariat_id` | Idem pour le secrétariat |
 | `scope.module_ids` | Encadrant : modules assignés uniquement |
 
-### Filtre de période (panneau « PÉRIODE — VH & SÉANCES »)
+### Filtre de période (panneau « PÉRIODE — INDICATEURS CLÉS »)
 
 Paramètres : `preset` (`tout`, `mois`, `trimestre`, `annee`, `custom`), `date_debut`, `date_fin`.
 
-**S’applique à** : KPI (VH + séances comptabilisées), pédagogique, admin (séances comptabilisées), secrétariats, alertes.
+**S’applique à** : tous les KPI globaux (`formations`, `modules`, `participants`, `formateurs`, `sessions_total`, `sessions_terminees`, VH, alertes dérivées), pédagogique, admin (séances comptabilisées), secrétariats.
+
+Règle commune hors « toutes périodes » : un module est **actif** s’il a au moins une séance dont `date_journee` est dans l’intervalle ; les effectifs (formations, modules, auditeurs, formateurs) portent sur ces modules ; `sessions_total` = toutes les séances planifiées dans l’intervalle.
 
 **Ne s’applique pas à** : Point journalier, Bilans, Bilan FAC, Historique (12 mois fixes).
 
@@ -76,11 +78,11 @@ _taux(a, b) = round(a / b × 100, 1)   si b > 0, sinon 0
 
 | Champ API | Source | Calcul |
 |-----------|--------|--------|
-| `formations` | `Formation` / `Module` | 1 si filtre formation ; sinon distinct formations sur modules ; sinon total |
-| `modules` | `Module` filtré | `count()` |
-| `participants` | `ModuleParticipant` | `distinct participant` sur modules du périmètre |
-| `formateurs` | `Formateur` / modules | Selon filtre secrétariat ou formation |
-| `sessions_total` | `SessionModule` | **Toutes** séances planifiées (inclut le futur) |
+| `formations` | `Formation` / `Module` | Distinct formations des modules actifs sur la période (ou périmètre entier si `preset=tout`) |
+| `modules` | `Module` filtré | Modules ayant ≥1 séance dans la période (ou tous si `preset=tout`) |
+| `participants` | `ModuleParticipant` | Inscrits distincts sur les modules actifs de la période |
+| `formateurs` | `Formateur` / modules | Assignés aux modules actifs de la période |
+| `sessions_total` | `SessionModule` | Séances planifiées dont `date_journee` ∈ période (inclut le futur de l’intervalle) |
 | `sessions_terminees` | `count_sessions_comptabilisables` | Séances comptabilisables + **filtre période** |
 | `sessions_en_cours` | `SessionModule` | `demarree_le` présent, `terminee_le` absent |
 | `pointages` | `Pointage` | Tous statuts, périmètre filtré |
@@ -197,7 +199,7 @@ Par créneau (matin/soir) et groupe :
 
 | A | B | Différence |
 |---|---|------------|
-| Séances totales | Séances comptabilisées | Total inclut le futur ; comptabilisées = règle EDT + période |
+| Séances totales | Séances comptabilisées | Total = séances planifiées dans la période ; comptabilisées = règle EDT + période |
 | Séances annulées | Comptabilisées | Annulées = passées sans démarrage badge |
 | Auditeurs notoires | Événements absence/suspect | Personnes jamais badgées vs pointages par séance |
 | Dashboard assiduité | Point journalier | Même règle séances ; PJ agrège par jour/créneau |

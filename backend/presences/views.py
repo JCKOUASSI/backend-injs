@@ -1335,8 +1335,14 @@ def my_historique(request):
     })
 
 
-def _module_fiche_payload(module, inscrit_le=None):
+def _module_fiche_payload(module, inscrit_le=None, participant=None):
+    from formations.duree_prevue_resolve import resolve_module_volume_contractuel_heures
+
     site_label = module.site.nom if module.site_id else (module.site_legacy or '')
+    duree_contractuelle, duree_source = resolve_module_volume_contractuel_heures(
+        module, participant=participant,
+    )
+    nb_seances_planifiees = module.sessions.count()
     return {
         'id': module.id,
         'formation_id': module.formation_id,
@@ -1351,7 +1357,10 @@ def _module_fiche_payload(module, inscrit_le=None):
         'statut': module.statut,
         'secretariat_nom': module.secretariat.nom if module.secretariat_id else None,
         'inscrit_le': inscrit_le.isoformat() if inscrit_le else None,
-        'duree_prevue_heures': float(module.duree_prevue_heures or 0),
+        'duree_prevue_heures': duree_contractuelle,
+        'duree_contractuelle_heures': duree_contractuelle,
+        'duree_prevue_source': duree_source,
+        'nb_seances_planifiees': nb_seances_planifiees,
     }
 
 
@@ -1370,7 +1379,7 @@ def _modules_for_personne(personne, type_str, user=None):
             .order_by('-inscrit_le')
         )
         for ins in inscriptions:
-            modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le))
+            modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le, participant=personne))
     elif type_str == 'formateur':
         inscriptions = (
             ModuleFormateur.objects.filter(formateur=personne)
@@ -1411,6 +1420,7 @@ def _pointage_historique_item(pt):
         'id': pt.id,
         'formation_id': formation.pk if formation else None,
         'formation_titre': formation.formation if formation else '',
+        'module_id': module.pk if module else None,
         'module_intitule': module.intitule if module else '',
         'seance_numero': session.numero if session else None,
         'seance_intitule': session.intitule if session else '',
@@ -2314,24 +2324,7 @@ def participant_fiche_admin(request, pk):
     )
     modules_data = []
     for ins in inscriptions:
-        module = ins.module
-        site_label = module.site.nom if module.site_id else (module.site_legacy or '')
-        modules_data.append({
-            'id': module.id,
-            'formation_id': module.formation_id,
-            'formation': module.formation.formation if module.formation_id else '',
-            'module': module.intitule,
-            'grade': module.grade or '',
-            'groupe': module.groupe or '',
-            'vague': module.vague or '',
-            'site': site_label,
-            'date_debut': str(module.date_debut) if module.date_debut else None,
-            'date_fin': str(module.date_fin) if module.date_fin else None,
-            'statut': module.statut,
-            'secretariat_nom': module.secretariat.nom if module.secretariat_id else None,
-            'inscrit_le': ins.inscrit_le.isoformat() if ins.inscrit_le else None,
-            'duree_prevue_heures': float(module.duree_prevue_heures or 0),
-        })
+        modules_data.append(_module_fiche_payload(ins.module, ins.inscrit_le, participant=participant))
 
     # Récupérer tous les pointages avec les détails complets
     pointages_qs = Pointage.objects.filter(participant=participant).select_related('session__module__formation')
@@ -2342,12 +2335,187 @@ def participant_fiche_admin(request, pk):
     stats.update(_compute_volume_horaire_stats(modules_data, pointages_qs))
     stats['nb_modules_inscrits'] = len(modules_data)
 
-    return Response({
+    payload = {
         'participant': ParticipantSerializer(participant).data,
         'modules': modules_data,
         'pointages': pointages_data,
         'stats': stats,
-    })
+    }
+
+    from suiviEvaluation.permissions import ROLES_GESTION_NOTES
+    if role in ROLES_GESTION_NOTES:
+        payload['notes_fiche'] = _build_notes_fiche_payload(participant, inscriptions)
+
+    return Response(payload)
+
+
+def _resolve_participant_fiche_admin(request, pk):
+    """Résout un participant pour les fiches admin (périmètre secrétariat inclus)."""
+    user = request.user
+    role = getattr(user, 'role', None)
+
+    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
+    read_only_roles = {'DIRECTION', 'FINANCE'}
+
+    if role not in full_access_roles and role not in read_only_roles:
+        return None, Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if role == 'SECRETARIAT' and getattr(user, 'secretariat', None):
+        try:
+            participant = Participant.objects.get(pk=pk, secretariat=user.secretariat)
+        except Participant.DoesNotExist:
+            return None, Response(
+                {'detail': 'Auditeur introuvable ou hors périmètre.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+    else:
+        try:
+            participant = Participant.objects.get(pk=pk)
+        except Participant.DoesNotExist:
+            return None, Response({'detail': 'Auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return participant, None
+
+
+def _serialize_participant_module_notes(module, participant):
+    """Résumé notes + assiduité pour un auditeur sur un module."""
+    from formations.api_views import _ensure_colonnes
+    from formations.models import NoteModuleSynthese
+    from suiviEvaluation.services import resume_module_participant
+
+    colonnes = _ensure_colonnes(module)
+    resume = resume_module_participant(module, participant)
+    synthese = NoteModuleSynthese.objects.filter(module=module, participant=participant).first()
+
+    return {
+        'module_id': module.id,
+        'formation_id': module.formation_id,
+        'colonne_id': colonnes[0].id if colonnes else None,
+        'moyenne': resume['moyenne'],
+        'heures_presence': resume['heures_presence'],
+        'heures_prevues': resume['heures_prevues'],
+        'taux_presence': resume['taux_presence'],
+        'admissible': resume['admissible'],
+        'mention': synthese.mention if synthese else '',
+    }
+
+
+def _build_notes_fiche_payload(participant, inscriptions):
+    """Payload notes + décisions pour un auditeur (tous ses cours)."""
+    from suiviEvaluation.models import DecisionPedagogique
+    from suiviEvaluation.academic_views import _serialize_decision
+    from suiviEvaluation.services import _get_parametres
+
+    modules_notes = [
+        _serialize_participant_module_notes(ins.module, participant)
+        for ins in inscriptions
+    ]
+
+    formation_ids = {
+        ins.module.formation_id
+        for ins in inscriptions
+        if ins.module.formation_id
+    }
+    formations_map = {
+        f.id: f
+        for f in Formation.objects.filter(pk__in=formation_ids)
+    }
+    decisions_qs = DecisionPedagogique.objects.filter(
+        participant=participant,
+        formation_id__in=formation_ids,
+    ).select_related('validee_par', 'formation')
+    decisions_map = {d.formation_id: d for d in decisions_qs}
+
+    formations_data = []
+    for fid in sorted(formation_ids):
+        formation = formations_map.get(fid)
+        if not formation:
+            continue
+        dec = decisions_map.get(fid)
+        formations_data.append({
+            'formation_id': fid,
+            'formation_libelle': formation.formation,
+            'criteres': _get_parametres(formation),
+            'decision': _serialize_decision(dec) if dec else None,
+        })
+
+    return {
+        'modules': modules_notes,
+        'formations': formations_data,
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def participant_notes_fiche(request, pk):
+    """Notes et décisions d'un auditeur — une requête pour tous ses cours."""
+    from suiviEvaluation.permissions import ROLES_GESTION_NOTES
+
+    role = getattr(request.user, 'role', None)
+    if role not in ROLES_GESTION_NOTES:
+        return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
+
+    participant, err = _resolve_participant_fiche_admin(request, pk)
+    if err:
+        return err
+
+    inscriptions = (
+        ModuleParticipant.objects.filter(participant=participant)
+        .select_related('module__formation')
+        .order_by('-inscrit_le')
+    )
+
+    return Response(_build_notes_fiche_payload(participant, inscriptions))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def participant_notes_fiche_export(request, pk, fmt):
+    """Export PDF ou Excel du relevé de notes avec décision finale."""
+    from django.http import HttpResponse
+    from suiviEvaluation.permissions import ROLES_GESTION_NOTES
+    from .notes_exports import (
+        build_releve_notes_export_data,
+        export_releve_notes_pdf,
+        export_releve_notes_excel,
+    )
+
+    role = getattr(request.user, 'role', None)
+    if role not in ROLES_GESTION_NOTES:
+        return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
+
+    participant, err = _resolve_participant_fiche_admin(request, pk)
+    if err:
+        return err
+
+    fmt = (fmt or '').lower()
+    if fmt not in ('pdf', 'xlsx'):
+        return Response({'detail': 'Format invalide (pdf ou xlsx).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    inscriptions = (
+        ModuleParticipant.objects.filter(participant=participant)
+        .select_related('module__formation')
+        .order_by('-inscrit_le')
+    )
+    notes_payload = _build_notes_fiche_payload(participant, inscriptions)
+    export_data = build_releve_notes_export_data(participant, inscriptions, notes_payload)
+
+    safe_name = f"{participant.nom}_{participant.prenom}".replace(' ', '_')
+    try:
+        if fmt == 'pdf':
+            buffer = export_releve_notes_pdf(export_data)
+            content_type = 'application/pdf'
+            filename = f"releve_notes_{safe_name}_{participant.pk}.pdf"
+        else:
+            buffer = export_releve_notes_excel(export_data)
+            content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = f"releve_notes_{safe_name}_{participant.pk}.xlsx"
+    except RuntimeError as exc:
+        return Response({'detail': str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    response = HttpResponse(buffer.getvalue(), content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 # ──────────────────────────────────────────────
