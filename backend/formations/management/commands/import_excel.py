@@ -579,6 +579,21 @@ class Command(BaseCommand):
         val_str = str(val_str).strip()
         if not val_str:
             return val_str
+
+        # ISO : conserver l'espace (ou T) entre date et heure
+        m_iso = re.match(r'^(\d{4}-\d{2}-\d{2})(?:\s+|T)(.+)$', val_str)
+        if m_iso:
+            return f'{m_iso.group(1)} {m_iso.group(2).strip()}'
+
+        # Européen avec heure : DD/MM/YYYY HH:MM
+        m_eu_time = re.match(
+            r'^(.+?)\s+(\d{1,2}:\d{2}(?::\d{2})?)$',
+            val_str,
+        )
+        if m_eu_time:
+            date_part = re.sub(r'\s+', '', m_eu_time.group(1).strip())
+            return f'{date_part} {m_eu_time.group(2)}'
+
         val_str = re.sub(r'\s+', '', val_str)
         # 03/072026 → 03/07/2026
         m = re.match(r'^(\d{1,2})/(\d{2})(\d{4})$', val_str)

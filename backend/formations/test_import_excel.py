@@ -146,6 +146,8 @@ class ImportFormationsRefSiteTest(TestCase):
             ('03/072026', datetime(2026, 7, 3)),
             ('23/072026', datetime(2026, 7, 23)),
             ('26/072026', datetime(2026, 7, 26)),
+            ('2026-05-05 08:00', datetime(2026, 5, 5, 8, 0)),
+            ('2026-05-09 17:00', datetime(2026, 5, 9, 17, 0)),
         ]
         for raw, expected in cases:
             parsed = self.cmd._parse_datetime(raw)
