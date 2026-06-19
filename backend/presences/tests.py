@@ -623,3 +623,98 @@ class VolumeHoraireFicheStatsTest(TestCase):
         stats = _compute_volume_horaire_stats(modules_data, Pointage.objects.none())
         self.assertEqual(stats['volume_horaire_total_heures'], 12.0)
 
+
+# ──────────────────────────────────────────
+# Admin — recalcul durée à l'enregistrement
+# ──────────────────────────────────────────
+
+class PointageAdminSaveTest(TestCase):
+
+    def setUp(self):
+        from datetime import datetime, time
+        from zoneinfo import ZoneInfo
+
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from unittest.mock import MagicMock
+
+        from presences.admin import PointageAdmin
+
+        self.tz = ZoneInfo('Africa/Abidjan')
+        self.date_journee = datetime(2026, 6, 18).date()
+        self.admin_user = make_user('pointageadmin', role='CPFAE_ADMIN')
+        self.factory = RequestFactory()
+        self.admin = PointageAdmin(Pointage, AdminSite())
+        self.form = MagicMock()
+        self.form.changed_data = ['timestamp_sortie']
+
+        f = Formation.objects.create(formation='SESSION 2026 VAGUE 2')
+        self.module = Module.objects.create(
+            formation=f,
+            intitule='REDACTION ADMINISTRATIVE',
+            grade='A4',
+            groupe='GROUPE 14',
+            vague='VAGUE 2',
+        )
+        self.session = SessionModule.objects.create(
+            module=self.module,
+            date_journee=self.date_journee,
+            numero=1,
+            intitule='MATIN',
+            heure_debut_prevue=time(7, 30),
+            heure_fin_prevue=time(12, 30),
+        )
+        self.participant = Participant.objects.create(
+            matricule='A4G14',
+            nom='Test',
+            prenom='Participant',
+        )
+
+    def _aware(self, hour, minute):
+        from datetime import datetime
+
+        return timezone.make_aware(
+            datetime.combine(self.date_journee, datetime.min.time().replace(hour=hour, minute=minute)),
+            self.tz,
+        )
+
+    def _save_via_admin(self, pointage, *, change=True, changed_data=None):
+        request = self.factory.post('/admin/presences/pointage/')
+        request.user = self.admin_user
+        self.form.changed_data = changed_data or ['timestamp_sortie']
+        self.admin.save_model(request, pointage, self.form, change=change)
+
+    def test_admin_recalcule_duree_si_sortie_superieure_a_entree(self):
+        pointage = Pointage.objects.create(
+            session=self.session,
+            participant=self.participant,
+            date_journee=self.date_journee,
+            timestamp_entree=self._aware(7, 32),
+            timestamp_sortie=self._aware(7, 32),
+            duree_presence_minutes=0,
+            statut=Pointage.Statut.ABSENT_NON_BADGE,
+        )
+        pointage.timestamp_sortie = self._aware(12, 30)
+        self._save_via_admin(pointage)
+
+        pointage.refresh_from_db()
+        self.assertGreater(float(pointage.duree_presence_minutes), 0)
+        self.assertEqual(pointage.statut, Pointage.Statut.TERMINE)
+
+    def test_admin_conserve_absent_si_duree_nulle(self):
+        entree = self._aware(7, 32)
+        pointage = Pointage.objects.create(
+            session=self.session,
+            participant=self.participant,
+            date_journee=self.date_journee,
+            timestamp_entree=entree,
+            timestamp_sortie=entree,
+            duree_presence_minutes=0,
+            statut=Pointage.Statut.ABSENT_NON_BADGE,
+        )
+        self._save_via_admin(pointage, changed_data=[])
+
+        pointage.refresh_from_db()
+        self.assertEqual(float(pointage.duree_presence_minutes), 0)
+        self.assertEqual(pointage.statut, Pointage.Statut.ABSENT_NON_BADGE)
+

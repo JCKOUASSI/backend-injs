@@ -1778,6 +1778,7 @@ def _finance_report_rows(
                 'total_duree_realisee_minutes': 0.0,
                 'taux_planned_minutes': 0.0,
                 'taux_realized_capped_minutes': 0.0,
+                'montant_prevu': 0.0,
                 'montant_realise': 0.0,
                 'prix_heure_realisee': module_prix_heure,
             })
@@ -1858,6 +1859,9 @@ def _finance_report_rows(
             mod_entry['total_duree_realisee_minutes'] = module_realized_capped
             mod_entry['taux_planned_minutes'] = module_planned
             mod_entry['taux_realized_capped_minutes'] = module_realized_capped
+            mod_entry['montant_prevu'] = _finance_montant_from_minutes(
+                module_planned, module_prix_heure,
+            )
             mod_entry['montant_realise'] = _finance_montant_from_minutes(
                 module_realized_capped, module_prix_heure,
             )
@@ -1881,10 +1885,6 @@ def _finance_report_rows(
             )
             entry['taux_planned_minutes'] = round(float(entry.get('taux_planned_minutes') or 0), 1)
             entry['taux_realized_capped_minutes'] = round(float(entry.get('taux_realized_capped_minutes') or 0), 1)
-            entry['montant_prevu'] = _finance_montant_from_minutes(
-                entry.get('total_duree_minutes', 0),
-                entry.get('prix_heure_realisee'),
-            )
             modules_list.append(entry)
         montant_total = round(sum(float(m.get('montant_realise') or 0) for m in modules_list), 2)
         if use_variable_rates:
