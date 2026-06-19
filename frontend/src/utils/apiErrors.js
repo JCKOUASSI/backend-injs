@@ -10,6 +10,7 @@ const DEFAULT_FIELD_LABELS = {
   telephone: 'Téléphone',
   detail: 'Erreur',
   non_field_errors: 'Erreur',
+  __all__: 'Erreur',
 }
 
 /**

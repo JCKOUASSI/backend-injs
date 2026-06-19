@@ -6,7 +6,7 @@ import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
-import { fmtHeuresLabel, sommeSeancesHeures } from '../utils/duree'
+import { fmtHeuresLabel, sommeSeancesHeures, sessionNumeroLabel, nextSessionNumeroForDate } from '../utils/duree'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
@@ -524,7 +524,7 @@ export default function FormationDetail() {
       loadFormationData()
       showToast(res.data?.detail || 'Séance modifiée')
     } catch (err) {
-      showToast(err.response?.data?.detail || 'Erreur lors de la modification', 'error')
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la modification de la séance.' }), 'error')
     } finally { setSavingSession(false) }
   }
 
@@ -1166,10 +1166,12 @@ export default function FormationDetail() {
                 <div className="card-body-flush">
                   <div className="table-container">
                     <table className="table">
-                      <thead><tr><th>Date</th><th>Horaire</th><th>Statut</th><th>Présences</th><th>Exports</th><th>Actions</th></tr></thead>
+                      <thead><tr><th>N°</th><th>Intitulé</th><th>Date</th><th>Horaire</th><th>Statut</th><th>Présences</th><th>Exports</th><th>Actions</th></tr></thead>
                       <tbody>
                         {moduleSessions.map((s) => (
                           <tr key={s.id}>
+                            <td><span className="badge-bg-info">{sessionNumeroLabel(s)}</span></td>
+                            <td><strong>{s.intitule || '—'}</strong></td>
                             <td>{s.date ? formatDate(s.date) : '-'}</td>
                             <td style={{ whiteSpace: 'nowrap' }}>{s.heure_debut || '-'} — {s.heure_fin || '-'}</td>
                             <td><span className={`badge ${s.en_cours ? 'badge-en-cours' : s.terminee ? 'badge-terminee' : 'badge-planifiee'}`}>
@@ -1364,11 +1366,16 @@ export default function FormationDetail() {
         <div className="modal-overlay" onClick={() => setEditSession(null)}>
           <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-pencil me-2"></i>Modifier la séance</h5>
+              <h5><i className="bi bi-pencil me-2"></i>Modifier la séance {sessionNumeroLabel(editSession)}</h5>
               <button className="btn-close" onClick={() => setEditSession(null)}>&times;</button>
             </div>
             <form onSubmit={handleUpdateSession}>
               <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Numéro (dans la journée)</label>
+                  <input type="text" className="form-control" readOnly disabled value={sessionNumeroLabel(editSession)} />
+                  <small className="text-muted">Une seule séance {sessionNumeroLabel(editSession)} par date.</small>
+                </div>
                 <div className="form-group">
                   <label className="form-label">Intitulé *</label>
                   <input type="text" className="form-control" required

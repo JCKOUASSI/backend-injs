@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.db import transaction
@@ -2522,17 +2523,8 @@ def participant_notes_fiche_export(request, pk, fmt):
 # PARTICIPANT — Lookup par numéro (pour app mobile R7)
 # ──────────────────────────────────────────────
 
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([AllowAny])
-def formation_offline_data(request, token):
-    """
-    Retourne les données d'une formation nécessaires au badgeage hors ligne.
-    Authentification par token QR (pas besoin de login).
-    Désactivé si PUBLIC_QR_SCAN_ENABLED=False (aligné sur /api/scan/).
-    """
-    if not settings.PUBLIC_QR_SCAN_ENABLED:
-        return _public_scan_disabled_response()
+def _formation_offline_data_response(token):
+    """Données hors-ligne pour un token QR (UUID). Retourne un Response DRF."""
     try:
         qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
     except QRToken.DoesNotExist:
@@ -2610,6 +2602,47 @@ def formation_offline_data(request, token):
         'formateurs': formateurs,
         'encadrants': encadrants,
     })
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def scan_offline_data(request):
+    """
+    Données hors-ligne pour la page badge (token QR en query string).
+
+    GET /api/scan/offline-data/?token=<uuid>
+    """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
+    token_str = (request.query_params.get('token') or '').strip()
+    if not token_str:
+        return Response(
+            {'detail': 'Paramètre "token" requis (UUID du QR code).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        token = uuid.UUID(token_str)
+    except ValueError:
+        return Response(
+            {'detail': 'Token QR invalide (UUID attendu, pas un ID formation).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return _formation_offline_data_response(token)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def formation_offline_data(request, token):
+    """
+    Données hors-ligne (legacy) — token QR dans le chemin.
+
+    Préférer ``GET /api/scan/offline-data/?token=…``.
+    """
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return _public_scan_disabled_response()
+    return _formation_offline_data_response(token)
 
 
 @api_view(['GET'])

@@ -4,6 +4,8 @@ Session management views for the React frontend.
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -30,6 +32,36 @@ def _session_audit_extra(session):
         'module_id': session.module_id,
         'module_intitule': session.module.intitule,
     }
+
+
+def _session_duplicate_detail(session, *, conflict=None):
+    """Message lisible pour une collision (module, date_journee, numero)."""
+    date_label = session.date_journee.strftime('%d/%m/%Y') if session.date_journee else '—'
+    base = (
+        f'Une séance n°{session.numero} existe déjà pour ce module le {date_label}.'
+    )
+    if conflict:
+        label = (conflict.intitule or f'Séance {conflict.numero}').strip()
+        return f'{base} Conflit avec « {label} » — choisissez une autre date.'
+    return base
+
+
+def _session_save_error_detail(exc, session=None):
+    if isinstance(exc, IntegrityError):
+        return _session_duplicate_detail(session) if session else (
+            'Une séance avec le même module, date et numéro existe déjà.'
+        )
+    if isinstance(exc, DjangoValidationError):
+        if hasattr(exc, 'message_dict') and exc.message_dict.get('__all__'):
+            msg = exc.message_dict['__all__'][0]
+        elif hasattr(exc, 'messages') and exc.messages:
+            msg = exc.messages[0]
+        else:
+            msg = str(exc)
+        if session and ('existe déjà' in msg.lower() or 'already exists' in msg.lower()):
+            return _session_duplicate_detail(session)
+        return msg
+    return str(exc)
 
 
 def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
@@ -460,6 +492,17 @@ def session_update(request, formation_pk, session_pk):
         session.heure_fin_prevue = request.data['heure_fin_prevue'] or None
         hours_changed = True
 
+    conflict = SessionModule.objects.filter(
+        module_id=session.module_id,
+        date_journee=session.date_journee,
+        numero=session.numero,
+    ).exclude(pk=session.pk).first()
+    if conflict:
+        return Response(
+            {'detail': _session_duplicate_detail(session, conflict=conflict)},
+            status=400,
+        )
+
     try:
         session.full_clean()
         auto_adjustment = None
@@ -473,6 +516,11 @@ def session_update(request, formation_pk, session_pk):
             session.save()
     except SessionEdtBalanceError as e:
         return Response({'detail': str(e)}, status=400)
+    except (DjangoValidationError, IntegrityError) as e:
+        return Response(
+            {'detail': _session_save_error_detail(e, session=session)},
+            status=400,
+        )
     except Exception as e:
         return Response({'detail': str(e)}, status=400)
 
