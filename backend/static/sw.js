@@ -57,7 +57,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // ── Offline-data API: network-first, cache fallback ──
-    if (url.pathname.includes('/offline-data/')) {
+    if (url.pathname.includes('/offline-data/') || url.pathname.includes('/scan/offline-data')) {
         event.respondWith(
             fetch(event.request)
                 .then((response) => {

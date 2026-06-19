@@ -53,3 +53,16 @@ def pointage_minutes_clampees(pointage, *, now=None):
         return 0.0
     entree, sortie, _ = pointage_bornes_clampees(pointage, now=now)
     return max(round((sortie - entree).total_seconds() / 60, 2), 0.0)
+
+
+def duree_minutes_effective(pointage, *, now=None):
+    """Durée pour affichage / stats : recalcule depuis les timestamps (règle canonique).
+
+    Utilisé quand ``duree_presence_minutes`` n'a pas été persistée (données historiques,
+    clôtures partielles). Les absents forcés (``ABSENT_NON_BADGE``) restent à 0.
+    """
+    if not pointage.timestamp_entree:
+        return 0.0
+    if getattr(pointage, 'statut', None) == 'ABSENT_NON_BADGE':
+        return 0.0
+    return pointage_minutes_clampees(pointage, now=now)

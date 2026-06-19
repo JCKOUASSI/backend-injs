@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Scan QR (participant — pas besoin d'auth)
     path('scan/', views.scan_view, name='scan'),
+    path('scan/offline-data/', views.scan_offline_data, name='scan-offline-data'),
 
     # Scan sécurisé (app mobile — anti-fraude, auth requise)
     path('scan/secure/', views.secure_scan_view, name='secure-scan'),

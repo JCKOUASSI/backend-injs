@@ -20,6 +20,30 @@ export function sommeSeancesHeures(sessions) {
   return Math.round((totalMin / 60) * 100) / 100
 }
 
+/** Libellé court du numéro de séance dans la journée (ex. « n°1 »). */
+export function sessionNumeroLabel(session) {
+  const n = session?.numero
+  if (n == null || n === '') return '—'
+  return `n°${n}`
+}
+
+/** Libellé complet séance : numéro + intitulé. */
+export function sessionDisplayLabel(session) {
+  const num = sessionNumeroLabel(session)
+  const title = (session?.intitule || '').trim()
+  if (title && num !== '—') return `${num} — ${title}`
+  if (title) return title
+  return num !== '—' ? `Séance ${num}` : 'Séance'
+}
+
+/** Prochain numéro disponible pour une date (séances du même module). */
+export function nextSessionNumeroForDate(sessions, dateJournee) {
+  if (!dateJournee) return 1
+  const sameDay = (sessions || []).filter(s => s.date === dateJournee)
+  if (!sameDay.length) return 1
+  return Math.max(...sameDay.map(s => Number(s.numero) || 0)) + 1
+}
+
 /** Libellé « 28h » ou « 28.5h » pour affichage. */
 export function fmtHeuresLabel(heures) {
   if (heures == null || heures <= 0) return null
