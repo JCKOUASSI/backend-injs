@@ -1881,10 +1881,6 @@ def _finance_report_rows(
             )
             entry['taux_planned_minutes'] = round(float(entry.get('taux_planned_minutes') or 0), 1)
             entry['taux_realized_capped_minutes'] = round(float(entry.get('taux_realized_capped_minutes') or 0), 1)
-            entry['montant_prevu'] = _finance_montant_from_minutes(
-                entry.get('total_duree_minutes', 0),
-                entry.get('prix_heure_realisee'),
-            )
             modules_list.append(entry)
         montant_total = round(sum(float(m.get('montant_realise') or 0) for m in modules_list), 2)
         if use_variable_rates:

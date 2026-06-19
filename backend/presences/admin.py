@@ -127,7 +127,45 @@ class PointageAdmin(AdminScopeMixin, ModelAdmin):
             cible_nom = ''
         return cible_type, cible_numero, cible_nom
 
+    def _sync_duree_et_statut(self, obj):
+        """Recalcule la durée et aligne le statut après édition admin des horodatages."""
+        if not obj.timestamp_entree:
+            return
+
+        if obj.timestamp_sortie is None:
+            obj.duree_presence_minutes = None
+            if obj.statut not in (Pointage.Statut.FORCE_DFRC,):
+                obj.statut = Pointage.Statut.EN_COURS
+            return
+
+        obj.calculer_duree()
+        duree = float(obj.duree_presence_minutes or 0)
+        if duree <= 0:
+            if obj.statut not in (
+                Pointage.Statut.FORCE_DFRC,
+                Pointage.Statut.SORTIE_AUTO,
+            ):
+                obj.statut = Pointage.Statut.ABSENT_NON_BADGE
+            return
+
+        if obj.statut in (
+            Pointage.Statut.EN_COURS,
+            Pointage.Statut.ABSENT_NON_BADGE,
+            Pointage.Statut.HORS_LIGNE_SUSPECT,
+        ):
+            obj.statut = Pointage.Statut.TERMINE
+
     def save_model(self, request, obj, form, change):
+        horodatages_modifies = (
+            not change
+            or any(
+                champ in getattr(form, 'changed_data', [])
+                for champ in ('timestamp_entree', 'timestamp_sortie', 'session')
+            )
+        )
+        if horodatages_modifies or obj.timestamp_sortie:
+            self._sync_duree_et_statut(obj)
+
         super().save_model(request, obj, form, change)
         if change:
             action = AuditLog.Action.FORCE_SORTIE if obj.timestamp_sortie else AuditLog.Action.FORCE_ENTREE
