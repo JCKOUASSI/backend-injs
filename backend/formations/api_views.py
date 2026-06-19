@@ -3331,6 +3331,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
+    from presences.duree import duree_minutes_effective
     from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours, _get_module_participants_categories
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
@@ -3382,7 +3383,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'session_numero': s.numero if s else None,
             'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
             'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
-            'duree_minutes': float(pt.duree_presence_minutes or 0),
+            'duree_minutes': duree_minutes_effective(pt),
             'statut': pt.statut,
         })
 
@@ -3404,7 +3405,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'session_numero': s.numero if s else None,
             'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
             'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
-            'duree_minutes': float(pt.duree_presence_minutes or 0),
+            'duree_minutes': duree_minutes_effective(pt),
             'statut': pt.statut,
         })
 
@@ -3427,7 +3428,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'session_numero': s.numero if s else None,
             'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
             'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
-            'duree_minutes': float(pt.duree_presence_minutes or 0),
+            'duree_minutes': duree_minutes_effective(pt),
             'statut': pt.statut,
         })
 
