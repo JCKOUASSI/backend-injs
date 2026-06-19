@@ -66,6 +66,14 @@ const KPI_SESSIONS_COMPT = {
   help: 'Séances dont la date est atteinte (EDT importé), alignées avec le point journalier et l\'assiduité.',
 }
 
+const KPI_SESSIONS_TOTAL = {
+  label: 'Séances totales',
+  help: 'Séances planifiées dont la date est dans la période sélectionnée (y compris futures sur l\'intervalle).',
+}
+
+const KPI_PERIOD_SCOPE_HELP =
+  'Filtré selon la période : modules ayant au moins une séance dans l\'intervalle. « Toutes les périodes » = cumul global du périmètre.'
+
 /** Définition métier unifiée (dashboard, bilans, FAC, alertes). */
 const AUDITEURS_NOTOIRES = {
   label: 'Absents notoires',
@@ -73,7 +81,10 @@ const AUDITEURS_NOTOIRES = {
   help: 'Inscrit à au moins un module démarré, sans aucune présence enregistrée, ou avec motif notoire renseigné.',
 }
 
-/** Onglets où le filtre période (VH + séances comptabilisées) s\'applique. */
+/** Onglets accessibles aux comptes secrétariat (point + bilans uniquement). */
+const SECRETARIAT_STATS_TABS = new Set(['point_journalier', 'rapports'])
+
+/** Onglets où le filtre période s'applique aux indicateurs clés. */
 const VH_PERIOD_TABS = new Set(['overview', 'pedagogy', 'admin', 'history', 'alertes'])
 
 /** Sections API chargées par onglet (évite le calcul de tout le dashboard d'un coup). */
@@ -1103,7 +1114,9 @@ export default function Statistiques() {
   const isEncadrantScoped = user?.role === 'ENCADRANT'
   const secretariatFilterLocked = isSecretariatScoped
   const userLockedSecretariatId = lockedSecretariatId(user)
-  const [onglet, setOnglet] = useState('overview')
+  const [onglet, setOnglet] = useState(() => (
+    isSecretariatScopedRole(user?.role) ? 'point_journalier' : 'overview'
+  ))
   const [data, setData] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingTab, setLoadingTab] = useState(false)
@@ -1170,12 +1183,15 @@ export default function Statistiques() {
   const [rbDimension, setRbDimension] = useState('module')
   const [rbData, setRbData] = useState(null)
   const [rbAllTableaux, setRbAllTableaux] = useState([])
-  const [rbDetail, setRbDetail] = useState(null)
+  const [rbJustificatifsText, setRbJustificatifsText] = useState('')
   const [rbSelection, setRbSelection] = useState(null)
+  const [rbDetail, setRbDetail] = useState(null)
   const [loadingRb, setLoadingRb] = useState(false)
   const [loadingRbAll, setLoadingRbAll] = useState(false)
   const [loadingRbDetail, setLoadingRbDetail] = useState(false)
   const [exportingRb, setExportingRb] = useState(null)
+  const [exportingFac, setExportingFac] = useState(null)
+  const [facExportMeta, setFacExportMeta] = useState({ justificatifs: {}, difficultes: {} })
 
   // Bilan FAC — sous-onglet dans Rapports & Bilans
   const [facFormationId, setFacFormationId] = useState('')
@@ -1185,10 +1201,15 @@ export default function Statistiques() {
   const [loadingFac, setLoadingFac] = useState(false)
   const [facSousOnglet, setFacSousOnglet] = useState('point_global')
   const [showFacPanel, setShowFacPanel] = useState(false)
+  const [facPerimetre, setFacPerimetre] = useState({ grades: [], groupes: [] })
+  const [facGradesSelected, setFacGradesSelected] = useState([])
+  const [facGroupesSelected, setFacGroupesSelected] = useState([])
+  const [loadingFacPerimetre, setLoadingFacPerimetre] = useState(false)
 
   const canValidate = VALIDATION_ROLES.includes(user?.role)
   const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedPeriodKey })
   const hasDataRef = useRef(false)
+  const fetchSeqRef = useRef(0)
 
   useEffect(() => {
     if (userLockedSecretariatId) {
@@ -1196,9 +1217,16 @@ export default function Statistiques() {
     }
   }, [userLockedSecretariatId])
 
+  useEffect(() => {
+    if (isSecretariatScoped && !SECRETARIAT_STATS_TABS.has(onglet)) {
+      setOnglet('point_journalier')
+    }
+  }, [isSecretariatScoped, onglet])
+
   const fetchData = useCallback(async (sections, { silent = false, initial = false } = {}) => {
     const tabSections = sections?.length ? sections : (TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
     const allSections = [...new Set([...tabSections, ...META_SECTIONS])]
+    const seq = ++fetchSeqRef.current
     if (!silent) {
       if (initial) setLoadingInitial(true)
       else setLoadingTab(true)
@@ -1211,14 +1239,18 @@ export default function Statistiques() {
       if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
       appendPeriodToSearchParams(params, appliedVhPeriod)
       const res = await api.get(`/statistiques/?${params}`)
+      if (seq !== fetchSeqRef.current) return
       setData(prev => ({ ...(prev || {}), ...res.data }))
       hasDataRef.current = true
       setLastRefresh(new Date())
     } catch(e) {
+      if (seq !== fetchSeqRef.current) return
       if (!silent) setError(e.response?.data?.detail || 'Erreur de chargement.')
     } finally {
-      setLoadingInitial(false)
-      setLoadingTab(false)
+      if (seq === fetchSeqRef.current) {
+        setLoadingInitial(false)
+        setLoadingTab(false)
+      }
     }
   }, [formationId, effectiveSecretariatId, onglet, appliedVhPeriod])
 
@@ -1386,6 +1418,13 @@ export default function Statistiques() {
       if (pjCategorie) params.set('categorie', pjCategorie)
       if (pjFormationId) params.set('formation_id', pjFormationId)
       if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
+      if (pjSelection !== null && pjData?.tableaux?.[pjSelection]) {
+        const tb = pjData.tableaux[pjSelection]
+        params.set('jour', tb.date)
+        params.set('formation_id', String(tb.formation_id))
+        if (tb.categorie) params.set('categorie', tb.categorie)
+        if (tb.grade) params.set('grade', tb.grade)
+      }
       const { blob, fileName } = await api.getBlob(`/statistiques/point-journalier-export/?${params}`)
       const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
       const url = URL.createObjectURL(blob)
@@ -1472,14 +1511,68 @@ export default function Statistiques() {
     }
   }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, rbData])
 
+  const fetchFacPerimetre = useCallback(async () => {
+    const effFormation = facFormationId || formationId
+    if (!effFormation) {
+      setFacPerimetre({ grades: [], groupes: [] })
+      setFacGradesSelected([])
+      setFacGroupesSelected([])
+      return
+    }
+    setLoadingFacPerimetre(true)
+    try {
+      const params = new URLSearchParams({ formation_id: effFormation })
+      if (facCategorie) params.set('categorie', facCategorie)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
+      const res = await api.get(`/statistiques/bilan-fac/perimetre/?${params}`)
+      const grades = res.data?.grades || []
+      const groupes = res.data?.groupes || []
+      setFacPerimetre({ grades, groupes })
+      setFacGradesSelected(grades)
+      setFacGroupesSelected(groupes.map(g => g.id))
+    } catch {
+      setFacPerimetre({ grades: [], groupes: [] })
+      setFacGradesSelected([])
+      setFacGroupesSelected([])
+    } finally {
+      setLoadingFacPerimetre(false)
+    }
+  }, [facFormationId, facCategorie, formationId, effectiveSecretariatId])
+
+  useEffect(() => {
+    if (!showFacPanel) return
+    fetchFacPerimetre()
+  }, [showFacPanel, fetchFacPerimetre])
+
+  const facGroupesVisibles = (facPerimetre.groupes || []).filter(
+    g => facGradesSelected.includes(g.grade),
+  )
+
+  useEffect(() => {
+    const visibleIds = new Set(facGroupesVisibles.map(g => g.id))
+    setFacGroupesSelected(prev => prev.filter(id => visibleIds.has(id)))
+  }, [facGradesSelected.join(','), facPerimetre.groupes.length])
+
   const fetchBilanFac = useCallback(async () => {
     const effFormation = facFormationId || formationId
     if (!effFormation) return
+    if (!facGradesSelected.length) return
     setLoadingFac(true)
     try {
       const params = new URLSearchParams({ formation_id: effFormation, annee: String(facAnnee) })
       if (facCategorie) params.set('categorie', facCategorie)
       if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
+      const allGrades = facPerimetre.grades || []
+      const allGroupeIds = facGroupesVisibles.map(g => g.id)
+      if (facGradesSelected.length < allGrades.length) {
+        params.set('grades', facGradesSelected.join(','))
+      }
+      if (
+        allGroupeIds.length > 0
+        && facGroupesSelected.length < allGroupeIds.length
+      ) {
+        params.set('groupes', facGroupesSelected.join(','))
+      }
       const res = await api.get(`/statistiques/bilan-fac/?${params}`)
       setFacData(res.data)
     } catch {
@@ -1487,7 +1580,10 @@ export default function Statistiques() {
     } finally {
       setLoadingFac(false)
     }
-  }, [facFormationId, facAnnee, facCategorie, formationId, secretariatId])
+  }, [
+    facFormationId, facAnnee, facCategorie, formationId, effectiveSecretariatId,
+    facGradesSelected, facGroupesSelected, facPerimetre.grades, facGroupesVisibles,
+  ])
 
   const fetchRbDetail = useCallback(async (bilan) => {
     if (!bilan) {
@@ -1567,6 +1663,7 @@ export default function Statistiques() {
       if (bilan?.ref_module_id) params.set('ref_module_id', String(bilan.ref_module_id))
       if (bilan?.matiere_intitule) params.set('matiere_intitule', bilan.matiere_intitule)
       if (bilan?.categorie && bilan.categorie !== '—') params.set('categorie', bilan.categorie)
+      if (rbJustificatifsText.trim()) params.set('justificatifs', rbJustificatifsText.trim())
       const { blob, fileName } = await api.getBlob(`/statistiques/bilans-export/?${params}`)
       const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
       const url = URL.createObjectURL(blob)
@@ -1583,11 +1680,64 @@ export default function Statistiques() {
     }
   }
 
+  const downloadBilanFac = async (format) => {
+    const effFormation = facFormationId || formationId
+    if (!effFormation || !facData) return
+    setExportingFac(format)
+    try {
+      const params = new URLSearchParams({
+        export: format,
+        formation_id: effFormation,
+        annee: String(facAnnee),
+      })
+      if (facCategorie) params.set('categorie', facCategorie)
+      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
+      const allGrades = facPerimetre.grades || []
+      const allGroupeIds = facGroupesVisibles.map(g => g.id)
+      if (facGradesSelected.length < allGrades.length) {
+        params.set('grades', facGradesSelected.join(','))
+      }
+      if (allGroupeIds.length > 0 && facGroupesSelected.length < allGroupeIds.length) {
+        params.set('groupes', facGroupesSelected.join(','))
+      }
+      const { justificatifs, difficultes } = facExportMeta
+      if (
+        Object.keys(justificatifs || {}).length
+        || Object.keys(difficultes || {}).length
+      ) {
+        params.set('meta', JSON.stringify({ justificatifs, difficultes }))
+      }
+      const { blob, fileName } = await api.getBlob(`/statistiques/bilan-fac-export/?${params}`)
+      const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName || `BILAN_FAC_${facAnnee}.${ext}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      const detail = e.response?.data?.detail
+      alert(detail || e.message || 'Erreur lors du téléchargement.')
+    } finally {
+      setExportingFac(null)
+    }
+  }
+
   const handleApplyVhPeriod = useCallback((periodOverride) => {
     const p = periodOverride ?? vhPeriod
     saveFinancePeriod(p)
     setVhPeriod(p)
     setAppliedVhPeriod({ ...p })
+    fetchSeqRef.current += 1
+    setData(prev => (prev ? {
+      ...prev,
+      kpis: undefined,
+      periode: undefined,
+      pedagogiques: undefined,
+      admin_operationnel: undefined,
+      alertes: undefined,
+      alertes_overview: undefined,
+    } : prev))
   }, [vhPeriod])
 
   const handleRefreshAll = () => {
@@ -1611,6 +1761,19 @@ export default function Statistiques() {
       || prev.secretariatId !== secretariatId
       || prev.appliedPeriodKey !== appliedPeriodKey
     prevLoadCtx.current = { onglet, formationId, secretariatId, appliedPeriodKey }
+
+    if (filtreChanged && hasDataRef.current) {
+      fetchSeqRef.current += 1
+      setData(d => (d ? {
+        ...d,
+        kpis: undefined,
+        periode: undefined,
+        pedagogiques: undefined,
+        admin_operationnel: undefined,
+        alertes: undefined,
+        alertes_overview: undefined,
+      } : d))
+    }
 
     const sections = TAB_SECTIONS[onglet] || TAB_SECTIONS.overview
     const isFirst = !hasDataRef.current
@@ -1653,6 +1816,10 @@ export default function Statistiques() {
     if (onglet !== 'point_journalier') return
     fetchPointJournalier()
   }, [onglet, pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, fetchPointJournalier])
+
+  useEffect(() => {
+    setRbJustificatifsText('')
+  }, [rbSelection, rbAnnee, rbMois, rbFormationId, rbPeriode, rbCalendrier, rbDimension])
 
   useEffect(() => {
     if (onglet !== 'rapports') return
@@ -1722,6 +1889,9 @@ export default function Statistiques() {
     {id:'point_journalier', icon:'bi-calendar2-check',   label:'Point Journalier'},
     {id:'alertes',       icon:'bi-bell',                 label:'Alertes'},
   ]
+  const visibleOnglets = isSecretariatScoped
+    ? onglets.filter(o => SECRETARIAT_STATS_TABS.has(o.id))
+    : onglets
 
   if (loadingInitial && !data) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:300,gap:'0.75rem',color:'#64748b'}}>
@@ -1736,6 +1906,9 @@ export default function Statistiques() {
   )
 
   const { kpis, pedagogiques, admin_operationnel: adm, historique, alertes, alertes_overview, formations_liste, secretariats_liste, filtre_actif } = data || {}
+  const secretariatScopeLabel = (secretariats_liste || []).find(
+    s => String(s.id) === String(effectiveSecretariatId),
+  )?.nom || user?.secretariat_nom || 'Mon secrétariat'
   const auditeursNotoires = adm?.auditeurs_notoires
     || pedagogiques?.auditeurs_notoires
     || secDetail?.admin_operationnel?.auditeurs_notoires
@@ -1823,7 +1996,7 @@ export default function Statistiques() {
       {VH_PERIOD_TABS.has(onglet) && (
       <div className="finance-filter-panel" style={{ marginBottom: '1rem' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.5rem', letterSpacing: '0.04em' }}>
-          PÉRIODE — VOLUME HORAIRE & SÉANCES COMPTABILISÉES
+          PÉRIODE — INDICATEURS CLÉS
         </div>
         <div className="finance-filter-panel-inner">
           <FinancePeriodFilter
@@ -1841,8 +2014,8 @@ export default function Statistiques() {
             background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', fontSize: '0.82rem',
           }}>
             <i className="bi bi-info-circle me-1"/>
-            Cette période n&apos;a pas encore commencé — aucune séance comptabilisable
-            (volume horaire et présences à 0).
+            Cette période n&apos;a pas encore commencé — indicateurs clés et séances comptabilisables à 0
+            (volume horaire et présences inclus).
             {(() => {
               const { annee, q } = currentTrimestreParts()
               return (
@@ -1906,7 +2079,7 @@ export default function Statistiques() {
 
       {/* ── Navigation onglets ─────────────────────────── */}
       <div style={{display:'flex',gap:'0.25rem',marginBottom:'1.2rem',borderBottom:'2px solid #e2e8f0',overflowX:'auto',paddingBottom:0}}>
-        {onglets.map(o => (
+        {visibleOnglets.map(o => (
           <button key={o.id} onClick={() => setOnglet(o.id)} style={{
             background:'none',border:'none',cursor:'pointer',padding:'0.55rem 0.9rem',
             fontSize:'0.82rem',fontWeight:onglet===o.id?700:500,
@@ -1942,7 +2115,7 @@ export default function Statistiques() {
             </div>
           </div>
 
-          {!kpis ? <TabSpinner label="Chargement de la vue d'ensemble…"/> : (
+          {loadingInitial && !data ? <TabSpinner label="Chargement de la vue d'ensemble…"/> : (
           <div style={{display:'grid',gridTemplateColumns:'minmax(200px,260px) 1fr',gap:'1rem',alignItems:'start',marginBottom:'1.2rem'}}>
             <div style={{background:'#fff',borderRadius:10,boxShadow:'0 1px 4px rgba(0,0,0,0.07)',overflow:'hidden',maxHeight:'70vh',overflowY:'auto'}}>
               <div style={{padding:'0.65rem 0.85rem',background:'#f8fafc',borderBottom:'1px solid #e2e8f0',fontSize:'0.78rem',color:'#64748b',fontWeight:600}}>
@@ -1987,15 +2160,25 @@ export default function Statistiques() {
             </div>
 
             {overviewSelection === null ? (
+              !kpis ? (
+                <TabSpinner label="Mise à jour des indicateurs pour la période sélectionnée…"/>
+              ) : (
               <VueEnsemblePanel
+                key={appliedPeriodKey}
                 kpis={kpis}
+                periode={data?.periode}
+                loading={loadingTab}
                 pedagogiques={pedagogiques}
                 adm={adm}
                 alertesOverview={alertes_overview || alertes}
                 onSelectSection={setOverviewSelection}
                 auditeursNotoires={auditeursNotoires}
               />
+              )
             ) : overviewSection ? (
+              !kpis ? (
+                <TabSpinner label="Mise à jour des indicateurs pour la période sélectionnée…"/>
+              ) : (
               <div style={{ minWidth: 0 }}>
                 <button
                   type="button"
@@ -2005,8 +2188,10 @@ export default function Statistiques() {
                   <i className="bi bi-grid-3x3-gap me-1"/>Voir tous les indicateurs
                 </button>
                 <VueOverviewDetailPanel
+                  key={appliedPeriodKey}
                   sectionId={overviewSection.id}
                   kpis={kpis}
+                  periode={data?.periode}
                   pedagogiques={pedagogiques}
                   adm={adm}
                   alertesOverview={alertes_overview || alertes}
@@ -2016,6 +2201,7 @@ export default function Statistiques() {
                   auditeursNotoires={auditeursNotoires}
                 />
               </div>
+              )
             ) : (
               <Empty label="Section introuvable"/>
             )}
@@ -2396,6 +2582,15 @@ export default function Statistiques() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {onglet==='rapports' && (
         <>
+        {secretariatFilterLocked && (
+          <div style={{
+            marginBottom: '0.75rem', padding: '0.55rem 0.85rem', borderRadius: 8,
+            background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.82rem',
+          }}>
+            <i className="bi bi-building me-1"/>
+            Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
+          </div>
+        )}
         {/* ── Filtres bilans (même entête que Point Journalier) ─────────── */}
         <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
           <select className="form-select form-select-sm" style={{width:100}}
@@ -2619,6 +2814,8 @@ export default function Statistiques() {
                     bilan={rbData.bilans[rbSelection]}
                     tableau={rbDetail}
                     filtres={rbData.filtres_actifs}
+                    justificatifsText={rbJustificatifsText}
+                    onJustificatifsChange={setRbJustificatifsText}
                   />
                 </div>
               )
@@ -2707,7 +2904,7 @@ export default function Statistiques() {
                   className="btn btn-sm"
                   style={{background:'#ED7D31',color:'#fff',border:'none',minWidth:110}}
                   onClick={fetchBilanFac}
-                  disabled={loadingFac || (!facFormationId && !formationId)}
+                  disabled={loadingFac || (!facFormationId && !formationId) || !facGradesSelected.length}
                 >
                   {loadingFac
                     ? <><span className="spinner-border spinner-border-sm me-1"/>Chargement…</>
@@ -2715,6 +2912,137 @@ export default function Statistiques() {
                   }
                 </button>
               </div>
+
+              {/* Grades & groupes */}
+              {(facFormationId || formationId) && (
+                <div style={{
+                  marginBottom: '1rem', padding: '0.75rem', borderRadius: 8,
+                  background: '#fffbeb', border: '1px solid #fde68a',
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.55rem',
+                  }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e' }}>
+                      <i className="bi bi-ui-checks me-1"/>
+                      Périmètre — grades et groupes
+                    </span>
+                    {loadingFacPerimetre && (
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        <span className="spinner-border spinner-border-sm me-1"/>Chargement…
+                      </span>
+                    )}
+                    {!loadingFacPerimetre && facPerimetre.grades.length > 0 && (
+                      <span style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}
+                          onClick={() => {
+                            setFacGradesSelected([...facPerimetre.grades])
+                            setFacGroupesSelected(facPerimetre.groupes.map(g => g.id))
+                          }}
+                        >
+                          Tout cocher
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}
+                          onClick={() => {
+                            setFacGradesSelected([])
+                            setFacGroupesSelected([])
+                            setFacData(null)
+                          }}
+                        >
+                          Tout décocher
+                        </button>
+                      </span>
+                    )}
+                  </div>
+
+                  {!loadingFacPerimetre && !facPerimetre.grades.length && (
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+                      Aucun grade/groupe pour cette formation et ces filtres.
+                    </p>
+                  )}
+
+                  {!loadingFacPerimetre && facPerimetre.grades.length > 0 && (
+                    <>
+                      <div style={{ marginBottom: '0.55rem' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem' }}>
+                          GRADES
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                          {facPerimetre.grades.map(grade => (
+                            <label
+                              key={grade}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                                background: facGradesSelected.includes(grade) ? '#fef3c7' : '#f8fafc',
+                                border: `1px solid ${facGradesSelected.includes(grade) ? '#f59e0b' : '#e2e8f0'}`,
+                                borderRadius: 6, padding: '0.25rem 0.55rem',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={facGradesSelected.includes(grade)}
+                                onChange={e => {
+                                  setFacData(null)
+                                  setFacGradesSelected(prev => (
+                                    e.target.checked
+                                      ? [...prev, grade]
+                                      : prev.filter(g => g !== grade)
+                                  ))
+                                }}
+                              />
+                              {grade}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {facGroupesVisibles.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem' }}>
+                            GROUPES
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', maxHeight: 140, overflowY: 'auto' }}>
+                            {facGroupesVisibles.map(g => (
+                              <label
+                                key={g.id}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                  fontSize: '0.72rem', cursor: 'pointer',
+                                  background: facGroupesSelected.includes(g.id) ? '#ecfdf5' : '#f8fafc',
+                                  border: `1px solid ${facGroupesSelected.includes(g.id) ? '#86efac' : '#e2e8f0'}`,
+                                  borderRadius: 6, padding: '0.2rem 0.45rem',
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={facGroupesSelected.includes(g.id)}
+                                  onChange={e => {
+                                    setFacData(null)
+                                    setFacGroupesSelected(prev => (
+                                      e.target.checked
+                                        ? [...prev, g.id]
+                                        : prev.filter(id => id !== g.id)
+                                    ))
+                                  }}
+                                />
+                                <span style={{ color: '#64748b' }}>{g.grade}</span>
+                                <span style={{ fontWeight: 600 }}>{g.groupe}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Contenu Bilan FAC */}
               {!facData && !loadingFac && (
@@ -2732,6 +3060,9 @@ export default function Statistiques() {
                   data={facData}
                   sousOnglet={facSousOnglet}
                   onChangeSousOnglet={setFacSousOnglet}
+                  onMetaChange={setFacExportMeta}
+                  onExport={downloadBilanFac}
+                  exportingFac={exportingFac}
                 />
               )}
             </div>
@@ -2746,6 +3077,15 @@ export default function Statistiques() {
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {onglet==='point_journalier' && (
         <div>
+          {secretariatFilterLocked && (
+            <div style={{
+              marginBottom: '0.75rem', padding: '0.55rem 0.85rem', borderRadius: 8,
+              background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.82rem',
+            }}>
+              <i className="bi bi-building me-1"/>
+              Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
+            </div>
+          )}
           {/* Filtres + Actualiser + exports (même ligne) */}
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
             <select className="form-select form-select-sm" style={{width:100}}
@@ -3124,7 +3464,14 @@ function fmtPctFR(n) {
   return (n ?? 0).toFixed(2).replace('.', ',')
 }
 
-function BilanPeriodeFormationTable({ data }) {
+function normalizeJustificatifs(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.filter(Boolean).map(j => `• ${j}`).join('\n')
+  return ''
+}
+
+function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificatifsChange }) {
   const th = {
     padding: '0.4rem 0.35rem',
     border: '1px solid #000',
@@ -3147,6 +3494,20 @@ function BilanPeriodeFormationTable({ data }) {
   }
   const tdBlue = { ...td, background: '#DDEBF7' }
   const tdTotal = { ...td, background: '#FFD966' }
+
+  const [justifText, setJustifText] = useState(() => (
+    justificatifsText || normalizeJustificatifs(data?.justificatifs)
+  ))
+
+  useEffect(() => {
+    setJustifText(justificatifsText || normalizeJustificatifs(data?.justificatifs))
+  }, [data?.titre, data?.formation_id, data?.annee, justificatifsText])
+
+  const handleJustifChange = (e) => {
+    const next = e.target.value
+    setJustifText(next)
+    onJustificatifsChange?.(next)
+  }
 
   const Soit = ({ children }) => (
     <div style={{ fontSize: '0.65rem', fontWeight: 600, marginTop: '0.2rem' }}>
@@ -3189,10 +3550,23 @@ function BilanPeriodeFormationTable({ data }) {
   }, 0) + 1
 
   const justificatifsCell = (
-    <td rowSpan={nbJustifRows} style={{ ...td, fontWeight: 500, fontSize: '0.72rem', textAlign: 'left', verticalAlign: 'top', minWidth: 140 }}>
-      <ul style={{ margin: 0, paddingLeft: '1.1rem', lineHeight: 1.5 }}>
-        {data.justificatifs.map(j => <li key={j}>{j}</li>)}
-      </ul>
+    <td rowSpan={nbJustifRows} style={{ ...td, fontWeight: 500, fontSize: '0.72rem', textAlign: 'left', verticalAlign: 'top', minWidth: 160, padding: '0.35rem' }}>
+      <textarea
+        className="form-control form-control-sm"
+        value={justifText}
+        onChange={handleJustifChange}
+        placeholder={'Saisir les justificatifs…\n• Report de formation\n• Maladie'}
+        rows={Math.max(5, nbJustifRows + 1)}
+        style={{
+          width: '100%',
+          minHeight: 120,
+          fontSize: '0.72rem',
+          lineHeight: 1.45,
+          resize: 'vertical',
+          border: '1px solid #cbd5e1',
+          background: '#fff',
+        }}
+      />
     </td>
   )
 
@@ -3349,9 +3723,29 @@ const FAC_TD_GREEN = { ...FAC_TD, background: '#E2EFDA' }
 const FAC_TD_RED = { ...FAC_TD, background: '#FCE4D6' }
 const FAC_TD_TEXT = { ...FAC_TD, textAlign: 'left', fontWeight: 500, fontSize: '0.7rem' }
 
-function BilanFACPointGlobalTable({ data }) {
+function BilanFACPointGlobalTable({ data, onMetaChange }) {
   const lignesRaw = data?.lignes || []
   const totaux = data?.totaux || {}
+
+  const [justifByGrade, setJustifByGrade] = useState({})
+  const [difficultesByGrade, setDifficultesByGrade] = useState({})
+
+  const updateJustif = (grade, text) => {
+    setJustifByGrade(prev => ({ ...prev, [grade]: text }))
+  }
+
+  const updateDifficultes = (grade, text) => {
+    setDifficultesByGrade(prev => ({ ...prev, [grade]: text }))
+  }
+
+  useEffect(() => {
+    setJustifByGrade({})
+    setDifficultesByGrade({})
+  }, [data?.formation_id, data?.annee, data?.date_generation])
+
+  useEffect(() => {
+    onMetaChange?.({ justificatifs: justifByGrade, difficultes: difficultesByGrade })
+  }, [justifByGrade, difficultesByGrade, onMetaChange])
 
   // Agréger les lignes par grade (évite les doublons)
   const lignesMap = new Map()
@@ -3381,8 +3775,8 @@ function BilanFACPointGlobalTable({ data }) {
         existing.taux_absence_cours = (existing.taux_absence_cours || 0) * w1 + (l.taux_absence_cours || 0) * w2
         existing.taux_exec_vh = (existing.taux_exec_vh || 0) * w1 + (l.taux_exec_vh || 0) * w2
       }
-      // Fusionner les justificatifs
-      existing.justificatifs = [...new Set([...(existing.justificatifs || []), ...(l.justificatifs || [])])]
+      // Fusionner les justificatifs (legacy liste → ignorée, champ libre côté UI)
+      existing.justificatifs = existing.justificatifs || ''
     }
   }
   const lignes = Array.from(lignesMap.values()).sort((a, b) => a.grade.localeCompare(b.grade))
@@ -3429,10 +3823,22 @@ function BilanFACPointGlobalTable({ data }) {
               <td style={{ ...FAC_TD_BLUE, fontWeight: 800 }}>{l.effectif_auditeurs ?? '—'}</td>
               <td style={FAC_TD}>{l.absents_notoires ?? '—'}</td>
               <td style={FAC_TD_GREEN}>{l.groupes_termines ?? '—'}</td>
-              <td style={{ ...FAC_TD_TEXT, verticalAlign: 'top' }}>
-                <ul style={{ margin: 0, paddingLeft: '1rem', lineHeight: 1.6 }}>
-                  {(l.justificatifs || []).map(j => <li key={j}>{j}</li>)}
-                </ul>
+              <td style={{ ...FAC_TD_TEXT, verticalAlign: 'top', padding: '0.35rem' }}>
+                <textarea
+                  className="form-control form-control-sm"
+                  value={justifByGrade[l.grade] ?? normalizeJustificatifs(l.justificatifs)}
+                  onChange={e => updateJustif(l.grade, e.target.value)}
+                  placeholder="Justificatifs (saisie libre)…"
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    minWidth: 110,
+                    fontSize: '0.68rem',
+                    lineHeight: 1.45,
+                    resize: 'vertical',
+                    border: '1px solid #cbd5e1',
+                  }}
+                />
               </td>
               <td style={FAC_TD_BLUE}>{pctStr(l.taux_participation)}</td>
               <td style={FAC_TD_RED}>{pctStr(l.taux_absents_notoires)}</td>
@@ -3441,7 +3847,24 @@ function BilanFACPointGlobalTable({ data }) {
               <td style={{ ...FAC_TD, background: '#FCE4D6' }}>{pctStr(l.taux_exec_vh)}</td>
               <td style={{ ...FAC_TD, background: '#BDD7EE' }}>{pctStr(l.taux_presence_cours)}</td>
               <td style={{ ...FAC_TD, background: '#F8CBAD' }}>{pctStr(l.taux_absence_cours)}</td>
-              <td style={{ ...FAC_TD_TEXT, color: '#C62828' }}>{l.difficultes || '—'}</td>
+              <td style={{ ...FAC_TD_TEXT, verticalAlign: 'top', padding: '0.35rem' }}>
+                <textarea
+                  className="form-control form-control-sm"
+                  value={difficultesByGrade[l.grade] ?? (l.difficultes || '')}
+                  onChange={e => updateDifficultes(l.grade, e.target.value)}
+                  placeholder="Difficultés rencontrées (saisie libre)…"
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    minWidth: 120,
+                    fontSize: '0.68rem',
+                    lineHeight: 1.45,
+                    resize: 'vertical',
+                    border: '1px solid #cbd5e1',
+                    color: '#C62828',
+                  }}
+                />
+              </td>
             </tr>
           ))}
           {/* Ligne TOTAL */}
@@ -3728,7 +4151,7 @@ function BilanFACModulesTable({ modules }) {
   )
 }
 
-function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet }) {
+function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet, onMetaChange, onExport, exportingFac }) {
   return (
     <div>
       {/* En-tête */}
@@ -3737,23 +4160,51 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet }) {
         borderRadius: 8, padding: '0.85rem 1rem', marginBottom: '1rem',
         border: '1px solid #FED7AA',
       }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-file-earmark-bar-graph me-2" style={{ color: '#ED7D31' }}/>
-          {data.titre}
-        </h3>
-        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            <i className="bi bi-calendar3 me-1"/>{data.annee}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            <i className="bi bi-card-list me-1"/>Grades : {(data.grades || []).join(', ') || '—'}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            <i className="bi bi-person-x me-1"/>Absents notoires : {data.absents_notoires?.length ?? 0}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            <i className="bi bi-printer me-1"/>Généré le {data.date_generation}
-          </span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.75rem' }}>
+          <div style={{ flex: '1 1 240px' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
+              <i className="bi bi-file-earmark-bar-graph me-2" style={{ color: '#ED7D31' }}/>
+              {data.titre}
+            </h3>
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <i className="bi bi-calendar3 me-1"/>{data.annee}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <i className="bi bi-card-list me-1"/>Grades : {(data.grades || []).join(', ') || '—'}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <i className="bi bi-person-x me-1"/>Absents notoires : {data.absents_notoires?.length ?? 0}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <i className="bi bi-printer me-1"/>Généré le {data.date_generation}
+              </span>
+            </div>
+          </div>
+          {onExport && (
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {PJ_EXPORT_FORMATS.map(({ fmt, icon, label, col }) => (
+                <button
+                  key={`fac-${fmt}`}
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={!!exportingFac}
+                  style={{
+                    background: col, color: '#fff', border: 'none', minWidth: 88,
+                    opacity: exportingFac ? 0.65 : 1,
+                  }}
+                  onClick={() => onExport(fmt)}
+                  title={`Exporter le bilan FAC (${label})`}
+                >
+                  {exportingFac === fmt ? (
+                    <span className="spinner-border spinner-border-sm"/>
+                  ) : (
+                    <><i className={`bi ${icon} me-1`}/>{label}</>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -3792,7 +4243,7 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet }) {
             }}>
               POINT GLOBAL — {data.formation}
             </h4>
-            <BilanFACPointGlobalTable data={data.point_global} />
+            <BilanFACPointGlobalTable data={data.point_global} onMetaChange={onMetaChange} />
           </>
         )}
 
@@ -3867,7 +4318,7 @@ function buildOverviewSections(alertesItems) {
   }))
 }
 
-function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSection, auditeursNotoires }) {
+function VueEnsemblePanel({ kpis, periode, loading, pedagogiques, adm, alertesOverview, onSelectSection, auditeursNotoires }) {
   return (
     <div style={{
       background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
@@ -3885,8 +4336,28 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
           Indicateurs clés, surveillance et graphiques opérationnels.
           Choisissez une section à gauche pour le focus détaillé.
         </p>
+        {periode?.label && (
+          <div className="finance-period-badge" style={{ marginTop: '0.55rem' }}>
+            <i className="bi bi-calendar-check"/>
+            <div>
+              <strong>Données filtrées : {periode.label}</strong>
+              {periode.periode_label && (
+                <span className="ms-1">— {periode.periode_label}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-      <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem' }}>
+      <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem', position: 'relative' }}>
+        {loading && !kpis && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 3, background: 'rgba(255,255,255,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            color: '#64748b', fontSize: '0.85rem',
+          }}>
+            <div className="spinner"/>Mise à jour des indicateurs…
+          </div>
+        )}
         <div
           style={{ marginBottom: '1rem', cursor: onSelectSection ? 'pointer' : undefined }}
           onClick={onSelectSection ? () => onSelectSection('alertes') : undefined}
@@ -3900,12 +4371,12 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
           onClick={onSelectSection ? () => onSelectSection('kpis') : undefined}
           role={onSelectSection ? 'button' : undefined}
         >
-          <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0"/>
-          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047"/>
-          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
-          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
-          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"
-            help="Toutes les séances planifiées du périmètre (y compris futures)."/>
+          <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-calendar-event" label={KPI_SESSIONS_TOTAL.label} value={kpis.sessions_total} color="#00838F"
+            help={KPI_SESSIONS_TOTAL.help}/>
           <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
             help={KPI_SESSIONS_COMPT.help}/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
@@ -3952,7 +4423,7 @@ function VueEnsemblePanel({ kpis, pedagogiques, adm, alertesOverview, onSelectSe
 }
 
 function VueOverviewDetailPanel({
-  sectionId, kpis, pedagogiques, adm, alertesOverview, onGoAlertes, onGoPedagogie, onGoAdmin, auditeursNotoires,
+  sectionId, kpis, periode, pedagogiques, adm, alertesOverview, onGoAlertes, onGoPedagogie, onGoAdmin, auditeursNotoires,
 }) {
   const section = OVERVIEW_SECTION_DEFS.find(s => s.id === sectionId)
   const header = (
@@ -3965,6 +4436,12 @@ function VueOverviewDetailPanel({
         <i className={`bi ${section?.icon || 'bi-speedometer2'} me-2`} style={{ color: section?.tagColor || '#43A047' }}/>
         {section?.label || sectionId}
       </h3>
+      {periode?.label && (
+        <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+          <i className="bi bi-calendar-check me-1"/>
+          {periode.label}{periode.periode_label ? ` — ${periode.periode_label}` : ''}
+        </p>
+      )}
     </div>
   )
 
@@ -4001,12 +4478,12 @@ function VueOverviewDetailPanel({
       <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', padding: '1rem', minWidth: 0 }}>
         {header}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(175px,1fr))', gap: '0.85rem' }}>
-          <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0"/>
-          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047"/>
-          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
-          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
-          <Kpi icon="bi-calendar-event" label="Séances totales" value={kpis.sessions_total} color="#00838F"
-            help="Toutes les séances planifiées du périmètre (y compris futures)."/>
+          <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-calendar-event" label={KPI_SESSIONS_TOTAL.label} value={kpis.sessions_total} color="#00838F"
+            help={KPI_SESSIONS_TOTAL.help}/>
           <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
             help={KPI_SESSIONS_COMPT.help}/>
           <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
@@ -4930,7 +5407,7 @@ function BilanEffectifsModuleTable({ data }) {
   )
 }
 
-function BilanDetailPanel({ bilan, tableau, filtres }) {
+function BilanDetailPanel({ bilan, tableau, filtres, justificatifsText, onJustificatifsChange }) {
   const dimLabel = RB_DIMENSIONS.find(d => d.id === bilan.dimension)?.label || bilan.dimension
 
   if (['module', 'matiere', 'categorie'].includes(bilan.dimension) && !tableau) {
@@ -4947,7 +5424,11 @@ function BilanDetailPanel({ bilan, tableau, filtres }) {
   if (bilan.dimension === 'formation' && tableau?.type === 'bilan_periode_formation') {
     return (
       <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
-        <BilanPeriodeFormationTable data={tableau} />
+        <BilanPeriodeFormationTable
+          data={tableau}
+          justificatifsText={justificatifsText}
+          onJustificatifsChange={onJustificatifsChange}
+        />
       </div>
     )
   }

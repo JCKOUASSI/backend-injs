@@ -787,16 +787,15 @@ def participant_formations_api(request, pk):
     except Participant.DoesNotExist:
         return Response({'error': 'Participant introuvable.'}, status=404)
 
-    modules = (
-        Module.objects
-        .filter(module_participants__participant=participant)
-        .select_related('formation', 'secretariat')
-        .order_by('-id')
-        .distinct()
+    inscriptions = (
+        ModuleParticipant.objects.filter(participant=participant)
+        .select_related('module__formation', 'module__secretariat', 'module__site')
+        .order_by('-inscrit_le')
     )
 
     data = []
-    for m in modules:
+    for ins in inscriptions:
+        m = ins.module
         data.append({
             'id': m.id,
             'formation_id': m.formation_id,
@@ -813,6 +812,8 @@ def participant_formations_api(request, pk):
             'date_fin': m.date_fin,
             'statut': m.statut,
             'secretariat_nom': m.secretariat.nom if m.secretariat else None,
+            'inscrit_le': ins.inscrit_le.isoformat() if ins.inscrit_le else None,
+            'duree_prevue_heures': float(m.duree_prevue_heures or 0),
         })
     return Response(data)
 

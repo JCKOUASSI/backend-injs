@@ -59,6 +59,16 @@ def _absents_full(t):
     return _fmt_nb(t.get('absents_notoires', 0))
 
 
+def _justificatifs_text(data):
+    """Texte libre ou liste legacy → chaîne affichable."""
+    raw = data.get('justificatifs', '')
+    if isinstance(raw, str):
+        return raw.strip()
+    if isinstance(raw, list):
+        return '\n'.join(f'• {j}' for j in raw if j)
+    return ''
+
+
 def collect_bilans_tableaux(
     dimension,
     annee,
@@ -238,7 +248,7 @@ def _write_formation_xlsx(ws, start_row, data, styles):
             ws.merge_cells(start_row=start_row, start_column=col, end_row=start_row + 1, end_column=col)
 
     row = start_row + 2
-    justif_text = '\n'.join(f'• {j}' for j in data.get('justificatifs', []))
+    justif_text = _justificatifs_text(data)
     justif_row_start = row
     justif_placed = False
 
@@ -385,7 +395,7 @@ def _pdf_formation_table(data, title_style, Table, TableStyle, colors, Paragraph
         f"INSCRITS {data['date_inscrits']}", 'LISTES', 'ABS.', 'JUSTIFICATIFS',
     ]
     rows = [hdr]
-    justifs = '\n'.join(f'• {j}' for j in data.get('justificatifs', []))
+    justifs = _justificatifs_text(data)
     first = True
     for ligne in data.get('lignes', []):
         if ligne.get('multi_grade') and ligne.get('sous_lignes'):
@@ -522,7 +532,7 @@ def _add_formation_word_table(doc, data):
     rows_data = [
         ['CAT/GRADE', 'GRADE', 'GRPES', 'ENC.', 'SEC.', f"INSCRITS {data['date_inscrits']}", 'LISTES', 'ABS.', 'JUSTIFICATIFS'],
     ]
-    justifs = '\n'.join(f'• {j}' for j in data.get('justificatifs', []))
+    justifs = _justificatifs_text(data)
     first = True
     for ligne in data.get('lignes', []):
         if ligne.get('multi_grade') and ligne.get('sous_lignes'):
@@ -610,6 +620,17 @@ def _export_filename(tableaux, dimension, annee):
     return _safe_filename(f'BILANS_{dimension.upper()}_{annee}')
 
 
+def _apply_justificatifs_text(tableaux, justificatifs_text):
+    """Injecte le texte saisi par l'utilisateur dans les bilans période formation."""
+    text = (justificatifs_text or '').strip()
+    if not text:
+        return tableaux
+    for tb in tableaux:
+        if tb.get('type') == 'bilan_periode_formation':
+            tb['justificatifs'] = text
+    return tableaux
+
+
 def build_bilans_export_response(
     fmt,
     dimension,
@@ -623,6 +644,7 @@ def build_bilans_export_response(
     periode=None,
     calendrier=None,
     ref_module_id=None,
+    justificatifs_text=None,
 ):
     tableaux = collect_bilans_tableaux(
         dimension=dimension, annee=annee, mois=mois, categorie=categorie,
@@ -630,6 +652,7 @@ def build_bilans_export_response(
         formation_id=formation_id, secretariat_id=secretariat_id,
         periode=periode, calendrier=calendrier, ref_module_id=ref_module_id,
     )
+    tableaux = _apply_justificatifs_text(tableaux, justificatifs_text)
 
     if fmt == 'xlsx':
         buffer = export_excel(tableaux)

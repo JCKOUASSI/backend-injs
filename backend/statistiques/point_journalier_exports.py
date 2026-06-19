@@ -152,7 +152,7 @@ def _safe_filename(text):
     return re.sub(r'[^\w\-]+', '_', text, flags=re.UNICODE).strip('_')[:80]
 
 
-def _filter_tableaux(data, formation_id=None, categorie=None, mois=None, jour=None):
+def _filter_tableaux(data, formation_id=None, categorie=None, mois=None, jour=None, grade=None):
     tableaux = data['tableaux']
     if formation_id:
         tableaux = [t for t in tableaux if t['formation_id'] == formation_id]
@@ -162,6 +162,9 @@ def _filter_tableaux(data, formation_id=None, categorie=None, mois=None, jour=No
         tableaux = [t for t in tableaux if t['mois'] == mois]
     if jour:
         tableaux = [t for t in tableaux if t['date'] == jour]
+    if grade:
+        grade_u = grade.strip().upper()
+        tableaux = [t for t in tableaux if (t.get('grade') or '').strip().upper() == grade_u]
     return tableaux
 
 
@@ -616,13 +619,13 @@ def export_word(tableaux, annee):
 
 
 def build_export_response(fmt, annee, mois=None, categorie=None, formation_id=None,
-                          secretariat_id=None, module_ids=None, jour=None):
+                          secretariat_id=None, module_ids=None, jour=None, grade=None):
     data = compute_point_journalier(
         annee=annee, mois=mois, categorie=categorie,
         formation_id=formation_id, secretariat_id=secretariat_id,
         module_ids=module_ids, jour=jour,
     )
-    tableaux = _filter_tableaux(data, formation_id, categorie, mois, jour)
+    tableaux = _filter_tableaux(data, formation_id, categorie, mois, jour, grade=grade)
 
     if fmt == 'xlsx':
         buffer = export_excel(tableaux, annee)

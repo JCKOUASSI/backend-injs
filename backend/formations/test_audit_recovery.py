@@ -101,12 +101,28 @@ class AuditRecoveryMatchingTest(TestCase):
         )
         self.assertEqual({k: v.id for k, v in mapping.items()}, explicit)
 
+    def test_ensure_edt_creates_when_no_slots(self):
+        from formations.audit_recovery import _merge_session_events, _resolve_session, ensure_audit_edt_slots
+
+        SessionModule.objects.filter(module=self.surv_327).delete()
+        merged = _merge_session_events(self.deleted[321])
+        self.assertEqual(len(merged), 2)
+        for key in merged:
+            self.assertIsNone(
+                _resolve_session(self.surv_327, key[0], key[1], {}),
+                msg=f'session résiduelle pour {key}',
+            )
+        edt_stats = ensure_audit_edt_slots(self.surv_327, merged, dry_run=False)
+        self.assertEqual(edt_stats['created'], 2)
+        self.assertEqual(self.surv_327.sessions.count(), 2)
+
     def test_apply_recovery_on_empty_survivor(self):
+        """Survivant sans horaires : reprise des timestamps audit (EDT déjà présent)."""
         mapping = match_deleted_modules_to_survivors(self.deleted, self.meta)
         stats = apply_session_recovery(
             mapping[321], self.deleted[321], dry_run=False, create_missing_edt=True,
         )
-        self.assertEqual(stats['edt_created'], 2)
+        self.assertEqual(stats['edt_created'], 0)
         self.assertEqual(stats['updated'], 2)
         self.assertEqual(stats['missing'], 0)
         self.assertEqual(
@@ -115,4 +131,3 @@ class AuditRecoveryMatchingTest(TestCase):
             ).count(),
             2,
         )
-

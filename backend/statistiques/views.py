@@ -7,6 +7,7 @@ Filtres disponibles sur GET /api/statistiques/ :
   (combinables)
 """
 from datetime import timedelta, date
+import json
 
 from django.db.models import Count, Q, Sum, F
 from django.db.models.functions import TruncMonth
@@ -29,9 +30,10 @@ from .bilans import (
     compute_bilans, compute_bilans_avec_tableaux, compute_bilan_effectifs_module,
     compute_bilan_effectifs_matiere,
     compute_bilan_effectifs_categorie, compute_bilan_periode_formation,
-    compute_bilan_fac,
+    compute_bilan_fac, list_bilan_fac_perimetre,
 )
 from .bilans_exports import build_bilans_export_response
+from .bilan_fac_exports import build_bilan_fac_export_response
 from .point_journalier import (
     compute_point_journalier, compute_point_journalier_avec_tableaux, get_tableau_detail,
 )
@@ -40,9 +42,12 @@ from .effectifs import (
     aggregation_seances_modules,
     count_sessions_comptabilisables,
     filter_sessions,
+    module_ids_with_sessions_in_period,
     participant_ids_notoires,
+    period_filter_active,
     q_pointage_present,
     session_ids_for_scope,
+    sessions_in_period_qs,
 )
 from .rapport_notifications import (
     ADMIN_RAPPORT_ROLES, notifier_rapport, notifier_rapport_supprime,
@@ -74,6 +79,30 @@ def _check_role(user, allowed):
 
 def _taux(num, den):
     return round(num / den * 100, 1) if den else 0.0
+
+
+def _count_formateurs_for_modules(module_ids, *, secretariat_id=None):
+    """Formateurs assignés aux modules (principal + ModuleFormateur)."""
+    from formations.models import Formateur, ModuleFormateur
+
+    module_ids = list(module_ids or [])
+    if not module_ids:
+        return 0
+    fids = set(
+        Module.objects.filter(id__in=module_ids)
+        .exclude(formateur=None)
+        .values_list('formateur_id', flat=True)
+    )
+    fids.update(
+        ModuleFormateur.objects.filter(module_id__in=module_ids)
+        .values_list('formateur_id', flat=True)
+    )
+    if secretariat_id:
+        fids &= set(
+            Formateur.objects.filter(secretariats__id=secretariat_id)
+            .values_list('id', flat=True)
+        )
+    return len(fids)
 
 
 def _derniers_mois_cles(n=12):
@@ -292,40 +321,105 @@ def _auditeurs_notoires(formation_id=None, secretariat_id=None, module_ids=None)
 def _kpis_globaux(formation_id=None, secretariat_id=None, module_ids=None, date_debut=None, date_fin=None):
     mf, pf, sm, mq, pq = _filtres(formation_id, secretariat_id, module_ids)
 
+    mod_ids_scope = list(Module.objects.filter(**mq).values_list('id', flat=True))
+    period_active = period_filter_active(date_debut, date_fin)
+
+    if period_active:
+        mod_ids_active = module_ids_with_sessions_in_period(
+            mod_ids_scope,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            extra_sm=sm,
+        )
+        mf_active = {**mf, 'module_id__in': mod_ids_active}
+    else:
+        mod_ids_active = mod_ids_scope
+        mf_active = mf
+
     # Formations
     if formation_id:
-        nb_formations = 1
+        nb_formations = 1 if (not period_active or mod_ids_active) else 0
     elif module_ids is not None:
-        nb_formations = Module.objects.filter(id__in=module_ids).values('formation').distinct().count()
+        nb_formations = (
+            Module.objects.filter(id__in=mod_ids_active).values('formation').distinct().count()
+            if mod_ids_active else 0
+        )
     elif secretariat_id:
-        nb_formations = Module.objects.filter(secretariat_id=secretariat_id).values('formation').distinct().count()
+        nb_formations = (
+            Module.objects.filter(secretariat_id=secretariat_id, id__in=mod_ids_active)
+            .values('formation').distinct().count()
+            if mod_ids_active else 0
+        )
     else:
-        nb_formations = Formation.objects.count()
+        if period_active:
+            nb_formations = (
+                Module.objects.filter(id__in=mod_ids_active).values('formation').distinct().count()
+                if mod_ids_active else 0
+            )
+        else:
+            nb_formations = Formation.objects.count()
 
-    nb_modules     = Module.objects.filter(**mq).count()
-    nb_participants = (
-        ModuleParticipant.objects.filter(**mf).values('participant').distinct().count()
-        if mf
-        else Participant.objects.filter(**pq).count() if pq
-        else Participant.objects.count()
-    )
-    # Formateurs
-    if secretariat_id and not formation_id:
+    nb_modules = len(mod_ids_active) if period_active else Module.objects.filter(**mq).count()
+
+    if period_active:
+        nb_participants = (
+            ModuleParticipant.objects.filter(**mf_active).values('participant').distinct().count()
+            if mod_ids_active else 0
+        )
+    elif mf:
+        nb_participants = ModuleParticipant.objects.filter(**mf).values('participant').distinct().count()
+    elif pq:
+        nb_participants = Participant.objects.filter(**pq).count()
+    else:
+        nb_participants = Participant.objects.count()
+
+    if period_active:
+        nb_formateurs = _count_formateurs_for_modules(
+            mod_ids_active,
+            secretariat_id=secretariat_id if secretariat_id and not formation_id else None,
+        )
+    elif secretariat_id and not formation_id:
         nb_formateurs = Formateur.objects.filter(secretariats__id=secretariat_id).distinct().count()
     elif formation_id:
         nb_formateurs = Module.objects.filter(**mq).exclude(formateur=None).values('formateur').distinct().count()
     else:
         nb_formateurs = Formateur.objects.count()
 
-    nb_sessions_total     = SessionModule.objects.filter(**sm).count()
-    mod_ids_scope = list(Module.objects.filter(**mq).values_list('id', flat=True))
+    if period_active:
+        nb_sessions_total = sessions_in_period_qs(
+            module_ids=mod_ids_scope,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            extra_sm=sm,
+        ).count()
+    else:
+        nb_sessions_total = SessionModule.objects.filter(**sm).count()
+
     nb_sessions_terminees = count_sessions_comptabilisables(
         module_ids=mod_ids_scope,
         date_debut=date_debut,
         date_fin=date_fin,
     )
-    nb_sessions_en_cours  = SessionModule.objects.filter(demarree_le__isnull=False, terminee_le__isnull=True, **sm).count()
-    nb_pointages          = Pointage.objects.filter(**pf).count()
+
+    sessions_en_cours_qs = SessionModule.objects.filter(
+        demarree_le__isnull=False, terminee_le__isnull=True, **sm,
+    )
+    if period_active:
+        if date_debut:
+            sessions_en_cours_qs = sessions_en_cours_qs.filter(date_journee__gte=date_debut)
+        if date_fin:
+            sessions_en_cours_qs = sessions_en_cours_qs.filter(date_journee__lte=date_fin)
+    nb_sessions_en_cours = sessions_en_cours_qs.count()
+
+    if period_active:
+        pf_period = dict(pf)
+        if date_debut:
+            pf_period['date_journee__gte'] = date_debut
+        if date_fin:
+            pf_period['date_journee__lte'] = date_fin
+        nb_pointages = Pointage.objects.filter(**pf_period).count()
+    else:
+        nb_pointages = Pointage.objects.filter(**pf).count()
 
     from formations.volume_horaire import compute_volume_horaire_from_module_ids
 
@@ -1069,6 +1163,13 @@ class SecretariatsStatsView(APIView):
                 pf['session__module__formation_id'] = formation_id
 
             mod_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
+            if period_filter_active(date_debut, date_fin):
+                mod_ids = module_ids_with_sessions_in_period(
+                    mod_ids,
+                    date_debut=date_debut,
+                    date_fin=date_fin,
+                )
+
             scope_session_ids = session_ids_for_scope(
                 mod_ids, date_debut=date_debut, date_fin=date_fin,
             )
@@ -1080,7 +1181,13 @@ class SecretariatsStatsView(APIView):
             nb_absences     = agg['places_absentes']
             nb_participants = nb_inscrits
             nb_sessions     = agg['nb_seances_terminees']
-            nb_pointages    = Pointage.objects.filter(**pf).filter(q_pointage_present()).count()
+            pf_present = dict(pf)
+            if period_filter_active(date_debut, date_fin):
+                if date_debut:
+                    pf_present['date_journee__gte'] = date_debut
+                if date_fin:
+                    pf_present['date_journee__lte'] = date_fin
+            nb_pointages    = Pointage.objects.filter(**pf_present).filter(q_pointage_present()).count()
 
             inscrits_pids = ModuleParticipant.objects.filter(
                 module_id__in=mod_ids,
@@ -1089,8 +1196,8 @@ class SecretariatsStatsView(APIView):
             hommes = p_inscrits.filter(sexe='MASCULIN').count()
             femmes = p_inscrits.filter(sexe='FEMININ').count()
 
-            # Formateurs du secrétariat
-            nb_formateurs = Formateur.objects.filter(secretariats=s).distinct().count()
+            # Formateurs du secrétariat (modules actifs sur la période)
+            nb_formateurs = _count_formateurs_for_modules(mod_ids, secretariat_id=s.id)
 
             from formations.volume_horaire import compute_volume_horaire_from_module_ids
 
@@ -1515,6 +1622,7 @@ def point_journalier_export(request):
     mois = _int('mois')
     categorie = request.query_params.get('categorie') or None
     jour = request.query_params.get('jour') or None
+    grade = request.query_params.get('grade') or None
 
     scope, err = _scope_from_request(request)
     if err:
@@ -1523,7 +1631,7 @@ def point_journalier_export(request):
 
     try:
         raw = build_export_response(
-            fmt, annee, mois=mois, categorie=categorie, jour=jour, **kw,
+            fmt, annee, mois=mois, categorie=categorie, jour=jour, grade=grade, **kw,
         )
         from django.http import HttpResponse as DjangoHttpResponse
         out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
@@ -1558,6 +1666,7 @@ def bilans_export(request):
     categorie = request.query_params.get('categorie') or None
     periode = request.query_params.get('periode') or None
     calendrier = request.query_params.get('calendrier') or None
+    justificatifs_text = request.query_params.get('justificatifs') or None
 
     scope, err = _scope_from_request(request, parse_module_id=True)
     if err:
@@ -1568,7 +1677,7 @@ def bilans_export(request):
         raw = build_bilans_export_response(
             fmt, dimension, annee, mois=mois, categorie=categorie,
             module_id=module_id, periode=periode, calendrier=calendrier,
-            ref_module_id=ref_module_id, **kw,
+            ref_module_id=ref_module_id, justificatifs_text=justificatifs_text, **kw,
         )
         from django.http import HttpResponse as DjangoHttpResponse
         out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
@@ -1722,6 +1831,7 @@ class BilanFACView(APIView):
     """
     GET /api/statistiques/bilan-fac/
       ?formation_id=<id>&annee=<yyyy>&categorie=<A|B|C|D>&secretariat_id=<id>&calendrier=<YYYY-MM-DD>
+      &grades=A4,B&groupes=A4|G1,A4|G2
 
     Retourne le Bilan FAC complet :
       - point_global    : tableau de synthèse par grade (effectifs, VH, taux…)
@@ -1754,6 +1864,11 @@ class BilanFACView(APIView):
         secretariat_id = _int('secretariat_id') or scope.secretariat_id
         calendrier = request.query_params.get('calendrier') or None
 
+        grades_raw = (request.query_params.get('grades') or '').strip()
+        grades_filter = [g.strip() for g in grades_raw.split(',') if g.strip()] or None
+        groupes_raw = (request.query_params.get('groupes') or '').strip()
+        groupes_filter = [g.strip() for g in groupes_raw.split(',') if g.strip()] or None
+
         data = compute_bilan_fac(
             formation_id=formation_id,
             annee=annee,
@@ -1761,7 +1876,107 @@ class BilanFACView(APIView):
             secretariat_id=secretariat_id,
             calendrier=calendrier,
             module_ids=scope.module_ids,
+            grades_filter=grades_filter,
+            groupes_filter=groupes_filter,
         )
         if not data:
             return Response({'detail': 'Formation introuvable.'}, status=404)
         return Response(data)
+
+
+class BilanFACPerimetreView(APIView):
+    """GET /api/statistiques/bilan-fac/perimetre/ — grades et groupes cochables."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not user_has_stats_access(request.user):
+            return Response({'detail': 'Accès non autorisé.'}, status=403)
+
+        def _int(key):
+            v = request.query_params.get(key)
+            return int(v) if v and v.isdigit() else None
+
+        formation_id = _int('formation_id')
+        scope, err = _scope_from_request(request)
+        if err:
+            return err
+        if not formation_id:
+            formation_id = scope.formation_id
+        if not formation_id:
+            return Response({'detail': 'Paramètre formation_id requis.'}, status=400)
+
+        categorie = request.query_params.get('categorie') or None
+        secretariat_id = _int('secretariat_id') or scope.secretariat_id
+
+        return Response(list_bilan_fac_perimetre(
+            formation_id=formation_id,
+            categorie=categorie,
+            secretariat_id=secretariat_id,
+            module_ids=scope.module_ids,
+        ))
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def bilan_fac_export(request):
+    """
+    GET /api/statistiques/bilan-fac-export/?export=xlsx|pdf|docx
+    """
+    if not user_has_stats_access(request.user):
+        return Response({'detail': 'Accès non autorisé.'}, status=403)
+
+    def _int(key):
+        v = request.query_params.get(key)
+        return int(v) if v and v.isdigit() else None
+
+    fmt = (request.query_params.get('export') or request.query_params.get('file_format') or 'xlsx').lower()
+    formation_id = _int('formation_id')
+    scope, err = _scope_from_request(request)
+    if err:
+        return err
+    if not formation_id:
+        formation_id = scope.formation_id
+    if not formation_id:
+        return Response({'detail': 'Paramètre formation_id requis.'}, status=400)
+
+    annee = _int('annee') or date.today().year
+    categorie = request.query_params.get('categorie') or None
+    secretariat_id = _int('secretariat_id') or scope.secretariat_id
+    calendrier = request.query_params.get('calendrier') or None
+
+    grades_raw = (request.query_params.get('grades') or '').strip()
+    grades_filter = [g.strip() for g in grades_raw.split(',') if g.strip()] or None
+    groupes_raw = (request.query_params.get('groupes') or '').strip()
+    groupes_filter = [g.strip() for g in groupes_raw.split(',') if g.strip()] or None
+
+    meta_raw = request.query_params.get('meta') or ''
+    meta = None
+    if meta_raw:
+        try:
+            meta = json.loads(meta_raw)
+        except json.JSONDecodeError:
+            return Response({'detail': 'Paramètre meta invalide (JSON attendu).'}, status=400)
+
+    try:
+        raw = build_bilan_fac_export_response(
+            fmt,
+            formation_id=formation_id,
+            annee=annee,
+            categorie=categorie,
+            secretariat_id=secretariat_id,
+            calendrier=calendrier,
+            module_ids=scope.module_ids,
+            grades_filter=grades_filter,
+            groupes_filter=groupes_filter,
+            meta=meta,
+        )
+        from django.http import HttpResponse as DjangoHttpResponse
+        out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
+        if raw.get('Content-Disposition'):
+            out['Content-Disposition'] = raw['Content-Disposition']
+        return out
+    except ValueError as exc:
+        return Response({'detail': str(exc)}, status=400)
+    except Exception as exc:
+        return Response({'detail': f'Erreur export : {exc}'}, status=500)

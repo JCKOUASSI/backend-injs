@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans
 ================================================================================
-Dernière mise à jour : 16/06/2026 02:42
+Dernière mise à jour : 19/06/2026 01:04
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,6 +28,15 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+
+[19/06/2026] Bilan FAC — sélection grades et groupes par cases à cocher (API perimetre + filtres grades/groupes sur génération).
+  · Enregistré automatiquement le 19/06/2026 01:04
+
+[19/06/2026] Bilan — colonne Justificatifs des absences notoires en champ libre (textarea UI, export Excel/PDF/Word avec param justificatifs).
+  · Enregistré automatiquement le 19/06/2026 00:54
+
+[19/06/2026] Étanchéité secrétariat point journalier & bilans : catégories par modules du périmètre, grades bilan formation filtrés, onglets UI limités (Point Journalier + Bilans), bandeau périmètre, tests API.
+  · Enregistré automatiquement le 19/06/2026 00:40
 
 [16/06/2026] Périmètre stats verrouillé pour comptes SECRETARIAT/CHEF_SECRETARIAT : filtre frontend imposé, secretariat_id systématique dans les requêtes API, scope_locked backend via user_stats_role.
   · Enregistré automatiquement le 16/06/2026 02:42

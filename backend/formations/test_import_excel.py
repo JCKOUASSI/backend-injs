@@ -1,4 +1,5 @@
 """Tests pour import_excel — résolution RefSite et endpoint API."""
+from datetime import datetime
 from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -139,6 +140,35 @@ class ImportFormationsRefSiteTest(TestCase):
         self.assertIsInstance(mod.site, RefSite)
         self.assertEqual(float(mod.duree_prevue_heures), 32)
 
+    def test_parse_datetime_malformed_excel_dates(self):
+        cases = [
+            (' 15/06/ 2026', datetime(2026, 6, 15)),
+            ('03/072026', datetime(2026, 7, 3)),
+            ('23/072026', datetime(2026, 7, 23)),
+            ('26/072026', datetime(2026, 7, 26)),
+            ('2026-05-05 08:00', datetime(2026, 5, 5, 8, 0)),
+            ('2026-05-09 17:00', datetime(2026, 5, 9, 17, 0)),
+        ]
+        for raw, expected in cases:
+            parsed = self.cmd._parse_datetime(raw)
+            self.assertIsNotNone(parsed, msg=raw)
+            self.assertEqual(parsed.date(), expected.date(), msg=raw)
+
+    def test_import_real_workbook_malformed_dates(self):
+        from pathlib import Path
+        from openpyxl import load_workbook
+        path = Path(__file__).resolve().parent.parent / 'importverif' / 'MODELE FORMATION A4 GROUPE 4-15 excel.xlsx'
+        if not path.exists():
+            self.skipTest('fichier de vérification absent')
+        wb = load_workbook(path, read_only=True)
+        ws = wb[wb.sheetnames[0]]
+        errors = []
+        created, updated = self.cmd._import_formations(ws, errors)
+        wb.close()
+        date_errors = [e for e in errors if 'date_debut ou date_fin invalide' in e]
+        self.assertEqual(date_errors, [], msg=date_errors)
+        self.assertGreater(created + updated, 0)
+
 
 class ImportExcelAPITest(TestCase):
     @classmethod
@@ -261,6 +291,155 @@ class ImportSeancesMatchTest(TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn('introuvable', errors[0])
         self.assertIn('GROUPE 99', errors[0])
+
+    def test_import_seance_carries_forward_missing_grade(self):
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet(
+                {},
+                {'grade': '', 'numero': 2, 'date_journee': '06/05/2026'},
+            ),
+            errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 2)
+        self.assertEqual(updated, 0)
+
+    def test_import_seance_ignores_wrong_grade_when_unique(self):
+        self.module.grade = 'A5'
+        self.module.save(update_fields=['grade'])
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({'grade': 'A4'}), errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
+
+    def test_import_seance_fuzzy_title_typo(self):
+        formation = self.module.formation
+        Module.objects.create(
+            formation=formation,
+            intitule='DROIT ADMINISTRATIF',
+            grade='A4',
+            groupe='GROUPE 13',
+            vague='SESSION 2026',
+            cycle='Cycle import test',
+        )
+        errors = []
+        created, updated = self.cmd._import_seances(
+            build_seances_sheet({
+                'module_titre': 'DROIT ADMINISTRATIVF',
+                'groupe': 'GROUPE 13',
+                'vague': 'SESSION 2026',
+            }),
+            errors,
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(created, 1)
+
+    def test_import_real_seances_workbook(self):
+        from pathlib import Path
+        from openpyxl import load_workbook
+
+        path = Path(__file__).resolve().parent.parent / 'importverif' / 'MODELE DE SEANCE A4 G9-15.xlsx'
+        form_path = Path(__file__).resolve().parent.parent / 'importverif' / 'MODELE FORMATION A4 GROUPE 4-15 excel.xlsx'
+        if not path.exists() or not form_path.exists():
+            self.skipTest('fichiers de vérification absents')
+
+        form_wb = load_workbook(form_path, read_only=True)
+        form_errors = []
+        self.cmd._import_formations(form_wb[form_wb.sheetnames[0]], form_errors)
+        form_wb.close()
+        self.assertEqual(form_errors, [], msg=form_errors)
+
+        wb = load_workbook(path, read_only=True)
+        errors = []
+        created, updated = self.cmd._import_seances(wb[wb.sheetnames[0]], errors)
+        wb.close()
+        self.assertEqual(errors, [], msg=errors)
+        self.assertGreater(created + updated, 0)
+
+
+PARTICIPANT_HEADERS = (
+    "N° d'inscription", 'Nom', 'Prénoms', 'Genre', 'Date de naissance', 'Lieu de naissance',
+    'E-mail', 'Téléphone 1', 'Téléphone 2', 'Type concours', 'Libellé concours',
+    'Catégorie', 'Grade', 'Groupe', 'Grade-Groupe', 'Vague', 'Formation(s)',
+)
+
+
+def build_participants_sheet(*data_rows):
+    defaults = {
+        "N° d'inscription": 'FNCE25-0001',
+        'Nom': 'DUPONT',
+        'Prénoms': 'Alice',
+        'Genre': 'FEMININ',
+        'Date de naissance': '01/01/1990',
+        'Lieu de naissance': 'Abidjan',
+        'E-mail': 'alice@example.com',
+        'Téléphone 1': '0700000000',
+        'Téléphone 2': '',
+        'Type concours': 'RECRUTEMENT',
+        'Libellé concours': 'Test',
+        'Catégorie': 'A',
+        'Grade': 'A4',
+        'Groupe': 'GROUPE 9',
+        'Grade-Groupe': 'A4-GROUPE 9',
+        'Vague': 'SESSION 2026 VAGUE 2',
+        'Formation(s)': '',
+    }
+    rows = [PARTICIPANT_HEADERS]
+    for overrides in data_rows:
+        merged = {**defaults, **overrides}
+        rows.append(tuple(merged[h] for h in PARTICIPANT_HEADERS))
+    return _MemorySheet(rows)
+
+
+class ImportParticipantsAutoMatchTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        ref_type = RefTypeSecretariat.objects.create(libelle='FAB A')
+        Secretariat.objects.create(nom='Secrétariat FAB A', type=ref_type)
+        formation = Formation.objects.create(formation='FORMATION EN ADMINISTRATION DE BASE')
+        for intitule in ('DEONTOLOGIE', 'CULTURE CIVIQUE', 'REDACTION ADMINISTRATIVE'):
+            Module.objects.create(
+                formation=formation,
+                intitule=intitule,
+                grade='A4',
+                groupe='GROUPE 9',
+                vague='SESSION 2026 VAGUE 2',
+                cycle='FORMATION EN ADMINISTRATION DE BASE',
+            )
+
+    def setUp(self):
+        self.cmd = Command()
+        self.cmd.stdout = _SilentStdout()
+
+    def test_auto_inscription_all_modules_of_group(self):
+        from formations.models import ModuleParticipant
+        errors = []
+        created = self.cmd._import_participants(build_participants_sheet({}), errors)
+        self.assertEqual(errors, [], msg=errors)
+        self.assertEqual(created, 1)
+        participant = ModuleParticipant.objects.filter(
+            participant__matricule='FNCE25-0001',
+        ).count()
+        self.assertEqual(participant, 3)
+
+    def test_inscription_with_formation_column(self):
+        from formations.models import ModuleParticipant
+        errors = []
+        created = self.cmd._import_participants(
+            build_participants_sheet({
+                'Formation(s)': 'FORMATION EN ADMINISTRATION DE BASE',
+            }),
+            errors,
+        )
+        self.assertEqual(errors, [], msg=errors)
+        self.assertEqual(created, 1)
+        self.assertEqual(
+            ModuleParticipant.objects.filter(participant__matricule='FNCE25-0001').count(),
+            3,
+        )
 
 
 class ImportCoherenceWorkbookTest(TestCase):

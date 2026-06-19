@@ -13,7 +13,7 @@ from django.db.models import Q
 from formations.models import Formation, Module, ModuleParticipant, SessionModule, RefCategorie, Participant
 from presences.models import Pointage
 
-from .effectifs import filter_sessions, presents_par_session, stats_creneau_module
+from .effectifs import filter_sessions, presents_par_session, stats_creneau_module, categories_for_scope
 
 MOIS_FR = [
     '', 'JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN',
@@ -155,16 +155,11 @@ def _jours_activite(annee, mois=None, formation_id=None, secretariat_id=None, al
 
 
 def _liste_categories(formation_id=None, secretariat_id=None, allowed_module_ids=None):
-    cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
-    pq = Participant.objects.exclude(categorie='')
-    if secretariat_id:
-        pq = pq.filter(secretariat_id=secretariat_id)
-    if formation_id:
-        pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
-    if allowed_module_ids is not None:
-        pq = pq.filter(modules_inscrits__module_id__in=allowed_module_ids).distinct()
-    cats.update(pq.values_list('categorie', flat=True))
-    return sorted(cats, key=lambda c: (len(c), c))
+    return categories_for_scope(
+        formation_id=formation_id,
+        secretariat_id=secretariat_id,
+        module_ids=allowed_module_ids,
+    )
 
 
 def _categories_pour_formation(formation_id, secretariat_id=None, cache=None, allowed_module_ids=None):

@@ -17,7 +17,7 @@ from datetime import date
 
 from django.db.models import Q, Exists, OuterRef
 
-from formations.models import Module, ModuleParticipant, SessionModule, Participant
+from formations.models import Module, ModuleParticipant, SessionModule, Participant, RefCategorie
 from presences.models import Pointage
 
 
@@ -81,6 +81,56 @@ def filter_sessions(
     if date_fin:
         qs = qs.filter(date_journee__lte=date_fin)
     return qs
+
+
+def period_filter_active(date_debut=None, date_fin=None):
+    return date_debut is not None or date_fin is not None
+
+
+def sessions_in_period_qs(
+    module_ids=None,
+    date_debut=None,
+    date_fin=None,
+    *,
+    extra_sm=None,
+):
+    """Séances planifiées dont ``date_journee`` est dans l'intervalle (inclut le futur de la période)."""
+    qs = SessionModule.objects.all()
+    if extra_sm:
+        qs = qs.filter(**extra_sm)
+    if module_ids is not None:
+        qs = qs.filter(module_id__in=module_ids)
+    if date_debut:
+        qs = qs.filter(date_journee__gte=date_debut)
+    if date_fin:
+        qs = qs.filter(date_journee__lte=date_fin)
+    return qs
+
+
+def module_ids_with_sessions_in_period(
+    module_ids,
+    date_debut=None,
+    date_fin=None,
+    *,
+    extra_sm=None,
+):
+    """Modules ayant au moins une séance planifiée dans la période."""
+    module_ids = list(module_ids or [])
+    if not period_filter_active(date_debut, date_fin):
+        return module_ids
+    if not module_ids:
+        return []
+    return list(
+        sessions_in_period_qs(
+            module_ids=module_ids,
+            date_debut=date_debut,
+            date_fin=date_fin,
+            extra_sm=extra_sm,
+        )
+        .order_by('module_id')
+        .values_list('module_id', flat=True)
+        .distinct()
+    )
 
 
 def _module_participant_qs(
@@ -451,6 +501,45 @@ def aggregation_seances_modules(module_ids, session_ids=None, categorie=None):
 
 def _pct(num, den, decimals=2):
     return round(num / den * 100, decimals) if den else 0.0
+
+
+def categories_for_scope(
+    formation_id=None,
+    secretariat_id=None,
+    module_ids=None,
+):
+    """
+    Catégories auditeur visibles dans un périmètre stats.
+
+    Dès qu'un secrétariat ou une liste de modules est imposée, les catégories
+    proviennent des inscriptions aux modules du périmètre (pas du champ
+    participant.secretariat seul).
+    """
+    scoped = secretariat_id is not None or module_ids is not None
+    if scoped:
+        mq = Module.objects.all()
+        if formation_id:
+            mq = mq.filter(formation_id=formation_id)
+        if secretariat_id:
+            mq = mq.filter(secretariat_id=secretariat_id)
+        if module_ids is not None:
+            mq = mq.filter(id__in=module_ids)
+        enrolled = (
+            ModuleParticipant.objects.filter(module__in=mq)
+            .exclude(participant__categorie='')
+            .values_list('participant__categorie', flat=True)
+            .distinct()
+        )
+        cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
+        cats.update(enrolled)
+        return sorted(cats, key=lambda c: (len(c), c))
+
+    cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
+    pq = Participant.objects.exclude(categorie='')
+    if formation_id:
+        pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
+    cats.update(pq.values_list('categorie', flat=True))
+    return sorted(cats, key=lambda c: (len(c), c))
 
 
 def _empty_effectifs_tableau():

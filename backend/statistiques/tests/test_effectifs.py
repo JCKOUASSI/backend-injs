@@ -64,6 +64,25 @@ class FilterSessionsPlannedTest(TestCase):
             1,
         )
 
+    def test_module_ids_with_sessions_in_period_distinct(self):
+        from statistiques.effectifs import module_ids_with_sessions_in_period
+
+        formation = Formation.objects.create(formation='FAB distinct')
+        module = Module.objects.create(formation=formation, intitule='M1', grade='A3')
+        jour = timezone.localdate()
+        for n in (1, 2, 3):
+            SessionModule.objects.create(
+                module=module,
+                date_journee=jour,
+                numero=n,
+                heure_debut_prevue=time(8, 0),
+                heure_fin_prevue=time(10, 0),
+            )
+        ids = module_ids_with_sessions_in_period(
+            [module.id], date_debut=jour, date_fin=jour,
+        )
+        self.assertEqual(ids, [module.id])
+
 
 class AbsentsNotoiresTest(TestCase):
     def test_notoire_jamais_badge_et_motif_explicite(self):
