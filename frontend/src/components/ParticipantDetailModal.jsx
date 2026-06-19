@@ -159,6 +159,45 @@ export default function ParticipantDetailModal({
   const [decisionRecalculating, setDecisionRecalculating] = useState({})
   const [exportingNotes, setExportingNotes] = useState(null)
 
+  useEffect(() => {
+    if (initialNotesFiche) {
+      const mapped = mapNotesFicheToState(initialNotesFiche)
+      setModuleNotes(mapped.moduleNotes)
+      setFormationDecisions(mapped.formationDecisions)
+      setNotesLoading(false)
+    } else {
+      setModuleNotes({})
+      setFormationDecisions({})
+    }
+  }, [initialNotesFiche, participant?.id])
+
+  useEffect(() => {
+    if (activeTab !== 'notes' || !participant?.id || initialNotesFiche) return
+
+    let cancelled = false
+    const loadNotes = async () => {
+      setNotesLoading(true)
+      try {
+        const { data } = await api.get(`/participant/${participant.id}/notes-fiche/`)
+        if (!cancelled) {
+          const mapped = mapNotesFicheToState(data)
+          setModuleNotes(mapped.moduleNotes)
+          setFormationDecisions(mapped.formationDecisions)
+        }
+      } catch {
+        if (!cancelled) {
+          setModuleNotes({})
+          setFormationDecisions({})
+          showToast('Erreur chargement des notes', 'error')
+        }
+      } finally {
+        if (!cancelled) setNotesLoading(false)
+      }
+    }
+    loadNotes()
+    return () => { cancelled = true }
+  }, [activeTab, participant?.id, initialNotesFiche, showToast])
+
   if (!participant) return null
 
   const sexeLabel = (s) => ({ MASCULIN: 'Masculin', FEMININ: 'Féminin' }[s] || '-')
@@ -209,45 +248,6 @@ export default function ParticipantDetailModal({
     }
     return acc
   }, {}) || {}
-
-  useEffect(() => {
-    if (initialNotesFiche) {
-      const mapped = mapNotesFicheToState(initialNotesFiche)
-      setModuleNotes(mapped.moduleNotes)
-      setFormationDecisions(mapped.formationDecisions)
-      setNotesLoading(false)
-    } else {
-      setModuleNotes({})
-      setFormationDecisions({})
-    }
-  }, [initialNotesFiche, participant?.id])
-
-  useEffect(() => {
-    if (activeTab !== 'notes' || !participant?.id || initialNotesFiche) return
-
-    let cancelled = false
-    const loadNotes = async () => {
-      setNotesLoading(true)
-      try {
-        const { data } = await api.get(`/participant/${participant.id}/notes-fiche/`)
-        if (!cancelled) {
-          const mapped = mapNotesFicheToState(data)
-          setModuleNotes(mapped.moduleNotes)
-          setFormationDecisions(mapped.formationDecisions)
-        }
-      } catch {
-        if (!cancelled) {
-          setModuleNotes({})
-          setFormationDecisions({})
-          showToast('Erreur chargement des notes', 'error')
-        }
-      } finally {
-        if (!cancelled) setNotesLoading(false)
-      }
-    }
-    loadNotes()
-    return () => { cancelled = true }
-  }, [activeTab, participant?.id, initialNotesFiche, showToast])
 
   const refreshNotesFiche = async () => {
     setNotesLoading(true)
