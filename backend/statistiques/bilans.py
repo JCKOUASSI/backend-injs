@@ -8,7 +8,12 @@ from datetime import date
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
-from formations.models import Formation, Module, RefCategorie, Participant, ModuleParticipant, SessionModule
+from formations.categorie_referentiel import (
+    libelles_ref_actifs,
+    q_module_participant_categorie_ref,
+    q_participant_categorie_ref,
+)
+from formations.models import Formation, Module, Participant, ModuleParticipant, SessionModule
 from presences.models import Pointage
 
 from .effectifs import (
@@ -65,9 +70,7 @@ def _modules_queryset(
         'formation__formation', 'grade', 'groupe', 'ordre', 'intitule',
     )
     if categorie:
-        qs = qs.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct()
+        qs = qs.filter(q_module_participant_categorie_ref(categorie)).distinct()
     return qs
 
 
@@ -122,9 +125,8 @@ def _module_ids_categorie(
     if module_ids is not None:
         mq = mq.filter(id__in=module_ids)
     return list(
-        mq.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct().values_list('id', flat=True)
+        mq.filter(q_module_participant_categorie_ref(categorie))
+        .distinct().values_list('id', flat=True)
     )
 
 
@@ -147,7 +149,7 @@ def compute_bilan_effectifs_module(
 
     mp_qs = ModuleParticipant.objects.filter(module=module).select_related('participant')
     if categorie and categorie != '—':
-        mp_qs = mp_qs.filter(participant__categorie__iexact=categorie)
+        mp_qs = mp_qs.filter(q_participant_categorie_ref(categorie))
 
     participants = {mp.participant_id: mp.participant for mp in mp_qs}
     session_ids = _session_ids_module(module_id, annee, mois, calendrier)
@@ -194,15 +196,13 @@ def compute_bilan_effectifs_categorie(
     if module_ids is not None:
         mq = mq.filter(id__in=module_ids)
     module_ids = list(
-        mq.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct().values_list('id', flat=True)
+        mq.filter(q_module_participant_categorie_ref(categorie))
+        .distinct().values_list('id', flat=True)
     )
 
     mp_qs = ModuleParticipant.objects.filter(
         module_id__in=module_ids,
-        participant__categorie__iexact=categorie,
-    ).select_related('participant')
+    ).filter(q_participant_categorie_ref(categorie)).select_related('participant')
     participants = {mp.participant_id: mp.participant for mp in mp_qs}
 
     session_ids = _session_ids_modules(module_ids, annee, mois, calendrier)
@@ -239,9 +239,7 @@ def _modules_formation_categorie(
     if grade:
         mq = mq.filter(grade=grade)
     if categorie:
-        mq = mq.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct()
+        mq = mq.filter(q_module_participant_categorie_ref(categorie)).distinct()
     return mq
 
 
@@ -321,8 +319,7 @@ def _ligne_categorie_formation(
 ):
     mq = Module.objects.filter(
         formation_id=formation_id,
-        module_participants__participant__categorie__iexact=categorie,
-    )
+    ).filter(q_module_participant_categorie_ref(categorie))
     if secretariat_id:
         mq = mq.filter(secretariat_id=secretariat_id)
     if module_ids is not None:
@@ -388,9 +385,7 @@ def compute_bilan_periode_formation(
     formation_nom = (formation.formation or f'Formation {formation.id}').strip().upper()
     titre = f'BILAN PERIODE {formation_nom} {annee}'
 
-    categories_ref = list(
-        RefCategorie.objects.filter(actif=True).order_by('libelle').values_list('libelle', flat=True)
-    )
+    categories_ref = libelles_ref_actifs()
     cats_data = _liste_categories(formation_id, secretariat_id, module_ids)
     categories = [c for c in categories_ref if c in cats_data] or sorted(cats_data)
     if categorie_filter:
@@ -424,10 +419,10 @@ def compute_bilan_periode_formation(
 
 
 def _resume_module(module, categorie=None, annee=None, mois=None, calendrier=None):
-    mq = {'module': module}
+    mq = ModuleParticipant.objects.filter(module=module)
     if categorie:
-        mq['participant__categorie__iexact'] = categorie
-    inscrits = ModuleParticipant.objects.filter(**mq).values('participant').distinct().count()
+        mq = mq.filter(q_participant_categorie_ref(categorie))
+    inscrits = mq.values('participant').distinct().count()
     sess_ids = session_ids_for_scope([module.id], annee, mois, calendrier)
     return {
         'inscrits': inscrits,
@@ -464,7 +459,7 @@ def _resume_matiere(module_ids, categorie=None, annee=None, mois=None, calendrie
     """Inscrits uniques et présences valides sur tous les modules d'une matière."""
     mq = Q(module_id__in=module_ids)
     if categorie:
-        mq &= Q(participant__categorie__iexact=categorie)
+        mq &= q_participant_categorie_ref(categorie)
     inscrits = ModuleParticipant.objects.filter(mq).values('participant').distinct().count()
     sess_ids = session_ids_for_scope(module_ids, annee, mois, calendrier)
     return {
@@ -515,7 +510,7 @@ def compute_bilan_effectifs_matiere(
     mod_ids = [m.id for m in modules]
     mp_qs = ModuleParticipant.objects.filter(module_id__in=mod_ids).select_related('participant')
     if categorie and categorie != '—':
-        mp_qs = mp_qs.filter(participant__categorie__iexact=categorie)
+        mp_qs = mp_qs.filter(q_participant_categorie_ref(categorie))
 
     participants = {}
     for mp in mp_qs:
@@ -871,9 +866,7 @@ def _mq_bilan_fac_base(formation_id, categorie=None, secretariat_id=None, module
     if module_ids is not None:
         mq = mq.filter(id__in=module_ids)
     if categorie:
-        mq = mq.filter(
-            module_participants__participant__categorie__iexact=categorie,
-        ).distinct()
+        mq = mq.filter(q_module_participant_categorie_ref(categorie)).distinct()
     return mq
 
 

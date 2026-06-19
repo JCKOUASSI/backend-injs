@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 
+from formations.categorie_referentiel import resolve_categorie_ref
 from formations.models import (
     Formation, Module, Participant, Formateur,
     ModuleParticipant, SessionModule, Secretariat,
@@ -590,6 +591,20 @@ def _indicateurs_pedagogiques(
     }
 
 
+def _participants_par_categorie_ref(participants_qs, limit=8):
+    """Répartition par libellé RefCategorie (mapping des valeurs brutes)."""
+    counts = {}
+    for raw in participants_qs.exclude(categorie='').values_list('categorie', flat=True):
+        resolved = resolve_categorie_ref(raw)
+        if not resolved:
+            continue
+        counts[resolved] = counts.get(resolved, 0) + 1
+    return [
+        {'categorie': cat, 'total': total}
+        for cat, total in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]
+
+
 def _indicateurs_admin(
     formation_id=None, secretariat_id=None, module_ids=None, date_debut=None, date_fin=None,
 ):
@@ -676,9 +691,7 @@ def _indicateurs_admin(
         'charge_formateurs': charge_formateurs,
         'pointages_par_statut': statuts,
         'participants_par_sexe': [{'sexe': 'Hommes', 'total': hommes}, {'sexe': 'Femmes', 'total': femmes}],
-        'participants_par_categorie': list(
-            p_inscrits.exclude(categorie='').values('categorie').annotate(total=Count('id')).order_by('-total').values('categorie', 'total')[:8]
-        ),
+        'participants_par_categorie': _participants_par_categorie_ref(p_inscrits),
         'participants_par_vague': list(
             p_inscrits.exclude(vague='').values('vague').annotate(total=Count('id')).order_by('-total').values('vague', 'total')[:6]
         ),

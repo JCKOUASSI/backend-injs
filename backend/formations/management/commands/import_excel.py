@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from openpyxl import load_workbook
 
+from formations.categorie_referentiel import resolve_categorie_participant
 from formations.models import (
     Formation, Participant, Formateur, Module,
     ModuleParticipant, ModuleFormateur, SessionModule, RefSite,
@@ -464,6 +465,10 @@ class Command(BaseCommand):
             return 'formateurs'
 
         return None
+
+    def _resolve_categorie_participant(self, raw_categorie='', grade=''):
+        """Mappe la catégorie saisie vers le libellé RefCategorie."""
+        return resolve_categorie_participant(raw_categorie, grade=grade)
 
     def _normalize_categorie(self, cat):
         """Normalise la catégorie vers le libellé RefTypeSecretariat.
@@ -1115,6 +1120,11 @@ class Command(BaseCommand):
                         sec = _secretariat_cache.get(cat)
                         if sec:
                             fields['secretariat'] = sec
+
+            fields['categorie'] = self._resolve_categorie_participant(
+                fields.get('categorie', ''),
+                grade=fields.get('grade', ''),
+            )
 
             if matricule:
                 obj, created = Participant.objects.update_or_create(
