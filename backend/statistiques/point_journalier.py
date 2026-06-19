@@ -10,7 +10,8 @@ from datetime import date
 
 from django.db.models import Q
 
-from formations.models import Formation, Module, ModuleParticipant, SessionModule, RefCategorie, Participant
+from formations.categorie_referentiel import categories_from_raw_values, resolve_categorie_ref
+from formations.models import Formation, Module, ModuleParticipant, SessionModule, Participant
 from presences.models import Pointage
 
 from .effectifs import filter_sessions, presents_par_session, stats_creneau_module, categories_for_scope
@@ -170,11 +171,11 @@ def _categories_pour_formation(formation_id, secretariat_id=None, cache=None, al
         mq['module__secretariat_id'] = secretariat_id
     if allowed_module_ids is not None:
         mq['module_id__in'] = allowed_module_ids
-    cats = sorted(set(
+    cats = categories_from_raw_values(
         ModuleParticipant.objects.filter(**mq)
         .exclude(participant__categorie='')
         .values_list('participant__categorie', flat=True)
-    ))
+    )
     return cats
 
 
@@ -235,10 +236,11 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
     )
     for mod_id, pid, cat in mp_rows:
         cache['participants_by_mod'][mod_id].add(pid)
-        c = (cat or '').strip()
-        cache['participant_cat'][pid] = c
-        if c:
-            cache['participants_by_mod_cat'][(mod_id, c.upper())].add(pid)
+        raw = (cat or '').strip()
+        resolved = resolve_categorie_ref(raw) or raw
+        cache['participant_cat'][pid] = resolved
+        if resolved:
+            cache['participants_by_mod_cat'][(mod_id, resolved.upper())].add(pid)
 
     sessions = list(
         _sessions_pj_queryset(module_ids=module_ids, jours=jours)
@@ -260,7 +262,7 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
                 c = cache['participant_cat'].get(pid, '')
                 if c:
                     cats.add(c)
-        cache['cats_by_formation'][fid] = sorted(cats)
+        cache['cats_by_formation'][fid] = sorted(cats, key=lambda c: (len(c), c))
 
     return cache
 

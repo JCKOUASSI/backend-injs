@@ -17,7 +17,8 @@ from datetime import date
 
 from django.db.models import Q, Exists, OuterRef
 
-from formations.models import Module, ModuleParticipant, SessionModule, Participant, RefCategorie
+from formations.categorie_referentiel import categories_from_raw_values, q_participant_categorie_ref
+from formations.models import Module, ModuleParticipant, SessionModule, Participant
 from presences.models import Pointage
 
 
@@ -150,7 +151,7 @@ def _module_participant_qs(
     if grade:
         q = q.filter(module__grade=grade)
     if categorie and categorie != '—':
-        q = q.filter(participant__categorie__iexact=categorie)
+        q = q.filter(q_participant_categorie_ref(categorie))
     return q
 
 
@@ -318,7 +319,7 @@ def participants_par_module(module_ids, categorie=None):
     """{module_id: {participant_id: Participant}}"""
     mq = ModuleParticipant.objects.filter(module_id__in=module_ids).select_related('participant')
     if categorie and categorie != '—':
-        mq = mq.filter(participant__categorie__iexact=categorie)
+        mq = mq.filter(q_participant_categorie_ref(categorie))
     out = defaultdict(dict)
     for mp in mq:
         out[mp.module_id][mp.participant_id] = mp.participant
@@ -511,9 +512,8 @@ def categories_for_scope(
     """
     Catégories auditeur visibles dans un périmètre stats.
 
-    Dès qu'un secrétariat ou une liste de modules est imposée, les catégories
-    proviennent des inscriptions aux modules du périmètre (pas du champ
-    participant.secretariat seul).
+    Retourne uniquement les libellés du référentiel RefCategorie pour lesquels
+    au moins un auditeur inscrit dans le périmètre est mappable.
     """
     scoped = secretariat_id is not None or module_ids is not None
     if scoped:
@@ -530,16 +530,12 @@ def categories_for_scope(
             .values_list('participant__categorie', flat=True)
             .distinct()
         )
-        cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
-        cats.update(enrolled)
-        return sorted(cats, key=lambda c: (len(c), c))
+        return categories_from_raw_values(enrolled)
 
-    cats = set(RefCategorie.objects.filter(actif=True).values_list('libelle', flat=True))
     pq = Participant.objects.exclude(categorie='')
     if formation_id:
         pq = pq.filter(modules_inscrits__module__formation_id=formation_id).distinct()
-    cats.update(pq.values_list('categorie', flat=True))
-    return sorted(cats, key=lambda c: (len(c), c))
+    return categories_from_raw_values(pq.values_list('categorie', flat=True))
 
 
 def _empty_effectifs_tableau():
