@@ -31,6 +31,19 @@ const HERO_KPIS = [
     sub: (kpis) => `${fmtHeures(kpis.total_duree_heures)} h · ${kpis.total_sessions ?? 0} séance(s)`,
   },
   {
+    id: 'cout_prevu',
+    label: 'Coût prévisionnel du volume horaire',
+    icon: 'bi-calculator',
+    variant: 'forecast',
+    kpiKey: 'total_montant_prevu',
+    format: 'money',
+    evolutionKey: 'total_montant_prevu',
+    sub: (kpis) => {
+      const h = fmtHeures(kpis.total_duree_heures)
+      return `Basé sur ${h} h planifiées · tarif par cycle de formation`
+    },
+  },
+  {
     id: 'realise',
     label: 'Volume horaire total réalisé',
     icon: 'bi-clock-history',
@@ -187,7 +200,18 @@ export default function FinanceDashboard() {
     setSynthesePage(1)
   }
 
-  const kpis = data?.kpis || {}
+  const volumesParModule = Array.isArray(data?.volumes_par_module) ? data.volumes_par_module : []
+  const kpis = useMemo(() => {
+    const raw = data?.kpis || {}
+    if (raw.total_montant_prevu != null && raw.total_montant_prevu !== '') {
+      return raw
+    }
+    const sumPrevu = volumesParModule.reduce(
+      (s, m) => s + Number(m.montant_prevu || 0),
+      0,
+    )
+    return { ...raw, total_montant_prevu: sumPrevu }
+  }, [data?.kpis, volumesParModule])
   const comparaison = data?.comparaison || null
   const evolution = comparaison?.evolution || null
   const periode = data?.periode || {}
@@ -197,7 +221,6 @@ export default function FinanceDashboard() {
   const topMontants = Array.isArray(data?.top_montants) ? data.top_montants : []
   const specialites = Array.isArray(data?.repartition_specialites) ? data.repartition_specialites : []
   const synthese = Array.isArray(data?.synthese_formateurs) ? data.synthese_formateurs : []
-  const volumesParModule = Array.isArray(data?.volumes_par_module) ? data.volumes_par_module : []
   const syntheseTotalPages = Math.max(1, Math.ceil(synthese.length / SYNTHESE_PAGE_SIZE))
   const synthesePageSafe = Math.min(synthesePage, syntheseTotalPages)
   const synthesePageRows = useMemo(() => {
@@ -254,7 +277,7 @@ export default function FinanceDashboard() {
         <div className="loading py-5"><div className="spinner"></div></div>
       ) : (
         <>
-          <div className="finance-hero-kpis finance-hero-kpis--4">
+          <div className="finance-hero-kpis finance-hero-kpis--5">
             {HERO_KPIS.map((item) => (
               <button
                 key={item.id}

@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Formation, Module
+from .models import Formation, Module, RefFormation
 
 User = get_user_model()
 
@@ -63,3 +63,17 @@ class FinanceApiScopeTest(TestCase):
         from .access import formation_accessible
 
         self.assertIsNone(formation_accessible(self.finance, self.formation.pk))
+
+    def test_finance_settings_get_does_not_auto_create_ref_formation(self):
+        """Le GET paramètres finance ne doit pas créer d'entrées référentiel."""
+        label = 'Cycle auto-sync interdit XYZ'
+        Formation.objects.create(formation=label)
+        self.assertFalse(RefFormation.objects.filter(intitule=label).exists())
+
+        self.client.force_authenticate(user=self.finance)
+        res = self.client.get('/api/formations/finance/settings/')
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(
+            RefFormation.objects.filter(intitule=label).exists(),
+            msg='GET finance/settings ne doit pas appeler _sync_ref_formations_from_cycles',
+        )

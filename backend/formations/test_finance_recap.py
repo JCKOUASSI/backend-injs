@@ -3,7 +3,7 @@ from datetime import timedelta, time as dt_time
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Formation, Module, Formateur, ModuleFormateur, SessionModule
+from .models import Formation, Module, Formateur, ModuleFormateur, RefFormation, SessionModule
 from .api_views import (
     _finance_recap_par_module,
     _finance_group_sessions_by_groupe,
@@ -81,6 +81,26 @@ class FinanceRecapModulesTest(TestCase):
         self.assertEqual(len(row['sessions_by_groupe']), 1)
         self.assertEqual(row['sessions_by_groupe'][0]['groupe'], 'GROUPE 4')
         self.assertEqual(row['sessions_by_groupe'][0]['sous_total']['sessions_count'], 1)
+
+    def test_recap_modules_includes_montant_prevu(self):
+        f = _make_formation('Cycle A')
+        RefFormation.objects.create(intitule='Cycle A', prix_heure_realisee=7500, actif=True)
+        module = _make_module(
+            f, intitule='Rédaction', grade='A4', groupe='GROUPE 15', duree_prevue_heures=2,
+        )
+        formateur = _make_formateur()
+        ModuleFormateur.objects.create(module=module, formateur=formateur)
+        SessionModule.objects.create(
+            module=module,
+            date_journee=timezone.localdate(),
+            numero=1,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(10, 0),
+        )
+        rows = _finance_report_rows([formateur], include_sessions=True)
+        recap = rows[0]['recap_modules'][0]
+        self.assertEqual(recap['montant_prevu'], 15000.0)
+        self.assertEqual(recap['montant_realise'], 0.0)
 
     def test_export_summary_preserves_recap_modules(self):
         """L'export fiche formateur ne doit pas écraser la ligne rapport finance."""
