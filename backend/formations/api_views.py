@@ -8,7 +8,7 @@ from datetime import timedelta, datetime, time, date
 import calendar
 import re
 from django.db.models import Count, Q, F
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
@@ -929,28 +929,6 @@ def _check_finance_access(request):
     return request.user.is_authenticated and request.user.role in _finance_allowed_roles()
 
 
-def _sync_ref_formations_from_cycles():
-    """Ajoute au référentiel les cycles de formation présents dans les données sans entrée RefFormation."""
-    labels = set()
-    for label in Formation.objects.exclude(formation='').values_list('formation', flat=True):
-        s = (label or '').strip()
-        if s:
-            labels.add(s)
-    for label in Module.objects.exclude(cycle='').values_list('cycle', flat=True):
-        s = (label or '').strip()
-        if s:
-            labels.add(s)
-
-    existing_keys = {
-        r.intitule.strip().lower()
-        for r in RefFormation.objects.all()
-    }
-    for label in labels:
-        if label.strip().lower() not in existing_keys:
-            RefFormation.objects.create(intitule=label, actif=True)
-            existing_keys.add(label.strip().lower())
-
-
 def _finance_normalize_label(label):
     """Normalise un libellé de formation pour la recherche de tarif."""
     s = (label or '').strip().lower()
@@ -1429,6 +1407,7 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
     if not meta_by_id:
         return []
 
+    prix_map = _finance_build_prix_map()
     module_ids = list(meta_by_id.keys())
     modules_by_id = {
         m.id: m for m in Module.objects.filter(id__in=module_ids).select_related(
@@ -1457,31 +1436,51 @@ def _finance_dashboard_modules_breakdown(rows, *, date_debut, date_fin, secretar
         )
         meta = meta_by_id[mid]
         realized = _finance_cap_module_realized(realise_by_id.get(mid, 0.0), planned)
-        prix = meta.get('prix_heure_realisee')
+        prix_raw = meta.get('prix_heure_realisee')
+        if prix_raw is not None:
+            prix = float(prix_raw)
+        elif mod_obj:
+            prix = _finance_resolve_prix_heure(
+                _finance_module_formation_label(mod_obj),
+                prix_map=prix_map,
+                module_obj=mod_obj,
+            )
+        else:
+            prix = 0.0
+        prix_display = prix if prix > 0 else None
+        montant_prevu = _finance_montant_from_minutes(planned, prix)
         montant = (
             _finance_montant_from_minutes(realized, prix)
-            if prix is not None
+            if prix_display is not None
             else round(montant_by_id.get(mid, 0.0), 2)
         )
         taux = _finance_taux_realisation_pct(realized, planned)
         results.append({
             **meta,
+            'prix_heure_realisee': prix_display,
             'sessions_count': sessions_count,
             'total_duree_minutes': round(planned, 1),
             'total_duree_heures': round(planned / 60, 2) if planned else 0,
             'total_duree_realisee_minutes': realized,
             'total_duree_realisee_heures': round(realized / 60, 2) if realized else 0,
             'taux_realisation_pct': taux,
+            'montant_prevu': montant_prevu,
             'montant_realise': montant,
         })
 
     return sorted(results, key=lambda m: m.get('module_intitule') or '')
 
 
+def _finance_total_montant_prevu_from_breakdown(breakdown):
+    """Coût prévisionnel global = Σ (volume planifié module × tarif cycle)."""
+    return round(sum(float(m.get('montant_prevu') or 0) for m in (breakdown or [])), 2)
+
+
 def _finance_kpi_evolution(current, previous):
     """Écarts absolus et relatifs entre deux jeux de KPI."""
     keys = (
         'total_montant_realise',
+        'total_montant_prevu',
         'total_duree_realisee_minutes',
         'total_duree_minutes',
         'total_sessions',
@@ -1882,6 +1881,10 @@ def _finance_report_rows(
             )
             entry['taux_planned_minutes'] = round(float(entry.get('taux_planned_minutes') or 0), 1)
             entry['taux_realized_capped_minutes'] = round(float(entry.get('taux_realized_capped_minutes') or 0), 1)
+            entry['montant_prevu'] = _finance_montant_from_minutes(
+                entry.get('total_duree_minutes', 0),
+                entry.get('prix_heure_realisee'),
+            )
             modules_list.append(entry)
         montant_total = round(sum(float(m.get('montant_realise') or 0) for m in modules_list), 2)
         if use_variable_rates:
@@ -2254,19 +2257,44 @@ def finance_dashboard_api(request):
     )
 
     comparaison = None
+    volumes_par_module = _finance_dashboard_modules_breakdown(
+        rows,
+        date_debut=period['date_debut'],
+        date_fin=period['date_fin'],
+        secretariat_id=secretariat_id,
+        additional_modules=global_aggregates.get('additional_modules'),
+    )
+    kpis['total_montant_prevu'] = _finance_total_montant_prevu_from_breakdown(volumes_par_module)
+
     if compare_previous and period['meta'].get('preset') != 'tout':
         prev_period = _finance_previous_period(
             period['date_debut'], period['date_fin'], period['meta'],
         )
         if prev_period:
+            prev_global = {}
             prev_rows = _finance_report_rows(
                 formateurs,
                 include_sessions=False,
+                global_aggregates=prev_global,
                 date_debut=prev_period['date_debut'],
                 date_fin=prev_period['date_fin'],
                 secretariat_id=secretariat_id,
+                include_all_modules=True,
             )
             prev_kpis = _finance_kpis_from_rows(prev_rows)
+            if prev_global.get('additional_sessions_count', 0) > 0:
+                prev_kpis['total_duree_minutes'] += round(
+                    float(prev_global.get('additional_planned_minutes') or 0), 1,
+                )
+                prev_kpis['total_duree_heures'] = round(prev_kpis['total_duree_minutes'] / 60, 2)
+            prev_breakdown = _finance_dashboard_modules_breakdown(
+                prev_rows,
+                date_debut=prev_period['date_debut'],
+                date_fin=prev_period['date_fin'],
+                secretariat_id=secretariat_id,
+                additional_modules=prev_global.get('additional_modules'),
+            )
+            prev_kpis['total_montant_prevu'] = _finance_total_montant_prevu_from_breakdown(prev_breakdown)
             comparaison = {
                 'periode': _finance_periode_payload(
                     prev_period['date_debut'],
@@ -2280,13 +2308,7 @@ def finance_dashboard_api(request):
     dashboard_payload = {
         'periode': periode_payload,
         'kpis': kpis,
-        'volumes_par_module': _finance_dashboard_modules_breakdown(
-            rows,
-            date_debut=period['date_debut'],
-            date_fin=period['date_fin'],
-            secretariat_id=secretariat_id,
-            additional_modules=global_aggregates.get('additional_modules'),
-        ),
+        'volumes_par_module': volumes_par_module,
         'top_formateurs': top_temps_planifie,
         'top_temps_realise': top_temps_realise,
         'top_montants': top_montants,
@@ -2323,7 +2345,6 @@ def finance_settings_api(request):
     settings_obj = FinanceSettings.get_solo()
 
     def _serialize_tarifs():
-        _sync_ref_formations_from_cycles()
         tarifs = []
         for ref in RefFormation.objects.order_by('intitule'):
             tarifs.append({

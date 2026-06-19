@@ -132,14 +132,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database — PostgreSQL
+_postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'qr_badge'),
+        'NAME': _postgres_db,
         'USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
+        'TEST': {
+            'NAME': f'test_{_postgres_db}',
+        },
     }
 }
 

@@ -1,7 +1,12 @@
 from django.test import TestCase
 
 from .models import Formation, Module, Formateur, ModuleFormateur, RefFormation, SessionModule
-from .api_views import _finance_report_rows, _finance_kpis_from_rows
+from .api_views import (
+    _finance_report_rows,
+    _finance_kpis_from_rows,
+    _finance_dashboard_modules_breakdown,
+    _finance_total_montant_prevu_from_breakdown,
+)
 
 
 def _make_formation(titre='Cycle test'):
@@ -55,3 +60,12 @@ class FinanceTarifsParFormationTest(TestCase):
         kpis = _finance_kpis_from_rows(rows)
         self.assertTrue(kpis['tarifs_variables'])
         self.assertIn(7500.0, kpis['tarifs_appliques'])
+
+    def test_montant_prevu_from_planned_volume(self):
+        rows = _finance_report_rows([self.formateur], include_sessions=False)
+        breakdown = _finance_dashboard_modules_breakdown(rows, date_debut=None, date_fin=None)
+        self.assertEqual(len(breakdown), 1)
+        mod = breakdown[0]
+        self.assertEqual(mod['total_duree_minutes'], 120.0)
+        self.assertEqual(mod['montant_prevu'], 15000.0)  # 2 h × 7500 FCFA/h
+        self.assertEqual(_finance_total_montant_prevu_from_breakdown(breakdown), 15000.0)

@@ -29,6 +29,13 @@ const DRILL_CONFIG = {
     format: 'money',
     sortKey: 'montant_realise',
   },
+  cout_prevu: {
+    title: 'Coût prévisionnel du volume horaire par module',
+    icon: 'bi-calculator',
+    valueKey: 'montant_prevu',
+    format: 'money',
+    sortKey: 'montant_prevu',
+  },
 }
 
 function formatDetailValue(mod, cfg) {
@@ -69,10 +76,11 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
             </div>
           ) : (
             <>
-              {drillType === 'cout' && (
+              {(drillType === 'cout' || drillType === 'cout_prevu') && (
                 <p className="text-muted small mb-2">
                   <i className="bi bi-info-circle me-1"></i>
-                  Chaque ligne est facturée au tarif horaire du cycle de formation associé au module.
+                  Chaque ligne est facturée au tarif horaire du cycle de formation associé au module
+                  {drillType === 'cout_prevu' ? ', appliqué au volume planifié.' : '.'}
                 </p>
               )}
               <div className="finance-table-wrap">
@@ -84,12 +92,13 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                     <th>Grade</th>
                     <th>Groupe</th>
                     <th>Séances</th>
-                    {drillType === 'cout' && <th style={{ textAlign: 'right' }}>Tarif / h</th>}
+                    {(drillType === 'cout' || drillType === 'cout_prevu') && <th style={{ textAlign: 'right' }}>Tarif / h</th>}
                     <th style={{ textAlign: 'right' }}>
                       {drillType === 'planifie' && 'Planifié'}
                       {drillType === 'realise' && 'Réalisé'}
                       {drillType === 'taux' && 'Taux'}
-                      {drillType === 'cout' && 'Coût'}
+                      {drillType === 'cout' && 'Coût réalisé'}
+                      {drillType === 'cout_prevu' && 'Coût prévisionnel'}
                     </th>
                   </tr>
                 </thead>
@@ -106,7 +115,7 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                       <td className="small">{m.grade || '—'}</td>
                       <td className="small">{m.groupe || '—'}</td>
                       <td><span className="badge-bg-secondary">{m.sessions_count ?? 0}</span></td>
-                      {drillType === 'cout' && (
+                      {(drillType === 'cout' || drillType === 'cout_prevu') && (
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           {m.prix_heure_realisee != null
                             ? `${formatMoney(m.prix_heure_realisee)} F`
@@ -131,7 +140,7 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--fin-light-orange, #fff3e0)' }}>
-                    <td colSpan={drillType === 'cout' ? 6 : 5}><strong>TOTAL</strong></td>
+                    <td colSpan={(drillType === 'cout' || drillType === 'cout_prevu') ? 6 : 5}><strong>TOTAL</strong></td>
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>
                       {drillType === 'planifie' && fmtDuration(rows.reduce((s, m) => s + Number(m.total_duree_minutes || 0), 0))}
                       {drillType === 'realise' && fmtDuration(rows.reduce((s, m) => s + Number(m.total_duree_realisee_minutes || 0), 0))}
@@ -142,6 +151,7 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                         return `${pct} %`
                       })()}
                       {drillType === 'cout' && `${formatMoney(rows.reduce((s, m) => s + Number(m.montant_realise || 0), 0))} FCFA`}
+                      {drillType === 'cout_prevu' && `${formatMoney(rows.reduce((s, m) => s + Number(m.montant_prevu || 0), 0))} FCFA`}
                     </td>
                   </tr>
                 </tfoot>

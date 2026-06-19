@@ -27,7 +27,8 @@ export default function FinanceModulesRecap({ modules, formatDuration }) {
             <th>Réalisé</th>
             <th>Taux</th>
             {showTolerance && <th>Statut</th>}
-            <th style={{ textAlign: 'right' }}>Montant</th>
+            <th style={{ textAlign: 'right' }}>Montant prévu</th>
+            <th style={{ textAlign: 'right' }}>Montant réalisé</th>
           </tr>
         </thead>
         <tbody>
@@ -44,7 +45,12 @@ export default function FinanceModulesRecap({ modules, formatDuration }) {
               {showTolerance && (
                 <td><FinanceToleranceBadge tolerance={m.tolerance} showInactive /></td>
               )}
-              <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatMoney(m.montant_realise ?? 0)} F</td>
+              <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                {formatMoney(m.montant_prevu ?? 0)} F
+              </td>
+              <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--fin-green)' }}>
+                {formatMoney(m.montant_realise ?? 0)} F
+              </td>
             </tr>
           ))}
         </tbody>
