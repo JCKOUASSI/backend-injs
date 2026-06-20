@@ -395,7 +395,7 @@ class ListeClasseExportTest(ExportFixtureMixin, TestCase):
         self.assertEqual(len(wb.sheetnames), 1)
         values = [str(cell.value or '') for row in wb.active.iter_rows() for cell in row]
         joined = ' '.join(values)
-        self.assertIn('Koné', joined)
+        self.assertIn('KONÉ', joined)
         self.assertNotIn('Diallo', joined)
 
     def test_liste_classe_excel_all_groupes(self):
