@@ -77,20 +77,17 @@ def session_in_date_range(session, date_debut=None, date_fin=None):
 
 
 def module_contractual_planned_minutes(module, categorie_code=None):
-    """Volume horaire contractuel (minutes) : référentiel uniquement (RefModule.volume_horaire).
-    Ignore Module.duree_prevue_heures car souvent rempli à tort à la somme brute EDT à l'import.
-
-    Si categorie_code est fourni, utilise le volume spécifique à cette catégorie.
-    Sinon, utilise la catégorie majoritaire des participants du module."""
+    """Volume horaire contractuel (minutes) : référentiel formation × catégorie, sinon fiche module."""
     if not module:
         return 0.0
-    from .duree_prevue_resolve import _ref_module_volume_hours, _get_majoritaire_categorie
+    from .duree_prevue_resolve import _ref_module_volume_hours, _get_majoritaire_categorie, resolve_module_volume_contractuel_heures
 
-    # Déterminer la catégorie à utiliser
     if not categorie_code:
         categorie_code = _get_majoritaire_categorie(module)
 
     heures = _ref_module_volume_hours(module, categorie_code)
+    if heures <= 0:
+        heures, _ = resolve_module_volume_contractuel_heures(module, categorie_code=categorie_code)
     return heures * 60 if heures > 0 else 0.0
 
 
@@ -101,18 +98,17 @@ def module_planned_minutes_for_period(
     sessions_in_period=None,
     categorie_code=None,
 ):
-    """Planifié période = Σ créneaux EDT des séances de la période,
-    plafonné au volume_horaire du référentiel (RefModule) si renseigné.
+    """Planifié = volume contractuel référentiel (ou fiche) si connu, sinon Σ créneaux EDT.
 
-    Si categorie_code est fourni, utilise le volume spécifique à cette catégorie.
-    Sinon, utilise la catégorie majoritaire des participants."""
+    L'EDT peut être incomplet : le planifié affiche l'objectif (ex. 16 h), pas seulement
+    la somme des séances déjà créées.
+    """
     if not sessions_in_period:
         return 0.0
-    edt_sum = sum(_session_prevu_minutes(s) for s in sessions_in_period)
     contractual = module_contractual_planned_minutes(module, categorie_code)
     if contractual > 0:
-        return min(edt_sum, contractual)
-    return edt_sum
+        return contractual
+    return sum(_session_prevu_minutes(s) for s in sessions_in_period)
 
 
 def accumulate_sessions_volume(sessions, *, date_debut=None, date_fin=None):

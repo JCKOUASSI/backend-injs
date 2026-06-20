@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../../services/api'
 import { useToast } from '../../context/ToastContext'
-import { FinanceStatsGrid, FinanceModulesList, fmtHeures, formatMoney } from '../FinanceStatsGrid'
+import { FinanceStatsGrid, FinanceModulesList, formatMoney } from '../FinanceStatsGrid'
 import FinanceModulesRecap from './FinanceModulesRecap'
 import { FinanceSessionsByGroupeTable } from './FinanceSessionsByGroupe'
 import FinanceToleranceBadge from './FinanceToleranceBadge'
@@ -246,9 +246,6 @@ export default function FinanceDetailModal({
                         <small className="text-muted">Temps réalisé</small>
                         <div style={{ fontWeight: 600 }}>
                           {formatDuration(financeDetail.total_duree_realisee_minutes)}
-                          <span className="text-muted small ms-1">
-                            ({fmtHeures(financeDetail.total_duree_realisee_heures)} h)
-                          </span>
                         </div>
                       </div>
                       <div style={{ gridColumn: '1 / -1' }}>

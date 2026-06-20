@@ -1,4 +1,5 @@
-import { fmtDuration, fmtHeures, formatMoney } from '../FinanceStatsGrid'
+import { useMemo, useState } from 'react'
+import { fmtDuration, formatMoney } from '../FinanceStatsGrid'
 
 const DRILL_CONFIG = {
   planifie: {
@@ -46,13 +47,68 @@ function formatDetailValue(mod, cfg) {
   return v ?? '—'
 }
 
+function sumBreakdown(rows, cfg, drillType) {
+  if (drillType === 'planifie') {
+    return rows.reduce((s, m) => s + Number(m.total_duree_minutes || 0), 0)
+  }
+  if (drillType === 'realise') {
+    return rows.reduce((s, m) => s + Number(m.total_duree_realisee_minutes || 0), 0)
+  }
+  if (drillType === 'taux') {
+    const planned = rows.reduce((s, m) => s + Number(m.total_duree_minutes || 0), 0)
+    const realized = rows.reduce((s, m) => s + Number(m.total_duree_realisee_minutes || 0), 0)
+    return planned > 0 ? Math.min(100, Math.round((realized / planned) * 1000) / 10) : 0
+  }
+  if (drillType === 'cout') {
+    return rows.reduce((s, m) => s + Number(m.montant_realise || 0), 0)
+  }
+  if (drillType === 'cout_prevu') {
+    return rows.reduce((s, m) => s + Number(m.montant_prevu || 0), 0)
+  }
+  return rows.reduce((s, m) => s + Number(m[cfg.valueKey] || 0), 0)
+}
+
+function formatFooterTotal(total, drillType) {
+  if (drillType === 'planifie' || drillType === 'realise') return fmtDuration(total)
+  if (drillType === 'taux') return `${total} %`
+  if (drillType === 'cout' || drillType === 'cout_prevu') return `${formatMoney(total)} FCFA`
+  return total
+}
+
+function matchesSearch(mod, query) {
+  if (!query) return true
+  const q = query.toLowerCase()
+  const haystack = [
+    mod.module_intitule,
+    mod.formation_intitule,
+    mod.secretariat_nom,
+    mod.grade,
+    mod.groupe,
+  ].filter(Boolean).join(' ').toLowerCase()
+  return haystack.includes(q)
+}
+
 export default function FinanceModuleBreakdownModal({ drillType, modules, onClose }) {
   const cfg = DRILL_CONFIG[drillType]
+  const [search, setSearch] = useState('')
+
+  const allRows = useMemo(() => {
+    if (!cfg) return []
+    return [...(modules || [])].sort(
+      (a, b) => Number(b[cfg.sortKey] || 0) - Number(a[cfg.sortKey] || 0),
+    )
+  }, [modules, cfg])
+
+  const rows = useMemo(
+    () => allRows.filter(m => matchesSearch(m, search.trim())),
+    [allRows, search],
+  )
+
   if (!cfg) return null
 
-  const rows = [...(modules || [])].sort(
-    (a, b) => Number(b[cfg.sortKey] || 0) - Number(a[cfg.sortKey] || 0),
-  )
+  const filteredTotal = sumBreakdown(rows, cfg, drillType)
+  const globalTotal = sumBreakdown(allRows, cfg, drillType)
+  const isFiltered = Boolean(search.trim()) && rows.length !== allRows.length
 
   return (
     <div className="modal-overlay finance-modal" onClick={onClose}>
@@ -62,17 +118,42 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h5 className="modal-title">
-            <i className={`bi ${cfg.icon} me-2`}></i>
-            {cfg.title}
-          </h5>
+          <div>
+            <h5 className="modal-title mb-1">
+              <i className={`bi ${cfg.icon} me-2`}></i>
+              {cfg.title}
+            </h5>
+            <div className="text-muted small">
+              {allRows.length} module{allRows.length !== 1 ? 's' : ''} sur la période
+              {isFiltered && (
+                <span> · {rows.length} affiché{rows.length !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+          </div>
           <button type="button" className="btn-close" aria-label="Fermer" onClick={onClose}></button>
         </div>
         <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '1rem 1.25rem' }}>
-          {rows.length === 0 ? (
+          {allRows.length > 0 && (
+            <div className="mb-3">
+              <input
+                type="search"
+                className="form-control form-control-sm"
+                placeholder="Filtrer par module, formation, secrétariat, grade, groupe…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+          {allRows.length === 0 ? (
             <div className="finance-empty">
               <i className="bi bi-inbox"></i>
               Aucun module sur cette période
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="finance-empty">
+              <i className="bi bi-search"></i>
+              Aucun module ne correspond au filtre
             </div>
           ) : (
             <>
@@ -124,34 +205,22 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                       )}
                       <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {formatDetailValue(m, cfg)}
-                        {drillType === 'planifie' && (m.total_duree_heures ?? 0) > 0 && (
-                          <div className="text-muted small fw-normal">
-                            {fmtHeures(m.total_duree_heures)} h
-                          </div>
-                        )}
-                        {drillType === 'realise' && (m.total_duree_realisee_heures ?? 0) > 0 && (
-                          <div className="text-muted small fw-normal">
-                            {fmtHeures(m.total_duree_realisee_heures)} h
-                          </div>
-                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--fin-light-orange, #fff3e0)' }}>
-                    <td colSpan={(drillType === 'cout' || drillType === 'cout_prevu') ? 6 : 5}><strong>TOTAL</strong></td>
+                    <td colSpan={(drillType === 'cout' || drillType === 'cout_prevu') ? 6 : 5}>
+                      <strong>TOTAL{isFiltered ? ' (filtre)' : ''}</strong>
+                      {isFiltered && (
+                        <div className="text-muted small fw-normal">
+                          Global : {formatFooterTotal(globalTotal, drillType)}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                      {drillType === 'planifie' && fmtDuration(rows.reduce((s, m) => s + Number(m.total_duree_minutes || 0), 0))}
-                      {drillType === 'realise' && fmtDuration(rows.reduce((s, m) => s + Number(m.total_duree_realisee_minutes || 0), 0))}
-                      {drillType === 'taux' && (() => {
-                        const planned = rows.reduce((s, m) => s + Number(m.total_duree_minutes || 0), 0)
-                        const realized = rows.reduce((s, m) => s + Number(m.total_duree_realisee_minutes || 0), 0)
-                        const pct = planned > 0 ? Math.min(100, Math.round((realized / planned) * 1000) / 10) : 0
-                        return `${pct} %`
-                      })()}
-                      {drillType === 'cout' && `${formatMoney(rows.reduce((s, m) => s + Number(m.montant_realise || 0), 0))} FCFA`}
-                      {drillType === 'cout_prevu' && `${formatMoney(rows.reduce((s, m) => s + Number(m.montant_prevu || 0), 0))} FCFA`}
+                      {formatFooterTotal(filteredTotal, drillType)}
                     </td>
                   </tr>
                 </tfoot>

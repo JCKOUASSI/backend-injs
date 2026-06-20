@@ -6,6 +6,8 @@ from django.utils import timezone
 from .models import Formation, Module, Formateur, ModuleFormateur, RefModule, SessionModule
 from .api_views import (
     _finance_dashboard_modules_breakdown,
+    _finance_kpis_from_modules_breakdown,
+    _finance_kpis_from_rows,
     _finance_module_planned_minutes,
     _finance_report_rows,
 )
@@ -54,17 +56,17 @@ class FinancePlannedVolumeTest(TestCase):
             heure_fin_prevue=dt_time(18, 0),
         )
 
-    def test_module_planned_sums_session_slots_capped_by_ref(self):
+    def test_module_planned_uses_contractual_ref_when_edt_incomplete(self):
         sessions = list(SessionModule.objects.filter(module=self.module))
         planned = _finance_module_planned_minutes(self.module, sessions)
-        self.assertEqual(planned, 600.0)  # 2 × 5h EDT = 600min < ref 30h=1800min → min=600
+        self.assertEqual(planned, 1800.0)  # ref 30h même si EDT = 2×5h seulement
 
-    def test_report_rows_module_planned_from_session_slots(self):
+    def test_report_rows_module_planned_from_contractual_ref(self):
         rows = _finance_report_rows([self.formateur], include_sessions=True)
         self.assertEqual(len(rows), 1)
         mod = rows[0]['modules'][0]
-        self.assertEqual(mod['total_duree_minutes'], 600.0)  # 2 × 5h EDT, plafonné à ref 30h
-        self.assertEqual(rows[0]['total_duree_minutes'], 600.0)
+        self.assertEqual(mod['total_duree_minutes'], 1800.0)  # ref 30h
+        self.assertEqual(rows[0]['total_duree_minutes'], 1800.0)
         self.assertEqual(mod['sessions_count'], 2)
         sess = rows[0]['sessions']
         self.assertEqual(len(sess), 2)
@@ -95,7 +97,7 @@ class FinancePlannedVolumeTest(TestCase):
             )
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         small_mod = next(m for m in rows[0]['modules'] if m['module_id'] == small.id)
-        self.assertEqual(small_mod['total_duree_minutes'], 120.0)  # 2×5h=600min > ref 2h=120min → plafonné à 120min
+        self.assertEqual(small_mod['total_duree_minutes'], 120.0)  # ref 2h même si EDT = 2×5h
         self.assertEqual(small_mod['total_duree_realisee_minutes'], 120.0)  # 2×2h badge plafonnés à 120min
         self.assertLessEqual(small_mod['total_duree_realisee_minutes'], small_mod['total_duree_minutes'])
 
@@ -103,7 +105,7 @@ class FinancePlannedVolumeTest(TestCase):
         rows = _finance_report_rows([self.formateur], include_sessions=False)
         breakdown = _finance_dashboard_modules_breakdown(rows, date_debut=None, date_fin=None)
         fin = next(b for b in breakdown if b['module_id'] == self.module.id)
-        self.assertEqual(fin['total_duree_minutes'], 600.0)  # 2×5h EDT plafonné ref 30h
+        self.assertEqual(fin['total_duree_minutes'], 1800.0)  # ref 30h
         self.assertEqual(fin['sessions_count'], 2)
         self.assertLessEqual(
             fin['total_duree_realisee_minutes'],
@@ -119,8 +121,8 @@ class FinancePlannedVolumeTest(TestCase):
                 row['total_duree_minutes'],
             )
 
-    def test_partial_period_sums_only_sessions_in_range(self):
-        """Seules les séances de la période sont sommées, plafonnées au référentiel."""
+    def test_partial_period_uses_contractual_when_sessions_in_range(self):
+        """Séances dans la période : planifié = volume contractuel, pas seulement Σ EDT période."""
         future = timezone.localdate() + timedelta(days=30)
         SessionModule.objects.create(
             module=self.module,
@@ -134,7 +136,7 @@ class FinancePlannedVolumeTest(TestCase):
         planned = _finance_module_planned_minutes(
             self.module, sessions, date_debut=today, date_fin=today,
         )
-        self.assertEqual(planned, 600.0)  # 2 séances du jour × 5h = 600min, pas la future
+        self.assertEqual(planned, 1800.0)  # ref 30h (EDT du jour = 10h seulement)
 
     def test_assigned_module_visible_even_without_sessions_in_period(self):
         """Module rattaché au formateur : visible même si aucune séance dans la période."""
@@ -152,9 +154,48 @@ class FinancePlannedVolumeTest(TestCase):
         self.assertEqual(rows[0]['recap_modules'][0]['total_duree_minutes'], 0.0)
         self.assertEqual(rows[0]['sessions_count'], 0)
 
-    def test_canonical_volume_horaire_uses_session_slots_capped_by_ref(self):
+    def test_canonical_volume_horaire_uses_contractual_ref(self):
         from .volume_horaire import compute_volume_horaire_from_module_ids
 
         totals = compute_volume_horaire_from_module_ids([self.module.id])
-        self.assertEqual(totals['prevu_minutes'], 600.0)  # 2×5h EDT < ref 30h → 600min
-        self.assertEqual(totals['prevu_heures'], 10.0)
+        self.assertEqual(totals['prevu_minutes'], 1800.0)  # ref 30h
+        self.assertEqual(totals['prevu_heures'], 30.0)
+
+    def test_dashboard_kpis_deduplicate_module_planned_with_multiple_formateurs(self):
+        """Deux formateurs sur le même module : KPI = une fois le planifié module."""
+        formateur2 = Formateur.objects.create(numerobadge='F201', nom='Durand', prenom='Anne')
+        ModuleFormateur.objects.create(module=self.module, formateur=formateur2)
+        rows = _finance_report_rows([self.formateur, formateur2], include_sessions=False)
+        breakdown = _finance_dashboard_modules_breakdown(rows, date_debut=None, date_fin=None)
+        kpis_rows = _finance_kpis_from_rows(rows)
+        kpis = _finance_kpis_from_modules_breakdown(kpis_rows, breakdown)
+        self.assertEqual(breakdown[0]['total_duree_minutes'], 1800.0)
+        self.assertEqual(kpis['total_duree_minutes'], 1800.0)
+        self.assertNotEqual(
+            sum(float(r.get('total_duree_minutes') or 0) for r in rows),
+            kpis['total_duree_minutes'],
+        )
+
+    def test_incomplete_edt_shows_contractual_hours(self):
+        """EDT incomplet (3×4h) : planifié = 16h référentiel, pas 12h EDT."""
+        ref = RefModule.objects.create(intitule='BUDGET TEST', volume_horaire=16)
+        mod = Module.objects.create(
+            formation=self.formation,
+            intitule='BUDGET TEST',
+            ref_module=ref,
+            statut='PLANIFIEE',
+            grade='B',
+            groupe='GROUPE TEST',
+        )
+        ModuleFormateur.objects.create(module=mod, formateur=self.formateur)
+        for n, h in enumerate([(8, 12), (13, 17), (8, 12)], start=1):
+            SessionModule.objects.create(
+                module=mod,
+                date_journee=timezone.localdate(),
+                numero=n,
+                heure_debut_prevue=dt_time(h[0], 0),
+                heure_fin_prevue=dt_time(h[1], 0),
+            )
+        sessions = list(SessionModule.objects.filter(module=mod))
+        planned = _finance_module_planned_minutes(mod, sessions)
+        self.assertEqual(planned, 960.0)  # 16h ref, pas 12h EDT

@@ -12,6 +12,51 @@ import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import { useClientPagination, TABLE_PAGE_SIZE } from '../hooks/useClientPagination'
 import Pagination from '../components/Pagination'
 
+function volumesApiToGrid(items) {
+  const grid = {}
+  for (const v of items || []) {
+    const fid = v.formation_id
+    if (fid == null) continue
+    if (!grid[fid]) grid[fid] = {}
+    grid[fid][v.categorie_id] = v.volume_horaire
+  }
+  return grid
+}
+
+function volumesGridToApi(grid, formationIds) {
+  const out = []
+  for (const fid of formationIds) {
+    const row = grid[fid] || grid[String(fid)] || {}
+    for (const [cid, val] of Object.entries(row)) {
+      if (val !== '' && val != null && !Number.isNaN(Number(val))) {
+        out.push({
+          formation_id: Number(fid),
+          categorie_id: Number(cid),
+          volume_horaire: parseFloat(val),
+        })
+      }
+    }
+  }
+  return out
+}
+
+function formatVolumesSummary(row) {
+  const items = row.volumes_horaires || row.volumes_par_categorie || []
+  if (!items.length) {
+    if (row.volume_horaire != null && row.volume_horaire !== '') return `${row.volume_horaire} h`
+    return '—'
+  }
+  const byFormation = {}
+  for (const v of items) {
+    const key = v.formation_intitule || `Formation #${v.formation_id}`
+    if (!byFormation[key]) byFormation[key] = []
+    byFormation[key].push(`${v.categorie_libelle}: ${v.volume_horaire}h`)
+  }
+  return Object.entries(byFormation)
+    .map(([f, parts]) => `${f} (${parts.join(', ')})`)
+    .join(' · ')
+}
+
 const TABS = [
   { key: 'formations', label: 'Formations', icon: 'bi-mortarboard' },
   { key: 'modules', label: 'Modules', icon: 'bi-journal-bookmark' },
@@ -73,10 +118,14 @@ function RefTable({ columns, rows, onEdit, onDelete, onToggle }) {
   )
 }
 
-function Modal({ title, onClose, onSubmit, saving, children }) {
+function Modal({ title, onClose, onSubmit, saving, children, wide }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+      <div
+        className="modal-content"
+        style={{ maxWidth: wide ? 680 : 480 }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h5>{title}</h5>
           <button className="btn-close" onClick={onClose}>&times;</button>
@@ -160,31 +209,37 @@ export default function Referentiels() {
 
   const openEdit = (row) => {
     setEditingRow(row)
-    // Transformer volumes_par_categorie en objet pour le formulaire
-    const volumesMap = {}
-    if (row.volumes_par_categorie) {
-      row.volumes_par_categorie.forEach(v => {
-        volumesMap[v.categorie_id] = v.volume_horaire
-      })
-    }
-    setForm({ ...row, volumes_par_categorie: volumesMap })
+    setForm({
+      ...row,
+      formation_ids: row.formation_ids || (row.formations || []).map(f => f.id),
+      volumes_grid: volumesApiToGrid(row.volumes_horaires || row.volumes_par_categorie),
+    })
     setShowModal(true)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (tab === 'modules' && (!form.formation_ids || form.formation_ids.length === 0)) {
+      showToast('Sélectionnez au moins une formation pour ce module.', 'error')
+      return
+    }
+    if (tab === 'modules') {
+      const volumes = volumesGridToApi(form.volumes_grid || {}, form.formation_ids || [])
+      if (volumes.length === 0) {
+        showToast('Renseignez au moins un volume horaire (formation × catégorie).', 'error')
+        return
+      }
+    }
     setSaving(true)
     try {
       const url = URL_MAP[tab]
-      // Préparer les données avec volumes_par_categorie au bon format
       const submitData = { ...form }
-      if (tab === 'modules' && form.volumes_par_categorie) {
-        submitData.volumes_par_categorie = Object.entries(form.volumes_par_categorie)
-          .filter(([_, val]) => val && val !== '')
-          .map(([catId, val]) => ({
-            categorie_id: parseInt(catId),
-            volume_horaire: parseFloat(val)
-          }))
+      if (tab === 'modules') {
+        submitData.volumes_horaires = volumesGridToApi(form.volumes_grid || {}, form.formation_ids || [])
+        delete submitData.volumes_grid
+        delete submitData.volumes_par_categorie
+        delete submitData.volume_horaire
+        delete submitData.formations
       }
       if (editingRow) {
         await api.put(`${url}${editingRow.id}/`, submitData)
@@ -210,7 +265,14 @@ export default function Referentiels() {
           await api.delete(`${URL_MAP[tab]}${row.id}/`)
           showToast('Supprimé')
           await loadAll()
-        } catch { showToast('Erreur lors de la suppression', 'error') }
+        } catch (err) {
+          if (err.response?.status === 404) {
+            showToast('Entrée déjà supprimée — liste actualisée')
+            await loadAll()
+          } else {
+            showToast('Erreur lors de la suppression', 'error')
+          }
+        }
       }
     })
   }
@@ -225,7 +287,7 @@ export default function Referentiels() {
 
   const defaultForm = (t) => {
     if (t === 'formations') return { intitule: '', actif: true }
-    if (t === 'modules') return { intitule: '', volumes_par_categorie: {}, actif: true }
+    if (t === 'modules') return { intitule: '', formation_ids: [], volumes_grid: {}, actif: true }
     if (t === 'categories') return { libelle: '', actif: true }
     if (t === 'grades') return { libelle: '', categorie_id: '', actif: true }
     if (t === 'sites') return { nom: '', actif: true }
@@ -240,10 +302,19 @@ export default function Referentiels() {
     formations: [{ key: 'intitule', label: 'Intitulé' }],
     modules: [
       { key: 'intitule', label: 'Intitulé' },
-      { key: 'volumes_par_categorie', label: 'Volumes horaires (h)', render: r => {
-        if (!r.volumes_par_categorie || r.volumes_par_categorie.length === 0) return '—'
-        return r.volumes_par_categorie.map(v => `${v.categorie_libelle}: ${v.volume_horaire}h`).join(', ')
+      { key: 'formations', label: 'Formations', render: r => {
+        if (r.formations?.length) return r.formations.map(f => f.intitule).join(', ')
+        if (r.formation_ids?.length) {
+          return r.formation_ids
+            .map(id => data.formations.find(f => f.id === id)?.intitule)
+            .filter(Boolean)
+            .join(', ') || '—'
+        }
+        return '—'
       }},
+      { key: 'volumes_horaires', label: 'Volumes horaires (h)', render: r => (
+        <span className="small">{formatVolumesSummary(r)}</span>
+      )},
     ],
     categories: [
       { key: 'libelle', label: 'Libellé' },
@@ -300,33 +371,78 @@ export default function Referentiels() {
         <input className="form-control" required value={form.intitule || ''} onChange={f('intitule')} placeholder="Ex: Déontologie de la Fonction Publique" />
       </div>
       <div className="form-group">
-        <label className="form-label">Volumes horaires par catégorie</label>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          {data.categories.filter(c => c.actif).map(cat => (
-            <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ minWidth: '100px' }}>{cat.libelle}:</span>
-              <input
-                type="number"
-                className="form-control"
-                min="0"
-                step="0.5"
-                placeholder="h"
-                value={form.volumes_par_categorie?.[cat.id] || ''}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setForm(prev => ({
-                    ...prev,
-                    volumes_par_categorie: {
-                      ...prev.volumes_par_categorie,
-                      [cat.id]: val
-                    }
-                  }))
-                }}
-                style={{ width: '100px' }}
-              />
-            </div>
-          ))}
+        <label className="form-label">Formations *</label>
+        <div style={{ display: 'grid', gap: '0.35rem', maxHeight: 160, overflowY: 'auto', padding: '0.5rem', border: '1px solid var(--border-color)', borderRadius: 6 }}>
+          {data.formations.filter(f => f.actif !== false).map(f => {
+            const checked = (form.formation_ids || []).includes(f.id)
+            return (
+              <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    setForm(prev => {
+                      const ids = prev.formation_ids || []
+                      const next = checked ? ids.filter(id => id !== f.id) : [...ids, f.id]
+                      return { ...prev, formation_ids: next }
+                    })
+                  }}
+                />
+                <span>{f.intitule}</span>
+              </label>
+            )
+          })}
         </div>
+        {(form.formation_ids || []).length === 0 && (
+          <small className="text-muted">Sélectionnez au moins une formation.</small>
+        )}
+      </div>
+      <div className="form-group">
+        <label className="form-label">Volumes horaires (h) — par formation et catégorie *</label>
+        {(form.formation_ids || []).length === 0 ? (
+          <small className="text-muted">Sélectionnez d&apos;abord une ou plusieurs formations.</small>
+        ) : (
+          <div style={{ display: 'grid', gap: '0.75rem', maxHeight: 280, overflowY: 'auto' }}>
+            {(form.formation_ids || []).map(fid => {
+              const formation = data.formations.find(f => f.id === fid)
+              const cats = data.categories.filter(c => c.actif !== false)
+              return (
+                <div key={fid} style={{ padding: '0.5rem', border: '1px solid var(--border-color)', borderRadius: 6 }}>
+                  <div className="small fw-semibold mb-2">{formation?.intitule || `Formation #${fid}`}</div>
+                  <div style={{ display: 'grid', gap: '0.35rem' }}>
+                    {cats.map(cat => (
+                      <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ minWidth: 90 }}>{cat.libelle}</span>
+                        <input
+                          type="number"
+                          className="form-control form-control-sm"
+                          min="0"
+                          step="0.5"
+                          placeholder="h"
+                          style={{ width: 90 }}
+                          value={form.volumes_grid?.[fid]?.[cat.id] ?? form.volumes_grid?.[String(fid)]?.[cat.id] ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setForm(prev => ({
+                              ...prev,
+                              volumes_grid: {
+                                ...prev.volumes_grid,
+                                [fid]: {
+                                  ...(prev.volumes_grid?.[fid] || {}),
+                                  [cat.id]: val,
+                                },
+                              },
+                            }))
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </>)
 
@@ -509,6 +625,7 @@ export default function Referentiels() {
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}
           saving={saving}
+          wide={tab === 'modules'}
         >
           {renderForm()}
         </Modal>
