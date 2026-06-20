@@ -150,13 +150,10 @@ class RefFormation(models.Model):
 
 class RefModule(models.Model):
     """Modules/cours prédéfinis (ex: Déontologie de la Fonction Publique)."""
-    formation = models.ForeignKey(
+    formations = models.ManyToManyField(
         RefFormation,
-        on_delete=models.CASCADE,
         related_name='modules',
-        null=True,
-        blank=True,
-        help_text="Formation (cycle) auquel appartient ce module",
+        help_text="Formation(s) (cycle) auxquelles appartient ce module",
     )
     intitule = models.CharField(max_length=255)
     volume_horaire = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -182,14 +179,45 @@ class RefModule(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.intitule}" + (f" ({self.formation.intitule})" if self.formation_id else "")
+        labels = list(self.formations.values_list('intitule', flat=True).order_by('intitule'))
+        if labels:
+            return f"{self.intitule} ({', '.join(labels)})"
+        return self.intitule
+
+    def get_volume_horaire_for_formation_categorie(self, formation_id=None, formation_intitule=None, categorie_code=None):
+        """Volume horaire pour une formation (cycle) et une catégorie données."""
+        qs = self.volumes_horaires.select_related('formation', 'categorie')
+        if formation_id:
+            qs = qs.filter(formation_id=formation_id)
+        elif formation_intitule:
+            qs = qs.filter(formation__intitule__iexact=str(formation_intitule).strip())
+        if categorie_code:
+            code = str(categorie_code).strip()
+            entry = qs.filter(categorie__libelle__iexact=code).first()
+            if not entry and len(code) == 1:
+                entry = qs.filter(categorie__libelle__iexact=code).first() or qs.filter(
+                    categorie__libelle__istartswith=code,
+                ).first()
+            if entry and entry.volume_horaire is not None:
+                return entry.volume_horaire
+        if formation_id or formation_intitule:
+            return None
+        return self.volume_horaire
 
     def get_volume_horaire_for_categorie(self, categorie_code):
-        """Retourne le volume horaire spécifique à une catégorie, ou le volume global si non défini."""
+        """Compatibilité : volume pour une catégorie (sans formation précise)."""
         if not categorie_code:
             return self.volume_horaire
         try:
-            volume_par_cat = self.volumes_horaires.filter(categorie__libelle__iexact=categorie_code).first()
+            volume_par_cat = self.volumes_horaires.filter(
+                categorie__libelle__iexact=categorie_code,
+            ).first()
+            if not volume_par_cat:
+                code = str(categorie_code).strip()
+                if len(code) == 1:
+                    volume_par_cat = self.volumes_horaires.filter(
+                        categorie__libelle__istartswith=code,
+                    ).first()
             if volume_par_cat and volume_par_cat.volume_horaire is not None:
                 return volume_par_cat.volume_horaire
         except Exception:
@@ -198,13 +226,19 @@ class RefModule(models.Model):
 
 
 class RefModuleVolumeHoraire(models.Model):
-    """Volume horaire d'un module du référentiel spécifique à une catégorie."""
+    """Volume horaire d'un module pour une formation (cycle) et une catégorie."""
 
     module = models.ForeignKey(
         RefModule,
         on_delete=models.CASCADE,
         related_name='volumes_horaires',
         help_text="Module du référentiel",
+    )
+    formation = models.ForeignKey(
+        RefFormation,
+        on_delete=models.CASCADE,
+        related_name='volumes_horaires_modules',
+        help_text="Formation (cycle) concernée",
     )
     categorie = models.ForeignKey(
         RefCategorie,
@@ -221,13 +255,16 @@ class RefModuleVolumeHoraire(models.Model):
     )
 
     class Meta:
-        ordering = ['module', 'categorie__libelle']
-        verbose_name = 'Référentiel – Volume horaire par catégorie'
-        verbose_name_plural = 'Référentiel – Volumes horaires par catégorie'
-        unique_together = ('module', 'categorie')
+        ordering = ['module', 'formation__intitule', 'categorie__libelle']
+        verbose_name = 'Référentiel – Volume horaire (formation × catégorie)'
+        verbose_name_plural = 'Référentiel – Volumes horaires (formation × catégorie)'
+        unique_together = ('module', 'formation', 'categorie')
 
     def __str__(self):
-        return f"{self.module.intitule} – {self.categorie.libelle} : {self.volume_horaire}h"
+        return (
+            f"{self.module.intitule} – {self.formation.intitule} – "
+            f"{self.categorie.libelle} : {self.volume_horaire}h"
+        )
 
 
 class RefSite(models.Model):

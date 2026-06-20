@@ -892,25 +892,34 @@ class RefFormationAdmin(ModelAdmin):
 class RefModuleVolumeHoraireInline(admin.TabularInline):
     model = RefModuleVolumeHoraire
     extra = 1
-    autocomplete_fields = ['categorie']
+    autocomplete_fields = ['formation', 'categorie']
 
 
 @admin.register(RefModule)
 class RefModuleAdmin(ModelAdmin):
-    list_display = ['intitule', 'formation', 'volume_horaire', 'volumes_par_categorie_display', 'actif']
-    search_fields = ['intitule', 'formation__intitule']
-    list_filter = ['actif', 'formation']
-    autocomplete_fields = ['formation']
-    list_select_related = ['formation']
-    ordering = ['formation__intitule', 'intitule']
+    list_display = ['intitule', 'formations_display', 'volume_horaire', 'volumes_par_categorie_display', 'actif']
+    search_fields = ['intitule', 'formations__intitule']
+    list_filter = ['actif', 'formations']
+    filter_horizontal = ['formations']
+    ordering = ['intitule']
     inlines = [RefModuleVolumeHoraireInline]
 
-    @admin.display(description='Volumes par catégorie')
+    @admin.display(description='Formations')
+    def formations_display(self, obj):
+        labels = list(obj.formations.values_list('intitule', flat=True).order_by('intitule'))
+        return ', '.join(labels) if labels else '—'
+
+    @admin.display(description='Volumes (formation × cat.)')
     def volumes_par_categorie_display(self, obj):
-        volumes = obj.volumes_horaires.select_related('categorie').all()
+        volumes = obj.volumes_horaires.select_related('formation', 'categorie').all()
         if not volumes:
             return '—'
-        return ', '.join([f"{v.categorie.libelle}: {v.volume_horaire}h" for v in volumes])
+        return ', '.join([
+            f"{v.formation.intitule[:20]}…/{v.categorie.libelle}: {v.volume_horaire}h"
+            if len(v.formation.intitule) > 20
+            else f"{v.formation.intitule}/{v.categorie.libelle}: {v.volume_horaire}h"
+            for v in volumes
+        ])
 
 
 class RefBatimentInline(admin.TabularInline):
@@ -957,12 +966,12 @@ class RefSalleAdmin(AdminSidebarHiddenMixin, ModelAdmin):
 
 @admin.register(RefModuleVolumeHoraire)
 class RefModuleVolumeHoraireAdmin(ModelAdmin):
-    list_display = ['module', 'categorie', 'volume_horaire']
-    search_fields = ['module__intitule', 'categorie__libelle']
-    list_filter = ['categorie']
-    autocomplete_fields = ['module', 'categorie']
-    list_select_related = ['module', 'categorie']
-    ordering = ['module__intitule', 'categorie__libelle']
+    list_display = ['module', 'formation', 'categorie', 'volume_horaire']
+    search_fields = ['module__intitule', 'formation__intitule', 'categorie__libelle']
+    list_filter = ['formation', 'categorie']
+    autocomplete_fields = ['module', 'formation', 'categorie']
+    list_select_related = ['module', 'formation', 'categorie']
+    ordering = ['module__intitule', 'formation__intitule', 'categorie__libelle']
 
 
 @admin.register(FinanceSettings)

@@ -9,6 +9,7 @@ from authentication.models import User
 from .models import (
     Formation, Module, Participant, Formateur,
     Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
+    RefFormation, RefModule, RefCategorie, RefModuleVolumeHoraire,
 )
 from .volume_horaire import compute_dashboard_volume_horaire
 
@@ -369,6 +370,55 @@ class ReferentielsAPITest(TestCase):
         ):
             self.assertIn(key, res.data)
             self.assertIsInstance(res.data[key], list)
+
+
+class RefModuleFormationsAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        u = make_user('admin_ref_module', role='CPFAE_ADMIN')
+        self.client.force_authenticate(u)
+        # Préfixe [TEST] : repérable si du code est lancé hors manage.py test (shell, serveur dev).
+        self.f1 = RefFormation.objects.create(intitule='[TEST] CYCLE A', actif=True)
+        self.f2 = RefFormation.objects.create(intitule='[TEST] CYCLE B', actif=True)
+        self.cat = RefCategorie.objects.create(libelle='A', actif=True)
+
+    def _sample_volumes(self, *formation_ids):
+        return [
+            {'formation_id': fid, 'categorie_id': self.cat.id, 'volume_horaire': 8}
+            for fid in formation_ids
+        ]
+
+    def test_create_ref_module_requires_formations(self):
+        res = self.client.post('/api/formations/ref/modules/', {
+            'intitule': 'Déontologie',
+            'formation_ids': [],
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_ref_module_with_multiple_formations(self):
+        res = self.client.post('/api/formations/ref/modules/', {
+            'intitule': 'Déontologie',
+            'formation_ids': [self.f1.id, self.f2.id],
+            'volumes_horaires': self._sample_volumes(self.f1.id, self.f2.id),
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(set(res.data['formation_ids']), {self.f1.id, self.f2.id})
+
+    def test_update_ref_module_formations(self):
+        mod = RefModule.objects.create(intitule='COMPTABILITÉ', actif=True)
+        mod.formations.add(self.f1)
+        RefModuleVolumeHoraire.objects.create(
+            module=mod, formation=self.f1, categorie=self.cat, volume_horaire=8,
+        )
+        res = self.client.put(f'/api/formations/ref/modules/{mod.id}/', {
+            'intitule': 'COMPTABILITÉ',
+            'formation_ids': [self.f1.id, self.f2.id],
+            'volumes_horaires': self._sample_volumes(self.f1.id, self.f2.id),
+            'actif': True,
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(res.data['formation_ids']), {self.f1.id, self.f2.id})
 
 
 # ──────────────────────────────────────────

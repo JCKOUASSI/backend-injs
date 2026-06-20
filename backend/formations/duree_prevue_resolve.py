@@ -10,15 +10,63 @@ Ordre de priorité :
 from collections import Counter
 from decimal import Decimal
 
-from .models import RefModule, SessionModule
+from .models import RefFormation, RefModule, SessionModule
 from .volume_horaire import _session_prevu_minutes, accumulate_sessions_volume
 
 
-def _ref_module_volume_hours(module, categorie_code=None):
-    """Volume horaire du référentiel module, si disponible.
+def _normalize_volume_categorie_code(categorie_code=None, module=None):
+    """Mappe FAB B, A4… vers le libellé référentiel (A, B…)."""
+    from .categorie_referentiel import resolve_categorie_ref
 
-    Si categorie_code est fourni, utilise le volume horaire spécifique à cette catégorie
-    (RefModuleVolumeHoraire), sinon utilise le volume global du module.
+    if categorie_code:
+        resolved = resolve_categorie_ref(categorie_code)
+        if resolved:
+            return resolved
+        code = str(categorie_code).strip().upper()
+        if len(code) == 1 and code in ('A', 'B', 'C', 'D'):
+            return code
+    if module is not None:
+        inferred = _infer_module_categorie_code(module)
+        if inferred:
+            return inferred
+    return None
+
+
+def _resolve_ref_formation_for_module(module):
+    """Retrouve la RefFormation correspondant au cycle du module opérationnel."""
+    if not module or not getattr(module, 'formation_id', None):
+        return None
+    formation_obj = getattr(module, 'formation', None)
+    if not formation_obj:
+        return None
+    label = (getattr(formation_obj, 'formation', None) or '').strip()
+    if not label:
+        return None
+    return RefFormation.objects.filter(intitule__iexact=label).first()
+
+
+def _infer_module_categorie_code(module):
+    """Déduit la catégorie auditeur (A, B…) depuis le secrétariat ou le grade du module."""
+    if module is None:
+        return None
+    secretariat = getattr(module, 'secretariat', None)
+    type_obj = getattr(secretariat, 'type', None) if secretariat else None
+    libelle = (getattr(type_obj, 'libelle', None) or '').strip()
+    if libelle:
+        code = libelle.replace('FAB', '').strip()[:1].upper()
+        if code:
+            return code
+    grade = (getattr(module, 'grade', None) or '').strip()
+    if grade:
+        return grade[:1].upper()
+    return None
+
+
+def _ref_module_volume_hours(module, categorie_code=None, formation_id=None, formation_intitule=None):
+    """Volume horaire référentiel pour un module opérationnel.
+
+    Priorité : volume (formation × catégorie) → volume catégorie seule (legacy)
+    → volume global ``RefModule.volume_horaire``.
     """
     ref = None
     if getattr(module, 'ref_module_id', None) and getattr(module, 'ref_module', None):
@@ -27,15 +75,32 @@ def _ref_module_volume_hours(module, categorie_code=None):
         intitule = RefModule.normalize_intitule(getattr(module, 'intitule', None))
         if intitule:
             ref = RefModule.objects.filter(intitule__iexact=intitule).first()
-    if not ref:
+    if ref is None:
         return 0.0
 
-    # Si une catégorie est spécifiée, utiliser le volume spécifique à cette catégorie
-    if categorie_code:
-        heures = float(ref.get_volume_horaire_for_categorie(categorie_code) or 0)
-    else:
-        heures = float(ref.volume_horaire or 0)
+    if formation_id is None and formation_intitule is None:
+        ref_formation = _resolve_ref_formation_for_module(module)
+        if ref_formation:
+            formation_id = ref_formation.id
+            formation_intitule = ref_formation.intitule
 
+    cat = _normalize_volume_categorie_code(categorie_code, module)
+
+    if cat and (formation_id or formation_intitule):
+        vol = ref.get_volume_horaire_for_formation_categorie(
+            formation_id=formation_id,
+            formation_intitule=formation_intitule,
+            categorie_code=cat,
+        )
+        if vol is not None and float(vol) > 0:
+            return float(vol)
+
+    if cat:
+        heures = float(ref.get_volume_horaire_for_categorie(cat) or 0)
+        if heures > 0:
+            return heures
+
+    heures = float(ref.volume_horaire or 0)
     return heures if heures > 0 else 0.0
 
 
@@ -56,7 +121,8 @@ def _get_majoritaire_categorie(module):
     cat_counts = _get_module_participants_categories(module)
     if not cat_counts:
         return None
-    return max(cat_counts, key=cat_counts.get)
+    raw = max(cat_counts, key=cat_counts.get)
+    return _normalize_volume_categorie_code(raw, module)
 
 
 def _ref_module_volume_hours_for_module(module, use_majoritaire=True):
@@ -139,6 +205,8 @@ def resolve_module_volume_contractuel_heures(module, *, categorie_code=None, par
         categorie_code = (getattr(participant, 'categorie', None) or '').strip() or None
     if categorie_code is None:
         categorie_code = _get_majoritaire_categorie(module)
+    else:
+        categorie_code = _normalize_volume_categorie_code(categorie_code, module)
 
     if categorie_code:
         ref_cat = _ref_module_volume_hours(module, categorie_code)

@@ -3,13 +3,14 @@ from datetime import date, time, timedelta
 from django.test import TestCase
 
 from formations.duree_prevue_resolve import (
+    _ref_module_volume_hours,
     ensure_module_duree_prevue,
     module_edt_planned_hours,
     module_edt_raw_hours,
     module_edt_typical_hours,
     resolve_module_duree_prevue_heures,
 )
-from formations.models import Formation, Module, RefModule, SessionModule
+from formations.models import Formation, Module, RefCategorie, RefFormation, RefModule, RefModuleVolumeHoraire, SessionModule
 
 
 def _formation():
@@ -72,6 +73,70 @@ class DureePrevueResolveTest(TestCase):
             _formation(), intitule='Fiche erronée', ref_module=ref, duree_prevue_heures=35,
         )
 
+        heures, source = resolve_module_duree_prevue_heures(module)
+        self.assertEqual(heures, 30)
+        self.assertEqual(source, 'ref_module')
+
+    def test_ref_module_volume_by_formation_and_categorie(self):
+        """Volume = formation (cycle) × catégorie."""
+        ref_formation = RefFormation.objects.create(intitule='FORMATION EN ADMINISTRATION DE BASE')
+        cat_a = RefCategorie.objects.create(libelle='A')
+        cat_b = RefCategorie.objects.create(libelle='B')
+        ref = RefModule.objects.create(intitule='BUDGET FAMILIAL')
+        ref.formations.add(ref_formation)
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_a, volume_horaire=12,
+        )
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_b, volume_horaire=8,
+        )
+        formation = Formation.objects.create(formation='FORMATION EN ADMINISTRATION DE BASE')
+        module = _module(formation, intitule='BUDGET FAMILIAL', ref_module=ref)
+
+        self.assertEqual(_ref_module_volume_hours(module, 'A'), 12.0)
+        self.assertEqual(_ref_module_volume_hours(module, 'B'), 8.0)
+
+    def test_ref_volume_fab_b_participant_maps_to_b(self):
+        """FAB B (auditeurs) → catégorie B du référentiel, pas A."""
+        ref_formation = RefFormation.objects.create(intitule='FORMATION EN ADMINISTRATION DE BASE')
+        cat_a = RefCategorie.objects.create(libelle='A')
+        cat_b = RefCategorie.objects.create(libelle='B')
+        ref = RefModule.objects.create(intitule='SIGFAE')
+        ref.formations.add(ref_formation)
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_a, volume_horaire=20,
+        )
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_b, volume_horaire=16,
+        )
+        formation = Formation.objects.create(formation='FORMATION EN ADMINISTRATION DE BASE')
+        module = _module(formation, intitule='SIGFAE', ref_module=ref, grade='B')
+
+        self.assertEqual(_ref_module_volume_hours(module, 'FAB B'), 16.0)
+
+    def test_ref_volume_inferred_from_grade_without_participants(self):
+        """Sans auditeurs inscrits, la catégorie est déduite du grade (ex. B → 30 h réf.)."""
+        ref_formation = RefFormation.objects.create(intitule='FORMATION EN ADMINISTRATION DE BASE')
+        cat_a = RefCategorie.objects.create(libelle='A')
+        cat_b = RefCategorie.objects.create(libelle='B')
+        ref = RefModule.objects.create(intitule='DEONTOLOGIE')
+        ref.formations.add(ref_formation)
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_a, volume_horaire=30,
+        )
+        RefModuleVolumeHoraire.objects.create(
+            module=ref, formation=ref_formation, categorie=cat_b, volume_horaire=30,
+        )
+        formation = Formation.objects.create(formation='FORMATION EN ADMINISTRATION DE BASE')
+        module = _module(
+            formation,
+            intitule='DEONTOLOGIE',
+            ref_module=ref,
+            grade='B',
+            duree_prevue_heures=32,
+        )
+
+        self.assertEqual(_ref_module_volume_hours(module), 30.0)
         heures, source = resolve_module_duree_prevue_heures(module)
         self.assertEqual(heures, 30)
         self.assertEqual(source, 'ref_module')

@@ -64,6 +64,7 @@ class Command(BaseCommand):
                 if not keeper.volume_horaire and ref.volume_horaire:
                     keeper.volume_horaire = ref.volume_horaire
                     keeper.save(update_fields=['volume_horaire'])
+                keeper.formations.add(*ref.formations.all())
                 ref.delete()
             merged += 1
 

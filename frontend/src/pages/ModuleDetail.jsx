@@ -570,9 +570,9 @@ export default function ModuleDetail() {
               <span className="badge ms-2" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
                 {sessions.length} séance{sessions.length > 1 ? 's' : ''}
               </span>
-              {planifieHeures != null && objectifHeures && (
+              {planifieHeures != null && objectifHeures != null && (
                 <span className="badge ms-2" style={{ background: '#ecfdf5', color: '#047857', fontSize: '0.78rem', fontWeight: 500 }}>
-                  Σ {fmtHeuresLabel(planifieHeures)} / {fmtHeuresLabel(objectifHeures)}
+                  Σ {fmtHeuresLabel(planifieHeures) ?? '—'} / {fmtHeuresLabel(objectifHeures) ?? '—'}
                 </span>
               )}
             </span>

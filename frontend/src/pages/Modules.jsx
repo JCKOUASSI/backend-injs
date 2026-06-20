@@ -60,6 +60,20 @@ export default function Modules() {
 
   const canManage = canMutateFormations(user?.role)
 
+  const refFormationIdForSelectedFormation = () => {
+    if (!form.formation_id) return null
+    const selected = allFormations.find(f => String(f.id) === String(form.formation_id))
+    if (!selected) return null
+    const ref = refs.formations.find(rf => rf.intitule === selected.formation)
+    return ref?.id ?? null
+  }
+
+  const availableRefModules = () => {
+    const refFormationId = refFormationIdForSelectedFormation()
+    if (!refFormationId) return refs.modules || []
+    return (refs.modules || []).filter(m => (m.formation_ids || []).includes(refFormationId))
+  }
+
   useEffect(() => {
     api.get('/formations/referentiels/').then(r => {
       const data = r.data
@@ -506,14 +520,14 @@ export default function Modules() {
 
                 <div className="form-group">
                   <label className="form-label">Intitulé du module *</label>
-                  {!editingModule && refs.modules?.length > 0 ? (
+                  {!editingModule && availableRefModules().length > 0 ? (
                     <select className="form-control" required value={form.intitule}
                       onChange={e => {
-                        const sel = refs.modules.find(m => m.intitule === e.target.value)
+                        const sel = availableRefModules().find(m => m.intitule === e.target.value)
                         setForm({ ...form, intitule: e.target.value, duree_prevue_heures: sel?.volume_horaire || form.duree_prevue_heures })
                       }}>
                       <option value="">-- Choisir un module --</option>
-                      {refs.modules.map(m => <option key={m.id} value={m.intitule}>{m.intitule}</option>)}
+                      {availableRefModules().map(m => <option key={m.id} value={m.intitule}>{m.intitule}</option>)}
                     </select>
                   ) : (
                     <input type="text" className="form-control" required value={form.intitule}

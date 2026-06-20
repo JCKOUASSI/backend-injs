@@ -1476,6 +1476,41 @@ def _finance_total_montant_prevu_from_breakdown(breakdown):
     return round(sum(float(m.get('montant_prevu') or 0) for m in (breakdown or [])), 2)
 
 
+def _finance_kpis_from_modules_breakdown(kpis, breakdown):
+    """Aligne les KPI volume/coût sur la ventilation dédupliquée par module.
+
+    Les lignes formateurs comptent le planifié une fois par formateur rattaché ;
+    le détail modal et les volumes pédagogiques doivent compter chaque module une seule fois.
+    """
+    breakdown = breakdown or []
+    planned = round(sum(float(m.get('total_duree_minutes') or 0) for m in breakdown), 1)
+    realized = round(sum(float(m.get('total_duree_realisee_minutes') or 0) for m in breakdown), 1)
+    montant_prevu = _finance_total_montant_prevu_from_breakdown(breakdown)
+    montant_realise = round(sum(float(m.get('montant_realise') or 0) for m in breakdown), 2)
+    sessions_count = sum(int(m.get('sessions_count') or 0) for m in breakdown)
+
+    kpis = dict(kpis)
+    kpis['total_duree_minutes'] = planned
+    kpis['total_duree_heures'] = round(planned / 60, 2) if planned else 0
+    kpis['total_duree_realisee_minutes'] = realized
+    kpis['total_duree_realisee_heures'] = round(realized / 60, 2) if realized else 0
+    kpis['total_montant_prevu'] = montant_prevu
+    kpis['total_montant_realise'] = montant_realise
+    kpis['total_sessions'] = sessions_count
+    kpis['taux_realisation_global_pct'] = _finance_taux_realisation_pct(realized, planned)
+    if kpis.get('formateurs_actifs', 0) > 0:
+        kpis['moyenne_heures_par_formateur'] = round(
+            kpis['total_duree_heures'] / kpis['formateurs_actifs'], 2,
+        )
+        kpis['moyenne_heures_realisees_par_formateur'] = round(
+            kpis['total_duree_realisee_heures'] / kpis['formateurs_actifs'], 2,
+        )
+        kpis['moyenne_montant_par_formateur_actif'] = round(
+            montant_realise / kpis['formateurs_actifs'], 2,
+        )
+    return kpis
+
+
 def _finance_kpi_evolution(current, previous):
     """Écarts absolus et relatifs entre deux jeux de KPI."""
     keys = (
@@ -2179,20 +2214,6 @@ def finance_dashboard_api(request):
 
     kpis = _finance_kpis_from_rows(rows)
 
-    # Ajouter les volumes des modules sans formateur aux KPIs
-    additional_sessions_count = global_aggregates.get('additional_sessions_count', 0)
-    additional_planned_minutes = global_aggregates.get('additional_planned_minutes', 0.0)
-
-    if additional_sessions_count > 0:
-        kpis['total_sessions'] += additional_sessions_count
-        kpis['total_duree_minutes'] += round(additional_planned_minutes, 1)
-        kpis['total_duree_heures'] = round(kpis['total_duree_minutes'] / 60, 2)
-        # Recalculer le taux avec les nouveaux totaux
-        if kpis['total_duree_minutes'] > 0:
-            kpis['taux_realisation_global_pct'] = _finance_taux_realisation_pct(
-                kpis['total_duree_realisee_minutes'], kpis['total_duree_minutes']
-            )
-
     montant_par_mois = global_aggregates.get('activite_montant_par_mois') or {}
     activite_par_mois = [
         {
@@ -2264,7 +2285,7 @@ def finance_dashboard_api(request):
         secretariat_id=secretariat_id,
         additional_modules=global_aggregates.get('additional_modules'),
     )
-    kpis['total_montant_prevu'] = _finance_total_montant_prevu_from_breakdown(volumes_par_module)
+    kpis = _finance_kpis_from_modules_breakdown(kpis, volumes_par_module)
 
     if compare_previous and period['meta'].get('preset') != 'tout':
         prev_period = _finance_previous_period(
@@ -2282,11 +2303,6 @@ def finance_dashboard_api(request):
                 include_all_modules=True,
             )
             prev_kpis = _finance_kpis_from_rows(prev_rows)
-            if prev_global.get('additional_sessions_count', 0) > 0:
-                prev_kpis['total_duree_minutes'] += round(
-                    float(prev_global.get('additional_planned_minutes') or 0), 1,
-                )
-                prev_kpis['total_duree_heures'] = round(prev_kpis['total_duree_minutes'] / 60, 2)
             prev_breakdown = _finance_dashboard_modules_breakdown(
                 prev_rows,
                 date_debut=prev_period['date_debut'],
@@ -2294,7 +2310,7 @@ def finance_dashboard_api(request):
                 secretariat_id=secretariat_id,
                 additional_modules=prev_global.get('additional_modules'),
             )
-            prev_kpis['total_montant_prevu'] = _finance_total_montant_prevu_from_breakdown(prev_breakdown)
+            prev_kpis = _finance_kpis_from_modules_breakdown(prev_kpis, prev_breakdown)
             comparaison = {
                 'periode': _finance_periode_payload(
                     prev_period['date_debut'],
@@ -2846,25 +2862,126 @@ def ref_formation_detail(request, pk):
     return Response(status=204)
 
 
+def _serialize_ref_module(obj):
+    formation_ids = list(obj.formations.values_list('id', flat=True))
+    formations = [
+        {'id': f.id, 'intitule': f.intitule}
+        for f in obj.formations.order_by('intitule')
+    ]
+    volumes_horaires = [
+        {
+            'formation_id': v.formation_id,
+            'formation_intitule': v.formation.intitule if v.formation_id else '',
+            'categorie_id': v.categorie_id,
+            'categorie_libelle': v.categorie.libelle,
+            'volume_horaire': v.volume_horaire,
+        }
+        for v in obj.volumes_horaires.select_related('formation', 'categorie').order_by(
+            'formation__intitule', 'categorie__libelle',
+        )
+    ]
+    # Compatibilité descendante
+    volumes_par_categorie = volumes_horaires
+    return {
+        'id': obj.id,
+        'intitule': obj.intitule,
+        'volume_horaire': obj.volume_horaire,
+        'volumes_horaires': volumes_horaires,
+        'volumes_par_categorie': volumes_par_categorie,
+        'actif': obj.actif,
+        'formation_ids': formation_ids,
+        'formations': formations,
+    }
+
+
+def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None, *, required=False):
+    """Enregistre les volumes horaire (formation × catégorie)."""
+    if volumes_horaires is None:
+        if required:
+            return Response(
+                {'volumes_horaires': ['Renseignez au moins un volume (formation × catégorie).']},
+                status=400,
+            )
+        return None
+    if not isinstance(volumes_horaires, (list, tuple)):
+        return Response({'volumes_horaires': ['Liste invalide.']}, status=400)
+    allowed_formations = set(formation_ids or obj.formations.values_list('id', flat=True))
+    obj.volumes_horaires.all().delete()
+    created = 0
+    for item in volumes_horaires:
+        if not isinstance(item, dict):
+            continue
+        try:
+            fid = int(item.get('formation_id'))
+        except (TypeError, ValueError):
+            if len(allowed_formations) == 1:
+                fid = next(iter(allowed_formations))
+            else:
+                continue
+        try:
+            cid = int(item.get('categorie_id'))
+        except (TypeError, ValueError):
+            continue
+        if allowed_formations and fid not in allowed_formations:
+            return Response(
+                {'volumes_horaires': ['Volume hors des formations sélectionnées.']},
+                status=400,
+            )
+        raw_vh = item.get('volume_horaire')
+        if raw_vh is None or raw_vh == '':
+            continue
+        try:
+            vh = float(raw_vh)
+        except (TypeError, ValueError):
+            return Response({'volumes_horaires': ['Volume horaire invalide.']}, status=400)
+        if vh < 0:
+            return Response({'volumes_horaires': ['Volume horaire négatif.']}, status=400)
+        obj.volumes_horaires.create(
+            formation_id=fid,
+            categorie_id=cid,
+            volume_horaire=vh,
+        )
+        created += 1
+    if required and created == 0:
+        return Response(
+            {'volumes_horaires': ['Renseignez au moins un volume (formation × catégorie).']},
+            status=400,
+        )
+    return None
+
+
+def _apply_ref_module_formations(obj, formation_ids):
+    """Associe une ou plusieurs formations au module référentiel."""
+    if formation_ids is None:
+        return None
+    if not isinstance(formation_ids, (list, tuple)):
+        return Response({'formations': ['Liste de formations invalide.']}, status=400)
+    ids = []
+    for raw in formation_ids:
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            return Response({'formations': ['Identifiant de formation invalide.']}, status=400)
+    if not ids:
+        return Response({'formations': ['Au moins une formation est requise.']}, status=400)
+    valid_ids = set(RefFormation.objects.filter(id__in=ids).values_list('id', flat=True))
+    if len(valid_ids) != len(set(ids)):
+        return Response({'formations': ['Une ou plusieurs formations sont introuvables.']}, status=400)
+    obj.formations.set(ids)
+    return None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def ref_module_list(request):
     if request.method == 'GET':
-        data = []
-        for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
-            volumes_par_categorie = [
-                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
-                for v in m.volumes_horaires.all()
-            ]
-            data.append({
-                'id': m.id,
-                'intitule': m.intitule,
-                'volume_horaire': m.volume_horaire,
-                'volumes_par_categorie': volumes_par_categorie,
-                'actif': m.actif,
-                'formation_id': m.formation_id,
-            })
-        return Response(data)
+        qs = RefModule.objects.order_by('intitule').prefetch_related(
+            'formations',
+            'volumes_horaires',
+            'volumes_horaires__categorie',
+            'volumes_horaires__formation',
+        )
+        return Response([_serialize_ref_module(m) for m in qs])
     intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
     if not intitule:
         return Response({'intitule': ['Intitulé obligatoire.']}, status=400)
@@ -2875,34 +2992,34 @@ def ref_module_list(request):
         )
     obj = RefModule.objects.create(
         intitule=intitule,
-        volume_horaire=request.data.get('volume_horaire') or None,
         actif=request.data.get('actif', True),
     )
-    # Créer les volumes horaires par catégorie si fournis
-    volumes_par_categorie = request.data.get('volumes_par_categorie', [])
-    if volumes_par_categorie:
-        for v in volumes_par_categorie:
-            if v.get('categorie_id') and v.get('volume_horaire') is not None:
-                obj.volumes_horaires.create(
-                    categorie_id=v['categorie_id'],
-                    volume_horaire=v['volume_horaire'],
-                )
-    return Response({
-        'id': obj.id,
-        'intitule': obj.intitule,
-        'volume_horaire': obj.volume_horaire,
-        'volumes_par_categorie': [
-            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
-            for v in obj.volumes_horaires.all()
-        ],
-        'actif': obj.actif,
-    }, status=201)
+    err = _apply_ref_module_formations(obj, request.data.get('formation_ids'))
+    if err:
+        obj.delete()
+        return err
+    formation_ids = list(obj.formations.values_list('id', flat=True))
+    err = _apply_ref_module_volumes_horaires(
+        obj,
+        request.data.get('volumes_horaires', request.data.get('volumes_par_categorie', [])),
+        formation_ids=formation_ids,
+        required=True,
+    )
+    if err:
+        obj.delete()
+        return err
+    return Response(_serialize_ref_module(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def ref_module_detail(request, pk):
     try:
-        obj = RefModule.objects.prefetch_related('volumes_horaires', 'volumes_horaires__categorie').get(pk=pk)
+        obj = RefModule.objects.prefetch_related(
+            'formations',
+            'volumes_horaires',
+            'volumes_horaires__categorie',
+            'volumes_horaires__formation',
+        ).get(pk=pk)
     except RefModule.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
@@ -2916,32 +3033,25 @@ def ref_module_detail(request, pk):
                     status=400,
                 )
             obj.intitule = intitule
-        obj.volume_horaire = request.data.get('volume_horaire') or None
         obj.actif = request.data.get('actif', obj.actif)
         obj.save()
 
-        # Mettre à jour les volumes horaires par catégorie si fournis
-        volumes_par_categorie = request.data.get('volumes_par_categorie')
-        if volumes_par_categorie is not None:
-            # Supprimer les anciens volumes et créer les nouveaux
-            obj.volumes_horaires.all().delete()
-            for v in volumes_par_categorie:
-                if v.get('categorie_id') and v.get('volume_horaire') is not None:
-                    obj.volumes_horaires.create(
-                        categorie_id=v['categorie_id'],
-                        volume_horaire=v['volume_horaire'],
-                    )
+        if 'formation_ids' in request.data:
+            err = _apply_ref_module_formations(obj, request.data.get('formation_ids'))
+            if err:
+                return err
 
-        return Response({
-            'id': obj.id,
-            'intitule': obj.intitule,
-            'volume_horaire': obj.volume_horaire,
-            'volumes_par_categorie': [
-                {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
-                for v in obj.volumes_horaires.all()
-            ],
-            'actif': obj.actif,
-        })
+        if 'volumes_horaires' in request.data or 'volumes_par_categorie' in request.data:
+            formation_ids = list(obj.formations.values_list('id', flat=True))
+            err = _apply_ref_module_volumes_horaires(
+                obj,
+                request.data.get('volumes_horaires') or request.data.get('volumes_par_categorie'),
+                formation_ids=formation_ids,
+            )
+            if err:
+                return err
+
+        return Response(_serialize_ref_module(obj))
     obj.delete()
     return Response(status=204)
 
@@ -3332,7 +3442,12 @@ def module_full_detail_api(request, formation_pk, module_pk):
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
     from presences.duree import duree_minutes_effective
-    from .duree_prevue_resolve import module_edt_raw_hours, _ref_module_volume_hours, _get_module_participants_categories
+    from .duree_prevue_resolve import (
+        module_edt_raw_hours,
+        _ref_module_volume_hours,
+        _get_module_participants_categories,
+        resolve_module_volume_contractuel_heures,
+    )
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
     sessions = module.sessions.all().order_by('date_journee', 'numero')
     participants = module.module_participants.select_related('participant').all()
@@ -3453,13 +3568,9 @@ def module_full_detail_api(request, formation_pk, module_pk):
             'username': sup.username,
         })
 
-    # Volume horaire selon la catégorie majoritaire (pour affichage principal)
-    ref_h = _ref_module_volume_hours(module)
-    ref_h_majoritaire = _ref_module_volume_hours(module, max(cat_counts, key=cat_counts.get) if cat_counts else None)
-    fiche_h = float(module.duree_prevue_heures or 0)
-
-    # Utiliser le volume de la catégorie majoritaire si disponible, sinon le volume global, sinon la fiche
-    contractuelle = ref_h_majoritaire if ref_h_majoritaire > 0 else (ref_h if ref_h > 0 else (fiche_h if fiche_h > 0 else None))
+    # Volume contractuel : référentiel (formation × catégorie) prioritaire sur la fiche module
+    contractuelle_val, _contractuelle_source = resolve_module_volume_contractuel_heures(module)
+    contractuelle = contractuelle_val if contractuelle_val > 0 else None
     planifiee = module_edt_raw_hours(module) or None
     ecart = None
     if contractuelle and planifiee is not None:
@@ -3969,7 +4080,14 @@ def referentiels_api(request):
 
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
     formations_reelles = list(Formation.objects.order_by('formation').values('id', 'formation'))
-    modules = list(RefModule.objects.filter(actif=True).values('id', 'intitule', 'volume_horaire', 'formation_id'))
+    modules = []
+    for m in RefModule.objects.filter(actif=True).prefetch_related('formations'):
+        modules.append({
+            'id': m.id,
+            'intitule': m.intitule,
+            'volume_horaire': m.volume_horaire,
+            'formation_ids': list(m.formations.values_list('id', flat=True)),
+        })
     modules_actifs = list(
         Module.objects.values_list('intitule', flat=True).distinct().order_by('intitule')
     )
@@ -4030,21 +4148,11 @@ def referentiels_api(request):
 @permission_classes([IsAuthenticated])
 def referentiels_gestion_api(request):
     """Toutes les tables référentielles (actifs + inactifs) — page admin Référentiels."""
-    # Récupérer les modules avec leurs volumes horaires par catégorie
     modules_data = []
-    for m in RefModule.objects.order_by('intitule').prefetch_related('volumes_horaires', 'volumes_horaires__categorie'):
-        volumes_par_categorie = [
-            {'categorie_id': v.categorie_id, 'categorie_libelle': v.categorie.libelle, 'volume_horaire': v.volume_horaire}
-            for v in m.volumes_horaires.all()
-        ]
-        modules_data.append({
-            'id': m.id,
-            'intitule': m.intitule,
-            'volume_horaire': m.volume_horaire,
-            'volumes_par_categorie': volumes_par_categorie,
-            'actif': m.actif,
-            'formation_id': m.formation_id,
-        })
+    for m in RefModule.objects.order_by('intitule').prefetch_related(
+        'formations', 'volumes_horaires', 'volumes_horaires__categorie',
+    ):
+        modules_data.append(_serialize_ref_module(m))
 
     return Response({
         'formations': list(RefFormation.objects.order_by('intitule').values('id', 'intitule', 'actif')),

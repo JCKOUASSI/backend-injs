@@ -28,7 +28,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_minutes',
-    sub: (kpis) => `${fmtHeures(kpis.total_duree_heures)} h · ${kpis.total_sessions ?? 0} séance(s)`,
+    sub: (kpis) => `${kpis.total_sessions ?? 0} séance(s)`,
   },
   {
     id: 'cout_prevu',
@@ -51,7 +51,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_realisee_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_realisee_minutes',
-    sub: (kpis) => `${fmtHeures(kpis.total_duree_realisee_heures)} h · ${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
+    sub: (kpis) => `${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
   },
   {
     id: 'taux',
