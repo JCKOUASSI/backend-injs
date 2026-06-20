@@ -28,7 +28,7 @@ import {
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
-import { canMutateFormations } from '../utils/roles'
+import { canMutateFormations, FINANCE_MODULE_ROLES } from '../utils/roles'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
 
@@ -41,7 +41,7 @@ const financeStatsForGrid = (detail) => ({
 
 export default function Formateurs() {
   const { user } = useAuth()
-  const canViewFinanceData = ['FINANCE', 'DIRECTION'].includes(user?.role)
+  const canViewFinanceData = FINANCE_MODULE_ROLES.includes(user?.role)
   const canEditFormateurSensitive = user?.role === 'FINANCE'
   const [searchParams] = useSearchParams()
   const listExtras = readFormateursListExtras(searchParams)

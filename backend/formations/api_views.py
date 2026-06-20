@@ -161,7 +161,7 @@ def dashboard_stats(request):
         modules_qs = modules_qs.filter(superviseur=request.user)
         fp_ids = ModuleParticipant.objects.filter(module__superviseur=request.user).values_list('participant_id', flat=True)
         participants_qs = participants_qs.filter(id__in=fp_ids).distinct()
-    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION') and secretariat_filter:
+    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION', 'ARCHIVE') and secretariat_filter:
         modules_qs = modules_qs.filter(secretariat_id=secretariat_filter)
         participants_qs = participants_qs.filter(secretariat_id=secretariat_filter)
 
@@ -539,7 +539,7 @@ def formation_list_api(request):
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
 
     secretariat_id = request.query_params.get('secretariat')
-    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION'):
+    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION', 'ARCHIVE'):
         queryset = queryset.filter(secretariat_id=secretariat_id)
 
     vague_filter = request.query_params.get('vague')
@@ -922,7 +922,7 @@ def _finance_taux_realisation_pct(realized_for_taux_total, planned_for_taux_tota
 
 
 def _finance_allowed_roles():
-    return {'FINANCE', 'DIRECTION'}
+    return {'FINANCE', 'DIRECTION', 'ARCHIVE'}
 
 
 def _check_finance_access(request):

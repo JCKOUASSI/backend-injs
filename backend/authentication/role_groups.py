@@ -28,6 +28,7 @@ ALLOWED_WEB_ROLES = frozenset({
     User.Role.CHEF_SECRETARIAT,
     User.Role.SECRETARIAT,
     User.Role.FINANCE,
+    User.Role.ARCHIVE,
     User.Role.ENCADRANT,
     User.Role.SUPERVISEUR,
 })
@@ -47,6 +48,7 @@ SECRETARIAT_ROLES = frozenset({
 GLOBAL_ACCESS_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
 })
 
 DASHBOARD_SECRETARIAT_FILTER_ROLES = GLOBAL_ACCESS_ROLES
@@ -54,6 +56,15 @@ DASHBOARD_SECRETARIAT_FILTER_ROLES = GLOBAL_ACCESS_ROLES
 PARTICIPANT_LIST_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
+    *SECRETARIAT_ROLES,
+    User.Role.ENCADRANT,
+})
+
+LISTE_CLASSE_EXPORT_ROLES = frozenset({
+    *ADMIN_LEVEL_ROLES,
+    User.Role.DIRECTION,
+    User.Role.ARCHIVE,
     *SECRETARIAT_ROLES,
     User.Role.ENCADRANT,
 })
@@ -61,6 +72,7 @@ PARTICIPANT_LIST_ROLES = frozenset({
 STATS_ACCESS_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
     *SECRETARIAT_ROLES,
     User.Role.FINANCE,
     User.Role.ENCADRANT,
@@ -69,6 +81,7 @@ STATS_ACCESS_ROLES = frozenset({
 GLOBAL_STATS_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
     User.Role.FINANCE,
 })
 
@@ -91,6 +104,7 @@ USER_MANAGEABLE_ROLES = frozenset({
     User.Role.CPFAE_ADMIN,
     *SECRETARIAT_ROLES,
     User.Role.FINANCE,
+    User.Role.ARCHIVE,
     User.Role.ENCADRANT,
     User.Role.SUPERVISEUR,
     *MOBILE_ONLY_ROLES,
@@ -99,6 +113,7 @@ USER_MANAGEABLE_ROLES = frozenset({
 FINANCE_MODULE_ROLES = frozenset({
     User.Role.FINANCE,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
 })
 
 FORMATION_MUTATION_ROLES = frozenset({
@@ -109,6 +124,7 @@ FORMATION_MUTATION_ROLES = frozenset({
 PRESENCE_VIEW_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
+    User.Role.ARCHIVE,
     *SECRETARIAT_ROLES,
     User.Role.ENCADRANT,
 })
@@ -136,6 +152,7 @@ ROLE_HIERARCHY = [
     User.Role.CHEF_SECRETARIAT,
     User.Role.SECRETARIAT,
     User.Role.FINANCE,
+    User.Role.ARCHIVE,
     User.Role.ENCADRANT,
     User.Role.SUPERVISEUR,
     User.Role.FORMATEUR,
@@ -152,6 +169,7 @@ ROLE_GROUP_NAMES = {
     User.Role.CHEF_SECRETARIAT: "ROLE_CHEF_SECRETARIAT",
     User.Role.SECRETARIAT: "ROLE_SECRETARIAT",
     User.Role.FINANCE: "ROLE_FINANCE",
+    User.Role.ARCHIVE: "ROLE_ARCHIVE",
     User.Role.ENCADRANT: "ROLE_ENCADRANT",
     User.Role.SUPERVISEUR: "ROLE_SUPERVISEUR",
     User.Role.FORMATEUR: "ROLE_FORMATEUR",
@@ -191,6 +209,10 @@ ROLE_POLICY = {
     },
     User.Role.FINANCE: {
         "apps": ("formations", "presences", "exports"),
+        "actions": ("view",),
+    },
+    User.Role.ARCHIVE: {
+        "apps": CORE_APPS + ("suiviEvaluation",),
         "actions": ("view",),
     },
     User.Role.ENCADRANT: {

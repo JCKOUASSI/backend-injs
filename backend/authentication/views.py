@@ -31,6 +31,7 @@ USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
     User.Role.CHEF_CPFAE_ADMIN,
     User.Role.CPFAE_ADMIN,
     User.Role.FINANCE,
+    User.Role.ARCHIVE,
     User.Role.ENCADRANT,
 })
 

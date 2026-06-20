@@ -73,6 +73,7 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             User.Role.CHEF_SECRETARIAT: ('#fff7e8', '#9a6700'),
             User.Role.SECRETARIAT: ('#fff7e8', '#9a6700'),
             User.Role.FINANCE: ('#f0f4ff', '#3949ab'),
+            User.Role.ARCHIVE: ('#f5f0ff', '#6b21a8'),
             User.Role.ENCADRANT: ('#e8f6f1', '#13624e'),
             User.Role.SUPERVISEUR: ('#fef3c7', '#92400e'),
             User.Role.AUDITEUR: ('#f3f4f6', '#374151'),

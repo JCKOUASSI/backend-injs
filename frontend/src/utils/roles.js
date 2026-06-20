@@ -8,6 +8,7 @@ export const ALLOWED_WEB_ROLES = [
   'CHEF_SECRETARIAT',
   'SECRETARIAT',
   'FINANCE',
+  'ARCHIVE',
   'ENCADRANT',
   'SUPERVISEUR',
 ]
@@ -48,12 +49,35 @@ export const DECISION_ROLES = [
   'SUPERVISEUR',
 ]
 
-/** FINANCE n'est pas du personnel opérationnel — module finance dédié uniquement. */
-export const FINANCE_MODULE_ROLES = ['FINANCE', 'DIRECTION']
+/** FINANCE et ARCHIVE : module finance dédié (consultation + export). */
+export const FINANCE_MODULE_ROLES = ['FINANCE', 'DIRECTION', 'ARCHIVE']
+
+/** Consultation globale en lecture seule (fiches, données archivées). */
+export const ARCHIVE_CONSULT_ROLES = ['ARCHIVE', 'DIRECTION', ...ADMIN_LEVEL_ROLES]
+
+/** Navigation opérationnelle + consultation globale (cours, auditeurs, fiches). */
+export const OPERATION_VIEW_ROLES = [...STAFF_WEB_ROLES, 'DIRECTION', 'ARCHIVE']
+
+/** Exports finance formateurs / encadrants (sans paramétrage). */
+export const FINANCE_EXPORT_ROLES = ['FINANCE', 'DIRECTION', 'ARCHIVE']
+
+/** Export liste de classe auditeurs par groupe. */
+export const LISTE_CLASSE_EXPORT_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'ARCHIVE',
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+  'ENCADRANT',
+]
+
+/** Paramétrage et ajustements finance (hors archiviste). */
+export const FINANCE_SETTINGS_ROLES = ['FINANCE', 'DIRECTION']
 
 export const STATS_ALLOWED_ROLES = [
   ...ADMIN_LEVEL_ROLES,
   'DIRECTION',
+  'ARCHIVE',
   'CHEF_SECRETARIAT',
   'SECRETARIAT',
   'FINANCE',
@@ -89,6 +113,7 @@ export const PARTICIPANT_MANAGE_ROLES = FORMATION_MUTATION_ROLES
 export const PRESENCE_VIEW_ROLES = [
   ...ADMIN_LEVEL_ROLES,
   'DIRECTION',
+  'ARCHIVE',
   'CHEF_SECRETARIAT',
   'SECRETARIAT',
   'ENCADRANT',

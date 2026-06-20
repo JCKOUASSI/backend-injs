@@ -211,7 +211,7 @@ export default function Users() {
     } finally { setSaving(false) }
   }
 
-  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'FORMATEUR': 'badge-formateur', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
+  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ARCHIVE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'FORMATEUR': 'badge-formateur', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
 
   const getFullName = (u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
   const getInitials = (u) => `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || u.username[0]?.toUpperCase()

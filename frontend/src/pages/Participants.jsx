@@ -13,7 +13,7 @@ import {
   readParticipantsFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
-import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES, NOTE_GESTION_ROLES, hasAppRole } from '../utils/roles'
+import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES, NOTE_GESTION_ROLES, LISTE_CLASSE_EXPORT_ROLES, hasAppRole } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import ParticipantDetailModal from '../components/ParticipantDetailModal'
@@ -66,6 +66,7 @@ export default function Participants() {
   const [detailStats, setDetailStats] = useState(null)
   const [detailNotesFiche, setDetailNotesFiche] = useState(null)
   const [detailPointagesLoading, setDetailPointagesLoading] = useState(false)
+  const [exportingListeClasse, setExportingListeClasse] = useState(false)
 
   const debouncedSearch = useDebounce(search)
 
@@ -248,6 +249,43 @@ export default function Participants() {
 
   const canManage = canManageParticipant(user?.role)
   const canCreate = canCreateParticipant(user?.role)
+  const canExportListeClasse = hasAppRole(user, LISTE_CLASSE_EXPORT_ROLES)
+
+  const buildListeClasseQuery = () => {
+    const params = new URLSearchParams()
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (secretariatFilter) params.set('secretariat', secretariatFilter)
+    if (gradeFilter) params.set('grade', gradeFilter)
+    if (groupeFilter) params.set('groupe', groupeFilter)
+    if (typeConcoursFilter) params.set('type_concours', typeConcoursFilter)
+    if (vagueFilter) params.set('vague', vagueFilter)
+    if (sexeFilter) params.set('sexe', sexeFilter)
+    return params.toString()
+  }
+
+  const handleExportListeClasse = async (fmt) => {
+    setExportingListeClasse(true)
+    try {
+      const qs = buildListeClasseQuery()
+      const path = `/exports/participants/liste-classe/${fmt}/${qs ? `?${qs}` : ''}`
+      const { blob, fileName } = await api.getBlob(path)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName || `liste_classe.${fmt === 'pdf' ? 'pdf' : 'xlsx'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      showToast(groupeFilter
+        ? `Liste de classe exportée (${fmt.toUpperCase()}) — ${groupeFilter}`
+        : `Listes de classe exportées (${fmt.toUpperCase()}) — tous les groupes`)
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur export liste de classe', 'error')
+    } finally {
+      setExportingListeClasse(false)
+    }
+  }
 
   return (
     <div>
@@ -321,6 +359,30 @@ export default function Participants() {
               <button onClick={openCreate} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
               </button>
+            )}
+            {canExportListeClasse && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  disabled={exportingListeClasse}
+                  onClick={() => handleExportListeClasse('pdf')}
+                  title={groupeFilter ? `Liste de classe PDF — ${groupeFilter}` : 'Liste de classe PDF — tous les groupes'}
+                >
+                  <i className="bi bi-file-earmark-pdf me-1"></i>
+                  {groupeFilter ? 'Liste de classe PDF' : 'Listes de classe PDF'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-success btn-sm"
+                  disabled={exportingListeClasse}
+                  onClick={() => handleExportListeClasse('excel')}
+                  title={groupeFilter ? `Liste de classe Excel — ${groupeFilter}` : 'Liste de classe Excel — tous les groupes'}
+                >
+                  <i className="bi bi-file-earmark-excel me-1"></i>
+                  {groupeFilter ? 'Liste de classe Excel' : 'Listes de classe Excel'}
+                </button>
+              </>
             )}
           </div>
         </div>

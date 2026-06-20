@@ -24,6 +24,7 @@ from .views import (
     _calculer_duree_export,
     _check_export_access,
     _check_finance_export_access,
+    _check_liste_classe_export_access,
     _formation_meta,
     _get_formation_data,
 )
@@ -58,7 +59,10 @@ class ExportFixtureMixin:
         )
 
         cls.participant = Participant.objects.create(
-            matricule='EXP001', nom='Koné', prenom='Awa',
+            matricule='EXP001', nom='Koné', prenom='Awa', grade='A4', groupe='GROUPE 1',
+        )
+        cls.participant_g2 = Participant.objects.create(
+            matricule='EXP002', nom='Diallo', prenom='Moussa', grade='A4', groupe='GROUPE 2',
         )
         ModuleParticipant.objects.create(module=cls.module_a, participant=cls.participant)
 
@@ -111,6 +115,7 @@ class ExportFixtureMixin:
         )
 
         cls.auditeur = make_user('export_auditeur', role='AUDITEUR')
+        cls.archive = make_user('export_archive', role='ARCHIVE')
 
 
 class ExportAccessTest(ExportFixtureMixin, TestCase):
@@ -199,6 +204,7 @@ class ExportAccessTest(ExportFixtureMixin, TestCase):
 
         self.assertTrue(_check_export_access(req(self.admin), self.formation))
         self.assertTrue(_check_export_access(req(self.direction), self.formation))
+        self.assertTrue(_check_export_access(req(self.archive), self.formation))
         self.assertTrue(_check_export_access(req(self.secretariat_user), self.formation))
         self.assertTrue(_check_export_access(req(self.other_secretariat), self.formation))
         self.assertFalse(_check_export_access(req(self.other_secretariat), self.formation_isolated))
@@ -238,6 +244,19 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.content.startswith(b'%PDF'))
 
+    def test_archive_allowed_on_finance_and_presence_exports(self):
+        self.client.force_authenticate(user=self.archive)
+        urls = [
+            f'/api/exports/formation/{self.formation.pk}/pdf/',
+            f'/api/exports/formateur/{self.formateur.pk}/pdf/',
+            '/api/exports/finance/encadrants/pdf/',
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                res = self.client.get(url)
+                self.assertEqual(res.status_code, status.HTTP_200_OK, msg=url)
+                self.assertGreater(len(res.content), 500)
+
     def test_secretariat_blocked_on_finance_exports(self):
         self.client.force_authenticate(user=self.secretariat_user)
         urls = [
@@ -259,6 +278,7 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
 
         self.assertTrue(_check_finance_export_access(req(self.finance)))
         self.assertTrue(_check_finance_export_access(req(self.direction)))
+        self.assertTrue(_check_finance_export_access(req(self.archive)))
         self.assertFalse(_check_finance_export_access(req(self.admin)))
         self.assertFalse(_check_finance_export_access(req(self.secretariat_user)))
 
@@ -335,3 +355,54 @@ class ExportDataHelpersTest(ExportFixtureMixin, TestCase):
         joined = ' '.join(values)
         self.assertIn('Koné', joined)
         self.assertIn('Awa', joined)
+
+
+class ListeClasseExportTest(ExportFixtureMixin, TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_check_liste_classe_export_access_matrix(self):
+        factory = APIRequestFactory()
+
+        def req(user):
+            request = factory.get('/')
+            request.user = user
+            return request
+
+        self.assertTrue(_check_liste_classe_export_access(req(self.archive)))
+        self.assertTrue(_check_liste_classe_export_access(req(self.admin)))
+        self.assertTrue(_check_liste_classe_export_access(req(self.direction)))
+        self.assertTrue(_check_liste_classe_export_access(req(self.secretariat_user)))
+        self.assertTrue(_check_liste_classe_export_access(req(self.encadrant)))
+        self.assertFalse(_check_liste_classe_export_access(req(self.finance)))
+        self.assertFalse(_check_liste_classe_export_access(req(self.auditeur)))
+
+    def test_archive_can_export_liste_classe_by_groupe(self):
+        self.client.force_authenticate(user=self.archive)
+        res = self.client.get('/api/exports/participants/liste-classe/pdf/?groupe=GROUPE%201')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res['Content-Type'], 'application/pdf')
+        self.assertTrue(res.content.startswith(b'%PDF'))
+        self.assertGreater(len(res.content), 500)
+
+    def test_liste_classe_excel_single_groupe(self):
+        from openpyxl import load_workbook
+
+        self.client.force_authenticate(user=self.archive)
+        res = self.client.get('/api/exports/participants/liste-classe/excel/?groupe=GROUPE%201')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        wb = load_workbook(BytesIO(res.content))
+        self.assertEqual(len(wb.sheetnames), 1)
+        values = [str(cell.value or '') for row in wb.active.iter_rows() for cell in row]
+        joined = ' '.join(values)
+        self.assertIn('KONÉ', joined)
+        self.assertNotIn('Diallo', joined)
+
+    def test_liste_classe_excel_all_groupes(self):
+        from openpyxl import load_workbook
+
+        self.client.force_authenticate(user=self.archive)
+        res = self.client.get('/api/exports/participants/liste-classe/excel/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        wb = load_workbook(BytesIO(res.content))
+        self.assertGreaterEqual(len(wb.sheetnames), 2)
