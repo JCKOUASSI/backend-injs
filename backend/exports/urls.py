@@ -19,4 +19,7 @@ urlpatterns = [
     path('finance/synthese/excel/', views.export_finance_synthese_excel, name='export-finance-synthese-excel'),
     path('finance/encadrants/pdf/', views.export_finance_encadrants_pdf, name='export-finance-encadrants-pdf'),
     path('finance/encadrants/excel/', views.export_finance_encadrants_excel, name='export-finance-encadrants-excel'),
+    # Export liste de classe auditeurs (par groupe)
+    path('participants/liste-classe/pdf/', views.export_liste_classe_pdf, name='export-liste-classe-pdf'),
+    path('participants/liste-classe/excel/', views.export_liste_classe_excel, name='export-liste-classe-excel'),
 ]

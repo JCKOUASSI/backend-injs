@@ -2297,7 +2297,7 @@ def participant_fiche_admin(request, pk):
 
     # Permissions : accès complet ou lecture seule
     full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
-    read_only_roles = {'DIRECTION', 'FINANCE'}
+    read_only_roles = {'DIRECTION', 'FINANCE', 'ARCHIVE'}
 
     if role not in full_access_roles and role not in read_only_roles:
         return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
@@ -2356,7 +2356,7 @@ def _resolve_participant_fiche_admin(request, pk):
     role = getattr(user, 'role', None)
 
     full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
-    read_only_roles = {'DIRECTION', 'FINANCE'}
+    read_only_roles = {'DIRECTION', 'FINANCE', 'ARCHIVE'}
 
     if role not in full_access_roles and role not in read_only_roles:
         return None, Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
@@ -2450,10 +2450,10 @@ def _build_notes_fiche_payload(participant, inscriptions):
 @permission_classes([IsAuthenticated])
 def participant_notes_fiche(request, pk):
     """Notes et décisions d'un auditeur — une requête pour tous ses cours."""
-    from suiviEvaluation.permissions import ROLES_GESTION_NOTES
+    from suiviEvaluation.permissions import ROLES_CONSULTATION
 
     role = getattr(request.user, 'role', None)
-    if role not in ROLES_GESTION_NOTES:
+    if role not in ROLES_CONSULTATION:
         return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     participant, err = _resolve_participant_fiche_admin(request, pk)
@@ -2474,7 +2474,7 @@ def participant_notes_fiche(request, pk):
 def participant_notes_fiche_export(request, pk, fmt):
     """Export PDF ou Excel du relevé de notes avec décision finale."""
     from django.http import HttpResponse
-    from suiviEvaluation.permissions import ROLES_GESTION_NOTES
+    from suiviEvaluation.permissions import ROLES_FICHE_EXPORT
     from .notes_exports import (
         build_releve_notes_export_data,
         export_releve_notes_pdf,
@@ -2482,7 +2482,7 @@ def participant_notes_fiche_export(request, pk, fmt):
     )
 
     role = getattr(request.user, 'role', None)
-    if role not in ROLES_GESTION_NOTES:
+    if role not in ROLES_FICHE_EXPORT:
         return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     participant, err = _resolve_participant_fiche_admin(request, pk)

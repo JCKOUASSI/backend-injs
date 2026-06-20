@@ -181,7 +181,7 @@ def _finance_paie_pied_de_page(export_opts):
 
 def _check_finance_export_access(request):
     user = request.user
-    return bool(user and user.is_authenticated and user.role in ('FINANCE', 'DIRECTION'))
+    return bool(user and user.is_authenticated and user.role in ('FINANCE', 'DIRECTION', 'ARCHIVE'))
 
 
 def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
@@ -705,7 +705,7 @@ def _check_export_access(request, formation):
     Vérifie que l'utilisateur peut exporter les données de cette formation.
 
     - DFRC (CPFAE_ADMIN / CHEF_CPFAE_ADMIN) : accès complet.
-    - DIRECTION / ADMIN                      : accès complet (lecture).
+    - DIRECTION / ARCHIVE                      : accès complet (lecture + export).
     - SECRETARIAT / CHEF_SECRETARIAT         : uniquement si au moins un module
                                                de la formation appartient au secrétariat
                                                de l'utilisateur.
@@ -716,7 +716,7 @@ def _check_export_access(request, formation):
     user = request.user
     if not user.is_authenticated:
         return False
-    if user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ADMIN', 'DIRECTION'):
+    if user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ADMIN', 'DIRECTION', 'ARCHIVE'):
         return True
     if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         secretariat = getattr(user, 'secretariat', None)
@@ -732,6 +732,29 @@ def _check_export_access(request, formation):
             modules__superviseur=user,
         ).exists()
     return False
+
+
+def _check_liste_classe_export_access(request):
+    from authentication.role_groups import LISTE_CLASSE_EXPORT_ROLES
+    user = request.user
+    return bool(user and user.is_authenticated and user.role in LISTE_CLASSE_EXPORT_ROLES)
+
+
+def _liste_classe_export_context(request):
+    from formations.access import participants_queryset_for_user
+    from .participants_list_export import (
+        build_liste_classe_groups,
+        build_liste_classe_meta,
+    )
+
+    if not _check_liste_classe_export_access(request):
+        return None, Response({'detail': 'Accès non autorisé.'}, status=403)
+
+    params = request.query_params
+    queryset = participants_queryset_for_user(request.user)
+    blocks = build_liste_classe_groups(queryset, params)
+    meta = build_liste_classe_meta(params)
+    return {'blocks': blocks, 'meta': meta}, None
 
 
 def _get_motif_force(pointage):
@@ -3288,4 +3311,49 @@ def export_finance_encadrants_excel(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = 'attachment; filename="liste_encadrants.xlsx"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_liste_classe_pdf(request):
+    """Export PDF : liste de classe auditeurs (par groupe)."""
+    from .participants_list_export import export_liste_classe_pdf, liste_classe_filename
+
+    ctx, err = _liste_classe_export_context(request)
+    if err:
+        return err
+
+    try:
+        buffer = export_liste_classe_pdf(ctx['blocks'], ctx['meta'])
+    except RuntimeError as exc:
+        return Response({'detail': str(exc)}, status=503)
+
+    filename = liste_classe_filename(ctx['blocks'], 'pdf')
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_liste_classe_excel(request):
+    """Export Excel : liste de classe auditeurs (une feuille par groupe)."""
+    from .participants_list_export import export_liste_classe_excel, liste_classe_filename
+
+    ctx, err = _liste_classe_export_context(request)
+    if err:
+        return err
+
+    try:
+        buffer = export_liste_classe_excel(ctx['blocks'], ctx['meta'])
+    except RuntimeError as exc:
+        return Response({'detail': str(exc)}, status=503)
+
+    filename = liste_classe_filename(ctx['blocks'], 'xlsx')
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response

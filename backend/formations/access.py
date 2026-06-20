@@ -25,7 +25,7 @@ def formation_accessible(user, pk):
                                Si l'utilisateur n'est rattaché à aucun secrétariat → accès refusé.
     - CPFAE_ADMIN /
       CHEF_CPFAE_ADMIN /
-      DIRECTION / ADMIN      : accès complet à toutes les formations.
+      DIRECTION / ARCHIVE / ADMIN      : accès complet à toutes les formations.
     - FINANCE                : accès refusé ici (module finance dédié).
     """
     if not (user and user.is_authenticated):

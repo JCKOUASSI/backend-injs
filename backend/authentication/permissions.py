@@ -118,19 +118,19 @@ class IsDFRC(BasePermission):
             return False
         if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
-        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
 
 
 class IsDFRCOrEncadrant(BasePermission):
-    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN/Encadrant : accès complet. Direction : lecture seule."""
+    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN/Encadrant : accès complet. Direction/Archiviste : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
         if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
             return True
-        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
 
@@ -182,7 +182,7 @@ class IsSecretariatOrDFRC(BasePermission):
         ):
             return True
         if _has_role(
-            request.user, 'DIRECTION', 'FINANCE', 'ENCADRANT',
+            request.user, 'DIRECTION', 'FINANCE', 'ENCADRANT', 'ARCHIVE',
         ) and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False
@@ -220,6 +220,6 @@ class IsSecretariatOrEncadrantOrDFRC(BasePermission):
             return False
         if _has_role(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
             return True
-        if _has_role(request.user, 'DIRECTION') and request.method in ('GET', 'HEAD', 'OPTIONS'):
+        if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return False

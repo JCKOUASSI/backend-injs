@@ -20,7 +20,10 @@ ROLES_DECISION = {
 }
 
 # Rôles ayant accès en lecture aux fiches/tableaux de bord
-ROLES_CONSULTATION = ROLES_GESTION_NOTES | {'FINANCE'}
+ROLES_CONSULTATION = ROLES_GESTION_NOTES | {'FINANCE', 'ARCHIVE'}
+
+# Export des fiches et relevés (archiviste : export global)
+ROLES_FICHE_EXPORT = ROLES_GESTION_NOTES | {'ARCHIVE'}
 
 
 class IsSuperviseur(BasePermission):

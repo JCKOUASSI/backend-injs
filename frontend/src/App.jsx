@@ -42,6 +42,10 @@ import {
   EVALUATION_ALLOWED_ROLES,
   NOTE_GESTION_ROLES,
   DECISION_ROLES,
+  FINANCE_MODULE_ROLES,
+  FINANCE_EXPORT_ROLES,
+  FINANCE_SETTINGS_ROLES,
+  OPERATION_VIEW_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -78,10 +82,12 @@ function Layout({ children, breadcrumb }) {
   }
 
   const isFinanceRole = user?.role === 'FINANCE'
+  const isArchiveRole = user?.role === 'ARCHIVE'
   const isSuperviseurRole = user?.role === 'SUPERVISEUR'
-  const canViewFinanceModule = ['FINANCE', 'DIRECTION'].includes(user?.role)
-  const canViewFinanceDashboard = canViewFinanceModule
-  const canViewParticipants = [...STAFF_WEB_ROLES].includes(user?.role)
+  const canViewFinanceModule = FINANCE_MODULE_ROLES.includes(user?.role)
+  const canViewFinanceDashboard = FINANCE_EXPORT_ROLES.includes(user?.role)
+  const canViewFinanceSettings = FINANCE_SETTINGS_ROLES.includes(user?.role)
+  const canViewParticipants = OPERATION_VIEW_ROLES.includes(user?.role)
   const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
     || canViewFinanceModule
   const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
@@ -91,7 +97,7 @@ function Layout({ children, breadcrumb }) {
   const canViewReferentiels = ADMIN_LEVEL_ROLES.includes(user?.role)
   const canViewStatistiques = STATS_ALLOWED_ROLES.includes(user?.role)
 
-  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
+  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
@@ -126,7 +132,7 @@ function Layout({ children, breadcrumb }) {
 
         <nav className="sidebar-nav">
           
-          {!isFinanceRole && !isSuperviseurRole && (
+          {!isFinanceRole && !isArchiveRole && !isSuperviseurRole && (
             <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
             </Link>
@@ -142,7 +148,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
-          {!isFinanceRole && (
+          {!isFinanceRole && !isArchiveRole && (
             <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
@@ -170,7 +176,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-person-badge"></i> <span className="nav-label">Encadrants</span></span>
             </Link>
           )}
-          {canViewFinanceDashboard && (
+          {canViewFinanceSettings && (
             <Link to={financeNavHref('/finance-parametrage')} className={`nav-item ${isActive('/finance-parametrage') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-sliders"></i> <span className="nav-label">Paramétrage</span></span>
             </Link>
@@ -255,6 +261,7 @@ function App() {
     const { user } = useAuth()
     // FINANCE est redirigé vers finance-dashboard par défaut
     if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
+    if (user?.role === 'ARCHIVE') return <Navigate to="/participants" replace />
     // DIRECTION peut choisir entre les deux dashboards
     if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
     return (
@@ -300,7 +307,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />
               </Layout>
@@ -321,82 +328,82 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations/:formationId/modules/:moduleId" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Cours</li></>}>
                 <ModuleDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/auditeurs/:participantId/formations/:formationId/fiche" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche auditeur</li></>}>
                 <FicheAuditeur />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formateurs/:formateurId/modules/:moduleId/fiche" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche formateur</li></>}>
                 <FicheFormateur />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Détail</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/modules" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Cours</li></>}>
                 <Modules />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/participants" element={
-            <ProtectedRoute allowedRoles={STAFF_WEB_ROLES}>
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formateurs" element={
-            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'FINANCE']}>
+            <ProtectedRoute allowedRoles={[...OPERATION_VIEW_ROLES, 'FINANCE']}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
                 <Formateurs />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/dashboard" element={
-            <ProtectedRoute allowedRoles={[...STAFF_WEB_ROLES, 'DIRECTION', 'FINANCE']}>
+            <ProtectedRoute allowedRoles={[...OPERATION_VIEW_ROLES, 'FINANCE']}>
               <DashboardRoute />
             </ProtectedRoute>
           } />
           <Route path="/finance-dashboard" element={
-            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={FINANCE_EXPORT_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Tableau de Bord Finance</li></>}>
                 <FinanceDashboard />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/finance-ajustements" element={
-            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={FINANCE_SETTINGS_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Ajustements Finance</li></>}>
                 <FinanceAjustements />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/finance-encadrants" element={
-            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={FINANCE_EXPORT_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Encadrants Finance</li></>}>
                 <FinanceEncadrants />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/finance-parametrage" element={
-            <ProtectedRoute allowedRoles={['FINANCE', 'DIRECTION']}>
+            <ProtectedRoute allowedRoles={FINANCE_SETTINGS_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Paramétrage Finance</li></>}>
                 <FinanceParametrage />
               </Layout>
