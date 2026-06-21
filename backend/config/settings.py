@@ -309,25 +309,40 @@ UNFOLD = {
     'SITE_SUBHEADER': 'Gestion des formations et présences',
     'SITE_URL': PUBLIC_APP_URL,
     'SITE_SYMBOL': 'school',
-    'BORDER_RADIUS': '6px',
+    'THEME': 'light',
+    'BORDER_RADIUS': '20px',
     'COLORS': {
         'primary': {
-            '50': 'oklch(98% 0.02 75)',
-            '100': 'oklch(95% 0.04 72)',
-            '200': 'oklch(90% 0.08 68)',
-            '300': 'oklch(83% 0.13 62)',
-            '400': 'oklch(75% 0.17 58)',
-            '500': 'oklch(67.5% 0.19 52)',   # #F57C00
-            '600': 'oklch(57% 0.20 42)',     # #E65100
-            '700': 'oklch(48% 0.17 40)',
-            '800': 'oklch(40% 0.14 38)',
-            '900': 'oklch(34% 0.11 36)',
-            '950': 'oklch(26% 0.08 34)',
+            '50': 'oklch(97% 0.02 250)',
+            '100': 'oklch(94% 0.04 248)',
+            '200': 'oklch(88% 0.08 246)',
+            '300': 'oklch(78% 0.12 244)',
+            '400': 'oklch(65% 0.15 242)',
+            '500': 'oklch(52% 0.15 250)',   # #1565C0
+            '600': 'oklch(48% 0.14 248)',   # #1976D2
+            '700': 'oklch(42% 0.12 246)',
+            '800': 'oklch(35% 0.10 244)',
+            '900': 'oklch(28% 0.08 242)',
+            '950': 'oklch(20% 0.06 240)',
+        },
+        'base': {
+            '50': 'oklch(98.5% 0.002 260)',
+            '100': 'oklch(97% 0.003 260)',
+            '200': 'oklch(93% 0.005 260)',
+            '300': 'oklch(88% 0.008 260)',
+            '400': 'oklch(72% 0.015 260)',
+            '500': 'oklch(58% 0.02 260)',
+            '600': 'oklch(48% 0.025 260)',
+            '700': 'oklch(40% 0.028 260)',
+            '800': 'oklch(30% 0.03 260)',
+            '900': 'oklch(22% 0.032 260)',
+            '950': 'oklch(16% 0.028 260)',
         },
     },
     'STYLES': [
         lambda request: static('admin/custom_admin.css'),
     ],
+    'DASHBOARD_CALLBACK': 'config.admin_dashboard.admin_dashboard_callback',
     'SIDEBAR': {
         'show_search': True,
         'show_all_applications': False,

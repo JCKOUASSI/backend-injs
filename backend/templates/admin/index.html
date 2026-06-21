@@ -3,82 +3,133 @@
 
 {% block content %}
 <div class="dfrc-admin-home">
-    <section class="dfrc-quick-links module">
-        <h2>{% trans "Pédagogie" %}</h2>
-        <div class="dfrc-quick-links-grid">
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_formation_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Formations" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Catalogue des formations en cours" %}</span>
+    <header class="dfrc-hero">
+        <h1 class="dfrc-hero-title">
+            {{ admin_greeting }}, {{ admin_user_name }}
+        </h1>
+        <p class="dfrc-hero-subtitle">
+            {% trans "Tableau de bord SYGEP-CPFAE — formations, présences et administration." %}
+        </p>
+    </header>
+
+  {% if admin_stats %}
+    <div class="dfrc-stats-row">
+        {% for stat in admin_stats %}
+        <a
+            class="dfrc-stat-card{% if stat.highlight %} dfrc-stat-card--highlight{% endif %}"
+            href="{% url stat.link %}"
+        >
+            <div class="dfrc-stat-header">
+                <span class="dfrc-stat-label">{{ stat.label }}</span>
+                <span class="dfrc-stat-icon">
+                    <span class="material-symbols-outlined">{{ stat.icon }}</span>
+                </span>
+            </div>
+            <span class="dfrc-stat-value">{{ stat.value }}</span>
+        </a>
+        {% endfor %}
+    </div>
+  {% endif %}
+
+    <div class="dfrc-quick-actions">
+        <a class="dfrc-quick-action-btn dfrc-quick-action-btn--primary" href="{% url 'admin:formations_module_changelist' %}">
+            <span class="material-symbols-outlined" style="font-size:18px">add</span>
+            {% trans "Nouveau module" %}
+        </a>
+        <a class="dfrc-quick-action-btn dfrc-quick-action-btn--secondary" href="{% url 'admin:presences_pointage_changelist' %}">
+            <span class="material-symbols-outlined" style="font-size:18px">fingerprint</span>
+            {% trans "Pointages" %}
+        </a>
+        <a class="dfrc-quick-action-btn dfrc-quick-action-btn--secondary" href="{{ PUBLIC_APP_URL }}">
+            <span class="material-symbols-outlined" style="font-size:18px">open_in_new</span>
+            {% trans "Dashboard web" %}
+        </a>
+    </div>
+
+    <section class="dfrc-section">
+        <div class="dfrc-section-header">
+            <h2>{% trans "Pédagogie" %}</h2>
+        </div>
+        <div class="dfrc-bento-grid">
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_formation_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Formations" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Catalogue des formations en cours" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_module_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Modules" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Planification, inscriptions et séances" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_module_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Modules" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Planification, inscriptions et séances" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_sessionmodule_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Séances" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Calendrier et exécution des séances" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_sessionmodule_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Séances" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Calendrier et exécution des séances" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_secretariat_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Secrétariats" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Organisation par secrétariat" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_secretariat_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Secrétariats" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Organisation par secrétariat" %}</span>
             </a>
         </div>
     </section>
 
-    <section class="dfrc-quick-links module">
-        <h2>{% trans "Personnes" %}</h2>
-        <div class="dfrc-quick-links-grid">
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_participant_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Auditeurs" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Profils et affectations pédagogiques" %}</span>
+    <section class="dfrc-section">
+        <div class="dfrc-section-header">
+            <h2>{% trans "Personnes" %}</h2>
+        </div>
+        <div class="dfrc-bento-grid">
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_participant_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Auditeurs" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Profils et affectations pédagogiques" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_formateur_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Formateurs" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Intervenants et coordonnées" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_formateur_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Formateurs" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Intervenants et coordonnées" %}</span>
             </a>
         </div>
     </section>
 
-    <section class="dfrc-quick-links module">
-        <h2>{% trans "Présences et suivi" %}</h2>
-        <div class="dfrc-quick-links-grid">
-            <a class="dfrc-quick-link" href="{% url 'admin:presences_pointage_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Pointages" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Entrées, sorties et corrections" %}</span>
+    <section class="dfrc-section">
+        <div class="dfrc-section-header">
+            <h2>{% trans "Présences et suivi" %}</h2>
+        </div>
+        <div class="dfrc-bento-grid">
+            <a class="dfrc-bento-card" href="{% url 'admin:presences_pointage_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Pointages" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Entrées, sorties et corrections" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_qrtoken_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Codes QR" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Tokens actifs par séance" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_qrtoken_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Codes QR" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Tokens actifs par séance" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:presences_auditlog_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Journal d'audit" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Historique des actions sensibles" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:presences_auditlog_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Journal d'audit" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Historique des actions sensibles" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_volume_horaire_diagnostic' %}">
-                <span class="dfrc-quick-link-title">{% trans "Diagnostic volume horaire" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Modules et séances au-delà du volume prévu" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_volume_horaire_diagnostic' %}">
+                <span class="dfrc-bento-card-title">{% trans "Diagnostic volume horaire" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Modules et séances au-delà du volume prévu" %}</span>
             </a>
         </div>
     </section>
 
-    <section class="dfrc-quick-links module">
-        <h2>{% trans "Administration" %}</h2>
-        <div class="dfrc-quick-links-grid">
-            <a class="dfrc-quick-link" href="{% url 'admin:authentication_user_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Utilisateurs" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Comptes, rôles et accès" %}</span>
+    <section class="dfrc-section">
+        <div class="dfrc-section-header">
+            <h2>{% trans "Administration" %}</h2>
+        </div>
+        <div class="dfrc-bento-grid">
+            <a class="dfrc-bento-card" href="{% url 'admin:authentication_user_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Utilisateurs" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Comptes, rôles et accès" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:presences_devicebinding_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Liaisons appareils" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Appareils mobiles autorisés" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:presences_devicebinding_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Liaisons appareils" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Appareils mobiles autorisés" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{% url 'admin:formations_financesettings_changelist' %}">
-                <span class="dfrc-quick-link-title">{% trans "Paramètres finance" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Tarifs et en-têtes des exports" %}</span>
+            <a class="dfrc-bento-card" href="{% url 'admin:formations_financesettings_changelist' %}">
+                <span class="dfrc-bento-card-title">{% trans "Paramètres finance" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Tarifs et en-têtes des exports" %}</span>
             </a>
-            <a class="dfrc-quick-link" href="{{ PUBLIC_APP_URL }}">
-                <span class="dfrc-quick-link-title">{% trans "Dashboard web" %}</span>
-                <span class="dfrc-quick-link-subtitle">{% trans "Interface opérationnelle CPFAE" %}</span>
+            <a class="dfrc-bento-card" href="{{ PUBLIC_APP_URL }}">
+                <span class="dfrc-bento-card-title">{% trans "Dashboard web" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Interface opérationnelle CPFAE" %}</span>
             </a>
         </div>
     </section>
@@ -86,7 +137,7 @@
     {% if app_list %}
     <section class="dfrc-app-grid">
         {% for app in app_list %}
-        <article class="dfrc-app-card module">
+        <article class="dfrc-app-card">
             <h2>
                 <a href="{{ app.app_url }}">{{ app.name }}</a>
             </h2>
