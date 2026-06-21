@@ -1,18 +1,602 @@
-/* Styles complémentaires SYGEP-CPFAE pour Django Unfold (orange #F57C00 / #E65100) */
+/* SYGEP-CPFAE — Thème admin bleu & vert (django-unfold) */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* ── Variables (alignées sur le dashboard CPFAE) ─────────────────────────── */
+:root {
+    --admin-bg: #f0f4f8;
+    --admin-surface: #ffffff;
+    --admin-blue: #1565c0;
+    --admin-blue-dark: #0d47a1;
+    --admin-blue-light: #1976d2;
+    --admin-green: #43a047;
+    --admin-green-dark: #388e3c;
+    --admin-text: #1e293b;
+    --admin-muted: #64748b;
+    --admin-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+    --admin-shadow-hover: 0 12px 32px rgba(21, 101, 192, 0.14);
+    --admin-radius: 20px;
+    --admin-radius-pill: 999px;
+}
+
+/* ── Base & typographie ───────────────────────────────────────────────────── */
+html,
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+}
+
+body,
+.min-h-screen {
+    background-color: var(--admin-bg) !important;
+}
+
+/* ── Branding header ─────────────────────────────────────────────────────── */
+header img,
+[data-header] img {
+    max-height: 36px;
+    width: auto;
+    border-radius: 8px;
+}
+
+/* ── Sidebar (fond clair, texte lisible) ─────────────────────────────────── */
+#nav-sidebar,
+#nav-sidebar-inner {
+    background: var(--admin-surface) !important;
+    border-right: 1px solid rgba(21, 101, 192, 0.1) !important;
+}
+
+#nav-sidebar a {
+    border-radius: var(--admin-radius-pill) !important;
+    transition: all 0.2s ease;
+    color: var(--admin-text) !important;
+}
+
+#nav-sidebar a:hover {
+    background: rgba(21, 101, 192, 0.06) !important;
+    color: var(--admin-blue) !important;
+}
+
+#nav-sidebar a.nav-current,
+#nav-sidebar a.active.nav-current {
+    background: rgba(21, 101, 192, 0.12) !important;
+    color: var(--admin-blue-dark) !important;
+    font-weight: 600;
+}
+
+#nav-sidebar h2 {
+    color: var(--admin-blue-dark) !important;
+}
+
+#nav-sidebar .material-symbols-outlined {
+    color: var(--admin-muted) !important;
+}
+
+#nav-sidebar a:hover .material-symbols-outlined {
+    color: var(--admin-blue) !important;
+}
+
+#nav-sidebar a.nav-current .material-symbols-outlined,
+#nav-sidebar a.active.nav-current .material-symbols-outlined {
+    color: var(--admin-blue) !important;
+}
+
+/* Onglets horizontaux Unfold (#tabs-items) */
+#tabs-items a {
+    color: var(--admin-text) !important;
+    border-radius: var(--admin-radius-pill) !important;
+}
+
+#tabs-items a:hover {
+    color: var(--admin-blue) !important;
+    background: rgba(21, 101, 192, 0.06) !important;
+}
+
+#tabs-items a.active {
+    background: var(--admin-blue) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.25);
+}
+
+/* ── Texte principal (lisibilité) ────────────────────────────────────────── */
+main,
+[data-main],
+#content,
+.content,
+.dfrc-admin-home,
+.module h2,
+.module caption {
+    color: var(--admin-text);
+}
+
+main a:not(.dfrc-stat-card):not(.dfrc-bento-card):not(.dfrc-quick-action-btn),
+#content a:not(.dfrc-stat-card):not(.dfrc-bento-card):not(.dfrc-quick-action-btn) {
+    color: var(--admin-blue);
+}
+
+/* ── Header flottant ─────────────────────────────────────────────────────── */
+header[class*="sticky"],
+.unfold-header,
+[data-header] {
+    background: var(--admin-surface) !important;
+    border-radius: var(--admin-radius) !important;
+    margin: 12px 16px 0 !important;
+    box-shadow: var(--admin-shadow) !important;
+    border: 1px solid rgba(21, 101, 192, 0.08) !important;
+}
+
+/* ── Zone de contenu principale ──────────────────────────────────────────── */
+main,
+[data-main],
+.lg\:pl-72 > div {
+    padding: 8px 16px 24px !important;
+}
+
+/* ── Cartes & modules Unfold ─────────────────────────────────────────────── */
+.module,
+.bg-white.dark\:bg-base-900,
+[class*="rounded-default"],
+fieldset.module {
+    background: var(--admin-surface) !important;
+    border: 1px solid rgba(21, 101, 192, 0.08) !important;
+    border-radius: var(--admin-radius) !important;
+    box-shadow: var(--admin-shadow) !important;
+}
+
+/* ── Boutons pill ────────────────────────────────────────────────────────── */
+button,
+input[type="submit"],
+a.button,
+.submit-row input {
+    border-radius: var(--admin-radius-pill) !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease;
+}
+
+button.bg-primary-600,
+input[type="submit"].default,
+.submit-row input.default,
+a.bg-primary-600 {
+    background: var(--admin-blue) !important;
+    border-color: var(--admin-blue) !important;
+    color: #fff !important;
+}
+
+button.bg-primary-600:hover,
+input[type="submit"].default:hover,
+.submit-row input.default:hover {
+    background: var(--admin-blue-dark) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(21, 101, 192, 0.3);
+}
+
+a.addlink,
+.object-tools a,
+[class*="border-primary"] {
+    border-radius: var(--admin-radius-pill) !important;
+}
+
+/* ── Champs de formulaire ────────────────────────────────────────────────── */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="url"],
+input[type="search"],
+select,
+textarea,
+.vTextField {
+    border-radius: 14px !important;
+    border-color: rgba(21, 101, 192, 0.15) !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--admin-blue) !important;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.15) !important;
+    outline: none;
+}
+
+/* ── Tableaux changelist ─────────────────────────────────────────────────── */
+#result_list,
+.results table,
+table#changelist-filter {
+    border-radius: var(--admin-radius) !important;
+    overflow: hidden;
+}
+
+#result_list thead th,
+.results thead th {
+    background: #e8f4fd !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--admin-blue-dark) !important;
+    border-bottom: 1px solid rgba(21, 101, 192, 0.12) !important;
+}
+
+#result_list tbody tr:hover td,
+.results tbody tr:hover td {
+    background: rgba(21, 101, 192, 0.04) !important;
+}
+
+/* ── Onglets (tabs Unfold) ───────────────────────────────────────────────── */
+nav[aria-label="Tabs"] a {
+    border-radius: var(--admin-radius-pill) !important;
+    color: var(--admin-text) !important;
+}
+
+nav[aria-label="Tabs"] a.bg-primary-600,
+nav[aria-label="Tabs"] a[class*="bg-primary-600"] {
+    background: var(--admin-blue) !important;
+    color: #fff !important;
+}
+
+/* ── Badges statut ───────────────────────────────────────────────────────── */
+.dfrc-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--admin-radius-pill);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.dfrc-status-badge::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dfrc-status-badge--success {
+    background: rgba(67, 160, 71, 0.12);
+    color: var(--admin-green-dark);
+}
+
+.dfrc-status-badge--success::before {
+    background: var(--admin-green);
+}
+
+.dfrc-status-badge--warning {
+    background: rgba(21, 101, 192, 0.1);
+    color: var(--admin-blue-dark);
+}
+
+.dfrc-status-badge--warning::before {
+    background: var(--admin-blue);
+}
+
+.dfrc-status-badge--danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+.dfrc-status-badge--danger::before {
+    background: #ef4444;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Page d'accueil admin — Dashboard
+   ══════════════════════════════════════════════════════════════════════════ */
 
 .dfrc-admin-home {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 24px;
+    max-width: 1400px;
 }
 
+.dfrc-hero {
+    padding: 8px 4px 4px;
+}
+
+.dfrc-hero-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--admin-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.dfrc-hero-subtitle {
+    margin: 6px 0 0;
+    color: var(--admin-muted);
+    font-size: 0.95rem;
+}
+
+.dfrc-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 1024px) {
+    .dfrc-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 540px) {
+    .dfrc-stats-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dfrc-stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 22px;
+    background: var(--admin-surface);
+    border: 1px solid rgba(21, 101, 192, 0.08);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
+    text-decoration: none;
+    transition: all 0.22s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.dfrc-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--admin-shadow-hover);
+    border-color: rgba(21, 101, 192, 0.25);
+}
+
+.dfrc-stat-card--highlight {
+    background: linear-gradient(135deg, var(--admin-blue) 0%, var(--admin-green) 100%);
+    border-color: transparent;
+    color: #fff;
+}
+
+.dfrc-stat-card--highlight:hover {
+    box-shadow: 0 16px 40px rgba(21, 101, 192, 0.35);
+}
+
+.dfrc-stat-card--highlight .dfrc-stat-label,
+.dfrc-stat-card--highlight .dfrc-stat-value {
+    color: #fff;
+}
+
+.dfrc-stat-card--highlight .dfrc-stat-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.dfrc-stat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dfrc-stat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(21, 101, 192, 0.1);
+    color: var(--admin-blue);
+}
+
+.dfrc-stat-icon .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.dfrc-stat-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--admin-muted);
+}
+
+.dfrc-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--admin-text);
+    line-height: 1;
+    margin-top: 4px;
+}
+
+.dfrc-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.dfrc-quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: var(--admin-radius-pill);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.dfrc-quick-action-btn--primary {
+    background: var(--admin-blue);
+    color: #fff;
+}
+
+.dfrc-quick-action-btn--primary:hover {
+    background: var(--admin-blue-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(21, 101, 192, 0.3);
+    color: #fff;
+}
+
+.dfrc-quick-action-btn--secondary {
+    background: var(--admin-surface);
+    color: var(--admin-blue);
+    border: 1px solid rgba(21, 101, 192, 0.35);
+}
+
+.dfrc-quick-action-btn--secondary:hover {
+    border-color: var(--admin-blue);
+    color: var(--admin-blue-dark);
+    background: rgba(21, 101, 192, 0.06);
+}
+
+.dfrc-section {
+    background: var(--admin-surface);
+    border: 1px solid rgba(21, 101, 192, 0.08);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
+    overflow: hidden;
+}
+
+.dfrc-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(21, 101, 192, 0.08);
+    background: rgba(21, 101, 192, 0.04);
+}
+
+.dfrc-section-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--admin-blue-dark);
+}
+
+.dfrc-bento-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    padding: 18px 22px;
+}
+
+.dfrc-bento-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(21, 101, 192, 0.1);
+    background: #f8fafc;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.dfrc-bento-card:hover {
+    border-color: rgba(21, 101, 192, 0.35);
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: var(--admin-shadow-hover);
+}
+
+.dfrc-bento-card-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--admin-blue-dark);
+}
+
+.dfrc-bento-card-subtitle {
+    font-size: 12px;
+    color: var(--admin-muted);
+    line-height: 1.45;
+}
+
+.dfrc-app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.dfrc-app-card {
+    background: var(--admin-surface);
+    border: 1px solid rgba(21, 101, 192, 0.08);
+    border-radius: var(--admin-radius);
+    box-shadow: var(--admin-shadow);
+    overflow: hidden;
+}
+
+.dfrc-app-card h2 {
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--admin-blue-dark);
+    border-bottom: 1px solid rgba(21, 101, 192, 0.12);
+    background: rgba(21, 101, 192, 0.05);
+}
+
+.dfrc-app-card h2 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.dfrc-model-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dfrc-model-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 1px solid rgba(21, 101, 192, 0.05);
+}
+
+.dfrc-model-item:nth-child(even) {
+    background: #f8fafc;
+}
+
+.dfrc-model-name {
+    color: var(--admin-text);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.dfrc-model-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.dfrc-model-actions a {
+    display: inline-block;
+    font-size: 12px;
+    padding: 4px 14px;
+    border: 1px solid rgba(21, 101, 192, 0.2);
+    border-radius: var(--admin-radius-pill);
+    text-decoration: none;
+    color: var(--admin-blue);
+    background: #fff;
+    font-weight: 600;
+    transition: all 0.18s ease;
+}
+
+.dfrc-model-actions a:hover {
+    border-color: var(--admin-blue);
+    color: var(--admin-blue-dark);
+    background: rgba(21, 101, 192, 0.06);
+}
+
+/* ── Diagnostic volume horaire ───────────────────────────────────────────── */
 .dfrc-diag-page .warning {
-    color: #c2410c;
+    color: var(--admin-blue-dark);
     font-weight: 600;
 }
 
 .dfrc-diag-page tr.dfrc-row-warning td {
-    background: #fff7ed;
+    background: #e8f4fd;
 }
 
 .dfrc-diag-totaux {
@@ -21,19 +605,23 @@
 
 .dfrc-diag-tfoot th,
 .dfrc-diag-tfoot td {
-    background: #ffedd5 !important;
+    background: #e8f4fd !important;
     font-weight: 700;
-    border-top: 2px solid #fed7aa;
+    border-top: 2px solid rgba(21, 101, 192, 0.25);
 }
 
 .dfrc-diag-muted {
-    color: #6b7280;
+    color: var(--admin-muted);
     font-size: 0.85em;
 }
 
 .dfrc-diag-filters {
     margin-bottom: 16px;
-    padding: 12px 14px;
+    padding: 16px 20px;
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius);
+    border: 1px solid rgba(21, 101, 192, 0.08);
+    box-shadow: var(--admin-shadow);
 }
 
 .dfrc-diag-filters-row {
@@ -56,117 +644,57 @@
     white-space: nowrap;
 }
 
-.dfrc-quick-links {
-    border: 1px solid #fed7aa;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.dfrc-quick-links h2 {
-    margin: 0;
-    padding: 12px 14px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #9a3412;
-    background: #fff7ed;
-    border-bottom: 1px solid #fed7aa;
-}
-
-.dfrc-quick-links-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
-    padding: 14px;
-}
-
-.dfrc-quick-link {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid #fed7aa;
-    text-decoration: none;
-    transition: all 0.18s ease;
-    background: #fff7ed;
-}
-
-.dfrc-quick-link:hover {
-    border-color: #fb923c;
-    box-shadow: 0 6px 16px rgba(230, 81, 0, 0.15);
-    transform: translateY(-1px);
-}
-
-.dfrc-quick-link-title {
-    font-weight: 700;
-    color: #e65100;
-    font-size: 14px;
-}
-
-.dfrc-quick-link-subtitle {
-    color: #4b5563;
-    font-size: 12px;
-}
-
-.dfrc-app-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 14px;
-}
-
-.dfrc-app-card {
-    border: 1px solid #fed7aa;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.dfrc-model-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.dfrc-model-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 12px;
-    border-top: 1px solid #ffedd5;
-}
-
-.dfrc-model-item:nth-child(even) {
-    background: #fffaf5;
-}
-
-.dfrc-model-name {
-    color: #0f172a;
-    font-weight: 600;
-}
-
-.dfrc-model-actions {
-    display: inline-flex;
-    gap: 8px;
-}
-
-.dfrc-model-actions a {
-    display: inline-block;
-    font-size: 12px;
-    padding: 3px 8px;
-    border: 1px solid #fdba74;
-    border-radius: 999px;
-    text-decoration: none;
-    color: #e65100;
-    background: #ffffff;
-}
-
-.dfrc-model-actions a:hover {
-    border-color: #e65100;
-    background: #fff7ed;
-}
-
-/* Boutons « + Ajouter » relationnels (inlines, formulaires) */
 .related-widget-wrapper-link.add-related,
 .related-widget-wrapper-link.delete-related {
     display: none !important;
+}
+
+/* ── Classes texte Unfold (lisibilité forcée en mode clair) ───────────────── */
+.text-important,
+.text-font-important-light {
+    color: var(--admin-text) !important;
+}
+
+.text-subtle,
+.text-font-subtle-light {
+    color: var(--admin-muted) !important;
+}
+
+.text-font-default-light {
+    color: var(--admin-text) !important;
+}
+
+#header-inner,
+.unfold-header,
+[data-header] {
+    color: var(--admin-text) !important;
+}
+
+#nav-sidebar .text-important,
+#nav-sidebar .text-font-important-light {
+    color: var(--admin-blue-dark) !important;
+}
+
+#nav-sidebar .text-subtle,
+#nav-sidebar .text-font-subtle-light {
+    color: var(--admin-muted) !important;
+}
+
+/* Tableaux : cellules toujours lisibles */
+#result_list td,
+#result_list th,
+.results td,
+.results th {
+    color: var(--admin-text) !important;
+}
+
+/* ── Login page ──────────────────────────────────────────────────────────── */
+.login #container {
+    background: var(--admin-bg);
+}
+
+.login .submit-row input {
+    background: var(--admin-blue) !important;
+    border-radius: var(--admin-radius-pill) !important;
+    padding: 10px 28px !important;
 }

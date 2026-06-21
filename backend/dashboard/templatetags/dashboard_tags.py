@@ -128,3 +128,17 @@ def get_item(dictionary, key):
     if dictionary is None:
         return None
     return dictionary.get(key)
+
+
+@register.simple_tag(takes_context=True)
+def nav_item_is_current(context, item):
+    """Vrai seulement si l'URL courante correspond exactement au lien (pas le groupe d'onglets)."""
+    request = context.get('request')
+    if not request or not item:
+        return False
+    from urllib.parse import urlparse
+
+    link = item.get('link_callback') or item.get('link')
+    if not link:
+        return False
+    return urlparse(str(link)).path == request.path
