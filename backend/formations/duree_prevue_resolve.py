@@ -68,13 +68,7 @@ def _ref_module_volume_hours(module, categorie_code=None, formation_id=None, for
     Priorité : volume (formation × catégorie) → volume catégorie seule (legacy)
     → volume global ``RefModule.volume_horaire``.
     """
-    ref = None
-    if getattr(module, 'ref_module_id', None) and getattr(module, 'ref_module', None):
-        ref = module.ref_module
-    if ref is None:
-        intitule = RefModule.normalize_intitule(getattr(module, 'intitule', None))
-        if intitule:
-            ref = RefModule.objects.filter(intitule__iexact=intitule).first()
+    ref = RefModule.resolve_for_module(module)
     if ref is None:
         return 0.0
 

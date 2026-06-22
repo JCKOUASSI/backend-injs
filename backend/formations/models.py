@@ -174,6 +174,23 @@ class RefModule(models.Model):
             return ''
         return ' '.join(str(value).split()).upper()
 
+    @classmethod
+    def resolve_for_intitule(cls, intitule):
+        """Retrouve le RefModule dont l'intitulé correspond exactement (après normalisation)."""
+        norm = cls.normalize_intitule(intitule)
+        if not norm:
+            return None
+        return cls.objects.filter(intitule__iexact=norm).first()
+
+    @classmethod
+    def resolve_for_module(cls, module):
+        """Retrouve le RefModule lié à un module opérationnel (FK ou intitulé exact)."""
+        if module is None:
+            return None
+        if getattr(module, 'ref_module_id', None) and getattr(module, 'ref_module', None):
+            return module.ref_module
+        return cls.resolve_for_intitule(getattr(module, 'intitule', None))
+
     def save(self, *args, **kwargs):
         self.intitule = RefModule.normalize_intitule(self.intitule)
         super().save(*args, **kwargs)
