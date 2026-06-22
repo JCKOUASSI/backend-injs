@@ -96,6 +96,33 @@ class DureePrevueResolveTest(TestCase):
         self.assertEqual(_ref_module_volume_hours(module, 'A'), 12.0)
         self.assertEqual(_ref_module_volume_hours(module, 'B'), 8.0)
 
+    def test_sigfae_et_teletravail_distinct_from_sigfae_ref(self):
+        """SIGFAE ET TELETRAVAIL est un référentiel distinct de SIGFAE."""
+        ref_formation = RefFormation.objects.create(intitule='FORMATION EN ADMINISTRATION DE BASE')
+        cat_a = RefCategorie.objects.create(libelle='A')
+        ref_sigfae = RefModule.objects.create(intitule='SIGFAE')
+        ref_sigfae.formations.add(ref_formation)
+        RefModuleVolumeHoraire.objects.create(
+            module=ref_sigfae, formation=ref_formation, categorie=cat_a, volume_horaire=12,
+        )
+        ref_combo = RefModule.objects.create(intitule='SIGFAE ET TELETRAVAIL')
+        ref_combo.formations.add(ref_formation)
+        RefModuleVolumeHoraire.objects.create(
+            module=ref_combo, formation=ref_formation, categorie=cat_a, volume_horaire=20,
+        )
+        formation = Formation.objects.create(formation='FORMATION EN ADMINISTRATION DE BASE')
+        module_combo = _module(
+            formation,
+            intitule='SIGFAE ET TELETRAVAIL',
+            ref_module=ref_combo,
+            grade='A3',
+            duree_prevue_heures=16,
+        )
+        module_sigfae = _module(formation, intitule='SIGFAE', ref_module=ref_sigfae, grade='A3')
+
+        self.assertEqual(_ref_module_volume_hours(module_combo), 20.0)
+        self.assertEqual(_ref_module_volume_hours(module_sigfae), 12.0)
+
     def test_ref_volume_fab_b_participant_maps_to_b(self):
         """FAB B (auditeurs) → catégorie B du référentiel, pas A."""
         ref_formation = RefFormation.objects.create(intitule='FORMATION EN ADMINISTRATION DE BASE')
