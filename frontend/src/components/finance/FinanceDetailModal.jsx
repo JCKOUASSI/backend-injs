@@ -7,6 +7,7 @@ import FinanceModulesRecap from './FinanceModulesRecap'
 import { FinanceSessionsByGroupeTable } from './FinanceSessionsByGroupe'
 import FinanceToleranceBadge from './FinanceToleranceBadge'
 import FinanceProposeAjustementModal from './FinanceProposeAjustementModal'
+import FinancePaieModulesTable from './FinancePaieModulesTable'
 
 const FINANCE_DETAIL_TABS = [
   { id: 'statistiques', label: 'Statistiques', icon: 'bi-graph-up' },
@@ -260,6 +261,10 @@ export default function FinanceDetailModal({
                       <i className="bi bi-exclamation-triangle me-1"></i>
                       Tarif non défini pour une ou plusieurs formations — <Link to="/finance-parametrage">Paramétrage Finance</Link>
                     </div>
+                  )}
+
+                  {(financeDetail.recap_modules ?? financeDetail.modules ?? []).length > 0 && (
+                    <FinancePaieModulesTable modules={financeDetail.recap_modules ?? financeDetail.modules} />
                   )}
 
                   {sessionsByGroupe.length > 0 ? (
