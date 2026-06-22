@@ -94,6 +94,16 @@ def _finance_paie_volume_heures(minutes):
     return int(round(float(minutes or 0) / 60))
 
 
+def _finance_paie_recap_modules(recap_modules):
+    """Fiche de paie : garde-fou — modules avec au moins une séance sur la période."""
+    from formations.api_views import _finance_recap_par_module
+
+    return [
+        m for m in _finance_recap_par_module(recap_modules)
+        if int(m.get('sessions_count') or 0) > 0
+    ]
+
+
 def _finance_paie_format_groupe(groupe):
     if not groupe:
         return '-'
@@ -512,6 +522,7 @@ def _finance_export_document_options(request, formateur):
 
 def _finance_formateur_export_context(formateur, request):
     summary = _finance_formateur_summary_rows(formateur, request)
+    summary['recap_modules'] = _finance_paie_recap_modules(summary.get('recap_modules'))
     options = _finance_export_document_options(request, formateur)
     summary['export'] = options
     summary['prix_label'] = 'Selon la formation'
@@ -2470,29 +2481,34 @@ def export_finance_formateur_pdf(request, formateur_pk):
     elements.append(Paragraph(f'<u>{_esc(titre)}</u>', style_title))
     elements.append(Spacer(1, 0.25 * cm))
 
-    col_widths = [1.0 * cm, 7.2 * cm, 3.0 * cm, 2.8 * cm, 2.5 * cm]
+    col_widths = [0.9 * cm, 6.0 * cm, 2.6 * cm, 2.4 * cm, 2.0 * cm, 2.0 * cm]
     table_data = []
     formateur_label = _finance_paie_formateur_label(fmt)
-    table_data.append([_cell(formateur_label, bold=True), '', '', '', ''])
+    table_data.append([_cell(formateur_label, bold=True), '', '', '', '', ''])
 
     table_data.append([
         _cell('N°', bold=True, center=True),
         _cell('MODULES', bold=True, center=True),
         _cell('CATEGORIE/GRADE', bold=True, center=True),
         _cell('GROUPES', bold=True, center=True),
-        _cell('VOLUME HORAIRE', bold=True, center=True),
+        _cell('VOLUME RÉALISÉ', bold=True, center=True),
+        _cell('VOLUME PLANIFIÉ', bold=True, center=True),
     ])
 
-    total_heures = 0
+    total_realise = 0
+    total_planifie = 0
     for idx, item in enumerate(recap_modules, start=1):
-        heures = _finance_paie_volume_heures(item.get('total_duree_minutes'))
-        total_heures += heures
+        heures_realise = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+        heures_planifie = _finance_paie_volume_heures(item.get('total_creneau_periode_minutes'))
+        total_realise += heures_realise
+        total_planifie += heures_planifie
         table_data.append([
             _cell(idx, center=True),
             _cell((item.get('module_intitule') or '-').upper()),
             _cell(item.get('grade') or '-', center=True),
             _cell(_finance_paie_format_groupe(item.get('groupe')), center=True),
-            _cell(heures, center=True),
+            _cell(heures_realise, center=True),
+            _cell(heures_planifie, center=True),
         ])
 
     if not recap_modules:
@@ -2502,12 +2518,14 @@ def export_finance_formateur_pdf(request, formateur_pk):
             _cell('—', center=True),
             _cell('—', center=True),
             _cell(0, center=True),
+            _cell(0, center=True),
         ])
 
     table_data.append([
         _cell('TOTAL VOLUME HORAIRE', bold=True, center=True),
         '', '', '',
-        _cell(total_heures, bold=True, center=True),
+        _cell(total_realise, bold=True, center=True),
+        _cell(total_planifie, bold=True, center=True),
     ])
 
     main_table = Table(table_data, colWidths=col_widths)
@@ -2582,7 +2600,7 @@ def export_finance_formateur_excel(request, formateur_pk):
     fmt = ctx.get('formateur') or {}
     recap_modules = ctx.get('recap_modules') or []
     periode = ctx.get('periode') or {}
-    last_col = 5
+    last_col = 6
 
     wb = Workbook()
     ws = wb.active
@@ -2639,7 +2657,7 @@ def export_finance_formateur_excel(request, formateur_pk):
     name_cell.alignment = Alignment(horizontal='left')
     row_idx += 1
 
-    headers = ['N°', 'MODULES', 'CATEGORIE/GRADE', 'GROUPES', 'VOLUME HORAIRE']
+    headers = ['N°', 'MODULES', 'CATEGORIE/GRADE', 'GROUPES', 'VOLUME RÉALISÉ', 'VOLUME PLANIFIÉ']
     for col, h in enumerate(headers, start=1):
         cell = ws.cell(row=row_idx, column=col, value=h)
         cell.font = Font(bold=True, size=9)
@@ -2648,17 +2666,21 @@ def export_finance_formateur_excel(request, formateur_pk):
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     row_idx += 1
 
-    total_heures = 0
+    total_realise = 0
+    total_planifie = 0
     if recap_modules:
         for idx, item in enumerate(recap_modules, start=1):
-            heures = _finance_paie_volume_heures(item.get('total_duree_minutes'))
-            total_heures += heures
+            heures_realise = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
+            heures_planifie = _finance_paie_volume_heures(item.get('total_creneau_periode_minutes'))
+            total_realise += heures_realise
+            total_planifie += heures_planifie
             values = [
                 idx,
                 (item.get('module_intitule') or '-').upper(),
                 item.get('grade') or '-',
                 _finance_paie_format_groupe(item.get('groupe')),
-                heures,
+                heures_realise,
+                heures_planifie,
             ]
             for col, val in enumerate(values, start=1):
                 cell = ws.cell(row=row_idx, column=col, value=val)
@@ -2670,7 +2692,7 @@ def export_finance_formateur_excel(request, formateur_pk):
                 )
             row_idx += 1
     else:
-        for col, val in enumerate(['—', 'Aucun module sur la période', '—', '—', 0], start=1):
+        for col, val in enumerate(['—', 'Aucun module sur la période', '—', '—', 0, 0], start=1):
             cell = ws.cell(row=row_idx, column=col, value=val)
             cell.border = black_border
         row_idx += 1
@@ -2681,11 +2703,16 @@ def export_finance_formateur_excel(request, formateur_pk):
     total_label.fill = green_fill
     total_label.border = black_border
     total_label.alignment = Alignment(horizontal='center')
-    total_val = ws.cell(row=row_idx, column=5, value=total_heures)
-    total_val.font = Font(bold=True, size=9)
-    total_val.fill = green_fill
-    total_val.border = black_border
-    total_val.alignment = Alignment(horizontal='center')
+    total_realise_cell = ws.cell(row=row_idx, column=5, value=total_realise)
+    total_realise_cell.font = Font(bold=True, size=9)
+    total_realise_cell.fill = green_fill
+    total_realise_cell.border = black_border
+    total_realise_cell.alignment = Alignment(horizontal='center')
+    total_planifie_cell = ws.cell(row=row_idx, column=6, value=total_planifie)
+    total_planifie_cell.font = Font(bold=True, size=9)
+    total_planifie_cell.fill = green_fill
+    total_planifie_cell.border = black_border
+    total_planifie_cell.alignment = Alignment(horizontal='center')
     row_idx += 2
 
     for text in _finance_paie_contacts(export_opts):
@@ -2709,10 +2736,11 @@ def export_finance_formateur_excel(request, formateur_pk):
     row_idx += 1
 
     ws.column_dimensions['A'].width = 5
-    ws.column_dimensions['B'].width = 42
+    ws.column_dimensions['B'].width = 38
     ws.column_dimensions['C'].width = 16
     ws.column_dimensions['D'].width = 14
     ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 14
 
     buffer = io.BytesIO()
     wb.save(buffer)

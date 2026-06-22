@@ -3,7 +3,7 @@ from datetime import timedelta, time as dt_time
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Formation, Module, Formateur, ModuleFormateur, RefFormation, SessionModule
+from .models import Formation, Module, Formateur, ModuleFormateur, RefFormation, RefModule, SessionModule
 from .api_views import (
     _finance_recap_par_module,
     _finance_group_sessions_by_groupe,
@@ -106,7 +106,7 @@ class FinanceRecapModulesTest(TestCase):
         """L'export fiche formateur ne doit pas écraser la ligne rapport finance."""
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
-        from exports.views import _finance_formateur_summary_rows
+        from exports.views import _finance_formateur_summary_rows, _finance_paie_recap_modules
 
         f = _make_formation()
         module = _make_module(
@@ -130,6 +130,127 @@ class FinanceRecapModulesTest(TestCase):
         self.assertEqual(summary['recap_modules'][0]['module_intitule'], 'Déontologie')
         self.assertGreater(summary['total_planned'], 0)
         self.assertEqual(len(summary['rows']), 1)
+        paie_recap = _finance_paie_recap_modules(summary['recap_modules'])
+        self.assertEqual(len(paie_recap), 1)
+        self.assertEqual(paie_recap[0]['sessions_count'], 1)
+
+    def test_paie_recap_excludes_modules_without_sessions_in_period(self):
+        from exports.views import _finance_paie_recap_modules
+
+        f = _make_formation()
+        dans_periode = _make_module(
+            f, intitule='Dans période', grade='A4', groupe='G1', duree_prevue_heures=4,
+        )
+        hors_periode = _make_module(
+            f, intitule='Hors période', grade='A4', groupe='G2', duree_prevue_heures=8,
+        )
+        formateur = _make_formateur()
+        ModuleFormateur.objects.create(module=dans_periode, formateur=formateur)
+        ModuleFormateur.objects.create(module=hors_periode, formateur=formateur)
+        today = timezone.localdate()
+        SessionModule.objects.create(
+            module=dans_periode,
+            date_journee=today,
+            numero=1,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(10, 0),
+        )
+        SessionModule.objects.create(
+            module=hors_periode,
+            date_journee=today + timedelta(days=60),
+            numero=1,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(12, 0),
+        )
+        rows = _finance_report_rows(
+            [formateur],
+            include_sessions=True,
+            date_debut=today,
+            date_fin=today,
+        )
+        recap = rows[0]['recap_modules']
+        self.assertEqual(len(recap), 1)
+        self.assertEqual(recap[0]['module_intitule'], 'Dans période')
+        paie_recap = _finance_paie_recap_modules(recap)
+        self.assertEqual(len(paie_recap), 1)
+        self.assertEqual(paie_recap[0]['module_intitule'], 'Dans période')
+        self.assertEqual(paie_recap[0]['total_creneau_periode_minutes'], 120.0)
+        self.assertEqual(paie_recap[0]['total_duree_realisee_minutes'], 0.0)
+
+    def test_paie_recap_three_groups_only_active_in_period(self):
+        """DEONTOLOGIE sur 3 groupes : seuls ceux avec séance dans la période apparaissent."""
+        from exports.views import _finance_formateur_export_context
+        from rest_framework.request import Request
+        from rest_framework.test import APIRequestFactory
+
+        f = _make_formation()
+        ref = RefModule.objects.create(intitule='DEONTOLOGIE', volume_horaire=30)
+        formateur = _make_formateur()
+        today = timezone.localdate()
+        for groupe, in_period in (('GROUPE 1', True), ('GROUPE 22', False), ('GROUPE 6', True)):
+            mod = _make_module(
+                f,
+                intitule='DEONTOLOGIE',
+                ref_module=ref,
+                grade='A3',
+                groupe=groupe,
+                duree_prevue_heures=30,
+            )
+            ModuleFormateur.objects.create(module=mod, formateur=formateur)
+            SessionModule.objects.create(
+                module=mod,
+                date_journee=today if in_period else today + timedelta(days=90),
+                numero=1,
+                heure_debut_prevue=dt_time(8, 0),
+                heure_fin_prevue=dt_time(18, 0),
+            )
+        drf_req = Request(APIRequestFactory().get('/x/', {
+            'preset': 'custom',
+            'date_debut': today.isoformat(),
+            'date_fin': today.isoformat(),
+        }))
+        ctx = _finance_formateur_export_context(formateur, drf_req)
+        groupes = [m.get('groupe') for m in ctx['recap_modules']]
+        self.assertEqual(len(ctx['recap_modules']), 2)
+        self.assertIn('GROUPE 1', groupes)
+        self.assertIn('GROUPE 6', groupes)
+        self.assertNotIn('GROUPE 22', groupes)
+
+    def test_paie_export_uses_period_creneau_not_full_contractual(self):
+        from rest_framework.request import Request
+        from rest_framework.test import APIRequestFactory
+        from exports.views import _finance_formateur_export_context
+
+        f = _make_formation()
+        ref = RefModule.objects.create(intitule='Long module', volume_horaire=30)
+        module = _make_module(
+            f,
+            intitule='Long module',
+            ref_module=ref,
+            grade='A4',
+            groupe='G1',
+            duree_prevue_heures=30,
+        )
+        formateur = _make_formateur()
+        ModuleFormateur.objects.create(module=module, formateur=formateur)
+        today = timezone.localdate()
+        SessionModule.objects.create(
+            module=module,
+            date_journee=today,
+            numero=1,
+            heure_debut_prevue=dt_time(8, 0),
+            heure_fin_prevue=dt_time(13, 0),
+        )
+        drf_req = Request(APIRequestFactory().get('/x/', {
+            'preset': 'custom',
+            'date_debut': today.isoformat(),
+            'date_fin': today.isoformat(),
+        }))
+        ctx = _finance_formateur_export_context(formateur, drf_req)
+        self.assertEqual(len(ctx['recap_modules']), 1)
+        item = ctx['recap_modules'][0]
+        self.assertEqual(item['total_creneau_periode_minutes'], 300.0)
+        self.assertEqual(item['total_duree_minutes'], 1800.0)
 
     def test_export_contacts_from_settings(self):
         from exports.views import _finance_paie_contacts, _finance_paie_parse_lines, _FINANCE_PAIE_CONTACTS

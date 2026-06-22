@@ -65,6 +65,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          # Driver natif : évite de tirer moby/buildkit depuis Docker Hub (timeouts CI fréquents).
+          driver: docker
 
       - name: Tags et build-args
         id: cfg
@@ -115,8 +118,6 @@ jobs:
             ${{ steps.cfg.outputs.backend_ref }}
             ${{ steps.cfg.outputs.backend_channel_ref }}
             ${{ env.BACKEND_IMAGE }}:channel1-latest-amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Vérifier staticfiles (appuser, collectstatic)
         run: |
@@ -143,5 +144,3 @@ jobs:
           build-args: |
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
             VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

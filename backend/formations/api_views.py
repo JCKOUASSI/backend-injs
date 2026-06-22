@@ -1547,6 +1547,14 @@ def _finance_recap_par_module(modules):
     return sorted(modules or [], key=_finance_recap_sort_key)
 
 
+def _finance_recap_modules_for_period(modules_list, *, date_debut=None, date_fin=None):
+    """Récap paie / export : avec filtre de dates, exclut les modules sans séance dans l'intervalle."""
+    modules = modules_list or []
+    if date_debut is not None or date_fin is not None:
+        modules = [m for m in modules if int(m.get('sessions_count') or 0) > 0]
+    return _finance_recap_par_module(modules)
+
+
 def _finance_group_sessions_by_groupe(sessions):
     """Groupe les séances par grade/groupe avec sous-totaux."""
     groups = {}
@@ -1664,6 +1672,8 @@ def _finance_report_rows(
     Si include_all_modules=True, inclut aussi tous les modules du secrétariat
     (même ceux sans formateur assigné) dans les calculs de volume horaire.
     """
+    from .volume_horaire import module_contractual_planned_minutes
+
     use_variable_rates = prix_heure is None
     if use_variable_rates:
         prix_map = _finance_build_prix_map()
@@ -1788,6 +1798,10 @@ def _finance_report_rows(
                 if groupe_val:
                     groupes_seen.add(groupe_val)
 
+            contractual_minutes = (
+                round(module_contractual_planned_minutes(module_obj), 1)
+                if module_obj else 0.0
+            )
             mod_entry = modules_data.setdefault(module_id, {
                 'module_id': module_id,
                 'module_intitule': module_obj.intitule if module_obj else '',
@@ -1816,11 +1830,15 @@ def _finance_report_rows(
                 'montant_prevu': 0.0,
                 'montant_realise': 0.0,
                 'prix_heure_realisee': module_prix_heure,
+                'volume_horaire_contractuel_minutes': contractual_minutes,
+                'total_creneau_periode_minutes': 0.0,
             })
 
+            module_creneau_sum = 0.0
             for session in sessions_in_period:
                 session_count += 1
                 session_slot = _finance_session_slot_minutes(session)
+                module_creneau_sum += session_slot
                 raw_realized_minutes = round(
                     realized_by_formateur_session.get((formateur.id, session.id), 0.0), 1,
                 )
@@ -1892,6 +1910,7 @@ def _finance_report_rows(
                 taux_realized_capped_minutes += module_realized_capped
             mod_entry['total_duree_minutes'] = module_planned
             mod_entry['total_duree_realisee_minutes'] = module_realized_capped
+            mod_entry['total_creneau_periode_minutes'] = round(module_creneau_sum, 1)
             mod_entry['taux_planned_minutes'] = module_planned
             mod_entry['taux_realized_capped_minutes'] = module_realized_capped
             mod_entry['montant_prevu'] = _finance_montant_from_minutes(
@@ -1970,7 +1989,9 @@ def _finance_report_rows(
         }
         if include_sessions:
             row['sessions'] = sessions_data
-            row['recap_modules'] = _finance_recap_par_module(modules_list)
+            row['recap_modules'] = _finance_recap_modules_for_period(
+                modules_list, date_debut=date_debut, date_fin=date_fin,
+            )
             row['sessions_by_groupe'] = _finance_group_sessions_by_groupe(sessions_data)
         results.append(row)
 

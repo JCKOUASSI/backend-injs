@@ -138,8 +138,8 @@ class FinancePlannedVolumeTest(TestCase):
         )
         self.assertEqual(planned, 1800.0)  # ref 30h (EDT du jour = 10h seulement)
 
-    def test_assigned_module_visible_even_without_sessions_in_period(self):
-        """Module rattaché au formateur : visible même si aucune séance dans la période."""
+    def test_assigned_module_without_sessions_excluded_from_period_recap(self):
+        """Module assigné sans séance dans la période filtrée : absent du récap paie."""
         future = timezone.localdate() + timedelta(days=60)
         SessionModule.objects.filter(module=self.module).update(date_journee=future)
         today = timezone.localdate()
@@ -149,9 +149,7 @@ class FinancePlannedVolumeTest(TestCase):
             date_debut=today,
             date_fin=today,
         )
-        self.assertEqual(len(rows[0]['recap_modules']), 1)
-        self.assertEqual(rows[0]['recap_modules'][0]['module_intitule'], 'Finances Publiques')
-        self.assertEqual(rows[0]['recap_modules'][0]['total_duree_minutes'], 0.0)
+        self.assertEqual(len(rows[0]['recap_modules']), 0)
         self.assertEqual(rows[0]['sessions_count'], 0)
 
     def test_canonical_volume_horaire_uses_contractual_ref(self):
