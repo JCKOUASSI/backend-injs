@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { useReferentiels } from '../hooks/useReferentiels'
 
 const CIBLE_LABELS = { COURS: 'Évaluation du cours', FORMATEUR: 'Évaluation du formateur' }
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
@@ -131,19 +132,17 @@ export default function EvaluationList() {
     }
   }, [filters, showToast, user?.role])
 
-  const fetchRefModules = useCallback(async () => {
-    if (user?.role === 'AUDITEUR') return
-    try {
-      const { data } = await api.get('/formations/referentiels/')
-      setRefModules((data.modules || []).filter(m => m.actif !== false))
-      setRefCategories((data.categories || []).filter(c => c.actif !== false))
-      setRefGrades((data.grades || []).filter(g => g.actif !== false))
-      setRefGroupes(data.groupes || [])
-    } catch { /* silencieux */ }
-  }, [user?.role])
+  const { data: referentielsData } = useReferentiels({ enabled: user?.role !== 'AUDITEUR' })
+
+  useEffect(() => {
+    if (!referentielsData) return
+    setRefModules((referentielsData.modules || []).filter(m => m.actif !== false))
+    setRefCategories((referentielsData.categories || []).filter(c => c.actif !== false))
+    setRefGrades((referentielsData.grades || []).filter(g => g.actif !== false))
+    setRefGroupes(referentielsData.groupes || [])
+  }, [referentielsData])
 
   useEffect(() => { fetchQuestionnaires() }, [fetchQuestionnaires])
-  useEffect(() => { fetchRefModules() }, [fetchRefModules])
 
   if (user?.role === 'AUDITEUR') return <AuditeurEvaluationList />
 

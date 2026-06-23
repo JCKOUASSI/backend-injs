@@ -67,6 +67,10 @@ class Pointage(models.Model):
         ordering = ['-date_journee', '-timestamp_entree']
         verbose_name = 'Pointage'
         verbose_name_plural = 'Pointages'
+        indexes = [
+            models.Index(fields=['date_journee', 'session'], name='pointage_date_session_idx'),
+            models.Index(fields=['session', 'participant'], name='pointage_session_part_idx'),
+        ]
 
     @property
     def personne(self):

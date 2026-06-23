@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
+import { useReferentiels } from '../hooks/useReferentiels'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
 import { formatDate } from '../utils/dates'
@@ -53,9 +54,10 @@ export default function Participants() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ ...emptyForm })
   const [formError, setFormError] = useState('')
+  const { data: referentielsData } = useReferentiels()
   useEffect(() => {
-    api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {})
-  }, [])
+    if (referentielsData) setRefs(referentielsData)
+  }, [referentielsData])
   const [saving, setSaving] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const { showToast } = useToast()

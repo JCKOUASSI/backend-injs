@@ -14,6 +14,7 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import { canMutateFormations } from '../utils/roles'
+import { useReferentiels } from '../hooks/useReferentiels'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { useListNavigationState } from '../hooks/useListReturn'
@@ -74,21 +75,22 @@ export default function Modules() {
     return (refs.modules || []).filter(m => (m.formation_ids || []).includes(refFormationId))
   }
 
+  const { data: referentielsData } = useReferentiels()
+
   useEffect(() => {
-    api.get('/formations/referentiels/').then(r => {
-      const data = r.data
-      if (data.formations_reelles?.length) {
-        setAllFormations(data.formations_reelles)
-      } else {
-        api.get('/formations/list/?page_size=500').then(r2 => {
-          const rows = Array.isArray(r2.data) ? r2.data : (r2.data.results || [])
-          const seen = new Set()
-          setAllFormations(rows.filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true }))
-        }).catch(() => {})
-      }
-      setRefs(data)
-    }).catch(() => {})
-  }, [])
+    if (!referentielsData) return
+    const data = referentielsData
+    if (data.formations_reelles?.length) {
+      setAllFormations(data.formations_reelles)
+    } else {
+      api.get('/formations/list/?page_size=500').then(r2 => {
+        const rows = Array.isArray(r2.data) ? r2.data : (r2.data.results || [])
+        const seen = new Set()
+        setAllFormations(rows.filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true }))
+      }).catch(() => {})
+    }
+    setRefs(data)
+  }, [referentielsData])
   usePersistedListQuery(
     LIST_STORAGE_KEYS.modules,
     () => buildModulesSearchParams(filters, page, debouncedSearch),

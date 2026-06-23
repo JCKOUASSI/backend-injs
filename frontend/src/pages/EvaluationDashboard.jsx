@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { useReferentiels } from '../hooks/useReferentiels'
 
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS = {
@@ -94,18 +95,17 @@ export default function EvaluationDashboard() {
     }
   }, [filters, showToast])
 
-  const fetchRefs = useCallback(async () => {
-    try {
-      const { data } = await api.get('/formations/referentiels/')
-      setRefModules((data.modules || []).filter(m => m.actif !== false))
-      setRefCategories((data.categories || []).filter(c => c.actif !== false))
-      setRefGrades((data.grades || []).filter(g => g.actif !== false))
-      setRefGroupes(data.groupes || [])
-    } catch { /* silencieux */ }
-  }, [])
+  const { data: referentielsData } = useReferentiels()
+
+  useEffect(() => {
+    if (!referentielsData) return
+    setRefModules((referentielsData.modules || []).filter(m => m.actif !== false))
+    setRefCategories((referentielsData.categories || []).filter(c => c.actif !== false))
+    setRefGrades((referentielsData.grades || []).filter(g => g.actif !== false))
+    setRefGroupes(referentielsData.groupes || [])
+  }, [referentielsData])
 
   useEffect(() => { fetchQuestionnaires() }, [fetchQuestionnaires])
-  useEffect(() => { fetchRefs() }, [fetchRefs])
 
   // ── KPIs calculés ────────────────────────────────────────────────────────
   const allQuestionnaires = questionnaires

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -14,6 +14,10 @@ import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
 import { canMutateFormations, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROLES } from '../utils/roles'
 import { formatApiErrors } from '../utils/apiErrors'
+import { useReferentiels } from '../hooks/useReferentiels'
+import { useVisibilityPolling } from '../hooks/useVisibilityPolling'
+
+const MODULE_PRESENCES_POLL_MS = 60 * 1000
 
 export default function ModuleDetail() {
   const { formationId, moduleId } = useParams()
@@ -86,20 +90,28 @@ export default function ModuleDetail() {
   const [bulkForceMotif, setBulkForceMotif] = useState('')
   const [bulkForceSaving, setBulkForceSaving] = useState(false)
   const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
+  const { data: referentielsData } = useReferentiels()
 
   const canSupervise = canSuperviseSessions(user?.role)
   const canManageSessions = canMutateFormations(user?.role)
   const canManageModule = canMutateFormations(user?.role)
 
   useEffect(() => { loadModule() }, [formationId, moduleId])
-  useEffect(() => { api.get('/formations/referentiels/').then(r => setRefs(r.data)).catch(() => {}) }, [])
-
-  // Auto-refresh toutes les 30s quand l'onglet présences est actif
   useEffect(() => {
-    if (activeTab !== 'presences') return
-    const timer = setInterval(() => loadModule(true), 30000)
-    return () => clearInterval(timer)
-  }, [activeTab, formationId, moduleId])
+    if (referentielsData) setRefs(referentielsData)
+  }, [referentielsData])
+
+  const refreshPresences = useCallback(async (silent = true) => {
+    if (!formationId || !moduleId) return
+    try {
+      const res = await api.get(`/formations/${formationId}/modules/${moduleId}/presences/`)
+      setModule(prev => prev ? { ...prev, presences: res.data.presences } : prev)
+    } catch (err) {
+      if (!silent) console.error('Rafraîchissement présences:', err)
+    }
+  }, [formationId, moduleId])
+
+  useVisibilityPolling(refreshPresences, MODULE_PRESENCES_POLL_MS, activeTab === 'presences')
 
   const loadModule = async (silent = false) => {
     if (!formationId || !moduleId) {
