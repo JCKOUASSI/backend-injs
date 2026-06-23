@@ -2,16 +2,23 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    GUNICORN_WORKERS=auto \
+    GUNICORN_WORKERS_MIN=2 \
+    GUNICORN_WORKERS_MAX=10 \
+    GUNICORN_AUTOSCALE=true \
+    GUNICORN_AUTOSCALE_INTERVAL=30
 
 WORKDIR /app
 
 # Installer les dépendances système nécessaires (Pillow/qrcode + PostgreSQL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        bash \
         gcc \
         libjpeg-dev \
         zlib1g-dev \
         libpq-dev \
+        procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Créer un utilisateur non-root pour la sécurité
@@ -27,6 +34,7 @@ COPY . .
 
 # Créer les répertoires persistants et appliquer les permissions
 RUN mkdir -p /app/media /app/staticfiles && \
+    chmod +x /app/entrypoint.sh /app/scripts/gunicorn-autoscale.sh && \
     chown -R appuser:appuser /app
 
 # Collecter les fichiers statiques en tant qu'appuser (évite PermissionError au runtime)
@@ -36,8 +44,4 @@ RUN SECRET_KEY=build-time-only DEBUG=True \
 
 EXPOSE 8001
 
-CMD ["gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8001", \
-     "--workers", "2", \
-     "--timeout", "120", \
-     "--access-logfile", "-"]
+ENTRYPOINT ["/app/entrypoint.sh"]
