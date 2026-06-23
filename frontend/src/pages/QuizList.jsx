@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { useReferentiels } from '../hooks/useReferentiels'
 
 const EMPTY_FORM = {
   titre: '', description: '', module: '', chapitre: '',
@@ -38,18 +39,16 @@ export default function QuizList() {
     } finally { setLoading(false) }
   }, [isAuditeur, showToast])
 
-  const fetchModules = useCallback(async () => {
-    if (isAuditeur) return
-    try {
-      const { data } = await api.get('/formations/referentiels/')
-      setModules((data.modules || []).filter(m => m.actif !== false))
-      setRefCategories((data.categories || []).filter(c => c.actif !== false))
-      setRefGrades((data.grades || []).filter(g => g.actif !== false))
-    } catch { /* silencieux */ }
-  }, [isAuditeur])
+  const { data: referentielsData } = useReferentiels({ enabled: !isAuditeur })
+
+  useEffect(() => {
+    if (!referentielsData) return
+    setModules((referentielsData.modules || []).filter(m => m.actif !== false))
+    setRefCategories((referentielsData.categories || []).filter(c => c.actif !== false))
+    setRefGrades((referentielsData.grades || []).filter(g => g.actif !== false))
+  }, [referentielsData])
 
   useEffect(() => { fetchQuizzes() }, [fetchQuizzes])
-  useEffect(() => { fetchModules() }, [fetchModules])
 
   const handleCreate = async (e) => {
     e.preventDefault()

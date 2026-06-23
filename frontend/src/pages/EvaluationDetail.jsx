@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
+import { useReferentiels } from '../hooks/useReferentiels'
 
 const STATUT_LABELS  = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS  = {
@@ -106,11 +107,11 @@ export default function EvaluationDetail() {
   useEffect(() => { fetchQuestionnaire() }, [fetchQuestionnaire])
   useEffect(() => { if (tab === 'resultats') fetchResultats() }, [tab, fetchResultats])
 
+  const { data: referentielsData } = useReferentiels()
+
   useEffect(() => {
-    api.get('/formations/referentiels/')
-      .then(({ data }) => setRefGroupes(data.groupes || []))
-      .catch(() => {})
-  }, [])
+    if (referentielsData) setRefGroupes(referentielsData.groupes || [])
+  }, [referentielsData])
 
   useEffect(() => {
     if (questionnaire && !editGroupes) {

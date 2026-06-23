@@ -10,6 +10,14 @@ services:
       - "5436:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: qr-badge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
     
   app:
     image: qrcodetest9:test
@@ -18,16 +26,22 @@ services:
       - "8001:8001"
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - db
+      - redis
 
   cron:
     image: qrcodetest9:test
     container_name: qr-badge-cron
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       - db
+      - redis
     # Toutes les 5 minutes : heartbeats + absents non badgés + séances auto
     entrypoint: >
       sh -c "while true; do
@@ -41,6 +55,8 @@ services:
 volumes:
 
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
     
 networks:

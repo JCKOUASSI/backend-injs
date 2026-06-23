@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { useReferentiels } from '../hooks/useReferentiels'
 
 function toggleArr(arr, val) {
   return arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]
@@ -99,12 +100,13 @@ function QuizEdit({ quiz: initialQuiz, onRefresh }) {
   const [refGrades, setRefGrades] = useState([])
   const [savingMeta, setSavingMeta] = useState(false)
 
+  const { data: referentielsData } = useReferentiels()
+
   useEffect(() => {
-    api.get('/formations/referentiels/').then(({ data }) => {
-      setRefCategories((data.categories || []).filter(c => c.actif !== false))
-      setRefGrades((data.grades || []).filter(g => g.actif !== false))
-    }).catch(() => {})
-  }, [])
+    if (!referentielsData) return
+    setRefCategories((referentielsData.categories || []).filter(c => c.actif !== false))
+    setRefGrades((referentielsData.grades || []).filter(g => g.actif !== false))
+  }, [referentielsData])
 
   const openMeta = () => {
     setMetaForm({

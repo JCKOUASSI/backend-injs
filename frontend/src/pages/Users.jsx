@@ -15,6 +15,9 @@ import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { formatApiErrors } from '../utils/apiErrors'
+import { useSecretariats } from '../hooks/useSecretariats'
+import { useQueryClient } from '@tanstack/react-query'
+import { SECRETARIATS_QUERY_KEY } from '../lib/queryClient'
 
 const TAB_CONFIG = {
   personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
@@ -68,7 +71,8 @@ export default function Users() {
   const [editForm, setEditForm] = useState({ ...emptyEditForm })
   const [editError, setEditError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [secretariats, setSecretariats] = useState([])
+  const queryClient = useQueryClient()
+  const { data: secretariats = [] } = useSecretariats()
   const [confirmDialog, setConfirmDialog] = useState(null)
   const { showToast } = useToast()
 
@@ -86,14 +90,6 @@ export default function Users() {
   )
 
   useEffect(() => { loadUsers() }, [page, debouncedSearch, roleFilter, userTab])
-  useEffect(() => {
-    api.get('/formations/secretariats/')
-      .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch((err) => {
-        console.error('Chargement secrétariats:', err)
-        showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les secrétariats.' }), 'error')
-      })
-  }, [])
 
   const setUserTabAndReset = (tab) => {
     setUserTab(tab)
@@ -142,7 +138,7 @@ export default function Users() {
           responsable: newUser.id,
         })
         await api.patch(`/auth/users/${newUser.id}/`, { secretariat: secRes.data.id })
-        setSecretariats(prev => [...prev, secRes.data])
+        queryClient.setQueryData(SECRETARIATS_QUERY_KEY, (old) => [...(old || []), secRes.data])
       }
       setShowModal(false)
       setForm({ ...emptyForm })

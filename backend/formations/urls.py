@@ -3,7 +3,7 @@ from . import views
 from . import api_views
 from . import session_views
 from .api_views import (
-    module_list_api, module_detail_api, module_full_detail_api,
+    module_list_api, module_detail_api, module_full_detail_api, module_presences_api,
     module_add_participant, module_remove_participant,
     module_add_formateur, module_remove_formateur,
     module_assign_superviseur,
@@ -104,6 +104,7 @@ urlpatterns = [
     path('<int:formation_pk>/modules/', module_list_api, name='api-module-list'),
     path('<int:formation_pk>/modules/<int:module_pk>/', module_detail_api, name='api-module-detail'),
     path('<int:formation_pk>/modules/<int:module_pk>/full/', module_full_detail_api, name='api-module-full-detail'),
+    path('<int:formation_pk>/modules/<int:module_pk>/presences/', module_presences_api, name='api-module-presences'),
     path('<int:formation_pk>/modules/<int:module_pk>/participants/add/', module_add_participant, name='api-module-add-participant'),
     path('<int:formation_pk>/modules/<int:module_pk>/participants/<int:participant_id>/remove/', module_remove_participant, name='api-module-remove-participant'),
     path('<int:formation_pk>/modules/<int:module_pk>/formateurs/add/', module_add_formateur, name='api-module-add-formateur'),

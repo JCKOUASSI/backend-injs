@@ -54,17 +54,18 @@ const handleResponse = async (res) => {
   return { data: text ? JSON.parse(text) : null, status: res.status }
 }
 
-const request = async (method, path, body, extraHeaders = {}) => {
+const request = async (method, path, body, config = {}) => {
   const url = `${API_BASE_URL}${path}`
   const isFormData = body instanceof FormData
   const headers = {
     ...(!isFormData && body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...getAuthHeaders(),
-    ...extraHeaders,
+    ...(config.headers || {}),
   }
   const init = {
     method,
     headers,
+    ...(config.signal ? { signal: config.signal } : {}),
     ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   }
 
@@ -120,11 +121,11 @@ const getBlob = async (path) => {
 }
 
 const api = {
-  get:     (path, config = {})         => request('GET',    path, undefined,  config.headers),
-  post:    (path, body, config = {})   => request('POST',   path, body,       config.headers),
-  patch:   (path, body, config = {})   => request('PATCH',  path, body,       config.headers),
-  put:     (path, body, config = {})   => request('PUT',    path, body,       config.headers),
-  delete:  (path, config = {})         => request('DELETE', path, undefined,  config.headers),
+  get:     (path, config = {})         => request('GET',    path, undefined, config),
+  post:    (path, body, config = {})   => request('POST',   path, body,       config),
+  patch:   (path, body, config = {})   => request('PATCH',  path, body,       config),
+  put:     (path, body, config = {})   => request('PUT',    path, body,       config),
+  delete:  (path, config = {})         => request('DELETE', path, undefined,  config),
   getBlob: (path)                      => getBlob(path),
 }
 

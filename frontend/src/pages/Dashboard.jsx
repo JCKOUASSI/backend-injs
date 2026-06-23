@@ -20,6 +20,10 @@ import {
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import { useListNavigationState } from '../hooks/useListReturn'
+import { useVisibilityPolling } from '../hooks/useVisibilityPolling'
+import { useSecretariats } from '../hooks/useSecretariats'
+
+const DASHBOARD_POLL_MS = 3 * 60 * 1000
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -31,13 +35,12 @@ export default function Dashboard() {
   const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])
-  const [secretariats, setSecretariats] = useState([])
+  const { data: secretariats = [], isLoading: loadingSecretariats } = useSecretariats({ enabled: canFilterBySecretariat })
   const [selectedSecretariatId, setSelectedSecretariatId] = useState(initialDash.secretariat)
   const [presencePeriod, setPresencePeriod] = useState(initialDash.presence_period)
   const [referenceDate, setReferenceDate] = useState(initialDash.reference_date)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [loadingSecretariats, setLoadingSecretariats] = useState(false)
   const [vhPeriod, setVhPeriod] = useState(() => resolveFinancePeriod())
   const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => resolveFinancePeriod())
   const appliedPeriodKey = financePeriodKey(appliedVhPeriod)
@@ -99,9 +102,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData()
-    const intervalId = setInterval(() => { loadDashboardData({ silent: true }) }, 60000)
-    return () => clearInterval(intervalId)
   }, [selectedSecretariatId, referenceDate, presencePeriod, appliedPeriodKey, loadDashboardData])
+
+  useVisibilityPolling(loadDashboardData, DASHBOARD_POLL_MS, true)
 
   const handleApplyVhPeriod = useCallback((periodOverride) => {
     const p = periodOverride ?? vhPeriod
@@ -114,27 +117,9 @@ export default function Dashboard() {
     setAppliedVhPeriod({ ...p })
   }, [vhPeriod])
 
-  useEffect(() => {
-    if (!canFilterBySecretariat) return
-    loadSecretariats()
-  }, [canFilterBySecretariat])
-
-  const loadSecretariats = async () => {
-    setLoadingSecretariats(true)
-    try {
-      const res = await api.get('/formations/secretariats/')
-      const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
-      setSecretariats(data)
-    } catch {
-      setSecretariats([])
-    } finally {
-      setLoadingSecretariats(false)
-    }
-  }
-
+  const selectedSecretariat = secretariats.find((s) => String(s.id) === String(selectedSecretariatId))
   const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
   const prochainesSeances = stats?.prochaines_seances || []
-  const selectedSecretariat = secretariats.find((s) => String(s.id) === String(selectedSecretariatId))
   const periodLabels = {
     jour: 'Jour',
     semaine: 'Semaine',

@@ -1161,7 +1161,6 @@ export default function Statistiques() {
   const [pjAllTableaux, setPjAllTableaux] = useState([])
   const [pjDetail, setPjDetail] = useState(null)
   const [loadingPj, setLoadingPj] = useState(false)
-  const [loadingPjAll, setLoadingPjAll] = useState(false)
   const [loadingPjDetail, setLoadingPjDetail] = useState(false)
   const [pjAnnee, setPjAnnee] = useState(new Date().getFullYear())
   const [pjMois, setPjMois] = useState('')
@@ -1187,7 +1186,6 @@ export default function Statistiques() {
   const [rbSelection, setRbSelection] = useState(null)
   const [rbDetail, setRbDetail] = useState(null)
   const [loadingRb, setLoadingRb] = useState(false)
-  const [loadingRbAll, setLoadingRbAll] = useState(false)
   const [loadingRbDetail, setLoadingRbDetail] = useState(false)
   const [exportingRb, setExportingRb] = useState(null)
   const [exportingFac, setExportingFac] = useState(null)
@@ -1365,26 +1363,6 @@ export default function Statistiques() {
     }
   }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId])
 
-  const fetchPjAllTableaux = useCallback(async () => {
-    if (pjAllTableaux.length) return
-    if (!pjData?.tableaux?.length) return
-    setLoadingPjAll(true)
-    try {
-      const params = new URLSearchParams({ annee: String(pjAnnee), tous_tableaux: '1' })
-      if (pjMois) params.set('mois', pjMois)
-      if (pjCategorie) params.set('categorie', pjCategorie)
-      if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      const res = await api.get(`/statistiques/point-journalier/?${params}`)
-      setPjAllTableaux(res.data.tableaux_complets || [])
-    } catch (err) {
-      console.error('Chargement tableaux point journalier:', err)
-      setPjAllTableaux([])
-    } finally {
-      setLoadingPjAll(false)
-    }
-  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, pjData, pjAllTableaux.length])
-
   const fetchPjDetail = useCallback(async (tb) => {
     if (!tb) {
       setPjDetail(null)
@@ -1451,43 +1429,6 @@ export default function Statistiques() {
       const params = new URLSearchParams({
         annee: String(rbAnnee),
         dimension: rbDimension,
-      })
-      if (rbMois) params.set('mois', rbMois)
-      if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbDimension === 'matiere') {
-        const mk = rbParseMatiereKey(rbMatiereKey)
-        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
-      } else if (rbModuleId) {
-        params.set('module_id', rbModuleId)
-      }
-      if (effFormation) params.set('formation_id', effFormation)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      if (rbPeriode) params.set('periode', rbPeriode)
-      if (rbCalendrier) params.set('calendrier', rbCalendrier)
-      const res = await api.get(`/statistiques/bilans/?${params}`)
-      setRbData(res.data)
-      setRbSelection(prev => {
-        if (!res.data.bilans?.length) return null
-        if (prev !== null && prev < res.data.bilans.length) return prev
-        return null
-      })
-    } catch {
-      setRbData(null)
-      setRbAllTableaux([])
-      setRbSelection(null)
-    } finally {
-      setLoadingRb(false)
-    }
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId])
-
-  const fetchRbAllTableaux = useCallback(async () => {
-    if (!rbData?.bilans?.length) return
-    setLoadingRbAll(true)
-    try {
-      const effFormation = rbFormationId || formationId
-      const params = new URLSearchParams({
-        annee: String(rbAnnee),
-        dimension: rbDimension,
         tous_tableaux: '1',
       })
       if (rbMois) params.set('mois', rbMois)
@@ -1503,13 +1444,21 @@ export default function Statistiques() {
       if (rbPeriode) params.set('periode', rbPeriode)
       if (rbCalendrier) params.set('calendrier', rbCalendrier)
       const res = await api.get(`/statistiques/bilans/?${params}`)
+      setRbData(res.data)
       setRbAllTableaux(res.data.tableaux_complets || [])
+      setRbSelection(prev => {
+        if (!res.data.bilans?.length) return null
+        if (prev !== null && prev < res.data.bilans.length) return prev
+        return null
+      })
     } catch {
+      setRbData(null)
       setRbAllTableaux([])
+      setRbSelection(null)
     } finally {
-      setLoadingRbAll(false)
+      setLoadingRb(false)
     }
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, rbData])
+  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId])
 
   const fetchFacPerimetre = useCallback(async () => {
     const effFormation = facFormationId || formationId
@@ -1742,14 +1691,8 @@ export default function Statistiques() {
 
   const handleRefreshAll = () => {
     fetchData(TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
-    if (onglet === 'point_journalier') {
-      fetchPointJournalier()
-      if (pjSelection === null) fetchPjAllTableaux()
-    }
-    if (onglet === 'rapports') {
-      fetchBilans()
-      if (rbSelection === null) fetchRbAllTableaux()
-    }
+    if (onglet === 'point_journalier') fetchPointJournalier()
+    if (onglet === 'rapports') fetchBilans()
     if (onglet === 'secretariats') fetchSecStats()
     if (onglet === 'alertes') fetchSeuils()
   }
@@ -1793,7 +1736,7 @@ export default function Statistiques() {
   useEffect(() => {
     if (onglet === 'alertes') fetchSeuils()
     if (onglet === 'secretariats') fetchSecStats()
-  }, [onglet, appliedPeriodKey, fetchSeuils, fetchSecStats])
+  }, [onglet, appliedPeriodKey, formationId, secretariatId, fetchSeuils, fetchSecStats])
 
   useEffect(() => {
     if (onglet !== 'secretariats' || secSelection === null || !secStats?.secretariats?.length) return
@@ -1847,22 +1790,6 @@ export default function Statistiques() {
     }
     fetchPjDetail(meta)
   }, [onglet, pjSelection, pjData, pjAllTableaux, fetchPjDetail])
-
-  useEffect(() => {
-    if (onglet === 'alertes') fetchSeuils()
-  }, [formationId, secretariatId, onglet, fetchSeuils])
-
-  useEffect(() => {
-    if (onglet !== 'point_journalier' || pjSelection !== null || !pjData?.tableaux?.length) return
-    if (pjAllTableaux.length) return
-    fetchPjAllTableaux()
-  }, [onglet, pjSelection, pjData, pjAllTableaux.length, fetchPjAllTableaux])
-
-  useEffect(() => {
-    if (onglet !== 'rapports' || rbSelection !== null || !rbData?.bilans?.length) return
-    if (rbAllTableaux.length) return
-    fetchRbAllTableaux()
-  }, [onglet, rbSelection, rbData, rbAllTableaux.length, fetchRbAllTableaux])
 
   const saveSeuils = async () => {
     try {
@@ -2785,7 +2712,7 @@ export default function Statistiques() {
               ))}
             </div>
             {rbSelection === null ? (
-              loadingRbAll ? (
+              loadingRb && !rbAllTableaux.length ? (
                 <TabSpinner label="Chargement de tous les tableaux…"/>
               ) : (
               <BilansEnsemblePanel
@@ -3225,7 +3152,7 @@ export default function Statistiques() {
               </div>
 
               {pjSelection === null ? (
-                loadingPjAll && !pjAllTableaux.length ? (
+                loadingPj && !pjAllTableaux.length ? (
                   <TabSpinner label="Chargement de tous les tableaux…"/>
                 ) : (
                 <PointJournalierEnsemblePanel

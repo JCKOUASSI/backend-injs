@@ -148,6 +148,13 @@ def dashboard_stats(request):
     if denied:
         return denied
 
+    from .api_cache import get_cached_response, request_cache_key, set_cached_response
+
+    cache_key = request_cache_key('dash_stats', request)
+    cached = get_cached_response(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     modules_qs = Module.objects.all()
     participants_qs = Participant.objects.all()
     secretariat_filter = request.query_params.get('secretariat')
@@ -443,7 +450,7 @@ def dashboard_stats(request):
             'heure_debut_prevue': sess.heure_debut_prevue,
         })
 
-    return Response({
+    payload = {
         'total_modules': total_formations,
         'modules_en_cours': formations_actives,
         'modules_termines': formations_terminees,
@@ -480,7 +487,9 @@ def dashboard_stats(request):
         'prochaines_seances': prochaines_seances,
         'derniers_pointages': derniers_pointages,
         'periode': periode_api_payload(date_debut, date_fin, period['meta']),
-    })
+    }
+    set_cached_response(cache_key, payload, 45)
+    return Response(payload)
 
 
 @api_view(['GET'])
@@ -494,7 +503,6 @@ def formation_list_api(request):
     if denied:
         return denied
 
-    from presences.models import Pointage
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
 
@@ -588,22 +596,30 @@ def formation_list_api(request):
         'id',
     )
 
+    today = timezone.localdate()
+    queryset = queryset.annotate(
+        _nb_participants=Count('module_participants', distinct=True),
+        _nb_presents=Count(
+            'sessions__pointages__participant',
+            filter=Q(
+                sessions__pointages__date_journee=today,
+                sessions__pointages__participant_id__isnull=False,
+            ),
+            distinct=True,
+        ),
+    )
+
     # Pagination
     total_count = queryset.count()
     start = (page - 1) * page_size
     end = start + page_size
     modules_page = queryset[start:end]
 
-    today = timezone.localdate()
     results = []
     for m in modules_page:
         f = m.formation
-        nb_p = ModuleParticipant.objects.filter(module=m).count()
-        nb_presents = (
-            Pointage.objects
-            .filter(session__module=m, date_journee=today, participant__isnull=False)
-            .values('participant').distinct().count()
-        )
+        nb_p = m._nb_participants
+        nb_presents = m._nb_presents
         superviseur = m.superviseur
         creee_par = m.creee_par
         results.append({
@@ -3444,58 +3460,19 @@ def module_detail_api(request, formation_pk, module_pk):
     return Response(status=204)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def module_full_detail_api(request, formation_pk, module_pk):
-    """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
-    denied = deny_finance_operational_response(request)
-    if denied:
-        return denied
-
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-        module = Module.objects.get(pk=module_pk, formation=formation)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module introuvable.'}, status=404)
-
-    from .serializers import SessionSerializer, ParticipantSerializer
+def _build_module_presences_list(module):
+    """Liste sérialisée des pointages d'un module (participants, formateurs, encadrants)."""
     from presences.models import Pointage
     from presences.duree import duree_minutes_effective
-    from .duree_prevue_resolve import (
-        module_edt_raw_hours,
-        _ref_module_volume_hours,
-        _get_module_participants_categories,
-        resolve_module_volume_contractuel_heures,
-    )
-    module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
-    sessions = module.sessions.all().order_by('date_journee', 'numero')
-    participants = module.module_participants.select_related('participant').all()
-    formateurs_assignes = module.module_formateurs.select_related('formateur').all()
 
-    # Calculer les volumes horaires par catégorie
-    cat_counts = _get_module_participants_categories(module)
-    volumes_par_categorie = {}
-    for cat in cat_counts.keys():
-        vol = _ref_module_volume_hours(module, cat)
-        volumes_par_categorie[cat] = vol if vol > 0 else None
-
-    formateur_nom = None
-    if module.formateur:
-        formateur_nom = f"{module.formateur.prenom} {module.formateur.nom}".strip()
-
-    # Présences participants
     pointages_part_qs = Pointage.objects.filter(
         session__module=module, participant__isnull=False
     ).select_related('participant', 'session').order_by('date_journee', 'timestamp_entree')
 
-    # Présences formateurs
     pointages_fmt_qs = Pointage.objects.filter(
         session__module=module, formateur__isnull=False
     ).select_related('formateur', 'session').order_by('date_journee', 'timestamp_entree')
 
-    # Présences encadrants
     pointages_enc_qs = Pointage.objects.filter(
         session__module=module, encadrant__isnull=False
     ).select_related('encadrant', 'session').order_by('date_journee', 'timestamp_entree')
@@ -3569,6 +3546,69 @@ def module_full_detail_api(request, formation_pk, module_pk):
         })
 
     presences.sort(key=lambda x: (x['date_journee'] or '', x['timestamp_entree'] or ''))
+    return presences
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def module_presences_api(request, formation_pk, module_pk):
+    """Présences d'un module uniquement (endpoint léger pour le polling)."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
+
+    return Response({'presences': _build_module_presences_list(module)})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def module_full_detail_api(request, formation_pk, module_pk):
+    """Retourne le détail complet d'un module : infos + séances + participants de la formation."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
+
+    from .serializers import SessionSerializer, ParticipantSerializer
+    from presences.models import Pointage
+    from .duree_prevue_resolve import (
+        module_edt_raw_hours,
+        _ref_module_volume_hours,
+        _get_module_participants_categories,
+        resolve_module_volume_contractuel_heures,
+    )
+    module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
+    sessions = module.sessions.all().order_by('date_journee', 'numero')
+    participants = module.module_participants.select_related('participant').all()
+    formateurs_assignes = module.module_formateurs.select_related('formateur').all()
+
+    # Calculer les volumes horaires par catégorie
+    cat_counts = _get_module_participants_categories(module)
+    volumes_par_categorie = {}
+    for cat in cat_counts.keys():
+        vol = _ref_module_volume_hours(module, cat)
+        volumes_par_categorie[cat] = vol if vol > 0 else None
+
+    formateur_nom = None
+    if module.formateur:
+        formateur_nom = f"{module.formateur.prenom} {module.formateur.nom}".strip()
+
+    presences = _build_module_presences_list(module)
 
     nb_presents = (
         Pointage.objects.filter(session__module=module, participant__isnull=False).values('participant').distinct().count()
@@ -4099,6 +4139,13 @@ def referentiels_api(request):
     if denied:
         return denied
 
+    from .api_cache import get_cached_response, request_cache_key, set_cached_response
+
+    cache_key = request_cache_key('ref_api', request)
+    cached = get_cached_response(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     formations = list(RefFormation.objects.filter(actif=True).values('id', 'intitule'))
     formations_reelles = list(Formation.objects.order_by('formation').values('id', 'formation'))
     modules = []
@@ -4107,7 +4154,7 @@ def referentiels_api(request):
             'id': m.id,
             'intitule': m.intitule,
             'volume_horaire': m.volume_horaire,
-            'formation_ids': list(m.formations.values_list('id', flat=True)),
+            'formation_ids': [f.id for f in m.formations.all()],
         })
     modules_actifs = list(
         Module.objects.values_list('intitule', flat=True).distinct().order_by('intitule')
@@ -4148,7 +4195,7 @@ def referentiels_api(request):
         key=lambda x: (x.lower(), x),
     )
 
-    return Response({
+    payload = {
         'formations': formations,
         'formations_reelles': formations_reelles,
         'modules': modules,
@@ -4162,7 +4209,9 @@ def referentiels_api(request):
         'grades': grades,
         'types_secretariat': types_secretariat,
         'vagues': vagues,
-    })
+    }
+    set_cached_response(cache_key, payload, 300)
+    return Response(payload)
 
 
 @api_view(['GET'])

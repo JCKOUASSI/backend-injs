@@ -19,6 +19,7 @@ import {
   saveFinanceExportMontants,
   saveFinancePeriod,
 } from '../utils/financePeriod'
+import { useSecretariats } from '../hooks/useSecretariats'
 import {
   buildFormateursListSearchParams,
   LIST_STORAGE_KEYS,
@@ -60,7 +61,7 @@ export default function Formateurs() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   const { showToast } = useToast()
 
-  const [secretariats, setSecretariats] = useState([])
+  const { data: secretariats = [] } = useSecretariats()
   const [refModules, setRefModules] = useState([])
   const [financeDetail, setFinanceDetail] = useState(null)
   const [financeDetailLoading, setFinanceDetailLoading] = useState(false)
@@ -89,11 +90,6 @@ export default function Formateurs() {
   )
 
   useEffect(() => { loadFormateurs() }, [page, debouncedSearch, appliedFinancePeriod])
-  useEffect(() => {
-    api.get('/formations/secretariats/')
-      .then(res => setSecretariats(Array.isArray(res.data) ? res.data : (res.data.results || [])))
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     api.get('/formations/ref/modules/')
