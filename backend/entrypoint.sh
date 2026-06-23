@@ -2,4 +2,4 @@
 set -o errexit
 
 python manage.py migrate --noinput
-exec "$@"
+exec /app/scripts/gunicorn-autoscale.sh

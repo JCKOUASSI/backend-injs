@@ -148,12 +148,20 @@ DATABASES = {
     }
 }
 
-# Cache — FileBasedCache en production pour partager le cache entre workers Gunicorn
+# Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
 if DEBUG:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+elif os.environ.get('REDIS_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.environ['REDIS_URL'],
+            'TIMEOUT': 300,
         }
     }
 else:
