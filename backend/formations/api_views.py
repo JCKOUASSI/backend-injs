@@ -7,7 +7,7 @@ from io import BytesIO
 from datetime import timedelta, datetime, time, date
 import calendar
 import re
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Prefetch
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
@@ -2646,10 +2646,20 @@ def formation_detail_api(request, pk):
         return denied
 
     try:
+        from .serializer_querysets import annotate_modules_for_serializer
+        from .models import ModuleParticipant
+
         formation = Formation.objects.prefetch_related(
-            'modules__sessions',
-            'modules__module_participants__participant',
-            'modules__secretariat',
+            Prefetch(
+                'modules',
+                queryset=annotate_modules_for_serializer(
+                    Module.objects.order_by('ordre', 'intitule')
+                ),
+            ),
+            Prefetch(
+                'modules__module_participants',
+                queryset=ModuleParticipant.objects.select_related('participant'),
+            ),
         ).get(pk=pk)
     except Formation.DoesNotExist:
         return Response({'detail': 'Formation introuvable.'}, status=404)
@@ -3320,7 +3330,10 @@ def module_list_api(request, formation_pk):
         return Response({'detail': 'Formation introuvable.'}, status=404)
 
     if request.method == 'GET':
-        modules = formation.modules.prefetch_related('sessions').all()
+        from .serializer_querysets import annotate_modules_for_serializer
+        modules = annotate_modules_for_serializer(
+            formation.modules.order_by('ordre', 'intitule')
+        )
         return Response(ModuleSerializer(modules, many=True).data)
 
     # POST — create module
@@ -3593,7 +3606,10 @@ def module_full_detail_api(request, formation_pk, module_pk):
         resolve_module_volume_contractuel_heures,
     )
     module = Module.objects.select_related('secretariat', 'formateur', 'superviseur').get(pk=module_pk, formation=formation)
-    sessions = module.sessions.all().order_by('date_journee', 'numero')
+    from .serializer_querysets import annotate_sessions_for_serializer
+    sessions = annotate_sessions_for_serializer(
+        module.sessions.all().order_by('date_journee', 'numero')
+    )
     participants = module.module_participants.select_related('participant').all()
     formateurs_assignes = module.module_formateurs.select_related('formateur').all()
 
@@ -4139,9 +4155,9 @@ def referentiels_api(request):
     if denied:
         return denied
 
-    from .api_cache import get_cached_response, request_cache_key, set_cached_response
+    from .api_cache import get_cached_response, request_cache_key, referentiels_cache_version, set_cached_response
 
-    cache_key = request_cache_key('ref_api', request)
+    cache_key = request_cache_key('ref_api', request, extra=(referentiels_cache_version(),))
     cached = get_cached_response(cache_key)
     if cached is not None:
         return Response(cached)

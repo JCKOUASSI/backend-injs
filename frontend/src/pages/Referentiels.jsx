@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
+import { invalidateReferentielsQuery } from '../hooks/useReferentiels'
 import {
   buildReferentielsSearchParams,
   LIST_STORAGE_KEYS,
@@ -148,6 +150,9 @@ export default function Referentiels() {
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => readReferentielsTab(searchParams))
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
+
+  const refreshReferentielsCache = () => invalidateReferentielsQuery(queryClient)
 
   usePersistedListQuery(
     LIST_STORAGE_KEYS.referentiels,
@@ -250,6 +255,7 @@ export default function Referentiels() {
       }
       setShowModal(false)
       await loadAll()
+      refreshReferentielsCache()
     } catch (err) {
       const msg = err.response?.data ? JSON.stringify(err.response.data) : 'Erreur'
       showToast(msg, 'error')
@@ -265,6 +271,7 @@ export default function Referentiels() {
           await api.delete(`${URL_MAP[tab]}${row.id}/`)
           showToast('Supprimé')
           await loadAll()
+          refreshReferentielsCache()
         } catch (err) {
           if (err.response?.status === 404) {
             showToast('Entrée déjà supprimée — liste actualisée')
@@ -282,6 +289,7 @@ export default function Referentiels() {
       await api.put(`${URL_MAP[tab]}${row.id}/`, { ...row, actif: !row.actif })
       showToast(row.actif ? 'Désactivé' : 'Activé')
       await loadAll()
+      refreshReferentielsCache()
     } catch { showToast('Erreur', 'error') }
   }
 

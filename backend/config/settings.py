@@ -90,7 +90,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     # Local apps
     'authentication',
-    'formations',
+    'formations.apps.FormationsConfig',
     'presences',
     'exports',
     'dashboard',

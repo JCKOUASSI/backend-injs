@@ -1,6 +1,9 @@
+"""Cache API formations (stats, referentiels) + invalidation referentiels."""
 import hashlib
 
 from django.core.cache import cache
+
+REFERENTIELS_CACHE_VERSION_KEY = 'referentiels_api_cache_version'
 
 
 def request_cache_key(prefix, request, extra=()):
@@ -29,6 +32,14 @@ def set_cached_response(key, data, timeout):
     cache.set(key, data, timeout)
 
 
+def referentiels_cache_version():
+    return cache.get(REFERENTIELS_CACHE_VERSION_KEY) or 0
+
+
+def bump_referentiels_cache_version():
+    current = cache.get(REFERENTIELS_CACHE_VERSION_KEY) or 0
+    cache.set(REFERENTIELS_CACHE_VERSION_KEY, current + 1, timeout=None)
+
+
 def invalidate_referentiels_cache():
-    """Invalidation best-effort (LocMem/FileBased : clé fixe par déploiement)."""
-    pass
+    bump_referentiels_cache_version()

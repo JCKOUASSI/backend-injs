@@ -4,6 +4,8 @@ import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { useReferentiels } from '../hooks/useReferentiels'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import Pagination from '../components/Pagination'
 
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS = {
@@ -65,6 +67,9 @@ export default function EvaluationDashboard() {
   // ── State questionnaires ─────────────────────────────────────────────────
   const [questionnaires, setQuestionnaires] = useState([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [filters, setFilters] = useState({ statut: '', categorie: '' })
   const [refModules, setRefModules] = useState([])
   const [refCategories, setRefCategories] = useState([])
@@ -82,18 +87,24 @@ export default function EvaluationDashboard() {
   const fetchQuestionnaires = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({
+        page: String(activeTab === 'dashboard' ? 1 : page),
+        page_size: activeTab === 'dashboard' ? '500' : '50',
+      })
       if (filters.statut) params.append('statut', filters.statut)
       if (filters.categorie) params.append('categorie', filters.categorie)
-      const q = params.toString() ? `?${params}` : ''
-      const { data } = await api.get(`/evaluations/questionnaires/${q}`)
-      setQuestionnaires(data)
+      const res = await api.get(`/evaluations/questionnaires/?${params}`)
+      const pageSize = activeTab === 'dashboard' ? 500 : 50
+      const { results, count, totalPages: pages } = parsePaginatedResponse(res.data, pageSize)
+      setQuestionnaires(results)
+      setTotalCount(count)
+      setTotalPages(pages)
     } catch {
       showToast('Erreur lors du chargement des questionnaires', 'error')
     } finally {
       setLoading(false)
     }
-  }, [filters, showToast])
+  }, [filters, page, activeTab, showToast])
 
   const { data: referentielsData } = useReferentiels()
 
@@ -105,12 +116,14 @@ export default function EvaluationDashboard() {
     setRefGroupes(referentielsData.groupes || [])
   }, [referentielsData])
 
+  useEffect(() => { setPage(1) }, [filters.statut, filters.categorie, activeTab])
+
   useEffect(() => { fetchQuestionnaires() }, [fetchQuestionnaires])
 
   // ── KPIs calculés ────────────────────────────────────────────────────────
   const allQuestionnaires = questionnaires
   const kpis = {
-    total:      allQuestionnaires.length,
+    total:      totalCount || allQuestionnaires.length,
     brouillon:  allQuestionnaires.filter(q => q.statut === 'BROUILLON').length,
     publie:     allQuestionnaires.filter(q => q.statut === 'PUBLIE').length,
     ferme:      allQuestionnaires.filter(q => q.statut === 'FERME').length,
@@ -375,6 +388,12 @@ export default function EvaluationDashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {!loading && activeTab === 'questionnaires' && totalPages > 1 && (
+            <div style={{ marginTop: '1rem' }}>
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalCount={totalCount} />
             </div>
           )}
         </div>

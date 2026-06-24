@@ -19,7 +19,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 
 class QuestionnaireListSerializer(serializers.ModelSerializer):
-    nb_questions = serializers.IntegerField(source='questions.count', read_only=True)
+    nb_questions = serializers.SerializerMethodField()
     createur_nom = serializers.SerializerMethodField()
     module_intitule = serializers.SerializerMethodField()
 
@@ -32,6 +32,11 @@ class QuestionnaireListSerializer(serializers.ModelSerializer):
             'date_ouverture', 'date_fermeture',
             'nb_questions', 'created_at',
         ]
+
+    def get_nb_questions(self, obj):
+        if hasattr(obj, '_nb_questions'):
+            return obj._nb_questions
+        return obj.questions.count()
 
     def get_createur_nom(self, obj):
         if obj.createur:
