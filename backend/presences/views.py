@@ -1961,8 +1961,25 @@ def formation_presences(request, pk):
     else:
         pointages = base_qs
 
-    serializer = PointageSerializer(pointages, many=True)
-    return Response(serializer.data)
+    pointages = pointages.order_by('-date_journee', '-timestamp_entree', '-id')
+
+    legacy_array = request.query_params.get('legacy') == '1'
+    if legacy_array:
+        serializer = PointageSerializer(pointages, many=True)
+        return Response(serializer.data)
+
+    page = max(int(request.query_params.get('page', 1)), 1)
+    page_size = min(max(int(request.query_params.get('page_size', 50)), 1), 200)
+    total_count = pointages.count()
+    start = (page - 1) * page_size
+    page_qs = pointages[start:start + page_size]
+    serializer = PointageSerializer(page_qs, many=True)
+    return Response({
+        'results': serializer.data,
+        'count': total_count,
+        'total_pages': (total_count + page_size - 1) // page_size if total_count else 0,
+        'current_page': page,
+    })
 
 
 # ──────────────────────────────────────────────

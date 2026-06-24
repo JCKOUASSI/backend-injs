@@ -35,6 +35,8 @@ class ModuleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
     def get_nb_participants(self, obj):
+        if hasattr(obj, '_nb_participants'):
+            return obj._nb_participants
         return ModuleParticipant.objects.filter(module=obj).count()
 
     def get_sessions(self, obj):
@@ -106,6 +108,8 @@ class SessionSerializer(serializers.ModelSerializer):
         return f"{mf.formateur.prenom} {mf.formateur.nom}".strip() if mf and mf.formateur else None
 
     def get_nb_presences(self, obj):
+        if hasattr(obj, '_nb_presences_part'):
+            return obj._nb_presences_part + getattr(obj, '_nb_presences_fmt', 0)
         from presences.models import Pointage
         qs = Pointage.objects.filter(session=obj)
         nb_participants = qs.filter(participant__isnull=False).values('participant').distinct().count()
@@ -113,6 +117,8 @@ class SessionSerializer(serializers.ModelSerializer):
         return nb_participants + nb_formateurs
 
     def get_nb_attendus(self, obj):
+        if hasattr(obj, '_nb_attendus_part'):
+            return obj._nb_attendus_part + getattr(obj, '_nb_attendus_fmt', 0)
         nb_p = ModuleParticipant.objects.filter(module=obj.module).values('participant').distinct().count()
         nb_f = ModuleFormateur.objects.filter(module=obj.module).values('formateur').distinct().count()
         return nb_p + nb_f
@@ -364,13 +370,21 @@ class FormationDetailSerializer(FormationListSerializer):
         return self.get_participants_attendus(obj)
 
     def get_modules(self, obj):
-        return ModuleSerializer(obj.modules.prefetch_related('sessions').all(), many=True).data
+        from .serializer_querysets import annotate_modules_for_serializer
+        cached = getattr(obj, '_prefetched_objects_cache', {})
+        if 'modules' in cached:
+            modules = obj.modules.all()
+        else:
+            modules = annotate_modules_for_serializer(
+                Module.objects.filter(formation=obj).order_by('ordre', 'intitule')
+            )
+        return ModuleSerializer(modules, many=True).data
 
     def get_sessions(self, obj):
-        from .models import SessionModule
-        sessions = SessionModule.objects.filter(
-            module__formation=obj
-        ).select_related('module').order_by('date_journee', 'numero')
+        from .serializer_querysets import annotate_sessions_for_serializer
+        sessions = annotate_sessions_for_serializer(
+            SessionModule.objects.filter(module__formation=obj)
+        ).order_by('date_journee', 'numero')
         return SessionSerializer(sessions, many=True).data
 
     def get_formateurs(self, obj):

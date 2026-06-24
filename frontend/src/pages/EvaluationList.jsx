@@ -4,6 +4,8 @@ import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { useReferentiels } from '../hooks/useReferentiels'
+import { parsePaginatedResponse } from '../utils/paginatedResponse'
+import Pagination from '../components/Pagination'
 
 const CIBLE_LABELS = { COURS: 'Évaluation du cours', FORMATEUR: 'Évaluation du formateur' }
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
@@ -96,6 +98,9 @@ export default function EvaluationList() {
 
   const [questionnaires, setQuestionnaires] = useState([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [filters, setFilters] = useState({ cible: '', statut: '', categorie: '' })
   const [refModules, setRefModules] = useState([])
   const [refCategories, setRefCategories] = useState([])
@@ -118,19 +123,21 @@ export default function EvaluationList() {
     if (user?.role === 'AUDITEUR') return
     setLoading(true)
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({ page: String(page), page_size: '50' })
       if (filters.cible) params.append('cible', filters.cible)
       if (filters.statut) params.append('statut', filters.statut)
       if (filters.categorie) params.append('categorie', filters.categorie)
-      const q = params.toString() ? `?${params}` : ''
-      const { data } = await api.get(`/evaluations/questionnaires/${q}`)
-      setQuestionnaires(data)
+      const res = await api.get(`/evaluations/questionnaires/?${params}`)
+      const { results, count, totalPages: pages } = parsePaginatedResponse(res.data, 50)
+      setQuestionnaires(results)
+      setTotalCount(count)
+      setTotalPages(pages)
     } catch {
       showToast('Erreur lors du chargement des questionnaires', 'error')
     } finally {
       setLoading(false)
     }
-  }, [filters, showToast, user?.role])
+  }, [filters, page, showToast, user?.role])
 
   const { data: referentielsData } = useReferentiels({ enabled: user?.role !== 'AUDITEUR' })
 
@@ -141,6 +148,8 @@ export default function EvaluationList() {
     setRefGrades((referentielsData.grades || []).filter(g => g.actif !== false))
     setRefGroupes(referentielsData.groupes || [])
   }, [referentielsData])
+
+  useEffect(() => { setPage(1) }, [filters.cible, filters.statut, filters.categorie])
 
   useEffect(() => { fetchQuestionnaires() }, [fetchQuestionnaires])
 
@@ -333,6 +342,12 @@ export default function EvaluationList() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && totalPages > 1 && (
+        <div style={{ marginTop: '1rem' }}>
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalCount={totalCount} />
         </div>
       )}
 

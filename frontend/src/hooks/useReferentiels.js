@@ -17,3 +17,9 @@ export function useReferentiels(options = {}) {
     enabled,
   })
 }
+
+export function invalidateReferentielsQuery(queryClient) {
+  if (queryClient) {
+    queryClient.invalidateQueries({ queryKey: REFERENTIELS_QUERY_KEY })
+  }
+}

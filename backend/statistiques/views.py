@@ -1132,7 +1132,130 @@ class DashboardView(APIView):
             return Response({'detail': period['detail']}, status=400)
 
         sections = _parse_dashboard_sections(request)
-        return Response(_build_dashboard_payload(scope, sections, request.user, period=period))
+
+        from .cache_utils import (
+            get_stats_dashboard_cached,
+            set_stats_dashboard_cached,
+            stats_dashboard_cache_key,
+        )
+
+        cache_key = stats_dashboard_cache_key(request, sections, scope, period)
+        cached = get_stats_dashboard_cached(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        payload = _build_dashboard_payload(scope, sections, request.user, period=period)
+        set_stats_dashboard_cached(cache_key, payload)
+        return Response(payload)
+
+
+def _build_secretariats_stats_payload(user, scope, period):
+    """Calcule la synthèse KPIs par secrétariat."""
+    from formations.period_filter import periode_api_payload
+
+    formation_id = scope.formation_id
+    module_ids = scope.module_ids
+    mod_kw = module_filter_kwargs(scope)
+    date_debut = period['date_debut']
+    date_fin = period['date_fin']
+
+    resultats = []
+
+    global_an = _auditeurs_notoires(formation_id, scope.secretariat_id, module_ids)
+    an_by_sec = {}
+    for item in global_an.get('liste') or []:
+        sid = item.get('secretariat_id')
+        if sid is not None:
+            an_by_sec.setdefault(sid, []).append(item)
+
+    for s in secretariats_stats_queryset(user):
+        mq = {'secretariat': s, **mod_kw}
+        pf = {'session__module__secretariat': s, **({'session__module_id__in': module_ids} if module_ids is not None else {})}
+        if formation_id:
+            mq['formation_id'] = formation_id
+            pf['session__module__formation_id'] = formation_id
+
+        mod_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
+        if period_filter_active(date_debut, date_fin):
+            mod_ids = module_ids_with_sessions_in_period(
+                mod_ids,
+                date_debut=date_debut,
+                date_fin=date_fin,
+            )
+
+        scope_session_ids = session_ids_for_scope(
+            mod_ids, date_debut=date_debut, date_fin=date_fin,
+        )
+        agg = aggregation_seances_modules(mod_ids, session_ids=scope_session_ids)
+
+        nb_modules = len(mod_ids)
+        nb_inscrits = agg['inscrits_distinct']
+        nb_presents = agg['presents_distinct']
+        nb_absences = agg['places_absentes']
+        nb_participants = nb_inscrits
+        nb_sessions = agg['nb_seances_terminees']
+        pf_present = dict(pf)
+        if period_filter_active(date_debut, date_fin):
+            if date_debut:
+                pf_present['date_journee__gte'] = date_debut
+            if date_fin:
+                pf_present['date_journee__lte'] = date_fin
+        nb_pointages = Pointage.objects.filter(**pf_present).filter(q_pointage_present()).count()
+
+        inscrits_pids = ModuleParticipant.objects.filter(
+            module_id__in=mod_ids,
+        ).values_list('participant_id', flat=True).distinct()
+        p_inscrits = Participant.objects.filter(id__in=inscrits_pids)
+        hommes = p_inscrits.filter(sexe='MASCULIN').count()
+        femmes = p_inscrits.filter(sexe='FEMININ').count()
+
+        nb_formateurs = _count_formateurs_for_modules(mod_ids, secretariat_id=s.id)
+
+        from formations.volume_horaire import compute_volume_horaire_from_module_ids
+
+        vh_totals = compute_volume_horaire_from_module_ids(
+            mod_ids, date_debut=date_debut, date_fin=date_fin,
+            integer_hours=True,
+        )
+        vh_prevu = vh_totals['prevu_heures']
+        vh_realise = vh_totals['realise_heures']
+
+        an_list = an_by_sec.get(s.id, [])
+        nb_auditeurs_notoires = len(an_list)
+
+        resultats.append({
+            'secretariat_id': s.id,
+            'secretariat': s.nom,
+            'numero': s.numero,
+            'responsable': s.responsable.get_full_name() if s.responsable else None,
+            'nb_modules': nb_modules,
+            'nb_participants': nb_participants,
+            'nb_formateurs': nb_formateurs,
+            'nb_sessions': nb_sessions,
+            'nb_pointages': nb_pointages,
+            'nb_inscrits': nb_inscrits,
+            'nb_presents': nb_presents,
+            'nb_absences': nb_absences,
+            'nb_auditeurs_notoires': nb_auditeurs_notoires,
+            'pct_auditeurs_notoires': _taux(nb_auditeurs_notoires, nb_inscrits),
+            'places_attendues': agg['places_attendues'],
+            'places_presentes': agg['places_presentes'],
+            'taux_presence': _taux(agg['places_presentes'], agg['places_attendues']),
+            'taux_absence': _taux(agg['places_absentes'], agg['places_attendues']),
+            'ratio_hf': {'hommes': hommes, 'femmes': femmes,
+                         'pct_hommes': _taux(hommes, hommes + femmes),
+                         'pct_femmes': _taux(femmes, hommes + femmes)},
+            'vh_prevu': vh_prevu,
+            'vh_realise': vh_realise,
+            'taux_execution_vh': vh_totals['taux_pct'],
+        })
+
+    return {
+        'secretariats': resultats,
+        'total': len(resultats),
+        'auditeurs_notoires': global_an,
+        'periode': periode_api_payload(date_debut, date_fin, period['meta']),
+    }
 
 
 class SecretariatsStatsView(APIView):
@@ -1147,116 +1270,26 @@ class SecretariatsStatsView(APIView):
         if err:
             return err
 
-        from formations.period_filter import parse_period_from_request, periode_api_payload
+        from formations.period_filter import parse_period_from_request
 
         period = parse_period_from_request(request)
         if period['error']:
             return Response({'detail': period['detail']}, status=400)
 
-        formation_id = scope.formation_id
-        module_ids = scope.module_ids
-        mod_kw = module_filter_kwargs(scope)
-        date_debut = period['date_debut']
-        date_fin = period['date_fin']
+        from .cache_utils import (
+            get_stats_secretariats_cached,
+            set_stats_secretariats_cached,
+            stats_secretariats_cache_key,
+        )
 
-        resultats = []
+        cache_key = stats_secretariats_cache_key(request, scope, period)
+        cached = get_stats_secretariats_cached(cache_key)
+        if cached is not None:
+            return Response(cached)
 
-        global_an = _auditeurs_notoires(formation_id, scope.secretariat_id, module_ids)
-        an_by_sec = {}
-        for item in global_an.get('liste') or []:
-            sid = item.get('secretariat_id')
-            if sid is not None:
-                an_by_sec.setdefault(sid, []).append(item)
-
-        for s in secretariats_stats_queryset(request.user):
-            mq = {'secretariat': s, **mod_kw}
-            pf = {'session__module__secretariat': s, **({'session__module_id__in': module_ids} if module_ids is not None else {})}
-            if formation_id:
-                mq['formation_id'] = formation_id
-                pf['session__module__formation_id'] = formation_id
-
-            mod_ids = list(Module.objects.filter(**mq).values_list('id', flat=True))
-            if period_filter_active(date_debut, date_fin):
-                mod_ids = module_ids_with_sessions_in_period(
-                    mod_ids,
-                    date_debut=date_debut,
-                    date_fin=date_fin,
-                )
-
-            scope_session_ids = session_ids_for_scope(
-                mod_ids, date_debut=date_debut, date_fin=date_fin,
-            )
-            agg = aggregation_seances_modules(mod_ids, session_ids=scope_session_ids)
-
-            nb_modules      = len(mod_ids)
-            nb_inscrits     = agg['inscrits_distinct']
-            nb_presents     = agg['presents_distinct']
-            nb_absences     = agg['places_absentes']
-            nb_participants = nb_inscrits
-            nb_sessions     = agg['nb_seances_terminees']
-            pf_present = dict(pf)
-            if period_filter_active(date_debut, date_fin):
-                if date_debut:
-                    pf_present['date_journee__gte'] = date_debut
-                if date_fin:
-                    pf_present['date_journee__lte'] = date_fin
-            nb_pointages    = Pointage.objects.filter(**pf_present).filter(q_pointage_present()).count()
-
-            inscrits_pids = ModuleParticipant.objects.filter(
-                module_id__in=mod_ids,
-            ).values_list('participant_id', flat=True).distinct()
-            p_inscrits = Participant.objects.filter(id__in=inscrits_pids)
-            hommes = p_inscrits.filter(sexe='MASCULIN').count()
-            femmes = p_inscrits.filter(sexe='FEMININ').count()
-
-            # Formateurs du secrétariat (modules actifs sur la période)
-            nb_formateurs = _count_formateurs_for_modules(mod_ids, secretariat_id=s.id)
-
-            from formations.volume_horaire import compute_volume_horaire_from_module_ids
-
-            vh_totals = compute_volume_horaire_from_module_ids(
-                mod_ids, date_debut=date_debut, date_fin=date_fin,
-                integer_hours=True,
-            )
-            vh_prevu = vh_totals['prevu_heures']
-            vh_realise = vh_totals['realise_heures']
-
-            an_list = an_by_sec.get(s.id, [])
-            nb_auditeurs_notoires = len(an_list)
-
-            resultats.append({
-                'secretariat_id': s.id,
-                'secretariat': s.nom,
-                'numero': s.numero,
-                'responsable': s.responsable.get_full_name() if s.responsable else None,
-                'nb_modules': nb_modules,
-                'nb_participants': nb_participants,
-                'nb_formateurs': nb_formateurs,
-                'nb_sessions': nb_sessions,
-                'nb_pointages': nb_pointages,
-                'nb_inscrits': nb_inscrits,
-                'nb_presents': nb_presents,
-                'nb_absences': nb_absences,
-                'nb_auditeurs_notoires': nb_auditeurs_notoires,
-                'pct_auditeurs_notoires': _taux(nb_auditeurs_notoires, nb_inscrits),
-                'places_attendues': agg['places_attendues'],
-                'places_presentes': agg['places_presentes'],
-                'taux_presence': _taux(agg['places_presentes'], agg['places_attendues']),
-                'taux_absence': _taux(agg['places_absentes'], agg['places_attendues']),
-                'ratio_hf': {'hommes': hommes, 'femmes': femmes,
-                             'pct_hommes': _taux(hommes, hommes+femmes),
-                             'pct_femmes': _taux(femmes, hommes+femmes)},
-                'vh_prevu': vh_prevu,
-                'vh_realise': vh_realise,
-                'taux_execution_vh': vh_totals['taux_pct'],
-            })
-
-        return Response({
-            'secretariats': resultats,
-            'total': len(resultats),
-            'auditeurs_notoires': global_an,
-            'periode': periode_api_payload(date_debut, date_fin, period['meta']),
-        })
+        payload = _build_secretariats_stats_payload(request.user, scope, period)
+        set_stats_secretariats_cached(cache_key, payload)
+        return Response(payload)
 
 
 # ── Vues Alertes, Rapports (inchangées) ───────────────────────────────────────
@@ -1703,6 +1736,118 @@ def bilans_export(request):
         return Response({'detail': f'Erreur export : {exc}'}, status=500)
 
 
+def _parse_bilans_query_params(request):
+    def _int(key):
+        v = request.query_params.get(key)
+        return int(v) if v and v.isdigit() else None
+
+    return {
+        'annee': _int('annee') or date.today().year,
+        'mois': _int('mois'),
+        'module_id': _int('module_id'),
+        'ref_module_id': _int('ref_module_id'),
+        'formation_id_qp': _int('formation_id'),
+        'categorie': request.query_params.get('categorie') or None,
+        'periode': request.query_params.get('periode') or None,
+        'calendrier': request.query_params.get('calendrier') or None,
+        'dimension': request.query_params.get('dimension') or 'formation',
+        'detail': request.query_params.get('detail', '').lower() in ('1', 'true', 'yes'),
+        'tous_tableaux': request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes'),
+        'matiere_intitule': request.query_params.get('matiere_intitule') or None,
+    }
+
+
+def _build_bilans_payload(request, scope, kw, params):
+    """
+    Calcule le payload bilans. Retourne (payload, error_response).
+    error_response est un Response DRF en cas d'erreur, sinon None.
+    """
+    annee = params['annee']
+    mois = params['mois']
+    module_id = params['module_id']
+    ref_module_id = params['ref_module_id']
+    categorie = params['categorie']
+    periode = params['periode']
+    calendrier = params['calendrier']
+    dimension = params['dimension']
+    detail = params['detail']
+    tous_tableaux = params['tous_tableaux']
+    formation_id = scope.formation_id
+    secretariat_id = scope.secretariat_id
+
+    if detail and dimension == 'categorie':
+        if not categorie:
+            return None, Response({'detail': 'Catégorie requise.'}, status=400)
+        tableau = compute_bilan_effectifs_categorie(
+            categorie, formation_id=formation_id, secretariat_id=secretariat_id,
+            annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+            module_ids=kw.get('module_ids'),
+        )
+        if not tableau:
+            return None, Response({
+                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+            }, status=404)
+        return {'tableau': tableau}, None
+
+    if detail and dimension == 'matiere':
+        eff_formation = formation_id or params['formation_id_qp']
+        if not eff_formation:
+            return None, Response({'detail': 'Formation requise pour le bilan matière.'}, status=400)
+        matiere_intitule = params['matiere_intitule']
+        if not ref_module_id and not matiere_intitule:
+            return None, Response({'detail': 'ref_module_id ou matiere_intitule requis.'}, status=400)
+        tableau = compute_bilan_effectifs_matiere(
+            eff_formation,
+            ref_module_id=ref_module_id,
+            matiere_intitule=matiere_intitule,
+            categorie=categorie,
+            secretariat_id=secretariat_id,
+            annee=annee, mois=mois, calendrier=calendrier, periode=periode,
+            module_ids=kw.get('module_ids'),
+        )
+        if not tableau:
+            return None, Response({
+                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+            }, status=404)
+        return {'tableau': tableau}, None
+
+    if detail and module_id:
+        tableau = compute_bilan_effectifs_module(
+            module_id, categorie=categorie, annee=annee, mois=mois,
+            calendrier=calendrier, periode=periode,
+        )
+        if not tableau:
+            return None, Response({
+                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
+            }, status=404)
+        return {'tableau': tableau}, None
+
+    if detail and formation_id:
+        tableau = compute_bilan_periode_formation(
+            formation_id, annee=annee, mois=mois, calendrier=calendrier,
+            periode=periode, secretariat_id=secretariat_id, categorie_filter=categorie,
+            module_ids=kw.get('module_ids'),
+        )
+        if not tableau:
+            return None, Response({'detail': 'Formation introuvable.'}, status=404)
+        return {'tableau': tableau}, None
+
+    if tous_tableaux:
+        return compute_bilans_avec_tableaux(
+            annee=annee, mois=mois, categorie=categorie,
+            module_id=module_id, periode=periode,
+            calendrier=calendrier, dimension=dimension,
+            ref_module_id=ref_module_id, **kw,
+        ), None
+
+    return compute_bilans(
+        annee=annee, mois=mois, categorie=categorie,
+        module_id=module_id, periode=periode,
+        calendrier=calendrier, dimension=dimension,
+        ref_module_id=ref_module_id, **kw,
+    ), None
+
+
 class BilansView(APIView):
     """
     GET /api/statistiques/bilans/
@@ -1716,99 +1861,30 @@ class BilansView(APIView):
         if not user_has_stats_access(request.user):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
 
-        def _int(key):
-            v = request.query_params.get(key)
-            return int(v) if v and v.isdigit() else None
-
-        annee = _int('annee') or date.today().year
-        mois = _int('mois')
-        module_id = _int('module_id')
-        ref_module_id = _int('ref_module_id')
-        categorie = request.query_params.get('categorie') or None
-        periode = request.query_params.get('periode') or None
-        calendrier = request.query_params.get('calendrier') or None
-        dimension = request.query_params.get('dimension') or 'formation'
-        detail = request.query_params.get('detail', '').lower() in ('1', 'true', 'yes')
-        tous_tableaux = request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes')
+        params = _parse_bilans_query_params(request)
 
         scope, err = _scope_from_request(request, parse_module_id=True)
         if err:
             return err
         kw = _scope_compute_kwargs(scope)
-        formation_id = scope.formation_id
-        secretariat_id = scope.secretariat_id
 
-        if detail and dimension == 'categorie':
-            if not categorie:
-                return Response({'detail': 'Catégorie requise.'}, status=400)
-            tableau = compute_bilan_effectifs_categorie(
-                categorie, formation_id=formation_id, secretariat_id=secretariat_id,
-                annee=annee, mois=mois, calendrier=calendrier, periode=periode,
-                module_ids=kw.get('module_ids'),
-            )
-            if not tableau:
-                return Response({
-                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-                }, status=404)
-            return Response({'tableau': tableau})
+        from .cache_utils import (
+            get_stats_bilans_cached,
+            set_stats_bilans_cached,
+            stats_bilans_cache_key,
+        )
 
-        if detail and dimension == 'matiere':
-            eff_formation = formation_id or _int('formation_id')
-            if not eff_formation:
-                return Response({'detail': 'Formation requise pour le bilan matière.'}, status=400)
-            matiere_intitule = request.query_params.get('matiere_intitule') or None
-            if not ref_module_id and not matiere_intitule:
-                return Response({'detail': 'ref_module_id ou matiere_intitule requis.'}, status=400)
-            tableau = compute_bilan_effectifs_matiere(
-                eff_formation,
-                ref_module_id=ref_module_id,
-                matiere_intitule=matiere_intitule,
-                categorie=categorie,
-                secretariat_id=secretariat_id,
-                annee=annee, mois=mois, calendrier=calendrier, periode=periode,
-                module_ids=kw.get('module_ids'),
-            )
-            if not tableau:
-                return Response({
-                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-                }, status=404)
-            return Response({'tableau': tableau})
+        cache_key = stats_bilans_cache_key(request, scope, params)
+        cached = get_stats_bilans_cached(cache_key)
+        if cached is not None:
+            return Response(cached)
 
-        if detail and module_id:
-            tableau = compute_bilan_effectifs_module(
-                module_id, categorie=categorie, annee=annee, mois=mois,
-                calendrier=calendrier, periode=periode,
-            )
-            if not tableau:
-                return Response({
-                    'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-                }, status=404)
-            return Response({'tableau': tableau})
+        payload, error_response = _build_bilans_payload(request, scope, kw, params)
+        if error_response is not None:
+            return error_response
 
-        if detail and formation_id:
-            tableau = compute_bilan_periode_formation(
-                formation_id, annee=annee, mois=mois, calendrier=calendrier,
-                periode=periode, secretariat_id=secretariat_id, categorie_filter=categorie,
-                module_ids=kw.get('module_ids'),
-            )
-            if not tableau:
-                return Response({'detail': 'Formation introuvable.'}, status=404)
-            return Response({'tableau': tableau})
-
-        if tous_tableaux:
-            return Response(compute_bilans_avec_tableaux(
-                annee=annee, mois=mois, categorie=categorie,
-                module_id=module_id, periode=periode,
-                calendrier=calendrier, dimension=dimension,
-                ref_module_id=ref_module_id, **kw,
-            ))
-
-        return Response(compute_bilans(
-            annee=annee, mois=mois, categorie=categorie,
-            module_id=module_id, periode=periode,
-            calendrier=calendrier, dimension=dimension,
-            ref_module_id=ref_module_id, **kw,
-        ))
+        set_stats_bilans_cached(cache_key, payload)
+        return Response(payload)
 
 
 class ObservationsView(APIView):

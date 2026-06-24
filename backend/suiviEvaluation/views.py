@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -65,8 +66,25 @@ def questionnaire_list_create(request):
         if statut:
             qs = qs.filter(statut__iexact=statut)
 
-        serializer = QuestionnaireListSerializer(qs, many=True)
-        return Response(serializer.data)
+        qs = qs.annotate(_nb_questions=Count('questions', distinct=True)).order_by('-created_at', '-id')
+
+        legacy_array = request.query_params.get('legacy') == '1'
+        if legacy_array:
+            serializer = QuestionnaireListSerializer(qs, many=True)
+            return Response(serializer.data)
+
+        page = max(int(request.query_params.get('page', 1)), 1)
+        page_size = min(max(int(request.query_params.get('page_size', 50)), 1), 200)
+        total_count = qs.count()
+        start = (page - 1) * page_size
+        page_qs = qs[start:start + page_size]
+        serializer = QuestionnaireListSerializer(page_qs, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': total_count,
+            'total_pages': (total_count + page_size - 1) // page_size if total_count else 0,
+            'current_page': page,
+        })
 
     # POST
     titres = request.data.get('titres') or []

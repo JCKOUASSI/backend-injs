@@ -16,6 +16,7 @@ import {
   financePeriodKey,
 } from '../utils/financePeriod'
 import { isSecretariatScopedRole, lockedSecretariatId } from '../utils/roles'
+import { useStatsMeta } from '../hooks/useStatsMeta'
 import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
 import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
 
@@ -97,9 +98,8 @@ const TAB_SECTIONS = {
   point_journalier: ['admin_operationnel'],
   rapports: ['admin_operationnel'],
 }
-const META_SECTIONS = ['formations_liste', 'secretariats_liste', 'filtre_actif']
 
-/** Bandeau Vue d'ensemble — 3 indicateurs clés uniquement */
+/** Méta (formations_liste, secretariats_liste, filtre_actif) — chargées via useStatsMeta. */
 const ALERTES_OVERVIEW_CODES = ['taux_presence', 'taux_execution_vh', 'saturation_groupe']
 
 const PJ_EXPORT_FORMATS = [
@@ -1129,6 +1129,22 @@ export default function Statistiques() {
   const [appliedVhPeriod, setAppliedVhPeriod] = useState(() => loadFinancePeriod())
   const appliedPeriodKey = financePeriodKey(appliedVhPeriod)
 
+  const { data: statsMeta } = useStatsMeta({
+    formationId: formationId || undefined,
+    secretariatId: effectiveSecretariatId || undefined,
+    period: appliedVhPeriod,
+  })
+
+  useEffect(() => {
+    if (!statsMeta) return
+    setData(prev => ({
+      ...(prev || {}),
+      formations_liste: statsMeta.formations_liste,
+      secretariats_liste: statsMeta.secretariats_liste,
+      filtre_actif: statsMeta.filtre_actif,
+    }))
+  }, [statsMeta])
+
   // Secrétariats — onglet dédié
   const [secStats, setSecStats] = useState(null)
   const [loadingSecStats, setLoadingSecStats] = useState(false)
@@ -1223,7 +1239,7 @@ export default function Statistiques() {
 
   const fetchData = useCallback(async (sections, { silent = false, initial = false } = {}) => {
     const tabSections = sections?.length ? sections : (TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
-    const allSections = [...new Set([...tabSections, ...META_SECTIONS])]
+    const allSections = tabSections
     const seq = ++fetchSeqRef.current
     if (!silent) {
       if (initial) setLoadingInitial(true)
