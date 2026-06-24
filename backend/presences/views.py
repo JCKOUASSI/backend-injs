@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import timedelta
 
@@ -5,6 +6,8 @@ from django.db import transaction
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.serializers.json import DjangoJSONEncoder
+from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Q
 from math import radians, sin, cos, sqrt, atan2
@@ -2567,6 +2570,27 @@ def _invalidate_offline_data_cache(token):
     cache.delete(_offline_data_cache_key(token))
 
 
+def _cached_offline_data_response(token):
+    """
+    Renvoie les données hors-ligne (≈450 KB) en servant le JSON déjà sérialisé
+    depuis le cache. Sur un cache hit, aucune re-sérialisation DRF n'a lieu :
+    on renvoie directement les octets JSON via un HttpResponse brut, ce qui
+    élimine le coût CPU de rendu à chaque requête.
+    """
+    cache_key = _offline_data_cache_key(token)
+    cached_json = cache.get(cache_key)
+    if cached_json is None:
+        try:
+            payload = _get_formation_offline_data_payload(token)
+        except OfflineDataError as exc:
+            return Response({'detail': exc.detail}, status=exc.status_code)
+        cached_json = json.dumps(
+            payload, cls=DjangoJSONEncoder, separators=(',', ':'), ensure_ascii=False,
+        )
+        cache.set(cache_key, cached_json, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
+    return HttpResponse(cached_json, content_type='application/json')
+
+
 def _get_formation_offline_data_payload(token):
     """Données hors-ligne pour un token QR (UUID). Retourne un dict sérialisable."""
     try:
@@ -2684,15 +2708,7 @@ def scan_offline_data(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    cache_key = _offline_data_cache_key(token)
-    payload = cache.get(cache_key)
-    if payload is None:
-        try:
-            payload = _get_formation_offline_data_payload(token)
-        except OfflineDataError as exc:
-            return Response({'detail': exc.detail}, status=exc.status_code)
-        cache.set(cache_key, payload, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
-    return Response(payload)
+    return _cached_offline_data_response(token)
 
 
 @api_view(['GET'])
@@ -2709,15 +2725,7 @@ def formation_offline_data(request, token):
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
 
-    cache_key = _offline_data_cache_key(token)
-    payload = cache.get(cache_key)
-    if payload is None:
-        try:
-            payload = _get_formation_offline_data_payload(token)
-        except OfflineDataError as exc:
-            return Response({'detail': exc.detail}, status=exc.status_code)
-        cache.set(cache_key, payload, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
-    return Response(payload)
+    return _cached_offline_data_response(token)
 
 
 @api_view(['GET'])
