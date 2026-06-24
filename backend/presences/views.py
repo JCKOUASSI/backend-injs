@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.utils import timezone
 from django.db.models import Q
 from math import radians, sin, cos, sqrt, atan2
@@ -570,6 +571,7 @@ def scan_view(request):
             )
             nb_sessions = sessions_jour.count()
 
+            _invalidate_offline_data_cache(qr_token.token)
             return Response({
                 'action': 'SORTIE',
                 'type_personne': type_str,
@@ -665,6 +667,7 @@ def scan_view(request):
             device_id=device_id,
         )
 
+        _invalidate_offline_data_cache(qr_token.token)
         return Response({
             'action': 'ENTREE',
             'type_personne': type_str,
@@ -867,6 +870,7 @@ def secure_scan_view(request):
             )
             nb_sessions = sessions_jour.count()
 
+            _invalidate_offline_data_cache(qr_token.token)
             return Response({
                 'action': 'SORTIE',
                 'type_personne': type_str,
@@ -1010,6 +1014,7 @@ def secure_scan_view(request):
             },
         )
 
+        _invalidate_offline_data_cache(qr_token.token)
         return Response({
             'action': 'ENTREE',
             'type_personne': type_str,
@@ -2540,15 +2545,37 @@ def participant_notes_fiche_export(request, pk, fmt):
 # PARTICIPANT — Lookup par numéro (pour app mobile R7)
 # ──────────────────────────────────────────────
 
-def _formation_offline_data_response(token):
-    """Données hors-ligne pour un token QR (UUID). Retourne un Response DRF."""
+class OfflineDataError(Exception):
+    """Erreur métier pour la préparation des données hors-ligne."""
+
+    def __init__(self, detail, status_code):
+        self.detail = detail
+        self.status_code = status_code
+        super().__init__(detail)
+
+
+OFFLINE_DATA_CACHE_TIMEOUT = 300  # 5 minutes
+
+
+def _offline_data_cache_key(token):
+    """Clé de cache Redis pour les données hors-ligne d'un token QR."""
+    return f"offline_data:{token}"
+
+
+def _invalidate_offline_data_cache(token):
+    """Invalide le cache offline-data pour un token QR donné."""
+    cache.delete(_offline_data_cache_key(token))
+
+
+def _get_formation_offline_data_payload(token):
+    """Données hors-ligne pour un token QR (UUID). Retourne un dict sérialisable."""
     try:
         qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
     except QRToken.DoesNotExist:
-        return Response({'detail': 'Token invalide.'}, status=status.HTTP_404_NOT_FOUND)
+        raise OfflineDataError('Token invalide.', status.HTTP_404_NOT_FOUND)
 
     if qr_token.is_expired:
-        return Response({'detail': 'Token expiré.'}, status=status.HTTP_400_BAD_REQUEST)
+        raise OfflineDataError('Token expiré.', status.HTTP_400_BAD_REQUEST)
 
     # Si le token a été remplacé (regeneration QR), utiliser le token actif courant
     if not qr_token.actif:
@@ -2559,12 +2586,21 @@ def _formation_offline_data_response(token):
         if replacement and replacement.is_valid:
             qr_token = replacement
         else:
-            return Response({'detail': 'Token désactivé. Aucun QR actif pour cette séance.'}, status=status.HTTP_400_BAD_REQUEST)
+            raise OfflineDataError(
+                'Token désactivé. Aucun QR actif pour cette séance.',
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     if not qr_token.session:
-        return Response({'detail': 'Ce token n\'est pas lié à une séance.'}, status=status.HTTP_400_BAD_REQUEST)
+        raise OfflineDataError(
+            'Ce token n\'est pas lié à une séance.',
+            status.HTTP_400_BAD_REQUEST,
+        )
     if qr_token.session.est_terminee:
-        return Response({'detail': 'Token désactivé. Cette séance est terminée.'}, status=status.HTTP_400_BAD_REQUEST)
+        raise OfflineDataError(
+            'Token désactivé. Cette séance est terminée.',
+            status.HTTP_400_BAD_REQUEST,
+        )
     formation = qr_token.session.module.formation
 
     participants = []
@@ -2606,7 +2642,7 @@ def _formation_offline_data_response(token):
     batiment = (module.batiment if module else '')
     salle    = (module.salle    if module else '')
 
-    return Response({
+    return {
         'formation': {
             'id': formation.id,
             'titre': formation.formation,
@@ -2618,7 +2654,7 @@ def _formation_offline_data_response(token):
         'participants': participants,
         'formateurs': formateurs,
         'encadrants': encadrants,
-    })
+    }
 
 
 @api_view(['GET'])
@@ -2629,6 +2665,8 @@ def scan_offline_data(request):
     Données hors-ligne pour la page badge (token QR en query string).
 
     GET /api/scan/offline-data/?token=<uuid>
+
+    Les données sont mises en cache Redis (5 min) car quasi-statiques.
     """
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
@@ -2645,7 +2683,16 @@ def scan_offline_data(request):
             {'detail': 'Token QR invalide (UUID attendu, pas un ID formation).'},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    return _formation_offline_data_response(token)
+
+    cache_key = _offline_data_cache_key(token)
+    payload = cache.get(cache_key)
+    if payload is None:
+        try:
+            payload = _get_formation_offline_data_payload(token)
+        except OfflineDataError as exc:
+            return Response({'detail': exc.detail}, status=exc.status_code)
+        cache.set(cache_key, payload, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
+    return Response(payload)
 
 
 @api_view(['GET'])
@@ -2656,10 +2703,21 @@ def formation_offline_data(request, token):
     Données hors-ligne (legacy) — token QR dans le chemin.
 
     Préférer ``GET /api/scan/offline-data/?token=…``.
+
+    Les données sont mises en cache Redis (5 min) car quasi-statiques.
     """
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
-    return _formation_offline_data_response(token)
+
+    cache_key = _offline_data_cache_key(token)
+    payload = cache.get(cache_key)
+    if payload is None:
+        try:
+            payload = _get_formation_offline_data_payload(token)
+        except OfflineDataError as exc:
+            return Response({'detail': exc.detail}, status=exc.status_code)
+        cache.set(cache_key, payload, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
+    return Response(payload)
 
 
 @api_view(['GET'])
