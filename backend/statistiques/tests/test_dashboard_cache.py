@@ -135,7 +135,8 @@ class StatsBilansCacheTests(TestCase):
             Response({'detail': 'Introuvable.'}, status=404),
         )
 
-        url = '/api/statistiques/bilans/?annee=2024&dimension=module&detail=1&module_id=999'
+        # Sans module_id dans l'URL : sinon resolve_stats_scope renvoie 403 avant le mock.
+        url = '/api/statistiques/bilans/?annee=2024&dimension=module&detail=1'
         res1 = self.client.get(url)
         res2 = self.client.get(url)
 
