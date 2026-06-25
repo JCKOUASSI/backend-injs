@@ -217,6 +217,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'login': os.environ.get('THROTTLE_LOGIN_RATE', '20/min'),
         'scan': os.environ.get('THROTTLE_SCAN_RATE', '30/min'),
+        'offline_data': os.environ.get('THROTTLE_OFFLINE_DATA_RATE', '60/min'),
     },
 }
 

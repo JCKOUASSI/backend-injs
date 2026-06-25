@@ -51,3 +51,21 @@ class ScanRateThrottle(SimpleRateThrottle):
         token_key = str(token).split('-')[0] if token else 'no-token'
         return f'scan:{ip}:{token_key}'
 
+
+class OfflineDataRateThrottle(SimpleRateThrottle):
+    """Throttling anti polling agressif sur l'endpoint offline-data."""
+
+    scope = 'offline_data'
+
+    def get_cache_key(self, request, view):
+        token = (
+            (request.query_params or {}).get('token', '')
+            or getattr(view, 'kwargs', {}).get('token', '')
+            or ''
+        )
+        token = str(token).strip().lower()
+        if not token:
+            ip = _client_ip(request)
+            return f'offline_data:{ip}:no-token'
+        return f'offline_data:{token}'
+

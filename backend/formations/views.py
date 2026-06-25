@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariat, IsSecretariatOrDFRC, IsEncadrant, IsSecretariatOrEncadrant, IsSecretariatOrEncadrantOrDFRC, CanManageParticipant, CanManageModuleParticipant
 from presences.models import AuditLog, _log_audit
+from presences.offline_cache import invalidate_offline_data_cache
 from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -566,10 +567,15 @@ def generate_qr(request, pk):
         )
 
     # Désactiver les anciens QR tokens (formation + séance cible si fournie)
+    # et invalider leur cache offline-data pour éviter de servir des données
+    # obsolètes après régénération.
     qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
     if session is not None:
         qr_filter = qr_filter.filter(session=session)
+    old_tokens = list(qr_filter.values_list('token', flat=True))
     qr_filter.update(actif=False)
+    for old_token in old_tokens:
+        invalidate_offline_data_cache(old_token)
 
     # Durée d'expiration configurable
     expire_in = request.data.get('expire_in', None)
