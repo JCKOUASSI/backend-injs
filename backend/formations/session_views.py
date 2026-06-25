@@ -13,6 +13,7 @@ from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
 from presences.models import AuditLog, _log_audit, log_audit_system
+from presences.offline_cache import invalidate_offline_data_cache
 from .models import Formation, Module, SessionModule, QRToken
 from .serializers import SessionSerializer, ModuleSerializer
 from .session_edt_balance import SessionEdtBalanceError, apply_session_edit_with_edt_balance
@@ -32,6 +33,12 @@ def _session_audit_extra(session):
         'module_id': session.module_id,
         'module_intitule': session.module.intitule,
     }
+
+
+def _invalidate_session_qr_cache(session):
+    """Invalide le cache offline-data des QR tokens actifs d'une séance."""
+    for token in QRToken.objects.filter(session=session, actif=True).values_list('token', flat=True):
+        invalidate_offline_data_cache(token)
 
 
 def _session_duplicate_detail(session, *, conflict=None):
@@ -86,6 +93,10 @@ def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
             demarree_le__isnull=False,
             terminee_le__isnull=True,
         ).exclude(pk=session.pk).update(terminee_le=now)
+
+    # Invalider le cache offline-data avant de réactiver : la date de
+    # séance ou les participants/formateurs peuvent avoir changé.
+    _invalidate_session_qr_cache(session)
 
     update_fields = ['terminee_le']
     session.terminee_le = None
@@ -256,6 +267,7 @@ def _auto_manage_sessions(formation):
         if _should_auto_close_session(session, local_now):
             session.terminee_le = _session_fin_prevue_local(session)
             session.save(update_fields=['terminee_le'])
+            _invalidate_session_qr_cache(session)
             QRToken.objects.filter(session=session, actif=True).update(actif=False)
             log_audit_system(
                 AuditLog.Action.SEANCE_STOP,
@@ -354,8 +366,9 @@ def session_stop(request, formation_pk, session_pk):
     
     session.terminee_le = timezone.now()
     session.save()
+    _invalidate_session_qr_cache(session)
     QRToken.objects.filter(session=session, actif=True).update(actif=False)
-    
+
     # Check if all sessions of the module are terminated
     module = session.module
     remaining = module.sessions.filter(terminee_le__isnull=True).exclude(pk=session.pk).count()

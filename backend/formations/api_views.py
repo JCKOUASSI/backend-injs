@@ -19,6 +19,7 @@ from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
+from presences.offline_cache import invalidate_offline_data_cache
 
 from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
 FormationParticipant = ModuleParticipant
@@ -2696,12 +2697,16 @@ def api_generate_qr(request, formation_pk, session_pk=None):
             status=400,
         )
     
-    # Deactivate old QR tokens
+    # Deactivate old QR tokens and invalidate their offline-data cache
+    # to avoid serving stale data after regeneration.
     qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
     if session:
         qr_filter = qr_filter.filter(session=session)
+    old_tokens = list(qr_filter.values_list('token', flat=True))
     qr_filter.update(actif=False)
-    
+    for old_token in old_tokens:
+        invalidate_offline_data_cache(old_token)
+
     # Create new token
     qr_token = QRToken.objects.create(
         session=session,

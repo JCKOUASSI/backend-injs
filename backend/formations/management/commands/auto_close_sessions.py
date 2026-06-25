@@ -20,6 +20,7 @@ from django.utils import timezone
 from formations.models import SessionModule, QRToken
 from formations.session_views import (
     AUTO_CLOSE_DELAY_MINUTES,
+    _invalidate_session_qr_cache,
     _session_fin_prevue_local,
     _should_auto_close_session,
 )
@@ -85,6 +86,7 @@ class Command(BaseCommand):
 
             sess.terminee_le = terminee_le_utc
             sess.save(update_fields=['terminee_le'])
+            _invalidate_session_qr_cache(sess)
             QRToken.objects.filter(session=sess, actif=True).update(actif=False)
             self.stdout.write(self.style.SUCCESS(f"Clôturée : {label}"))
             cloturees += 1

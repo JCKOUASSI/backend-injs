@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 from datetime import timedelta
 
@@ -17,7 +18,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
-from authentication.throttles import ScanRateThrottle
+from authentication.throttles import ScanRateThrottle, OfflineDataRateThrottle
 from formations.models import (
     Formation, Participant, Module, ModuleParticipant, ModuleFormateur,
     Formateur, QRToken, SessionModule, RefSite,
@@ -26,6 +27,12 @@ FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
 from .models import Pointage, DeviceBinding, AuditLog, _log_audit
+from .offline_cache import (
+    OFFLINE_DATA_CACHE_TIMEOUT,
+    OFFLINE_DATA_LOCK_TIMEOUT,
+    offline_data_cache_key,
+    offline_data_lock_key,
+)
 from .serializers import (
     PointageSerializer,
     ScanSerializer,
@@ -2553,17 +2560,12 @@ class OfflineDataError(Exception):
         super().__init__(detail)
 
 
-OFFLINE_DATA_CACHE_TIMEOUT = 300  # 5 minutes
-
-
-def _offline_data_cache_key(token):
-    """Clé de cache Redis pour les données hors-ligne d'un token QR."""
-    return f"offline_data:{token}"
-
-
-def _invalidate_offline_data_cache(token):
-    """Invalide le cache offline-data pour un token QR donné."""
-    cache.delete(_offline_data_cache_key(token))
+def _compute_offline_data_json(token):
+    """Calcule et sérialise le payload offline-data (≈450 KB)."""
+    payload = _get_formation_offline_data_payload(token)
+    return json.dumps(
+        payload, cls=DjangoJSONEncoder, separators=(',', ':'), ensure_ascii=False,
+    )
 
 
 def _cached_offline_data_response(token):
@@ -2572,18 +2574,45 @@ def _cached_offline_data_response(token):
     depuis le cache. Sur un cache hit, aucune re-sérialisation DRF n'a lieu :
     on renvoie directement les octets JSON via un HttpResponse brut, ce qui
     élimine le coût CPU de rendu à chaque requête.
+
+    Un verrou Redis (cache.add) protège contre la ruée vers le cache (thundering
+    herd) : une seule requête regénère le payload, les autres attendent le résultat.
     """
-    cache_key = _offline_data_cache_key(token)
+    cache_key = offline_data_cache_key(token)
     cached_json = cache.get(cache_key)
-    if cached_json is None:
+    if cached_json is not None:
+        return HttpResponse(cached_json, content_type='application/json')
+
+    lock_key = offline_data_lock_key(token)
+    lock_acquired = cache.add(lock_key, True, timeout=OFFLINE_DATA_LOCK_TIMEOUT)
+
+    if lock_acquired:
         try:
-            payload = _get_formation_offline_data_payload(token)
-        except OfflineDataError as exc:
-            return Response({'detail': exc.detail}, status=exc.status_code)
-        cached_json = json.dumps(
-            payload, cls=DjangoJSONEncoder, separators=(',', ':'), ensure_ascii=False,
-        )
-        cache.set(cache_key, cached_json, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
+            cached_json = cache.get(cache_key)
+            if cached_json is None:
+                try:
+                    cached_json = _compute_offline_data_json(token)
+                except OfflineDataError as exc:
+                    return Response({'detail': exc.detail}, status=exc.status_code)
+                cache.set(cache_key, cached_json, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
+        finally:
+            cache.delete(lock_key)
+        return HttpResponse(cached_json, content_type='application/json')
+
+    # Attente passive si un autre worker regénère déjà le payload.
+    deadline = time.monotonic() + OFFLINE_DATA_LOCK_TIMEOUT
+    while time.monotonic() < deadline:
+        time.sleep(0.1)
+        cached_json = cache.get(cache_key)
+        if cached_json is not None:
+            return HttpResponse(cached_json, content_type='application/json')
+
+    # Dernier recours : regénérer localement si le verrou a été abandonné.
+    try:
+        cached_json = _compute_offline_data_json(token)
+    except OfflineDataError as exc:
+        return Response({'detail': exc.detail}, status=exc.status_code)
+    cache.set(cache_key, cached_json, timeout=OFFLINE_DATA_CACHE_TIMEOUT)
     return HttpResponse(cached_json, content_type='application/json')
 
 
@@ -2623,39 +2652,44 @@ def _get_formation_offline_data_payload(token):
         )
     formation = qr_token.session.module.formation
 
-    participants = []
-    seen_ids = set()
-    for fp in ModuleParticipant.objects.filter(module__formation=formation).select_related('participant'):
-        if fp.participant_id in seen_ids:
-            continue
-        seen_ids.add(fp.participant_id)
-        p = fp.participant
-        participants.append({'numero': p.matricule, 'nom': p.nom, 'prenom': p.prenom})
+    participants = [
+        {'numero': matricule, 'nom': nom, 'prenom': prenom}
+        for matricule, nom, prenom in (
+            Participant.objects.filter(
+                modules_inscrits__module__formation=formation,
+            )
+            .distinct()
+            .values_list('matricule', 'nom', 'prenom')
+        )
+    ]
 
-    formateurs = []
-    seen_ff = set()
-    for ff in ModuleFormateur.objects.filter(module__formation=formation).select_related('formateur'):
-        if ff.formateur_id in seen_ff:
-            continue
-        seen_ff.add(ff.formateur_id)
-        f = ff.formateur
-        formateurs.append({'numero': f.numerobadge, 'nom': f.nom, 'prenom': f.prenom})
+    formateurs = [
+        {'numero': numerobadge, 'nom': nom, 'prenom': prenom}
+        for numerobadge, nom, prenom in (
+            Formateur.objects.filter(
+                modules_assignes__module__formation=formation,
+            )
+            .distinct()
+            .values_list('numerobadge', 'nom', 'prenom')
+        )
+    ]
 
-    encadrants = []
-    seen_enc = set()
-    for enc in User.objects.filter(
-        role='ENCADRANT',
-        modules_supervises__formation=formation,
-    ).distinct():
-        if enc.id in seen_enc:
-            continue
-        seen_enc.add(enc.id)
-        encadrants.append({
-            'numero': enc.matricule or '',
-            'nom': enc.last_name or '',
-            'prenom': enc.first_name or '',
-            'username': enc.username,
-        })
+    encadrants = [
+        {
+            'numero': matricule or '',
+            'nom': last_name or '',
+            'prenom': first_name or '',
+            'username': username,
+        }
+        for matricule, last_name, first_name, username in (
+            User.objects.filter(
+                role='ENCADRANT',
+                modules_supervises__formation=formation,
+            )
+            .distinct()
+            .values_list('matricule', 'last_name', 'first_name', 'username')
+        )
+    ]
 
     module = getattr(qr_token.session, 'module', None) if qr_token.session else None
     site     = ((module.site.nom if getattr(module, 'site', None) else getattr(module, 'site_legacy', '')) if module else '')
@@ -2680,13 +2714,14 @@ def _get_formation_offline_data_payload(token):
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([OfflineDataRateThrottle])
 def scan_offline_data(request):
     """
     Données hors-ligne pour la page badge (token QR en query string).
 
     GET /api/scan/offline-data/?token=<uuid>
 
-    Les données sont mises en cache Redis (5 min) car quasi-statiques.
+    Les données sont mises en cache Redis (1 h) car quasi-statiques.
     """
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
@@ -2710,13 +2745,14 @@ def scan_offline_data(request):
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([OfflineDataRateThrottle])
 def formation_offline_data(request, token):
     """
     Données hors-ligne (legacy) — token QR dans le chemin.
 
     Préférer ``GET /api/scan/offline-data/?token=…``.
 
-    Les données sont mises en cache Redis (5 min) car quasi-statiques.
+    Les données sont mises en cache Redis (1 h) car quasi-statiques.
     """
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
