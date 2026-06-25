@@ -121,9 +121,7 @@ def formateurs_queryset_for_user(user, queryset=None):
         sec = user.secretariat
         if not sec:
             return qs.none()
-        return qs.filter(
-            Q(secretariats=sec) | Q(modules_assignes__module__secretariat=sec)
-        ).distinct()
+        return qs
     if user.role == 'ENCADRANT':
         return qs.filter(
             modules_assignes__module__superviseur=user

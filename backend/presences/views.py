@@ -574,7 +574,6 @@ def scan_view(request):
             )
             nb_sessions = sessions_jour.count()
 
-            _invalidate_offline_data_cache(qr_token.token)
             return Response({
                 'action': 'SORTIE',
                 'type_personne': type_str,
@@ -670,7 +669,6 @@ def scan_view(request):
             device_id=device_id,
         )
 
-        _invalidate_offline_data_cache(qr_token.token)
         return Response({
             'action': 'ENTREE',
             'type_personne': type_str,
@@ -873,7 +871,6 @@ def secure_scan_view(request):
             )
             nb_sessions = sessions_jour.count()
 
-            _invalidate_offline_data_cache(qr_token.token)
             return Response({
                 'action': 'SORTIE',
                 'type_personne': type_str,
@@ -1017,7 +1014,6 @@ def secure_scan_view(request):
             },
         )
 
-        _invalidate_offline_data_cache(qr_token.token)
         return Response({
             'action': 'ENTREE',
             'type_personne': type_str,
