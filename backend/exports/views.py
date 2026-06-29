@@ -317,6 +317,7 @@ def _finance_formateur_summary_rows(formateur, request=None):
             ],
             'numero_piece_identite': formateur.numero_piece_identite or '',
             'numero_compte_bancaire': formateur.numero_compte_bancaire or '',
+            'observations': formateur.observations or '',
         },
     }
 
@@ -471,7 +472,8 @@ def _finance_billing_mode_label():
 def _finance_strip_formateur_sensitive(formateur_dict, request):
     if not formateur_dict:
         return formateur_dict
-    if request and getattr(request.user, 'role', None) == 'FINANCE':
+    # FINANCE et ARCHIVE peuvent voir/exporter les données sensibles.
+    if request and getattr(request.user, 'role', None) in ('FINANCE', 'ARCHIVE'):
         return formateur_dict
     out = dict(formateur_dict)
     out.pop('numero_piece_identite', None)
@@ -2549,6 +2551,33 @@ def export_finance_formateur_pdf(request, formateur_pk):
     elements.append(main_table)
     elements.append(Spacer(1, 0.5 * cm))
 
+    # ── Bloc identité & observations (fiche complète) ──
+    identite_lignes = []
+    if fmt.get('specialite'):
+        identite_lignes.append(f"<b>Spécialité :</b> {_esc(fmt.get('specialite'))}")
+    if fmt.get('organisation'):
+        identite_lignes.append(f"<b>Organisation :</b> {_esc(fmt.get('organisation'))}")
+    if fmt.get('email'):
+        identite_lignes.append(f"<b>E-mail :</b> {_esc(fmt.get('email'))}")
+    if fmt.get('telephone'):
+        identite_lignes.append(f"<b>Téléphone :</b> {_esc(fmt.get('telephone'))}")
+    if fmt.get('numero_piece_identite'):
+        identite_lignes.append(f"<b>N° pièce d'identité :</b> {_esc(fmt.get('numero_piece_identite'))}")
+    if fmt.get('numero_compte_bancaire'):
+        identite_lignes.append(f"<b>N° compte bancaire (RIB) :</b> {_esc(fmt.get('numero_compte_bancaire'))}")
+    if identite_lignes:
+        elements.append(Paragraph('<u>IDENTITÉ</u>', style_confidentiel))
+        for ligne in identite_lignes:
+            elements.append(Paragraph(ligne, style_body))
+        elements.append(Spacer(1, 0.4 * cm))
+
+    observations_txt = (fmt.get('observations') or '').strip()
+    if observations_txt:
+        elements.append(Paragraph('<u>OBSERVATIONS</u>', style_confidentiel))
+        for para in observations_txt.split('\n'):
+            elements.append(Paragraph(_esc(para) or '&nbsp;', style_body))
+        elements.append(Spacer(1, 0.5 * cm))
+
     for line in _finance_paie_contacts(export_opts):
         elements.append(Paragraph(_esc(line), style_body))
     elements.append(Spacer(1, 0.6 * cm))
@@ -2714,6 +2743,45 @@ def export_finance_formateur_excel(request, formateur_pk):
     total_planifie_cell.border = black_border
     total_planifie_cell.alignment = Alignment(horizontal='center')
     row_idx += 2
+
+    # ── Bloc identité & observations (fiche complète) ──
+    identite_pairs = []
+    if fmt.get('specialite'):
+        identite_pairs.append(('Spécialité', fmt.get('specialite')))
+    if fmt.get('organisation'):
+        identite_pairs.append(('Organisation', fmt.get('organisation')))
+    if fmt.get('email'):
+        identite_pairs.append(('E-mail', fmt.get('email')))
+    if fmt.get('telephone'):
+        identite_pairs.append(('Téléphone', fmt.get('telephone')))
+    if fmt.get('numero_piece_identite'):
+        identite_pairs.append(("N° pièce d'identité", fmt.get('numero_piece_identite')))
+    if fmt.get('numero_compte_bancaire'):
+        identite_pairs.append(('N° compte bancaire (RIB)', fmt.get('numero_compte_bancaire')))
+    if identite_pairs:
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+        hdr = ws.cell(row=row_idx, column=1, value='IDENTITÉ')
+        hdr.font = Font(bold=True, size=10)
+        row_idx += 1
+        for label, value in identite_pairs:
+            lbl = ws.cell(row=row_idx, column=1, value=label)
+            lbl.font = Font(bold=True, size=9)
+            ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=last_col)
+            ws.cell(row=row_idx, column=2, value=str(value)).font = Font(size=9)
+            row_idx += 1
+        row_idx += 1
+
+    observations_txt = (fmt.get('observations') or '').strip()
+    if observations_txt:
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+        obs_hdr = ws.cell(row=row_idx, column=1, value='OBSERVATIONS')
+        obs_hdr.font = Font(bold=True, size=10)
+        row_idx += 1
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
+        obs_cell = ws.cell(row=row_idx, column=1, value=observations_txt)
+        obs_cell.font = Font(size=9)
+        obs_cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
+        row_idx += 2
 
     for text in _finance_paie_contacts(export_opts):
         ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)

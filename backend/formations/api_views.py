@@ -7,14 +7,14 @@ from io import BytesIO
 from datetime import timedelta, datetime, time, date
 import calendar
 import re
-from django.db.models import Count, Q, F, Prefetch
+from django.db.models import Count, Q, F, Prefetch, Case, When, Value, IntegerField
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
-from suiviEvaluation.permissions import IsGestionNotes
+from suiviEvaluation.permissions import IsGestionNotes, IsGestionNotesOrReadOnly
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
 from rest_framework.response import Response
@@ -555,6 +555,20 @@ def formation_list_api(request):
     if vague_filter:
         queryset = queryset.filter(vague__iexact=vague_filter)
 
+    formation_id_filter = request.query_params.get('formation_id')
+    if formation_id_filter:
+        queryset = queryset.filter(formation_id=formation_id_filter)
+
+    annee_filter = request.query_params.get('annee')
+    if annee_filter:
+        try:
+            annee_val = int(annee_filter)
+            queryset = queryset.filter(
+                Q(date_debut__year=annee_val) | Q(date_fin__year=annee_val)
+            ).distinct()
+        except (ValueError, TypeError):
+            pass
+
     groupe_param = request.query_params.get('groupe')
     if groupe_param:
         groupe_normalise = _normalize_groupe_value(groupe_param)
@@ -866,7 +880,7 @@ def formateur_list_api(request):
     end = start + page_size
     formateurs = queryset[start:end]
     
-    serializer = FormateurSerializer(formateurs, many=True)
+    serializer = FormateurSerializer(formateurs, many=True, context={'request': request})
     
     return Response({
         'results': serializer.data,
@@ -1991,6 +2005,7 @@ def _finance_report_rows(
             ],
             'numero_piece_identite': formateur.numero_piece_identite or '',
             'numero_compte_bancaire': formateur.numero_compte_bancaire or '',
+            'observations': formateur.observations or '',
             'nb_formations': len(modules_list),
             'created_at': formateur.created_at,
             'prix_heure_realisee': row_prix_heure,
@@ -2139,7 +2154,7 @@ def formateur_finance_report_api(request):
                 payload['secretariat_filtre'] = {'id': sec.id, 'nom': sec.nom, 'numero': sec.numero}
             except Secretariat.DoesNotExist:
                 pass
-        if request.user.role != 'FINANCE':
+        if request.user.role not in ('FINANCE', 'ARCHIVE'):
             for row in results:
                 row.pop('numero_piece_identite', None)
                 row.pop('numero_compte_bancaire', None)
@@ -2149,7 +2164,7 @@ def formateur_finance_report_api(request):
     page_size = int(request.query_params.get('page_size', 25))
     include_sessions = request.query_params.get('include_sessions', '0').lower() in ('1', 'true', 'yes')
 
-    queryset = Formateur.objects.prefetch_related('secretariats').order_by('nom', 'prenom')
+    queryset = Formateur.objects.prefetch_related('secretariats')
     queryset = _finance_filter_formateur_queryset(queryset, secretariat_id)
     search = (request.query_params.get('search') or '').strip()
     if search:
@@ -2158,6 +2173,19 @@ def formateur_finance_report_api(request):
             Q(prenom__icontains=search) |
             Q(specialite__icontains=search)
         )
+    # Afficher en premier les formateurs qui dispensent des cours
+    # (au moins un module assigné ou rattaché directement), puis l'ordre alphabétique.
+    queryset = queryset.annotate(
+        _nb_modules_assignes=Count('modules_assignes', distinct=True),
+        _nb_modules_direct=Count('modules', distinct=True),
+    ).annotate(
+        _dispense_cours=Case(
+            When(_nb_modules_assignes__gt=0, then=Value(1)),
+            When(_nb_modules_direct__gt=0, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        ),
+    ).order_by('-_dispense_cours', 'nom', 'prenom')
 
     total_count = queryset.count()
     start = (page - 1) * page_size
@@ -2184,7 +2212,7 @@ def formateur_finance_report_api(request):
             list_payload['secretariat_filtre'] = {'id': sec.id, 'nom': sec.nom, 'numero': sec.numero}
         except Secretariat.DoesNotExist:
             pass
-    if request.user.role != 'FINANCE':
+    if request.user.role not in ('FINANCE', 'ARCHIVE'):
         for row in results:
             row.pop('numero_piece_identite', None)
             row.pop('numero_compte_bancaire', None)
@@ -3718,9 +3746,12 @@ def module_full_detail_api(request, formation_pk, module_pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsGestionNotes])
+@permission_classes([IsGestionNotesOrReadOnly])
 def module_notes_list_api(request, formation_pk, module_pk):
-    """Liste les auditeurs inscrits au module avec leurs notes par colonne."""
+    """Liste les auditeurs inscrits au module avec leurs notes par colonne.
+
+    Lecture seule autorisée pour les rôles de consultation (dont ARCHIVE).
+    """
     denied = deny_finance_operational_response(request)
     if denied:
         return denied
@@ -4216,6 +4247,14 @@ def referentiels_api(request):
         key=lambda x: (x.lower(), x),
     )
 
+    annees = set()
+    for d_debut, d_fin in mods_groupes_qs.values_list('date_debut', 'date_fin'):
+        if d_debut:
+            annees.add(d_debut.year)
+        if d_fin:
+            annees.add(d_fin.year)
+    annees = sorted(annees, reverse=True)
+
     payload = {
         'formations': formations,
         'formations_reelles': formations_reelles,
@@ -4230,6 +4269,7 @@ def referentiels_api(request):
         'grades': grades,
         'types_secretariat': types_secretariat,
         'vagues': vagues,
+        'annees': annees,
     }
     set_cached_response(cache_key, payload, 300)
     return Response(payload)

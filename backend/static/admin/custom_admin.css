@@ -1,20 +1,20 @@
-/* SYGEP-CPFAE — Thème admin bleu & vert (django-unfold) */
+/* SYGEP-CPFAE — Thème admin orange / blanc / vert (django-unfold) */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ── Variables (alignées sur le dashboard CPFAE) ─────────────────────────── */
+/* ── Variables (palette orange / blanc / vert) ───────────────────────────── */
 :root {
-    --admin-bg: #f0f4f8;
+    --admin-bg: #fff7ed;
     --admin-surface: #ffffff;
-    --admin-blue: #1565c0;
-    --admin-blue-dark: #0d47a1;
-    --admin-blue-light: #1976d2;
-    --admin-green: #43a047;
-    --admin-green-dark: #388e3c;
+    --admin-blue: #ea580c;
+    --admin-blue-dark: #c2410c;
+    --admin-blue-light: #f97316;
+    --admin-green: #16a34a;
+    --admin-green-dark: #15803d;
     --admin-text: #1e293b;
-    --admin-muted: #64748b;
-    --admin-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
-    --admin-shadow-hover: 0 12px 32px rgba(21, 101, 192, 0.14);
+    --admin-muted: #78716c;
+    --admin-shadow: 0 4px 24px rgba(124, 45, 18, 0.06);
+    --admin-shadow-hover: 0 12px 32px rgba(234, 88, 12, 0.16);
     --admin-radius: 20px;
     --admin-radius-pill: 999px;
 }
@@ -686,6 +686,82 @@ nav[aria-label="Tabs"] a[class*="bg-primary-600"] {
 .results td,
 .results th {
     color: var(--admin-text) !important;
+}
+
+/* ── Barre d'actions du changelist (fin du blanc sur blanc) ──────────────── */
+#changelist .actions,
+#changelist-form .actions,
+.actions {
+    background: #ffedd5 !important;
+    border: 1px solid var(--admin-blue) !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    margin: 12px 0 !important;
+    color: var(--admin-text) !important;
+}
+
+#changelist .actions label,
+.actions label {
+    color: var(--admin-text) !important;
+    font-weight: 600 !important;
+}
+
+#changelist .actions select,
+#changelist-form .actions select,
+.actions select {
+    background: #ffffff !important;
+    border: 2px solid var(--admin-blue) !important;
+    color: var(--admin-text) !important;
+    border-radius: 10px !important;
+    padding: 6px 10px !important;
+    font-weight: 500 !important;
+}
+
+#changelist .actions button,
+#changelist-form .actions button,
+.actions button,
+#changelist .actions input[type="submit"],
+.actions input[type="submit"] {
+    background: var(--admin-green) !important;
+    color: #ffffff !important;
+    border: 1px solid var(--admin-green-dark) !important;
+    border-radius: var(--admin-radius-pill) !important;
+    padding: 6px 16px !important;
+    font-weight: 600 !important;
+}
+
+#changelist .actions button:hover,
+.actions button:hover,
+.actions input[type="submit"]:hover {
+    background: var(--admin-green-dark) !important;
+}
+
+/* Cases / radios de sélection visibles */
+#result_list input[type="checkbox"],
+#changelist-form input[type="checkbox"],
+#result_list input[type="radio"],
+#changelist-form input[type="radio"] {
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    accent-color: var(--admin-blue) !important;
+    border: 2px solid var(--admin-blue) !important;
+    background: #ffffff !important;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+#result_list input[type="radio"],
+#changelist-form input[type="radio"] {
+    -webkit-appearance: radio !important;
+    appearance: radio !important;
+    border-radius: 50% !important;
+}
+
+/* Ligne sélectionnée visible */
+#result_list tbody tr.selected,
+#result_list tbody tr:has(td input[type="checkbox"]:checked) {
+    background: #ffedd5 !important;
 }
 
 /* ── Login page ──────────────────────────────────────────────────────────── */

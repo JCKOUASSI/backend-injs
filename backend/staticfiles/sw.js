@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qr-badge-v2';
+const CACHE_NAME = 'qr-badge-v3';
 
 const CDN_ASSETS = [
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
@@ -56,16 +56,26 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // ── Offline-data API: network-first, cache fallback ──
-    if (url.pathname.includes('/offline-data/')) {
+    // ── Offline-data API: stale-while-revalidate ──
+    // Données quasi-statiques (~450 KB). On sert immédiatement la copie en
+    // cache si elle existe et on rafraîchit en arrière-plan : la majorité des
+    // requêtes ne touchent plus le backend (réduit fortement la charge CPU).
+    if (url.pathname.includes('/offline-data/') || url.pathname.includes('/scan/offline-data')) {
         event.respondWith(
-            fetch(event.request)
-                .then((response) => {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
+            caches.match(event.request).then((cached) => {
+                const networkFetch = fetch(event.request)
+                    .then((response) => {
+                        // Ne cacher que les réponses valides (200)
+                        if (response && response.ok) {
+                            const clone = response.clone();
+                            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                        }
+                        return response;
+                    })
+                    .catch(() => cached);
+                // Cache hit → réponse instantanée + revalidation en arrière-plan
+                return cached || networkFetch;
+            })
         );
         return;
     }
