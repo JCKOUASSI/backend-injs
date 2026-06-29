@@ -35,7 +35,32 @@ _HEADER_LINES = [
     "Centre de Perfectionnement des Fonctionnaires et Agents de l'État — CPFAE",
 ]
 
-_TABLE_HEADERS = ['N°', 'Matricule', 'Nom', 'Prénom', 'Sexe', 'Grade', 'Téléphone', 'Type concours']
+_TABLE_HEADERS = ['N°', 'Matricule', 'Nom', 'Prénom', 'Sexe', 'Grade', 'Téléphone', 'Type concours', 'Moyenne', 'Temps', 'Décision']
+
+_DECISION_LABELS = {
+    'ADMIS': 'Admis',
+    'AJOURNE': 'Ajourné',
+    'EXCLUSION': 'Exclusion',
+    'EN_ATTENTE': 'En attente',
+}
+
+
+def _decision_moyenne(decision):
+    if decision is None or decision.moyenne_generale is None:
+        return '—'
+    return f"{decision.moyenne_generale}/20"
+
+
+def _decision_temps(decision):
+    if decision is None or decision.taux_presence is None:
+        return '—'
+    return f"{decision.taux_presence}%"
+
+
+def _decision_label(decision):
+    if decision is None:
+        return '—'
+    return _DECISION_LABELS.get(decision.decision, '—')
 
 
 def _normalize_groupe_value(value):
@@ -62,6 +87,7 @@ def _sexe_label(participant):
 
 
 def _participant_table_row(index, participant):
+    decision = getattr(participant, '_decision', None)
     return [
         index,
         participant.matricule or '—',
@@ -71,6 +97,9 @@ def _participant_table_row(index, participant):
         participant.grade or '—',
         participant.telephone or '—',
         participant.type_concours or '—',
+        _decision_moyenne(decision),
+        _decision_temps(decision),
+        _decision_label(decision),
     ]
 
 
@@ -126,6 +155,27 @@ def _apply_participant_filters(queryset, params):
     return qs.select_related('secretariat').order_by('nom', 'prenom', 'matricule')
 
 
+def _attach_decisions(participants):
+    """Attache à chaque participant sa décision pédagogique la plus récente (_decision)."""
+    if not participants:
+        return
+    try:
+        from suiviEvaluation.models import DecisionPedagogique
+    except Exception:
+        return
+    ids = [p.id for p in participants]
+    latest = {}
+    for dec in (
+        DecisionPedagogique.objects
+        .filter(participant_id__in=ids)
+        .order_by('participant_id', '-updated_at')
+    ):
+        if dec.participant_id not in latest:
+            latest[dec.participant_id] = dec
+    for p in participants:
+        p._decision = latest.get(p.id)
+
+
 def build_liste_classe_groups(queryset, params):
     """
     Retourne une liste de blocs {groupe, grade, secretariat, participants, effectif}.
@@ -133,6 +183,7 @@ def build_liste_classe_groups(queryset, params):
     """
     filtered = _apply_participant_filters(queryset, params)
     participants = list(filtered)
+    _attach_decisions(participants)
 
     buckets = defaultdict(list)
     for p in participants:
@@ -237,7 +288,10 @@ def export_liste_classe_pdf(blocks, meta=None):
             for num, participant in enumerate(block['participants'], start=1):
                 data.append([_p(v) for v in _participant_table_row(num, participant)])
 
-            col_widths = [0.8 * cm, 2.2 * cm, 3.0 * cm, 3.0 * cm, 1.2 * cm, 1.5 * cm, 2.5 * cm, 3.0 * cm]
+            col_widths = [
+                0.7 * cm, 2.0 * cm, 2.6 * cm, 2.6 * cm, 1.0 * cm, 1.3 * cm,
+                2.0 * cm, 2.2 * cm, 1.3 * cm, 1.3 * cm, 1.6 * cm,
+            ]
             table = Table(data, repeatRows=1, colWidths=col_widths)
             table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#388E3C')),
@@ -300,7 +354,7 @@ def _write_liste_classe_sheet(ws, block, meta=None):
             ws.cell(row=row, column=col, value=value)
         row += 1
 
-    widths = [5, 14, 18, 18, 8, 10, 14, 18]
+    widths = [5, 14, 18, 18, 8, 10, 14, 18, 10, 10, 12]
     for col, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col)].width = width
 

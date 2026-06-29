@@ -30,6 +30,9 @@ import EvaluationDashboard from './pages/EvaluationDashboard'
 import AnalyseQualitative from './pages/AnalyseQualitative'
 import NotesModule from './pages/NotesModule'
 import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
+import ArchivesDashboard from './pages/archives/ArchivesDashboard'
+import ArchiveListesNotes from './pages/archives/ArchiveListesNotes'
+import ArchiveCahiersAppel from './pages/archives/ArchiveCahiersAppel'
 import ModulesListLink from './components/ModulesListLink'
 import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
 import { financeNavHref } from './utils/financePeriod'
@@ -46,6 +49,7 @@ import {
   FINANCE_EXPORT_ROLES,
   FINANCE_SETTINGS_ROLES,
   OPERATION_VIEW_ROLES,
+  ARCHIVE_CONSULT_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -84,11 +88,11 @@ function Layout({ children, breadcrumb }) {
   const isFinanceRole = user?.role === 'FINANCE'
   const isArchiveRole = user?.role === 'ARCHIVE'
   const isSuperviseurRole = user?.role === 'SUPERVISEUR'
-  const canViewFinanceModule = FINANCE_MODULE_ROLES.includes(user?.role)
-  const canViewFinanceDashboard = FINANCE_EXPORT_ROLES.includes(user?.role)
+  const canViewFinanceModule = FINANCE_MODULE_ROLES.includes(user?.role) && !isArchiveRole
+  const canViewFinanceDashboard = FINANCE_EXPORT_ROLES.includes(user?.role) && !isArchiveRole
   const canViewFinanceSettings = FINANCE_SETTINGS_ROLES.includes(user?.role)
   const canViewParticipants = OPERATION_VIEW_ROLES.includes(user?.role)
-  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
+  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
     || canViewFinanceModule
   const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
   const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
@@ -138,6 +142,20 @@ function Layout({ children, breadcrumb }) {
             </Link>
           )}
 
+          {isArchiveRole && (
+            <>
+              <Link to="/archives" className={`nav-item ${path === '/archives' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-archive"></i> <span className="nav-label">Tableau de bord</span></span>
+              </Link>
+              <Link to="/archives/listes-notes" className={`nav-item ${isActive('/archives/listes-notes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-card-checklist"></i> <span className="nav-label">Listes de note</span></span>
+              </Link>
+              <Link to="/archives/cahiers-appel" className={`nav-item ${isActive('/archives/cahiers-appel') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-journal-check"></i> <span className="nav-label">Cahiers d'appel</span></span>
+              </Link>
+            </>
+          )}
+
           {canViewFinanceDashboard && (
             <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
@@ -148,7 +166,7 @@ function Layout({ children, breadcrumb }) {
               <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
             </Link>
           )}
-          {!isFinanceRole && !isArchiveRole && (
+          {!isFinanceRole && (
             <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
             </Link>
@@ -261,7 +279,7 @@ function App() {
     const { user } = useAuth()
     // FINANCE est redirigé vers finance-dashboard par défaut
     if (user?.role === 'FINANCE') return <Navigate to="/finance-dashboard" replace />
-    if (user?.role === 'ARCHIVE') return <Navigate to="/participants" replace />
+    if (user?.role === 'ARCHIVE') return <Navigate to="/archives" replace />
     // DIRECTION peut choisir entre les deux dashboards
     if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
     return (
@@ -469,6 +487,27 @@ function App() {
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <Statistiques />
                 </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/archives" element={
+            <ProtectedRoute allowedRoles={ARCHIVE_CONSULT_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Archives</li></>}>
+                <ArchivesDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/archives/listes-notes" element={
+            <ProtectedRoute allowedRoles={ARCHIVE_CONSULT_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/archives">Archives</Link></li><li className="separator">/</li><li>Listes de note</li></>}>
+                <ArchiveListesNotes />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/archives/cahiers-appel" element={
+            <ProtectedRoute allowedRoles={ARCHIVE_CONSULT_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/archives">Archives</Link></li><li className="separator">/</li><li>Cahiers d'appel</li></>}>
+                <ArchiveCahiersAppel />
               </Layout>
             </ProtectedRoute>
           } />

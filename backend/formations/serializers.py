@@ -156,6 +156,7 @@ class FormateurSerializer(serializers.ModelSerializer):
             'id', 'numerobadge', 'nom', 'prenom', 'email',
             'telephone', 'specialite', 'organisation',
             'numero_piece_identite', 'numero_compte_bancaire',
+            'observations',
             'secretariats', 'secretariats_noms', 'nb_formations', 'created_at',
         ]
         read_only_fields = ['id', 'created_at']

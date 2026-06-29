@@ -15,10 +15,10 @@ def _is_own_formateur_profile(user, formateur):
 
 
 def can_view_formateur_sensitive_data(user, formateur=None):
-    """Finance ou le formateur concerné."""
+    """Finance, Archiviste (lecture) ou le formateur concerné."""
     if not user or not user.is_authenticated:
         return False
-    if getattr(user, 'role', None) == 'FINANCE':
+    if getattr(user, 'role', None) in ('FINANCE', 'ARCHIVE'):
         return True
     if formateur is not None:
         return _is_own_formateur_profile(user, formateur)

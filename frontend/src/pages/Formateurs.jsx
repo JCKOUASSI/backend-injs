@@ -8,6 +8,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import { formatMoney, fmtDuration } from '../components/FinanceStatsGrid'
 import FinancePageShell, { FinanceNavActions } from '../components/finance/FinancePageShell'
 import FinanceDetailModal from '../components/finance/FinanceDetailModal'
+import FormateurFicheModal from '../components/formateurs/FormateurFicheModal'
 import {
   buildFinanceListSearchParams,
   buildFinanceExportQuery,
@@ -31,7 +32,7 @@ import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { canMutateFormations, FINANCE_MODULE_ROLES } from '../utils/roles'
 
-const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', secretariats: [] }
+const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', observations: '', secretariats: [] }
 
 const financeStatsForGrid = (detail) => ({
   ...(detail?.statistiques || {}),
@@ -42,8 +43,11 @@ const financeStatsForGrid = (detail) => ({
 
 export default function Formateurs() {
   const { user } = useAuth()
-  const canViewFinanceData = FINANCE_MODULE_ROLES.includes(user?.role)
+  const isArchiveRole = user?.role === 'ARCHIVE'
+  const canViewFinanceData = FINANCE_MODULE_ROLES.includes(user?.role) && !isArchiveRole
   const canEditFormateurSensitive = user?.role === 'FINANCE'
+  // Données sensibles (pièce d'identité, RIB) visibles en lecture pour FINANCE et ARCHIVE
+  const canViewSensitive = user?.role === 'FINANCE' || isArchiveRole
   const [searchParams] = useSearchParams()
   const listExtras = readFormateursListExtras(searchParams)
   const [formateurs, setFormateurs] = useState([])
@@ -59,6 +63,8 @@ export default function Formateurs() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [detailFormateur, setDetailFormateur] = useState(null)
+  const [exportingFiche, setExportingFiche] = useState('')
   const { showToast } = useToast()
 
   const { data: secretariats = [] } = useSecretariats()
@@ -150,6 +156,7 @@ export default function Formateurs() {
       telephone: f.telephone || '',
       specialite: f.specialite || '',
       organisation: f.organisation || '',
+      observations: f.observations || '',
       secretariats: f.secretariats || [],
     })
     setFormError('')
@@ -226,6 +233,27 @@ export default function Formateurs() {
       showToast(`Fiche résumé exportée (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur export état financier', 'error')
+    }
+  }
+
+  const exportFicheFormateur = async (f, format) => {
+    if (!f?.id) return
+    setExportingFiche(format)
+    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
+    // preset 'tout' = toutes les données ; montants masqués hors finance
+    const q = buildFinanceExportQuery({ preset: 'tout' }, canViewFinanceData)
+    const base = format === 'pdf'
+      ? `/exports/formateur/${f.id}/pdf/`
+      : `/exports/formateur/${f.id}/excel/`
+    try {
+      const { blob, fileName } = await api.getBlob(`${base}?${q.toString()}`)
+      const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
+      downloadBlob(blob, fileName || `fiche_formateur_${safeName || f.id}.${ext}`)
+      showToast(`Fiche formateur exportée (${ext.toUpperCase()})`)
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors de l\'export de la fiche', 'error')
+    } finally {
+      setExportingFiche('')
     }
   }
 
@@ -552,12 +580,14 @@ export default function Formateurs() {
                       {!canViewFinanceData && <th>Adresse e-mail</th>}
                       {!canViewFinanceData && <th>Téléphone</th>}
                       {!canViewFinanceData && <th>Modules</th>}
+                      {!canViewFinanceData && canViewSensitive && <th>N° pièce d'identité</th>}
+                      {!canViewFinanceData && canViewSensitive && <th>N° compte bancaire (RIB)</th>}
                       {canViewFinanceData && <th>Séances</th>}
                       {canViewFinanceData && <th>Temps planifié</th>}
                       {canViewFinanceData && <th>Temps réalisé</th>}
                       {canViewFinanceData && <th>Taux réal.</th>}
                       {canViewFinanceData && <th>Montant</th>}
-                      {(canEdit || canViewFinanceData) && <th>Actions</th>}
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -570,6 +600,8 @@ export default function Formateurs() {
                         {!canViewFinanceData && <td>{f.email || '-'}</td>}
                         {!canViewFinanceData && <td>{f.telephone || '-'}</td>}
                         {!canViewFinanceData && <td><span className="badge-bg-success">{f.nb_formations || 0}</span></td>}
+                        {!canViewFinanceData && canViewSensitive && <td className="small">{f.numero_piece_identite || '-'}</td>}
+                        {!canViewFinanceData && canViewSensitive && <td className="small">{f.numero_compte_bancaire || '-'}</td>}
                         {canViewFinanceData && (
                           <td><span className="badge-bg-secondary">{f.sessions_count ?? 0}</span></td>
                         )}
@@ -600,23 +632,26 @@ export default function Formateurs() {
                             </div>
                           </td>
                         )}
-                        {canEdit && (
-                          <td>
-                            <div className="btn-group">
-                              <button onClick={() => openEdit(f)} className="btn btn-outline-primary btn-sm" title="Modifier">
+                        <td>
+                          <div className="btn-group">
+                            <button onClick={() => setDetailFormateur(f)} className="btn btn-outline-primary btn-sm" title="Voir la fiche détaillée">
+                              <i className="bi bi-eye me-1"></i>Détail
+                            </button>
+                            {canEdit && (
+                              <button onClick={() => openEdit(f)} className="btn btn-outline-secondary btn-sm" title="Modifier">
                                 <i className="bi bi-pencil"></i>
                               </button>
-                              {canDelete && (
-                                <button onClick={() => handleDelete(f.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
-                                  <i className="bi bi-trash"></i>
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        )}
+                            )}
+                            {canDelete && (
+                              <button onClick={() => handleDelete(f.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={canViewFinanceData ? 10 : (canEdit ? 8 : 7)} className="text-center py-4 text-muted">Aucun formateur trouvé</td></tr>
+                      <tr><td colSpan={canViewFinanceData ? 10 : (8 + (canViewSensitive ? 2 : 0))} className="text-center py-4 text-muted">Aucun formateur trouvé</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -690,6 +725,10 @@ export default function Formateurs() {
                   <label className="form-label">Organisation</label>
                   <input type="text" className="form-control" value={form.organisation} onChange={e => setForm({...form, organisation: e.target.value})} />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Observations <small className="text-muted">(notes internes)</small></label>
+                  <textarea className="form-control" rows={4} value={form.observations} onChange={e => setForm({...form, observations: e.target.value})} placeholder="Notes / observations sur le formateur…" />
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Annuler</button>
@@ -698,6 +737,17 @@ export default function Formateurs() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Fiche formateur à onglets (lecture seule) */}
+      {detailFormateur && (
+        <FormateurFicheModal
+          formateur={detailFormateur}
+          onClose={() => setDetailFormateur(null)}
+          canViewSensitive={canViewSensitive}
+          onExport={exportFicheFormateur}
+          exporting={exportingFiche}
+        />
       )}
     </div>
   )

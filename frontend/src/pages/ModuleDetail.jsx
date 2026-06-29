@@ -16,6 +16,7 @@ import { canMutateFormations, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROL
 import { formatApiErrors } from '../utils/apiErrors'
 import { useReferentiels } from '../hooks/useReferentiels'
 import { useVisibilityPolling } from '../hooks/useVisibilityPolling'
+import { useDebounce } from '../hooks/useDebounce'
 
 const MODULE_PRESENCES_POLL_MS = 60 * 1000
 
@@ -57,6 +58,7 @@ export default function ModuleDetail() {
   const [allParticipants, setAllParticipants] = useState([])
   const [participantSearch, setParticipantSearch] = useState('')
   const [participantLoading, setParticipantLoading] = useState(false)
+  const [enrolledSearch, setEnrolledSearch] = useState('')
 
   // Formateurs
   const [showAddFormateur, setShowAddFormateur] = useState(false)
@@ -66,7 +68,13 @@ export default function ModuleDetail() {
 
   const participantsList = module?.participants ?? []
   const formateursList = module?.formateurs ?? []
-  const participantsPager = useClientPagination(participantsList, TABLE_PAGE_SIZE, [moduleId, participantsList.length])
+  const debouncedEnrolledSearch = useDebounce(enrolledSearch)
+  const filteredParticipants = participantsList.filter(p =>
+    !debouncedEnrolledSearch ||
+    `${p.nom} ${p.prenom}`.toLowerCase().includes(debouncedEnrolledSearch.toLowerCase()) ||
+    (p.numero_matricule || p.matricule || '').toLowerCase().includes(debouncedEnrolledSearch.toLowerCase())
+  )
+  const participantsPager = useClientPagination(filteredParticipants, TABLE_PAGE_SIZE, [moduleId, debouncedEnrolledSearch])
   const formateursPager = useClientPagination(formateursList, TABLE_PAGE_SIZE, [moduleId, formateursList.length])
   const participantPicker = usePickerPagination(showAddParticipant)
   const formateurPicker = usePickerPagination(showAddFormateur)
@@ -817,7 +825,18 @@ export default function ModuleDetail() {
             )}
           </div>
           <div className="card-body-flush">
-            {participants.length > 0 ? (
+            {participants.length > 0 && (
+              <div className="p-3 pb-0">
+                <input
+                  className="form-control form-control-sm"
+                  placeholder="Rechercher un auditeur (nom, prénom, matricule)…"
+                  value={enrolledSearch}
+                  onChange={e => setEnrolledSearch(e.target.value)}
+                  style={{ maxWidth: 360 }}
+                />
+              </div>
+            )}
+            {filteredParticipants.length > 0 ? (
               <>
               <div className="table-container">
                 <table className="table">
@@ -853,7 +872,9 @@ export default function ModuleDetail() {
             ) : (
               <div className="text-center py-4 text-muted">
                 <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
-                <p className="mt-2">Aucun auditeur inscrit</p>
+                <p className="mt-2">
+                  {participants.length > 0 ? 'Aucun auditeur ne correspond à cette recherche.' : 'Aucun auditeur inscrit'}
+                </p>
               </div>
             )}
           </div>

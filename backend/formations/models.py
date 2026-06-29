@@ -476,6 +476,12 @@ class Formateur(models.Model):
         default='',
         verbose_name='N° de compte bancaire',
     )
+    observations = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Observations',
+        help_text="Notes / observations libres sur le formateur (consultables par les archives).",
+    )
     secretariats = models.ManyToManyField(
         Secretariat,
         blank=True,
