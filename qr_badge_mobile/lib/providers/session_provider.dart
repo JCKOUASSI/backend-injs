@@ -6,10 +6,12 @@ import '../config/app_env.dart';
 import '../services/auth_service.dart';
 import '../services/background_keepalive.dart';
 import '../services/device_telemetry_service.dart';
+import '../services/evaluation_service.dart';
 import '../services/mobile_config_service.dart';
 import '../services/scan_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dev_api_defaults.dart';
+import '../utils/open_session_recovery.dart';
 
 class SessionProvider extends ChangeNotifier {
   final StorageService _storage = StorageService();
@@ -18,9 +20,12 @@ class SessionProvider extends ChangeNotifier {
   final DeviceTelemetryService _heartbeatTelemetry = DeviceTelemetryService();
 
   final MobileConfigService _mobileConfig = MobileConfigService();
+  final EvaluationService _evaluations = EvaluationService();
 
   Timer? _heartbeatTimer;
   String? _heartbeatTokenQr;
+  String? _openSessionHeureEntree;
+  String? _openSessionSeanceLabel;
   bool _heartbeatBusy = false;
   int _heartbeatGpsMisses = 0;
   static const _kGpsMissThreshold = 3;
@@ -49,6 +54,33 @@ class SessionProvider extends ChangeNotifier {
 
   /// Heartbeat automatique actif (après une entrée, jusqu'à sortie ou fin de session).
   bool get isSecureHeartbeatRunning => _heartbeatTimer != null;
+
+  /// Libellé du bandeau « session ouverte » (persistant sur tous les écrans).
+  String? get openSessionChipLabel => buildOpenSessionChipLabel(
+        heartbeatRunning: isSecureHeartbeatRunning,
+        heureEntree: _openSessionHeureEntree,
+        seanceLabel: _openSessionSeanceLabel,
+      );
+
+  /// Questionnaires d'évaluation non encore remplis (auditeurs).
+  int pendingEvaluationsCount = 0;
+
+  /// Vrai une fois si une session ouverte a été reprise au démarrage (snackbar unique).
+  bool _openSessionRestoredOnBoot = false;
+  bool get openSessionRestoredOnBoot => _openSessionRestoredOnBoot;
+
+  /// Consomme le message de reprise (affiché une seule fois au lancement).
+  String? consumeOpenSessionRestoredSnack() {
+    if (!_openSessionRestoredOnBoot) {
+      return null;
+    }
+    _openSessionRestoredOnBoot = false;
+    final label = openSessionChipLabel;
+    if (label != null && label.isNotEmpty) {
+      return 'Session reprise — $label';
+    }
+    return 'Session reprise — suivi de présence actif';
+  }
 
   bool? _remoteHeartbeatEnabled;
   int? _remoteHeartbeatIntervalSec;
@@ -88,8 +120,13 @@ class SessionProvider extends ChangeNotifier {
   }
 
   /// Démarre l'envoi périodique de `/api/scan/secure/heartbeat/` pour le QR courant.
-  void startSecureSessionHeartbeat(String tokenQr) {
-    stopSecureSessionHeartbeat();
+  void startSecureSessionHeartbeat(
+    String tokenQr, {
+    String? heureEntree,
+    String? seanceLabel,
+    bool persist = true,
+  }) {
+    stopSecureSessionHeartbeat(notify: false);
     if (!_effectiveHeartbeatEnabled) {
       return;
     }
@@ -98,6 +135,8 @@ class SessionProvider extends ChangeNotifier {
       return;
     }
     _heartbeatTokenQr = t;
+    _openSessionHeureEntree = heureEntree?.trim();
+    _openSessionSeanceLabel = seanceLabel?.trim();
     final every = _effectiveHeartbeatInterval;
     void schedulePulse() {
       scheduleMicrotask(_heartbeatPulse);
@@ -105,9 +144,16 @@ class SessionProvider extends ChangeNotifier {
 
     schedulePulse();
     _heartbeatTimer = Timer.periodic(every, (_) => schedulePulse());
-    // Garde l'app vivante en arrière-plan (foreground service Android,
-    // background location iOS) tant que la session est ouverte.
     unawaited(BackgroundKeepalive.instance.start());
+    if (persist) {
+      unawaited(
+        _storage.saveOpenSession(
+          tokenQr: t,
+          heureEntree: _openSessionHeureEntree,
+          seanceLabel: _openSessionSeanceLabel,
+        ),
+      );
+    }
     notifyListeners();
   }
 
@@ -124,10 +170,13 @@ class SessionProvider extends ChangeNotifier {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _heartbeatTokenQr = null;
+    _openSessionHeureEntree = null;
+    _openSessionSeanceLabel = null;
     _heartbeatBusy = false;
     _heartbeatGpsMisses = 0;
     heartbeatGpsBlocked = false;
     unawaited(BackgroundKeepalive.instance.stop());
+    unawaited(_storage.clearOpenSession());
     if (notify) {
       notifyListeners();
     }
@@ -278,9 +327,52 @@ class SessionProvider extends ChangeNotifier {
         }
       }
       await refreshMobileConfig();
+      await refreshPendingEvaluationsCount();
+      await _tryRestoreOpenSession();
     }
     isBootstrapping = false;
     notifyListeners();
+  }
+
+  Future<void> _tryRestoreOpenSession() async {
+    if (!_effectiveHeartbeatEnabled || isSecureHeartbeatRunning) {
+      return;
+    }
+    final token = accessToken;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    final cached = await _storage.loadOpenSession();
+    if (cached == null || !cached.isValid) {
+      return;
+    }
+
+    OpenSessionSnapshot snapshot = cached;
+    try {
+      final status = await _heartbeatScan.checkSecureStatus(
+        baseUrl: baseUrl,
+        accessToken: token,
+        tokenQr: cached.tokenQr,
+        onRefreshToken: _refreshTokenForApi,
+      );
+      if (!shouldRestoreOpenSession(status)) {
+        await _storage.clearOpenSession();
+        return;
+      }
+      snapshot = mergeOpenSessionSnapshot(cached: cached, serverStatus: status);
+    } catch (e, st) {
+      debugPrint(
+        '[qr_badge.session] Reprise session (hors-ligne ou erreur): $e\n$st',
+      );
+    }
+
+    startSecureSessionHeartbeat(
+      snapshot.tokenQr,
+      heureEntree: snapshot.heureEntree,
+      seanceLabel: snapshot.seanceLabel,
+      persist: true,
+    );
+    _openSessionRestoredOnBoot = true;
   }
 
   /// Priorité : dart-define > app.env > fallback.
@@ -330,7 +422,34 @@ class SessionProvider extends ChangeNotifier {
     await _storage.setMustChangePassword(mustChangePassword);
     isAuthenticated = true;
     await refreshMobileConfig();
+    await refreshPendingEvaluationsCount();
     notifyListeners();
+  }
+
+  /// Compte les questionnaires publiés non encore soumis (badge menu ⋮).
+  Future<void> refreshPendingEvaluationsCount() async {
+    if (!evaluationsEnabled) {
+      pendingEvaluationsCount = 0;
+      notifyListeners();
+      return;
+    }
+    final token = accessToken;
+    if (token == null || token.isEmpty) {
+      pendingEvaluationsCount = 0;
+      notifyListeners();
+      return;
+    }
+    try {
+      final list = await _evaluations.mesQuestionnaires(
+        baseUrl: baseUrl,
+        accessToken: token,
+        onRefreshToken: _refreshTokenForApi,
+      );
+      pendingEvaluationsCount = list.length;
+      notifyListeners();
+    } catch (e, st) {
+      debugPrint('[qr_badge.session] Évaluations en attente: $e\n$st');
+    }
   }
 
   /// Tente de rafraîchir le token d'accès avec le refresh token.
@@ -383,11 +502,17 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applyUserProfile(Map<String, dynamic> data) {
+    user = Map<String, dynamic>.from(data);
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     stopSecureSessionHeartbeat();
     _remoteHeartbeatEnabled = null;
     _remoteHeartbeatIntervalSec = null;
     _remoteEvaluationsEnabled = null;
+    pendingEvaluationsCount = 0;
     await _storage.clearTokens();
     accessToken = null;
     refreshToken = null;

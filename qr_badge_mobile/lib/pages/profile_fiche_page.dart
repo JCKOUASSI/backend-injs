@@ -7,13 +7,25 @@ import '../services/api_client.dart';
 import '../services/profile_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/auth_navigation.dart';
+import 'change_password_page.dart';
 import '../widgets/home_summary_card.dart';
+import '../widgets/empty_state_view.dart';
 import '../widgets/qr_badge_logo.dart';
 
-class ProfileFichePage extends StatefulWidget {
-  const ProfileFichePage({super.key, this.onClose, this.onOpenHistory});
+part 'profile_fiche_widgets.dart';
 
-  /// Fermeture sans détruire l’état (overlay dans [HomePage]).
+class ProfileFichePage extends StatefulWidget {
+  const ProfileFichePage({
+    super.key,
+    this.embedded = false,
+    this.onClose,
+    this.onOpenHistory,
+  });
+
+  /// Intégré comme onglet dans [HomePage] (sans AppBar propre).
+  final bool embedded;
+
+  /// Fermeture sans détruire l'état (overlay legacy).
   final VoidCallback? onClose;
   final VoidCallback? onOpenHistory;
 
@@ -167,6 +179,29 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
     final isFallback = _payload?['_fallback'] == true;
 
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isFallback)
+          Material(
+            color: Colors.orange.shade50,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Text(
+                'Mode dégradé : redémarrez le serveur Django pour activer '
+                'l\u2019endpoint /api/me/fiche/.',
+                style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+              ),
+            ),
+          ),
+        Expanded(child: _buildBody(context)),
+      ],
+    );
+
+    if (widget.embedded) {
+      return body;
+    }
+
     return PopScope(
       canPop: widget.onClose == null,
       onPopInvokedWithResult: (didPop, _) {
@@ -175,33 +210,16 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         }
       },
       child: Scaffold(
-      backgroundColor: AppColors.ciLight,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _close,
+        backgroundColor: AppColors.ciLight,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _close,
+          ),
+          title: const Text('Fiche'),
         ),
-        title: const Text('Fiche'),
+        body: body,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (isFallback)
-            Material(
-              color: Colors.orange.shade50,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                child: Text(
-                  'Mode dégradé : redémarrez le serveur Django pour activer '
-                  'l\u2019endpoint /api/me/fiche/.',
-                  style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
-                ),
-              ),
-            ),
-          Expanded(child: _buildBody(context)),
-        ],
-      ),
-    ),
     );
   }
 
@@ -279,12 +297,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         children: [
           _FicheTappableCard(
-            onTap: () => _showProfileSheet(
-              context,
-              displayName: displayName,
-              user: user,
-              profil: profil,
-            ),
+            onTap: null,
             child: Row(
               children: [
                 const QrBadgeLogo(
@@ -323,10 +336,25 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
             ),
           ),
           const SizedBox(height: 20),
-          _SectionTitle(title: 'Informations'),
-          _InfoCard(
-            onTap: () => _showInfoSheet(context, rows: infoRows),
-            rows: infoRows,
+          _SectionTitle(title: 'Mes informations'),
+          _InfoCard(rows: infoRows),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _showProfileEditSheet(context, user: user, profil: profil),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Modifier mes informations'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ChangePasswordPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.lock_outline, size: 18),
+            label: const Text('Changer le mot de passe'),
           ),
           if (profil['type_personne']?.toString() == 'formateur') ...[
             const SizedBox(height: 12),
@@ -337,50 +365,28 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
             ),
           ],
           const SizedBox(height: 20),
-          _SectionTitle(title: 'Statistiques personnelles'),
+          _SectionTitle(title: 'Statistiques'),
           _StatsGrid(
             stats: stats,
             volumeLabel: volumeLabel,
             volumeTaux: volumeTaux,
             minutesLabel: minutesLabel,
             dernierLabel: dernierLabel,
-            onVolumeTap: () => _showStatSheet(
-              context,
-              title: 'Volume horaire',
-              value: volumeLabel,
-              description:
-                  'Heures de présence badgeées sur le volume total prévu de vos modules inscrits.'
-                  '${volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
-            ),
-            onBadgeagesTap: widget.onOpenHistory ?? () => _showStatSheet(
-                      context,
-                      title: 'Badgeages',
-                      value: stats['nb_badgeages']?.toString() ?? '0',
-                      description:
-                          'Nombre total de pointages enregistrés sur votre compte.',
-                    ),
-            onTermineesTap: () => _showStatSheet(
-              context,
-              title: 'Séances terminées',
-              value: stats['nb_seances_terminees']?.toString() ?? '0',
-              description:
-                  'Séances pour lesquelles une entrée et une sortie ont été enregistrées.',
-            ),
-            onModulesTap: modules.isEmpty ? null : _scrollToModules,
-            onAVerifierTap: () => _showStatSheet(
-              context,
-              title: 'Éléments à vérifier',
-              value: stats['nb_a_verifier']?.toString() ?? '0',
-              description:
-                  'Pointages en cours, sorties manquantes ou statuts nécessitant une attention.',
-            ),
-            onPresenceTap: () => _showStatSheet(
-              context,
-              title: 'Temps de présence',
-              value: minutesLabel,
-              description: 'Dernier badgeage : $dernierLabel',
-            ),
+            volumeDescription:
+                'Heures de présence badgeées sur le volume total prévu de vos modules inscrits.'
+                '${volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
           ),
+          if (modules.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _scrollToModules,
+                icon: const Icon(Icons.menu_book_outlined, size: 18),
+                label: Text('Voir mes ${modules.length} module${modules.length > 1 ? 's' : ''}'),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _SectionTitle(
             key: _modulesSectionKey,
@@ -388,24 +394,21 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
             trailing: '${modules.length}',
           ),
           if (modules.isEmpty)
-            _FicheTappableCard(
-              onTap: null,
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                profil['type_personne'] == 'encadrant'
-                    ? 'Aucun module d\u2019inscription pour un compte encadrant.'
-                    : 'Aucun module inscrit pour le moment.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
+            EmptyStateView(
+              icon: Icons.menu_book_outlined,
+              iconColor: AppColors.ciBlue,
+              title: profil['type_personne'] == 'encadrant'
+                  ? 'Aucun module d\u2019inscription'
+                  : 'Aucun module inscrit',
+              subtitle: profil['type_personne'] == 'encadrant'
+                  ? 'Les comptes encadrant n\u2019ont pas de modules d\u2019inscription.'
+                  : 'Vos inscriptions apparaîtront ici une fois enregistrées.',
             )
           else
             ...modules.map(
               (m) => _ModuleCard(
                 data: m,
                 statut: _statutModuleLabel(m['statut']?.toString()),
-                onTap: () => _showModuleSheet(context, m),
               ),
             ),
         ],
@@ -440,33 +443,206 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         _InfoRow('Secrétariat', user['secretariat_nom']?.toString()),
       ];
 
-  void _showProfileSheet(
+  Future<void> _showProfileEditSheet(
     BuildContext context, {
-    required String displayName,
     required Map<String, dynamic> user,
     required Map<String, dynamic> profil,
-  }) {
-    _showDetailSheet(
-      context,
-      title: displayName,
-      children: [
-        _DetailRow('Type', _typeLabel(profil['type_personne']?.toString())),
-        _DetailRow('Rôle', _roleLabel(user['role']?.toString())),
-        _DetailRow('Identifiant', user['username']?.toString()),
-        _DetailRow('Matricule', profil['numero']?.toString()),
-      ],
+  }) async {
+    final prenomCtrl = TextEditingController(
+      text: (user['first_name'] ?? profil['prenom'] ?? '').toString(),
     );
-  }
-
-  void _showInfoSheet(BuildContext context, {required List<_InfoRow> rows}) {
-    _showDetailSheet(
-      context,
-      title: 'Informations',
-      children: rows
-          .where((r) => r.value != null && r.value!.trim().isNotEmpty)
-          .map((r) => _DetailRow(r.label, r.value))
-          .toList(),
+    final nomCtrl = TextEditingController(
+      text: (user['last_name'] ?? profil['nom'] ?? '').toString(),
     );
+    final emailCtrl = TextEditingController(
+      text: user['email']?.toString() ?? '',
+    );
+    final telCtrl = TextEditingController(
+      text: user['telephone']?.toString() ?? '',
+    );
+    final matriculeCtrl = TextEditingController(
+      text: (user['matricule'] ?? profil['numero'] ?? '').toString(),
+    );
+    final orgCtrl = TextEditingController(
+      text: user['organisation']?.toString() ?? '',
+    );
+    final gradeCtrl = TextEditingController(
+      text: user['grade']?.toString() ?? '',
+    );
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        var saving = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Modifier mes informations',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Identifiant : ${user['username'] ?? '—'} · '
+                      'Rôle : ${_roleLabel(user['role']?.toString())}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: prenomCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Prénom',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nomCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'E-mail',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: telCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Téléphone',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: matriculeCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'N° matricule (badge)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: orgCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Organisation',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: gradeCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Grade',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              setModalState(() => saving = true);
+                              final session = context.read<SessionProvider>();
+                              try {
+                                final matricule =
+                                    matriculeCtrl.text.trim();
+                                final res = await _service.updateMyProfile(
+                                  baseUrl: session.baseUrl,
+                                  accessToken: session.accessToken!,
+                                  data: {
+                                    'first_name': prenomCtrl.text.trim(),
+                                    'last_name': nomCtrl.text.trim(),
+                                    'email': emailCtrl.text.trim(),
+                                    'telephone': telCtrl.text.trim(),
+                                    'organisation': orgCtrl.text.trim(),
+                                    'grade': gradeCtrl.text.trim(),
+                                    'matricule':
+                                        matricule.isEmpty ? null : matricule,
+                                  },
+                                  onRefreshToken: () => session
+                                      .tryRefreshToken()
+                                      .then((ok) => ok ? session.accessToken : null),
+                                );
+                                session.applyUserProfile(res);
+                                if (context.mounted) {
+                                  Navigator.of(context).pop(true);
+                                }
+                              } on SessionExpiredException {
+                                if (context.mounted) {
+                                  await session.logout();
+                                  if (!context.mounted) return;
+                                  resetToAuthRoot(context);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        e.toString().replaceFirst('Exception: ', ''),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (context.mounted) {
+                                  setModalState(() => saving = false);
+                                }
+                              }
+                            },
+                      child: Text(saving ? 'Enregistrement…' : 'Enregistrer'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    prenomCtrl.dispose();
+    nomCtrl.dispose();
+    emailCtrl.dispose();
+    telCtrl.dispose();
+    matriculeCtrl.dispose();
+    orgCtrl.dispose();
+    gradeCtrl.dispose();
+    final messenger = ScaffoldMessenger.of(context);
+    if (saved == true && mounted) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profil mis à jour.')),
+      );
+      await _load(showSpinner: false);
+    }
   }
 
   Future<void> _showBankingEditSheet(
@@ -573,633 +749,5 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     if (saved == true && mounted) {
       await _load(showSpinner: false);
     }
-  }
-
-  void _showStatSheet(
-    BuildContext context, {
-    required String title,
-    required String value,
-    required String description,
-  }) {
-    _showDetailSheet(
-      context,
-      title: title,
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: AppColors.ciGreenDark,
-              ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          description,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-        ),
-      ],
-    );
-  }
-
-  void _showModuleSheet(BuildContext context, Map<String, dynamic> m) {
-    final statut = _statutModuleLabel(m['statut']?.toString());
-    _showDetailSheet(
-      context,
-      title: m['module']?.toString() ?? 'Module',
-      children: [
-        if ((m['formation']?.toString() ?? '').isNotEmpty)
-          _DetailRow('Formation', m['formation']?.toString()),
-        _DetailRow('Statut', statut),
-        _DetailRow('Grade', m['grade']?.toString()),
-        _DetailRow('Groupe', m['groupe']?.toString()),
-        _DetailRow('Vague', m['vague']?.toString()),
-        _DetailRow('Site', m['site']?.toString()),
-        _DetailRow('Début', m['date_debut']?.toString()),
-        _DetailRow('Fin', m['date_fin']?.toString()),
-        _DetailRow('Secrétariat', m['secretariat_nom']?.toString()),
-        _DetailRow('Inscription', m['inscrit_le']?.toString()),
-      ],
-    );
-  }
-
-  void _showDetailSheet(
-    BuildContext context, {
-    required String title,
-    required List<Widget> children,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          20 + MediaQuery.paddingOf(ctx).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FicheTappableCard extends StatelessWidget {
-  const _FicheTappableCard({
-    required this.onTap,
-    required this.child,
-    this.padding = const EdgeInsets.all(18),
-  });
-
-  final VoidCallback? onTap;
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.cardBg,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppColors.borderColor.withValues(alpha: 0.6),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(child: child),
-              if (onTap != null)
-                Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textSecondary.withValues(alpha: 0.5),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow(this.label, this.value);
-
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) {
-    if (value == null || value!.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({super.key, required this.title, this.trailing});
-
-  final String title;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          if (trailing != null)
-            Text(
-              trailing!,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.ciGreenDark,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow {
-  const _InfoRow(this.label, this.value);
-  final String label;
-  final String? value;
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.rows, this.onTap});
-
-  final List<_InfoRow> rows;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = rows
-        .where((r) => r.value != null && r.value!.trim().isNotEmpty)
-        .toList();
-    if (visible.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return _FicheTappableCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        children: visible
-            .map(
-              (r) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 110,
-                      child: Text(
-                        r.label,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        r.value!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-  }
-}
-
-String _formatHeures(dynamic h) {
-  if (h is! num) return '0 h';
-  final v = h.toDouble();
-  if (v == v.roundToDouble()) return '${v.round()} h';
-  return '${v.toStringAsFixed(1)} h';
-}
-
-class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({
-    required this.stats,
-    required this.volumeLabel,
-    required this.volumeTaux,
-    required this.minutesLabel,
-    required this.dernierLabel,
-    this.onVolumeTap,
-    this.onBadgeagesTap,
-    this.onTermineesTap,
-    this.onModulesTap,
-    this.onAVerifierTap,
-    this.onPresenceTap,
-  });
-
-  final Map<String, dynamic> stats;
-  final String volumeLabel;
-  final double volumeTaux;
-  final String minutesLabel;
-  final String dernierLabel;
-  final VoidCallback? onVolumeTap;
-  final VoidCallback? onBadgeagesTap;
-  final VoidCallback? onTermineesTap;
-  final VoidCallback? onModulesTap;
-  final VoidCallback? onAVerifierTap;
-  final VoidCallback? onPresenceTap;
-
-  String _n(String key) => stats[key]?.toString() ?? '0';
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = (volumeTaux / 100).clamp(0.0, 1.0);
-    final tauxDisplay = volumeTaux == volumeTaux.roundToDouble()
-        ? '${volumeTaux.round()} %'
-        : '${volumeTaux.toStringAsFixed(1)} %';
-
-    return Column(
-      children: [
-        _FicheTappableCard(
-          onTap: onVolumeTap,
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.schedule, size: 20, color: AppColors.ciGreenDark),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Volume horaire',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    tauxDisplay,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ciGreenDark,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                volumeLabel,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ciGreenDark,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Effectué / total prévu',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress > 0 ? progress : null,
-                  minHeight: 6,
-                  backgroundColor: AppColors.navIndicator,
-                  color: AppColors.ciGreenDark,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatTile(
-                icon: Icons.qr_code_scanner,
-                value: _n('nb_badgeages'),
-                label: 'Badgeages',
-                color: AppColors.ciGreenDark,
-                onTap: onBadgeagesTap,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatTile(
-                icon: Icons.check_circle_outline,
-                value: _n('nb_seances_terminees'),
-                label: 'Séances terminées',
-                color: AppColors.ciGreenDark,
-                onTap: onTermineesTap,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _StatTile(
-                icon: Icons.menu_book_outlined,
-                value: _n('nb_modules_inscrits'),
-                label: 'Modules inscrits',
-                color: AppColors.ciBlue,
-                onTap: onModulesTap,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatTile(
-                icon: Icons.warning_amber_rounded,
-                value: _n('nb_a_verifier'),
-                label: 'À vérifier',
-                color: AppColors.ciOrangeDark,
-                onTap: onAVerifierTap,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _FicheTappableCard(
-          onTap: onPresenceTap,
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                minutesLabel,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ciGreenDark,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Dernier badgeage : $dernierLabel',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _FicheTappableCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.2,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModuleCard extends StatelessWidget {
-  const _ModuleCard({
-    required this.data,
-    required this.statut,
-    required this.onTap,
-  });
-
-  final Map<String, dynamic> data;
-  final String statut;
-  final VoidCallback onTap;
-
-  String? _fmtDate(String? raw) {
-    if (raw == null || raw.isEmpty) return null;
-    final d = DateTime.tryParse(raw.length >= 10 ? raw.substring(0, 10) : raw);
-    if (d == null) return raw;
-    return DateFormat('d MMM yyyy', 'fr_FR').format(d);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final formation = data['formation']?.toString() ?? '';
-    final module = data['module']?.toString() ?? 'Module';
-    final grade = data['grade']?.toString();
-    final groupe = data['groupe']?.toString();
-    final vague = data['vague']?.toString();
-    final site = data['site']?.toString();
-    final dateDebut = data['date_debut']?.toString();
-    final dateFin = data['date_fin']?.toString();
-    final secretariat = data['secretariat_nom']?.toString();
-    final inscritLe = data['inscrit_le']?.toString();
-
-    final periode = [
-      if (_fmtDate(dateDebut) != null) 'Du ${_fmtDate(dateDebut)}',
-      if (_fmtDate(dateFin) != null) 'au ${_fmtDate(dateFin)}',
-    ].join(' ');
-
-    final meta = [
-      if (grade != null && grade.isNotEmpty) 'Grade $grade',
-      if (groupe != null && groupe.isNotEmpty) 'Groupe $groupe',
-      if (vague != null && vague.isNotEmpty) 'Vague $vague',
-      if (site != null && site.isNotEmpty) site,
-    ].join(' · ');
-
-    final inscritDt = DateTime.tryParse(inscritLe ?? '');
-    final inscritLabel = inscritDt != null
-        ? 'Inscrit le ${DateFormat('d MMM yyyy', 'fr_FR').format(inscritDt.toLocal())}'
-        : null;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _FicheTappableCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (formation.isNotEmpty)
-                        Text(
-                          formation,
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: AppColors.ciGreenDark,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      const SizedBox(height: 4),
-                      Text(
-                        module,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                StatusPill(
-                  label: statut,
-                  color: AppColors.ciGreenDark,
-                  backgroundColor: AppColors.navIndicator,
-                ),
-              ],
-            ),
-            if (meta.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                meta,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ],
-            if (periode.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                periode,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ],
-            if (secretariat != null && secretariat.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                secretariat,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ],
-            if (inscritLabel != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                inscritLabel,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.textMuted,
-                    ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
   }
 }

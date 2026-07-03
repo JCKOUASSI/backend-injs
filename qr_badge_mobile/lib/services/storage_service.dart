@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/open_session_recovery.dart';
+
 /// Persistance locale.
 ///
 /// • Tokens JWT (access + refresh) → [FlutterSecureStorage] (Keystore Android /
@@ -14,6 +16,10 @@ class StorageService {
 
   static const _kAccessToken = 'access_token';
   static const _kRefreshToken = 'refresh_token';
+
+  static const _kOpenSessionToken = 'open_session_token_qr';
+  static const _kOpenSessionHeure = 'open_session_heure_entree';
+  static const _kOpenSessionSeance = 'open_session_seance_label';
 
   static const _secure = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -89,6 +95,47 @@ class StorageService {
   Future<void> setUsername(String username) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kUsername, username);
+  }
+
+  Future<void> saveOpenSession({
+    required String tokenQr,
+    String? heureEntree,
+    String? seanceLabel,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kOpenSessionToken, tokenQr.trim());
+    final heure = heureEntree?.trim();
+    final seance = seanceLabel?.trim();
+    if (heure != null && heure.isNotEmpty) {
+      await prefs.setString(_kOpenSessionHeure, heure);
+    } else {
+      await prefs.remove(_kOpenSessionHeure);
+    }
+    if (seance != null && seance.isNotEmpty) {
+      await prefs.setString(_kOpenSessionSeance, seance);
+    } else {
+      await prefs.remove(_kOpenSessionSeance);
+    }
+  }
+
+  Future<OpenSessionSnapshot?> loadOpenSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_kOpenSessionToken)?.trim();
+    if (token == null || token.isEmpty) {
+      return null;
+    }
+    return OpenSessionSnapshot(
+      tokenQr: token,
+      heureEntree: prefs.getString(_kOpenSessionHeure),
+      seanceLabel: prefs.getString(_kOpenSessionSeance),
+    );
+  }
+
+  Future<void> clearOpenSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kOpenSessionToken);
+    await prefs.remove(_kOpenSessionHeure);
+    await prefs.remove(_kOpenSessionSeance);
   }
 
 }

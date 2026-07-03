@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import '../services/evaluation_service.dart';
 import '../theme/qr_badge_theme.dart';
+import '../widgets/empty_state_view.dart';
 
 class EvaluationsPage extends StatefulWidget {
   const EvaluationsPage({super.key});
@@ -48,7 +49,10 @@ class _EvaluationsPageState extends State<EvaluationsPage>
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        context.read<SessionProvider>().refreshPendingEvaluationsCount();
+      }
     }
   }
 
@@ -62,7 +66,17 @@ class _EvaluationsPageState extends State<EvaluationsPage>
           : _error != null
               ? _ErrorView(message: _error!, onRetry: _load)
               : _questionnaires.isEmpty
-                  ? _EmptyView(onRefresh: _load)
+                  ? EmptyStateView(
+                      icon: Icons.assignment_turned_in_outlined,
+                      title: 'Aucun questionnaire en attente',
+                      subtitle:
+                          'Vous avez répondu à tous les questionnaires ou aucun ne vous est assigné pour le moment.',
+                      action: OutlinedButton.icon(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Actualiser'),
+                      ),
+                    )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: _questionnaires.length,
@@ -553,44 +567,6 @@ class _ChoixMultipleSelector extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────
 // Vues utilitaires
 // ─────────────────────────────────────────────────────────────
-
-class _EmptyView extends StatelessWidget {
-  const _EmptyView({required this.onRefresh});
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline, size: 64, color: AppColors.ciGreenDark.withValues(alpha: 0.4)),
-            const SizedBox(height: 16),
-            const Text(
-              'Aucun questionnaire disponible',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Vous avez répondu à tous les questionnaires ou aucun ne vous est assigné pour le moment.',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Actualiser'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});

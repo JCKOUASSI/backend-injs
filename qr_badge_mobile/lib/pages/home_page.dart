@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/guarded_logout.dart';
+import '../utils/location_permission.dart';
 import '../utils/open_privacy_policy.dart';
+import '../widgets/session_status_banner.dart';
 import 'evaluations_page.dart';
 import 'history_page.dart';
 import 'home_dashboard_page.dart';
@@ -21,14 +24,30 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  int _index = 1;
-  bool _ficheVisible = false;
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  static const _tabScanner = 0;
+  static const _tabAccueil = 1;
+  static const _tabHistorique = 2;
+  static const _tabProfil = 3;
+
+  int _index = _tabAccueil;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final session = context.read<SessionProvider>();
+      session.refreshPendingEvaluationsCount();
+      final restored = session.consumeOpenSessionRestoredSnack();
+      if (restored != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(restored)),
+        );
+      }
+    });
   }
 
   @override
@@ -40,29 +59,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      context.read<SessionProvider>().pulseHeartbeatNow();
+      final session = context.read<SessionProvider>();
+      unawaited(_recheckGpsOnResume(session));
+      session.pulseHeartbeatNow();
+      session.refreshPendingEvaluationsCount();
+    }
+  }
+
+  Future<void> _recheckGpsOnResume(SessionProvider session) async {
+    final perm = await Geolocator.checkPermission();
+    if (!mounted) {
+      return;
+    }
+    final granted = perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse;
+    session.setGpsGranted(granted);
+    if (granted && session.heartbeatGpsBlocked) {
+      session.pulseHeartbeatNow();
+    }
+  }
+
+  void _selectTab(int index) {
+    setState(() => _index = index);
+    if (index == _tabAccueil ||
+        index == _tabHistorique ||
+        index == _tabProfil) {
+      context.read<SessionProvider>().requestHistoryRefresh();
     }
   }
 
   Future<void> _requestGps(SessionProvider session) async {
-    final serviceOn = await Geolocator.isLocationServiceEnabled();
-    if (!serviceOn) {
-      if (mounted) Geolocator.openLocationSettings();
-      return;
-    }
-    var perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.deniedForever) {
-      if (mounted) openAppSettings();
-      return;
-    }
-    if (perm != LocationPermission.always &&
-        perm != LocationPermission.whileInUse) {
-      perm = await Geolocator.requestPermission();
-    }
+    final granted = await quickEnableLocation();
     if (mounted) {
-      final granted = perm == LocationPermission.always ||
-          perm == LocationPermission.whileInUse;
       session.setGpsGranted(granted);
+      if (granted && session.isSecureHeartbeatRunning) {
+        session.pulseHeartbeatNow();
+      }
     }
   }
 
@@ -70,17 +102,92 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   String get _title {
     switch (_index) {
-      case 0:
+      case _tabScanner:
         return 'Scanner';
-      case 1:
+      case _tabAccueil:
         return 'Accueil';
-      case 2:
+      case _tabHistorique:
         return 'Historique';
-      case 3:
-        return 'Évaluations';
+      case _tabProfil:
+        return 'Profil';
       default:
         return 'QR Badge';
     }
+  }
+
+  Future<void> _openEvaluations() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.ciLight,
+          appBar: AppBar(title: const Text('Évaluations')),
+          body: const EvaluationsPage(),
+        ),
+      ),
+    );
+    if (mounted) {
+      await context.read<SessionProvider>().refreshPendingEvaluationsCount();
+    }
+  }
+
+  Future<void> _onMoreMenuSelected(String value) async {
+    final session = context.read<SessionProvider>();
+    switch (value) {
+      case 'evaluations':
+        await _openEvaluations();
+      case 'gps':
+        await _requestGps(session);
+      case 'privacy':
+        await openPrivacyPolicy(context, session.baseUrl);
+      case 'logout':
+        await performGuardedLogout(context);
+    }
+  }
+
+  List<PopupMenuEntry<String>> _moreMenuItems(SessionProvider session) {
+    final pendingEval = session.pendingEvaluationsCount;
+    return [
+      if (_isAuditeur(session))
+        PopupMenuItem(
+          value: 'evaluations',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.assignment_outlined),
+            title: const Text('Évaluations'),
+            trailing: pendingEval > 0
+                ? Badge(
+                    label: Text('$pendingEval'),
+                    backgroundColor: AppColors.ciOrangeDark,
+                  )
+                : null,
+          ),
+        ),
+      const PopupMenuItem(
+        value: 'gps',
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.location_on_outlined),
+          title: Text('Autoriser le GPS'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: 'privacy',
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.policy_outlined),
+          title: Text('Confidentialité'),
+        ),
+      ),
+      const PopupMenuDivider(),
+      const PopupMenuItem(
+        value: 'logout',
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.logout, color: AppColors.ciDanger),
+          title: Text('Déconnexion', style: TextStyle(color: AppColors.ciDanger)),
+        ),
+      ),
+    ];
   }
 
   @override
@@ -88,45 +195,60 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final session = context.watch<SessionProvider>();
 
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: AppColors.ciLight,
-      drawer: _AppDrawer(
-        onRequestGps: () => _requestGps(session),
-        onOpenFiche: () => setState(() => _ficheVisible = true),
-        onOpenEvaluations: _isAuditeur(session)
-            ? () => setState(() => _index = 3)
-            : null,
-        onLogout: () => performGuardedLogout(context),
-      ),
-      appBar: _ficheVisible || _index == 0
-          ? null
-          : AppBar(
-              centerTitle: _index == 2,
-              title: Text(_title),
-              leading: IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              ),
-              automaticallyImplyLeading: false,
-              actions: [
-                if (_index == 1)
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Aucune notification pour le moment.'),
-                        ),
-                      );
-                    },
-                  ),
-              ],
+      appBar: AppBar(
+        centerTitle: _index == _tabHistorique,
+        title: Text(_title),
+        actions: [
+          Badge(
+            isLabelVisible: session.pendingEvaluationsCount > 0,
+            label: Text('${session.pendingEvaluationsCount}'),
+            backgroundColor: AppColors.ciOrangeDark,
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Plus',
+              onSelected: _onMoreMenuSelected,
+              itemBuilder: (_) => _moreMenuItems(session),
             ),
-      body: Stack(
+          ),
+        ],
+      ),
+      body: Column(
         children: [
-          Column(
-        children: [
-          if (!session.gpsGranted && _index != 0)
+          if (session.heartbeatGpsBlocked && session.isSecureHeartbeatRunning)
+            Material(
+              color: Colors.orange.shade50,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_off,
+                        color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'GPS indisponible — le suivi de pr\u00e9sence est suspendu.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: Colors.orange.shade800,
+                      ),
+                      onPressed: () => _requestGps(session),
+                      child: const Text('Activer',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (!session.gpsGranted)
             Material(
               color: Colors.orange.shade50,
               child: Padding(
@@ -159,172 +281,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             ),
+          if (session.isSecureHeartbeatRunning) const SessionStatusBanner(),
           Expanded(
-            child: Builder(
-              builder: (context) {
-                final session = context.watch<SessionProvider>();
-                final auditeur = _isAuditeur(session);
-                return IndexedStack(
-                  index: _index,
-                  children: [
-                    ScanPage(
-                      isActive: _index == 0,
-                      onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
-                    ),
-                    HomeDashboardPage(
-                      onOpenHistory: () => setState(() => _index = 2),
-                    ),
-                    const HistoryPage(),
-                    if (auditeur) const EvaluationsPage(),
-                  ],
-                );
-              },
+            child: IndexedStack(
+              index: _index,
+              children: [
+                ScanPage(isActive: _index == _tabScanner),
+                HomeDashboardPage(
+                  onOpenHistory: () => _selectTab(_tabHistorique),
+                  onOpenScanner: () => _selectTab(_tabScanner),
+                ),
+                HistoryPage(
+                  onOpenScanner: () => _selectTab(_tabScanner),
+                ),
+                ProfileFichePage(
+                  embedded: true,
+                  onOpenHistory: () => _selectTab(_tabHistorique),
+                ),
+              ],
             ),
           ),
         ],
       ),
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: !_ficheVisible,
-              child: Offstage(
-                offstage: !_ficheVisible,
-                child: ProfileFichePage(
-                  onClose: () => setState(() => _ficheVisible = false),
-                  onOpenHistory: () => setState(() {
-                    _ficheVisible = false;
-                    _index = 2;
-                  }),
-                ),
-              ),
-            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: _selectTab,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.qr_code_scanner_outlined),
+            selectedIcon: Icon(Icons.qr_code_scanner),
+            label: 'Scanner',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'Historique',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profil',
           ),
         ],
-      ),
-      bottomNavigationBar: _ficheVisible
-          ? null
-          : Builder(
-              builder: (context) {
-                final session = context.watch<SessionProvider>();
-                final auditeur = _isAuditeur(session);
-                return NavigationBar(
-                  selectedIndex: _index,
-                  onDestinationSelected: (v) {
-                    setState(() => _index = v);
-                    if (v == 1 || v == 2) {
-                      context.read<SessionProvider>().requestHistoryRefresh();
-                    }
-                  },
-                  destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.qr_code_scanner_outlined),
-                      selectedIcon: Icon(Icons.qr_code_scanner),
-                      label: 'Scanner',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: 'Accueil',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.history_outlined),
-                      selectedIcon: Icon(Icons.history),
-                      label: 'Historique',
-                    ),
-                    if (auditeur)
-                      const NavigationDestination(
-                        icon: Icon(Icons.assignment_outlined),
-                        selectedIcon: Icon(Icons.assignment),
-                        label: 'Évaluations',
-                      ),
-                  ],
-                );
-              },
-            ),
-    );
-  }
-}
-
-class _AppDrawer extends StatelessWidget {
-  const _AppDrawer({
-    required this.onRequestGps,
-    required this.onOpenFiche,
-    this.onOpenEvaluations,
-    required this.onLogout,
-  });
-
-  final VoidCallback onRequestGps;
-  final VoidCallback onOpenFiche;
-  final VoidCallback? onOpenEvaluations;
-  final Future<bool> Function() onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final session = context.watch<SessionProvider>();
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: AppColors.ciGreenDark),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  'QR Badge',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Fiche'),
-              onTap: () {
-                Navigator.pop(context);
-                onOpenFiche();
-              },
-            ),
-            if (onOpenEvaluations != null)
-              ListTile(
-                leading: const Icon(Icons.assignment_outlined),
-                title: const Text('Évaluations'),
-                onTap: () {
-                  Navigator.pop(context);
-                  onOpenEvaluations!();
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.location_on_outlined),
-              title: const Text('Autoriser le GPS'),
-              onTap: () {
-                Navigator.pop(context);
-                onRequestGps();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.policy_outlined),
-              title: const Text('Confidentialité'),
-              onTap: () async {
-                Navigator.pop(context);
-                await openPrivacyPolicy(context, session.baseUrl);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.ciDanger),
-              title: const Text('Déconnexion'),
-              onTap: () {
-                Navigator.pop(context);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  onLogout();
-                });
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

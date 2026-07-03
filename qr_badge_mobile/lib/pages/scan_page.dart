@@ -9,14 +9,15 @@ import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/camera_permission.dart';
 import '../utils/confirm_dialog.dart';
+import '../utils/location_permission.dart';
 import '../widgets/scan_frame_overlay.dart';
+import '../widgets/session_status_banner.dart';
 
 class ScanPage extends StatefulWidget {
-  const ScanPage({super.key, this.isActive = true, this.onOpenMenu});
+  const ScanPage({super.key, this.isActive = true});
 
-  /// Quand l’onglet Scanner n’est pas sélectionné, la caméra est arrêtée pour économiser batterie / éviter un aperçu actif en arrière-plan.
+  /// Quand l'onglet Scanner n'est pas sélectionné, la caméra est arrêtée.
   final bool isActive;
-  final VoidCallback? onOpenMenu;
 
   @override
   State<ScanPage> createState() => _ScanPageState();
@@ -123,39 +124,82 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     );
   }
 
-  Widget _buildScannerHeader() {
-    return Material(
-      color: AppColors.ciGreenDark,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: kToolbarHeight,
-          child: Row(
+  String _scanButtonLabel(bool hasToken) {
+    if (_loadingScan) return 'Vérification…';
+    if (!hasToken) return 'En attente du QR code…';
+    if (_geofenceBlocksBadge()) return 'Zone GPS non conforme';
+    final action = _statusInfo?['action_suivante']?.toString();
+    if (action == 'SORTIE') return 'Badger la sortie';
+    if (action == 'ENTREE') return 'Badger l\u2019entrée';
+    return 'Badger entrée / sortie';
+  }
+
+  int _scanCurrentStep(bool hasToken) {
+    if (!hasToken) return 0;
+    if (_loadingStatus || _statusInfo == null) return 1;
+    if (_geofenceBlocksBadge()) return 1;
+    return 2;
+  }
+
+  Widget _buildStepBar(bool hasToken) {
+    final current = _scanCurrentStep(hasToken);
+    const labels = ['Scanner', 'Vérifier', 'Confirmer'];
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0)
+            Expanded(
+              child: Container(
+                height: 2,
+                color: i <= current
+                    ? AppColors.ciGreenDark
+                    : AppColors.borderColor,
+              ),
+            ),
+          Column(
             children: [
-              if (widget.onOpenMenu != null)
-                IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.white),
-                  onPressed: widget.onOpenMenu,
-                )
-              else
-                const SizedBox(width: 8),
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: i <= current
+                    ? AppColors.ciGreenDark
+                    : AppColors.borderColor,
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: i <= current ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(
-                'Scanner',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 20,
+                labels[i],
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
+                      color: i <= current
+                          ? AppColors.ciGreenDark
+                          : AppColors.textSecondary,
                     ),
               ),
             ],
           ),
-        ),
-      ),
+        ],
+      ],
+    );
+  }
+
+  Widget? _buildSessionChip(SessionProvider session) {
+    if (!session.isSecureHeartbeatRunning) return null;
+    return const Align(
+      alignment: Alignment.centerLeft,
+      child: SessionStatusChip(),
     );
   }
 
   Widget _buildBottomSheet(SessionProvider session) {
     final hasToken = _tokenQr != null && _tokenQr!.isNotEmpty;
+    final sessionChip = _buildSessionChip(session);
     return Material(
       color: AppColors.cardBg,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -177,6 +221,12 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
               ),
             ),
             const SizedBox(height: 16),
+            _buildStepBar(hasToken),
+            if (sessionChip != null) ...[
+              const SizedBox(height: 10),
+              Align(alignment: Alignment.centerLeft, child: sessionChip),
+            ],
+            const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -234,7 +284,9 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                   icon: Icons.location_off,
                   color: Colors.orange,
                   text:
-                      'GPS indisponible — activez la localisation pour le suivi.',
+                      'GPS indisponible — le suivi de présence est suspendu.',
+                  actionLabel: 'Activer',
+                  onAction: () => _requestGpsForHeartbeat(session),
                 )
               else
                 _InfoStrip(
@@ -273,21 +325,24 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                         ),
                       )
                     : Icon(hasToken ? Icons.login : Icons.hourglass_empty),
-                label: Text(
-                  _loadingScan
-                      ? 'Vérification…'
-                      : _geofenceBlocksBadge()
-                          ? 'Zone GPS non conforme'
-                          : hasToken
-                              ? 'Badger entrée / sortie'
-                              : 'En attente du QR code…',
-                ),
+                label: Text(_scanButtonLabel(hasToken)),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _requestGpsForHeartbeat(SessionProvider session) async {
+    final granted = await quickEnableLocation();
+    if (!mounted) {
+      return;
+    }
+    session.setGpsGranted(granted);
+    if (granted) {
+      session.pulseHeartbeatNow();
+    }
   }
 
   Future<void> _resumeScan() async {
@@ -451,7 +506,13 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       final action = res['action']?.toString();
       if (action == 'ENTREE') {
         await session.refreshMobileConfig();
-        session.startSecureSessionHeartbeat(token);
+        session.startSecureSessionHeartbeat(
+          token,
+          heureEntree:
+              res['heure_entree']?.toString() ?? heureEntree,
+          seanceLabel:
+              res['seance_intitule']?.toString() ?? seanceLabel,
+        );
       } else if (action == 'SORTIE' || action == 'SORTIE_AUTO') {
         session.stopSecureSessionHeartbeat();
       }
@@ -567,7 +628,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildScannerHeader(),
         Expanded(
           child: Stack(
             fit: StackFit.expand,
@@ -602,11 +662,15 @@ class _InfoStrip extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.text,
+    this.actionLabel,
+    this.onAction,
   });
 
   final IconData icon;
   final Color color;
   final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -627,6 +691,16 @@ class _InfoStrip extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
+          if (actionLabel != null && onAction != null)
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                foregroundColor: color,
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: onAction,
+              child: Text(actionLabel!, style: const TextStyle(fontSize: 12)),
+            ),
         ],
       ),
     );

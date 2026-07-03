@@ -7,21 +7,37 @@ import '../services/api_client.dart';
 import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/auth_navigation.dart';
+import '../widgets/empty_state_view.dart';
+
+enum _HistoryFilter { all, entrees, sorties, alertes }
+
+enum _HistoryEventKind { entree, sortie }
 
 class _HistoryEvent {
   _HistoryEvent({
     required this.at,
     required this.label,
     required this.success,
+    required this.kind,
   });
 
   final DateTime at;
   final String label;
   final bool success;
+  final _HistoryEventKind kind;
+}
+
+class _HistorySection {
+  _HistorySection({required this.title, required this.events});
+
+  final String title;
+  final List<_HistoryEvent> events;
 }
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  const HistoryPage({super.key, this.onOpenScanner});
+
+  final VoidCallback? onOpenScanner;
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -33,6 +49,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   String? _error;
   bool _noProfile = false;
   List<_HistoryEvent> _events = [];
+  _HistoryFilter _filter = _HistoryFilter.all;
   int _lastRefreshTick = -1;
 
   @override
@@ -76,6 +93,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
           at: entree.toLocal(),
           label: contexte.isEmpty ? 'Entrée' : '$contexte — Entrée',
           success: ok,
+          kind: _HistoryEventKind.entree,
         ));
       }
       if (sortie != null) {
@@ -85,12 +103,62 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
         events.add(_HistoryEvent(
           at: sortie.toLocal(),
           label: contexte.isEmpty ? sortieLabel : '$contexte — $sortieLabel',
-          success: ok,
+          success: ok && statut != 'SORTIE_AUTO',
+          kind: _HistoryEventKind.sortie,
         ));
       }
     }
     events.sort((a, b) => b.at.compareTo(a.at));
     return events;
+  }
+
+  List<_HistoryEvent> _filteredEvents() {
+    return _events.where((e) {
+      switch (_filter) {
+        case _HistoryFilter.all:
+          return true;
+        case _HistoryFilter.entrees:
+          return e.kind == _HistoryEventKind.entree;
+        case _HistoryFilter.sorties:
+          return e.kind == _HistoryEventKind.sortie;
+        case _HistoryFilter.alertes:
+          return !e.success;
+      }
+    }).toList();
+  }
+
+  String _dateGroupLabel(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(dt.year, dt.month, dt.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Aujourd\u2019hui';
+    if (diff == 1) return 'Hier';
+    return DateFormat('d MMMM yyyy', 'fr_FR').format(dt);
+  }
+
+  List<_HistorySection> _groupEvents(List<_HistoryEvent> events) {
+    if (events.isEmpty) {
+      return [];
+    }
+    final sections = <_HistorySection>[];
+    String? currentTitle;
+    final buffer = <_HistoryEvent>[];
+    for (final event in events) {
+      final title = _dateGroupLabel(event.at);
+      if (title != currentTitle) {
+        if (buffer.isNotEmpty) {
+          sections.add(_HistorySection(title: currentTitle!, events: [...buffer]));
+          buffer.clear();
+        }
+        currentTitle = title;
+      }
+      buffer.add(event);
+    }
+    if (buffer.isNotEmpty && currentTitle != null) {
+      sections.add(_HistorySection(title: currentTitle, events: [...buffer]));
+    }
+    return sections;
   }
 
   Future<void> _load() async {
@@ -134,6 +202,40 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
     }
   }
 
+  Widget _buildFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Row(
+        children: [
+          _FilterChip(
+            label: 'Tous',
+            selected: _filter == _HistoryFilter.all,
+            onSelected: () => setState(() => _filter = _HistoryFilter.all),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Entrées',
+            selected: _filter == _HistoryFilter.entrees,
+            onSelected: () => setState(() => _filter = _HistoryFilter.entrees),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Sorties',
+            selected: _filter == _HistoryFilter.sorties,
+            onSelected: () => setState(() => _filter = _HistoryFilter.sorties),
+          ),
+          const SizedBox(width: 8),
+          _FilterChip(
+            label: 'Alertes',
+            selected: _filter == _HistoryFilter.alertes,
+            onSelected: () => setState(() => _filter = _HistoryFilter.alertes),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -164,25 +266,98 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
     }
 
     if (_events.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Aucun historique disponible.'),
-            const SizedBox(height: 8),
-            OutlinedButton(onPressed: _load, child: const Text('Rafraîchir')),
-          ],
-        ),
+      return EmptyStateView(
+        icon: Icons.history,
+        title: 'Aucun pointage enregistré',
+        subtitle:
+            'Scannez un QR code de séance pour voir vos badgeages ici.',
+        action: widget.onOpenScanner != null
+            ? FilledButton.icon(
+                onPressed: widget.onOpenScanner,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Aller au scanner'),
+              )
+            : null,
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        itemCount: _events.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 10),
-        itemBuilder: (context, i) => _HistoryEntryCard(event: _events[i]),
+    final filtered = _filteredEvents();
+    final sections = _groupEvents(filtered);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFilterChips(),
+        Expanded(
+          child: filtered.isEmpty
+              ? EmptyStateView(
+                  icon: Icons.filter_list_off,
+                  iconColor: AppColors.textSecondary,
+                  title: 'Aucun pointage pour ce filtre',
+                  subtitle: 'Essayez un autre filtre ou actualisez la liste.',
+                  action: OutlinedButton.icon(
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Actualiser'),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    children: [
+                      for (var i = 0; i < sections.length; i++) ...[
+                        Padding(
+                          padding:
+                              EdgeInsets.only(bottom: 10, top: i == 0 ? 0 : 16),
+                          child: Text(
+                            sections[i].title,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
+                        ),
+                        for (final event in sections[i].events)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _HistoryEntryCard(event: event),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: AppColors.navIndicator,
+      checkmarkColor: AppColors.ciGreenDark,
+      labelStyle: TextStyle(
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        color: selected ? AppColors.ciGreenDark : AppColors.textPrimary,
+      ),
+      side: BorderSide(
+        color: selected ? AppColors.ciGreenDark : AppColors.borderColor,
       ),
     );
   }
@@ -195,7 +370,6 @@ class _HistoryEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('d MMMM yyyy', 'fr_FR');
     final timeFmt = DateFormat.Hm('fr_FR');
     return Material(
       color: AppColors.cardBg,
@@ -234,17 +408,10 @@ class _HistoryEntryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    dateFmt.format(event.at),
+                    timeFmt.format(event.at),
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
-                        ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    timeFmt.format(event.at),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
                         ),
                   ),
                   const SizedBox(height: 4),

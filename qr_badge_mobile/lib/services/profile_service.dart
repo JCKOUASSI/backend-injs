@@ -185,6 +185,20 @@ class ProfileService {
     };
   }
 
+  Future<Map<String, dynamic>> updateMyProfile({
+    required String baseUrl,
+    required String accessToken,
+    required Map<String, dynamic> data,
+    Future<String?> Function()? onRefreshToken,
+  }) {
+    return _auth.updateMyProfile(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      data: data,
+      onRefreshToken: onRefreshToken,
+    );
+  }
+
   Future<Map<String, dynamic>> updateMySensitiveData({
     required String baseUrl,
     required String accessToken,
