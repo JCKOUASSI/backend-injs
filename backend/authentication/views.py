@@ -19,7 +19,7 @@ from .serializers import (
     ChangePasswordSerializer,
 )
 from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, ROLE_HIERARCHY, get_creatable_roles
-from .role_groups import ALLOWED_WEB_ROLES, user_role_context
+from .role_groups import ALLOWED_WEB_ROLES, user_role_context, get_user_role, user_has_perm, user_in_roles
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
 from presences.models import DeviceBinding, AuditLog, _log_audit
@@ -82,28 +82,29 @@ def login_view(request):
         )
 
     device_id = request.data.get('device_id', '').strip()
+    user_role = get_user_role(user)
 
-    if not device_id and user.role not in ALLOWED_WEB_ROLES:
-        if user.role == User.Role.AUDITEUR:
+    if not device_id and not user_has_perm(user, 'authentication.access_web') and not user_in_roles(user, ALLOWED_WEB_ROLES):
+        if user_role == User.Role.AUDITEUR:
             detail = 'Les comptes auditeur sont réservés à l\'application mobile.'
-        elif user.role == User.Role.FORMATEUR:
+        elif user_role == User.Role.FORMATEUR:
             detail = 'Les comptes formateur sont réservés à l\'application mobile.'
         else:
             detail = 'Ce compte n\'a pas accès à la plateforme web.'
         logger.warning(
             'login_web_forbidden role=%s username=%r ip=%s',
-            user.role,
+            user_role,
             user.username,
             client_ip,
         )
         return Response({'detail': detail}, status=status.HTTP_403_FORBIDDEN)
 
-    if user.role in ('AUDITEUR', 'FORMATEUR', 'ENCADRANT'):
+    if user_role in ('AUDITEUR', 'FORMATEUR', 'ENCADRANT'):
         from .profile_sync import sync_user_profile_links
         sync_user_profile_links(user)
 
     # ── Verrouillage appareil (auditeurs / formateurs uniquement) ──
-    if device_id and user.role in ('AUDITEUR', 'FORMATEUR'):
+    if device_id and user_role in ('AUDITEUR', 'FORMATEUR'):
         existing = DeviceBinding.objects.filter(
             device_id=device_id, is_active=True
         ).select_related('user').first()
@@ -140,13 +141,13 @@ def login_view(request):
         'login_ok user_id=%s username=%r role=%s ip=%s device_id=%r',
         user.pk,
         user.username,
-        user.role,
+        user_role,
         client_ip,
         device_id[:16] + '…' if len(device_id) > 16 else device_id,
     )
 
     refresh = RefreshToken.for_user(user)
-    refresh['role'] = user.role
+    refresh['role'] = user_role
     refresh['full_name'] = user.get_full_name()
     refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
     _log_audit(
@@ -155,7 +156,7 @@ def login_view(request):
         cible_type='user',
         cible_numero=user.username,
         cible_nom=user.get_full_name() or user.username,
-        extra={'role': user.role, 'device_id': bool(device_id)},
+        extra={'role': user_role, 'device_id': bool(device_id)},
     )
     return Response({
         'access': str(refresh.access_token),

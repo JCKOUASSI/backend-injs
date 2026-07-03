@@ -6,6 +6,7 @@ import '../config/app_env.dart';
 import '../services/auth_service.dart';
 import '../services/background_keepalive.dart';
 import '../services/device_telemetry_service.dart';
+import '../services/mobile_config_service.dart';
 import '../services/scan_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dev_api_defaults.dart';
@@ -15,6 +16,8 @@ class SessionProvider extends ChangeNotifier {
   final AuthService _auth = AuthService();
   final ScanService _heartbeatScan = ScanService();
   final DeviceTelemetryService _heartbeatTelemetry = DeviceTelemetryService();
+
+  final MobileConfigService _mobileConfig = MobileConfigService();
 
   Timer? _heartbeatTimer;
   String? _heartbeatTokenQr;
@@ -47,6 +50,27 @@ class SessionProvider extends ChangeNotifier {
   /// Heartbeat automatique actif (après une entrée, jusqu'à sortie ou fin de session).
   bool get isSecureHeartbeatRunning => _heartbeatTimer != null;
 
+  bool? _remoteHeartbeatEnabled;
+  int? _remoteHeartbeatIntervalSec;
+
+  bool get _effectiveHeartbeatEnabled {
+    if (!AppEnv.heartbeatEnabled) {
+      return false;
+    }
+    if (_remoteHeartbeatEnabled == false) {
+      return false;
+    }
+    return true;
+  }
+
+  Duration get _effectiveHeartbeatInterval {
+    final remote = _remoteHeartbeatIntervalSec;
+    if (remote != null) {
+      return Duration(seconds: remote.clamp(30, 600));
+    }
+    return AppEnv.heartbeatInterval;
+  }
+
   /// Notifie l'app du résultat de la demande de permission GPS.
   void setGpsGranted(bool granted) {
     if (gpsGranted == granted) return;
@@ -57,12 +81,15 @@ class SessionProvider extends ChangeNotifier {
   /// Démarre l'envoi périodique de `/api/scan/secure/heartbeat/` pour le QR courant.
   void startSecureSessionHeartbeat(String tokenQr) {
     stopSecureSessionHeartbeat();
+    if (!_effectiveHeartbeatEnabled) {
+      return;
+    }
     final t = tokenQr.trim();
     if (t.isEmpty) {
       return;
     }
     _heartbeatTokenQr = t;
-    final every = AppEnv.heartbeatInterval;
+    final every = _effectiveHeartbeatInterval;
     void schedulePulse() {
       scheduleMicrotask(_heartbeatPulse);
     }
@@ -159,6 +186,42 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshMobileConfig() async {
+    final token = accessToken;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    try {
+      final cfg = await _mobileConfig.fetch(
+        baseUrl: baseUrl,
+        accessToken: token,
+        onRefreshToken: _refreshTokenForApi,
+      );
+      final enabled = cfg['heartbeat_enabled'];
+      if (enabled is bool) {
+        _remoteHeartbeatEnabled = enabled;
+      } else if (enabled != null) {
+        _remoteHeartbeatEnabled = enabled.toString().toLowerCase() != 'false';
+      }
+      final sec = cfg['heartbeat_interval_seconds'];
+      if (sec is int) {
+        _remoteHeartbeatIntervalSec = sec;
+      } else if (sec != null) {
+        _remoteHeartbeatIntervalSec = int.tryParse(sec.toString());
+      }
+      if (!_effectiveHeartbeatEnabled && _heartbeatTimer != null) {
+        stopSecureSessionHeartbeat();
+      }
+    } catch (e, st) {
+      debugPrint('[qr_badge.session] Config mobile: $e\n$st');
+    }
+  }
+
+  Future<String?> _refreshTokenForApi() async {
+    final ok = await tryRefreshToken();
+    return ok ? accessToken : null;
+  }
+
   Future<void> bootstrap() async {
     isBootstrapping = true;
     notifyListeners();
@@ -189,6 +252,7 @@ class SessionProvider extends ChangeNotifier {
           }
         }
       }
+      await refreshMobileConfig();
     }
     isBootstrapping = false;
     notifyListeners();
@@ -240,6 +304,7 @@ class SessionProvider extends ChangeNotifier {
     await _storage.setUsername(username!);
     await _storage.setMustChangePassword(mustChangePassword);
     isAuthenticated = true;
+    await refreshMobileConfig();
     notifyListeners();
   }
 
@@ -295,6 +360,8 @@ class SessionProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     stopSecureSessionHeartbeat();
+    _remoteHeartbeatEnabled = null;
+    _remoteHeartbeatIntervalSec = null;
     await _storage.clearTokens();
     accessToken = null;
     refreshToken = null;

@@ -16,6 +16,10 @@ class AppEnv {
     'HEARTBEAT_INTERVAL_SECONDS',
     defaultValue: '',
   );
+  static const String _heartbeatEnabledDefine = String.fromEnvironment(
+    'HEARTBEAT_ENABLED',
+    defaultValue: '',
+  );
   static const String _privacyPolicyFromDefine = String.fromEnvironment(
     'PRIVACY_POLICY_URL',
     defaultValue: '',
@@ -86,6 +90,25 @@ class AppEnv {
       port: u.hasPort ? u.port : null,
       path: '/dashboard/legal/confidentialite-qr-badge/',
     ).toString();
+  }
+
+  static bool _parseBoolEnv(String raw, {bool defaultValue = true}) {
+    final v = raw.trim().toLowerCase();
+    if (v.isEmpty) {
+      return defaultValue;
+    }
+    if (v == 'false' || v == '0' || v == 'no' || v == 'off') {
+      return false;
+    }
+    return true;
+  }
+
+  /// Envoi périodique de heartbeat pendant une session ouverte (défaut : activé).
+  static bool get heartbeatEnabled {
+    if (_heartbeatEnabledDefine.isNotEmpty) {
+      return _parseBoolEnv(_heartbeatEnabledDefine);
+    }
+    return _parseBoolEnv(_dot('HEARTBEAT_ENABLED') ?? '');
   }
 
   /// Entre deux envois automatiques de heartbeat pendant une session ouverte.

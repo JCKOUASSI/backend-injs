@@ -619,7 +619,15 @@ def formation_edit(request, pk):
         formateur_ids = set(map(int, request.POST.getlist('formateur_ids')))
         current_ids = set(ModuleFormateur.objects.filter(module__formation=formation).values_list('formateur_id', flat=True))
         if first_module:
+            from formations.formateur_assignment import check_formateur_groupe_jour_conflict
             for fid in formateur_ids - current_ids:
+                formateur = Formateur.objects.filter(pk=fid).first()
+                if not formateur:
+                    continue
+                conflict = check_formateur_groupe_jour_conflict(formateur, first_module)
+                if conflict:
+                    messages.error(request, conflict)
+                    return redirect('web-formation-edit', pk=formation.pk)
                 ModuleFormateur.objects.create(module=first_module, formateur_id=fid)
         ModuleFormateur.objects.filter(module__formation=formation, formateur_id__in=current_ids - formateur_ids).delete()
         messages.success(request, f"Formation « {formation.formation} » modifiée.")
@@ -1438,6 +1446,11 @@ def formation_add_formateur(request, pk):
             formateur = get_object_or_404(Formateur, pk=formateur_id)
             _mod = formation.modules.order_by('ordre').first()
             if _mod:
+                from formations.formateur_assignment import check_formateur_groupe_jour_conflict
+                conflict = check_formateur_groupe_jour_conflict(formateur, _mod)
+                if conflict:
+                    messages.error(request, conflict)
+                    return redirect('web-formation-detail', pk=pk)
                 _, created = ModuleFormateur.objects.get_or_create(
                     module=_mod, formateur=formateur
                 )

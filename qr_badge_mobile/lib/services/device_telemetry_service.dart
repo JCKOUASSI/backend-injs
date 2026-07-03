@@ -29,8 +29,13 @@ class DeviceTelemetryService {
   final Battery _battery;
 
   /// Récupère position (une lecture) + état batterie. Ne demande pas la localisation si déjà refusée définitivement sans nouvelle demande.
+  ///
+  /// Pour rester rapide, on réutilise d'abord le dernier point connu (retour
+  /// quasi instantané). Un fix frais n'est demandé qu'en secours, avec un
+  /// timeout court, afin de ne pas bloquer le badgeage plusieurs secondes.
   Future<DeviceTelemetry> capture({
-    Duration locationTimeout = const Duration(seconds: 25),
+    Duration locationTimeout = const Duration(seconds: 6),
+    Duration lastKnownMaxAge = const Duration(seconds: 30),
   }) async {
     String? locErr;
     double? lat;
@@ -51,15 +56,34 @@ class DeviceTelemetryService {
         } else if (perm == LocationPermission.deniedForever) {
           locErr = 'Localisation refusée définitivement. Activez-la dans les réglages.';
         } else {
-          final p = await Geolocator.getCurrentPosition(
-            locationSettings: LocationSettings(
-              accuracy: LocationAccuracy.high,
-              timeLimit: locationTimeout,
-            ),
-          );
-          lat = p.latitude;
-          lng = p.longitude;
-          acc = p.accuracy;
+          // 1) Dernier point connu : instantané s'il est encore récent.
+          try {
+            final last = await Geolocator.getLastKnownPosition();
+            final ts = last?.timestamp;
+            final fresh = last != null &&
+                ts != null &&
+                DateTime.now().difference(ts) <= lastKnownMaxAge;
+            if (fresh) {
+              lat = last.latitude;
+              lng = last.longitude;
+              acc = last.accuracy;
+            }
+          } catch (_) {
+            // Ignoré : on tentera un fix frais ci-dessous.
+          }
+
+          // 2) Sinon, fix frais avec timeout court.
+          if (lat == null || lng == null) {
+            final p = await Geolocator.getCurrentPosition(
+              locationSettings: LocationSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: locationTimeout,
+              ),
+            );
+            lat = p.latitude;
+            lng = p.longitude;
+            acc = p.accuracy;
+          }
         }
       }
     } catch (e) {

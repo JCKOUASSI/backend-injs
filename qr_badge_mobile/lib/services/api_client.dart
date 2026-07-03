@@ -219,6 +219,9 @@ class ApiClient {
             'Vous devez changer votre mot de passe avant de continuer.',
       );
     }
+    if (json['code']?.toString() == 'NO_PROFILE') {
+      throw NoProfileException(json['detail']?.toString());
+    }
     final detail = json['detail']?.toString() ??
         json['message']?.toString() ??
         _firstFieldError(json) ??
@@ -259,6 +262,17 @@ class SessionExpiredException implements Exception {
   const SessionExpiredException();
   @override
   String toString() => 'Session expir\u00e9e. Veuillez vous reconnecter.';
+}
+
+/// Levée quand le compte n'a aucun profil auditeur/formateur/encadrant lié
+/// (HTTP 403, code `NO_PROFILE`). Permet d'afficher un état vide dédié.
+class NoProfileException implements Exception {
+  const NoProfileException([this.detail]);
+  final String? detail;
+  @override
+  String toString() =>
+      detail ??
+      'Aucun profil auditeur, formateur ou encadrant n\u2019est li\u00e9 \u00e0 ce compte.';
 }
 
 /// Réponse HTTP non JSON (souvent une page 404 HTML Django).

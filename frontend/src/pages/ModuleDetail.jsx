@@ -286,7 +286,9 @@ export default function ModuleDetail() {
       loadModule()
       loadAvailableFormateurs(formateurSearch)
       showToast('Formateur assigné')
-    } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
+    } catch (err) {
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible d\'assigner ce formateur.' }), 'error')
+    }
   }
 
   const handleRemoveFormateur = (fid, nom) => {

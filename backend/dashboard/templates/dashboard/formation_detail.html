@@ -401,7 +401,8 @@
                                             <i class="bi bi-printer me-1"></i>Imprimer
                                         </a>
                                         {% if not s.est_terminee %}
-                                        <form method="post" action="{% url 'web-formation-generate-qr' formation.id %}" class="d-inline">
+                                        <form method="post" action="{% url 'web-formation-generate-qr' formation.id %}" class="d-inline"
+                                              onsubmit="return confirm('Régénérer le QR code ? L\u2019ancien QR ne sera plus valide pour le badgeage.');">
                                             {% csrf_token %}
                                             <input type="hidden" name="session_id" value="{{ s.id }}">
                                             <input type="hidden" name="duree_expiration" value="24">

@@ -31,6 +31,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   final _service = ScanService();
   bool _loading = true;
   String? _error;
+  bool _noProfile = false;
   List<_HistoryEvent> _events = [];
   int _lastRefreshTick = -1;
 
@@ -104,6 +105,7 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
     setState(() {
       _loading = true;
       _error = null;
+      _noProfile = false;
     });
     try {
       final res = await _service.myHistory(
@@ -114,6 +116,8 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
             ),
       );
       setState(() => _events = _eventsFromPayload(res));
+    } on NoProfileException {
+      setState(() => _noProfile = true);
     } on SessionExpiredException {
       if (mounted) {
         await context.read<SessionProvider>().logout();
@@ -136,6 +140,9 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
     _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (_noProfile) {
+      return _NoProfileState(onRetry: _load);
     }
     if (_error != null) {
       return Center(
@@ -254,6 +261,40 @@ class _HistoryEntryCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoProfileState extends StatelessWidget {
+  const _NoProfileState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_off, size: 56, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun profil trouvé.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Vérifiez votre compte et réessayez.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
           ],
         ),
       ),

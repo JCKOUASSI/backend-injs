@@ -319,6 +319,28 @@ class RoleGroupsTest(TestCase):
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.groups.filter(name=ROLE_GROUP_NAMES[User.Role.ADMIN]).exists())
 
+    def test_sync_role_from_group_when_admin_changes_group(self):
+        user = make_user('group-sync-user', role=User.Role.AUDITEUR)
+        encadrant_group = Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.ENCADRANT])
+        user.groups.set([encadrant_group])
+        user.refresh_from_db()
+        self.assertEqual(user.role, User.Role.ENCADRANT)
+
+    def test_custom_permissions_assigned_to_secretariat_group(self):
+        group = Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.SECRETARIAT])
+        codenames = set(group.permissions.values_list('codename', flat=True))
+        self.assertIn('mutate_users', codenames)
+        self.assertIn('access_web', codenames)
+        self.assertIn('operational_web', codenames)
+
+    def test_get_user_role_from_groups(self):
+        from authentication.role_groups import get_user_role
+
+        user = make_user('role-from-group', role=User.Role.FINANCE)
+        self.assertEqual(get_user_role(user), User.Role.FINANCE)
+        user.role = User.Role.ADMIN  # champ désynchronisé volontairement
+        self.assertEqual(get_user_role(user), User.Role.FINANCE)
+
 
 class AuditeurProfileSyncTests(TestCase):
 

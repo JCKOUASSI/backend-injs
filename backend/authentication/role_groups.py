@@ -176,24 +176,59 @@ ROLE_GROUP_NAMES = {
     User.Role.AUDITEUR: "ROLE_AUDITEUR",
 }
 
+GROUP_NAME_TO_ROLE = {name: role for role, name in ROLE_GROUP_NAMES.items()}
+
+# Permissions métier (modèle User) assignées aux groupes via ROLE_POLICY.
+CUSTOM_PERMISSIONS = {
+    'access_web': 'authentication.access_web',
+    'operational_web': 'authentication.operational_web',
+    'mutate_users': 'authentication.mutate_users',
+    'global_scope': 'authentication.global_scope',
+    'list_participants': 'authentication.list_participants',
+    'finance_module': 'authentication.finance_module',
+    'manage_questionnaires': 'authentication.manage_questionnaires',
+    'manage_notes': 'authentication.manage_notes',
+    'validate_decisions': 'authentication.validate_decisions',
+    'consult_evaluation': 'authentication.consult_evaluation',
+}
+
 CORE_APPS = ("authentication", "formations", "presences", "exports")
 
 ROLE_POLICY = {
     User.Role.ADMIN: {
         "apps": CORE_APPS,
         "actions": ("view", "add", "change", "delete"),
+        "custom": (
+            "access_web", "operational_web", "mutate_users", "global_scope",
+            "list_participants", "manage_questionnaires", "manage_notes",
+            "validate_decisions", "consult_evaluation",
+        ),
     },
     User.Role.CHEF_CPFAE_ADMIN: {
         "apps": CORE_APPS,
         "actions": ("view", "add", "change", "delete"),
+        "custom": (
+            "access_web", "operational_web", "mutate_users", "global_scope",
+            "list_participants", "manage_questionnaires", "manage_notes",
+            "validate_decisions", "consult_evaluation",
+        ),
     },
     User.Role.CPFAE_ADMIN: {
         "apps": CORE_APPS,
         "actions": ("view", "add", "change", "delete"),
+        "custom": (
+            "access_web", "operational_web", "mutate_users", "global_scope",
+            "list_participants", "manage_questionnaires", "manage_notes",
+            "validate_decisions", "consult_evaluation",
+        ),
     },
     User.Role.DIRECTION: {
         "apps": CORE_APPS,
         "actions": ("view",),
+        "custom": (
+            "access_web", "operational_web", "global_scope", "list_participants",
+            "manage_notes", "validate_decisions", "consult_evaluation",
+        ),
     },
     User.Role.CHEF_SECRETARIAT: {
         "apps": ("formations", "presences", "suiviEvaluation"),
@@ -201,37 +236,114 @@ ROLE_POLICY = {
         # Interdit uniquement la création de nouvelles fiches auditeur.
         # Toutes les autres actions (y compris suppression) restent autorisées.
         "exclude_codenames": ("add_participant",),
+        "custom": (
+            "access_web", "operational_web", "mutate_users", "list_participants",
+            "manage_questionnaires", "manage_notes", "validate_decisions",
+            "consult_evaluation",
+        ),
     },
     User.Role.SECRETARIAT: {
         "apps": ("formations", "presences", "suiviEvaluation"),
         "actions": ("view", "add", "change", "delete"),
         "exclude_codenames": ("add_participant",),
+        "custom": (
+            "access_web", "operational_web", "mutate_users", "list_participants",
+            "manage_questionnaires", "manage_notes", "validate_decisions",
+            "consult_evaluation",
+        ),
     },
     User.Role.FINANCE: {
         "apps": ("formations", "presences", "exports"),
         "actions": ("view",),
+        "custom": ("access_web", "finance_module", "consult_evaluation"),
     },
     User.Role.ARCHIVE: {
         "apps": CORE_APPS + ("suiviEvaluation",),
         "actions": ("view",),
+        "custom": (
+            "access_web", "operational_web", "global_scope", "list_participants",
+            "finance_module", "consult_evaluation",
+        ),
     },
     User.Role.ENCADRANT: {
         "apps": ("formations", "presences", "suiviEvaluation"),
         "actions": ("view", "add", "change", "delete"),
+        "custom": (
+            "access_web", "operational_web", "list_participants",
+            "manage_questionnaires", "manage_notes", "validate_decisions",
+            "consult_evaluation",
+        ),
     },
     User.Role.SUPERVISEUR: {
         "apps": ("suiviEvaluation",),
         "actions": ("view", "add", "change", "delete"),
+        "custom": (
+            "access_web", "operational_web", "manage_questionnaires",
+            "manage_notes", "validate_decisions", "consult_evaluation",
+        ),
     },
     User.Role.FORMATEUR: {
         "apps": ("formations", "presences"),
         "actions": ("view",),
+        "custom": (),
     },
     User.Role.AUDITEUR: {
         "apps": ("formations", "presences"),
         "actions": ("view",),
+        "custom": (),
     },
 }
+
+
+def _cached_user_groups(user):
+    """Noms de groupes Django de l'utilisateur (cache requête)."""
+    if not hasattr(user, '_role_groups_cache'):
+        user._role_groups_cache = set(user.groups.values_list('name', flat=True))
+    return user._role_groups_cache
+
+
+def _role_from_group_names(group_names):
+    """Dérive le rôle à partir des noms de groupes ROLE_*."""
+    role_groups = set(group_names) & set(ROLE_GROUP_NAMES.values())
+    if not role_groups:
+        return None
+    if len(role_groups) == 1:
+        return GROUP_NAME_TO_ROLE[next(iter(role_groups))]
+    # Plusieurs groupes ROLE_* : conserver le rôle le plus élevé dans la hiérarchie.
+    roles = [GROUP_NAME_TO_ROLE[name] for name in role_groups if name in GROUP_NAME_TO_ROLE]
+    for candidate in ROLE_HIERARCHY:
+        if candidate in roles:
+            return candidate
+    return roles[0] if roles else None
+
+
+def get_user_role(user):
+    """Rôle effectif — source de vérité : groupes Django ROLE_*.
+
+    Le champ ``User.role`` est une dénormalisation synchronisée automatiquement
+    (voir ``sync_role_from_group`` / ``sync_user_role_group``).
+    """
+    if not user or not getattr(user, 'is_authenticated', True):
+        return None
+    if not user.pk:
+        return getattr(user, 'role', None)
+    role = _role_from_group_names(_cached_user_groups(user))
+    if role:
+        return role
+    return getattr(user, 'role', None)
+
+
+def user_in_roles(user, role_set):
+    """Vérifie si le rôle effectif (groupes) appartient à l'ensemble donné."""
+    role = get_user_role(user)
+    return role in role_set if role else False
+
+
+def user_has_perm(user, codename):
+    """Vérifie une permission Django (modèle ou custom) via les groupes."""
+    if not user or not user.is_authenticated:
+        return False
+    return user.has_perm(codename)
 
 
 def get_subordinate_roles(role):
@@ -268,7 +380,7 @@ def get_staff_filter_roles(role):
 
 def user_role_context(user):
     """Métadonnées rôles pour le frontend (login / auth/me)."""
-    role = getattr(user, 'role', None)
+    role = get_user_role(user)
     return {
         'hierarchy': ROLE_HIERARCHY,
         'labels': ROLE_LABELS,
@@ -298,6 +410,18 @@ def _permissions_for_policy(policy):
                     content_type__app_label=app_label,
                     codename__in=codenames,
                 )
+    custom_keys = policy.get("custom", ())
+    if custom_keys:
+        custom_codenames = [
+            CUSTOM_PERMISSIONS[key].split(".", 1)[1]
+            for key in custom_keys
+            if key in CUSTOM_PERMISSIONS
+        ]
+        if custom_codenames:
+            permissions = permissions | Permission.objects.filter(
+                content_type__app_label="authentication",
+                codename__in=custom_codenames,
+            )
     return permissions.distinct()
 
 
@@ -334,6 +458,21 @@ def ensure_role_groups(force_reset=False):
                 )
 
 
+def sync_role_from_group(user):
+    """Synchronise le champ ``User.role`` depuis le groupe Django ROLE_*."""
+    if not user or not user.pk:
+        return
+
+    derived = _role_from_group_names(user.groups.values_list('name', flat=True))
+    if not derived or derived == user.role:
+        return
+
+    User.objects.filter(pk=user.pk).update(role=derived)
+    user.role = derived
+    if hasattr(user, '_role_groups_cache'):
+        del user._role_groups_cache
+
+
 def sync_user_role_group(user):
     """Synchronise l'appartenance du user à son groupe de rôle unique."""
     if not user or not user.pk:
@@ -365,13 +504,17 @@ def sync_user_role_group(user):
             target_group_name,
         )
 
+    if hasattr(user, '_role_groups_cache'):
+        del user._role_groups_cache
+
 
 def sync_user_staff_status(user):
     """Active is_staff pour les rôles autorisés sur l'admin Django."""
     if not user or not user.pk or user.is_superuser:
         return
 
-    should_be_staff = user.role in DUAL_ACCESS_ROLES
+    effective = get_user_role(user) or getattr(user, 'role', None)
+    should_be_staff = effective in DUAL_ACCESS_ROLES
     if user.is_staff != should_be_staff:
         User.objects.filter(pk=user.pk).update(is_staff=should_be_staff)
         user.is_staff = should_be_staff

@@ -11,6 +11,9 @@ urlpatterns = [
     path('scan/secure/heartbeat/', views.secure_scan_heartbeat, name='secure-scan-heartbeat'),
     path('scan/secure/check-status/', views.secure_check_badge_status, name='secure-check-badge-status'),
 
+    # Config runtime (app mobile)
+    path('mobile/config/', views.mobile_config, name='mobile-config'),
+
     # Historique personnel (app mobile)
     path('me/historique/', views.my_historique, name='my-historique'),
     path('me/fiche/', views.my_fiche, name='my-fiche'),

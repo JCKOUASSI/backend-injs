@@ -11,6 +11,7 @@ Surveille les pointages mobiles ouverts et applique les sanctions heartbeat :
   */5 * * * * /path/to/venv/bin/python /path/to/manage.py process_mobile_heartbeats
 """
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -37,6 +38,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options['dry_run']
         local_now = timezone.localtime(timezone.now())
+
+        if getattr(settings, 'MOBILE_HEARTBEAT_DISABLED', False):
+            self.stdout.write(
+                self.style.WARNING(
+                    f'[{local_now.strftime("%Y-%m-%d %H:%M")}] '
+                    'Sanctions heartbeat désactivées (MOBILE_HEARTBEAT_DISABLED=true).'
+                )
+            )
+            return
 
         traites = process_mobile_heartbeat_sanctions(
             dry_run=dry_run,

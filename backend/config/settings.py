@@ -243,6 +243,13 @@ PUBLIC_QR_SCAN_ENABLED = os.environ.get(
 AUTO_ABSENT_DELAI_MINUTES = int(os.environ.get('AUTO_ABSENT_DELAI_MINUTES', 60))
 
 # Paramètres anti-fraude mobile (heartbeat + geofence)
+MOBILE_HEARTBEAT_DISABLED = os.environ.get(
+    'MOBILE_HEARTBEAT_DISABLED',
+    'False',
+).lower() in ('true', '1', 'yes')
+MOBILE_HEARTBEAT_INTERVAL_SECONDS = int(
+    os.environ.get('MOBILE_HEARTBEAT_INTERVAL_SECONDS', 60)
+)
 MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES = int(
     os.environ.get('MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)
 )
