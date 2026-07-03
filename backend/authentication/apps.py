@@ -56,7 +56,7 @@ class AuthenticationConfig(AppConfig):
         # / presences / … pour compléter les codenames créés plus tard (voir
         # role_groups.ensure_role_groups branche « merge »).
         post_migrate.connect(
-            _on_post_migrate,
+            _on_post_migrate_finalize,
             sender=self,
             dispatch_uid='authentication_post_migrate',
         )
@@ -66,7 +66,7 @@ class AuthenticationConfig(AppConfig):
             except LookupError:
                 continue
             post_migrate.connect(
-                _on_post_migrate,
+                _on_post_migrate_ensure_roles,
                 sender=app_config,
                 dispatch_uid=f'authentication_ensure_roles_{label}',
             )
@@ -80,7 +80,13 @@ class AuthenticationConfig(AppConfig):
         )
 
 
-def _on_post_migrate(sender, **kwargs):
+def _on_post_migrate_ensure_roles(sender, **kwargs):
+    from .role_groups import ensure_role_groups
+
+    ensure_role_groups()
+
+
+def _on_post_migrate_finalize(sender, **kwargs):
     from .role_groups import ensure_role_groups, sync_all_users_role_groups
 
     ensure_role_groups()
@@ -89,8 +95,11 @@ def _on_post_migrate(sender, **kwargs):
 
 
 def _on_user_saved(sender, instance, **kwargs):
-    from .role_groups import sync_user_role_group, sync_user_staff_status
+    from .role_groups import is_bulk_role_sync, sync_user_role_group, sync_user_staff_status
     from .profile_sync import sync_user_profile_links
+
+    if is_bulk_role_sync():
+        return
 
     sync_user_role_group(instance)
     sync_user_staff_status(instance)
@@ -103,9 +112,12 @@ def _on_user_groups_changed(sender, instance, action, **kwargs):
     # et provoque une fenêtre transitoire sans groupe ROLE_*.
     if action not in ('post_add', 'post_clear'):
         return
+    from .role_groups import is_bulk_role_sync, sync_role_from_group, sync_user_staff_status
+
+    if is_bulk_role_sync():
+        return
     if hasattr(instance, '_role_groups_cache'):
         del instance._role_groups_cache
-    from .role_groups import sync_role_from_group, sync_user_staff_status
     from .profile_sync import sync_user_profile_links
 
     sync_role_from_group(instance)
