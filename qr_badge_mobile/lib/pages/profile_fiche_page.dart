@@ -448,6 +448,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     required Map<String, dynamic> user,
     required Map<String, dynamic> profil,
   }) async {
+    final messenger = ScaffoldMessenger.of(context);
     final prenomCtrl = TextEditingController(
       text: (user['first_name'] ?? profil['prenom'] ?? '').toString(),
     );
@@ -636,7 +637,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     matriculeCtrl.dispose();
     orgCtrl.dispose();
     gradeCtrl.dispose();
-    final messenger = ScaffoldMessenger.of(context);
     if (saved == true && mounted) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Profil mis à jour.')),

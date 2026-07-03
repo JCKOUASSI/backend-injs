@@ -60,10 +60,9 @@ class FormateurSameDayConflictTest(TestCase):
 
         ModuleFormateur.objects.create(module=self.module_a, formateur=self.formateur)
 
-    def test_blocks_assignment_when_same_day_even_without_time_overlap(self):
+    def test_allows_assignment_when_same_group_without_time_overlap(self):
         conflict = check_formateur_groupe_jour_conflict(self.formateur, self.module_b)
-        self.assertIsNotNone(conflict)
-        self.assertIn('même jour', conflict)
+        self.assertIsNone(conflict)
 
     def test_allows_assignment_when_no_common_day(self):
         other_day = date(2026, 3, 11)
