@@ -76,6 +76,7 @@ class PointageAdmin(AdminScopeMixin, ModelAdmin):
     ]
     autocomplete_fields = ['participant', 'formateur', 'encadrant', 'session']
     list_per_page = 50
+    show_full_result_count = False
     actions = ['remettre_selection_en_cours']
     fieldsets = (
         ("Personne", {

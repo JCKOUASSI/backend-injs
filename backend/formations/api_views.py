@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import timedelta, datetime, time, date
 import calendar
 import re
+from django.core.cache import cache
 from django.db.models import Count, Q, F, Prefetch, Case, When, Value, IntegerField
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -3506,8 +3507,17 @@ def module_detail_api(request, formation_pk, module_pk):
     return Response(status=204)
 
 
+def module_presences_cache_key(module_pk):
+    return f"module_presences_v1_{module_pk}"
+
+
 def _build_module_presences_list(module):
     """Liste sérialisée des pointages d'un module (participants, formateurs, encadrants)."""
+    cache_key = module_presences_cache_key(module.pk)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     from presences.models import Pointage
     from presences.duree import duree_minutes_effective
 
@@ -3592,6 +3602,7 @@ def _build_module_presences_list(module):
         })
 
     presences.sort(key=lambda x: (x['date_journee'] or '', x['timestamp_entree'] or ''))
+    cache.set(module_presences_cache_key(module.pk), presences, timeout=60)
     return presences
 
 
