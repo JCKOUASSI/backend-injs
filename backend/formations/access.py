@@ -8,6 +8,8 @@ from authentication.role_groups import (
     DASHBOARD_SECRETARIAT_FILTER_ROLES,
     GLOBAL_ACCESS_ROLES,
     SECRETARIAT_ROLES,
+    get_user_role,
+    user_has_perm,
 )
 
 from .models import Formation, Module, Participant, Formateur
@@ -31,7 +33,9 @@ def formation_accessible(user, pk):
     if not (user and user.is_authenticated):
         return None
 
-    if user.role == 'ENCADRANT':
+    role = get_user_role(user)
+
+    if role == 'ENCADRANT':
         return (
             Formation.objects
             .filter(pk=pk, modules__superviseur=user)
@@ -39,7 +43,7 @@ def formation_accessible(user, pk):
             .first()
         )
 
-    if user.role in SECRETARIAT_ROLES:
+    if role in SECRETARIAT_ROLES:
         secretariat = getattr(user, 'secretariat', None)
         if not secretariat:
             return None
@@ -50,7 +54,7 @@ def formation_accessible(user, pk):
             .first()
         )
 
-    if user.role == 'AUDITEUR':
+    if role == 'AUDITEUR':
         return (
             Formation.objects
             .filter(pk=pk, modules__module_participants__participant__user=user)
@@ -58,7 +62,7 @@ def formation_accessible(user, pk):
             .first()
         )
 
-    if user.role in GLOBAL_ACCESS_ROLES:
+    if role in GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
         return Formation.objects.filter(pk=pk).first()
 
     return None
@@ -69,15 +73,16 @@ def modules_queryset_for_user(user, queryset=None):
     qs = queryset if queryset is not None else Module.objects.all()
     if not (user and user.is_authenticated):
         return qs.none()
-    if user.role in SECRETARIAT_ROLES:
+    role = get_user_role(user)
+    if role in SECRETARIAT_ROLES:
         if user.secretariat:
             return qs.filter(secretariat=user.secretariat)
         return qs.none()
-    if user.role == 'ENCADRANT':
+    if role == 'ENCADRANT':
         return qs.filter(superviseur=user)
-    if user.role in GLOBAL_ACCESS_ROLES:
+    if role in GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
         return qs
-    if user.role == 'FINANCE':
+    if role == 'FINANCE':
         return qs.none()
     return qs
 
@@ -87,20 +92,21 @@ def participants_queryset_for_user(user, queryset=None):
     qs = queryset if queryset is not None else Participant.objects.all()
     if not (user and user.is_authenticated):
         return qs.none()
-    if user.role in SECRETARIAT_ROLES:
+    role = get_user_role(user)
+    if role in SECRETARIAT_ROLES:
         if user.secretariat:
             return qs.filter(
                 Q(secretariat=user.secretariat)
                 | Q(modules_inscrits__module__secretariat=user.secretariat)
             ).distinct()
         return qs.filter(secretariat__isnull=True)
-    if user.role == 'ENCADRANT':
+    if role == 'ENCADRANT':
         return qs.filter(
             modules_inscrits__module__superviseur=user
         ).distinct()
-    if user.role in GLOBAL_ACCESS_ROLES:
+    if role in GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
         return qs
-    if user.role == 'FINANCE':
+    if role == 'FINANCE':
         return qs.none()
     return qs
 
@@ -117,22 +123,27 @@ def formateurs_queryset_for_user(user, queryset=None):
     qs = queryset if queryset is not None else Formateur.objects.all()
     if not (user and user.is_authenticated):
         return qs.none()
-    if user.role in SECRETARIAT_ROLES:
+    role = get_user_role(user)
+    if role in SECRETARIAT_ROLES:
         sec = user.secretariat
         if not sec:
             return qs.none()
-        return qs
-    if user.role == 'ENCADRANT':
+        return qs.filter(
+            Q(secretariats=sec)
+            | Q(modules_assignes__module__secretariat=sec)
+        ).distinct()
+    if role == 'ENCADRANT':
         return qs.filter(
             modules_assignes__module__superviseur=user
         ).distinct()
-    if user.role in GLOBAL_ACCESS_ROLES:
+    if role in GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
         return qs
-    if user.role == 'FINANCE':
+    if role == 'FINANCE':
         return qs.none()
     return qs
 
 
 def can_filter_modules_by_secretariat(user):
     """Indique si l'utilisateur peut appliquer un filtre secrétariat sur les listes modules."""
-    return user.role in DASHBOARD_SECRETARIAT_FILTER_ROLES
+    role = get_user_role(user)
+    return role in DASHBOARD_SECRETARIAT_FILTER_ROLES or user_has_perm(user, 'authentication.global_scope')

@@ -1,5 +1,8 @@
 from rest_framework.permissions import BasePermission
 
+from authentication.permissions import _has_role
+from authentication.role_groups import get_user_role, user_has_perm
+
 
 ROLES_SUPERVISEUR = {'SUPERVISEUR', 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'}
 
@@ -26,16 +29,34 @@ ROLES_CONSULTATION = ROLES_GESTION_NOTES | {'FINANCE', 'ARCHIVE'}
 ROLES_FICHE_EXPORT = ROLES_GESTION_NOTES | {'ARCHIVE'}
 
 
+def _can_manage_questionnaires(user):
+    return user_has_perm(user, 'authentication.manage_questionnaires') or _has_role(
+        user, *ROLES_GESTION_QUESTIONNAIRES
+    )
+
+
+def _can_manage_notes(user):
+    return user_has_perm(user, 'authentication.manage_notes') or get_user_role(user) in ROLES_GESTION_NOTES
+
+
+def _can_consult_evaluation(user):
+    return user_has_perm(user, 'authentication.consult_evaluation') or get_user_role(user) in ROLES_CONSULTATION
+
+
+def _can_validate_decisions(user):
+    return user_has_perm(user, 'authentication.validate_decisions') or get_user_role(user) in ROLES_DECISION
+
+
 class IsSuperviseur(BasePermission):
     """Secrétariat, encadrants, superviseurs et admins peuvent gérer les questionnaires."""
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ROLES_GESTION_QUESTIONNAIRES
+        return request.user.is_authenticated and _can_manage_questionnaires(request.user)
 
 
 class IsAuditeur(BasePermission):
     """Seuls les auditeurs peuvent soumettre des réponses."""
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == 'AUDITEUR'
+        return request.user.is_authenticated and _has_role(request.user, 'AUDITEUR')
 
 
 class IsSuperviseurOrReadOnly(BasePermission):
@@ -44,13 +65,13 @@ class IsSuperviseurOrReadOnly(BasePermission):
             return False
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
-        return request.user.role in ROLES_GESTION_QUESTIONNAIRES
+        return _can_manage_questionnaires(request.user)
 
 
 class IsGestionNotes(BasePermission):
     """Secrétariat, encadrants et au-dessus peuvent saisir/gérer les notes."""
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ROLES_GESTION_NOTES
+        return request.user.is_authenticated and _can_manage_notes(request.user)
 
 
 class IsGestionNotesOrReadOnly(BasePermission):
@@ -59,8 +80,8 @@ class IsGestionNotesOrReadOnly(BasePermission):
         if not request.user.is_authenticated:
             return False
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return request.user.role in ROLES_CONSULTATION
-        return request.user.role in ROLES_GESTION_NOTES
+            return _can_consult_evaluation(request.user)
+        return _can_manage_notes(request.user)
 
 
 class IsDecisionValidator(BasePermission):
@@ -69,5 +90,5 @@ class IsDecisionValidator(BasePermission):
         if not request.user.is_authenticated:
             return False
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
-            return request.user.role in ROLES_CONSULTATION
-        return request.user.role in ROLES_DECISION
+            return _can_consult_evaluation(request.user)
+        return _can_validate_decisions(request.user)

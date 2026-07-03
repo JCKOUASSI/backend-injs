@@ -14,6 +14,7 @@ from authentication.role_groups import (
     GLOBAL_STATS_ROLES,
     SECRETARIAT_ROLES,
     STATS_ACCESS_ROLES,
+    get_user_role,
 )
 
 from .models import Rapport
@@ -26,19 +27,15 @@ ROLE_ALIASES = {
 
 
 def effective_user_role(user) -> Optional[str]:
-    role = getattr(user, 'role', None)
+    role = get_user_role(user)
     return ROLE_ALIASES.get(role, role)
 
 
 def user_stats_role(user) -> Optional[str]:
-    """Rôle effectif pour le périmètre stats (champ role ou groupe Django)."""
+    """Rôle effectif pour le périmètre stats (groupes Django ROLE_*)."""
     role = effective_user_role(user)
     if role in STATS_ACCESS_ROLES:
         return role
-    from authentication.permissions import _in_groups
-    for candidate in STATS_ACCESS_ROLES:
-        if _in_groups(user, candidate):
-            return candidate
     return role
 
 

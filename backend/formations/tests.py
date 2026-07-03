@@ -303,6 +303,66 @@ class ModuleFormateurAPITest(TestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_add_formateur_blocks_two_groups_same_day(self):
+        m_g1 = make_module(self.f, intitule='Cours G1', groupe='GROUPE 1')
+        m_g2 = make_module(self.f, intitule='Cours G2', groupe='GROUPE 2')
+        day = timezone.localdate()
+        SessionModule.objects.create(module=m_g1, date_journee=day, numero=1, intitule='Matin')
+        SessionModule.objects.create(module=m_g2, date_journee=day, numero=1, intitule='Matin')
+        ModuleFormateur.objects.create(module=m_g1, formateur=self.fmt)
+
+        res = self.client.post(
+            f'/api/formations/{self.f.pk}/modules/{m_g2.pk}/formateurs/add/',
+            {'formateur_id': self.fmt.pk},
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('GROUPE 1', res.data['detail'])
+        self.assertIn('GROUPE 2', res.data['detail'])
+        self.assertIn('deux groupes différents', res.data['detail'])
+        self.assertFalse(ModuleFormateur.objects.filter(module=m_g2, formateur=self.fmt).exists())
+
+    def test_add_formateur_allows_same_group_same_day(self):
+        m_g1 = make_module(self.f, intitule='Cours G1 A', groupe='GROUPE 1')
+        m_g1b = make_module(self.f, intitule='Cours G1 B', groupe='GROUPE 1')
+        day = timezone.localdate()
+        SessionModule.objects.create(
+            module=m_g1, date_journee=day, numero=1,
+            heure_debut_prevue=dt_time(8, 0), heure_fin_prevue=dt_time(12, 0),
+        )
+        SessionModule.objects.create(
+            module=m_g1b, date_journee=day, numero=1,
+            heure_debut_prevue=dt_time(14, 0), heure_fin_prevue=dt_time(17, 0),
+        )
+        ModuleFormateur.objects.create(module=m_g1, formateur=self.fmt)
+
+        res = self.client.post(
+            f'/api/formations/{self.f.pk}/modules/{m_g1b.pk}/formateurs/add/',
+            {'formateur_id': self.fmt.pk},
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_add_formateur_blocks_same_group_overlapping_hours(self):
+        m_g1 = make_module(self.f, intitule='Cours G1 A', groupe='GROUPE 1')
+        m_g1b = make_module(self.f, intitule='Cours G1 B', groupe='GROUPE 1')
+        day = timezone.localdate()
+        SessionModule.objects.create(
+            module=m_g1, date_journee=day, numero=1, intitule='Matin',
+            heure_debut_prevue=dt_time(8, 0), heure_fin_prevue=dt_time(12, 0),
+        )
+        SessionModule.objects.create(
+            module=m_g1b, date_journee=day, numero=1, intitule='Fin matinée',
+            heure_debut_prevue=dt_time(10, 0), heure_fin_prevue=dt_time(13, 0),
+        )
+        ModuleFormateur.objects.create(module=m_g1, formateur=self.fmt)
+
+        res = self.client.post(
+            f'/api/formations/{self.f.pk}/modules/{m_g1b.pk}/formateurs/add/',
+            {'formateur_id': self.fmt.pk},
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('conflit horaire', res.data['detail'])
+        self.assertFalse(ModuleFormateur.objects.filter(module=m_g1b, formateur=self.fmt).exists())
+
 
 # ──────────────────────────────────────────
 # API — dashboard stats

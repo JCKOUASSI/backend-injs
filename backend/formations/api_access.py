@@ -6,6 +6,9 @@ from authentication.role_groups import (
     ALLOWED_WEB_ROLES,
     OPERATIONAL_WEB_ROLES,
     PARTICIPANT_LIST_ROLES,
+    get_user_role,
+    user_has_perm,
+    user_in_roles,
 )
 from authentication.permissions import IsDFRC, IsSecretariatOrDFRC, IsSecretariatOrEncadrantOrDFRC
 
@@ -32,7 +35,9 @@ class IsWebStaff(BasePermission):
 
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and user.role in ALLOWED_WEB_ROLES)
+        if not (user and user.is_authenticated):
+            return False
+        return user_has_perm(user, 'authentication.access_web') or user_in_roles(user, ALLOWED_WEB_ROLES)
 
 
 class IsOperationalWebStaff(BasePermission):
@@ -40,7 +45,9 @@ class IsOperationalWebStaff(BasePermission):
 
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and user.role in OPERATIONAL_WEB_ROLES)
+        if not (user and user.is_authenticated):
+            return False
+        return user_has_perm(user, 'authentication.operational_web') or user_in_roles(user, OPERATIONAL_WEB_ROLES)
 
 
 class CanListParticipants(BasePermission):
@@ -48,7 +55,9 @@ class CanListParticipants(BasePermission):
 
     def has_permission(self, request, view):
         user = request.user
-        return bool(user and user.is_authenticated and user.role in PARTICIPANT_LIST_ROLES)
+        if not (user and user.is_authenticated):
+            return False
+        return user_has_perm(user, 'authentication.list_participants') or user_in_roles(user, PARTICIPANT_LIST_ROLES)
 
 
 def formation_or_response(user, pk):
@@ -79,7 +88,8 @@ def deny_if_not_formation_accessible(user, pk):
 def deny_finance_operational_response(request):
     """Bloque FINANCE sur les endpoints opérationnels du dashboard formations."""
     user = getattr(request, 'user', None)
-    if user and user.is_authenticated and user.role == 'FINANCE':
+    role = get_user_role(user) if user and user.is_authenticated else None
+    if role == 'FINANCE' and not user_has_perm(user, 'authentication.operational_web'):
         return Response(
             {
                 'detail': (

@@ -49,7 +49,7 @@ class AuthenticationConfig(AppConfig):
 
         from django.apps import apps
         from django.contrib.auth import get_user_model
-        from django.db.models.signals import post_migrate, post_save
+        from django.db.models.signals import post_migrate, post_save, m2m_changed
 
         # Après authentication : crée les groupes (souvent avant les permissions
         # des apps métier). Il faut ré‑exécuter ensure_role_groups après formations
@@ -72,6 +72,13 @@ class AuthenticationConfig(AppConfig):
             )
         post_save.connect(_on_user_saved, sender=get_user_model(), dispatch_uid='authentication_sync_role_group')
 
+        User = get_user_model()
+        m2m_changed.connect(
+            _on_user_groups_changed,
+            sender=User.groups.through,
+            dispatch_uid='authentication_sync_role_from_group',
+        )
+
 
 def _on_post_migrate(sender, **kwargs):
     from .role_groups import ensure_role_groups, sync_all_users_role_groups
@@ -86,5 +93,21 @@ def _on_user_saved(sender, instance, **kwargs):
     from .profile_sync import sync_user_profile_links
 
     sync_user_role_group(instance)
+    sync_user_staff_status(instance)
+    sync_user_profile_links(instance)
+
+
+def _on_user_groups_changed(sender, instance, action, **kwargs):
+    """Quand les groupes changent (admin Django), resynchronise role + is_staff."""
+    # post_remove est ignoré : il survient en plein remplacement role→groupe
+    # et provoque une fenêtre transitoire sans groupe ROLE_*.
+    if action not in ('post_add', 'post_clear'):
+        return
+    if hasattr(instance, '_role_groups_cache'):
+        del instance._role_groups_cache
+    from .role_groups import sync_role_from_group, sync_user_staff_status
+    from .profile_sync import sync_user_profile_links
+
+    sync_role_from_group(instance)
     sync_user_staff_status(instance)
     sync_user_profile_links(instance)

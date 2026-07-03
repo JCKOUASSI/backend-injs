@@ -30,7 +30,9 @@ from .formateur_privacy import (
     can_edit_formateur_sensitive_data,
     formateur_sensitive_payload,
 )
+from .formateur_assignment import check_formateur_groupe_jour_conflict
 from .api_access import deny_finance_operational_response
+from .volume_horaire import compute_dashboard_volume_horaire
 from .finance_encadrants import finance_encadrants_report
 from .finance_ajustements import (
     propose_ajustement,
@@ -197,8 +199,6 @@ def dashboard_stats(request):
     formations_planifiees = modules_qs.filter(statut='PLANIFIEE').count()
     groupes_en_cours = modules_qs.filter(statut='EN_COURS', groupe__isnull=False).exclude(groupe='').values('groupe').distinct().count()
     total_participants = participants_qs.count()
-
-    from .volume_horaire import compute_dashboard_volume_horaire
 
     volume_horaire_effectue_heures, volume_horaire_total_heures, volume_horaire_effectue_taux = (
         compute_dashboard_volume_horaire(modules_qs, date_debut=date_debut, date_fin=date_fin)
@@ -4100,6 +4100,9 @@ def module_add_formateur(request, formation_pk, module_pk):
         return Response({'detail': 'Formateur introuvable.'}, status=404)
     if ModuleFormateur.objects.filter(module=module, formateur=formateur).exists():
         return Response({'detail': 'Déjà assigné.'}, status=400)
+    conflict = check_formateur_groupe_jour_conflict(formateur, module)
+    if conflict:
+        return Response({'detail': conflict}, status=400)
     ModuleFormateur.objects.create(module=module, formateur=formateur)
     return Response({'detail': f'{formateur} assigné au module.'}, status=201)
 

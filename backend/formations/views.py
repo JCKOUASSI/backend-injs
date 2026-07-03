@@ -15,6 +15,7 @@ from .models import Formation, Participant, Secretariat, ModuleParticipant, Modu
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
+from .formateur_assignment import check_formateur_groupe_jour_conflict
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -449,9 +450,14 @@ def add_formateur_to_formation(request, pk):
     except Module.DoesNotExist:
         return Response({'detail': 'Module introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
-    ff, created = ModuleFormateur.objects.get_or_create(module=module, formateur=formateur)
-    if not created:
+    if ModuleFormateur.objects.filter(module=module, formateur=formateur).exists():
         return Response({'detail': 'Formateur déjà assigné à ce module.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    conflict = check_formateur_groupe_jour_conflict(formateur, module)
+    if conflict:
+        return Response({'detail': conflict}, status=status.HTTP_400_BAD_REQUEST)
+
+    ModuleFormateur.objects.create(module=module, formateur=formateur)
 
     _log_audit(
         action=AuditLog.Action.FORMATEUR_ADD_FORMATION,

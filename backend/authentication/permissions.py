@@ -8,6 +8,10 @@ from authentication.role_groups import (
     USER_MUTATION_ROLES,
     get_subordinate_roles,
     get_creatable_roles,
+    get_user_role,
+    user_has_perm,
+    user_in_roles,
+    _cached_user_groups,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,20 +36,12 @@ __all__ = [
     'IsSecretariatOrDFRC',
     'IsSecretariatOrEncadrantOrDFRC',
     'IsUserMutationAllowed',
+    'get_user_role',
+    'user_in_roles',
+    'user_has_perm',
 ]
 
 # Hiérarchie et helpers de création : source canonique authentication.role_groups
-
-
-def _cached_user_groups(user):
-    """Retourne le set de noms de groupes de l'utilisateur.
-
-    Mis en cache sur l'objet user pour la durée de la requête afin
-    d'éviter une requête DB par appel à has_permission().
-    """
-    if not hasattr(user, '_role_groups_cache'):
-        user._role_groups_cache = set(user.groups.values_list('name', flat=True))
-    return user._role_groups_cache
 
 
 def _in_groups(user, *roles):
@@ -55,16 +51,12 @@ def _in_groups(user, *roles):
 
 
 def _has_role(user, *roles):
-    """Vérifie le rôle de l'utilisateur — règle unique pour toutes les permissions.
+    """Vérifie le rôle effectif via les groupes Django ROLE_*.
 
-    Le champ ``User.role`` est la source de vérité (c'est lui qui pilote
-    ``sync_user_role_group``) ; le groupe Django sert de secours si le champ
-    est vide ou désynchronisé. Toutes les classes de permission DOIVENT passer
-    par cette fonction, jamais par ``_in_groups`` directement.
+    Les groupes Django sont la source de vérité pour les rôles et permissions.
+    Le champ ``User.role`` est une dénormalisation synchronisée automatiquement.
     """
-    if getattr(user, 'role', None) in roles:
-        return True
-    return _in_groups(user, *roles)
+    return _in_groups(user, *roles) or get_user_role(user) in roles
 
 
 def _model_perm(request, app_label, model_name):
@@ -200,7 +192,9 @@ class IsUserMutationAllowed(BasePermission):
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        role = getattr(request.user, 'role', None)
+        if user_has_perm(request.user, 'authentication.mutate_users'):
+            return True
+        role = get_user_role(request.user)
         if role in USER_MUTATION_ROLES:
             return True
         logger.warning(

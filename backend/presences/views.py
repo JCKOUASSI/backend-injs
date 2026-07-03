@@ -1308,6 +1308,27 @@ def secure_scan_heartbeat(request):
 
 
 # ──────────────────────────────────────────────
+# Config app mobile (heartbeat, etc.)
+# ──────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def mobile_config(request):
+    """
+    Paramètres runtime pour l'app mobile (sans mise à jour store).
+
+    MOBILE_HEARTBEAT_DISABLED=true côté serveur → heartbeat_enabled=false.
+    """
+    disabled = getattr(settings, 'MOBILE_HEARTBEAT_DISABLED', False)
+    interval = getattr(settings, 'MOBILE_HEARTBEAT_INTERVAL_SECONDS', 60)
+    interval = max(30, min(600, int(interval)))
+    return Response({
+        'heartbeat_enabled': not disabled,
+        'heartbeat_interval_seconds': interval,
+    })
+
+
+# ──────────────────────────────────────────────
 # Historique personnel (app mobile)
 # ──────────────────────────────────────────────
 

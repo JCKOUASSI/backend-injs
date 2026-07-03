@@ -51,6 +51,9 @@ def process_mobile_heartbeat_sanctions(*, dry_run=False, write=None):
 
     Retourne le nombre de pointages traités (suspect ou sortie auto).
     """
+    if getattr(settings, 'MOBILE_HEARTBEAT_DISABLED', False):
+        return 0
+
     write = write or (lambda _msg: None)
     now = timezone.now()
     traites = 0

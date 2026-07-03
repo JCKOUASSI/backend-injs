@@ -2,7 +2,7 @@ import logging
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .role_groups import get_creatable_roles, ROLE_LABELS
+from .role_groups import get_creatable_roles, ROLE_LABELS, get_user_role
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def validate_role(self, value):
         request = self.context.get('request')
         requester = getattr(request, 'user', None)
-        requester_role = getattr(requester, 'role', None)
+        requester_role = get_user_role(requester)
         allowed = get_creatable_roles(requester_role)
         if value not in allowed:
             role_label = ROLE_LABELS.get(value, value)
@@ -112,7 +112,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def validate_secretariat(self, value):
         request = self.context.get('request')
         requester = getattr(request, 'user', None)
-        if getattr(requester, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if get_user_role(requester) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             if value is not None and value != requester.secretariat:
                 logger.warning(
                     'user_create_secretariat_denied requester=%s requester_secretariat=%s attempted_secretariat=%s',
@@ -174,7 +174,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate_role(self, value):
         request = self.context.get('request')
         requester = getattr(request, 'user', None)
-        requester_role = getattr(requester, 'role', None)
+        requester_role = get_user_role(requester)
         allowed = get_creatable_roles(requester_role)
         if value not in allowed:
             role_label = ROLE_LABELS.get(value, value)
@@ -202,7 +202,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate_secretariat(self, value):
         request = self.context.get('request')
         requester = getattr(request, 'user', None)
-        if getattr(requester, 'role', None) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if get_user_role(requester) in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
             if value is not None and value != requester.secretariat:
                 logger.warning(
                     'user_update_secretariat_denied requester=%s requester_secretariat=%s attempted_secretariat=%s',

@@ -1,5 +1,7 @@
 from django.contrib import admin
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import Group
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
@@ -8,6 +10,32 @@ from admin_mixins import AuditLogAdminMixin, UserAdminScopeMixin
 from presences.models import AuditLog
 
 from .models import User
+from .role_groups import GROUP_NAME_TO_ROLE, ROLE_LABELS
+
+try:
+    admin.site.unregister(Group)
+except admin.sites.NotRegistered:
+    pass
+
+
+@admin.register(Group)
+class RoleGroupAdmin(BaseGroupAdmin, ModelAdmin):
+    """Groupes Django ROLE_* — permissions et rôles de l'application."""
+
+    list_display = ['name', 'role_label', 'permissions_count']
+    search_fields = ['name']
+    filter_horizontal = ['permissions']
+
+    @admin.display(description='Rôle métier')
+    def role_label(self, obj):
+        role = GROUP_NAME_TO_ROLE.get(obj.name)
+        if role:
+            return ROLE_LABELS.get(role, role)
+        return '—'
+
+    @admin.display(description='Permissions')
+    def permissions_count(self, obj):
+        return obj.permissions.count()
 
 
 @admin.register(User)

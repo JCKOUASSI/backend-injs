@@ -60,6 +60,18 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Utilisateur'
         verbose_name_plural = 'Utilisateurs'
+        permissions = [
+            ('access_web', 'Accès à la plateforme web'),
+            ('operational_web', 'Personnel opérationnel web (hors module Finance)'),
+            ('mutate_users', 'Créer ou modifier des comptes utilisateurs'),
+            ('global_scope', 'Périmètre global (tous secrétariats)'),
+            ('list_participants', 'Consulter la liste des participants'),
+            ('finance_module', 'Accès au module Finance'),
+            ('manage_questionnaires', 'Gérer les questionnaires d\'évaluation'),
+            ('manage_notes', 'Gérer les notes et épreuves'),
+            ('validate_decisions', 'Valider les décisions pédagogiques'),
+            ('consult_evaluation', 'Consulter les évaluations'),
+        ]
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.role})"

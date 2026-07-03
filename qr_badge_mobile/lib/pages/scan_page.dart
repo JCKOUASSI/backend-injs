@@ -450,6 +450,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       );
       final action = res['action']?.toString();
       if (action == 'ENTREE') {
+        await session.refreshMobileConfig();
         session.startSecureSessionHeartbeat(token);
       } else if (action == 'SORTIE' || action == 'SORTIE_AUTO') {
         session.stopSecureSessionHeartbeat();

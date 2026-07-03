@@ -718,3 +718,29 @@ class PointageAdminSaveTest(TestCase):
         self.assertEqual(float(pointage.duree_presence_minutes), 0)
         self.assertEqual(pointage.statut, Pointage.Statut.ABSENT_NON_BADGE)
 
+
+class MobileConfigApiTest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = make_user('mobile_cfg_user', role='CPFAE_ADMIN')
+
+    def test_mobile_config_requires_auth(self):
+        res = self.client.get('/api/mobile/config/')
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_mobile_config_heartbeat_enabled_by_default(self):
+        self.client.force_authenticate(self.user)
+        res = self.client.get('/api/mobile/config/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data['heartbeat_enabled'])
+        self.assertEqual(res.data['heartbeat_interval_seconds'], 60)
+
+    @override_settings(MOBILE_HEARTBEAT_DISABLED=True, MOBILE_HEARTBEAT_INTERVAL_SECONDS=120)
+    def test_mobile_config_reflects_server_disabled(self):
+        self.client.force_authenticate(self.user)
+        res = self.client.get('/api/mobile/config/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.data['heartbeat_enabled'])
+        self.assertEqual(res.data['heartbeat_interval_seconds'], 120)
+

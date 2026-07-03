@@ -176,6 +176,32 @@ a.addlink,
     border-radius: var(--admin-radius-pill) !important;
 }
 
+/* ── Bouton de confirmation de suppression (danger, fin du blanc sur blanc) ── */
+.delete-confirmation form input[type="submit"],
+.delete-confirmation form button[type="submit"],
+form input[type="submit"][value*="confirme"],
+form input[type="submit"][value*="sure"],
+.submit-row input[name="post"],
+.submit-row .deletelink,
+a.deletelink,
+.deletelink-box a {
+    background: #dc2626 !important;
+    border: 1px solid #b91c1c !important;
+    color: #ffffff !important;
+    border-radius: var(--admin-radius-pill) !important;
+    padding: 8px 20px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+}
+
+.delete-confirmation form input[type="submit"]:hover,
+.delete-confirmation form button[type="submit"]:hover,
+.submit-row .deletelink:hover,
+a.deletelink:hover {
+    background: #b91c1c !important;
+    color: #ffffff !important;
+}
+
 /* ── Champs de formulaire ────────────────────────────────────────────────── */
 input[type="text"],
 input[type="email"],
