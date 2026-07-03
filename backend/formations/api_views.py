@@ -25,7 +25,7 @@ from presences.offline_cache import invalidate_offline_data_cache
 from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
-from .access import formateurs_queryset_for_user
+from .access import formateurs_queryset_for_user, formation_accessible
 from .formateur_privacy import (
     can_view_formateur_sensitive_data,
     can_edit_formateur_sensitive_data,
@@ -858,33 +858,53 @@ def formateur_list_api(request):
     Query params:
     - search: search in name
     - page: pagination
+    - module_id: si fourni, indique assignable/conflit_assignation pour ce module
     """
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 50))
-    
+
+    target_module = None
+    module_id = request.query_params.get('module_id')
+    if module_id:
+        try:
+            target_module = Module.objects.select_related('formation').get(pk=int(module_id))
+        except (Module.DoesNotExist, ValueError, TypeError):
+            return Response({'detail': 'Module introuvable.'}, status=404)
+        if not formation_accessible(request.user, target_module.formation_id):
+            return Response({'detail': 'Accès interdit.'}, status=403)
+
     queryset = formateurs_queryset_for_user(request.user)
-    
+
     # Apply search
     search = request.query_params.get('search')
     if search:
         queryset = queryset.filter(
-            Q(nom__icontains=search) | 
+            Q(nom__icontains=search) |
             Q(prenom__icontains=search) |
             Q(specialite__icontains=search)
         )
-    
+
     queryset = queryset.order_by('nom', 'prenom')
-    
+
     # Pagination
     total_count = queryset.count()
     start = (page - 1) * page_size
     end = start + page_size
     formateurs = queryset[start:end]
-    
+
     serializer = FormateurSerializer(formateurs, many=True, context={'request': request})
-    
+    results = serializer.data
+    if target_module:
+        enriched = []
+        for row, formateur in zip(results, formateurs):
+            conflit = check_formateur_groupe_jour_conflict(formateur, target_module)
+            row['assignable'] = conflit is None
+            row['conflit_assignation'] = conflit
+            enriched.append(row)
+        results = enriched
+
     return Response({
-        'results': serializer.data,
+        'results': results,
         'count': total_count,
         'total_pages': (total_count + page_size - 1) // page_size,
         'current_page': page,

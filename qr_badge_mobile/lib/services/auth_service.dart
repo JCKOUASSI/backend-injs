@@ -55,4 +55,19 @@ class AuthService {
       },
     );
   }
+
+  /// Champs autorisés : prénom, nom, e-mail, téléphone, organisation, grade, matricule.
+  Future<Map<String, dynamic>> updateMyProfile({
+    required String baseUrl,
+    required String accessToken,
+    required Map<String, dynamic> data,
+    Future<String?> Function()? onRefreshToken,
+  }) async {
+    final client = ApiClient(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      onRefreshToken: onRefreshToken,
+    );
+    return client.patch('/api/auth/me/', data: data);
+  }
 }

@@ -60,8 +60,13 @@ class ScanService {
     double? latitude,
     double? longitude,
     double? accuracyM,
+    Future<String?> Function()? onRefreshToken,
   }) async {
-    final client = ApiClient(baseUrl: baseUrl, accessToken: accessToken);
+    final client = ApiClient(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      onRefreshToken: onRefreshToken,
+    );
     final params = <String, String>{'token_qr': tokenQr};
     if (latitude != null) params['latitude'] = latitude.toString();
     if (longitude != null) params['longitude'] = longitude.toString();

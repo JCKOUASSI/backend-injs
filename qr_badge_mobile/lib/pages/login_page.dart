@@ -142,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Connectez-vous à votre compte',
+                                'Connectez-vous pour badger vos présences',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context)
                                     .textTheme
@@ -214,20 +214,6 @@ class _LoginPageState extends State<LoginPage> {
                                     ? 'Champ requis'
                                     : null,
                                 onFieldSubmitted: (_) => _submit(),
-                              ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () {},
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.ciGreenDark,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                      vertical: 4,
-                                    ),
-                                  ),
-                                  child: const Text('Mot de passe oublié ?'),
-                                ),
                               ),
                               if (_error != null) ...[
                                 const SizedBox(height: 8),

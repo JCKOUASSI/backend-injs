@@ -134,6 +134,26 @@ Future<bool> ensureLocationPermission(BuildContext context) async {
   return granted;
 }
 
+/// Demande rapide GPS (bandeaux « Activer ») sans dialogue explicatif préalable.
+Future<bool> quickEnableLocation() async {
+  final serviceOn = await Geolocator.isLocationServiceEnabled();
+  if (!serviceOn) {
+    await Geolocator.openLocationSettings();
+    return false;
+  }
+  var perm = await Geolocator.checkPermission();
+  if (perm == LocationPermission.deniedForever) {
+    await openAppSettings();
+    return false;
+  }
+  if (perm != LocationPermission.always &&
+      perm != LocationPermission.whileInUse) {
+    perm = await Geolocator.requestPermission();
+  }
+  return perm == LocationPermission.always ||
+      perm == LocationPermission.whileInUse;
+}
+
 /// Demande les permissions complémentaires nécessaires au suivi en arrière-plan.
 /// Best-effort : on ne bloque pas le flux si l'utilisateur refuse, le badgeage
 /// reste possible (le suivi sera juste dégradé en arrière-plan).

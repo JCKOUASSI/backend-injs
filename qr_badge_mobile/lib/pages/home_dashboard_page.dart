@@ -22,9 +22,14 @@ String _displayName(SessionProvider session) {
 }
 
 class HomeDashboardPage extends StatefulWidget {
-  const HomeDashboardPage({super.key, this.onOpenHistory});
+  const HomeDashboardPage({
+    super.key,
+    this.onOpenHistory,
+    this.onOpenScanner,
+  });
 
   final VoidCallback? onOpenHistory;
+  final VoidCallback? onOpenScanner;
 
   @override
   State<HomeDashboardPage> createState() => _HomeDashboardPageState();
@@ -127,7 +132,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
     final aVerifier = _ouvertsSansSortie(items) +
         (session.gpsGranted ? 0 : 1) +
         (session.heartbeatGpsBlocked ? 1 : 0);
-    final sansProbleme = items.length - _ouvertsSansSortie(items);
     final systemOk = session.gpsGranted && !session.heartbeatGpsBlocked;
 
     String dernierSousTitre = 'Aucun scan enregistré.';
@@ -184,6 +188,42 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          if (session.isSecureHeartbeatRunning) ...[
+            HomeSummaryCard(
+              icon: Icons.sensors,
+              iconBg: AppColors.navIndicator,
+              iconColor: AppColors.ciGreenDark,
+              title: 'Session en cours',
+              subtitle: session.openSessionChipLabel ??
+                  'Suivi de présence actif — pensez à badger votre sortie.',
+              trailing: const StatusPill(
+                label: 'En salle',
+                color: AppColors.ciGreenDark,
+                backgroundColor: AppColors.navIndicator,
+                icon: Icons.check_circle,
+              ),
+              onTap: widget.onOpenScanner,
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (widget.onOpenScanner != null)
+            FilledButton.icon(
+              onPressed: widget.onOpenScanner,
+              icon: Icon(
+                session.isSecureHeartbeatRunning
+                    ? Icons.logout
+                    : Icons.qr_code_scanner,
+              ),
+              label: Text(
+                session.isSecureHeartbeatRunning
+                    ? 'Badger ma sortie'
+                    : 'Scanner maintenant',
+              ),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           const SizedBox(height: 20),
           if (_loading)
             const Padding(
@@ -247,135 +287,9 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
                 ),
                 onTap: widget.onOpenHistory,
               ),
-            _ResumeCard(
-              scans: items.length,
-              ok: sansProbleme.clamp(0, items.length),
-              alertes: aVerifier,
-            ),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _ResumeCard extends StatelessWidget {
-  const _ResumeCard({
-    required this.scans,
-    required this.ok,
-    required this.alertes,
-  });
-
-  final int scans;
-  final int ok;
-  final int alertes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderColor.withValues(alpha: 0.6)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Résumé',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 16),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ResumeCol(
-                    icon: Icons.qr_code_scanner,
-                    iconColor: AppColors.ciGreenDark,
-                    value: '$scans',
-                    valueColor: AppColors.ciGreenDark,
-                    label: 'Scans réalisés',
-                  ),
-                ),
-                VerticalDivider(color: AppColors.borderColor, width: 24),
-                Expanded(
-                  child: _ResumeCol(
-                    icon: Icons.check_circle_outline,
-                    iconColor: AppColors.ciGreenDark,
-                    value: '$ok',
-                    valueColor: AppColors.ciGreenDark,
-                    label: 'Sans problème',
-                  ),
-                ),
-                VerticalDivider(color: AppColors.borderColor, width: 24),
-                Expanded(
-                  child: _ResumeCol(
-                    icon: Icons.warning_amber_rounded,
-                    iconColor: AppColors.ciOrangeDark,
-                    value: '$alertes',
-                    valueColor: AppColors.ciOrangeDark,
-                    label: 'À vérifier',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResumeCol extends StatelessWidget {
-  const _ResumeCol({
-    required this.icon,
-    required this.iconColor,
-    required this.value,
-    required this.valueColor,
-    required this.label,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  final Color valueColor;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: iconColor, size: 22),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.2,
-              ),
-        ),
-      ],
     );
   }
 }

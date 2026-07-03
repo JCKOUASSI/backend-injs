@@ -735,6 +735,8 @@ class MobileConfigApiTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.data['heartbeat_enabled'])
         self.assertEqual(res.data['heartbeat_interval_seconds'], 60)
+        self.assertEqual(res.data['role'], 'CPFAE_ADMIN')
+        self.assertFalse(res.data['evaluations_enabled'])
 
     @override_settings(MOBILE_HEARTBEAT_DISABLED=True, MOBILE_HEARTBEAT_INTERVAL_SECONDS=120)
     def test_mobile_config_reflects_server_disabled(self):
@@ -743,4 +745,12 @@ class MobileConfigApiTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(res.data['heartbeat_enabled'])
         self.assertEqual(res.data['heartbeat_interval_seconds'], 120)
+
+    def test_mobile_config_evaluations_enabled_for_auditeur(self):
+        auditeur = make_user('mobile_cfg_auditeur', role='AUDITEUR')
+        self.client.force_authenticate(auditeur)
+        res = self.client.get('/api/mobile/config/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['role'], 'AUDITEUR')
+        self.assertTrue(res.data['evaluations_enabled'])
 

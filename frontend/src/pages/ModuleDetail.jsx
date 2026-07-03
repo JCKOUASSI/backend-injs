@@ -251,7 +251,7 @@ export default function ModuleDetail() {
   const loadAvailableFormateurs = async () => {
     setFormateurLoading(true)
     try {
-      const params = new URLSearchParams({ page: formateurPicker.page, page_size: PICKER_PAGE_SIZE })
+      const params = new URLSearchParams({ page: formateurPicker.page, page_size: PICKER_PAGE_SIZE, module_id: moduleId })
       if (formateurSearch) params.set('search', formateurSearch)
       const res = await api.get(`/formations/formateurs/list/?${params}`)
       const data = Array.isArray(res.data) ? res.data : (res.data.results || [])
@@ -1528,7 +1528,7 @@ export default function ModuleDetail() {
               </div>
               {formateurLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!formateurLoading && allFormateurs.length === 0 && (
-                <p className="text-muted text-center py-2">Aucun formateur disponible</p>
+                <p className="text-muted text-center py-2">Aucun formateur trouvé</p>
               )}
               {!formateurLoading && allFormateurs.length > 0 && (
                 <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
@@ -1536,14 +1536,24 @@ export default function ModuleDetail() {
                     <thead><tr><th>Nom</th><th>Prénom</th><th>Spécialité</th><th></th></tr></thead>
                     <tbody>
                       {allFormateurs.map(f => (
-                        <tr key={f.id}>
+                        <tr key={f.id} className={f.conflit_assignation ? 'table-secondary' : undefined}>
                           <td>{f.nom}</td>
                           <td>{f.prenom}</td>
                           <td>{f.specialite || '—'}</td>
                           <td>
-                            <button onClick={() => handleAddFormateur(f.id)} className="btn btn-outline-success btn-sm">
-                              <i className="bi bi-plus"></i>
-                            </button>
+                            {f.conflit_assignation ? (
+                              <span
+                                className="badge text-bg-warning"
+                                title={f.conflit_assignation}
+                                style={{ cursor: 'help' }}
+                              >
+                                <i className="bi bi-calendar-x me-1"></i>Occupé
+                              </span>
+                            ) : (
+                              <button onClick={() => handleAddFormateur(f.id)} className="btn btn-outline-success btn-sm">
+                                <i className="bi bi-plus"></i>
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
