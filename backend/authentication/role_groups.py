@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
@@ -6,6 +7,23 @@ from django.contrib.auth.models import Group, Permission
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+_bulk_role_sync_depth = 0
+
+
+def is_bulk_role_sync():
+    """True pendant sync_all_users_role_groups (évite les signaux m2m/post_save)."""
+    return _bulk_role_sync_depth > 0
+
+
+@contextmanager
+def _bulk_role_sync():
+    global _bulk_role_sync_depth
+    _bulk_role_sync_depth += 1
+    try:
+        yield
+    finally:
+        _bulk_role_sync_depth -= 1
 
 
 # Rôles pouvant accéder à l'admin Django ET à la plateforme web.
@@ -489,6 +507,12 @@ def sync_user_role_group(user):
         )
         return
 
+    current_role_group_names = set(
+        user.groups.filter(name__in=role_group_names).values_list('name', flat=True)
+    )
+    if current_role_group_names == {target_group_name}:
+        return
+
     current_role_groups = user.groups.filter(name__in=role_group_names)
     user.groups.remove(*current_role_groups)
 
@@ -521,6 +545,12 @@ def sync_user_staff_status(user):
 
 
 def sync_all_users_role_groups():
-    for user in User.objects.all().only("id", "role", "is_staff", "is_superuser"):
-        sync_user_role_group(user)
-        sync_user_staff_status(user)
+    """Resynchronise tous les utilisateurs (groupes ROLE_* + is_staff).
+
+    Désactive les signaux m2m/post_save pendant l'opération pour éviter une
+    cascade coûteuse (notamment lors de ``manage.py migrate``).
+    """
+    with _bulk_role_sync():
+        for user in User.objects.all().only("id", "role", "is_staff", "is_superuser").iterator():
+            sync_user_role_group(user)
+            sync_user_staff_status(user)
