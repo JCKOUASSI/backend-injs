@@ -52,6 +52,15 @@ class SessionProvider extends ChangeNotifier {
 
   bool? _remoteHeartbeatEnabled;
   int? _remoteHeartbeatIntervalSec;
+  bool? _remoteEvaluationsEnabled;
+
+  /// Onglet « Évaluations » visible pour les comptes auditeur (participant).
+  bool get evaluationsEnabled {
+    if (_remoteEvaluationsEnabled != null) {
+      return _remoteEvaluationsEnabled!;
+    }
+    return user?['role']?.toString() == 'AUDITEUR';
+  }
 
   bool get _effectiveHeartbeatEnabled {
     if (!AppEnv.heartbeatEnabled) {
@@ -209,9 +218,25 @@ class SessionProvider extends ChangeNotifier {
       } else if (sec != null) {
         _remoteHeartbeatIntervalSec = int.tryParse(sec.toString());
       }
+      final evalEnabled = cfg['evaluations_enabled'];
+      if (evalEnabled is bool) {
+        _remoteEvaluationsEnabled = evalEnabled;
+      } else if (evalEnabled != null) {
+        _remoteEvaluationsEnabled =
+            evalEnabled.toString().toLowerCase() != 'false';
+      }
+      final role = cfg['role']?.toString();
+      if (role != null &&
+          role.isNotEmpty &&
+          user != null &&
+          user!['role']?.toString() != role) {
+        user = Map<String, dynamic>.from(user!);
+        user!['role'] = role;
+      }
       if (!_effectiveHeartbeatEnabled && _heartbeatTimer != null) {
         stopSecureSessionHeartbeat();
       }
+      notifyListeners();
     } catch (e, st) {
       debugPrint('[qr_badge.session] Config mobile: $e\n$st');
     }
@@ -362,6 +387,7 @@ class SessionProvider extends ChangeNotifier {
     stopSecureSessionHeartbeat();
     _remoteHeartbeatEnabled = null;
     _remoteHeartbeatIntervalSec = null;
+    _remoteEvaluationsEnabled = null;
     await _storage.clearTokens();
     accessToken = null;
     refreshToken = null;

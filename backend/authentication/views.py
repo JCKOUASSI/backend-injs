@@ -26,6 +26,16 @@ from presences.models import DeviceBinding, AuditLog, _log_audit
 
 User = get_user_model()
 
+
+def _user_payload(user):
+    """Profil utilisateur pour le client avec le rôle effectif (groupes Django)."""
+    data = UserSerializer(user).data
+    effective = get_user_role(user)
+    if effective:
+        data['role'] = effective
+    return data
+
+
 # Rôles sans rattachement secrétariat sur le compte User (aligné serializers UserCreate/Update).
 USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
     User.Role.CHEF_CPFAE_ADMIN,
@@ -162,7 +172,7 @@ def login_view(request):
         'access': str(refresh.access_token),
         'refresh': str(refresh),
         'must_change_password': bool(getattr(user, 'must_change_password', False)),
-        'user': UserSerializer(user).data,
+        'user': _user_payload(user),
         'role_context': user_role_context(user),
     })
 
@@ -173,7 +183,7 @@ def me_view(request):
     """Profil de l'utilisateur connecté : lecture ou mise à jour partielle des données personnelles."""
     user = request.user
     if request.method == 'GET':
-        data = UserSerializer(user).data
+        data = _user_payload(user)
         data['role_context'] = user_role_context(user)
         return Response(data)
     serializer = UserSelfProfileSerializer(user, data=request.data, partial=True)
@@ -187,7 +197,7 @@ def me_view(request):
         cible_nom=user.get_full_name() or user.username,
         extra={'self_profile': True, 'champs_modifies': list(request.data.keys())},
     )
-    data = UserSerializer(user).data
+    data = _user_payload(user)
     data['role_context'] = user_role_context(user)
     return Response(data)
 

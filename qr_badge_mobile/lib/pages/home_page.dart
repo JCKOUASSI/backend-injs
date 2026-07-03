@@ -66,8 +66,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  bool _isAuditeur(SessionProvider session) =>
-      session.user?['role']?.toString() == 'AUDITEUR';
+  bool _isAuditeur(SessionProvider session) => session.evaluationsEnabled;
 
   String get _title {
     switch (_index) {
@@ -94,6 +93,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       drawer: _AppDrawer(
         onRequestGps: () => _requestGps(session),
         onOpenFiche: () => setState(() => _ficheVisible = true),
+        onOpenEvaluations: _isAuditeur(session)
+            ? () => setState(() => _index = 3)
+            : null,
         onLogout: () => performGuardedLogout(context),
       ),
       appBar: _ficheVisible || _index == 0
@@ -246,11 +248,13 @@ class _AppDrawer extends StatelessWidget {
   const _AppDrawer({
     required this.onRequestGps,
     required this.onOpenFiche,
+    this.onOpenEvaluations,
     required this.onLogout,
   });
 
   final VoidCallback onRequestGps;
   final VoidCallback onOpenFiche;
+  final VoidCallback? onOpenEvaluations;
   final Future<bool> Function() onLogout;
 
   @override
@@ -283,6 +287,15 @@ class _AppDrawer extends StatelessWidget {
                 onOpenFiche();
               },
             ),
+            if (onOpenEvaluations != null)
+              ListTile(
+                leading: const Icon(Icons.assignment_outlined),
+                title: const Text('Évaluations'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onOpenEvaluations!();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.location_on_outlined),
               title: const Text('Autoriser le GPS'),

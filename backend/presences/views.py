@@ -18,6 +18,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
+from authentication.role_groups import get_user_role
 from authentication.throttles import ScanRateThrottle, OfflineDataRateThrottle
 from formations.models import (
     Formation, Participant, Module, ModuleParticipant, ModuleFormateur,
@@ -1322,9 +1323,12 @@ def mobile_config(request):
     disabled = getattr(settings, 'MOBILE_HEARTBEAT_DISABLED', False)
     interval = getattr(settings, 'MOBILE_HEARTBEAT_INTERVAL_SECONDS', 60)
     interval = max(30, min(600, int(interval)))
+    role = get_user_role(request.user)
     return Response({
         'heartbeat_enabled': not disabled,
         'heartbeat_interval_seconds': interval,
+        'role': role,
+        'evaluations_enabled': role == 'AUDITEUR',
     })
 
 
