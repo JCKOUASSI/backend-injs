@@ -1,5 +1,6 @@
 """Mixins partagés pour l'admin Django SYGEP-CPFAE."""
 
+from authentication.role_groups import get_user_role, user_in_roles, users_with_roles
 from presences.models import AuditLog, _log_audit
 
 
@@ -14,7 +15,7 @@ def admin_user_has_global_access(user):
         return False
     if user.is_superuser:
         return True
-    return getattr(user, 'role', None) in _ADMIN_GLOBAL_ROLES
+    return user_in_roles(user, _ADMIN_GLOBAL_ROLES)
 
 
 class AdminSidebarHiddenMixin:
@@ -36,7 +37,7 @@ class AdminScopeMixin:
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = getattr(request.user, 'role', None)
+        role = get_user_role(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
 
         if role == 'ENCADRANT' and self.admin_scope_superviseur_field:
@@ -68,7 +69,7 @@ class ParticipantAdminScopeMixin(AdminScopeMixin):
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = getattr(request.user, 'role', None)
+        role = get_user_role(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
 
         if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and secretariat:
@@ -88,7 +89,7 @@ class FormateurAdminScopeMixin(AdminScopeMixin):
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = getattr(request.user, 'role', None)
+        role = get_user_role(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
 
         if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and secretariat:
@@ -104,19 +105,18 @@ class UserAdminScopeMixin:
     """Limite la liste users aux rôles subordonnés (+ secrétariat si applicable)."""
 
     def get_queryset(self, request):
-        from authentication.models import User
         from authentication.permissions import get_creatable_roles
 
         qs = super().get_queryset(request)
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = getattr(request.user, 'role', None)
+        role = get_user_role(request.user)
         subordinates = get_creatable_roles(role)
         if not subordinates:
             return qs.none()
 
-        qs = qs.filter(role__in=subordinates)
+        qs = users_with_roles(subordinates)
         if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and request.user.secretariat_id:
             qs = qs.filter(secretariat=request.user.secretariat)
         return qs

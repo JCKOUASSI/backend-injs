@@ -202,6 +202,35 @@ class ModuleAPITest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Module.objects.filter(pk=self.m.pk).exists())
 
+    def test_archive_module(self):
+        res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/archive/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.m.refresh_from_db()
+        self.assertTrue(self.m.archived)
+        self.assertIsNotNone(self.m.archived_at)
+
+    def test_archived_module_hidden_from_operational_list(self):
+        self.m.archived = True
+        self.m.save(update_fields=['archived'])
+        res = self.client.get('/api/formations/list/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        module_ids = [row['module_id'] for row in res.data['results']]
+        self.assertNotIn(self.m.pk, module_ids)
+
+    def test_archived_module_visible_in_archives_list(self):
+        self.m.archived = True
+        self.m.save(update_fields=['archived'])
+        res = self.client.get('/api/formations/archives/modules/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        module_ids = [row['module_id'] for row in res.data['results']]
+        self.assertIn(self.m.pk, module_ids)
+
+    def test_archive_forbidden_for_encadrant(self):
+        enc = make_user('enc_archive', role='ENCADRANT')
+        self.client.force_authenticate(enc)
+        res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/archive/')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_module_not_found(self):
         res = self.client.get(f'/api/formations/{self.f.pk}/modules/99999/full/')
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

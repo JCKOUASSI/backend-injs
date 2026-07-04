@@ -10,7 +10,7 @@ from admin_mixins import AuditLogAdminMixin, UserAdminScopeMixin
 from presences.models import AuditLog
 
 from .models import User
-from .role_groups import GROUP_NAME_TO_ROLE, ROLE_LABELS
+from .role_groups import GROUP_NAME_TO_ROLE, ROLE_GROUP_NAMES, ROLE_LABELS, get_user_role
 
 try:
     admin.site.unregister(Group)
@@ -53,7 +53,7 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
         'is_active', 'must_change_password',
     ]
     list_filter = [
-        'role', 'is_active', 'must_change_password',
+        'groups', 'is_active', 'must_change_password',
         'secretariat', 'is_staff', 'is_superuser',
     ]
     search_fields = [
@@ -64,12 +64,28 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
     list_select_related = ['secretariat']
     list_per_page = 50
     autocomplete_fields = ['secretariat']
-    fieldsets = BaseUserAdmin.fieldsets + (
+    filter_horizontal = ['groups']
+    readonly_fields = ['role_badge']
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Informations personnelles', {'fields': ('first_name', 'last_name', 'email')}),
+        (
+            'Permissions',
+            {
+                'fields': ('is_active', 'is_staff', 'is_superuser', 'user_permissions'),
+            },
+        ),
+        ('Dates importantes', {'fields': ('last_login', 'date_joined')}),
         ('Informations supplémentaires', {
             'fields': (
-                'role', 'matricule', 'grade',
+                'role_badge', 'groups',
+                'matricule', 'grade',
                 'telephone', 'organisation',
                 'secretariat', 'must_change_password',
+            ),
+            'description': (
+                'Le rôle et les permissions sont définis par le groupe Django (ROLE_*). '
+                'Attribuez un seul groupe de rôle par utilisateur.'
             ),
         }),
     )
@@ -77,12 +93,21 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
         ('Informations supplémentaires', {
             'fields': (
                 'first_name', 'last_name', 'email',
-                'role', 'matricule', 'grade',
+                'groups',
+                'matricule', 'grade',
                 'telephone', 'organisation',
                 'secretariat',
             ),
+            'description': (
+                'Sélectionnez le groupe de rôle (ROLE_*) — il détermine le rôle et les permissions.'
+            ),
         }),
     )
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == 'groups':
+            kwargs['queryset'] = Group.objects.filter(name__in=ROLE_GROUP_NAMES.values())
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def _audit_cible(self, obj):
         return (
@@ -93,6 +118,7 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
 
     @admin.display(description='Rôle', ordering='role')
     def role_badge(self, obj):
+        effective = get_user_role(obj) or obj.role
         colors = {
             User.Role.ADMIN: ('#fdecec', '#b42318'),
             User.Role.DIRECTION: ('#eef6fc', '#0f4c81'),
@@ -104,11 +130,13 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             User.Role.ARCHIVE: ('#f5f0ff', '#6b21a8'),
             User.Role.ENCADRANT: ('#e8f6f1', '#13624e'),
             User.Role.SUPERVISEUR: ('#fef3c7', '#92400e'),
+            User.Role.FORMATEUR: ('#f3f4f6', '#374151'),
             User.Role.AUDITEUR: ('#f3f4f6', '#374151'),
         }
-        bg, fg = colors.get(obj.role, ('#f3f4f6', '#374151'))
+        bg, fg = colors.get(effective, ('#f3f4f6', '#374151'))
+        label = ROLE_LABELS.get(effective, effective)
         return format_html(
             '<span style="background:{};color:{};padding:3px 8px;'
             'border-radius:999px;font-weight:600;font-size:11px;">{}</span>',
-            bg, fg, obj.get_role_display(),
+            bg, fg, label,
         )

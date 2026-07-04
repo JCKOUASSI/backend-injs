@@ -7,12 +7,44 @@ from django.db.models import Q
 from authentication.role_groups import (
     DASHBOARD_SECRETARIAT_FILTER_ROLES,
     GLOBAL_ACCESS_ROLES,
+    MODULE_ARCHIVE_ROLES,
     SECRETARIAT_ROLES,
     get_user_role,
     user_has_perm,
+    user_in_roles,
 )
 
 from .models import Formation, Module, Participant, Formateur
+
+
+def operational_modules_queryset(queryset=None):
+    """Modules actifs (hors espace Archives)."""
+    qs = queryset if queryset is not None else Module.objects.all()
+    return qs.filter(archived=False)
+
+
+def archived_modules_queryset(queryset=None):
+    """Modules archivés (espace Archives uniquement)."""
+    qs = queryset if queryset is not None else Module.objects.all()
+    return qs.filter(archived=True)
+
+
+def can_archive_module(user):
+    """Indique si l'utilisateur peut archiver un module."""
+    if not (user and user.is_authenticated):
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+    return user_in_roles(user, MODULE_ARCHIVE_ROLES)
+
+
+def module_operational_accessible(user, module):
+    """Module consultable dans les écrans opérationnels (non archivé)."""
+    if module is None:
+        return False
+    if getattr(module, 'archived', False):
+        return False
+    return True
 
 
 def formation_accessible(user, pk):
@@ -38,7 +70,7 @@ def formation_accessible(user, pk):
     if role == 'ENCADRANT':
         return (
             Formation.objects
-            .filter(pk=pk, modules__superviseur=user)
+            .filter(pk=pk, modules__superviseur=user, modules__archived=False)
             .distinct()
             .first()
         )
@@ -49,7 +81,7 @@ def formation_accessible(user, pk):
             return None
         return (
             Formation.objects
-            .filter(pk=pk, modules__secretariat=secretariat)
+            .filter(pk=pk, modules__secretariat=secretariat, modules__archived=False)
             .distinct()
             .first()
         )
@@ -57,7 +89,7 @@ def formation_accessible(user, pk):
     if role == 'AUDITEUR':
         return (
             Formation.objects
-            .filter(pk=pk, modules__module_participants__participant__user=user)
+            .filter(pk=pk, modules__module_participants__participant__user=user, modules__archived=False)
             .distinct()
             .first()
         )
@@ -70,7 +102,7 @@ def formation_accessible(user, pk):
 
 def modules_queryset_for_user(user, queryset=None):
     """Modules visibles selon le périmètre opérationnel de l'utilisateur."""
-    qs = queryset if queryset is not None else Module.objects.all()
+    qs = operational_modules_queryset(queryset)
     if not (user and user.is_authenticated):
         return qs.none()
     role = get_user_role(user)

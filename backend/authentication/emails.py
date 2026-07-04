@@ -6,6 +6,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.mail import send_mail
 
+from authentication.role_groups import get_user_role
+
 logger = logging.getLogger(__name__)
 
 _LOGO_DATA_URI_CACHE = None
@@ -123,7 +125,7 @@ def send_welcome_email(user, plain_password, *, mobile: bool = False):
         return
 
     full_name = user.get_full_name() or user.username
-    role_label = ROLE_LABELS.get(user.role, user.role)
+    role_label = ROLE_LABELS.get(get_user_role(user) or user.role, user.role)
     app_url = _app_url()
 
     if mobile:

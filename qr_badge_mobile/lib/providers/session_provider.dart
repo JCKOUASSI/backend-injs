@@ -11,6 +11,7 @@ import '../services/mobile_config_service.dart';
 import '../services/scan_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dev_api_defaults.dart';
+import '../utils/device_label.dart';
 import '../utils/open_session_recovery.dart';
 
 class SessionProvider extends ChangeNotifier {
@@ -389,6 +390,7 @@ class SessionProvider extends ChangeNotifier {
     required String passwordInput,
   }) async {
     final id = deviceId ?? await _storage.getOrCreateDeviceId();
+    final info = await DeviceLabel.resolve();
     late final Map<String, dynamic> payload;
     try {
       payload = await _auth.login(
@@ -396,6 +398,7 @@ class SessionProvider extends ChangeNotifier {
         username: usernameInput.trim(),
         password: passwordInput,
         deviceId: id,
+        deviceInfo: info,
       );
     } catch (e, st) {
       debugPrint('[qr_badge.session] Connexion échouée: $e');

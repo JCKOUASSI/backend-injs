@@ -61,7 +61,7 @@ export default function ArchiveModuleBrowser({
       if (filters.groupe) params.set('groupe', filters.groupe)
       if (filters.vague) params.set('vague', filters.vague)
       if (filters.statut) params.set('statut', filters.statut)
-      const res = await api.get(`/formations/list/?${params}`, signal ? { signal } : {})
+      const res = await api.get(`/formations/archives/modules/?${params}`, signal ? { signal } : {})
       const { results, count, totalPages: pages } = parsePaginatedResponse(res.data, 24)
       setModules(results)
       setTotal(count)
@@ -81,10 +81,16 @@ export default function ArchiveModuleBrowser({
     return () => ac.abort()
   }, [loadModules])
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, filters.formation_id, filters.annee, filters.secretariat_type, filters.grade, filters.groupe, filters.vague, filters.statut])
+  const updateFilter = (key, value) => {
+    setPage(1)
+    setFilters(f => ({ ...f, [key]: value }))
+  }
+  const resetFilters = () => {
+    setPage(1)
+    setFilters({ search: '', formation_id: '', annee: '', secretariat_type: '', grade: '', groupe: '', vague: '', statut: '' })
+  }
 
-  const updateFilter = (key, value) => setFilters(f => ({ ...f, [key]: value }))
-  const resetFilters = () => setFilters({ search: '', formation_id: '', annee: '', secretariat_type: '', grade: '', groupe: '', vague: '', statut: '' })
+  useEffect(() => { setPage(1) }, [debouncedSearch])
 
   const cycles = refs?.formations_reelles || []
   const annees = refs?.annees || []
@@ -187,9 +193,14 @@ export default function ArchiveModuleBrowser({
           <p>{error}</p>
         </div>
       ) : modules.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
           <i className="bi bi-inbox" style={{ fontSize: '3rem', color: 'var(--text-muted)' }}></i>
-          <p>Aucun module ne correspond à ces critères.</p>
+          <p style={{ fontWeight: 600, marginTop: '1rem' }}>Aucun module archivé pour le moment</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 0 }}>
+            Les documents n'apparaissent ici qu'après archivage par le secrétariat ou la direction
+            (bouton <strong>Archiver</strong> sur la page Cours).
+            Tant qu'aucun cours n'a été archivé, cet espace reste vide.
+          </p>
         </div>
       ) : (
         <>

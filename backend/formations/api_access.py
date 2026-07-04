@@ -12,7 +12,7 @@ from authentication.role_groups import (
 )
 from authentication.permissions import IsDFRC, IsSecretariatOrDFRC, IsSecretariatOrEncadrantOrDFRC
 
-from .access import formation_accessible
+from .access import formation_accessible, module_operational_accessible
 from .models import Module
 
 # Réexport des classes DRF déjà utilisées ailleurs dans le projet.
@@ -77,6 +77,8 @@ def module_or_response(user, formation_pk, module_pk):
         module = Module.objects.get(pk=module_pk, formation=formation)
     except Module.DoesNotExist:
         return formation, None, Response({'detail': 'Module introuvable.'}, status=404)
+    if not module_operational_accessible(user, module):
+        return formation, None, Response({'detail': 'Module archivé ou non autorisé.'}, status=404)
     return formation, module, None
 
 

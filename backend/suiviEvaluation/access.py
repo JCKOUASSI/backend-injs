@@ -3,7 +3,7 @@ import re
 
 from django.db.models import Q
 
-from authentication.role_groups import GLOBAL_ACCESS_ROLES, SECRETARIAT_ROLES
+from authentication.role_groups import GLOBAL_ACCESS_ROLES, SECRETARIAT_ROLES, get_user_role
 from formations.access import modules_queryset_for_user
 
 from .models import Questionnaire
@@ -55,9 +55,10 @@ def questionnaire_accessible(user, questionnaire):
     """True si l'utilisateur peut consulter / modifier ce questionnaire."""
     if not user or not user.is_authenticated:
         return False
-    if user.role in GLOBAL_ACCESS_ROLES or user.role == 'SUPERVISEUR':
+    role = get_user_role(user)
+    if role in GLOBAL_ACCESS_ROLES or role == 'SUPERVISEUR':
         return True
-    if user.role in SECRETARIAT_ROLES or user.role == 'ENCADRANT':
+    if role in SECRETARIAT_ROLES or role == 'ENCADRANT':
         if questionnaire.module_id:
             return modules_queryset_for_user(user).filter(pk=questionnaire.module_id).exists()
         titres = set(questionnaire.titres or [])
@@ -75,9 +76,10 @@ def questionnaires_queryset_for_user(user, queryset=None):
     qs = queryset if queryset is not None else Questionnaire.objects.all()
     if not user or not user.is_authenticated:
         return qs.none()
-    if user.role in GLOBAL_ACCESS_ROLES or user.role == 'SUPERVISEUR':
+    role = get_user_role(user)
+    if role in GLOBAL_ACCESS_ROLES or role == 'SUPERVISEUR':
         return qs
-    if user.role in SECRETARIAT_ROLES or user.role == 'ENCADRANT':
+    if role in SECRETARIAT_ROLES or role == 'ENCADRANT':
         scoped_modules = modules_queryset_for_user(user)
         module_ids = list(scoped_modules.values_list('pk', flat=True))
         intitules = _scoped_module_intitules(user)
@@ -101,9 +103,10 @@ def questionnaires_queryset_for_user(user, queryset=None):
 
 def titres_dans_perimetre(user, titres):
     """Vérifie que tous les titres ciblés appartiennent au périmètre de l'utilisateur."""
-    if user.role in GLOBAL_ACCESS_ROLES or user.role == 'SUPERVISEUR':
+    role = get_user_role(user)
+    if role in GLOBAL_ACCESS_ROLES or role == 'SUPERVISEUR':
         return True
-    if user.role in SECRETARIAT_ROLES or user.role == 'ENCADRANT':
+    if role in SECRETARIAT_ROLES or role == 'ENCADRANT':
         scoped = _scoped_module_intitules(user)
         if not scoped:
             return False

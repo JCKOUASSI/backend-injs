@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import ConfirmModal from '../components/ConfirmModal'
+import TripleConfirmModal from '../components/TripleConfirmModal'
 import { useDebounce } from '../hooks/useDebounce'
 import { formatDate } from '../utils/dates'
 import {
@@ -13,7 +14,7 @@ import {
   readModulesFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
-import { canMutateFormations } from '../utils/roles'
+import { canMutateFormations, canArchiveModuleFromUser } from '../utils/roles'
 import { useReferentiels } from '../hooks/useReferentiels'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
@@ -54,12 +55,14 @@ export default function Modules() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
   const [showFormationModal, setShowFormationModal] = useState(false)
   const [formationForm, setFormationForm] = useState({ ...emptyFormationForm })
   const [savingFormation, setSavingFormation] = useState(false)
   const [formationError, setFormationError] = useState('')
 
   const canManage = canMutateFormations(user?.role)
+  const canArchive = canArchiveModuleFromUser(user)
 
   const refFormationIdForSelectedFormation = () => {
     if (!form.formation_id) return null
@@ -229,6 +232,23 @@ export default function Modules() {
       }
     } finally {
       setSavingFormation(false)
+    }
+  }
+
+  const handleArchive = (m) => {
+    setArchiveTarget(m)
+  }
+
+  const confirmArchive = async () => {
+    const m = archiveTarget
+    if (!m) return
+    setArchiveTarget(null)
+    try {
+      await api.post(`/formations/${m.id}/modules/${m.module_id}/archive/`)
+      loadModules()
+      showToast('Module archivé — visible uniquement dans l\'espace Archives')
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors de l\'archivage', 'error')
     }
   }
 
@@ -408,7 +428,7 @@ export default function Modules() {
                           <span className={`badge ${getStatutBadge(m.statut)}`}>{getStatutLabel(m.statut)}</span>
                         </td>
                         <td>
-                          <div className="btn-group">
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                             <Link
                               to={`/formations/${m.id}/modules/${m.module_id}`}
                               state={listNavState}
@@ -420,6 +440,16 @@ export default function Modules() {
                             {canManage && (
                               <button onClick={() => openEdit(m)} className="btn btn-outline-secondary btn-sm" title="Modifier">
                                 <i className="bi bi-pencil"></i>
+                              </button>
+                            )}
+                            {canArchive && !m.archived && (
+                              <button
+                                onClick={() => handleArchive(m)}
+                                className="btn btn-warning btn-sm"
+                                title="Archiver ce module (3 confirmations)"
+                                style={{ whiteSpace: 'nowrap' }}
+                              >
+                                <i className="bi bi-archive me-1"></i>Archiver
                               </button>
                             )}
                             {canManage && (
@@ -678,6 +708,15 @@ export default function Modules() {
           detail={confirmDialog.detail}
           onConfirm={() => { confirmDialog.onConfirm(); setConfirmDialog(null) }}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {archiveTarget && (
+        <TripleConfirmModal
+          title="Archivage du module"
+          subject={archiveTarget.module}
+          onConfirm={confirmArchive}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
     </div>
