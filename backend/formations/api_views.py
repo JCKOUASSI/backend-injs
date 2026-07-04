@@ -55,7 +55,9 @@ from .serializers import (
     ParticipantSerializer,
     FormateurSerializer,
     ModuleSerializer,
+    QRTokenSerializer,
 )
+from .qr_helpers import get_session_for_qr
 
 
 def _normalize_groupe_value(value):
@@ -2838,47 +2840,46 @@ def formation_detail_api(request, pk):
 @permission_classes([IsAuthenticated])
 def api_generate_qr(request, formation_pk, session_pk=None):
     """
-    Generate QR code for a formation or session.
+    Generate QR code for a session (module-scoped).
+    Optional body: { module_id } — vérifie que la séance appartient au module affiché.
     """
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, formation_pk)
+    if not formation:
         return Response({'detail': 'Formation introuvable.'}, status=404)
-    
-    if not session_pk:
-        return Response({'detail': 'session_pk est obligatoire pour générer un QR.'}, status=400)
-    try:
-        session = SessionModule.objects.get(pk=session_pk, module__formation=formation)
-    except SessionModule.DoesNotExist:
-        return Response({'detail': 'Séance introuvable.'}, status=404)
+
+    module_id = request.data.get('module_id')
+    session, err = get_session_for_qr(
+        formation=formation,
+        session_id=session_pk,
+        module_id=module_id,
+    )
+    if err:
+        return err
     if session.est_terminee:
         return Response(
             {'detail': 'Impossible de générer un QR pour une séance terminée.'},
             status=400,
         )
-    
-    # Deactivate old QR tokens and invalidate their offline-data cache
-    # to avoid serving stale data after regeneration.
-    qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
-    if session:
-        qr_filter = qr_filter.filter(session=session)
+
+    qr_filter = QRToken.objects.filter(session=session, actif=True)
     old_tokens = list(qr_filter.values_list('token', flat=True))
     qr_filter.update(actif=False)
     for old_token in old_tokens:
         invalidate_offline_data_cache(old_token)
 
-    # Create new token
     qr_token = QRToken.objects.create(
         session=session,
         genere_par=request.user,
         expire_at=timezone.now() + timedelta(hours=24),
     )
-    
-    return Response({
-        'detail': 'QR code généré.',
-        'qr_url': f'/api/formations/{formation_pk}/sessions/{session_pk}/qr-image/' if session else f'/api/formations/{formation_pk}/qr-image/',
-        'token': str(qr_token.token),
-    }, status=201)
+
+    payload = QRTokenSerializer(qr_token).data
+    payload['detail'] = 'QR code généré.'
+    payload['token'] = str(qr_token.token)
+    payload['qr_url'] = (
+        f'/api/formations/{formation_pk}/sessions/{session_pk}/qr-image/'
+    )
+    return Response(payload, status=201)
 
 
 @api_view(['POST'])

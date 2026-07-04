@@ -92,13 +92,14 @@ class SessionSerializer(serializers.ModelSerializer):
     nb_attendus = serializers.SerializerMethodField()
     module_id = serializers.IntegerField(source='module.id', read_only=True, allow_null=True)
     module_intitule = serializers.CharField(source='module.intitule', read_only=True, allow_null=True)
+    module_groupe = serializers.CharField(source='module.groupe', read_only=True, allow_null=True)
 
     class Meta:
         model = SessionModule
         fields = [
             'id', 'numero', 'intitule', 'date', 'heure_debut', 'heure_fin',
             'en_cours', 'terminee', 'formateur_nom', 'nb_presences', 'nb_attendus',
-            'module_id', 'module_intitule',
+            'module_id', 'module_intitule', 'module_groupe',
         ]
 
     def get_formateur_nom(self, obj):
@@ -399,13 +400,18 @@ class FormationDetailSerializer(FormationListSerializer):
 class QRTokenSerializer(serializers.ModelSerializer):
     formation_id = serializers.IntegerField(source='session.module.formation_id', read_only=True)
     formation_titre = serializers.CharField(source='session.module.formation.formation', read_only=True)
+    module_id = serializers.IntegerField(source='session.module_id', read_only=True)
+    module_intitule = serializers.CharField(source='session.module.intitule', read_only=True)
+    module_groupe = serializers.CharField(source='session.module.groupe', read_only=True)
     session_intitule = serializers.SerializerMethodField()
     is_valid = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = QRToken
         fields = [
-            'id', 'formation_id', 'formation_titre', 'session', 'session_intitule',
+            'id', 'formation_id', 'formation_titre',
+            'module_id', 'module_intitule', 'module_groupe',
+            'session', 'session_intitule',
             'token', 'genere_par', 'actif', 'expire_at', 'is_valid', 'created_at',
         ]
         read_only_fields = ['id', 'token', 'genere_par', 'created_at']
