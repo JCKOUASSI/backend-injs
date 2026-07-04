@@ -65,6 +65,62 @@ def _normalize_scan_identifier(value):
     return ''.join(ch for ch in (value or '').strip().upper() if ch.isalnum())
 
 
+def _matricule_matches_value(stored, numero_upper, numero_compact):
+    """Compare un matricule stocké à la saisie (casse / espaces / ponctuation tolérés)."""
+    if not stored:
+        return False
+    val = stored.strip()
+    if numero_upper and val.upper() == numero_upper:
+        return True
+    if numero_compact and _normalize_scan_identifier(val) == numero_compact:
+        return True
+    return False
+
+
+def _formateur_badge_candidates(numero_upper, numero_compact):
+    """Variantes acceptées pour un badge formateur (F0042, f0042, 42…)."""
+    candidates = set()
+    if numero_upper:
+        candidates.add(numero_upper)
+    if numero_compact:
+        candidates.add(numero_compact)
+    if numero_compact.isdigit():
+        candidates.add(f"F{int(numero_compact):04d}")
+    elif numero_compact.startswith('F') and numero_compact[1:].isdigit():
+        candidates.add(f"F{int(numero_compact[1:]):04d}")
+    return candidates
+
+
+def _formateur_matches_badge(formateur, candidates):
+    badge = (formateur.numerobadge or '').strip().upper()
+    badge_compact = _normalize_scan_identifier(formateur.numerobadge)
+    for candidate in candidates:
+        c_upper = candidate.upper()
+        if badge == c_upper:
+            return True
+        c_compact = _normalize_scan_identifier(candidate)
+        if badge_compact and c_compact and badge_compact == c_compact:
+            return True
+    return False
+
+
+def _module_scan_label(module):
+    if module is None:
+        return 'ce module'
+    label = module.intitule or f'Module #{module.pk}'
+    if module.groupe:
+        return f'« {label} » ({module.groupe})'
+    return f'« {label} »'
+
+
+def _participant_personne_data(participant):
+    return {
+        'numero': participant.matricule,
+        'nom': participant.nom,
+        'prenom': participant.prenom,
+    }
+
+
 def _resolve_personne(numero, formation, module=None):
     """
     Résout un numéro (auditeur, formateur, encadrant) vers la personne et vérifie l'inscription.
@@ -73,25 +129,50 @@ def _resolve_personne(numero, formation, module=None):
     """
     numero_upper = (numero or '').strip().upper()
     numero_compact = _normalize_scan_identifier(numero)
+    if not numero_upper and not numero_compact:
+        return None, None, None, Response(
+            {'code': 'PARTICIPANT_NOT_FOUND', 'detail': 'Auditeur introuvable.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
-    # Variantes acceptées pour un badge formateur:
-    # - casse indifférente (f0042 == F0042)
-    # - espaces/ponctuation ignorés (F 00-42)
-    # - saisie numérique seule (42 -> F0042)
-    formateur_candidates = {numero_upper}
-    if numero_compact:
-        formateur_candidates.add(numero_compact)
-    if numero_compact.isdigit():
-        formateur_candidates.add(f"F{int(numero_compact):04d}")
-    elif numero_compact.startswith('F') and numero_compact[1:].isdigit():
-        formateur_candidates.add(f"F{int(numero_compact[1:]):04d}")
-
-    # Portée du contrôle: module (si fourni) sinon formation.
-    # Cela permet d'imposer strictement la liste autorisée de la séance scannée.
+    formateur_candidates = _formateur_badge_candidates(numero_upper, numero_compact)
     module_scope = module
 
-    # Chercher d'abord comme formateur (numéros courts: F0001, F0002…)
-    # puis comme participant (numéros FNCE24-xxx, matricule, etc.)
+    # 1. Priorité module : auditeurs inscrits sur la séance scannée (évite les faux négatifs).
+    if module_scope is not None:
+        for insc in (
+            ModuleParticipant.objects
+            .filter(module=module_scope)
+            .select_related('participant')
+        ):
+            p = insc.participant
+            if p and _matricule_matches_value(p.matricule, numero_upper, numero_compact):
+                return p, 'participant', _participant_personne_data(p), None
+
+        for mf in (
+            ModuleFormateur.objects
+            .filter(module=module_scope)
+            .select_related('formateur')
+        ):
+            f = mf.formateur
+            if f and _formateur_matches_badge(f, formateur_candidates):
+                return f, 'formateur', {
+                    'numero': f.numerobadge,
+                    'nom': f.nom,
+                    'prenom': f.prenom,
+                }, None
+
+        if module_scope.superviseur_id:
+            sup = module_scope.superviseur
+            if sup and _matricule_matches_value(sup.matricule, numero_upper, numero_compact):
+                return sup, 'encadrant', {
+                    'numero': sup.matricule,
+                    'nom': sup.last_name or '',
+                    'prenom': sup.first_name or '',
+                    'username': sup.username,
+                }, None
+
+    # 2. Formateur global — ne bloque pas si hors module (un matricule auditeur peut coïncider).
     formateur_filters = Q()
     for candidate in formateur_candidates:
         formateur_filters |= Q(numerobadge__iexact=candidate)
@@ -102,52 +183,49 @@ def _resolve_personne(numero, formation, module=None):
             if module_scope is not None
             else ModuleFormateur.objects.filter(module__formation=formation, formateur=formateur).exists()
         )
-        if not formateur_in_scope:
-            return None, None, None, Response(
-                {'code': 'FORMATEUR_NOT_IN_LIST',
-                 'detail': 'Formateur non autorisé pour ce module.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        return formateur, 'formateur', {
-            'numero': formateur.numerobadge,
-            'nom': formateur.nom,
-            'prenom': formateur.prenom,
-        }, None
+        if formateur_in_scope:
+            return formateur, 'formateur', {
+                'numero': formateur.numerobadge,
+                'nom': formateur.nom,
+                'prenom': formateur.prenom,
+            }, None
 
-    # Chercher comme encadrant via son matricule utilisateur
-    encadrant = User.objects.filter(
-        role='ENCADRANT',
-        matricule=numero_upper,
-    ).first()
+    # 3. Encadrant global (matricule tolérant sur casse / compact).
+    encadrant = None
+    if numero_upper or numero_compact:
+        encadrant_filters = Q()
+        if numero_upper:
+            encadrant_filters |= Q(matricule__iexact=numero_upper)
+        if numero_compact and numero_compact != numero_upper:
+            encadrant_filters |= Q(matricule__iexact=numero_compact)
+        encadrant = User.objects.filter(role='ENCADRANT').filter(encadrant_filters).first()
     if encadrant is not None:
         encadrant_in_scope = (
             bool(module_scope and module_scope.superviseur_id == encadrant.id)
             if module_scope is not None
             else Formation.objects.filter(pk=formation.pk, modules__superviseur=encadrant).exists()
         )
-        if not encadrant_in_scope:
-            return None, None, None, Response(
-                {'code': 'ENCADRANT_NOT_IN_LIST',
-                 'detail': 'Encadrant non autorisé pour ce module.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        return encadrant, 'encadrant', {
-            'numero': encadrant.matricule,
-            'nom': encadrant.last_name or '',
-            'prenom': encadrant.first_name or '',
-            'username': encadrant.username,
-        }, None
+        if encadrant_in_scope:
+            return encadrant, 'encadrant', {
+                'numero': encadrant.matricule,
+                'nom': encadrant.last_name or '',
+                'prenom': encadrant.first_name or '',
+                'username': encadrant.username,
+            }, None
 
-    # Chercher comme participant par matricule
+    # 4. Auditeur global puis contrôle d'inscription au module.
     participant = Participant.objects.filter(matricule__iexact=numero_upper).first()
     if participant is None and numero_compact and numero_compact != numero_upper:
         participant = Participant.objects.filter(matricule__iexact=numero_compact).first()
     if participant is None and numero_compact:
-        # Fallback tolérant: comparer la version normalisée des matricules
-        # uniquement sur les participants attendus de la formation.
+        enroll_filter = (
+            {'module': module_scope}
+            if module_scope is not None
+            else {'module__formation': formation}
+        )
         for insc in (
             ModuleParticipant.objects
-            .filter(module__formation=formation)
+            .filter(**enroll_filter)
             .select_related('participant')
             .only(
                 'participant__id',
@@ -172,16 +250,19 @@ def _resolve_personne(numero, formation, module=None):
         else ModuleParticipant.objects.filter(module__formation=formation, participant=participant).exists()
     )
     if not participant_in_scope:
+        module_label = _module_scan_label(module_scope)
         return None, None, None, Response(
-            {'code': 'PARTICIPANT_NOT_IN_LIST',
-             'detail': 'Auditeur non autorisé pour ce module.'},
+            {
+                'code': 'PARTICIPANT_NOT_IN_LIST',
+                'detail': (
+                    f'Auditeur non autorisé pour {module_label}. '
+                    f'Vérifiez le QR affiché (bon groupe / bon module) '
+                    f'ou contactez le secrétariat.'
+                ),
+            },
             status=status.HTTP_403_FORBIDDEN,
         )
-    return participant, 'participant', {
-        'numero': participant.matricule,
-        'nom': participant.nom,
-        'prenom': participant.prenom,
-    }, None
+    return participant, 'participant', _participant_personne_data(participant), None
 
 
 def _pointage_filter(personne, type_personne, formation, **extra):
@@ -430,50 +511,6 @@ def _check_geofence(module, latitude, longitude, accuracy_m=None):
     return True, None, None, distance_m, rayon_m
 
 
-def _validate_public_scan_location(data, module, *, check_geofence=True):
-    """
-    Valide latitude/longitude pour le scan public.
-    Retourne (latitude, longitude, accuracy_m, distance_m, rayon_m, error_response).
-    """
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-    accuracy_m = data.get('accuracy_m')
-
-    if (latitude is None) ^ (longitude is None):
-        return None, None, None, None, None, Response(
-            {
-                'code': 'LOCATION_INVALID',
-                'detail': 'latitude et longitude doivent être fournis ensemble.',
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    distance_m = None
-    rayon_m = None
-    if check_geofence:
-        site_lat_cfg, site_lon_cfg, _site_rayon = _resolve_site_geofence(module)
-        if site_lat_cfg is not None and latitude is None:
-            return None, None, None, None, None, Response(
-                {
-                    'code': 'LOCATION_REQUIRED',
-                    'detail': 'La géolocalisation est obligatoire pour badger cette séance.',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if latitude is not None and longitude is not None:
-            geo_ok, geo_code, geo_detail, distance_m, rayon_m = _check_geofence(
-                module, latitude, longitude, accuracy_m
-            )
-            if not geo_ok:
-                return None, None, None, None, None, Response(
-                    {'code': geo_code, 'detail': geo_detail},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-    return latitude, longitude, accuracy_m, distance_m, rayon_m, None
-
-
 # ──────────────────────────────────────────────
 # ENDPOINT /api/scan/ — Participants & Formateurs
 # ──────────────────────────────────────────────
@@ -499,10 +536,10 @@ def scan_view(request):
     """
     Endpoint de scan QR — gère ENTREE et SORTIE pour participants (P0001) et formateurs (F0001).
 
-    body: { token_qr, numero_participant, device_id, latitude?, longitude?, accuracy_m? }
+    body: { token_qr, numero_participant, device_id }
 
     Désactivé en production sauf PUBLIC_QR_SCAN_ENABLED=True (voir settings).
-    Préférer /api/scan/secure/ (JWT + profil lié + géofence).
+    Préférer /api/scan/secure/ (JWT + profil lié + géofence) pour l'app mobile.
     """
     if not settings.PUBLIC_QR_SCAN_ENABLED:
         return _public_scan_disabled_response()
@@ -598,17 +635,6 @@ def scan_view(request):
         ).order_by('-timestamp_entree').first()
 
         if pointage_ouvert:
-            latitude, longitude, accuracy_m, _, _, loc_err = _validate_public_scan_location(
-                data, seance.module, check_geofence=False
-            )
-            if loc_err:
-                return loc_err
-
-            if latitude is not None:
-                pointage_ouvert.last_latitude = latitude
-                pointage_ouvert.last_longitude = longitude
-                pointage_ouvert.last_accuracy_m = accuracy_m
-
             pointage_ouvert.timestamp_sortie = _clamp_to_seance(timezone.now(), seance)
             pointage_ouvert.statut = Pointage.Statut.TERMINE
             pointage_ouvert.calculer_duree()
@@ -622,12 +648,7 @@ def scan_view(request):
                 cible_nom=f"{personne_data['nom']} {personne_data['prenom']}",
                 pointage=pointage_ouvert,
                 device_id=device_id,
-                extra={
-                    'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0),
-                    'latitude': latitude,
-                    'longitude': longitude,
-                    'accuracy_m': accuracy_m,
-                },
+                extra={'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0)},
             )
 
             sessions_jour = Pointage.objects.filter(
@@ -715,20 +736,11 @@ def scan_view(request):
         if fenetre_err:
             return fenetre_err
 
-        latitude, longitude, accuracy_m, distance_m, rayon_m, loc_err = (
-            _validate_public_scan_location(data, seance.module)
-        )
-        if loc_err:
-            return loc_err
-
         timestamp_entree = _clamp_to_seance(timezone.now(), seance)
         create_kwargs = _create_pointage_kwargs(
             personne, type_str, seance,
             date_journee=today,
             device_id=device_id,
-            last_latitude=latitude,
-            last_longitude=longitude,
-            last_accuracy_m=accuracy_m,
             timestamp_entree=timestamp_entree,
             statut=Pointage.Statut.EN_COURS,
         )
@@ -744,13 +756,6 @@ def scan_view(request):
             formation=formation,
             pointage=pointage,
             device_id=device_id,
-            extra={
-                'latitude': latitude,
-                'longitude': longitude,
-                'accuracy_m': accuracy_m,
-                'distance_m': round(distance_m, 1) if distance_m is not None else None,
-                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
-            },
         )
 
         return Response({
@@ -2720,7 +2725,10 @@ def _cached_offline_data_response(token):
 def _get_formation_offline_data_payload(token):
     """Données hors-ligne pour un token QR (UUID). Retourne un dict sérialisable."""
     try:
-        qr_token = QRToken.objects.select_related('session__module__formation').get(token=token)
+        qr_token = QRToken.objects.select_related(
+            'session__module__formation',
+            'session__module__superviseur',
+        ).get(token=token)
     except QRToken.DoesNotExist:
         raise OfflineDataError('Token invalide.', status.HTTP_404_NOT_FOUND)
 
@@ -2752,12 +2760,13 @@ def _get_formation_offline_data_payload(token):
             status.HTTP_400_BAD_REQUEST,
         )
     formation = qr_token.session.module.formation
+    scan_module = qr_token.session.module
 
     participants = [
         {'numero': matricule, 'nom': nom, 'prenom': prenom}
         for matricule, nom, prenom in (
             Participant.objects.filter(
-                modules_inscrits__module__formation=formation,
+                modules_inscrits__module=scan_module,
             )
             .distinct()
             .values_list('matricule', 'nom', 'prenom')
@@ -2768,31 +2777,24 @@ def _get_formation_offline_data_payload(token):
         {'numero': numerobadge, 'nom': nom, 'prenom': prenom}
         for numerobadge, nom, prenom in (
             Formateur.objects.filter(
-                modules_assignes__module__formation=formation,
+                modules_assignes__module=scan_module,
             )
             .distinct()
             .values_list('numerobadge', 'nom', 'prenom')
         )
     ]
 
-    encadrants = [
-        {
-            'numero': matricule or '',
-            'nom': last_name or '',
-            'prenom': first_name or '',
-            'username': username,
-        }
-        for matricule, last_name, first_name, username in (
-            User.objects.filter(
-                role='ENCADRANT',
-                modules_supervises__formation=formation,
-            )
-            .distinct()
-            .values_list('matricule', 'last_name', 'first_name', 'username')
-        )
-    ]
+    encadrants = []
+    if scan_module.superviseur_id:
+        sup = scan_module.superviseur
+        encadrants.append({
+            'numero': sup.matricule or '',
+            'nom': sup.last_name or '',
+            'prenom': sup.first_name or '',
+            'username': sup.username,
+        })
 
-    module = getattr(qr_token.session, 'module', None) if qr_token.session else None
+    module = scan_module
     site     = ((module.site.nom if getattr(module, 'site', None) else getattr(module, 'site_legacy', '')) if module else '')
     batiment = (module.batiment if module else '')
     salle    = (module.salle    if module else '')
@@ -3130,7 +3132,12 @@ def check_badge_status(request):
 
     personne, type_str, _, err = _resolve_personne(numero, formation, qr_token.session.module)
     if err:
-        return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+        return Response({
+            'statut': 'NON_AUTORISE',
+            'action_suivante': None,
+            'code': err.data.get('code'),
+            'detail': err.data.get('detail'),
+        })
 
     seance = qr_token.session
     session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
