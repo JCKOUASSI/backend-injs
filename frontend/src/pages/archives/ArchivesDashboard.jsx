@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
-import { parsePaginatedResponse } from '../../utils/paginatedResponse'
 
 const STAT_CARDS = [
   { key: 'modules', label: 'Modules archivés', icon: 'bi-journal-bookmark', color: '#1565c0' },
@@ -41,13 +40,12 @@ export default function ArchivesDashboard() {
     const opts = { signal: ac.signal }
     const load = async () => {
       try {
-        const [m, p, f] = await Promise.allSettled([
-          api.get('/formations/list/?page_size=1', opts),
-          api.get('/formations/participants/list/?page_size=1', opts),
-          api.get('/formations/formateurs/list/?page_size=1', opts),
-        ])
-        const extract = (r) => r.status === 'fulfilled' ? parsePaginatedResponse(r.value.data, 1).count : null
-        setCounts({ modules: extract(m), participants: extract(p), formateurs: extract(f) })
+        const res = await api.get('/formations/archives/stats/', opts)
+        setCounts({
+          modules: res.data.modules ?? null,
+          participants: res.data.participants ?? null,
+          formateurs: res.data.formateurs ?? null,
+        })
       } catch { /* ignore */ }
     }
     load()
@@ -89,6 +87,19 @@ export default function ArchivesDashboard() {
           </div>
         ))}
       </div>
+
+      {counts.modules === 0 && (
+        <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.75rem', borderLeft: '4px solid #f59e0b', background: '#fffbeb' }}>
+          <p style={{ margin: 0, fontWeight: 600, color: '#92400e' }}>
+            <i className="bi bi-info-circle me-2"></i>Aucun cours archivé pour l'instant
+          </p>
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#78350f' }}>
+            En tant qu'<strong>archiviste</strong>, vous consultez ici les cours déjà transférés aux archives.
+            L'archivage est effectué par le <strong>secrétariat</strong> ou la <strong>direction</strong> depuis la page
+            <strong> Cours</strong> (bouton orange « Archiver », avec 3 confirmations).
+          </p>
+        </div>
+      )}
 
       {/* Documents d'archives */}
       <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.9rem' }}>Documents d'archives</h2>

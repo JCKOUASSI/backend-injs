@@ -430,6 +430,50 @@ def _check_geofence(module, latitude, longitude, accuracy_m=None):
     return True, None, None, distance_m, rayon_m
 
 
+def _validate_public_scan_location(data, module, *, check_geofence=True):
+    """
+    Valide latitude/longitude pour le scan public.
+    Retourne (latitude, longitude, accuracy_m, distance_m, rayon_m, error_response).
+    """
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    accuracy_m = data.get('accuracy_m')
+
+    if (latitude is None) ^ (longitude is None):
+        return None, None, None, None, None, Response(
+            {
+                'code': 'LOCATION_INVALID',
+                'detail': 'latitude et longitude doivent être fournis ensemble.',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    distance_m = None
+    rayon_m = None
+    if check_geofence:
+        site_lat_cfg, site_lon_cfg, _site_rayon = _resolve_site_geofence(module)
+        if site_lat_cfg is not None and latitude is None:
+            return None, None, None, None, None, Response(
+                {
+                    'code': 'LOCATION_REQUIRED',
+                    'detail': 'La géolocalisation est obligatoire pour badger cette séance.',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if latitude is not None and longitude is not None:
+            geo_ok, geo_code, geo_detail, distance_m, rayon_m = _check_geofence(
+                module, latitude, longitude, accuracy_m
+            )
+            if not geo_ok:
+                return None, None, None, None, None, Response(
+                    {'code': geo_code, 'detail': geo_detail},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+    return latitude, longitude, accuracy_m, distance_m, rayon_m, None
+
+
 # ──────────────────────────────────────────────
 # ENDPOINT /api/scan/ — Participants & Formateurs
 # ──────────────────────────────────────────────
@@ -455,7 +499,7 @@ def scan_view(request):
     """
     Endpoint de scan QR — gère ENTREE et SORTIE pour participants (P0001) et formateurs (F0001).
 
-    body: { token_qr, numero_participant, device_id }
+    body: { token_qr, numero_participant, device_id, latitude?, longitude?, accuracy_m? }
 
     Désactivé en production sauf PUBLIC_QR_SCAN_ENABLED=True (voir settings).
     Préférer /api/scan/secure/ (JWT + profil lié + géofence).
@@ -554,6 +598,17 @@ def scan_view(request):
         ).order_by('-timestamp_entree').first()
 
         if pointage_ouvert:
+            latitude, longitude, accuracy_m, _, _, loc_err = _validate_public_scan_location(
+                data, seance.module, check_geofence=False
+            )
+            if loc_err:
+                return loc_err
+
+            if latitude is not None:
+                pointage_ouvert.last_latitude = latitude
+                pointage_ouvert.last_longitude = longitude
+                pointage_ouvert.last_accuracy_m = accuracy_m
+
             pointage_ouvert.timestamp_sortie = _clamp_to_seance(timezone.now(), seance)
             pointage_ouvert.statut = Pointage.Statut.TERMINE
             pointage_ouvert.calculer_duree()
@@ -567,7 +622,12 @@ def scan_view(request):
                 cible_nom=f"{personne_data['nom']} {personne_data['prenom']}",
                 pointage=pointage_ouvert,
                 device_id=device_id,
-                extra={'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0)},
+                extra={
+                    'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0),
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    'accuracy_m': accuracy_m,
+                },
             )
 
             sessions_jour = Pointage.objects.filter(
@@ -655,11 +715,20 @@ def scan_view(request):
         if fenetre_err:
             return fenetre_err
 
+        latitude, longitude, accuracy_m, distance_m, rayon_m, loc_err = (
+            _validate_public_scan_location(data, seance.module)
+        )
+        if loc_err:
+            return loc_err
+
         timestamp_entree = _clamp_to_seance(timezone.now(), seance)
         create_kwargs = _create_pointage_kwargs(
             personne, type_str, seance,
             date_journee=today,
             device_id=device_id,
+            last_latitude=latitude,
+            last_longitude=longitude,
+            last_accuracy_m=accuracy_m,
             timestamp_entree=timestamp_entree,
             statut=Pointage.Statut.EN_COURS,
         )
@@ -675,6 +744,13 @@ def scan_view(request):
             formation=formation,
             pointage=pointage,
             device_id=device_id,
+            extra={
+                'latitude': latitude,
+                'longitude': longitude,
+                'accuracy_m': accuracy_m,
+                'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+            },
         )
 
         return Response({

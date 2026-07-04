@@ -139,6 +139,11 @@ FORMATION_MUTATION_ROLES = frozenset({
     *SECRETARIAT_ROLES,
 })
 
+MODULE_ARCHIVE_ROLES = frozenset({
+    *FORMATION_MUTATION_ROLES,
+    User.Role.DIRECTION,
+})
+
 PRESENCE_VIEW_ROLES = frozenset({
     *ADMIN_LEVEL_ROLES,
     User.Role.DIRECTION,
@@ -357,6 +362,27 @@ def user_in_roles(user, role_set):
     return role in role_set if role else False
 
 
+def role_group_names_for_roles(roles):
+    """Noms de groupes Django ROLE_* correspondant à une liste de rôles."""
+    return [ROLE_GROUP_NAMES[r] for r in roles if r in ROLE_GROUP_NAMES]
+
+
+def users_with_roles(roles):
+    """Utilisateurs appartenant à au moins un groupe ROLE_* des rôles donnés."""
+    names = role_group_names_for_roles(roles)
+    if not names:
+        return User.objects.none()
+    return User.objects.filter(groups__name__in=names).distinct()
+
+
+def users_with_role(role):
+    """Utilisateurs appartenant au groupe ROLE_* du rôle donné."""
+    name = ROLE_GROUP_NAMES.get(role)
+    if not name:
+        return User.objects.none()
+    return User.objects.filter(groups__name=name).distinct()
+
+
 def user_has_perm(user, codename):
     """Vérifie une permission Django (modèle ou custom) via les groupes."""
     if not user or not user.is_authenticated:
@@ -407,6 +433,7 @@ def user_role_context(user):
         'staff_filter_roles': get_staff_filter_roles(role),
         'badge_account_roles': list(BADGE_ACCOUNT_ROLES),
         'can_mutate_users': role in USER_MUTATION_ROLES,
+        'can_archive_modules': user_in_roles(user, MODULE_ARCHIVE_ROLES),
     }
 
 

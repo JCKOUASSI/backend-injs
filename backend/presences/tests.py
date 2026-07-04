@@ -16,6 +16,7 @@ from formations.models import (
     ModuleParticipant,
     ModuleFormateur,
     QRToken,
+    RefSite,
 )
 from .models import Pointage
 
@@ -229,6 +230,73 @@ class ScanModuleExclusivityTest(TestCase):
             res.data.get('participant', {}).get('numero'),
             self.participant.matricule,
         )
+
+    def test_public_scan_stores_geolocation_on_entree(self):
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token_seance_2.token),
+                'numero_participant': self.participant.matricule,
+                'latitude': 5.3364,
+                'longitude': -4.0267,
+                'accuracy_m': 12.5,
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        pointage = Pointage.objects.get(
+            participant=self.participant,
+            session=self.seance_2,
+        )
+        self.assertAlmostEqual(pointage.last_latitude, 5.3364)
+        self.assertAlmostEqual(pointage.last_longitude, -4.0267)
+        self.assertAlmostEqual(pointage.last_accuracy_m, 12.5)
+
+    def test_public_scan_rejects_partial_location(self):
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token_seance_2.token),
+                'numero_participant': self.participant.matricule,
+                'latitude': 5.3364,
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.data.get('code'), 'LOCATION_INVALID')
+
+    def test_public_scan_requires_location_when_geofence_configured(self):
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
+        site = RefSite.objects.create(
+            nom='Site scan test',
+            geofence_latitude=5.3364,
+            geofence_longitude=-4.0267,
+            geofence_rayon_m=200,
+        )
+        self.module.site = site
+        self.module.save(update_fields=['site'])
+
+        res = self.client.post(
+            '/api/scan/',
+            {
+                'token_qr': str(self.token_seance_2.token),
+                'numero_participant': self.participant.matricule,
+            },
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.data.get('code'), 'LOCATION_REQUIRED')
 
     def test_force_pointage_blocks_entry_when_other_session_open_same_module_same_day(self):
         user = make_user('secretariat_for_force', role='SECRETARIAT')

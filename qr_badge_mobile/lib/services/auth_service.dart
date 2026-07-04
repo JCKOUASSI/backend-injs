@@ -6,6 +6,7 @@ class AuthService {
     required String username,
     required String password,
     required String deviceId,
+    required String deviceInfo,
   }) async {
     final client = ApiClient(baseUrl: baseUrl);
     return client.post(
@@ -15,7 +16,7 @@ class AuthService {
         'username': username,
         'password': password,
         'device_id': deviceId,
-        'device_info': 'Flutter Mobile',
+        'device_info': deviceInfo,
       },
     );
   }

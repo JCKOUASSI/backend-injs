@@ -31,6 +31,7 @@ class ModuleSerializer(serializers.ModelSerializer):
             'formateur', 'formateur_nom',
             'nb_participants',
             'sessions', 'created_at',
+            'archived', 'archived_at',
         ]
         read_only_fields = ['id', 'created_at']
 

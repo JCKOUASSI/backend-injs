@@ -25,7 +25,13 @@ from presences.offline_cache import invalidate_offline_data_cache
 from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
-from .access import formateurs_queryset_for_user, formation_accessible
+from .access import (
+    can_archive_module,
+    formateurs_queryset_for_user,
+    formation_accessible,
+    module_operational_accessible,
+    operational_modules_queryset,
+)
 from .formateur_privacy import (
     can_view_formateur_sensitive_data,
     can_edit_formateur_sensitive_data,
@@ -159,7 +165,7 @@ def dashboard_stats(request):
     if cached is not None:
         return Response(cached)
 
-    modules_qs = Module.objects.all()
+    modules_qs = operational_modules_queryset()
     participants_qs = Participant.objects.all()
     secretariat_filter = request.query_params.get('secretariat')
     reference_date_raw = request.query_params.get('reference_date')
@@ -494,25 +500,18 @@ def dashboard_stats(request):
     return Response(payload)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def formation_list_api(request):
+def _filtered_modules_queryset(request, *, archives_only=False):
     """
-    List modules (une ligne par module) with optional filtering.
-    Query params: statut, search, module, categorie, grade, secretariat_type, vague, groupe, actives, page, page_size, date_mode, date
+    Queryset modules filtré et trié (sans annotations coûteuses ni pagination).
+    Retourne (queryset, None) ou (None, Response) si paramètres invalides.
     """
-    denied = deny_finance_operational_response(request)
-    if denied:
-        return denied
+    from .access import archived_modules_queryset, operational_modules_queryset
 
-    page = int(request.query_params.get('page', 1))
-    page_size = int(request.query_params.get('page_size', 50))
-
-    queryset = Module.objects.select_related(
-        'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par'
+    base_qs = archived_modules_queryset() if archives_only else operational_modules_queryset()
+    queryset = base_qs.select_related(
+        'formation', 'secretariat__type', 'formateur', 'superviseur', 'creee_par', 'site',
     )
 
-    # Restriction par rôle
     if request.user.is_authenticated and request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         if request.user.secretariat:
             queryset = queryset.filter(secretariat=request.user.secretariat)
@@ -521,7 +520,6 @@ def formation_list_api(request):
     elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
         queryset = queryset.filter(superviseur=request.user)
 
-    # Filtres
     statut = request.query_params.get('statut')
     if statut:
         queryset = queryset.filter(statut=statut)
@@ -598,19 +596,165 @@ def formation_list_api(request):
         target_date = timezone.localdate()
         if date_mode == 'date':
             if not date_value:
-                return Response({'detail': 'Le paramètre date est requis pour date_mode=date.'}, status=400)
+                return None, Response({'detail': 'Le paramètre date est requis pour date_mode=date.'}, status=400)
             try:
                 target_date = datetime.strptime(date_value, '%Y-%m-%d').date()
             except ValueError:
-                return Response({'detail': 'Format de date invalide. Utilisez YYYY-MM-DD.'}, status=400)
+                return None, Response({'detail': 'Format de date invalide. Utilisez YYYY-MM-DD.'}, status=400)
         queryset = queryset.filter(sessions__date_journee=target_date).distinct()
 
-    # Tri : modules les plus proches d'abord, dates vides en dernier
     queryset = queryset.order_by(
         F('date_debut').asc(nulls_last=True),
         F('date_fin').asc(nulls_last=True),
         'id',
     )
+    return queryset, None
+
+
+def _serialize_module_list_item(module, *, nb_participants=0, nb_presents=0):
+    formation = module.formation
+    superviseur = module.superviseur
+    creee_par = module.creee_par
+    return {
+        'id': formation.id,
+        'module_id': module.id,
+        'numero_formation': formation.numero_formation,
+        'formation': formation.formation,
+        'intitule': formation.formation,
+        'module': module.intitule,
+        'statut': module.statut,
+        'grade': module.grade,
+        'categorie': module.grade,
+        'groupe': module.groupe,
+        'vague': module.vague,
+        'site': (module.site.nom if module.site else (module.site_legacy or '')),
+        'site_id': module.site_id,
+        'batiment': module.batiment,
+        'salle': module.salle,
+        'date_debut': module.date_debut,
+        'date_fin': module.date_fin,
+        'date_debut_prevue': module.date_debut,
+        'date_fin_prevue': module.date_fin,
+        'secretariat': module.secretariat_id,
+        'secretariat_nom': module.secretariat.nom if module.secretariat else None,
+        'secretariat_type': module.secretariat.type_id if module.secretariat else None,
+        'secretariat_type_libelle': (
+            module.secretariat.type.libelle if module.secretariat and module.secretariat.type else None
+        ),
+        'superviseur': superviseur.id if superviseur else None,
+        'superviseur_nom': superviseur.get_full_name() if superviseur else None,
+        'creee_par': creee_par.id if creee_par else None,
+        'creee_par_nom': creee_par.get_full_name() if creee_par else None,
+        'nb_participants': nb_participants,
+        'nb_presents': nb_presents,
+        'archived': module.archived,
+        'created_at': formation.created_at,
+        'updated_at': formation.updated_at,
+    }
+
+
+def _module_participant_counts(module_ids):
+    if not module_ids:
+        return {}
+    rows = (
+        ModuleParticipant.objects.filter(module_id__in=module_ids)
+        .values('module_id')
+        .annotate(c=Count('participant', distinct=True))
+    )
+    return {row['module_id']: row['c'] for row in rows}
+
+
+def _moyenne_from_valeurs_map(valeurs_by_colonne):
+    normalized = []
+    for val in valeurs_by_colonne.values():
+        if val and val.note is not None:
+            note_max = float(val.colonne.note_max or 20)
+            if note_max <= 0:
+                note_max = 20.0
+            normalized.append(float(val.note) * 20.0 / note_max)
+    if not normalized:
+        return None
+    return round(sum(normalized) / len(normalized), 2)
+
+
+def _batch_resume_module_participants(module, inscriptions, valeurs_map, criteres):
+    """Résumés notes/présence pour tous les auditeurs d'un module (requêtes groupées)."""
+    from django.db.models import Sum
+    from suiviEvaluation.models import MoyenneModule
+    from suiviEvaluation.services import est_admissible
+    from formations.duree_prevue_resolve import resolve_module_volume_contractuel_heures
+
+    participant_ids = [mp.participant_id for mp in inscriptions]
+    if not participant_ids:
+        return {}
+
+    moyennes_map = {
+        mm.participant_id: mm
+        for mm in MoyenneModule.objects.filter(module=module, participant_id__in=participant_ids)
+    }
+    presence_minutes = {
+        row['participant_id']: float(row['total'] or 0)
+        for row in Pointage.objects.filter(
+            session__module=module,
+            participant_id__in=participant_ids,
+            duree_presence_minutes__isnull=False,
+        ).values('participant_id').annotate(total=Sum('duree_presence_minutes'))
+    }
+    heures_prevues_cache = {}
+    default_heures_prevues, _ = resolve_module_volume_contractuel_heures(module)
+
+    resumes = {}
+    for mp in inscriptions:
+        pid = mp.participant_id
+        mm = moyennes_map.get(pid)
+        if mm is not None:
+            moyenne = float(mm.moyenne) if mm.moyenne is not None else None
+            heures_presence = float(mm.heures_presence)
+            heures_prevues = float(mm.heures_prevues)
+            taux = float(mm.taux_presence) if mm.taux_presence is not None else None
+        else:
+            moyenne = _moyenne_from_valeurs_map(valeurs_map.get(pid, {}))
+            participant = mp.participant
+            cat_key = (getattr(participant, 'categorie', None) or '').strip() or None
+            if cat_key not in heures_prevues_cache:
+                heures_prevues_cache[cat_key], _ = resolve_module_volume_contractuel_heures(
+                    module, participant=participant,
+                )
+            heures_prevues = heures_prevues_cache[cat_key] or default_heures_prevues
+            minutes = presence_minutes.get(pid, 0)
+            cap_minutes = heures_prevues * 60 if heures_prevues > 0 else 0
+            if cap_minutes > 0:
+                minutes = min(minutes, cap_minutes)
+            heures_presence = round(minutes / 60.0, 2)
+            taux = round((heures_presence / heures_prevues) * 100, 2) if heures_prevues > 0 else None
+
+        resumes[pid] = {
+            'moyenne': moyenne,
+            'heures_presence': heures_presence,
+            'heures_prevues': heures_prevues,
+            'taux_presence': taux,
+            'admissible': est_admissible(moyenne, taux, criteres),
+        }
+    return resumes
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def formation_list_api(request):
+    """
+    List modules (une ligne par module) with optional filtering.
+    Query params: statut, search, module, categorie, grade, secretariat_type, vague, groupe, actives, page, page_size, date_mode, date
+    """
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 50))
+
+    queryset, err = _filtered_modules_queryset(request)
+    if err:
+        return err
 
     today = timezone.localdate()
     queryset = queryset.annotate(
@@ -625,52 +769,19 @@ def formation_list_api(request):
         ),
     )
 
-    # Pagination
     total_count = queryset.count()
     start = (page - 1) * page_size
     end = start + page_size
     modules_page = queryset[start:end]
 
-    results = []
-    for m in modules_page:
-        f = m.formation
-        nb_p = m._nb_participants
-        nb_presents = m._nb_presents
-        superviseur = m.superviseur
-        creee_par = m.creee_par
-        results.append({
-            'id': f.id,
-            'module_id': m.id,
-            'numero_formation': f.numero_formation,
-            'formation': f.formation,
-            'intitule': f.formation,
-            'module': m.intitule,
-            'statut': m.statut,
-            'grade': m.grade,
-            'categorie': m.grade,
-            'groupe': m.groupe,
-            'vague': m.vague,
-            'site': (m.site.nom if m.site else (m.site_legacy or '')),
-            'site_id': m.site_id,
-            'batiment': m.batiment,
-            'salle': m.salle,
-            'date_debut': m.date_debut,
-            'date_fin': m.date_fin,
-            'date_debut_prevue': m.date_debut,
-            'date_fin_prevue': m.date_fin,
-            'secretariat': m.secretariat_id,
-            'secretariat_nom': m.secretariat.nom if m.secretariat else None,
-            'secretariat_type': m.secretariat.type_id if m.secretariat else None,
-            'secretariat_type_libelle': m.secretariat.type.libelle if m.secretariat and m.secretariat.type else None,
-            'superviseur': superviseur.id if superviseur else None,
-            'superviseur_nom': superviseur.get_full_name() if superviseur else None,
-            'creee_par': creee_par.id if creee_par else None,
-            'creee_par_nom': creee_par.get_full_name() if creee_par else None,
-            'nb_participants': nb_p,
-            'nb_presents': nb_presents,
-            'created_at': f.created_at,
-            'updated_at': f.updated_at,
-        })
+    results = [
+        _serialize_module_list_item(
+            m,
+            nb_participants=m._nb_participants,
+            nb_presents=m._nb_presents,
+        )
+        for m in modules_page
+    ]
 
     return Response({
         'results': results,
@@ -3443,6 +3554,9 @@ def module_detail_api(request, formation_pk, module_pk):
     except Module.DoesNotExist:
         return Response({'detail': 'Module introuvable.'}, status=404)
 
+    if not module_operational_accessible(request.user, module):
+        return Response({'detail': 'Module archivé ou non autorisé.'}, status=404)
+
     if request.method == 'GET':
         return Response(ModuleSerializer(module).data)
 
@@ -3525,6 +3639,62 @@ def module_detail_api(request, formation_pk, module_pk):
         return Response({'detail': 'Impossible de supprimer un module qui a des séances.'}, status=400)
     module.delete()
     return Response(status=204)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def module_archive_api(request, formation_pk, module_pk):
+    """Archive un module : masqué des listes opérationnelles, visible dans l'espace Archives."""
+    if not can_archive_module(request.user):
+        return Response({'detail': 'Action non autorisée.'}, status=403)
+
+    try:
+        formation = Formation.objects.get(pk=formation_pk)
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Formation.DoesNotExist:
+        return Response({'detail': 'Formation introuvable.'}, status=404)
+    except Module.DoesNotExist:
+        return Response({'detail': 'Module introuvable.'}, status=404)
+
+    if module.archived:
+        return Response({'detail': 'Ce module est déjà archivé.'}, status=400)
+
+    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if not request.user.secretariat or module.secretariat_id != request.user.secretariat_id:
+            return Response({'detail': 'Module hors de votre secrétariat.'}, status=403)
+
+    active_sessions = module.sessions.filter(
+        demarree_le__isnull=False,
+        terminee_le__isnull=True,
+    ).exists()
+    if active_sessions:
+        return Response(
+            {'detail': 'Impossible d\'archiver un module avec une séance en cours.'},
+            status=400,
+        )
+
+    now = timezone.now()
+    module.archived = True
+    module.archived_at = now
+    module.archived_by = request.user
+    module.save(update_fields=['archived', 'archived_at', 'archived_by'])
+
+    _log_audit(
+        action=AuditLog.Action.MODULE_ARCHIVE,
+        request=request,
+        formation=formation,
+        extra={
+            'module_id': module.pk,
+            'module_intitule': module.intitule,
+            'formation_id': formation.pk,
+        },
+    )
+
+    return Response({
+        'detail': 'Module archivé avec succès.',
+        'archived': True,
+        'archived_at': module.archived_at,
+    })
 
 
 def module_presences_cache_key(module_pk):
@@ -3661,6 +3831,9 @@ def module_full_detail_api(request, formation_pk, module_pk):
     except Module.DoesNotExist:
         return Response({'detail': 'Module introuvable.'}, status=404)
 
+    if not module_operational_accessible(request.user, module):
+        return Response({'detail': 'Module archivé ou non autorisé.'}, status=404)
+
     from .serializers import SessionSerializer, ParticipantSerializer
     from presences.models import Pointage
     from .duree_prevue_resolve import (
@@ -3756,6 +3929,7 @@ def module_full_detail_api(request, formation_pk, module_pk):
         'superviseur_nom': module.superviseur.get_full_name() if module.superviseur else None,
         'nb_participants': len(participants),
         'nb_presents': nb_presents,
+        'archived': module.archived,
         'sessions': SessionSerializer(sessions, many=True).data,
         'participants': ParticipantSerializer(
             [fp.participant for fp in participants], many=True
@@ -3811,15 +3985,17 @@ def module_notes_list_api(request, formation_pk, module_pk):
         for s in NoteModuleSynthese.objects.filter(module=module).select_related('saisie_par')
     }
 
-    from suiviEvaluation.services import resume_module_participant, _get_parametres
+    from suiviEvaluation.services import _get_parametres
 
     criteres = _get_parametres(module.formation)
+    inscriptions_list = list(inscriptions)
+    resumes_map = _batch_resume_module_participants(module, inscriptions_list, valeurs_map, criteres)
 
     rows = []
-    for mp in inscriptions:
+    for mp in inscriptions_list:
         p = mp.participant
         synthese = syntheses_map.get(p.id)
-        resume = resume_module_participant(module, p)
+        resume = resumes_map.get(p.id, {})
         notes_by_colonne = {}
         for cid in colonne_ids:
             val = valeurs_map.get(p.id, {}).get(cid)

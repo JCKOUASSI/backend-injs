@@ -17,7 +17,7 @@ from presences.models import AuditLog, _log_audit
 
 User = get_user_model()
 
-from authentication.role_groups import DUAL_ACCESS_ROLES, ALLOWED_WEB_ROLES
+from authentication.role_groups import DUAL_ACCESS_ROLES, ALLOWED_WEB_ROLES, get_user_role, user_in_roles
 
 
 # ──────────────────────────────────────────────
@@ -25,13 +25,13 @@ from authentication.role_groups import DUAL_ACCESS_ROLES, ALLOWED_WEB_ROLES
 # ──────────────────────────────────────────────
 
 def login_view(request):
-    if request.user.is_authenticated and request.user.role in ALLOWED_WEB_ROLES:
+    if request.user.is_authenticated and user_in_roles(request.user, ALLOWED_WEB_ROLES):
         return redirect('web-dashboard')
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
         user = authenticate(request, username=username, password=password)
-        if user and user.role in ALLOWED_WEB_ROLES:
+        if user and user_in_roles(user, ALLOWED_WEB_ROLES):
             login(request, user)
             _log_audit(
                 action=AuditLog.Action.USER_LOGIN,
@@ -39,7 +39,7 @@ def login_view(request):
                 cible_type='user',
                 cible_numero=user.username,
                 cible_nom=user.get_full_name() or user.username,
-                extra={'role': user.role, 'via': 'web_dashboard'},
+                extra={'role': get_user_role(user), 'via': 'web_dashboard'},
             )
             return redirect('web-dashboard')
         elif user:

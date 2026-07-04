@@ -207,6 +207,10 @@
             <div id="token-ready" class="alert alert-success py-2 mb-3" style="display:none;">
                 <i class="bi bi-check-circle me-1"></i> QR code détecté — entrez votre numéro et badgez.
             </div>
+            <p class="text-muted small mb-3">
+                <i class="bi bi-geo-alt me-1"></i>
+                Votre position sera demandée au navigateur pour enregistrer le badgeage.
+            </p>
             <button type="submit" class="btn btn-scan" id="btn-submit">
                 <i class="bi bi-check2-circle me-2"></i>Badger
             </button>
@@ -370,6 +374,38 @@
     }
 
     // ════════════════════════════════════════════
+    // Géolocalisation (consentement navigateur)
+    // ════════════════════════════════════════════
+    function captureGeolocation() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve({ latitude: null, longitude: null, accuracy_m: null });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy_m: pos.coords.accuracy,
+                }),
+                () => resolve({ latitude: null, longitude: null, accuracy_m: null }),
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+            );
+        });
+    }
+
+    function appendGeolocation(formData, geo) {
+        if (geo.latitude != null && geo.longitude != null) {
+            formData.latitude = geo.latitude;
+            formData.longitude = geo.longitude;
+            if (geo.accuracy_m != null) {
+                formData.accuracy_m = geo.accuracy_m;
+            }
+        }
+        return formData;
+    }
+
+    // ════════════════════════════════════════════
     // Synchronisation des scans hors ligne
     // ════════════════════════════════════════════
     let syncing = false;
@@ -381,14 +417,20 @@
             const scans = await getOfflineScans();
             for (const scan of scans) {
                 try {
+                    const payload = {
+                        token_qr: scan.token_qr,
+                        numero_participant: scan.numero_participant,
+                        device_id: scan.device_id,
+                    };
+                    if (scan.latitude != null && scan.longitude != null) {
+                        payload.latitude = scan.latitude;
+                        payload.longitude = scan.longitude;
+                        if (scan.accuracy_m != null) payload.accuracy_m = scan.accuracy_m;
+                    }
                     const resp = await fetch('/api/scan/', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            token_qr: scan.token_qr,
-                            numero_participant: scan.numero_participant,
-                            device_id: scan.device_id,
-                        }),
+                        body: JSON.stringify(payload),
                     });
                     if (resp.ok || resp.status === 400 || resp.status === 404 || resp.status === 403) {
                         await deleteOfflineScan(scan.id);
@@ -595,15 +637,19 @@
         };
     });
 
-    function doBadge() {
+    async function doBadge() {
         btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Localisation…';
+
+        const geo = await captureGeolocation();
         btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Envoi...';
 
-        const formData = {
+        let formData = {
             token_qr: document.getElementById('token_qr').value.trim(),
             numero_participant: document.getElementById('numero_participant').value.trim(),
             device_id: 'WEB_BADGE',
         };
+        formData = appendGeolocation(formData, geo);
 
         if (!navigator.onLine) {
             handleOfflineScan(formData);
@@ -696,6 +742,9 @@
             numero_participant: formData.numero_participant,
             device_id: 'OFFLINE_WEB',
             timestamp_local: new Date().toISOString(),
+            latitude: formData.latitude ?? null,
+            longitude: formData.longitude ?? null,
+            accuracy_m: formData.accuracy_m ?? null,
         });
         await updateQueueCount();
 

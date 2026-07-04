@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
+import TripleConfirmModal from '../components/TripleConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
 import { fmtHeuresLabel, fmtEdtVsObjectif, sessionDureeHeures, sommeSeancesHeures, sessionNumeroLabel, nextSessionNumeroForDate } from '../utils/duree'
@@ -12,7 +13,7 @@ import { useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
 import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
-import { canMutateFormations, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROLES } from '../utils/roles'
+import { canMutateFormations, canArchiveModuleFromUser, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROLES } from '../utils/roles'
 import { formatApiErrors } from '../utils/apiErrors'
 import { useReferentiels } from '../hooks/useReferentiels'
 import { useVisibilityPolling } from '../hooks/useVisibilityPolling'
@@ -35,6 +36,7 @@ export default function ModuleDetail() {
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [archiveOpen, setArchiveOpen] = useState(false)
   const [startingSession, setStartingSession] = useState(null)
   const [stoppingSession, setStoppingSession] = useState(null)
   const [editSession, setEditSession] = useState(null)
@@ -103,6 +105,7 @@ export default function ModuleDetail() {
   const canSupervise = canSuperviseSessions(user?.role)
   const canManageSessions = canMutateFormations(user?.role)
   const canManageModule = canMutateFormations(user?.role)
+  const canArchive = canArchiveModuleFromUser(user)
 
   useEffect(() => { loadModule() }, [formationId, moduleId])
   useEffect(() => {
@@ -175,6 +178,17 @@ export default function ModuleDetail() {
         catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
       }
     })
+  }
+
+  const confirmArchiveModule = async () => {
+    setArchiveOpen(false)
+    try {
+      await api.post(`/formations/${formationId}/modules/${moduleId}/archive/`)
+      showToast('Module archivé — visible uniquement dans l\'espace Archives')
+      backToModulesList()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors de l\'archivage', 'error')
+    }
   }
 
   const openEditSession = (s) => {
@@ -542,6 +556,15 @@ export default function ModuleDetail() {
             >
               <i className="bi bi-clipboard-check me-1"></i>Décisions
             </Link>
+            )}
+            {canArchive && !module.archived && (
+              <button
+                onClick={() => setArchiveOpen(true)}
+                className="btn btn-warning btn-sm"
+                title="Archiver ce module (3 confirmations)"
+              >
+                <i className="bi bi-archive me-1"></i>Archiver
+              </button>
             )}
             <button
               onClick={() => handleExportAllSeances('pdf')}
@@ -1767,6 +1790,15 @@ export default function ModuleDetail() {
           detail={confirmDialog.detail}
           onConfirm={() => { setConfirmDialog(null); confirmDialog.onConfirm() }}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {archiveOpen && module && (
+        <TripleConfirmModal
+          title="Archivage du module"
+          subject={module.intitule}
+          onConfirm={confirmArchiveModule}
+          onCancel={() => setArchiveOpen(false)}
         />
       )}
 

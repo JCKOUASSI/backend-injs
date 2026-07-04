@@ -4,6 +4,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import QRCodeModal from '../components/QRCodeModal'
 import ConfirmModal from '../components/ConfirmModal'
+import TripleConfirmModal from '../components/TripleConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
 import { fmtHeuresLabel, sommeSeancesHeures, sessionNumeroLabel, nextSessionNumeroForDate } from '../utils/duree'
@@ -14,6 +15,7 @@ import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
 import {
   canMutateFormations,
+  canArchiveModuleFromUser,
   canPresenceAction,
   canSuperviseSessions,
   canViewPresences,
@@ -88,6 +90,7 @@ export default function FormationDetail() {
 
   const { showToast } = useToast()
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
 
   const participantsPager = useClientPagination(participants, TABLE_PAGE_SIZE, [id, participants.length])
   const formateursPager = useClientPagination(formateurs, TABLE_PAGE_SIZE, [id, formateurs.length])
@@ -528,12 +531,26 @@ export default function FormationDetail() {
     } finally { setSavingSession(false) }
   }
 
+  const confirmArchiveModule = async () => {
+    const target = archiveTarget
+    if (!target) return
+    setArchiveTarget(null)
+    try {
+      await api.post(`/formations/${id}/modules/${target.moduleId}/archive/`)
+      showToast('Module archivé — visible uniquement dans l\'espace Archives')
+      loadFormationData()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors de l\'archivage', 'error')
+    }
+  }
+
   const getStatutBadge = (s) => ({ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[s] || 'badge-info')
   const getStatutLabel = (s) => ({ 'PLANIFIEE': 'Planifié', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminé', 'SUSPENDUE': 'Suspendu' }[s] || s)
 
   const canEdit = canMutateFormations(user?.role)
   const canSupervise = canSuperviseSessions(user?.role)
   const canManageSessions = canMutateFormations(user?.role)
+  const canArchive = canArchiveModuleFromUser(user)
   const canImport = user?.role === 'SECRETARIAT'
   const canViewPresencesTab = canViewPresences(user?.role)
 
@@ -1154,14 +1171,26 @@ export default function FormationDetail() {
                       {moduleSessions.length} séance{moduleSessions.length > 1 ? 's' : ''}
                     </span>
                   </span>
-                  <Link
-                    to={`/formations/${id}/modules/${moduleKey}`}
-                    state={listNavState}
-                    className="btn btn-outline-secondary btn-sm"
-                    title="Détail du module"
-                  >
-                    <i className="bi bi-arrow-right"></i>
-                  </Link>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {canArchive && moduleKey !== 'Sans module' && (
+                      <button
+                        type="button"
+                        className="btn btn-warning btn-sm"
+                        title="Archiver ce module (3 confirmations)"
+                        onClick={() => setArchiveTarget({ moduleId: moduleKey, label: moduleLabel })}
+                      >
+                        <i className="bi bi-archive me-1"></i>Archiver
+                      </button>
+                    )}
+                    <Link
+                      to={`/formations/${id}/modules/${moduleKey}`}
+                      state={listNavState}
+                      className="btn btn-outline-secondary btn-sm"
+                      title="Détail du module"
+                    >
+                      <i className="bi bi-arrow-right"></i>
+                    </Link>
+                  </div>
                 </div>
                 <div className="card-body-flush">
                   <div className="table-container">
@@ -1422,6 +1451,15 @@ export default function FormationDetail() {
           confirmLabel={confirmDialog.confirmLabel}
           onConfirm={() => { setConfirmDialog(null); confirmDialog.onConfirm() }}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {archiveTarget && (
+        <TripleConfirmModal
+          title="Archivage du module"
+          subject={archiveTarget.label}
+          onConfirm={confirmArchiveModule}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
 

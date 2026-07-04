@@ -33,7 +33,7 @@ function CahierAppelDocument({ module, onBack }) {
   const fetchData = useCallback(async (signal) => {
     setLoading(true)
     try {
-      const res = await api.get(`/formations/${formationId}/modules/${moduleId}/full/`, signal ? { signal } : {})
+      const res = await api.get(`/formations/${formationId}/modules/${moduleId}/archives/cahier/`, signal ? { signal } : {})
       setSessions((res.data.sessions || []).slice().sort((a, b) =>
         (a.date || '').localeCompare(b.date || '') || (a.numero || 0) - (b.numero || 0)
       ))

@@ -104,6 +104,12 @@ export const FORMATION_MUTATION_ROLES = [
   'SECRETARIAT',
 ]
 
+/** Archivage de modules (masqués des listes opérationnelles). */
+export const MODULE_ARCHIVE_ROLES = [
+  ...FORMATION_MUTATION_ROLES,
+  'DIRECTION',
+]
+
 /** POST /formations/participants/ — secrétariat exclu (role_groups exclude add_participant). */
 export const PARTICIPANT_CREATE_ROLES = [...ADMIN_LEVEL_ROLES]
 
@@ -154,6 +160,17 @@ export function isAdminLevelRole(role) {
 
 export function canMutateFormations(role) {
   return FORMATION_MUTATION_ROLES.includes(role)
+}
+
+export function canArchiveModule(role) {
+  return MODULE_ARCHIVE_ROLES.includes(role)
+}
+
+/** Archivage module — role_context API en priorité, sinon rôle effectif. */
+export function canArchiveModuleFromUser(user) {
+  if (!user) return false
+  if (user.role_context?.can_archive_modules === true) return true
+  return canArchiveModule(user.role)
 }
 
 export function canCreateParticipant(role) {

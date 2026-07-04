@@ -18,8 +18,16 @@ from .serializers import (
     LoginSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, ROLE_HIERARCHY, get_creatable_roles
-from .role_groups import ALLOWED_WEB_ROLES, user_role_context, get_user_role, user_has_perm, user_in_roles
+from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, get_creatable_roles
+from .role_groups import (
+    ALLOWED_WEB_ROLES,
+    ROLE_GROUP_NAMES,
+    user_role_context,
+    get_user_role,
+    user_has_perm,
+    user_in_roles,
+    users_with_roles,
+)
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
 from presences.models import DeviceBinding, AuditLog, _log_audit
@@ -233,11 +241,15 @@ def change_password_view(request):
 
 def _staff_users_queryset(user):
     """Utilisateurs visibles/gérables par un compte personnel (hors auto-gestion)."""
-    subordinates = get_creatable_roles(user.role)
-    qs = User.objects.filter(role__in=subordinates)
-    if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+    actor_role = get_user_role(user)
+    subordinates = get_creatable_roles(actor_role)
+    qs = users_with_roles(subordinates)
+    if actor_role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         # Encadrants : assignables sur tout secrétariat, donc listés globalement.
-        qs = qs.filter(Q(role=User.Role.ENCADRANT) | Q(secretariat=user.secretariat))
+        qs = qs.filter(
+            Q(groups__name=ROLE_GROUP_NAMES[User.Role.ENCADRANT])
+            | Q(secretariat=user.secretariat)
+        ).distinct()
     return qs
 
 
@@ -303,15 +315,21 @@ class UserListCreateView(generics.ListCreateAPIView):
             )
         role = self.request.query_params.get('role')
         if role:
-            qs = qs.filter(role=role)
+            group_name = ROLE_GROUP_NAMES.get(role)
+            if group_name:
+                qs = qs.filter(groups__name=group_name)
         exclude_role = self.request.query_params.get('exclude_role')
         if exclude_role:
             for role_code in exclude_role.split(','):
                 role_code = role_code.strip()
-                if role_code in ROLE_HIERARCHY:
-                    qs = qs.exclude(role=role_code)
-        if user.role == 'DIRECTION':
-            qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
+                group_name = ROLE_GROUP_NAMES.get(role_code)
+                if group_name:
+                    qs = qs.exclude(groups__name=group_name)
+        if get_user_role(user) == 'DIRECTION':
+            for mobile_role in ('AUDITEUR', 'FORMATEUR'):
+                group_name = ROLE_GROUP_NAMES.get(mobile_role)
+                if group_name:
+                    qs = qs.exclude(groups__name=group_name)
         return qs
 
     def get_serializer_class(self):
@@ -323,8 +341,9 @@ class UserListCreateView(generics.ListCreateAPIView):
         user = self.request.user
         plain_password = serializer.validated_data.get('password', '')
         role = serializer.validated_data.get('role')
+        actor_role = get_user_role(user)
         if (
-            user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT')
+            actor_role in ('SECRETARIAT', 'CHEF_SECRETARIAT')
             and user.secretariat
             and role not in USER_ROLES_WITHOUT_SECRETARIAT
         ):
@@ -347,7 +366,7 @@ class UserListCreateView(generics.ListCreateAPIView):
             cible_type='user',
             cible_numero=new_user.username,
             cible_nom=new_user.get_full_name() or new_user.username,
-            extra={'role': new_user.role, 'secretariat': str(new_user.secretariat) if new_user.secretariat else None},
+            extra={'role': get_user_role(new_user), 'secretariat': str(new_user.secretariat) if new_user.secretariat else None},
         )
 
 
@@ -425,8 +444,11 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         user = self.request.user
         qs = _staff_users_queryset(user)
-        if user.role == 'DIRECTION':
-            qs = qs.exclude(role__in=['AUDITEUR', 'FORMATEUR'])
+        if get_user_role(user) == 'DIRECTION':
+            for mobile_role in ('AUDITEUR', 'FORMATEUR'):
+                group_name = ROLE_GROUP_NAMES.get(mobile_role)
+                if group_name:
+                    qs = qs.exclude(groups__name=group_name)
         return qs
 
     def get_serializer_class(self):
@@ -442,7 +464,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             cible_type='user',
             cible_numero=instance.username,
             cible_nom=instance.get_full_name() or instance.username,
-            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+            extra={'role': get_user_role(instance), 'secretariat': str(instance.secretariat) if instance.secretariat else None},
         )
 
     def destroy(self, request, *args, **kwargs):
@@ -458,6 +480,6 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             cible_type='user',
             cible_numero=instance.username,
             cible_nom=instance.get_full_name() or instance.username,
-            extra={'role': instance.role, 'secretariat': str(instance.secretariat) if instance.secretariat else None},
+            extra={'role': get_user_role(instance), 'secretariat': str(instance.secretariat) if instance.secretariat else None},
         )
         return super().destroy(request, *args, **kwargs)

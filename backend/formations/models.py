@@ -659,6 +659,20 @@ class Module(models.Model):
         help_text="Utilisateur ayant créé le module",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    archived = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Module archivé : visible uniquement dans l'espace Archives.",
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    archived_by = models.ForeignKey(
+        'authentication.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='modules_archives',
+        help_text="Utilisateur ayant archivé le module",
+    )
 
     class Meta:
         ordering = ['ordre', 'intitule']

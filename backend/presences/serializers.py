@@ -44,6 +44,9 @@ class ScanSerializer(serializers.Serializer):
     token_qr = serializers.UUIDField()
     numero_participant = serializers.CharField(max_length=50)
     device_id = serializers.CharField(max_length=255, required=False, default='')
+    latitude = serializers.FloatField(required=False)
+    longitude = serializers.FloatField(required=False)
+    accuracy_m = serializers.FloatField(required=False)
 
 
 class ScanResponseSerializer(serializers.Serializer):
