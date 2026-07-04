@@ -124,11 +124,6 @@ async function replayOfflineScans() {
                     token_qr: scan.token_qr,
                     numero_participant: scan.numero_participant,
                     device_id: scan.device_id || 'OFFLINE_SYNC',
-                    ...(scan.latitude != null && scan.longitude != null ? {
-                        latitude: scan.latitude,
-                        longitude: scan.longitude,
-                        ...(scan.accuracy_m != null ? { accuracy_m: scan.accuracy_m } : {}),
-                    } : {}),
                 }),
             });
             if (response.ok || response.status === 400 || response.status === 404) {

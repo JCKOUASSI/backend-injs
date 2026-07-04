@@ -208,8 +208,8 @@
                 <i class="bi bi-check-circle me-1"></i> QR code détecté — entrez votre numéro et badgez.
             </div>
             <p class="text-muted small mb-3">
-                <i class="bi bi-geo-alt me-1"></i>
-                Votre position sera demandée au navigateur pour enregistrer le badgeage.
+                <i class="bi bi-info-circle me-1"></i>
+                Entrée puis sortie : un badgeage par action sur la séance en cours.
             </p>
             <button type="submit" class="btn btn-scan" id="btn-submit">
                 <i class="bi bi-check2-circle me-2"></i>Badger
@@ -374,38 +374,6 @@
     }
 
     // ════════════════════════════════════════════
-    // Géolocalisation (consentement navigateur)
-    // ════════════════════════════════════════════
-    function captureGeolocation() {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                resolve({ latitude: null, longitude: null, accuracy_m: null });
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                    accuracy_m: pos.coords.accuracy,
-                }),
-                () => resolve({ latitude: null, longitude: null, accuracy_m: null }),
-                { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-            );
-        });
-    }
-
-    function appendGeolocation(formData, geo) {
-        if (geo.latitude != null && geo.longitude != null) {
-            formData.latitude = geo.latitude;
-            formData.longitude = geo.longitude;
-            if (geo.accuracy_m != null) {
-                formData.accuracy_m = geo.accuracy_m;
-            }
-        }
-        return formData;
-    }
-
-    // ════════════════════════════════════════════
     // Synchronisation des scans hors ligne
     // ════════════════════════════════════════════
     let syncing = false;
@@ -422,11 +390,6 @@
                         numero_participant: scan.numero_participant,
                         device_id: scan.device_id,
                     };
-                    if (scan.latitude != null && scan.longitude != null) {
-                        payload.latitude = scan.latitude;
-                        payload.longitude = scan.longitude;
-                        if (scan.accuracy_m != null) payload.accuracy_m = scan.accuracy_m;
-                    }
                     const resp = await fetch('/api/scan/', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -587,7 +550,14 @@
                 const roleTag = info.type_personne === 'formateur'
                     ? '<span style="background:#e0f2fe;color:#0369a1;border-radius:4px;padding:1px 7px;font-size:0.78rem;font-weight:700;margin-left:6px;">Formateur</span>'
                     : '';
-                if (info.statut === 'EN_SALLE') {
+                if (info.statut === 'NON_AUTORISE') {
+                    confirmTitle.textContent = 'Badgeage refusé';
+                    confirmIcon.innerHTML = '&#x26A0;&#xFE0F;';
+                    confirmOk.disabled = true;
+                    confirmOkLabel.textContent = 'Fermer';
+                    statusBadge.className = 'confirm-status-badge status-termine';
+                    statusBadge.innerHTML = `<span class="status-icon">&#x274C;</span><span>${info.detail || 'Auditeur non autorisé pour ce module.'}</span>`;
+                } else if (info.statut === 'EN_SALLE') {
                     // Déjà en salle → prochaine action = SORTIE
                     confirmTitle.textContent = 'Enregistrer la sortie';
                     confirmIcon.innerHTML = '&#x1F44B;';
@@ -633,23 +603,21 @@
 
         confirmOk.onclick = function() {
             confirmOverlay.style.display = 'none';
-            doBadge();
+            if (!confirmOk.disabled) {
+                doBadge();
+            }
         };
     });
 
     async function doBadge() {
         btnSubmit.disabled = true;
-        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Localisation…';
-
-        const geo = await captureGeolocation();
         btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Envoi...';
 
-        let formData = {
+        const formData = {
             token_qr: document.getElementById('token_qr').value.trim(),
             numero_participant: document.getElementById('numero_participant').value.trim(),
             device_id: 'WEB_BADGE',
         };
-        formData = appendGeolocation(formData, geo);
 
         if (!navigator.onLine) {
             handleOfflineScan(formData);
@@ -742,9 +710,6 @@
             numero_participant: formData.numero_participant,
             device_id: 'OFFLINE_WEB',
             timestamp_local: new Date().toISOString(),
-            latitude: formData.latitude ?? null,
-            longitude: formData.longitude ?? null,
-            accuracy_m: formData.accuracy_m ?? null,
         });
         await updateQueueCount();
 
