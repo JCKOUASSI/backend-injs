@@ -3,8 +3,8 @@ from datetime import time, timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from .models import Formation, Module, SessionModule, QRToken
-from .session_views import (
+from ..models import Formation, Module, SessionModule, QRToken
+from ..session_views import (
     _auto_manage_sessions,
     reactiver_session_et_qr,
     reactiver_sessions_en_lot,

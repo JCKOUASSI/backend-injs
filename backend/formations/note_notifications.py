@@ -32,6 +32,8 @@ def notifier_modification_note(modificateur, participant, module, colonne, ancie
     """
     if not _is_admin_modificateur(modificateur):
         return
+    if ancienne_note is None:
+        return
     if _notes_egales(ancienne_note, nouvelle_note):
         return
 
