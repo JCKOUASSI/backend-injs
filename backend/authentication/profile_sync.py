@@ -99,16 +99,59 @@ def _sync_formateur_user_link(user):
         formateur.secretariats.add(user.secretariat)
 
 
+def _update_participant_from_user(participant, user):
+    """Aligne les champs profil de la fiche sur le compte + le matricule du compte sur la fiche."""
+    updates = []
+    if participant.user_id != user.id:
+        participant.user = user
+        updates.append('user')
+    nom = (user.last_name or '').strip() or '—'
+    prenom = (user.first_name or '').strip() or '—'
+    if participant.nom != nom:
+        participant.nom = nom
+        updates.append('nom')
+    if participant.prenom != prenom:
+        participant.prenom = prenom
+        updates.append('prenom')
+    if participant.email != (user.email or ''):
+        participant.email = user.email or ''
+        updates.append('email')
+    if participant.telephone != (user.telephone or ''):
+        participant.telephone = user.telephone or ''
+        updates.append('telephone')
+    if participant.secretariat_id != getattr(user.secretariat, 'pk', None):
+        participant.secretariat = user.secretariat
+        updates.append('secretariat')
+    if updates:
+        participant.save(update_fields=updates)
+    # Le matricule de la fiche fait foi : on aligne le compte dessus (jamais l'inverse).
+    if participant.matricule and (user.matricule or '').strip() != participant.matricule:
+        User.objects.filter(pk=user.pk).update(matricule=participant.matricule)
+        user.matricule = participant.matricule
+
+
 def _sync_auditeur_user_link(user):
-    """Lie le compte AUDITEUR à un profil Participant, ou le crée s'il n'existe pas."""
+    """Lie le compte AUDITEUR à un profil Participant, ou le crée s'il n'existe pas.
+
+    La fiche déjà rattachée au compte (``user_id``) fait autorité : on ne la
+    délie jamais et on ne crée pas de doublon vide, même si le matricule/username
+    du compte a un format différent (ex. « OPH-1 » vs « OPH1 »). C'est ce qui
+    évitait auparavant qu'un simple écart de format fasse perdre l'inscription
+    aux modules lors du badgeage.
+    """
     from formations.models import Participant
 
     if user.role != User.Role.AUDITEUR:
         return
 
+    # 1. Fiche déjà liée au compte : autorité, on l'aligne et on s'arrête.
+    linked = Participant.objects.filter(user=user).first()
+    if linked is not None:
+        _update_participant_from_user(linked, user)
+        return
+
     matricule = _ensure_user_matricule(user)
     if not matricule:
-        Participant.objects.filter(user=user).update(user=None)
         logger.warning(
             'sync_auditeur_skipped user_id=%s username=%s reason=missing_matricule',
             user.pk,
@@ -116,8 +159,7 @@ def _sync_auditeur_user_link(user):
         )
         return
 
-    Participant.objects.filter(user=user).exclude(matricule__iexact=matricule).update(user=None)
-
+    # 2. Fiche existante par matricule (non liée à un autre compte).
     participant = Participant.objects.filter(matricule__iexact=matricule).first()
     if participant:
         if participant.user_id not in (None, user.id):
@@ -129,34 +171,10 @@ def _sync_auditeur_user_link(user):
                 participant.pk,
             )
             return
-        updates = []
-        if participant.user_id != user.id:
-            participant.user = user
-            updates.append('user')
-        nom = (user.last_name or '').strip() or '—'
-        prenom = (user.first_name or '').strip() or '—'
-        if participant.nom != nom:
-            participant.nom = nom
-            updates.append('nom')
-        if participant.prenom != prenom:
-            participant.prenom = prenom
-            updates.append('prenom')
-        if participant.email != (user.email or ''):
-            participant.email = user.email or ''
-            updates.append('email')
-        if participant.telephone != (user.telephone or ''):
-            participant.telephone = user.telephone or ''
-            updates.append('telephone')
-        if participant.secretariat_id != getattr(user.secretariat, 'pk', None):
-            participant.secretariat = user.secretariat
-            updates.append('secretariat')
-        if updates:
-            participant.save(update_fields=updates)
-        if participant.matricule and (user.matricule or '').strip() != participant.matricule:
-            User.objects.filter(pk=user.pk).update(matricule=participant.matricule)
-            user.matricule = participant.matricule
+        _update_participant_from_user(participant, user)
         return
 
+    # 3. Aucun profil connu : on crée la fiche.
     Participant.objects.create(
         matricule=matricule,
         nom=(user.last_name or '').strip() or '—',

@@ -874,14 +874,16 @@ def secure_scan_view(request):
                 status=status.HTTP_403_FORBIDDEN,
             )
     else:
-        if not ModuleParticipant.objects.filter(
-            module=seance.module, participant=personne
-        ).exists():
+        from .participant_scope import participant_for_module
+        inscrit = participant_for_module(user, seance.module)
+        if inscrit is None:
             return Response(
                 {'code': 'NOT_IN_LIST',
                  'detail': 'Vous n\'êtes pas inscrit(e) à ce module.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # On badge sur la fiche réellement inscrite (gère un compte rattaché à une autre fiche).
+        personne = inscrit
 
     personne_data = {
         'numero': (
@@ -1197,8 +1199,11 @@ def secure_scan_heartbeat(request):
         if seance.module.superviseur_id != personne.id:
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas encadrant de ce module."}, status=status.HTTP_403_FORBIDDEN)
     else:
-        if not ModuleParticipant.objects.filter(module=seance.module, participant=personne).exists():
+        from .participant_scope import participant_for_module
+        inscrit = participant_for_module(user, seance.module)
+        if inscrit is None:
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas inscrit(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
+        personne = inscrit
 
     today = timezone.localdate()
     session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
@@ -3019,6 +3024,14 @@ def secure_check_badge_status(request):
         return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
 
     formation = seance.module.formation
+
+    # Aligne sur la fiche réellement inscrite au module (compte rattaché à une autre fiche).
+    if type_str == 'participant':
+        from .participant_scope import participant_for_module
+        inscrit = participant_for_module(user, seance.module)
+        if inscrit is not None:
+            personne = inscrit
+
     today = timezone.localdate()
     session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
     session_filter['session'] = seance

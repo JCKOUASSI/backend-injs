@@ -167,6 +167,10 @@ class NotificationRapport(models.Model):
     class Evenement(models.TextChoices):
         MODIFIE  = 'MODIFIE',  'Rapport modifié'
         SUPPRIME = 'SUPPRIME', 'Rapport supprimé'
+        SOUMIS   = 'SOUMIS',   'Rapport soumis à validation'
+        VALIDE   = 'VALIDE',   'Rapport validé'
+        PUBLIE   = 'PUBLIE',   'Rapport publié'
+        REJETE   = 'REJETE',   'Rapport rejeté'
 
     destinataire  = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -10,6 +10,8 @@ from .api_views import (
     module_assign_superviseur,
     module_notes_list_api, module_notes_bulk_api,
     module_notes_colonnes_api, module_notes_colonne_delete_api,
+    note_modifications_notifications_api,
+    finance_ajustements_notifications_api,
     ref_type_secretariat_list, ref_type_secretariat_detail,
 )
 
@@ -75,6 +77,7 @@ urlpatterns = [
     path('finance/ajustements/', api_views.finance_ajustements_api, name='api-finance-ajustements'),
     path('finance/ajustements/<int:pk>/valider/', api_views.finance_ajustement_valider_api, name='api-finance-ajustement-valider'),
     path('finance/ajustements/<int:pk>/rejeter/', api_views.finance_ajustement_rejeter_api, name='api-finance-ajustement-rejeter'),
+    path('finance/notifications/', finance_ajustements_notifications_api, name='api-finance-ajustements-notifications'),
     
     # Référentiels (listes déroulantes)
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
@@ -119,6 +122,7 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/notes/bulk/', module_notes_bulk_api, name='api-module-notes-bulk'),
     path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/', module_notes_colonnes_api, name='api-module-notes-colonnes'),
     path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/<int:colonne_pk>/', module_notes_colonne_delete_api, name='api-module-notes-colonne-delete'),
+    path('notes/notifications/', note_modifications_notifications_api, name='api-note-modifications-notifications'),
 
     # Session management (via module)
     path('<int:formation_pk>/sessions/', session_views.session_list, name='api-session-list'),

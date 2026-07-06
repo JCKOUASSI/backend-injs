@@ -4,6 +4,7 @@ import logo from './assets/logo.png'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { hasAppRole } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
+import AppNotificationsBell from './components/AppNotificationsBell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Formations from './pages/Formations'
@@ -100,6 +101,9 @@ function Layout({ children, breadcrumb }) {
   const canViewEvaluations = EVALUATION_ALLOWED_ROLES.includes(user?.role)
   const canViewReferentiels = ADMIN_LEVEL_ROLES.includes(user?.role)
   const canViewStatistiques = STATS_ALLOWED_ROLES.includes(user?.role)
+  const isDirection = user?.role === 'DIRECTION'
+  const canViewFinanceNotifications = FINANCE_MODULE_ROLES.includes(user?.role) && user?.role !== 'ARCHIVE'
+  const showAppNotifications = isDirection || canViewStatistiques || canViewFinanceNotifications
 
   const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
@@ -261,10 +265,19 @@ function Layout({ children, breadcrumb }) {
               </ol>
             </nav>
           </div>
-          <Link to="/profile" className="top-bar-user" title="Mon profil" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <span className="text-muted small">{fullName}</span>
-            <div className="user-avatar">{userInitials}</div>
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {showAppNotifications && (
+              <AppNotificationsBell
+                showNotes={isDirection}
+                showRapports={canViewStatistiques}
+                showFinance={canViewFinanceNotifications}
+              />
+            )}
+            <Link to="/profile" className="top-bar-user" title="Mon profil" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <span className="text-muted small">{fullName}</span>
+              <div className="user-avatar">{userInitials}</div>
+            </Link>
+          </div>
         </div>
         <div className="page-content">
           {children}

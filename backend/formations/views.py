@@ -671,9 +671,44 @@ def qr_image(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    qr_token = QRToken.objects.filter(
-        session__module__formation=formation, actif=True
-    ).first()
+    # Le QR est scopé à une séance/module. Si une séance (ou un module) est
+    # fournie, on la résout explicitement pour éviter de servir le QR d'un
+    # autre groupe. Sinon, on n'autorise l'image « formation » que s'il
+    # existe une seule séance avec un QR actif (formation mono-groupe).
+    session_id = request.query_params.get('session_id')
+    module_id = request.query_params.get('module_id')
+
+    if session_id or module_id:
+        session, err = get_session_for_qr(
+            formation=formation,
+            session_id=session_id,
+            module_id=module_id,
+        )
+        if err:
+            return err
+        qr_token = (
+            QRToken.objects.filter(session=session, actif=True)
+            .order_by('-created_at')
+            .first()
+        )
+    else:
+        active_tokens = QRToken.objects.filter(
+            session__module__formation=formation, actif=True
+        ).order_by('-created_at')
+        distinct_sessions = {t.session_id for t in active_tokens}
+        if len(distinct_sessions) > 1:
+            return Response(
+                {
+                    'code': 'QR_AMBIGUOUS',
+                    'detail': (
+                        'Plusieurs groupes ont un QR actif. Précisez la séance '
+                        '(session_id) ou utilisez l\'URL par séance '
+                        '/formations/<pk>/sessions/<session_pk>/qr-image/.'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        qr_token = active_tokens.first()
 
     if not qr_token or not qr_token.is_valid:
         return Response(

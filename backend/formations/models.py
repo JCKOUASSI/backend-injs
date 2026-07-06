@@ -1150,3 +1150,89 @@ class NoteModuleSynthese(models.Model):
 
     def __str__(self):
         return f'{self.participant} — {self.module}'
+
+
+class NotificationModificationNote(models.Model):
+    """Notification in-app à la Direction lorsqu'un admin modifie une note déjà enregistrée."""
+
+    destinataire = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications_modification_note',
+    )
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications_modification_note_emises',
+    )
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications_modification_note',
+    )
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications_modification_note',
+    )
+    colonne_libelle = models.CharField(max_length=120, blank=True, default='')
+    ancienne_note = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    nouvelle_note = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    message = models.TextField()
+    lu = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Notification modification de note'
+        verbose_name_plural = 'Notifications modifications de notes'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.message[:60]}… → {self.destinataire}'
+
+
+class NotificationFinanceAjustement(models.Model):
+    """Notification in-app pour le workflow ajustements horaires (Finance ↔ Direction)."""
+
+    class Evenement(models.TextChoices):
+        PROPOSE = 'PROPOSE', 'Ajustement proposé'
+        VALIDE = 'VALIDE', 'Ajustement validé'
+        REJETE = 'REJETE', 'Ajustement rejeté'
+
+    destinataire = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications_finance_ajustement',
+    )
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications_finance_ajustement_emises',
+    )
+    ajustement = models.ForeignKey(
+        FinanceAjustement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications',
+    )
+    evenement = models.CharField(max_length=20, choices=Evenement.choices)
+    message = models.TextField()
+    lu = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Notification ajustement finance'
+        verbose_name_plural = 'Notifications ajustements finance'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_evenement_display()} → {self.destinataire}'

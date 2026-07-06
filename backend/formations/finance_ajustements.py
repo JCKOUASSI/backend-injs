@@ -118,6 +118,8 @@ def propose_ajustement(session, formateur, minutes_delta, motif, user):
         realise_apres_minutes=realise_apres,
         proposed_by=user,
     )
+    from .finance_notifications import notifier_ajustement_propose
+    notifier_ajustement_propose(ajustement, user)
     return ajustement, []
 
 
@@ -175,6 +177,8 @@ def valider_ajustement(ajustement, user, request=None):
             ajustement,
             extra={'realise_effectif_minutes': realise_apres},
         )
+    from .finance_notifications import notifier_ajustement_valide
+    notifier_ajustement_valide(ajustement, user)
     return ajustement, []
 
 
@@ -202,6 +206,8 @@ def rejeter_ajustement(ajustement, user, rejection_motif='', request=None):
             ajustement,
             extra={'rejection_motif': motif},
         )
+    from .finance_notifications import notifier_ajustement_rejete
+    notifier_ajustement_rejete(ajustement, user, rejection_motif=motif)
     return ajustement, []
 
 

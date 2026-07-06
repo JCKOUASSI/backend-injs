@@ -53,6 +53,11 @@ export default function QRCodeModal({
   }
 
   const applyQrPayload = (data) => {
+    // Garde-fou contre une réponse tardive (race) : le QR reçu doit
+    // correspondre à la séance actuellement affichée.
+    if (data.session && sessionId && String(data.session) !== String(sessionId)) {
+      return false
+    }
     if (moduleId && data.module_id && String(data.module_id) !== String(moduleId)) {
       setError(
         `QR refusé : ce code appartient à « ${data.module_intitule || '?'} » `
@@ -169,11 +174,6 @@ export default function QRCodeModal({
             {token && !loading && scopeLabel && (
               <p className="fw-semibold mb-2" style={{ color: '#388E3C' }}>
                 {scopeLabel}
-              </p>
-            )}
-            {token && !loading && (
-              <p className="text-muted small mb-3">
-                <i className="bi bi-key me-1"></i>Token : {token.substring(0, 12)}…
               </p>
             )}
           </div>
