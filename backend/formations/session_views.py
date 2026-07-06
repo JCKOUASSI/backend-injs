@@ -41,6 +41,33 @@ def _invalidate_session_qr_cache(session):
         invalidate_offline_data_cache(token)
 
 
+def close_open_sessions_for_module(module=None, *, module_id=None, exclude_pks=None, when=None):
+    """Ferme (``terminee_le``) les séances ouvertes d'UN module.
+
+    Ne touche qu'au module ciblé : les autres modules/groupes de la formation
+    ne sont pas affectés, ce qui évite d'invalider leurs QR codes lorsqu'on
+    démarre/réactive une séance.
+
+    Args:
+        module: instance ``Module`` (ou passer ``module_id``).
+        module_id: identifiant du module (alternative à ``module``).
+        exclude_pks: séances à ne pas fermer (itérable de pk).
+        when: horodatage de clôture (par défaut ``timezone.now()``).
+
+    Returns:
+        Nombre de séances fermées.
+    """
+    when = when or timezone.now()
+    qs = SessionModule.objects.filter(
+        demarree_le__isnull=False,
+        terminee_le__isnull=True,
+    )
+    qs = qs.filter(module=module) if module is not None else qs.filter(module_id=module_id)
+    if exclude_pks:
+        qs = qs.exclude(pk__in=list(exclude_pks))
+    return qs.update(terminee_le=when)
+
+
 def _session_duplicate_detail(session, *, conflict=None):
     """Message lisible pour une collision (module, date_journee, numero)."""
     date_label = session.date_journee.strftime('%d/%m/%Y') if session.date_journee else '—'
@@ -88,11 +115,9 @@ def reactiver_session_et_qr(session, *, close_other_open_sessions=False):
     today = local_now.date()
 
     if close_other_open_sessions:
-        SessionModule.objects.filter(
-            module=session.module,
-            demarree_le__isnull=False,
-            terminee_le__isnull=True,
-        ).exclude(pk=session.pk).update(terminee_le=now)
+        close_open_sessions_for_module(
+            session.module, exclude_pks=[session.pk], when=now,
+        )
 
     # Invalider le cache offline-data avant de réactiver : la date de
     # séance ou les participants/formateurs peuvent avoir changé.
@@ -158,11 +183,7 @@ def reactiver_sessions_en_lot(sessions):
 
     for module_id, module_sessions in par_module.items():
         pks = [s.pk for s in module_sessions]
-        SessionModule.objects.filter(
-            module_id=module_id,
-            demarree_le__isnull=False,
-            terminee_le__isnull=True,
-        ).exclude(pk__in=pks).update(terminee_le=now)
+        close_open_sessions_for_module(module_id=module_id, exclude_pks=pks, when=now)
         for session in module_sessions:
             reactiver_session_et_qr(session, close_other_open_sessions=False)
 

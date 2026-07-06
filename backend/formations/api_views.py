@@ -15,6 +15,7 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from authentication.permissions import IsSecretariat, IsSecretariatOrDFRC, CanManageModuleParticipant
+from authentication.role_groups import get_user_role
 from suiviEvaluation.permissions import IsGestionNotes, IsGestionNotesOrReadOnly
 from formations.models import Secretariat
 from django.contrib.auth import get_user_model
@@ -22,7 +23,7 @@ from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 from presences.offline_cache import invalidate_offline_data_cache
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese, NotificationModificationNote, NotificationFinanceAjustement
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import (
@@ -48,6 +49,12 @@ from .finance_ajustements import (
     serialize_ajustement,
     _log_finance_audit,
 )
+from .finance_notifications import (
+    notifier_ajustement_propose,
+    notifier_ajustement_valide,
+    notifier_ajustement_rejete,
+)
+from .note_notifications import note_deja_enregistree, notifier_modification_note
 from .finance_tolerance import tolerance_settings_payload
 from .serializers import (
     FormationListSerializer,
@@ -55,7 +62,9 @@ from .serializers import (
     ParticipantSerializer,
     FormateurSerializer,
     ModuleSerializer,
+    QRTokenSerializer,
 )
+from .qr_helpers import get_session_for_qr
 
 
 def _normalize_groupe_value(value):
@@ -2838,47 +2847,48 @@ def formation_detail_api(request, pk):
 @permission_classes([IsAuthenticated])
 def api_generate_qr(request, formation_pk, session_pk=None):
     """
-    Generate QR code for a formation or session.
+    Generate QR code for a session (module-scoped).
+    Optional body: { module_id } — vérifie que la séance appartient au module affiché.
     """
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-    except Formation.DoesNotExist:
+    formation = formation_accessible(request.user, formation_pk)
+    if not formation:
         return Response({'detail': 'Formation introuvable.'}, status=404)
-    
-    if not session_pk:
-        return Response({'detail': 'session_pk est obligatoire pour générer un QR.'}, status=400)
-    try:
-        session = SessionModule.objects.get(pk=session_pk, module__formation=formation)
-    except SessionModule.DoesNotExist:
-        return Response({'detail': 'Séance introuvable.'}, status=404)
+
+    module_id = request.data.get('module_id')
+    session, err = get_session_for_qr(
+        formation=formation,
+        session_id=session_pk,
+        module_id=module_id,
+    )
+    if err:
+        return err
     if session.est_terminee:
         return Response(
             {'detail': 'Impossible de générer un QR pour une séance terminée.'},
             status=400,
         )
-    
-    # Deactivate old QR tokens and invalidate their offline-data cache
-    # to avoid serving stale data after regeneration.
-    qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
-    if session:
-        qr_filter = qr_filter.filter(session=session)
+
+    qr_filter = QRToken.objects.filter(session=session, actif=True)
     old_tokens = list(qr_filter.values_list('token', flat=True))
     qr_filter.update(actif=False)
     for old_token in old_tokens:
         invalidate_offline_data_cache(old_token)
 
-    # Create new token
+    from django.conf import settings as django_settings
+    lifetime_hours = getattr(django_settings, 'QR_TOKEN_LIFETIME_HOURS', 24)
     qr_token = QRToken.objects.create(
         session=session,
         genere_par=request.user,
-        expire_at=timezone.now() + timedelta(hours=24),
+        expire_at=timezone.now() + timedelta(hours=lifetime_hours),
     )
-    
-    return Response({
-        'detail': 'QR code généré.',
-        'qr_url': f'/api/formations/{formation_pk}/sessions/{session_pk}/qr-image/' if session else f'/api/formations/{formation_pk}/qr-image/',
-        'token': str(qr_token.token),
-    }, status=201)
+
+    payload = QRTokenSerializer(qr_token).data
+    payload['detail'] = 'QR code généré.'
+    payload['token'] = str(qr_token.token)
+    payload['qr_url'] = (
+        f'/api/formations/{formation_pk}/sessions/{session_pk}/qr-image/'
+    )
+    return Response(payload, status=201)
 
 
 @api_view(['POST'])
@@ -4127,6 +4137,9 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
     enrolled_ids = set(
         ModuleParticipant.objects.filter(module=module).values_list('participant_id', flat=True)
     )
+    participants_map = {
+        p.id: p for p in Participant.objects.filter(id__in=enrolled_ids)
+    }
 
     saved = 0
     errors = []
@@ -4174,8 +4187,28 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                     continue
 
             if note_val is None:
+                existing = NoteModule.objects.filter(
+                    colonne=colonne, participant_id=participant_id,
+                ).first()
+                if note_deja_enregistree(existing):
+                    participant = participants_map.get(participant_id)
+                    if participant:
+                        notifier_modification_note(
+                            request.user, participant, module, colonne,
+                            existing.note, None,
+                        )
                 NoteModule.objects.filter(colonne=colonne, participant_id=participant_id).delete()
             else:
+                existing = NoteModule.objects.filter(
+                    colonne=colonne, participant_id=participant_id,
+                ).first()
+                if note_deja_enregistree(existing):
+                    participant = participants_map.get(participant_id)
+                    if participant:
+                        notifier_modification_note(
+                            request.user, participant, module, colonne,
+                            existing.note, note_val,
+                        )
                 NoteModule.objects.update_or_create(
                     colonne=colonne,
                     participant_id=participant_id,
@@ -4254,6 +4287,92 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
     calculer_moyennes_module_tous(module)
 
     return Response({'saved': saved, 'errors': errors})
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def note_modifications_notifications_api(request):
+    """GET/PATCH /api/formations/notes/notifications/ — notifications Direction (modifications de notes)."""
+    if get_user_role(request.user) != get_user_model().Role.DIRECTION:
+        return Response({'detail': 'Accès réservé à la Direction.'}, status=403)
+
+    qs = NotificationModificationNote.objects.filter(
+        destinataire=request.user,
+    ).select_related('auteur', 'participant', 'module')
+
+    if request.method == 'GET':
+        items = list(qs[:50])
+        return Response({
+            'notifications': [
+                {
+                    'id': n.id,
+                    'message': n.message,
+                    'auteur': n.auteur.get_full_name() or n.auteur.username if n.auteur else None,
+                    'auditeur': (
+                        f'{n.participant.nom} {n.participant.prenom}'.strip()
+                        if n.participant else None
+                    ),
+                    'module': n.module.intitule if n.module else None,
+                    'colonne': n.colonne_libelle,
+                    'ancienne_note': n.ancienne_note,
+                    'nouvelle_note': n.nouvelle_note,
+                    'lu': n.lu,
+                    'created_at': n.created_at,
+                }
+                for n in items
+            ],
+            'non_lues': qs.filter(lu=False).count(),
+        })
+
+    if request.data.get('tout'):
+        qs.filter(lu=False).update(lu=True)
+    else:
+        ids = request.data.get('ids') or []
+        qs.filter(id__in=ids).update(lu=True)
+    non_lues = NotificationModificationNote.objects.filter(
+        destinataire=request.user, lu=False,
+    ).count()
+    return Response({'non_lues': non_lues})
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def finance_ajustements_notifications_api(request):
+    """GET/PATCH /api/formations/finance/notifications/ — workflow ajustements."""
+    if request.user.role not in {'FINANCE', 'DIRECTION'}:
+        return Response({'detail': 'Accès réservé à la finance et à la direction.'}, status=403)
+
+    qs = NotificationFinanceAjustement.objects.filter(
+        destinataire=request.user,
+    ).select_related('auteur', 'ajustement')
+
+    if request.method == 'GET':
+        items = list(qs[:50])
+        return Response({
+            'notifications': [
+                {
+                    'id': n.id,
+                    'evenement': n.evenement,
+                    'message': n.message,
+                    'auteur': n.auteur.get_full_name() or n.auteur.username if n.auteur else None,
+                    'ajustement_id': n.ajustement_id,
+                    'lu': n.lu,
+                    'created_at': n.created_at,
+                }
+                for n in items
+            ],
+            'non_lues': qs.filter(lu=False).count(),
+        })
+
+    if request.data.get('tout'):
+        qs.filter(lu=False).update(lu=True)
+    else:
+        ids = request.data.get('ids') or []
+        qs.filter(id__in=ids).update(lu=True)
+    non_lues = NotificationFinanceAjustement.objects.filter(
+        destinataire=request.user, lu=False,
+    ).count()
+    return Response({'non_lues': non_lues})
 
 
 @api_view(['POST'])

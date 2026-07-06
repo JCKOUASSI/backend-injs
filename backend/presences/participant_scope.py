@@ -5,6 +5,53 @@ from django.db.models import Count
 from formations.models import Participant
 
 
+def _compact_identifier(value):
+    """Normalise un identifiant pour comparer les variantes de format (casse, espaces, ponctuation)."""
+    return ''.join(ch for ch in (value or '').strip().upper() if ch.isalnum())
+
+
+def _user_matricule_candidates(user):
+    """Variantes compactes du matricule/username du compte."""
+    candidates = set()
+    for raw in (getattr(user, 'matricule', ''), getattr(user, 'username', '')):
+        compact = _compact_identifier(raw)
+        if compact:
+            candidates.add(compact)
+    return candidates
+
+
+def participant_for_module(user, module):
+    """Fiche Participant de l'utilisateur réellement inscrite au module donné.
+
+    Contrairement à ``primary_participant_for_user`` (qui choisit une fiche
+    « principale » indépendamment du module), cette résolution s'appuie sur les
+    inscriptions du module et tolère les écarts de format de matricule. Elle
+    évite les faux négatifs « pas inscrit à ce module » lorsque le compte est
+    rattaché à une autre fiche (ou à une fiche vide) que celle inscrite.
+
+    Priorité : lien de compte (``user_id``) puis correspondance de matricule.
+    Retourne ``None`` si aucune fiche inscrite ne correspond au compte.
+    """
+    from formations.models import ModuleParticipant
+
+    candidates = _user_matricule_candidates(user)
+    inscriptions = (
+        ModuleParticipant.objects
+        .filter(module=module)
+        .select_related('participant')
+    )
+    fallback = None
+    for insc in inscriptions:
+        p = insc.participant
+        if p is None:
+            continue
+        if p.user_id == user.pk:
+            return p
+        if candidates and _compact_identifier(p.matricule) in candidates:
+            fallback = fallback or p
+    return fallback
+
+
 def participant_ids_for_user(user):
     """IDs des fiches Participant dont les pointages concernent cet auditeur."""
     ids = set()

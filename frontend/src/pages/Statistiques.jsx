@@ -3,6 +3,7 @@
  * Dashboard multi-onglets : Vue d'ensemble · Pédagogique · Administratif · Historique · Secrétariats · Rapports · Alertes
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
@@ -19,6 +20,7 @@ import { isSecretariatScopedRole, lockedSecretariatId } from '../utils/roles'
 import { useStatsMeta } from '../hooks/useStatsMeta'
 import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
 import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
+import RapportsWorkflowPanel from '../components/RapportsWorkflowPanel'
 
 // ── Palettes & constantes ────────────────────────────────────────────────────
 const C = ['#43A047','#1565C0','#F57C00','#7B1FA2','#C62828','#00838F','#558B2F','#AD1457','#0277BD','#4E342E']
@@ -29,6 +31,11 @@ const STATUT_LABELS = {
   SORTIE_AUTO:'Sortie automatique',
 }
 const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN']
+
+const RB_VIEWS = [
+  { id: 'bilans', label: 'Bilans CPFAE', icon: 'bi-table' },
+  { id: 'workflow', label: 'Rapports périodiques', icon: 'bi-file-earmark-check' },
+]
 
 /** Libellés harmonisés des taux pédagogiques (vague 1). */
 const TAUX_PEDAGOGIE = {
@@ -1110,6 +1117,7 @@ function Card({ title, icon, children, col }) {
 // ── Composant principal ────────────────────────────────────────────────────────
 export default function Statistiques() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const isEncadrantScoped = user?.role === 'ENCADRANT'
   const secretariatFilterLocked = isSecretariatScoped
@@ -1219,6 +1227,7 @@ export default function Statistiques() {
   const [facGradesSelected, setFacGradesSelected] = useState([])
   const [facGroupesSelected, setFacGroupesSelected] = useState([])
   const [loadingFacPerimetre, setLoadingFacPerimetre] = useState(false)
+  const [rbView, setRbView] = useState(() => searchParams.get('rbView') || 'bilans')
 
   const canValidate = VALIDATION_ROLES.includes(user?.role)
   const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedPeriodKey })
@@ -1230,6 +1239,22 @@ export default function Statistiques() {
       setSecretariatId(userLockedSecretariatId)
     }
   }, [userLockedSecretariatId])
+
+  useEffect(() => {
+    const v = searchParams.get('rbView')
+    if (v === 'workflow' || v === 'bilans') setRbView(v)
+    if (searchParams.get('tab') === 'rapports' || searchParams.get('rbView') === 'workflow') {
+      setOnglet('rapports')
+    }
+  }, [searchParams])
+
+  const setRbViewAndUrl = (view) => {
+    setRbView(view)
+    const next = new URLSearchParams(searchParams)
+    if (view === 'bilans') next.delete('rbView')
+    else next.set('rbView', view)
+    setSearchParams(next, { replace: true })
+  }
 
   useEffect(() => {
     if (isSecretariatScoped && !SECRETARIAT_STATS_TABS.has(onglet)) {
@@ -2534,6 +2559,37 @@ export default function Statistiques() {
             Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
           </div>
         )}
+
+        <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+          {RB_VIEWS.map(v => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setRbViewAndUrl(v.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.45rem 0.85rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                border: rbView === v.id ? '2px solid #2e7d32' : '1px solid #e2e8f0',
+                background: rbView === v.id ? '#f0fdf4' : '#fff',
+                color: rbView === v.id ? '#15803d' : '#64748b',
+              }}
+            >
+              <i className={`bi ${v.icon}`}/>{v.label}
+            </button>
+          ))}
+        </div>
+
+        {rbView === 'workflow' && (
+          <RapportsWorkflowPanel
+            user={user}
+            formationId={formationId}
+            secretariatId={effectiveSecretariatId}
+            appliedVhPeriod={appliedVhPeriod}
+          />
+        )}
+
+        {rbView === 'bilans' && (
+        <>
         {/* ── Filtres bilans (même entête que Point Journalier) ─────────── */}
         <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
           <select className="form-select form-select-sm" style={{width:100}}
@@ -3011,6 +3067,9 @@ export default function Statistiques() {
             </div>
           )}
         </div>
+
+        </>
+        )}
 
         </>
       )}

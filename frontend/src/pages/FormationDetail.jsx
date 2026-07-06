@@ -41,6 +41,7 @@ export default function FormationDetail() {
   // QR modal
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
+  const [selectedQrModule, setSelectedQrModule] = useState(null)
 
   // Session creation
   const [newSession, setNewSession] = useState({ date_journee: '', numero: 1, heure_debut_prevue: '', heure_fin_prevue: '' })
@@ -502,7 +503,15 @@ export default function FormationDetail() {
     } catch (err) { showToast(err.response?.data?.detail || 'Erreur lors de la création', 'error') }
   }
 
-  const handleGenerateQR = (sid) => { setSelectedSessionId(sid); setQrModalOpen(true) }
+  const handleGenerateQR = (session) => {
+    setSelectedSessionId(session.id)
+    setSelectedQrModule({
+      id: session.module_id,
+      label: session.module_intitule,
+      groupe: session.module_groupe,
+    })
+    setQrModalOpen(true)
+  }
 
   const openEditSession = (s) => {
     setEditSession(s)
@@ -1230,7 +1239,7 @@ export default function FormationDetail() {
                                   </button>
                                 )}
                                 {!s.terminee && (
-                                  <button onClick={() => handleGenerateQR(s.id)} className="btn btn-outline-primary btn-sm" title="QR Code">
+                                  <button onClick={() => handleGenerateQR(s)} className="btn btn-outline-primary btn-sm" title="QR Code">
                                     <i className="bi bi-qr-code"></i>
                                   </button>
                                 )}
@@ -1388,7 +1397,15 @@ export default function FormationDetail() {
       )}
 
       {/* ── MODAL: QR Code ── */}
-      <QRCodeModal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} formationId={id} sessionId={selectedSessionId} />
+      <QRCodeModal
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        formationId={id}
+        sessionId={selectedSessionId}
+        moduleId={selectedQrModule?.id}
+        moduleLabel={selectedQrModule?.label}
+        moduleGroupe={selectedQrModule?.groupe}
+      />
 
       {/* ── MODAL: Modifier séance ── */}
       {editSession && (

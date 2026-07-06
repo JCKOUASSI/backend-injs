@@ -16,6 +16,7 @@ FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
 from .formateur_assignment import check_formateur_groupe_jour_conflict
+from .qr_helpers import get_session_for_qr
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -554,18 +555,14 @@ def generate_qr(request, pk):
         )
 
     session_id = request.data.get('session_id')
-    if not session_id:
-        return Response(
-            {'detail': 'session_id est obligatoire pour générer un QR.'},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    try:
-        session = SessionModule.objects.get(pk=session_id, module__formation=formation)
-    except SessionModule.DoesNotExist:
-        return Response(
-            {'detail': 'Séance introuvable pour cette formation.'},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+    module_id = request.data.get('module_id')
+    session, err = get_session_for_qr(
+        formation=formation,
+        session_id=session_id,
+        module_id=module_id,
+    )
+    if err:
+        return err
     if session.est_terminee:
         return Response(
             {'detail': 'Impossible de générer un QR pour une séance terminée.'},
@@ -634,16 +631,25 @@ def get_active_qr(request, pk):
         )
 
     session_id = request.query_params.get('session_id')
-    qr_filter = QRToken.objects.filter(session__module__formation=formation, actif=True)
-    if session_id is not None:
-        qr_filter = qr_filter.filter(session_id=session_id)
+    module_id = request.query_params.get('module_id')
+    session, err = get_session_for_qr(
+        formation=formation,
+        session_id=session_id,
+        module_id=module_id,
+    )
+    if err:
+        return err
 
-    qr_token = qr_filter.first()
+    qr_token = (
+        QRToken.objects.filter(session=session, actif=True)
+        .select_related('session__module')
+        .order_by('-created_at')
+        .first()
+    )
 
     if not qr_token or not qr_token.is_valid:
-        label = 'séance' if session_id else 'formation'
         return Response(
-            {'detail': f'Aucun QR code actif pour cette {label}.'},
+            {'detail': 'Aucun QR code actif pour cette séance.'},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -665,9 +671,44 @@ def qr_image(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    qr_token = QRToken.objects.filter(
-        session__module__formation=formation, actif=True
-    ).first()
+    # Le QR est scopé à une séance/module. Si une séance (ou un module) est
+    # fournie, on la résout explicitement pour éviter de servir le QR d'un
+    # autre groupe. Sinon, on n'autorise l'image « formation » que s'il
+    # existe une seule séance avec un QR actif (formation mono-groupe).
+    session_id = request.query_params.get('session_id')
+    module_id = request.query_params.get('module_id')
+
+    if session_id or module_id:
+        session, err = get_session_for_qr(
+            formation=formation,
+            session_id=session_id,
+            module_id=module_id,
+        )
+        if err:
+            return err
+        qr_token = (
+            QRToken.objects.filter(session=session, actif=True)
+            .order_by('-created_at')
+            .first()
+        )
+    else:
+        active_tokens = QRToken.objects.filter(
+            session__module__formation=formation, actif=True
+        ).order_by('-created_at')
+        distinct_sessions = {t.session_id for t in active_tokens}
+        if len(distinct_sessions) > 1:
+            return Response(
+                {
+                    'code': 'QR_AMBIGUOUS',
+                    'detail': (
+                        'Plusieurs groupes ont un QR actif. Précisez la séance '
+                        '(session_id) ou utilisez l\'URL par séance '
+                        '/formations/<pk>/sessions/<session_pk>/qr-image/.'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        qr_token = active_tokens.first()
 
     if not qr_token or not qr_token.is_valid:
         return Response(

@@ -380,6 +380,83 @@ class AuditeurProfileSyncTests(TestCase):
         self.assertEqual(participant.user_id, user.id)
         self.assertEqual(user.participant_profile.pk, participant.pk)
 
+    def test_resync_does_not_unlink_participant_on_matricule_format_drift(self):
+        """Une dérive de format (matricule vidé / username sans séparateur) ne doit
+        plus délier la fiche ni créer de doublon vide — sinon le badgeage échoue."""
+        from formations.models import Participant
+        from authentication.profile_sync import sync_user_profile_links
+
+        participant = Participant.objects.create(
+            matricule='OPH-1', nom='Nom', prenom='Prenom',
+        )
+        user = User.objects.create_user(
+            username='OPH-1', password='pass12345', role=User.Role.AUDITEUR,
+        )
+        participant.refresh_from_db()
+        self.assertEqual(participant.user_id, user.id)
+
+        # Dérive : matricule vidé, username réécrit dans un autre format.
+        User.objects.filter(pk=user.pk).update(matricule='', username='OPH1')
+        user.refresh_from_db()
+
+        sync_user_profile_links(user)
+
+        participant.refresh_from_db()
+        self.assertEqual(participant.user_id, user.id, 'La fiche liée ne doit pas être déliée.')
+        self.assertEqual(Participant.objects.count(), 1, 'Aucune fiche fantôme ne doit être créée.')
+        user.refresh_from_db()
+        self.assertEqual(user.matricule, 'OPH-1', 'Le matricule du compte doit être réaligné sur la fiche.')
+
+    def test_repair_command_relinks_account_to_enrolled_fiche(self):
+        """La commande repair_auditeur_fiches doit rebrancher le compte sur la fiche
+        inscrite et supprimer le doublon vide, en migrant les pointages."""
+        from io import StringIO
+        from django.core.management import call_command
+        from django.utils import timezone
+        from formations.models import (
+            Formation, Module, ModuleParticipant, Participant, SessionModule,
+        )
+        from presences.models import Pointage
+
+        formation = Formation.objects.create(formation='F repair')
+        module = Module.objects.create(formation=formation, intitule='M repair', statut='EN_COURS')
+        seance = SessionModule.objects.create(
+            module=module, date_journee=timezone.localdate(), numero=1,
+        )
+
+        # Fiche réellement inscrite (matricule avec tiret).
+        enrolled = Participant.objects.create(matricule='OPH-1', nom='Vrai', prenom='Fiche')
+        ModuleParticipant.objects.create(module=module, participant=enrolled)
+
+        # Compte au format compact : la synchro crée un doublon vide « OPH1 ».
+        user = User.objects.create_user(
+            username='OPH1', password='pass12345', role=User.Role.AUDITEUR,
+        )
+        phantom = Participant.objects.get(user=user)
+        self.assertNotEqual(phantom.pk, enrolled.pk)
+        self.assertEqual(phantom.modules_inscrits.count(), 0)
+
+        # Pointage historique enregistré (avant correctif) sur le doublon vide.
+        Pointage.objects.create(
+            participant=phantom, session=seance,
+            date_journee=timezone.localdate(), timestamp_entree=timezone.now(),
+        )
+
+        call_command('repair_auditeur_fiches', '--apply', stdout=StringIO())
+
+        enrolled.refresh_from_db()
+        user.refresh_from_db()
+        self.assertEqual(enrolled.user_id, user.id, 'Le compte doit être rebranché sur la fiche inscrite.')
+        self.assertEqual(user.matricule, 'OPH-1', 'Le matricule du compte doit être réaligné.')
+        self.assertFalse(
+            Participant.objects.filter(pk=phantom.pk).exists(),
+            'Le doublon vide doit être supprimé.',
+        )
+        self.assertTrue(
+            Pointage.objects.filter(participant=enrolled, session=seance).exists(),
+            'Le pointage doit avoir été migré vers la fiche inscrite.',
+        )
+
     def test_admin_user_does_not_create_participant_profile(self):
         from formations.models import Participant
 

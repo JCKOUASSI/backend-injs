@@ -340,6 +340,7 @@ def formation_detail(request, pk):
     from formations.session_views import (
         _session_debut_prevu_local,
         _should_auto_start_session,
+        close_open_sessions_for_module,
     )
 
     local_now = timezone.localtime(now)
@@ -353,10 +354,10 @@ def formation_detail(request, pk):
     for sess in auto_start_qs:
         if not _should_auto_start_session(sess, local_now):
             continue
-        # Fermer toute session ouverte avant d'en démarrer une nouvelle
-        SessionModule.objects.filter(
-            module__formation=formation, demarree_le__isnull=False, terminee_le__isnull=True,
-        ).update(terminee_le=now)
+        # Fermer les séances ouvertes du MÊME module avant d'en démarrer une
+        # nouvelle. Ne pas toucher aux autres modules/groupes de la formation,
+        # sinon on invaliderait les QR des autres groupes.
+        close_open_sessions_for_module(sess.module, exclude_pks=[sess.pk], when=now)
         sess.demarree_le = _session_debut_prevu_local(sess)
         sess.save(update_fields=['demarree_le'])
         module = sess.module

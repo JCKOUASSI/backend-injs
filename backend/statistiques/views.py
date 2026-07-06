@@ -52,6 +52,7 @@ from .effectifs import (
 )
 from .rapport_notifications import (
     ADMIN_RAPPORT_ROLES, notifier_rapport, notifier_rapport_supprime,
+    notifier_rapport_workflow,
 )
 from .access import (
     StatsScope,
@@ -1588,6 +1589,12 @@ class RapportWorkflowView(APIView):
                 commentaire=request.data.get('commentaire', ''),
                 hash_rapport=rapport.hash_donnees,
             )
+        notifier_rapport_workflow(
+            rapport,
+            action,
+            request.user,
+            commentaire=request.data.get('commentaire') or request.data.get('motif') or '',
+        )
         return Response({'statut': rapport.statut})
 
 

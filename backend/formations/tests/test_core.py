@@ -6,12 +6,12 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
 from authentication.models import User
-from .models import (
+from ..models import (
     Formation, Module, Participant, Formateur,
     Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
     RefFormation, RefModule, RefCategorie, RefModuleVolumeHoraire,
 )
-from .volume_horaire import compute_dashboard_volume_horaire
+from ..volume_horaire import compute_dashboard_volume_horaire
 
 
 def make_user(username, role='CPFAE_ADMIN', **kwargs):
@@ -583,7 +583,7 @@ class DashboardVolumeHoraireTest(TestCase):
 
     def test_realise_plafonne_au_prevu_seance(self):
         """Une séance laissée ouverte ne compte pas plus que son créneau planifié."""
-        from .volume_horaire import _accumulate_module_session_volumes
+        from ..volume_horaire import _accumulate_module_session_volumes
 
         f = make_formation()
         module = make_module(f, duree_prevue_heures=4)

@@ -109,6 +109,10 @@ export default function ModuleDetail() {
 
   useEffect(() => { loadModule() }, [formationId, moduleId])
   useEffect(() => {
+    setSelectedSessionId(null)
+    setQrModalOpen(false)
+  }, [moduleId])
+  useEffect(() => {
     if (referentielsData) setRefs(referentielsData)
   }, [referentielsData])
 
@@ -1733,7 +1737,15 @@ export default function ModuleDetail() {
       )}
 
       {/* Modals */}
-      <QRCodeModal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} formationId={formationId} sessionId={selectedSessionId} />
+      <QRCodeModal
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        formationId={formationId}
+        sessionId={selectedSessionId}
+        moduleId={moduleId}
+        moduleLabel={module?.intitule}
+        moduleGroupe={module?.groupe}
+      />
 
       {editSession && (
         <div className="modal-overlay" onClick={() => setEditSession(null)}>

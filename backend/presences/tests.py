@@ -434,6 +434,36 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res.data.get('code'), 'SESSION_ALREADY_OPEN')
 
+    def test_secure_scan_resolves_enrolled_fiche_when_account_matricule_format_differs(self):
+        """Compte rattaché à une fiche au format de matricule différent : le badge
+        doit réussir sur la fiche réellement inscrite (au lieu de « pas inscrit »)."""
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
+
+        # Fiche réellement inscrite au module (matricule avec tirets).
+        inscrit = Participant.objects.create(
+            matricule='OPH-2026-1', nom='Kone', prenom='Ali',
+        )
+        ModuleParticipant.objects.create(module=self.module, participant=inscrit)
+
+        # Compte auditeur au format compact (sans tirets) : la synchro crée une
+        # fiche distincte de la fiche inscrite, mais le badge doit rester possible.
+        user = make_user('OPH20261', role='AUDITEUR')
+        self.client.force_authenticate(user)
+
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token_seance_2.token)},
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'participant')
+        self.assertTrue(
+            Pointage.objects.filter(participant=inscrit, session=self.seance_2).exists(),
+            'Le pointage doit être enregistré sur la fiche réellement inscrite.',
+        )
+
 
 @override_settings(PUBLIC_QR_SCAN_ENABLED=False)
 class PublicScanDisabledTest(TestCase):
