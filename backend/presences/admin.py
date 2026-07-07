@@ -13,7 +13,12 @@ from admin_mixins import (
     log_admin_audit,
     pointage_remettre_en_cours_guard,
 )
-from .models import Pointage, AuditLog, DeviceBinding, _log_audit
+from .models import Pointage, AuditLog, DeviceBinding, Rattrapage, _log_audit
+from .rattrapage_service import (
+    RattrapageError,
+    annuler_rattrapage,
+    generer_presence_rattrapage,
+)
 
 
 class TypePersonneFilter(admin.SimpleListFilter):
@@ -450,6 +455,176 @@ class AuditLogAdmin(AdminScopeMixin, ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Rattrapage)
+class RattrapageAdmin(AdminScopeMixin, ModelAdmin):
+    """Gestion des rattrapages inter-cohorte (auditeur suivant une séance d'une
+    autre cohorte pour rattraper un cours manqué)."""
+
+    admin_scope_secretariat_field = 'seance_rattrapage__module__secretariat'
+    admin_scope_superviseur_field = 'seance_rattrapage__module__superviseur'
+
+    list_display = [
+        'participant_label', 'origine_label', 'accueil_label',
+        'seance_rattrapage_label', 'statut_badge', 'presence_label', 'created_at',
+    ]
+    list_filter = [
+        'statut',
+        'seance_rattrapage__module__formation',
+        'seance_rattrapage__module__grade',
+        'seance_rattrapage__module__groupe',
+        'seance_rattrapage__date_journee',
+    ]
+    search_fields = [
+        'participant__matricule', 'participant__nom', 'participant__prenom',
+        'participant__grade', 'participant__groupe',
+        'seance_rattrapage__module__intitule',
+        'seance_rattrapage__module__formation__formation',
+        'motif',
+    ]
+    autocomplete_fields = [
+        'participant', 'seance_rattrapage', 'module_origine', 'seance_manquee', 'pointage',
+    ]
+    list_select_related = [
+        'participant',
+        'seance_rattrapage', 'seance_rattrapage__module', 'seance_rattrapage__module__formation',
+        'module_origine', 'module_origine__formation',
+        'pointage',
+    ]
+    ordering = ['-created_at']
+    date_hierarchy = 'created_at'
+    list_per_page = 50
+    readonly_fields = ['cree_par', 'created_at', 'updated_at']
+    actions = ['action_generer_presence', 'action_annuler']
+    fieldsets = (
+        ("Auditeur", {
+            'fields': ('participant',),
+            'description': (
+                "L'auditeur garde son groupe/grade/secrétariat d'origine : "
+                "aucune inscription n'est créée sur la cohorte d'accueil."
+            ),
+        }),
+        ("Cours manqué (origine)", {
+            'fields': ('module_origine', 'seance_manquee'),
+            'description': "Optionnel — pour tracer précisément ce qui est rattrapé.",
+        }),
+        ("Séance de rattrapage (accueil)", {
+            'fields': ('seance_rattrapage',),
+            'description': (
+                "Séance d'une AUTRE cohorte dispensant le même cours. "
+                "Recherchez par formation / grade / groupe / vague."
+            ),
+        }),
+        ("Suivi", {
+            'fields': ('statut', 'motif', 'pointage', 'cree_par', 'created_at', 'updated_at'),
+        }),
+    )
+
+    @admin.display(description="Auditeur", ordering='participant__nom')
+    def participant_label(self, obj):
+        p = obj.participant
+        cohorte = ' / '.join(x for x in (p.grade, p.groupe) if x)
+        base = f"{p.nom} {p.prenom}".strip() or p.matricule
+        return f"{base} ({cohorte})" if cohorte else base
+
+    @admin.display(description="Origine")
+    def origine_label(self, obj):
+        if not obj.module_origine_id:
+            return "—"
+        m = obj.module_origine
+        return ' / '.join(x for x in (m.grade, m.groupe, m.vague) if x) or m.intitule
+
+    @admin.display(description="Accueil")
+    def accueil_label(self, obj):
+        m = obj.module_rattrapage
+        if not m:
+            return "—"
+        return ' / '.join(x for x in (m.grade, m.groupe, m.vague) if x) or m.intitule
+
+    @admin.display(description="Séance rattrapage", ordering='seance_rattrapage__date_journee')
+    def seance_rattrapage_label(self, obj):
+        s = obj.seance_rattrapage
+        url = reverse('admin:formations_sessionmodule_change', args=[s.pk])
+        label = s.intitule or f"Séance {s.numero}"
+        return format_html('<a href="{}">{} — {}</a>', url, s.date_journee, label)
+
+    @admin.display(description="Présence")
+    def presence_label(self, obj):
+        if not obj.pointage_id:
+            return "—"
+        url = reverse('admin:presences_pointage_change', args=[obj.pointage_id])
+        return format_html('<a href="{}">Voir le pointage</a>', url)
+
+    @admin.display(description="Statut")
+    def statut_badge(self, obj):
+        colors = {
+            Rattrapage.Statut.PLANIFIE: ("#fff7e8", "#9a6700"),
+            Rattrapage.Statut.EFFECTUE: ("#e8f6f1", "#13624e"),
+            Rattrapage.Statut.ANNULE: ("#fdecec", "#b42318"),
+        }
+        bg, fg = colors.get(obj.statut, ("#f3f4f6", "#374151"))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 8px;border-radius:999px;font-weight:600;">{}</span>',
+            bg, fg, obj.get_statut_display(),
+        )
+
+    def save_model(self, request, obj, form, change):
+        is_new = not change
+        if is_new and obj.cree_par_id is None:
+            obj.cree_par = request.user
+        super().save_model(request, obj, form, change)
+        if is_new:
+            module = obj.module_rattrapage
+            _log_audit(
+                action=AuditLog.Action.RATTRAPAGE_CREATE,
+                request=request,
+                cible_type='participant',
+                cible_numero=obj.participant.matricule or str(obj.participant.pk),
+                cible_nom=f"{obj.participant.nom} {obj.participant.prenom}".strip(),
+                formation=module.formation if module else None,
+                extra={
+                    'rattrapage_id': obj.pk,
+                    'seance_rattrapage_id': obj.seance_rattrapage_id,
+                    'module_origine_id': obj.module_origine_id,
+                    'via_admin': True,
+                },
+            )
+
+    @admin.action(description="Générer / forcer la présence (rattrapage)")
+    def action_generer_presence(self, request, queryset):
+        ok = 0
+        for rattrapage in queryset.exclude(statut=Rattrapage.Statut.ANNULE).select_related(
+            'participant', 'seance_rattrapage', 'seance_rattrapage__module',
+            'seance_rattrapage__module__formation',
+        ):
+            try:
+                generer_presence_rattrapage(rattrapage, request=request)
+                ok += 1
+            except RattrapageError as exc:
+                self.message_user(
+                    request,
+                    f"{self.participant_label(rattrapage)} : {exc}",
+                    level=messages.WARNING,
+                )
+        if ok:
+            self.message_user(
+                request, f"{ok} présence(s) de rattrapage générée(s).", level=messages.SUCCESS,
+            )
+        elif queryset:
+            self.message_user(request, "Aucune présence générée.", level=messages.WARNING)
+
+    @admin.action(description="Annuler les rattrapages sélectionnés")
+    def action_annuler(self, request, queryset):
+        count = 0
+        for rattrapage in queryset.exclude(statut=Rattrapage.Statut.ANNULE):
+            annuler_rattrapage(rattrapage, request=request)
+            count += 1
+        self.message_user(
+            request,
+            f"{count} rattrapage(s) annulé(s)." if count else "Aucun rattrapage à annuler.",
+            level=messages.SUCCESS if count else messages.WARNING,
+        )
 
 
 @admin.register(DeviceBinding)

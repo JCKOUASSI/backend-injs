@@ -49,6 +49,24 @@ def participant_for_module(user, module):
             return p
         if candidates and _compact_identifier(p.matricule) in candidates:
             fallback = fallback or p
+    if fallback is None:
+        # Autoriser un rattrapage inter-cohorte planifié sur ce module.
+        from .models import Rattrapage
+
+        ids = participant_ids_for_user(user)
+        if ids:
+            rattrapage = (
+                Rattrapage.objects
+                .filter(
+                    participant_id__in=ids,
+                    seance_rattrapage__module=module,
+                    statut=Rattrapage.Statut.PLANIFIE,
+                )
+                .select_related('participant')
+                .first()
+            )
+            if rattrapage is not None:
+                return rattrapage.participant
     return fallback
 
 

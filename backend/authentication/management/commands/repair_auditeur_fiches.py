@@ -43,6 +43,31 @@ from presences.participant_scope import _compact_identifier
 User = get_user_model()
 
 
+def _digits_key(value):
+    """Suite de chiffres d'un matricule, zéros en tête de chaque groupe neutralisés.
+
+    Permet de rapprocher « FNCE24-00178543 » et « FNCE24-0178543 » (écart de
+    zéros) que ``_compact_identifier`` considère, lui, comme distincts.
+    """
+    groups = []
+    current = []
+    for ch in (value or ''):
+        if ch.isdigit():
+            current.append(ch)
+        elif current:
+            groups.append(str(int(''.join(current))))
+            current = []
+    if current:
+        groups.append(str(int(''.join(current))))
+    return '-'.join(groups)
+
+
+def _name_key(participant):
+    """Clé compacte nom+prénom pour rapprocher deux fiches de la même personne."""
+    return _compact_identifier(getattr(participant, 'nom', '')) + '|' + \
+        _compact_identifier(getattr(participant, 'prenom', ''))
+
+
 class Command(BaseCommand):
     help = (
         "Répare les comptes auditeurs liés à une fiche vide alors qu'une fiche "
@@ -141,6 +166,60 @@ class Command(BaseCommand):
                 best_nb = cand.nb_inscriptions
         return best
 
+    def _print_suggestions(self, phantom, limit=5):
+        """Liste les fiches inscrites plausibles (même personne / matricule proche).
+
+        Purement informatif : aide l'opérateur à décider s'il existe une vraie
+        fiche à rattacher (à traiter avec --user) ou si l'auditeur n'est
+        réellement inscrit à aucun module.
+        """
+        user = phantom.user
+        name_key = _name_key(phantom)
+        digit_keys = {
+            _digits_key(getattr(user, 'matricule', '')),
+            _digits_key(getattr(user, 'username', '')),
+            _digits_key(phantom.matricule),
+        }
+        digit_keys.discard('')
+
+        enrolled = (
+            Participant.objects
+            .exclude(pk=phantom.pk)
+            .annotate(nb_inscriptions=Count('modules_inscrits'))
+            .filter(nb_inscriptions__gt=0)
+        )
+
+        suggestions = []
+        for cand in enrolled:
+            reasons = []
+            if name_key.strip('|') and _name_key(cand) == name_key:
+                reasons.append('même nom+prénom')
+            if _digits_key(cand.matricule) in digit_keys:
+                reasons.append('matricule proche (écart de zéros)')
+            if reasons:
+                suggestions.append((cand, reasons))
+
+        if not suggestions:
+            self.stdout.write(
+                "    (aucune fiche inscrite proche par nom ou matricule — "
+                "l'auditeur n'est probablement inscrit à aucun module.)"
+            )
+            return
+
+        self.stdout.write(self.style.WARNING(
+            f"    Candidats possibles ({len(suggestions)}) — à vérifier puis "
+            f"rattacher via --user :"
+        ))
+        for cand, reasons in suggestions[:limit]:
+            self.stdout.write(
+                f"      • #{cand.pk} matricule={cand.matricule!r} "
+                f"{cand.nom} {cand.prenom} "
+                f"({cand.nb_inscriptions} inscription(s), user_id={cand.user_id}) "
+                f"[{', '.join(reasons)}]"
+            )
+        if len(suggestions) > limit:
+            self.stdout.write(f"      … et {len(suggestions) - limit} autre(s).")
+
     def _process_phantom(self, phantom, apply_changes, stats):
         user = phantom.user
         nb_pointages = Pointage.objects.filter(participant=phantom).count()
@@ -155,9 +234,10 @@ class Command(BaseCommand):
         if real is None:
             stats['sans_solution'] += 1
             self.stdout.write(self.style.ERROR(
-                "  ✗ Aucune fiche inscrite ne correspond à ce compte — "
-                "vérifier manuellement (l'auditeur est-il réellement inscrit ?)."
+                "  ✗ Aucune fiche inscrite ne correspond à ce compte (rapprochement "
+                "strict par matricule) — vérifier manuellement."
             ))
+            self._print_suggestions(phantom)
             return
 
         if real.user_id not in (None, user.pk):

@@ -11,6 +11,7 @@ import Formations from './pages/Formations'
 import FormationDetail from './pages/FormationDetail'
 import ModuleDetail from './pages/ModuleDetail'
 import Participants from './pages/Participants'
+import Rattrapages from './pages/Rattrapages'
 import Formateurs from './pages/Formateurs'
 import Users from './pages/Users'
 import ImportExcel from './pages/ImportExcel'
@@ -51,6 +52,7 @@ import {
   FINANCE_SETTINGS_ROLES,
   OPERATION_VIEW_ROLES,
   ARCHIVE_CONSULT_ROLES,
+  PRESENCE_VIEW_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
@@ -93,6 +95,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceDashboard = FINANCE_EXPORT_ROLES.includes(user?.role) && !isArchiveRole
   const canViewFinanceSettings = FINANCE_SETTINGS_ROLES.includes(user?.role)
   const canViewParticipants = OPERATION_VIEW_ROLES.includes(user?.role)
+  const canViewRattrapages = PRESENCE_VIEW_ROLES.includes(user?.role)
   const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
     || canViewFinanceModule
   const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
@@ -178,6 +181,11 @@ function Layout({ children, breadcrumb }) {
           {canViewParticipants && (
             <Link to={listHref('/participants', LIST_STORAGE_KEYS.participants)} className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-people"></i> <span className="nav-label">Auditeurs</span></span>
+            </Link>
+          )}
+          {canViewRattrapages && (
+            <Link to="/rattrapages" className={`nav-item ${isActive('/rattrapages') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-arrow-left-right"></i> <span className="nav-label">Rattrapages</span></span>
             </Link>
           )}
           {canViewFormateurs && (
@@ -397,6 +405,13 @@ function App() {
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/rattrapages" element={
+            <ProtectedRoute allowedRoles={PRESENCE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Rattrapages</li></>}>
+                <Rattrapages />
               </Layout>
             </ProtectedRoute>
           } />
