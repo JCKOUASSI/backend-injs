@@ -33,7 +33,8 @@ class UserSelfProfileSerializer(serializers.ModelSerializer):
     def validate_matricule(self, value):
         if value in (None, ''):
             return None
-        qs = User.objects.filter(matricule=value)
+        value = value.strip()
+        qs = User.objects.filter(matricule__iexact=value)
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():

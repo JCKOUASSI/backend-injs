@@ -27,29 +27,33 @@ ROLE_ALIASES = {
 }
 
 
+def _normalize_stats_roles(roles):
+    """Mappe les rôles legacy (DFRC, SUPERVISEUR…) vers les rôles actuels."""
+    return frozenset(ROLE_ALIASES.get(role, role) for role in roles)
+
+
 def effective_user_role(user) -> Optional[str]:
     return user_stats_role(user)
 
 
 def user_stats_role(user) -> Optional[str]:
     """Rôle principal pour le périmètre stats (le plus élevé parmi les rôles autorisés)."""
-    roles = get_user_roles(user) & STATS_ACCESS_ROLES
+    roles = _normalize_stats_roles(get_user_roles(user)) & STATS_ACCESS_ROLES
     if not roles:
         return None
     for candidate in ROLE_HIERARCHY:
         if candidate in roles:
-            return ROLE_ALIASES.get(candidate, candidate)
-    role = next(iter(roles))
-    return ROLE_ALIASES.get(role, role)
+            return candidate
+    return next(iter(roles))
 
 
 def user_has_stats_access(user) -> bool:
-    return bool(get_user_roles(user) & STATS_ACCESS_ROLES)
+    return bool(_normalize_stats_roles(get_user_roles(user)) & STATS_ACCESS_ROLES)
 
 
 def user_secretariat_scope_locked(user) -> bool:
     """Compte limité aux statistiques de son secrétariat."""
-    roles = get_user_roles(user)
+    roles = _normalize_stats_roles(get_user_roles(user))
     if roles & (GLOBAL_STATS_ROLES - SECRETARIAT_ROLES):
         return False
     return bool(roles & SECRETARIAT_ROLES)

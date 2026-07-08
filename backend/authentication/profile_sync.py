@@ -124,12 +124,17 @@ def _update_participant_from_user(participant, user):
     if participant.secretariat_id != getattr(user.secretariat, 'pk', None):
         participant.secretariat = user.secretariat
         updates.append('secretariat')
+    user_mat = (user.matricule or '').strip()
+    participant_mat = (participant.matricule or '').strip()
+    if user_mat and user_mat != participant_mat:
+        participant.matricule = user_mat
+        updates.append('matricule')
     if updates:
         participant.save(update_fields=updates)
-    # Le matricule de la fiche fait foi : on aligne le compte dessus (jamais l'inverse).
-    if participant.matricule and (user.matricule or '').strip() != participant.matricule:
-        User.objects.filter(pk=user.pk).update(matricule=participant.matricule)
-        user.matricule = participant.matricule
+    # Matricule vide sur le compte : la fiche fait foi (dérive de format, badgeage).
+    if participant_mat and not user_mat:
+        User.objects.filter(pk=user.pk).update(matricule=participant_mat)
+        user.matricule = participant_mat
 
 
 def _sync_auditeur_user_link(user):

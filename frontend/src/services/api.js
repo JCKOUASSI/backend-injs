@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api'
 const ADMIN_URL = (() => {
   const explicit = (import.meta.env.VITE_ADMIN_URL || '').trim()
   if (explicit) return explicit.replace(/\/?$/, '/')
-  const base = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace(/\/api\/?$/, '')
+  const base = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api').replace(/\/api\/?$/, '')
   return `${base}/admin/`
 })()
 
