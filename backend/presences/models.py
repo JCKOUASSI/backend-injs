@@ -150,6 +150,10 @@ class AuditLog(models.Model):
         PARTICIPANT_ADD_FORMATION = 'PARTICIPANT_ADD_FORMATION', 'Inscription auditeur à formation'
         PARTICIPANT_REMOVE_FORMATION = 'PARTICIPANT_REMOVE_FORMATION', 'Désinscription auditeur de formation'
         PARTICIPANT_IMPORT = 'PARTICIPANT_IMPORT', 'Import auditeurs (Excel)'
+        # ── Rattrapages (déplacement inter-cohorte) ──
+        RATTRAPAGE_CREATE = 'RATTRAPAGE_CREATE', 'Création d\'un rattrapage inter-cohorte'
+        RATTRAPAGE_PRESENCE = 'RATTRAPAGE_PRESENCE', 'Présence générée pour un rattrapage'
+        RATTRAPAGE_CANCEL = 'RATTRAPAGE_CANCEL', 'Annulation d\'un rattrapage'
         # ── Formateurs ──
         FORMATEUR_CREATE = 'FORMATEUR_CREATE', 'Création de formateur'
         FORMATEUR_UPDATE = 'FORMATEUR_UPDATE', 'Modification de formateur'
@@ -310,3 +314,109 @@ class DeviceBinding(models.Model):
 
     def __str__(self):
         return f"{self.user} ↔ {self.device_id[:20]}..."
+
+
+class Rattrapage(models.Model):
+    """Rattrapage d'un cours par un auditeur dans la séance d'une AUTRE cohorte.
+
+    Un auditeur (groupe/grade/vague/secrétariat A) peut suivre le même cours
+    dispensé à une autre cohorte (B) pour rattraper une séance manquée.
+
+    Ce modèle trace explicitement l'opération SANS modifier l'appartenance de
+    cohorte de l'auditeur ni créer d'inscription ``ModuleParticipant`` sur le
+    module d'accueil : les effectifs attendus de la cohorte B ne sont donc pas
+    pollués. La présence effective est un ``Pointage`` forcé, lié ici.
+    """
+
+    class Statut(models.TextChoices):
+        PLANIFIE = 'PLANIFIE', 'Planifié'
+        EFFECTUE = 'EFFECTUE', 'Effectué'
+        ANNULE = 'ANNULE', 'Annulé'
+
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name='rattrapages',
+        help_text="Auditeur qui effectue le rattrapage",
+    )
+    seance_rattrapage = models.ForeignKey(
+        SessionModule,
+        on_delete=models.CASCADE,
+        related_name='rattrapages',
+        help_text="Séance d'accueil (autre cohorte) où l'auditeur rattrape le cours",
+    )
+    module_origine = models.ForeignKey(
+        'formations.Module',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rattrapages_origine',
+        help_text="Module de la cohorte d'origine (cours manqué). Optionnel.",
+    )
+    seance_manquee = models.ForeignKey(
+        SessionModule,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rattrapages_manques',
+        help_text="Séance précise manquée par l'auditeur. Optionnel.",
+    )
+    pointage = models.OneToOneField(
+        'Pointage',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rattrapage',
+        help_text="Présence effectivement générée pour ce rattrapage",
+    )
+    statut = models.CharField(
+        max_length=10,
+        choices=Statut.choices,
+        default=Statut.PLANIFIE,
+        db_index=True,
+    )
+    motif = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Motif du rattrapage (ex. absence justifiée, chevauchement…)",
+    )
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='rattrapages_crees',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Rattrapage'
+        verbose_name_plural = 'Rattrapages'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['participant', 'seance_rattrapage'],
+                name='uniq_rattrapage_participant_seance',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['participant', 'statut']),
+            models.Index(fields=['seance_rattrapage', 'statut']),
+        ]
+
+    @property
+    def module_rattrapage(self):
+        return self.seance_rattrapage.module if self.seance_rattrapage_id else None
+
+    @property
+    def formation(self):
+        module = self.module_rattrapage
+        return module.formation if module else None
+
+    def __str__(self):
+        return (
+            f"Rattrapage {self.participant} → {self.seance_rattrapage} "
+            f"({self.get_statut_display()})"
+        )

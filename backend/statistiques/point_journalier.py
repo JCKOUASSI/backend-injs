@@ -14,7 +14,13 @@ from formations.categorie_referentiel import categories_from_raw_values, resolve
 from formations.models import Formation, Module, ModuleParticipant, SessionModule, Participant
 from presences.models import Pointage
 
-from .effectifs import filter_sessions, presents_par_session, stats_creneau_module, categories_for_scope
+from .effectifs import (
+    filter_sessions,
+    presents_par_session,
+    rattrapages_par_session,
+    stats_creneau_module,
+    categories_for_scope,
+)
 
 MOIS_FR = [
     '', 'JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN',
@@ -206,6 +212,7 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
         'participants_by_mod_cat': defaultdict(set),
         'participant_cat': {},
         'presents_by_session': defaultdict(set),
+        'rattrapage_by_session': defaultdict(set),
         'cats_by_formation': defaultdict(list),
     }
 
@@ -253,6 +260,9 @@ def _build_pj_cache(annee, mois, formation_ids, jours, secretariat_id=None, allo
 
     for sid, pids in presents_par_session(session_ids).items():
         cache['presents_by_session'][sid] = pids
+
+    for sid, pids in rattrapages_par_session(session_ids).items():
+        cache['rattrapage_by_session'][sid] = pids
 
     for fid in formation_ids:
         mod_ids = [m.id for m in cache['modules_by_formation'][fid]]
@@ -316,6 +326,7 @@ def _stats_groupe_cached(module, jour, creneau, categorie, cache):
         participant_ids,
         sessions,
         cache['presents_by_session'],
+        cache['rattrapage_by_session'],
     )
 
 
@@ -329,6 +340,7 @@ def _stats_groupe_modules(modules, jour, creneau, categorie, cache):
         participant_ids,
         sessions,
         cache['presents_by_session'],
+        cache['rattrapage_by_session'],
     )
 
 

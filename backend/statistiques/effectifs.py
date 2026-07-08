@@ -338,6 +338,37 @@ def presents_par_session(session_ids):
     return result
 
 
+def rattrapages_par_session(session_ids):
+    """{session_id: set(participant_id)} des auditeurs en rattrapage (attendus
+    additionnels sur la séance d'accueil, hors rattrapages annulés)."""
+    from presences.models import Rattrapage
+
+    result = defaultdict(set)
+    if not session_ids:
+        return result
+    for sid, pid in Rattrapage.objects.filter(
+        seance_rattrapage_id__in=list(session_ids),
+    ).exclude(statut=Rattrapage.Statut.ANNULE).values_list(
+        'seance_rattrapage_id', 'participant_id',
+    ):
+        result[sid].add(pid)
+    return result
+
+
+def rattrapage_participants(session_ids):
+    """{participant_id: Participant} des auditeurs en rattrapage sur ces séances."""
+    from presences.models import Rattrapage
+
+    if not session_ids:
+        return {}
+    qs = (
+        Rattrapage.objects.filter(seance_rattrapage_id__in=list(session_ids))
+        .exclude(statut=Rattrapage.Statut.ANNULE)
+        .select_related('participant')
+    )
+    return {r.participant_id: r.participant for r in qs}
+
+
 def repartition_hf(participants_dict, participant_ids=None):
     """Compte H/F sur un ensemble de participants (dict id -> Participant)."""
     pids = participant_ids if participant_ids is not None else participants_dict.keys()
@@ -353,12 +384,24 @@ def repartition_hf(participants_dict, participant_ids=None):
     return masculin, feminin
 
 
-def stats_creneau_module(participant_ids, sessions, presents_by_session):
+def stats_creneau_module(participant_ids, sessions, presents_by_session, rattrapage_by_session=None):
     """
     Effectifs pour un module sur un créneau (une ou plusieurs séances terminées).
     participant_ids : set des inscrits.
+    rattrapage_by_session : {session_id: set(pid)} des auditeurs en rattrapage
+    (attendus/présents additionnels sur la séance d'accueil). Calculé si absent.
     """
-    effectif = len(participant_ids)
+    if rattrapage_by_session is None:
+        rattrapage_by_session = rattrapages_par_session([s.id for s in sessions])
+
+    inscrits = set(participant_ids)
+    rattr_all = set()
+    for s in sessions:
+        rattr_all |= rattrapage_by_session.get(s.id, set())
+    # Un rattrapant déjà inscrit au module ne double pas l'effectif.
+    rattr_all -= inscrits
+    effectif = len(inscrits) + len(rattr_all)
+
     if not sessions or effectif == 0:
         return {
             'effectif': effectif,
@@ -369,10 +412,10 @@ def stats_creneau_module(participant_ids, sessions, presents_by_session):
             'actif': bool(sessions),
         }
 
-    presents = {
-        pid for s in sessions for pid in presents_by_session.get(s.id, set())
-        if pid in participant_ids
-    }
+    presents = set()
+    for s in sessions:
+        attendus_s = inscrits | rattrapage_by_session.get(s.id, set())
+        presents |= presents_by_session.get(s.id, set()) & attendus_s
     nb_presents = len(presents)
     absents = max(effectif - nb_presents, 0)
     return {
@@ -418,17 +461,23 @@ def effectifs_tableau_agrege(participants, session_ids, module_ids):
             'absences_non_calculees': True,
         }
 
+    # Rattrapages : auditeurs d'autres cohortes attendus/présents sur ces séances.
+    rattr_participants = rattrapage_participants(session_ids)
+    rattr_extra = {pid: p for pid, p in rattr_participants.items() if pid not in participants}
+    participants_all = {**participants, **rattr_extra}
+    effectif_total = len(participants_all)
+
     present_pids = set()
     if session_ids:
         for pids in presents_par_session(session_ids).values():
             present_pids |= pids
-        present_pids &= set(participants.keys())
+        present_pids &= set(participants_all.keys())
 
     effectif_presents = len(present_pids)
     absents = max(effectif_total - effectif_presents, 0)
 
-    m_insc, f_insc = repartition_hf(participants)
-    m_pres, f_pres = repartition_hf(participants, present_pids)
+    m_insc, f_insc = repartition_hf(participants_all)
+    m_pres, f_pres = repartition_hf(participants_all, present_pids)
 
     return {
         'effectifs_auditeurs': effectif_total,
@@ -474,20 +523,27 @@ def aggregation_seances_modules(module_ids, session_ids=None, categorie=None):
         SessionModule.objects.filter(id__in=session_ids).values_list('id', 'module_id')
     )
     presents_map = presents_par_session(session_ids)
+    rattr_map = rattrapages_par_session([sid for sid, _ in sessions])
 
     places_attendues = 0
     places_presentes = 0
     present_any = set()
+    rattr_distinct = set()
 
     for sid, mid in sessions:
         pids_mod = set(par_mod.get(mid, {}))
-        places_attendues += len(pids_mod)
-        pres = presents_map.get(sid, set()) & pids_mod
+        # Rattrapages : attendus additionnels sur la séance d'accueil (hors inscrits).
+        rattr_pids = rattr_map.get(sid, set()) - pids_mod
+        rattr_distinct |= rattr_pids
+        attendus = pids_mod | rattr_pids
+        places_attendues += len(attendus)
+        pres = presents_map.get(sid, set()) & attendus
         places_presentes += len(pres)
         present_any |= pres
 
-    presents_distinct = len(present_any & inscrits_distinct)
-    inscrits_n = len(inscrits_distinct)
+    inscrits_all = inscrits_distinct | rattr_distinct
+    presents_distinct = len(present_any & inscrits_all)
+    inscrits_n = len(inscrits_all)
 
     return {
         'inscrits_distinct': inscrits_n,

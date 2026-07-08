@@ -279,8 +279,43 @@ class RoleGroupsTest(TestCase):
         user.role = User.Role.ENCADRANT
         user.save()
 
-        self.assertFalse(user.groups.filter(name=old_group).exists())
+        self.assertTrue(user.groups.filter(name=old_group).exists())
         self.assertTrue(user.groups.filter(name=new_group).exists())
+
+    def test_multiple_role_groups(self):
+        from authentication.role_groups import get_user_role, get_user_roles, user_in_roles
+
+        user = make_user('multi-role-user', role=User.Role.SECRETARIAT)
+        secretariat_group = Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.SECRETARIAT])
+        encadrant_group = Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.ENCADRANT])
+        user.groups.set([secretariat_group, encadrant_group])
+        user.refresh_from_db()
+
+        self.assertEqual(
+            get_user_roles(user),
+            frozenset({User.Role.SECRETARIAT, User.Role.ENCADRANT}),
+        )
+        self.assertEqual(get_user_role(user), User.Role.SECRETARIAT)
+        self.assertTrue(user_in_roles(user, {User.Role.AUDITEUR, User.Role.ENCADRANT}))
+
+    def test_validate_role_combination_allowed_pair(self):
+        from authentication.role_groups import validate_role_combination
+
+        validate_role_combination({User.Role.SECRETARIAT, User.Role.ENCADRANT})
+
+    def test_validate_role_combination_rejects_mobile_mix(self):
+        from django.core.exceptions import ValidationError
+        from authentication.role_groups import validate_role_combination
+
+        with self.assertRaises(ValidationError):
+            validate_role_combination({User.Role.AUDITEUR, User.Role.SECRETARIAT})
+
+    def test_validate_role_combination_rejects_unlisted_pair(self):
+        from django.core.exceptions import ValidationError
+        from authentication.role_groups import validate_role_combination
+
+        with self.assertRaises(ValidationError):
+            validate_role_combination({User.Role.ADMIN, User.Role.SECRETARIAT})
 
     def test_dual_access_roles_get_staff_status(self):
         from authentication.role_groups import DUAL_ACCESS_ROLES, MOBILE_ONLY_ROLES
@@ -299,13 +334,23 @@ class RoleGroupsTest(TestCase):
         encadrant.refresh_from_db()
         self.assertFalse(encadrant.is_staff)
 
-    def test_staff_status_removed_when_role_changes_away(self):
+    def test_staff_status_kept_while_admin_group_present(self):
         user = make_user('staff-role-change', role=User.Role.ADMIN)
         user.refresh_from_db()
         self.assertTrue(user.is_staff)
 
         user.role = User.Role.SECRETARIAT
         user.save()
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+    def test_staff_status_removed_when_admin_group_replaced(self):
+        user = make_user('staff-role-change-2', role=User.Role.ADMIN)
+        user.refresh_from_db()
+        self.assertTrue(user.is_staff)
+
+        secretariat_group = Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.SECRETARIAT])
+        user.groups.set([secretariat_group])
         user.refresh_from_db()
         self.assertFalse(user.is_staff)
 

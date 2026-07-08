@@ -27,7 +27,7 @@ from formations.models import (
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
-from .models import Pointage, DeviceBinding, AuditLog, _log_audit
+from .models import Pointage, DeviceBinding, AuditLog, Rattrapage, _log_audit
 from .offline_cache import (
     OFFLINE_DATA_CACHE_TIMEOUT,
     OFFLINE_DATA_LOCK_TIMEOUT,
@@ -249,6 +249,14 @@ def _resolve_personne(numero, formation, module=None):
         if module_scope is not None
         else ModuleParticipant.objects.filter(module__formation=formation, participant=participant).exists()
     )
+    if not participant_in_scope and module_scope is not None:
+        # Autoriser un rattrapage inter-cohorte planifié sur ce module (l'auditeur
+        # n'est pas inscrit mais dispose d'un rattrapage actif pour ce module).
+        participant_in_scope = Rattrapage.objects.filter(
+            participant=participant,
+            seance_rattrapage__module=module_scope,
+            statut=Rattrapage.Statut.PLANIFIE,
+        ).exists()
     if not participant_in_scope:
         module_label = _module_scan_label(module_scope)
         return None, None, None, Response(
@@ -1939,6 +1947,28 @@ def formation_dashboard(request, pk):
         cat, data = _classify(insc.participant, 'participant', ParticipantSerializer)
         {'present': presents, 'en_salle': en_salle, 'absent': absents}[cat].append(data)
 
+    # Auditeurs en rattrapage sur les séances d'accueil du périmètre : non inscrits
+    # à la cohorte, mais attendus/présents sur CE créneau précis (l'effectif de la
+    # séance d'accueil augmente sans modifier les inscrits de la cohorte).
+    rattrapage_scope = Rattrapage.objects.filter(
+        statut__in=[Rattrapage.Statut.PLANIFIE, Rattrapage.Statut.EFFECTUE],
+        seance_rattrapage__module_id__in=module_ids_scope,
+        seance_rattrapage__date_journee=jour,
+    ).select_related('participant')
+    if seance_selectionnee:
+        rattrapage_scope = rattrapage_scope.filter(seance_rattrapage=seance_selectionnee)
+
+    nb_rattrapage_places = 0
+    for r in rattrapage_scope:
+        nb_rattrapage_places += 1
+        p = r.participant
+        if p.id in seen_p:
+            continue
+        seen_p.add(p.id)
+        cat, data = _classify(p, 'participant', ParticipantSerializer)
+        data['rattrapage'] = True
+        {'present': presents, 'en_salle': en_salle, 'absent': absents}[cat].append(data)
+
     # Formateurs (périmètre: modules du dashboard)
     seen_fmt = set()
     for insc in ModuleFormateur.objects.filter(module_id__in=module_ids_scope).select_related('formateur'):
@@ -1991,8 +2021,12 @@ def formation_dashboard(request, pk):
     nb_inscrits_encadrants = encadrants_qs.count()
     nb_inscrits = nb_inscrits_participants + nb_inscrits_formateurs + nb_inscrits_encadrants
 
-    # Si filtre séance : total attendus = inscrits, sinon inscrits × nb séances
-    total = nb_inscrits if seance_selectionnee else nb_inscrits * nb_seances_jour
+    # Si filtre séance : total attendus = inscrits, sinon inscrits × nb séances.
+    # Chaque rattrapage ajoute une place attendue sur la séance d'accueil.
+    if seance_selectionnee:
+        total = nb_inscrits + nb_rattrapage_places
+    else:
+        total = nb_inscrits * nb_seances_jour + nb_rattrapage_places
 
     total_pointes = sum(
         1 for pts in sessions_map.values()

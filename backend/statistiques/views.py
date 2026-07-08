@@ -717,7 +717,11 @@ def _historique_mensuel(mois=12, formation_id=None, secretariat_id=None, module_
     # Présences / absences par mois : places séance (inscrits × séances terminées)
     places_par_mois = {cle: {'attendues': 0, 'presentes': 0} for cle in mois_cles}
     if module_ids:
-        from .effectifs import participants_par_module, presents_par_session
+        from .effectifs import (
+            participants_par_module,
+            presents_par_session,
+            rattrapages_par_session,
+        )
 
         par_mod = participants_par_module(module_ids)
         sess_rows = list(
@@ -727,13 +731,15 @@ def _historique_mensuel(mois=12, formation_id=None, secretariat_id=None, module_
         )
         sess_ids = [r[0] for r in sess_rows]
         pres_map = presents_par_session(sess_ids)
+        rattr_map = rattrapages_par_session(sess_ids)
         for sid, mid, d_jour in sess_rows:
             cle = d_jour.strftime('%Y-%m')
             if cle not in places_par_mois:
                 continue
             pids = set(par_mod.get(mid, {}))
-            places_par_mois[cle]['attendues'] += len(pids)
-            places_par_mois[cle]['presentes'] += len(pres_map.get(sid, set()) & pids)
+            attendus = pids | rattr_map.get(sid, set())
+            places_par_mois[cle]['attendues'] += len(attendus)
+            places_par_mois[cle]['presentes'] += len(pres_map.get(sid, set()) & attendus)
 
     pt_presents = {cle: v['presentes'] for cle, v in places_par_mois.items()}
     pt_absents = {

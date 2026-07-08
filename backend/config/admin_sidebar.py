@@ -1,10 +1,10 @@
-"""Navigation latérale et onglets contextuels de l'admin Unfold."""
+"""Navigation latérale de l'admin Django personnalisé."""
 
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 
-def get_admin_sidebar_navigation(app_url='https://app.sygepcpfae.org'):
+def get_admin_sidebar_navigation():
   return [
     {
       'title': _('Navigation'),
@@ -16,14 +16,14 @@ def get_admin_sidebar_navigation(app_url='https://app.sygepcpfae.org'):
           'link': reverse_lazy('admin:index'),
         },
         {
-          'title': _('Dashboard web'),
-          'icon': 'open_in_new',
-          'link': app_url,
-        },
-        {
           'title': _('Diagnostic volume horaire'),
           'icon': 'monitoring',
           'link': reverse_lazy('admin:formations_volume_horaire_diagnostic'),
+        },
+        {
+          'title': _('Guide des actions'),
+          'icon': 'menu_book',
+          'link': reverse_lazy('admin:admin_guide_actions'),
         },
       ],
     },
@@ -102,6 +102,11 @@ def get_admin_sidebar_navigation(app_url='https://app.sygepcpfae.org'):
           'title': _('Utilisateurs'),
           'icon': 'manage_accounts',
           'link': reverse_lazy('admin:authentication_user_changelist'),
+        },
+        {
+          'title': _('Groupes & permissions'),
+          'icon': 'admin_panel_settings',
+          'link': reverse_lazy('admin:auth_group_changelist'),
         },
         {
           'title': _('Liaisons appareils'),

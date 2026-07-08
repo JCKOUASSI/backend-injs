@@ -905,6 +905,11 @@ export default function FormationDetail() {
                                       <i className={`bi ${personIcon(p)} me-1`}></i>
                                       {personLabel(p)}
                                     </span>
+                                    {p.rattrapage && (
+                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                        <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
+                                      </span>
+                                    )}
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>
@@ -961,6 +966,11 @@ export default function FormationDetail() {
                                       <i className={`bi ${personIcon(p)} me-1`}></i>
                                       {personLabel(p)}
                                     </span>
+                                    {p.rattrapage && (
+                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                        <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
+                                      </span>
+                                    )}
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>
@@ -1008,6 +1018,11 @@ export default function FormationDetail() {
                                       <i className={`bi ${personIcon(p)} me-1`}></i>
                                       {personLabel(p)}
                                     </span>
+                                    {p.rattrapage && (
+                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                        <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
+                                      </span>
+                                    )}
                                   </small>
                                 </td>
                                 <td><code style={{ fontSize: '0.82rem' }}>{matricule(p)}</code></td>

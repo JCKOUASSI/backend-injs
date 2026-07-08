@@ -4,6 +4,8 @@ import logging
 
 from django.contrib.auth import get_user_model
 
+from authentication.role_groups import user_in_roles
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ def _ensure_user_matricule(user):
 
 def _sync_encadrant_user_link(user):
     """Assure un matricule sur le compte encadrant (la fiche métier est le User lui-même)."""
-    if user.role != User.Role.ENCADRANT:
+    if not user_in_roles(user, {'ENCADRANT'}):
         return
     _ensure_user_matricule(user)
 
@@ -33,7 +35,7 @@ def _sync_formateur_user_link(user):
     """Lie le compte FORMATEUR à un profil Formateur, ou le crée s'il n'existe pas."""
     from formations.models import Formateur
 
-    if user.role != User.Role.FORMATEUR:
+    if not user_in_roles(user, {'FORMATEUR'}):
         return
 
     badge = _ensure_user_matricule(user)
@@ -122,12 +124,17 @@ def _update_participant_from_user(participant, user):
     if participant.secretariat_id != getattr(user.secretariat, 'pk', None):
         participant.secretariat = user.secretariat
         updates.append('secretariat')
+    user_mat = (user.matricule or '').strip()
+    participant_mat = (participant.matricule or '').strip()
+    if user_mat and user_mat != participant_mat:
+        participant.matricule = user_mat
+        updates.append('matricule')
     if updates:
         participant.save(update_fields=updates)
-    # Le matricule de la fiche fait foi : on aligne le compte dessus (jamais l'inverse).
-    if participant.matricule and (user.matricule or '').strip() != participant.matricule:
-        User.objects.filter(pk=user.pk).update(matricule=participant.matricule)
-        user.matricule = participant.matricule
+    # Matricule vide sur le compte : la fiche fait foi (dérive de format, badgeage).
+    if participant_mat and not user_mat:
+        User.objects.filter(pk=user.pk).update(matricule=participant_mat)
+        user.matricule = participant_mat
 
 
 def _sync_auditeur_user_link(user):
@@ -141,7 +148,7 @@ def _sync_auditeur_user_link(user):
     """
     from formations.models import Participant
 
-    if user.role != User.Role.AUDITEUR:
+    if not user_in_roles(user, {'AUDITEUR'}):
         return
 
     # 1. Fiche déjà liée au compte : autorité, on l'aligne et on s'arrête.

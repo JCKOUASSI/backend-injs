@@ -1,7 +1,16 @@
 from django.urls import path
 from . import views
+from . import rattrapage_api
 
 urlpatterns = [
+    # Rattrapages inter-cohorte (DFRC / Encadrant / Secrétariat)
+    path('rattrapages/', rattrapage_api.rattrapage_list_create, name='rattrapage-list-create'),
+    path('rattrapages/participants/', rattrapage_api.rattrapage_participants_search, name='rattrapage-participants'),
+    path('rattrapages/seances/', rattrapage_api.rattrapage_seances_search, name='rattrapage-seances'),
+    path('rattrapages/modules/', rattrapage_api.rattrapage_modules_search, name='rattrapage-modules'),
+    path('rattrapages/<int:pk>/generer-presence/', rattrapage_api.rattrapage_generer_presence, name='rattrapage-generer'),
+    path('rattrapages/<int:pk>/annuler/', rattrapage_api.rattrapage_annuler, name='rattrapage-annuler'),
+
     # Scan QR (participant — pas besoin d'auth)
     path('scan/', views.scan_view, name='scan'),
     path('scan/offline-data/', views.scan_offline_data, name='scan-offline-data'),

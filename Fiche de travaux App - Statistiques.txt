@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans
 ================================================================================
-Dernière mise à jour : 19/06/2026 01:04
+Dernière mise à jour : 07/07/2026 17:49
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,6 +28,13 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+
+[07/07/2026] Rattrapages comptés dans les statistiques de la séance d'accueil : un auditeur en rattrapage (statut PLANIFIE/EFFECTUE) devient un attendu additionnel sur sa séance d'accueil, et présent s'il a pointé. Un rattrapage annulé est exclu.
+  Fichiers modifiés :
+  · backend/statistiques/effectifs.py — helpers rattrapages_par_session()/rattrapage_participants() ; aggregation_seances_modules(), stats_creneau_module() (param rattrapage_by_session), effectifs_tableau_agrege() (attendus + répartition H/F) rattrapage-aware.
+  · backend/statistiques/point_journalier.py — cache rattrapage_by_session alimenté et passé aux stats de créneau (évite N+1).
+  · backend/statistiques/views.py — évolution mensuelle des places (attendues/présentes) inclut les rattrapages.
+  · backend/presences/test_rattrapage.py — tests mis à jour (compte attendu/présent, planifié, annulé exclu).
 
 [19/06/2026] Bilan FAC — sélection grades et groupes par cases à cocher (API perimetre + filtres grades/groupes sur génération).
   · Enregistré automatiquement le 19/06/2026 01:04

@@ -2,10 +2,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-from django.templatetags.static import static
-from django.utils.translation import gettext_lazy as _
-
-from config.admin_sidebar import get_admin_sidebar_navigation, get_admin_tabs
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -74,9 +70,6 @@ if DEBUG:
 
 # Application definition
 INSTALLED_APPS = [
-    'unfold',
-    'unfold.contrib.filters',
-    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -124,6 +117,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'dashboard.context_processors.sidebar_counts',
                 'config.context_processors.public_urls',
+                'config.context_processors.admin_ui',
             ],
         },
     },
@@ -315,57 +309,8 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# URL publique de l'application web (bouton « Voir le site » dans l'admin Unfold).
+# URL publique de l'application web (lien « Dashboard web » dans l'admin).
 PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'https://app.sygepcpfae.org').rstrip('/')
-
-# ── Django Unfold (admin) ─────────────────────────────────────────────────────
-UNFOLD = {
-    'SITE_TITLE': 'SYGEP-CPFAE Admin',
-    'SITE_HEADER': 'SYGEP-CPFAE',
-    'SITE_SUBHEADER': 'Gestion des formations et présences',
-    'SITE_URL': PUBLIC_APP_URL,
-    'SITE_SYMBOL': 'school',
-    'THEME': 'light',
-    'BORDER_RADIUS': '20px',
-    'COLORS': {
-        'primary': {
-            '50': 'oklch(97% 0.02 60)',
-            '100': 'oklch(94% 0.05 58)',
-            '200': 'oklch(88% 0.09 55)',
-            '300': 'oklch(80% 0.13 52)',
-            '400': 'oklch(73% 0.16 50)',
-            '500': 'oklch(70% 0.18 48)',   # #F97316 orange-500
-            '600': 'oklch(64% 0.19 42)',   # #EA580C orange-600
-            '700': 'oklch(55% 0.17 40)',   # #C2410C orange-700
-            '800': 'oklch(47% 0.14 38)',
-            '900': 'oklch(40% 0.11 38)',
-            '950': 'oklch(27% 0.08 38)',
-        },
-        'base': {
-            '50': 'oklch(98.5% 0.002 260)',
-            '100': 'oklch(97% 0.003 260)',
-            '200': 'oklch(93% 0.005 260)',
-            '300': 'oklch(88% 0.008 260)',
-            '400': 'oklch(72% 0.015 260)',
-            '500': 'oklch(58% 0.02 260)',
-            '600': 'oklch(48% 0.025 260)',
-            '700': 'oklch(40% 0.028 260)',
-            '800': 'oklch(30% 0.03 260)',
-            '900': 'oklch(22% 0.032 260)',
-            '950': 'oklch(16% 0.028 260)',
-        },
-    },
-    'STYLES': [
-        lambda request: static('admin/custom_admin.css'),
-    ],
-    'DASHBOARD_CALLBACK': 'config.admin_dashboard.admin_dashboard_callback',
-    'SIDEBAR': {
-        'show_search': True,
-        'show_all_applications': False,
-        'navigation': get_admin_sidebar_navigation(PUBLIC_APP_URL),
-    },
-    'TABS': get_admin_tabs(),
-}
 
 # ── Production security (activé quand DEBUG=False) ──
 # NOTE: SECURE_SSL_REDIRECT est intentionnellement désactivé — la redirection

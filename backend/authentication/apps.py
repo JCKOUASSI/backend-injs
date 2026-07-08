@@ -108,9 +108,7 @@ def _on_user_saved(sender, instance, **kwargs):
 
 def _on_user_groups_changed(sender, instance, action, **kwargs):
     """Quand les groupes changent (admin Django), resynchronise role + is_staff."""
-    # post_remove est ignoré : il survient en plein remplacement role→groupe
-    # et provoque une fenêtre transitoire sans groupe ROLE_*.
-    if action not in ('post_add', 'post_clear'):
+    if action not in ('post_add', 'post_clear', 'post_remove'):
         return
     from .role_groups import is_bulk_role_sync, sync_role_from_group, sync_user_staff_status
 

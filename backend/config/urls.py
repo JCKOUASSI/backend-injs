@@ -2,12 +2,11 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from config.admin_site import setup_admin_site
 from config.views import api_root
 from config.static_views import service_worker, favicon
 
-admin.site.site_header = "SYGEP-CPFAE Administration"
-admin.site.site_title = "SYGEP-CPFAE Admin"
-admin.site.index_title = "Gestion des formations et présences"
+setup_admin_site()
 
 urlpatterns = [
     # Racine → page d'accueil API

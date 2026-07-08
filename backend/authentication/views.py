@@ -21,9 +21,11 @@ from .serializers import (
 from .permissions import IsDFRC, IsSecretariatOrDFRC, IsUserMutationAllowed, get_creatable_roles
 from .role_groups import (
     ALLOWED_WEB_ROLES,
+    MOBILE_ONLY_ROLES,
     ROLE_GROUP_NAMES,
     user_role_context,
     get_user_role,
+    get_user_roles,
     user_has_perm,
     user_in_roles,
     users_with_roles,
@@ -36,11 +38,13 @@ User = get_user_model()
 
 
 def _user_payload(user):
-    """Profil utilisateur pour le client avec le rôle effectif (groupes Django)."""
+    """Profil utilisateur pour le client avec les rôles effectifs (groupes Django)."""
     data = UserSerializer(user).data
     effective = get_user_role(user)
+    roles = sorted(get_user_roles(user))
     if effective:
         data['role'] = effective
+    data['roles'] = roles or data.get('roles', [])
     return data
 
 
@@ -101,9 +105,14 @@ def login_view(request):
 
     device_id = request.data.get('device_id', '').strip()
     user_role = get_user_role(user)
+    user_roles = get_user_roles(user)
 
     if not device_id and not user_has_perm(user, 'authentication.access_web') and not user_in_roles(user, ALLOWED_WEB_ROLES):
-        if user_role == User.Role.AUDITEUR:
+        if user_roles <= MOBILE_ONLY_ROLES and User.Role.AUDITEUR in user_roles:
+            detail = 'Les comptes auditeur sont réservés à l\'application mobile.'
+        elif user_roles <= MOBILE_ONLY_ROLES and User.Role.FORMATEUR in user_roles:
+            detail = 'Les comptes formateur sont réservés à l\'application mobile.'
+        elif user_role == User.Role.AUDITEUR:
             detail = 'Les comptes auditeur sont réservés à l\'application mobile.'
         elif user_role == User.Role.FORMATEUR:
             detail = 'Les comptes formateur sont réservés à l\'application mobile.'
@@ -117,12 +126,12 @@ def login_view(request):
         )
         return Response({'detail': detail}, status=status.HTTP_403_FORBIDDEN)
 
-    if user_role in ('AUDITEUR', 'FORMATEUR', 'ENCADRANT'):
+    if user_in_roles(user, ('AUDITEUR', 'FORMATEUR', 'ENCADRANT')):
         from .profile_sync import sync_user_profile_links
         sync_user_profile_links(user)
 
     # ── Verrouillage appareil (auditeurs / formateurs uniquement) ──
-    if device_id and user_role in ('AUDITEUR', 'FORMATEUR'):
+    if device_id and user_in_roles(user, ('AUDITEUR', 'FORMATEUR')):
         existing = DeviceBinding.objects.filter(
             device_id=device_id, is_active=True
         ).select_related('user').first()
