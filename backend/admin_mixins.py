@@ -1,6 +1,8 @@
 """Mixins partagés pour l'admin Django SYGEP-CPFAE."""
 
-from authentication.role_groups import get_user_role, user_in_roles, users_with_roles
+from django.db.models import Q
+
+from authentication.role_groups import get_user_roles, user_in_roles, users_with_roles
 from presences.models import AuditLog, _log_audit
 
 
@@ -37,23 +39,26 @@ class AdminScopeMixin:
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = get_user_role(request.user)
+        roles = get_user_roles(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
+        scope_filter = Q()
 
-        if role == 'ENCADRANT' and self.admin_scope_superviseur_field:
-            return qs.filter(**{self.admin_scope_superviseur_field: request.user})
+        if 'ENCADRANT' in roles and self.admin_scope_superviseur_field:
+            scope_filter |= Q(**{self.admin_scope_superviseur_field: request.user})
 
-        if role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            if not secretariat:
-                return qs.none()
-            if self.admin_scope_secretariat_field:
-                return qs.filter(**{self.admin_scope_secretariat_field: secretariat})
-            if self.admin_scope_formation_field:
-                return qs.filter(
-                    **{f'{self.admin_scope_formation_field}__modules__secretariat': secretariat}
-                ).distinct()
+        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'}:
+            if secretariat:
+                if self.admin_scope_secretariat_field:
+                    scope_filter |= Q(**{self.admin_scope_secretariat_field: secretariat})
+                elif self.admin_scope_formation_field:
+                    scope_filter |= Q(
+                        **{f'{self.admin_scope_formation_field}__modules__secretariat': secretariat}
+                    )
 
-        if role in ('FINANCE', 'ENCADRANT', 'AUDITEUR'):
+        if scope_filter:
+            return qs.filter(scope_filter).distinct()
+
+        if roles & {'FINANCE', 'ENCADRANT', 'AUDITEUR', 'SECRETARIAT', 'CHEF_SECRETARIAT'}:
             return qs.none()
 
         return qs
@@ -69,15 +74,15 @@ class ParticipantAdminScopeMixin(AdminScopeMixin):
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = get_user_role(request.user)
+        roles = get_user_roles(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
 
-        if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and secretariat:
+        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'} and secretariat:
             return qs.filter(secretariat=secretariat).filter(
                 _participants_grade_filter(secretariat)
             )
 
-        if role == 'ENCADRANT':
+        if 'ENCADRANT' in roles:
             return qs.none()
 
         return qs.none()
@@ -89,13 +94,13 @@ class FormateurAdminScopeMixin(AdminScopeMixin):
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = get_user_role(request.user)
+        roles = get_user_roles(request.user)
         secretariat = getattr(request.user, 'secretariat', None)
 
-        if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and secretariat:
+        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'} and secretariat:
             return qs.filter(secretariats=secretariat).distinct()
 
-        if role == 'ENCADRANT':
+        if 'ENCADRANT' in roles:
             return qs.none()
 
         return qs.none()
@@ -111,13 +116,15 @@ class UserAdminScopeMixin:
         if admin_user_has_global_access(request.user):
             return qs
 
-        role = get_user_role(request.user)
-        subordinates = get_creatable_roles(role)
+        roles = get_user_roles(request.user)
+        subordinates = set()
+        for role in roles:
+            subordinates.update(get_creatable_roles(role))
         if not subordinates:
             return qs.none()
 
         qs = users_with_roles(subordinates)
-        if role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and request.user.secretariat_id:
+        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'} and request.user.secretariat_id:
             qs = qs.filter(secretariat=request.user.secretariat)
         return qs
 

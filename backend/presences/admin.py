@@ -1,5 +1,4 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
@@ -44,7 +43,7 @@ class TypePersonneFilter(admin.SimpleListFilter):
 
 
 @admin.register(Pointage)
-class PointageAdmin(AdminScopeMixin, ModelAdmin):
+class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
     admin_scope_secretariat_field = 'session__module__secretariat'
     admin_scope_superviseur_field = 'session__module__superviseur'
     list_display = [
@@ -400,11 +399,11 @@ class PointageAdmin(AdminScopeMixin, ModelAdmin):
 
 
 @admin.register(AuditLog)
-class AuditLogAdmin(AdminScopeMixin, ModelAdmin):
+class AuditLogAdmin(AdminScopeMixin, admin.ModelAdmin):
     admin_scope_secretariat_field = None
 
     def get_queryset(self, request):
-        qs = super(ModelAdmin, self).get_queryset(request)
+        qs = super().get_queryset(request)
         if admin_user_has_global_access(request.user):
             return qs
 
@@ -458,7 +457,7 @@ class AuditLogAdmin(AdminScopeMixin, ModelAdmin):
 
 
 @admin.register(Rattrapage)
-class RattrapageAdmin(AdminScopeMixin, ModelAdmin):
+class RattrapageAdmin(AdminScopeMixin, admin.ModelAdmin):
     """Gestion des rattrapages inter-cohorte (auditeur suivant une séance d'une
     autre cohorte pour rattraper un cours manqué)."""
 
@@ -628,7 +627,7 @@ class RattrapageAdmin(AdminScopeMixin, ModelAdmin):
 
 
 @admin.register(DeviceBinding)
-class DeviceBindingAdmin(ModelAdmin):
+class DeviceBindingAdmin(admin.ModelAdmin):
     list_display = [
         'user', 'device_id_court', 'device_info', 'is_active', 'bound_at',
     ]

@@ -207,7 +207,7 @@ export function isSecretariatScopedRole(role) {
 
 /** ID secrétariat imposé pour un compte secrétariat (null si non applicable). */
 export function lockedSecretariatId(user) {
-  if (!isSecretariatScopedRole(user?.role) || user?.secretariat == null || user?.secretariat === '') {
+  if (!hasAppRole(user, SECRETARIAT_SCOPED_ROLES) || user?.secretariat == null || user?.secretariat === '') {
     return null
   }
   return String(user.secretariat)
@@ -227,7 +227,13 @@ export function webLoginForbiddenMessage(role) {
   return 'Ce compte n\'a pas accès à la plateforme web.'
 }
 
+export function getUserRoles(user) {
+  if (!user) return []
+  if (Array.isArray(user.roles) && user.roles.length) return user.roles
+  return user.role ? [user.role] : []
+}
+
 export function hasAppRole(user, allowedRoles) {
-  if (!user || !user.role) return false
-  return allowedRoles.includes(user.role)
+  const roles = getUserRoles(user)
+  return roles.some((role) => allowedRoles.includes(role))
 }

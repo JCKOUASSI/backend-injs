@@ -3,14 +3,13 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin
-from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from admin_mixins import AuditLogAdminMixin, UserAdminScopeMixin
 from presences.models import AuditLog
 
+from .admin_forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from .models import User
-from .role_groups import GROUP_NAME_TO_ROLE, ROLE_GROUP_NAMES, ROLE_LABELS, get_user_role
+from .role_groups import GROUP_NAME_TO_ROLE, ROLE_GROUP_NAMES, ROLE_LABELS, get_user_role, get_user_roles
 
 try:
     admin.site.unregister(Group)
@@ -19,12 +18,22 @@ except admin.sites.NotRegistered:
 
 
 @admin.register(Group)
-class RoleGroupAdmin(BaseGroupAdmin, ModelAdmin):
+class RoleGroupAdmin(BaseGroupAdmin, admin.ModelAdmin):
     """Groupes Django ROLE_* — permissions et rôles de l'application."""
 
     list_display = ['name', 'role_label', 'permissions_count']
     search_fields = ['name']
     filter_horizontal = ['permissions']
+    fieldsets = (
+        (None, {
+            'fields': ('name',),
+            'description': (
+                'Chaque groupe ROLE_* correspond à un rôle métier. '
+                'Modifiez les permissions ci-dessous pour définir ce que ce rôle peut faire.'
+            ),
+        }),
+        ('Permissions du rôle', {'fields': ('permissions',)}),
+    )
 
     @admin.display(description='Rôle métier')
     def role_label(self, obj):
@@ -39,7 +48,7 @@ class RoleGroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 
 @admin.register(User)
-class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdmin):
+class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, admin.ModelAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
@@ -64,7 +73,7 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
     list_select_related = ['secretariat']
     list_per_page = 50
     autocomplete_fields = ['secretariat']
-    filter_horizontal = ['groups']
+    filter_horizontal = ['groups', 'user_permissions']
     readonly_fields = ['role_badge']
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -73,6 +82,10 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             'Permissions',
             {
                 'fields': ('is_active', 'is_staff', 'is_superuser', 'user_permissions'),
+                'description': (
+                    'Préférez Administration → Groupes & permissions pour modifier les droits d\'un rôle. '
+                    'Les permissions individuelles ci-dessous sont réservées aux exceptions (super-utilisateur).'
+                ),
             },
         ),
         ('Dates importantes', {'fields': ('last_login', 'date_joined')}),
@@ -84,8 +97,9 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
                 'secretariat', 'must_change_password',
             ),
             'description': (
-                'Le rôle et les permissions sont définis par le groupe Django (ROLE_*). '
-                'Attribuez un seul groupe de rôle par utilisateur.'
+                'Attribuez ici les rôles (groupes ROLE_*). '
+                'Seules certaines combinaisons multi-rôles sont autorisées (ex. Secrétariat + Encadrant). '
+                'Les permissions détaillées se configurent dans Administration → Groupes & permissions.'
             ),
         }),
     )
@@ -99,14 +113,38 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
                 'secretariat',
             ),
             'description': (
-                'Sélectionnez le groupe de rôle (ROLE_*) — il détermine le rôle et les permissions.'
+                'Sélectionnez un ou plusieurs groupes ROLE_* (combinaisons limitées — voir aide). '
+                'Permissions du rôle : Administration → Groupes & permissions.'
             ),
         }),
     )
 
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if request.user.is_superuser:
+            return fieldsets
+        result = []
+        for name, opts in fieldsets:
+            if name != 'Permissions':
+                result.append((name, opts))
+                continue
+            fields = tuple(f for f in opts['fields'] if f != 'user_permissions')
+            result.append((name, {**opts, 'fields': fields}))
+        return result
+
     def formfield_for_manytomany(self, db_field, request, **kwargs):
         if db_field.name == 'groups':
             kwargs['queryset'] = Group.objects.filter(name__in=ROLE_GROUP_NAMES.values())
+            kwargs['label'] = 'Rôles (groupes ROLE_*)'
+            kwargs['help_text'] = (
+                'Choisissez un ou plusieurs rôles. Pour modifier les droits associés à un rôle, '
+                'allez dans Administration → Groupes & permissions.'
+            )
+        if db_field.name == 'user_permissions':
+            kwargs['help_text'] = (
+                'Permissions exceptionnelles pour cet utilisateur uniquement. '
+                'Utilisez les flèches pour déplacer les droits autorisés vers la colonne de droite.'
+            )
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def _audit_cible(self, obj):
@@ -116,9 +154,9 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             obj.get_full_name() or obj.username,
         )
 
-    @admin.display(description='Rôle', ordering='role')
+    @admin.display(description='Rôles', ordering='role')
     def role_badge(self, obj):
-        effective = get_user_role(obj) or obj.role
+        effective_roles = sorted(get_user_roles(obj)) or ([obj.role] if obj.role else [])
         colors = {
             User.Role.ADMIN: ('#fdecec', '#b42318'),
             User.Role.DIRECTION: ('#eef6fc', '#0f4c81'),
@@ -133,10 +171,13 @@ class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, ModelAdm
             User.Role.FORMATEUR: ('#f3f4f6', '#374151'),
             User.Role.AUDITEUR: ('#f3f4f6', '#374151'),
         }
-        bg, fg = colors.get(effective, ('#f3f4f6', '#374151'))
-        label = ROLE_LABELS.get(effective, effective)
-        return format_html(
-            '<span style="background:{};color:{};padding:3px 8px;'
-            'border-radius:999px;font-weight:600;font-size:11px;">{}</span>',
-            bg, fg, label,
-        )
+        badges = []
+        for effective in effective_roles:
+            bg, fg = colors.get(effective, ('#f3f4f6', '#374151'))
+            label = ROLE_LABELS.get(effective, effective)
+            badges.append(format_html(
+                '<span style="background:{};color:{};padding:3px 8px;'
+                'border-radius:999px;font-weight:600;font-size:11px;margin-right:4px;">{}</span>',
+                bg, fg, label,
+            ))
+        return format_html(''.join(badges)) if badges else '—'

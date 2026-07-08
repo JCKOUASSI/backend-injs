@@ -1,8 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import api, { setSessionExpiredCallback } from '../services/api'
-import { isWebRoleAllowed, webLoginForbiddenMessage } from '../utils/roles'
+import { hasAppRole, webLoginForbiddenMessage, ALLOWED_WEB_ROLES } from '../utils/roles'
 
 const AuthContext = createContext(null)
+
+function canAccessWeb(userData) {
+  return hasAppRole(userData, ALLOWED_WEB_ROLES)
+}
 
 function normalizeUser(userData) {
   return {
@@ -32,7 +36,7 @@ export function AuthProvider({ children }) {
     if (token) {
       api.get('/auth/me/')
         .then(res => {
-          if (!isWebRoleAllowed(res.data?.role)) {
+          if (!canAccessWeb(res.data)) {
             _clearSession()
             return
           }
@@ -49,7 +53,7 @@ export function AuthProvider({ children }) {
     const response = await api.post('/auth/login/', { username, password })
     const { access, refresh, user: userData } = response.data
 
-    if (!isWebRoleAllowed(userData?.role)) {
+    if (!canAccessWeb(userData)) {
       const err = new Error('Web access forbidden')
       err.response = { data: { detail: webLoginForbiddenMessage(userData?.role) } }
       throw err
@@ -71,7 +75,7 @@ export function AuthProvider({ children }) {
 
   const refreshUser = useCallback(async () => {
     const res = await api.get('/auth/me/')
-    if (!isWebRoleAllowed(res.data?.role)) {
+    if (!canAccessWeb(res.data)) {
       _clearSession()
       return
     }

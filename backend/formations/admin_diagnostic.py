@@ -1,20 +1,18 @@
 from django.contrib import admin
 from django.urls import path
 from django.views.generic import TemplateView
-from unfold.views import UnfoldModelAdminViewMixin
 
 from .volume_horaire import run_organisation_diagnostic
 
 
-class VolumeHoraireDiagnosticView(UnfoldModelAdminViewMixin, TemplateView):
-    title = 'Diagnostic volume horaire'
-    permission_required = ()
+class VolumeHoraireDiagnosticView(TemplateView):
     template_name = 'admin/formations/volume_horaire_diagnostic.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         depassements_only = self.request.GET.get('depassements_only') == '1'
         context.update({
+            'title': 'Diagnostic volume horaire',
             'result': run_organisation_diagnostic(
                 self.request,
                 depassements_only=depassements_only,
@@ -38,7 +36,7 @@ def attach_volume_diagnostic_admin_urls():
             path(
                 'diagnostique-volume-horaire/',
                 admin.site.admin_view(
-                    VolumeHoraireDiagnosticView.as_view(model_admin=module_admin)
+                    VolumeHoraireDiagnosticView.as_view()
                 ),
                 name='formations_volume_horaire_diagnostic',
             ),

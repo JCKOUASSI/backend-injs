@@ -1,5 +1,4 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin, TabularInline
 
 from .models import (
     Questionnaire, Question, ChoixQuestion,
@@ -7,13 +6,13 @@ from .models import (
 )
 
 
-class ChoixQuestionInline(TabularInline):
+class ChoixQuestionInline(admin.TabularInline):
     model = ChoixQuestion
     extra = 2
     fields = ['ordre', 'libelle']
 
 
-class QuestionInline(TabularInline):
+class QuestionInline(admin.TabularInline):
     model = Question
     extra = 1
     fields = ['ordre', 'intitule', 'type_question', 'obligatoire']
@@ -21,7 +20,7 @@ class QuestionInline(TabularInline):
 
 
 @admin.register(Questionnaire)
-class QuestionnaireAdmin(ModelAdmin):
+class QuestionnaireAdmin(admin.ModelAdmin):
     list_display = ['get_titres', 'cible', 'statut', 'get_categories', 'module', 'createur', 'created_at']
     list_filter = ['cible', 'statut']
     search_fields = ['titres', 'module__intitule']
@@ -38,7 +37,7 @@ class QuestionnaireAdmin(ModelAdmin):
 
 
 @admin.register(Question)
-class QuestionAdmin(ModelAdmin):
+class QuestionAdmin(admin.ModelAdmin):
     list_display = ['questionnaire', 'ordre', 'intitule', 'type_question', 'obligatoire']
     list_filter = ['type_question', 'obligatoire']
     search_fields = ['intitule']
@@ -46,7 +45,7 @@ class QuestionAdmin(ModelAdmin):
 
 
 @admin.register(ReponseQuestionnaire)
-class ReponseQuestionnaireAdmin(ModelAdmin):
+class ReponseQuestionnaireAdmin(admin.ModelAdmin):
     list_display = ['participant', 'questionnaire', 'soumis_le']
     list_filter = ['questionnaire__cible', 'questionnaire__statut']
     search_fields = ['participant__nom', 'participant__prenom']

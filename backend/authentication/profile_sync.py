@@ -4,6 +4,8 @@ import logging
 
 from django.contrib.auth import get_user_model
 
+from authentication.role_groups import user_in_roles
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ def _ensure_user_matricule(user):
 
 def _sync_encadrant_user_link(user):
     """Assure un matricule sur le compte encadrant (la fiche métier est le User lui-même)."""
-    if user.role != User.Role.ENCADRANT:
+    if not user_in_roles(user, {'ENCADRANT'}):
         return
     _ensure_user_matricule(user)
 
@@ -33,7 +35,7 @@ def _sync_formateur_user_link(user):
     """Lie le compte FORMATEUR à un profil Formateur, ou le crée s'il n'existe pas."""
     from formations.models import Formateur
 
-    if user.role != User.Role.FORMATEUR:
+    if not user_in_roles(user, {'FORMATEUR'}):
         return
 
     badge = _ensure_user_matricule(user)
@@ -141,7 +143,7 @@ def _sync_auditeur_user_link(user):
     """
     from formations.models import Participant
 
-    if user.role != User.Role.AUDITEUR:
+    if not user_in_roles(user, {'AUDITEUR'}):
         return
 
     # 1. Fiche déjà liée au compte : autorité, on l'aligne et on s'arrête.

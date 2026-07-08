@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import logo from './assets/logo.png'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { hasAppRole } from './utils/roles'
+import { hasAppRole, getUserRoles } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
 import AppNotificationsBell from './components/AppNotificationsBell'
 import Login from './pages/Login'
@@ -88,24 +88,24 @@ function Layout({ children, breadcrumb }) {
     return path.startsWith(route)
   }
 
-  const isFinanceRole = user?.role === 'FINANCE'
-  const isArchiveRole = user?.role === 'ARCHIVE'
-  const isSuperviseurRole = user?.role === 'SUPERVISEUR'
-  const canViewFinanceModule = FINANCE_MODULE_ROLES.includes(user?.role) && !isArchiveRole
-  const canViewFinanceDashboard = FINANCE_EXPORT_ROLES.includes(user?.role) && !isArchiveRole
-  const canViewFinanceSettings = FINANCE_SETTINGS_ROLES.includes(user?.role)
-  const canViewParticipants = OPERATION_VIEW_ROLES.includes(user?.role)
-  const canViewRattrapages = PRESENCE_VIEW_ROLES.includes(user?.role)
-  const canViewFormateurs = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'].includes(user?.role)
+  const isFinanceRole = hasAppRole(user, ['FINANCE'])
+  const isArchiveRole = hasAppRole(user, ['ARCHIVE'])
+  const isSuperviseurRole = hasAppRole(user, ['SUPERVISEUR'])
+  const canViewFinanceModule = hasAppRole(user, FINANCE_MODULE_ROLES) && !isArchiveRole
+  const canViewFinanceDashboard = hasAppRole(user, FINANCE_EXPORT_ROLES) && !isArchiveRole
+  const canViewFinanceSettings = hasAppRole(user, FINANCE_SETTINGS_ROLES)
+  const canViewParticipants = hasAppRole(user, OPERATION_VIEW_ROLES)
+  const canViewRattrapages = hasAppRole(user, PRESENCE_VIEW_ROLES)
+  const canViewFormateurs = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'])
     || canViewFinanceModule
-  const canViewUsers = [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewSecretariats = ADMIN_LEVEL_ROLES.includes(user?.role)
-  const canViewImport = [...ADMIN_LEVEL_ROLES, 'CHEF_SECRETARIAT', 'SECRETARIAT'].includes(user?.role)
-  const canViewEvaluations = EVALUATION_ALLOWED_ROLES.includes(user?.role)
-  const canViewReferentiels = ADMIN_LEVEL_ROLES.includes(user?.role)
-  const canViewStatistiques = STATS_ALLOWED_ROLES.includes(user?.role)
-  const isDirection = user?.role === 'DIRECTION'
-  const canViewFinanceNotifications = FINANCE_MODULE_ROLES.includes(user?.role) && user?.role !== 'ARCHIVE'
+  const canViewUsers = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'CHEF_SECRETARIAT', 'SECRETARIAT'])
+  const canViewSecretariats = hasAppRole(user, ADMIN_LEVEL_ROLES)
+  const canViewImport = hasAppRole(user, IMPORT_ALLOWED_ROLES)
+  const canViewEvaluations = hasAppRole(user, EVALUATION_ALLOWED_ROLES)
+  const canViewReferentiels = hasAppRole(user, ADMIN_LEVEL_ROLES)
+  const canViewStatistiques = hasAppRole(user, STATS_ALLOWED_ROLES)
+  const isDirection = hasAppRole(user, ['DIRECTION'])
+  const canViewFinanceNotifications = hasAppRole(user, FINANCE_MODULE_ROLES) && !hasAppRole(user, ['ARCHIVE'])
   const showAppNotifications = isDirection || canViewStatistiques || canViewFinanceNotifications
 
   const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
@@ -134,9 +134,9 @@ function Layout({ children, breadcrumb }) {
           <div className="sidebar-user">
             <small>Connecté en tant que</small><br/>
             <span className="user-name">{fullName}</span><br/>
-            {user.role === 'SECRETARIAT' && user.secretariat_nom
+            {hasAppRole(user, ['SECRETARIAT']) && user.secretariat_nom
               ? <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i>{user.secretariat_nom}</small>
-              : <span className="user-role">{ROLE_LABELS[user.role] || user.role}</span>
+              : <span className="user-role">{getUserRoles(user).map((r) => ROLE_LABELS[r] || r).join(', ') || user.role}</span>
             }
           </div>
         )}

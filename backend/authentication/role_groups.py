@@ -166,6 +166,16 @@ SUPERVISION_ROLES = frozenset({
 
 IMPORT_ROLES = FORMATION_MUTATION_ROLES
 
+# Combinaisons multi-rôles autorisées (phase de migration progressive).
+# Un seul rôle : toujours autorisé (sauf mobile + autre, voir validate_role_combination).
+ALLOWED_MULTI_ROLE_COMBINATIONS = frozenset({
+    frozenset({User.Role.CHEF_SECRETARIAT, User.Role.ENCADRANT}),
+    frozenset({User.Role.SECRETARIAT, User.Role.ENCADRANT}),
+    frozenset({User.Role.CHEF_SECRETARIAT, User.Role.SUPERVISEUR}),
+    frozenset({User.Role.SECRETARIAT, User.Role.SUPERVISEUR}),
+    frozenset({User.Role.ENCADRANT, User.Role.SUPERVISEUR}),
+})
+
 # Hiérarchie stricte : index bas = rang élevé.
 ROLE_HIERARCHY = [
     User.Role.ADMIN,
@@ -325,41 +335,110 @@ def _cached_user_groups(user):
     return user._role_groups_cache
 
 
-def _role_from_group_names(group_names):
-    """Dérive le rôle à partir des noms de groupes ROLE_*."""
+def _roles_from_group_names(group_names):
+    """Dérive l'ensemble des rôles à partir des noms de groupes ROLE_*."""
     role_groups = set(group_names) & set(ROLE_GROUP_NAMES.values())
-    if not role_groups:
+    return frozenset(
+        GROUP_NAME_TO_ROLE[name]
+        for name in role_groups
+        if name in GROUP_NAME_TO_ROLE
+    )
+
+
+def _primary_role_from_roles(roles):
+    """Rôle principal (le plus élevé dans la hiérarchie) parmi un ensemble de rôles."""
+    if not roles:
         return None
-    if len(role_groups) == 1:
-        return GROUP_NAME_TO_ROLE[next(iter(role_groups))]
-    # Plusieurs groupes ROLE_* : conserver le rôle le plus élevé dans la hiérarchie.
-    roles = [GROUP_NAME_TO_ROLE[name] for name in role_groups if name in GROUP_NAME_TO_ROLE]
+    if len(roles) == 1:
+        return next(iter(roles))
     for candidate in ROLE_HIERARCHY:
         if candidate in roles:
             return candidate
-    return roles[0] if roles else None
+    return next(iter(roles))
+
+
+def _role_from_group_names(group_names):
+    """Dérive le rôle principal à partir des noms de groupes ROLE_*."""
+    return _primary_role_from_roles(_roles_from_group_names(group_names))
+
+
+def get_user_roles(user):
+    """Ensemble des rôles effectifs — source de vérité : groupes Django ROLE_*."""
+    if not user or not getattr(user, 'is_authenticated', True):
+        return frozenset()
+    if not user.pk:
+        role = getattr(user, 'role', None)
+        return frozenset({role}) if role else frozenset()
+    group_names = _cached_user_groups(user)
+    roles = _roles_from_group_names(group_names)
+    if roles:
+        return roles
+    if group_names:
+        return frozenset()
+    role = getattr(user, 'role', None)
+    return frozenset({role}) if role else frozenset()
 
 
 def get_user_role(user):
-    """Rôle effectif — source de vérité : groupes Django ROLE_*.
+    """Rôle principal — le plus élevé dans la hiérarchie parmi les groupes ROLE_*.
 
-    Le champ ``User.role`` est une dénormalisation synchronisée automatiquement
-    (voir ``sync_role_from_group`` / ``sync_user_role_group``).
+    Le champ ``User.role`` est une dénormalisation du rôle principal, synchronisée
+    automatiquement (voir ``sync_role_from_group`` / ``sync_user_role_group``).
     """
     if not user or not getattr(user, 'is_authenticated', True):
         return None
     if not user.pk:
         return getattr(user, 'role', None)
-    role = _role_from_group_names(_cached_user_groups(user))
-    if role:
-        return role
+    roles = get_user_roles(user)
+    if roles:
+        return _primary_role_from_roles(roles)
     return getattr(user, 'role', None)
 
 
 def user_in_roles(user, role_set):
-    """Vérifie si le rôle effectif (groupes) appartient à l'ensemble donné."""
-    role = get_user_role(user)
-    return role in role_set if role else False
+    """Vérifie si l'utilisateur possède au moins un des rôles demandés."""
+    roles = get_user_roles(user)
+    if not roles:
+        return False
+    return bool(roles & frozenset(role_set))
+
+
+def validate_role_combination(roles):
+    """Valide une combinaison de rôles métier.
+
+    Lève ``ValidationError`` si la combinaison n'est pas autorisée.
+    """
+    from django.core.exceptions import ValidationError
+
+    role_set = frozenset(roles or ())
+    if not role_set:
+        return
+
+    if len(role_set) == 1:
+        return
+
+    if role_set & MOBILE_ONLY_ROLES:
+        mobile = ', '.join(ROLE_LABELS.get(r, r) for r in sorted(role_set & MOBILE_ONLY_ROLES))
+        raise ValidationError(
+            f'Le rôle {mobile} (application mobile) ne peut pas être combiné avec d\'autres rôles.'
+        )
+
+    if role_set not in ALLOWED_MULTI_ROLE_COMBINATIONS:
+        allowed_labels = [
+            ' + '.join(ROLE_LABELS.get(r, r) for r in sorted(combo))
+            for combo in sorted(ALLOWED_MULTI_ROLE_COMBINATIONS, key=lambda c: sorted(c))
+        ]
+        current = ' + '.join(ROLE_LABELS.get(r, r) for r in sorted(role_set))
+        raise ValidationError(
+            f'Combinaison « {current} » non autorisée. '
+            f'Combinaisons multi-rôles acceptées : {" ; ".join(allowed_labels)}.'
+        )
+
+
+def roles_from_group_queryset(groups):
+    """Rôles métier dérivés d'un queryset / iterable de groupes Django."""
+    names = [g.name for g in groups]
+    return _roles_from_group_names(names)
 
 
 def role_group_names_for_roles(roles):
@@ -422,17 +501,28 @@ def get_staff_filter_roles(role):
     return []
 
 
+def _aggregate_roles_capability(user, getter):
+    """Union des capacités dérivées de chaque rôle de l'utilisateur."""
+    aggregated = set()
+    for role in get_user_roles(user):
+        aggregated.update(getter(role))
+    return sorted(aggregated)
+
+
 def user_role_context(user):
     """Métadonnées rôles pour le frontend (login / auth/me)."""
-    role = get_user_role(user)
+    roles = get_user_roles(user)
+    primary = get_user_role(user)
     return {
         'hierarchy': ROLE_HIERARCHY,
         'labels': ROLE_LABELS,
-        'creatable_roles': get_creatable_roles(role),
-        'manageable_roles': get_manageable_roles(role),
-        'staff_filter_roles': get_staff_filter_roles(role),
+        'role': primary,
+        'roles': sorted(roles),
+        'creatable_roles': _aggregate_roles_capability(user, get_creatable_roles),
+        'manageable_roles': _aggregate_roles_capability(user, get_manageable_roles),
+        'staff_filter_roles': _aggregate_roles_capability(user, get_staff_filter_roles),
         'badge_account_roles': list(BADGE_ACCOUNT_ROLES),
-        'can_mutate_users': role in USER_MUTATION_ROLES,
+        'can_mutate_users': user_in_roles(user, USER_MUTATION_ROLES),
         'can_archive_modules': user_in_roles(user, MODULE_ARCHIVE_ROLES),
     }
 
@@ -519,11 +609,10 @@ def sync_role_from_group(user):
 
 
 def sync_user_role_group(user):
-    """Synchronise l'appartenance du user à son groupe de rôle unique."""
+    """Assure que le groupe ROLE_* du champ ``user.role`` est présent (sans retirer les autres)."""
     if not user or not user.pk:
         return
 
-    role_group_names = set(ROLE_GROUP_NAMES.values())
     target_group_name = ROLE_GROUP_NAMES.get(user.role)
     if not target_group_name:
         logger.warning(
@@ -534,14 +623,8 @@ def sync_user_role_group(user):
         )
         return
 
-    current_role_group_names = set(
-        user.groups.filter(name__in=role_group_names).values_list('name', flat=True)
-    )
-    if current_role_group_names == {target_group_name}:
+    if user.groups.filter(name=target_group_name).exists():
         return
-
-    current_role_groups = user.groups.filter(name__in=role_group_names)
-    user.groups.remove(*current_role_groups)
 
     target_group = Group.objects.filter(name=target_group_name).first()
     if target_group:
@@ -564,8 +647,7 @@ def sync_user_staff_status(user):
     if not user or not user.pk or user.is_superuser:
         return
 
-    effective = get_user_role(user) or getattr(user, 'role', None)
-    should_be_staff = effective in DUAL_ACCESS_ROLES
+    should_be_staff = user_in_roles(user, DUAL_ACCESS_ROLES)
     if user.is_staff != should_be_staff:
         User.objects.filter(pk=user.pk).update(is_staff=should_be_staff)
         user.is_staff = should_be_staff

@@ -1,5 +1,9 @@
-{% extends "admin/base.html" %}
+{% extends "admin/base_site.html" %}
 {% load i18n %}
+
+{% block nav-breadcrumbs %}{% endblock %}
+{% block bodyclass %}dashboard{% endblock %}
+{% block content_title %}{% endblock %}
 
 {% block content %}
 <div class="dfrc-admin-home">
@@ -31,6 +35,102 @@
     </div>
   {% endif %}
 
+  {% if admin_charts %}
+    <section class="dfrc-charts-grid">
+        <article class="dfrc-chart-card">
+            <header class="dfrc-chart-header">
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--action">bar_chart</span>
+                <div>
+                    <h2 class="dfrc-chart-title">{% trans "Pointages par mois" %}</h2>
+                    <p class="dfrc-chart-subtitle">{% trans "6 derniers mois" %}</p>
+                </div>
+            </header>
+            <div class="dfrc-chart-body">
+                {% for row in admin_charts.pointages_mensuels %}
+                <div class="dfrc-chart-row">
+                    <span class="dfrc-chart-label">{{ row.label }}</span>
+                    <div class="dfrc-chart-bar-wrap">
+                        <div class="dfrc-chart-bar dfrc-chart-bar--action{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
+                    </div>
+                    <span class="dfrc-chart-meta">{{ row.value }}</span>
+                </div>
+                {% empty %}
+                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="dfrc-chart-card">
+            <header class="dfrc-chart-header">
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">percent</span>
+                <div>
+                    <h2 class="dfrc-chart-title">{% trans "Taux de présence" %}</h2>
+                    <p class="dfrc-chart-subtitle">{% trans "6 derniers mois" %}</p>
+                </div>
+            </header>
+            <div class="dfrc-chart-body">
+                {% for row in admin_charts.taux_presence %}
+                <div class="dfrc-chart-row">
+                    <span class="dfrc-chart-label">{{ row.label }}</span>
+                    <div class="dfrc-chart-bar-wrap">
+                        <div class="dfrc-chart-bar dfrc-chart-bar--nav{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
+                    </div>
+                    <span class="dfrc-chart-meta" title="{{ row.detail }}">{{ row.display }}%</span>
+                </div>
+                {% empty %}
+                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="dfrc-chart-card">
+            <header class="dfrc-chart-header">
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">event</span>
+                <div>
+                    <h2 class="dfrc-chart-title">{% trans "Séances par mois" %}</h2>
+                    <p class="dfrc-chart-subtitle">{% trans "Séances comptabilisables" %}</p>
+                </div>
+            </header>
+            <div class="dfrc-chart-body">
+                {% for row in admin_charts.sessions_mensuelles %}
+                <div class="dfrc-chart-row">
+                    <span class="dfrc-chart-label">{{ row.label }}</span>
+                    <div class="dfrc-chart-bar-wrap">
+                        <div class="dfrc-chart-bar dfrc-chart-bar--nav{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
+                    </div>
+                    <span class="dfrc-chart-meta">{{ row.value }}</span>
+                </div>
+                {% empty %}
+                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="dfrc-chart-card dfrc-chart-card--wide">
+            <header class="dfrc-chart-header">
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--action">pie_chart</span>
+                <div>
+                    <h2 class="dfrc-chart-title">{% trans "Pointages par statut" %}</h2>
+                    <p class="dfrc-chart-subtitle">{% trans "Répartition globale" %}</p>
+                </div>
+            </header>
+            <div class="dfrc-chart-body">
+                {% for row in admin_charts.pointages_par_statut %}
+                <div class="dfrc-chart-row">
+                    <span class="dfrc-chart-label dfrc-chart-label--wide">{{ row.label }}</span>
+                    <div class="dfrc-chart-bar-wrap">
+                        <div class="dfrc-chart-bar{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%; background: {{ row.color }}"></div>
+                    </div>
+                    <span class="dfrc-chart-meta">{{ row.value }}</span>
+                </div>
+                {% empty %}
+                <p class="dfrc-chart-empty">{% trans "Aucun pointage enregistré." %}</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+  {% endif %}
+
     <div class="dfrc-quick-actions">
         <a class="dfrc-quick-action-btn dfrc-quick-action-btn--primary" href="{% url 'admin:formations_module_changelist' %}">
             <span class="material-symbols-outlined" style="font-size:18px">add</span>
@@ -43,6 +143,10 @@
         <a class="dfrc-quick-action-btn dfrc-quick-action-btn--secondary" href="{{ PUBLIC_APP_URL }}">
             <span class="material-symbols-outlined" style="font-size:18px">open_in_new</span>
             {% trans "Dashboard web" %}
+        </a>
+        <a class="dfrc-quick-action-btn dfrc-quick-action-btn--secondary" href="{% url 'admin:admin_guide_actions' %}">
+            <span class="material-symbols-outlined" style="font-size:18px">menu_book</span>
+            {% trans "Guide des actions" %}
         </a>
     </div>
 
@@ -115,6 +219,10 @@
             <h2>{% trans "Administration" %}</h2>
         </div>
         <div class="dfrc-bento-grid">
+            <a class="dfrc-bento-card" href="{% url 'admin:admin_guide_actions' %}">
+                <span class="dfrc-bento-card-title">{% trans "Guide des actions" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Comment faire chaque opération depuis l’admin" %}</span>
+            </a>
             <a class="dfrc-bento-card" href="{% url 'admin:authentication_user_changelist' %}">
                 <span class="dfrc-bento-card-title">{% trans "Utilisateurs" %}</span>
                 <span class="dfrc-bento-card-subtitle">{% trans "Comptes, rôles et accès" %}</span>
@@ -133,31 +241,5 @@
             </a>
         </div>
     </section>
-
-    {% if app_list %}
-    <section class="dfrc-app-grid">
-        {% for app in app_list %}
-        <article class="dfrc-app-card">
-            <h2>
-                <a href="{{ app.app_url }}">{{ app.name }}</a>
-            </h2>
-            <ul class="dfrc-model-list">
-                {% for model in app.models %}
-                <li class="dfrc-model-item">
-                    <span class="dfrc-model-name">{{ model.name }}</span>
-                    {% if model.admin_url %}
-                    <span class="dfrc-model-actions">
-                        <a href="{{ model.admin_url }}">{% trans "Voir" %}</a>
-                    </span>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </article>
-        {% endfor %}
-    </section>
-    {% else %}
-    <p>{% trans "Aucune application admin n'est disponible pour votre compte." %}</p>
-    {% endif %}
 </div>
 {% endblock %}
