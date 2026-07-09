@@ -250,7 +250,7 @@ def dashboard_home(request):
             'total_formations': Formation.objects.filter(id__in=sec_formation_ids).count(),
             'en_cours': Module.objects.filter(secretariat=sec, statut='EN_COURS').values('formation_id').distinct().count(),
             'total_participants': Participant.objects.filter(secretariat=sec).count(),
-            'total_formateurs': Formateur.objects.filter(secretariats=sec).count(),
+            'total_formateurs': Formateur.objects.count(),
             'total_superviseurs': User.objects.filter(role='ENCADRANT').count(),
             'total_pointages': Pointage.objects.filter(session__module__secretariat=sec).count(),
             'total_cours': cours_stats['total_cours'],
@@ -1362,8 +1362,6 @@ def formateurs_list(request):
     qs = Formateur.objects.annotate(
         nb_formations=Count('modules_assignes', distinct=True)
     ).order_by('nom', 'prenom')
-    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT') and request.user.secretariat:
-        qs = qs.filter(secretariats=request.user.secretariat)
     q = request.GET.get('q', '')
     if q:
         qs = qs.filter(
