@@ -389,12 +389,17 @@ export default function ModuleDetail() {
     e.preventDefault()
     setForceSaving(true)
     try {
-      await api.post(`/formations/${formationId}/force-pointage/`, {
+      const res = await api.post(`/formations/${formationId}/force-pointage/`, {
         ...forceForm,
         personne_id: parseInt(forceForm.personne_id),
         module_id: moduleId,
+        date_journee: selectedPresenceDate,
       })
-      showToast(`${forceForm.action === 'ENTREE' ? 'Entrée' : 'Sortie'} forcée enregistrée`)
+      showToast(res.data?.detail || (
+        forceForm.type_personne === 'participant' && forceForm.action === 'ENTREE'
+          ? 'Présence forcée — durée planifiée de la séance'
+          : `${forceForm.action === 'ENTREE' ? 'Entrée' : 'Sortie'} forcée enregistrée`
+      ))
       setForceModal(false)
       setForceForm({ personne_id: '', type_personne: 'participant', action: 'ENTREE', motif: '' })
       loadModule(true)
@@ -1147,13 +1152,17 @@ export default function ModuleDetail() {
                       <td><small>{pt.timestamp_sortie ? new Date(pt.timestamp_sortie).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : <span className="text-warning">En cours</span>}</small></td>
                       <td><small>{pt.duree_minutes > 0 ? `${Math.round(pt.duree_minutes)} min` : '—'}</small></td>
                       <td>
-                        <span className={`badge ${
+                        <span
+                          className={`badge ${
                           pt.statut === 'ABSENT_NON_BADGE' ? 'badge-danger'
                           : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'badge-danger'
                           : pt.statut === 'FORCE_DFRC' ? 'badge-info'
                           : pt.timestamp_sortie ? 'badge-terminee'
                           : 'badge-en-cours'
-                        }`} style={{ fontSize: '0.72rem' }}>
+                        }`}
+                          style={{ fontSize: '0.72rem' }}
+                          title={pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) > 0 ? 'Présence forcée — durée planifiée de la séance' : undefined}
+                        >
                           {pt.statut === 'ABSENT_NON_BADGE' ? 'Absent'
                           : (pt.statut === 'FORCE_DFRC' && (pt.duree_minutes || 0) === 0 && !!pt.timestamp_sortie) ? 'Absent'
                           : pt.statut === 'FORCE_DFRC' ? 'Forcé'
@@ -1294,7 +1303,7 @@ export default function ModuleDetail() {
                       </td>
                       {canSupervise && (
                         <td>
-                          <button className="btn btn-outline-success btn-sm" title="Forcer l'entrée"
+                          <button className="btn btn-outline-success btn-sm" title="Forcer la présence (durée planifiée de la séance)"
                             onClick={() => openForceModal(p.id, 'ENTREE', p.type_personne || 'participant')}>
                             <i className="bi bi-box-arrow-in-right"></i>
                           </button>
@@ -1375,6 +1384,7 @@ export default function ModuleDetail() {
                   Pour chaque séance active du {formatDate(selectedPresenceDate)}
                   {selectedPresenceSessionId !== 'ALL' ? ' (séance sélectionnée uniquement)' : ''},
                   un tirage aléatoire badge <strong>entre 80 % et 95 %</strong> des auditeurs encore absents.
+                  Chaque auditeur badgé reçoit la <strong>durée planifiée de la séance</strong> (horaires EDT).
                   Les formateurs et encadrants ne sont pas concernés.
                 </p>
                 <label className="form-label">Motif <span className="text-danger">*</span></label>
@@ -1417,6 +1427,20 @@ export default function ModuleDetail() {
                     ) : null
                   })()}
                 </div>
+                {forceForm.type_personne === 'participant' && forceForm.action === 'ENTREE' && (
+                  <p style={{ fontSize: '0.85rem', color: '#475569', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.75rem' }}>
+                    <i className="bi bi-info-circle me-1"></i>
+                    La présence sera enregistrée sur <strong>toute la durée planifiée de la séance</strong>
+                    {(() => {
+                      if (selectedPresenceSessionId === 'ALL') return ' (horaires EDT de la séance).'
+                      const s = sessions.find(
+                        x => x.date === selectedPresenceDate && String(x.id) === String(selectedPresenceSessionId),
+                      )
+                      if (!s?.heure_debut) return ' (horaires EDT de la séance).'
+                      return s.heure_fin ? ` (${s.heure_debut} → ${s.heure_fin}).` : ` (${s.heure_debut}).`
+                    })()}
+                  </p>
+                )}
                 <div className="form-group">
                   <label className="form-label fw-semibold">Motif *</label>
                   <textarea className="form-control" rows={2} placeholder="Ex: téléphone en panne, problème réseau…"
@@ -1426,7 +1450,11 @@ export default function ModuleDetail() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setForceModal(false)}>Annuler</button>
                 <button type="submit" className="btn btn-danger" disabled={forceSaving || !forceForm.personne_id || !forceForm.motif.trim()}>
-                  {forceSaving ? 'Enregistrement…' : `Forcer ${forceForm.action === 'ENTREE' ? "l'entrée" : 'la sortie'}`}
+                  {forceSaving ? 'Enregistrement…' : (
+                    forceForm.type_personne === 'participant' && forceForm.action === 'ENTREE'
+                      ? 'Forcer la présence'
+                      : `Forcer ${forceForm.action === 'ENTREE' ? "l'entrée" : 'la sortie'}`
+                  )}
                 </button>
               </div>
             </form>

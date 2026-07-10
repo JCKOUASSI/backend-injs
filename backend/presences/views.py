@@ -2185,10 +2185,26 @@ def close_session(request, pk):
     except Pointage.DoesNotExist:
         return Response({'detail': 'Aucune session ouverte pour cette personne.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    pointage.timestamp_sortie = timezone.now()
-    pointage.statut = Pointage.Statut.FORCE_DFRC
-    pointage.calculer_duree()
-    pointage.save()
+    if type_personne == 'participant' and pointage.statut == Pointage.Statut.FORCE_DFRC:
+        from .bulk_force_auditeurs import force_sortie_pointage
+
+        pointage, err = force_sortie_pointage(
+            formation,
+            pointage,
+            pointage.session,
+            personne,
+            type_personne,
+            'Fermeture session (présence forcée)',
+            request=request,
+            creneau_complet=True,
+        )
+        if err:
+            return Response({'detail': err}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        pointage.timestamp_sortie = timezone.now()
+        pointage.statut = Pointage.Statut.FORCE_DFRC
+        pointage.calculer_duree()
+        pointage.save()
     personne_label = (
         f"{getattr(personne, 'nom', '')} {getattr(personne, 'prenom', '')}".strip()
         or f"{getattr(personne, 'last_name', '')} {getattr(personne, 'first_name', '')}".strip()
@@ -2293,7 +2309,28 @@ def _force_pointage_impl(request, pk):
                 {'detail': 'Une session est déjà en cours sur ce module pour ce jour.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Timestamp fourni explicitement (rétroactif) ou calculé maintenant
+        motif = data.get('motif', '')
+        if type_str == 'participant':
+            from .bulk_force_auditeurs import force_presence_auditeur, force_sortie_pointage
+
+            pointage, err = force_presence_auditeur(
+                formation,
+                seance_active,
+                personne,
+                date_journee,
+                motif,
+                request=request,
+                timestamp_entree=data.get('timestamp_entree'),
+                timestamp_sortie=data.get('timestamp_sortie'),
+            )
+            if err:
+                return Response({'detail': err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'action': 'ENTREE',
+                'detail': 'Présence forcée enregistrée (durée planifiée de la séance).',
+                'pointage': PointageSerializer(pointage).data,
+            }, status=status.HTTP_201_CREATED)
+
         ts_entree_raw = data.get('timestamp_entree') or timezone.now()
         timestamp_entree = _clamp_to_seance(ts_entree_raw, seance_active)
         pointage = Pointage.objects.create(
@@ -2335,6 +2372,29 @@ def _force_pointage_impl(request, pk):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        motif = data.get('motif', '')
+        if type_str == 'participant':
+            from .bulk_force_auditeurs import force_sortie_pointage
+
+            pointage, err = force_sortie_pointage(
+                formation,
+                pointage,
+                pointage.session,
+                personne,
+                type_str,
+                motif,
+                request=request,
+                timestamp_sortie=data.get('timestamp_sortie'),
+                creneau_complet=pointage.statut == Pointage.Statut.FORCE_DFRC,
+            )
+            if err:
+                return Response({'detail': err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'action': 'SORTIE',
+                'detail': 'Sortie forcée enregistrée.',
+                'pointage': PointageSerializer(pointage).data,
+            })
+
         ts_sortie_raw = data.get('timestamp_sortie') or timezone.now()
         pointage.timestamp_sortie = _clamp_to_seance(ts_sortie_raw, pointage.session)
         pointage.statut = Pointage.Statut.FORCE_DFRC
@@ -2367,7 +2427,8 @@ def _force_pointage_impl(request, pk):
 @permission_classes([IsSecretariatOrEncadrantOrDFRC])
 def force_badgeage_auditeurs_bulk(request, pk):
     """
-    Forcer l'entrée d'un sous-ensemble aléatoire d'auditeurs absents par séance (80–95 %).
+    Forcer l'entrée+sortie d'un sous-ensemble aléatoire d'auditeurs absents par séance (80–95 %).
+    Chaque auditeur reçoit la durée du créneau planifié (heure_debut → heure_fin).
     Secrétariat / Superviseur / DFRC uniquement.
     """
     from django.conf import settings

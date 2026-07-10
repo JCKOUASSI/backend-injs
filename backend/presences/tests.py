@@ -339,7 +339,15 @@ class ScanModuleExclusivityTest(TestCase):
         self.assertIn('motif', res.data)
 
     def test_force_pointage_entry_creates_pointage_and_logs_motif(self):
+        from datetime import time
+        from formations.volume_horaire import _session_prevu_minutes
         from presences.models import AuditLog, Pointage
+
+        self.seance_2.heure_debut_prevue = time(9, 0)
+        self.seance_2.heure_fin_prevue = time(11, 0)
+        self.seance_2.save(update_fields=['heure_debut_prevue', 'heure_fin_prevue'])
+        self.seance_1.terminee_le = timezone.now()
+        self.seance_1.save(update_fields=['terminee_le'])
 
         user = make_user('secretariat_for_force_ok', role='SECRETARIAT')
         user.secretariat = self.secretariat
@@ -362,12 +370,21 @@ class ScanModuleExclusivityTest(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         pointage_id = res.data.get('pointage', {}).get('id')
-        self.assertTrue(Pointage.objects.filter(pk=pointage_id, statut=Pointage.Statut.FORCE_DFRC).exists())
+        pt = Pointage.objects.get(pk=pointage_id)
+        self.assertEqual(pt.statut, Pointage.Statut.FORCE_DFRC)
+        self.assertIsNotNone(pt.timestamp_sortie)
+        self.assertAlmostEqual(
+            float(pt.duree_presence_minutes),
+            _session_prevu_minutes(self.seance_2),
+            places=1,
+        )
         self.assertTrue(
             AuditLog.objects.filter(action=AuditLog.Action.FORCE_ENTREE, pointage_id=pointage_id, extra__motif=motif).exists()
         )
 
     def test_force_badgeage_auditeurs_bulk_applies_ratio(self):
+        from datetime import time
+        from formations.volume_horaire import _session_prevu_minutes
         from presences.models import AuditLog
 
         user = make_user('bulk_force_user', role='CPFAE_ADMIN')
@@ -378,6 +395,10 @@ class ScanModuleExclusivityTest(TestCase):
             p = Participant.objects.create(matricule=f'BULK{i:03d}', nom=f'N{i}', prenom=f'P{i}')
             ModuleParticipant.objects.create(module=self.module, participant=p)
             participants.append(p)
+
+        self.seance_2.heure_debut_prevue = time(8, 0)
+        self.seance_2.heure_fin_prevue = time(12, 0)
+        self.seance_2.save(update_fields=['heure_debut_prevue', 'heure_fin_prevue'])
 
         self.seance_1.terminee_le = timezone.now()
         self.seance_1.save(update_fields=['terminee_le'])
@@ -402,6 +423,10 @@ class ScanModuleExclusivityTest(TestCase):
             Pointage.objects.filter(session=self.seance_2, statut=Pointage.Statut.FORCE_DFRC).count(),
             expected,
         )
+        prevu = _session_prevu_minutes(self.seance_2)
+        for pt in Pointage.objects.filter(session=self.seance_2, statut=Pointage.Statut.FORCE_DFRC):
+            self.assertIsNotNone(pt.timestamp_sortie)
+            self.assertAlmostEqual(float(pt.duree_presence_minutes), prevu, places=1)
         self.assertTrue(
             AuditLog.objects.filter(
                 action=AuditLog.Action.FORCE_ENTREE,

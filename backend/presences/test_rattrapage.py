@@ -11,6 +11,7 @@ from formations.models import (
 from statistiques.effectifs import aggregation_seances_modules, participant_ids_notoires
 
 from .models import Pointage, Rattrapage
+from .bulk_force_auditeurs import run_rattrapage_badgeage
 from .rattrapage_service import annuler_rattrapage, generer_presence_rattrapage
 from .views import _resolve_personne
 
@@ -76,6 +77,44 @@ class RattrapageFlowTest(TestCase):
         self.assertEqual(pointage.participant, self.p)
         self.assertEqual(rattrapage.pointage_id, pointage.id)
         self.assertEqual(rattrapage.statut, Rattrapage.Statut.EFFECTUE)
+
+    def test_rattrapage_groupé_credite_creneau_planifie_complet(self):
+        """Rattrapage admin : durée = créneau EDT (heure_debut → heure_fin), pas +4 h."""
+        from formations.volume_horaire import _session_prevu_minutes
+
+        self.seance_b.heure_debut_prevue = time(8, 0)
+        self.seance_b.heure_fin_prevue = time(13, 0)
+        self.seance_b.save(update_fields=['heure_debut_prevue', 'heure_fin_prevue'])
+
+        counts = run_rattrapage_badgeage(
+            [self.p],
+            self.seance_b,
+            motif='Rattrapage test créneau complet',
+            with_sortie=True,
+        )
+        self.assertEqual(counts['created'], 1)
+        self.assertEqual(counts['sorties'], 1)
+
+        pointage = Pointage.objects.get(session=self.seance_b, participant=self.p)
+        prevu = _session_prevu_minutes(self.seance_b)
+        self.assertEqual(prevu, 300.0)
+        self.assertAlmostEqual(float(pointage.duree_presence_minutes), prevu, places=1)
+
+    def test_generer_presence_credite_creneau_planifie(self):
+        from formations.volume_horaire import _session_prevu_minutes
+
+        self.seance_b.heure_debut_prevue = time(7, 30)
+        self.seance_b.heure_fin_prevue = time(12, 30)
+        self.seance_b.save(update_fields=['heure_debut_prevue', 'heure_fin_prevue'])
+
+        rattrapage = self._make_rattrapage()
+        pointage = generer_presence_rattrapage(rattrapage)
+
+        self.assertAlmostEqual(
+            float(pointage.duree_presence_minutes),
+            _session_prevu_minutes(self.seance_b),
+            places=1,
+        )
 
     def test_generer_presence_idempotent(self):
         rattrapage = self._make_rattrapage()

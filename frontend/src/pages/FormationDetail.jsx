@@ -254,6 +254,7 @@ export default function FormationDetail() {
 
   const badgerEntree = async (personne, motif, heureEntree, heureSortie) => {
     setBadgingEntree(personne.id)
+    const isAuditeur = (personne.type_personne || 'participant') === 'participant'
     try {
       const payload = {
         action: 'ENTREE',
@@ -263,22 +264,12 @@ export default function FormationDetail() {
         date_journee: dashboardDate,
       }
       const tsEntree = buildTimestamp(dashboardDate, heureEntree)
+      const tsSortie = buildTimestamp(dashboardDate, heureSortie)
       if (tsEntree) payload.timestamp_entree = tsEntree
-      await api.post(`/formations/${id}/force-pointage/`, payload)
-      // Si une heure de sortie est aussi fournie, enchaîner la sortie
-      if (heureSortie) {
-        const tsSortie = buildTimestamp(dashboardDate, heureSortie)
-        await api.post(`/formations/${id}/force-pointage/`, {
-          action: 'SORTIE',
-          personne_id: personne.id,
-          type_personne: personne.type_personne || 'participant',
-          motif,
-          date_journee: dashboardDate,
-          timestamp_sortie: tsSortie,
-        })
-      }
+      if (tsSortie) payload.timestamp_sortie = tsSortie
+      const res = await api.post(`/formations/${id}/force-pointage/`, payload)
       await loadDashboard(dashboardDate)
-      showToast('Entrée badgée')
+      showToast(res.data?.detail || (isAuditeur ? 'Présence forcée — durée planifiée de la séance' : 'Entrée badgée'))
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur lors du badgeage', 'error')
     } finally { setBadgingEntree(null) }
@@ -1036,7 +1027,9 @@ export default function FormationDetail() {
                                       onClick={() => openForceMotifDialog(p, 'ENTREE')}>
                                       {badgingEntree === p.id
                                         ? <span className="spinner" style={{ width: '0.9rem', height: '0.9rem', display: 'inline-block' }}></span>
-                                        : <><i className="bi bi-box-arrow-in-right me-1"></i>Badger</>}
+                                        : ((p.type_personne || 'participant') === 'participant'
+                                          ? <><i className="bi bi-person-check me-1"></i>Forcer présence</>
+                                          : <><i className="bi bi-box-arrow-in-right me-1"></i>Badger</>)}
                                     </button>
                                   </td>
                                 )}
@@ -1631,13 +1624,16 @@ export default function FormationDetail() {
       {/* Motif popup pour badgeage forcé */}
       {forceMotifDialog && (() => {
         const jourPasse = isJourPasse(dashboardDate)
+        const isAuditeur = (forceMotifDialog.personne.type_personne || 'participant') === 'participant'
         return (
           <div className="modal-overlay" onClick={() => setForceMotifDialog(null)}>
             <div className="modal-content" style={{ maxWidth: '460px' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <h5>
                   {forceMotifDialog.action === 'ENTREE'
-                    ? <><i className="bi bi-box-arrow-in-right me-2 text-success"></i>Badger l'entrée</>
+                    ? (isAuditeur
+                      ? <><i className="bi bi-person-check me-2 text-success"></i>Forcer la présence</>
+                      : <><i className="bi bi-box-arrow-in-right me-2 text-success"></i>Badger l'entrée</>)
                     : <><i className="bi bi-box-arrow-right me-2 text-warning"></i>Fermer la session</>}
                 </h5>
                 <button className="btn-close" onClick={() => setForceMotifDialog(null)}>&times;</button>
@@ -1645,7 +1641,9 @@ export default function FormationDetail() {
               <div className="modal-body">
                 <p className="mb-3" style={{ color: '#4a5568' }}>
                   {forceMotifDialog.action === 'ENTREE'
-                    ? <>Badgeage forcé de l'entrée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong>.</>
+                    ? (isAuditeur
+                      ? <>Présence forcée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong> — durée planifiée de la séance.</>
+                      : <>Badgeage forcé de l'entrée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong>.</>)
                     : <>Sortie forcée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong>.</>}
                   {jourPasse && (
                     <span className="badge ms-2" style={{ background: '#FFF3E0', color: '#7B3500', border: '1px solid #F57C00', fontSize: '0.78rem' }}>
@@ -1653,6 +1651,13 @@ export default function FormationDetail() {
                     </span>
                   )}
                 </p>
+
+                {isAuditeur && forceMotifDialog.action === 'ENTREE' && !jourPasse && (
+                  <p style={{ fontSize: '0.85rem', color: '#475569', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.75rem', marginBottom: '0.75rem' }}>
+                    <i className="bi bi-info-circle me-1"></i>
+                    Entrée et sortie seront enregistrées sur <strong>toute la durée planifiée de la séance</strong> (horaires EDT).
+                  </p>
+                )}
 
                 {/* Champs heure — uniquement sur jour passé */}
                 {jourPasse && forceMotifDialog.action === 'ENTREE' && (
@@ -1708,7 +1713,9 @@ export default function FormationDetail() {
                   onClick={submitForceMotif}
                 >
                   {forceMotifDialog.action === 'ENTREE'
-                    ? <><i className="bi bi-box-arrow-in-right me-1"></i>Confirmer le badgeage</>
+                    ? (isAuditeur
+                      ? <><i className="bi bi-person-check me-1"></i>Confirmer la présence</>
+                      : <><i className="bi bi-box-arrow-in-right me-1"></i>Confirmer le badgeage</>)
                     : <><i className="bi bi-box-arrow-right me-1"></i>Confirmer la sortie</>}
                 </button>
               </div>
