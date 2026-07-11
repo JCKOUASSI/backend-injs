@@ -4,20 +4,24 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from presences.models import Pointage
-from .api_access import deny_finance_operational_response
+from .api_access import (
+    IsOperationalWebStaff,
+    archived_module_or_response,
+    deny_finance_operational_response,
+)
 from .api_cache import get_cached_response, request_cache_key, set_cached_response
 from .api_views import (
     _filtered_modules_queryset,
     _module_participant_counts,
     _serialize_module_list_item,
 )
-from .models import Formateur, Formation, Module, ModuleParticipant, Participant
+from .models import Formateur, ModuleParticipant, Participant
 from .access import archived_modules_queryset
 from .serializers import ParticipantSerializer
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def archives_stats_api(request):
     """Compteurs rapides pour le tableau de bord Archives (sans filter_options)."""
     denied = deny_finance_operational_response(request)
@@ -60,7 +64,7 @@ def archives_stats_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def archives_modules_list_api(request):
     """Liste paginée de modules pour l'archiviste (sans annotation nb_presents du jour)."""
     denied = deny_finance_operational_response(request)
@@ -96,20 +100,16 @@ def archives_modules_list_api(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def archives_cahier_appel_api(request, formation_pk, module_pk):
     """Cahier d'appel léger : séances, auditeurs et présences (matrice émargement)."""
     denied = deny_finance_operational_response(request)
     if denied:
         return denied
 
-    try:
-        formation = Formation.objects.get(pk=formation_pk)
-        module = Module.objects.get(pk=module_pk, formation=formation, archived=True)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=404)
-    except Module.DoesNotExist:
-        return Response({'detail': 'Module archivé introuvable.'}, status=404)
+    formation, module, err = archived_module_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
 
     sessions = list(
         module.sessions.order_by('date_journee', 'numero').values(

@@ -676,6 +676,26 @@ class SecureScanFormateurEncadrantTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data.get('type_personne'), 'encadrant')
 
+    def test_secure_scan_formateur_requires_device_id(self):
+        self.client.force_authenticate(self.formateur_user)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.data.get('code'), 'DEVICE_REQUIRED')
+
+    def test_secure_scan_encadrant_without_device_id_allowed(self):
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+
 
 class VolumeHoraireFicheStatsTest(TestCase):
 

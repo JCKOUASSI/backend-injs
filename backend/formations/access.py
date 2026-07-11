@@ -168,6 +168,19 @@ def participant_accessible(user, pk):
     return participants_queryset_for_user(user).filter(pk=pk).first()
 
 
+def participant_fiche_accessible(user, pk):
+    """Participant consultable via fiche admin (historique badgeage, stats).
+
+    FINANCE a un accès lecture globale (aligné sur participant_fiche_admin).
+    """
+    if not (user and user.is_authenticated):
+        return None
+    roles = get_user_roles(user)
+    if roles & (GLOBAL_ACCESS_ROLES | {'FINANCE'}) or user_has_perm(user, 'authentication.global_scope'):
+        return Participant.objects.filter(pk=pk).first()
+    return participants_queryset_for_user(user).filter(pk=pk).first()
+
+
 def formateurs_queryset_for_user(user, queryset=None):
     """Formateurs visibles selon le périmètre opérationnel de l'utilisateur.
 
@@ -192,9 +205,7 @@ def formateurs_queryset_for_user(user, queryset=None):
     union = _union_querysets(parts)
     if union is not None:
         return union
-    if roles & {'FINANCE'}:
-        return qs.none()
-    return qs
+    return qs.none()
 
 
 def can_filter_modules_by_secretariat(user):

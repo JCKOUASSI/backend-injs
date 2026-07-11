@@ -17,6 +17,7 @@ from .models import Formation, Participant, Secretariat, ModuleParticipant, Modu
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
+from .api_access import IsOperationalWebStaff
 from .formateur_assignment import check_formateur_groupe_jour_conflict
 from .qr_helpers import get_session_for_qr
 from .serializers import (
@@ -529,10 +530,9 @@ def remove_formateur_from_formation(request, pk, formateur_id):
 @permission_classes([IsAuthenticated])
 def list_formateurs_of_formation(request, pk):
     """Lister les formateurs assignés à une formation."""
-    try:
-        formation = Formation.objects.get(pk=pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response({'detail': 'Formation introuvable ou non autorisée.'}, status=status.HTTP_404_NOT_FOUND)
 
     formateurs = Formateur.objects.filter(modules_assignes__module__formation=formation).distinct()
     return Response(FormateurSerializer(formateurs, many=True).data)
@@ -685,7 +685,7 @@ def get_active_qr(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def qr_image(request, pk):
     """Génère l'image PNG du QR code actif d'une formation (A4 printable)."""
     import io
@@ -772,7 +772,7 @@ def qr_image(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def session_qr_image(request, pk, session_pk):
     """Génère l'image PNG du QR code actif d'une séance spécifique."""
     import io

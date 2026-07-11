@@ -27,6 +27,7 @@ from formations.models import (
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
+from formations.access import participant_fiche_accessible
 from .models import Pointage, DeviceBinding, AuditLog, Rattrapage, _log_audit
 from .offline_cache import (
     OFFLINE_DATA_CACHE_TIMEOUT,
@@ -434,6 +435,21 @@ def _resolve_authenticated_personne(user):
     )
 
 
+def _require_mobile_device_id(type_str, device_id):
+    """device_id obligatoire pour auditeur/formateur (verrouillage appareil)."""
+    if type_str not in ('participant', 'formateur'):
+        return None
+    if not (device_id or '').strip():
+        return Response(
+            {
+                'code': 'DEVICE_REQUIRED',
+                'detail': "L'identifiant appareil est requis pour le badgeage mobile.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
+
 def _distance_meters(lat1, lon1, lat2, lon2):
     """Distance approximative en mètres (haversine)."""
     earth_radius_m = 6371000
@@ -809,6 +825,10 @@ def secure_scan_view(request):
     if err:
         return err
 
+    device_err = _require_mobile_device_id(type_str, data.get('device_id', ''))
+    if device_err:
+        return device_err
+
     # 1b. Vérifier que l'appareil est bien lié à ce user
     device_id = data.get('device_id', '')
     if device_id and type_str in ('participant', 'formateur'):
@@ -1146,6 +1166,10 @@ def secure_scan_heartbeat(request):
     personne, type_str, err = _resolve_authenticated_personne(user)
     if err:
         return err
+
+    device_err = _require_mobile_device_id(type_str, data.get('device_id', ''))
+    if device_err:
+        return device_err
 
     device_id = data.get('device_id', '')
     if device_id and type_str in ('participant', 'formateur'):
@@ -2536,19 +2560,9 @@ def participant_fiche_admin(request, pk):
     if role not in full_access_roles and role not in read_only_roles:
         return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Vérifier le périmètre pour les secrétariats
-    if role == 'SECRETARIAT' and getattr(user, 'secretariat', None):
-        from formations.models import Participant
-        try:
-            participant = Participant.objects.get(pk=pk, secretariat=user.secretariat)
-        except Participant.DoesNotExist:
-            return Response({'detail': 'Auditeur introuvable ou hors périmètre.'}, status=status.HTTP_404_NOT_FOUND)
-    else:
-        from formations.models import Participant
-        try:
-            participant = Participant.objects.get(pk=pk)
-        except Participant.DoesNotExist:
-            return Response({'detail': 'Auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    participant = participant_fiche_accessible(user, pk)
+    if not participant:
+        return Response({'detail': 'Auditeur introuvable ou hors périmètre.'}, status=status.HTTP_404_NOT_FOUND)
 
     # Récupérer les modules inscrits
     from formations.models import ModuleParticipant
@@ -2595,19 +2609,12 @@ def _resolve_participant_fiche_admin(request, pk):
     if role not in full_access_roles and role not in read_only_roles:
         return None, Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
-    if role == 'SECRETARIAT' and getattr(user, 'secretariat', None):
-        try:
-            participant = Participant.objects.get(pk=pk, secretariat=user.secretariat)
-        except Participant.DoesNotExist:
-            return None, Response(
-                {'detail': 'Auditeur introuvable ou hors périmètre.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-    else:
-        try:
-            participant = Participant.objects.get(pk=pk)
-        except Participant.DoesNotExist:
-            return None, Response({'detail': 'Auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    participant = participant_fiche_accessible(user, pk)
+    if not participant:
+        return None, Response(
+            {'detail': 'Auditeur introuvable ou hors périmètre.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     return participant, None
 
