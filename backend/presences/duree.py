@@ -10,7 +10,7 @@ Utilisé par ``Pointage.calculer_duree()``, le badgeage (``presences/views.py``)
 les exports (``exports/views.py``) et la finance (``formations/api_views.py``).
 La règle équivalente côté séance est ``formations.volume_horaire._session_realise_minutes``.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 
@@ -53,6 +53,41 @@ def pointage_minutes_clampees(pointage, *, now=None):
         return 0.0
     entree, sortie, _ = pointage_bornes_clampees(pointage, now=now)
     return max(round((sortie - entree).total_seconds() / 60, 2), 0.0)
+
+
+def rattrapage_creneau_timestamps(seance, *, offset_seconds=0):
+    """Horodatages entrée/sortie pour présence forcée : durée planifiée de la séance.
+
+    Règle métier : présence forcée = présent pour toute la durée de la séance
+    (``heure_debut_prevue`` → ``heure_fin_prevue`` sur cette séance uniquement,
+    pas le volume horaire total du module/cours).
+    Aligné sur ``formations.volume_horaire._session_prevu_minutes``.
+    """
+    from formations.volume_horaire import _session_prevu_minutes
+
+    tz = timezone.get_current_timezone()
+    day = seance.date_journee
+
+    if day and seance.heure_debut_prevue and seance.heure_fin_prevue:
+        entree = timezone.make_aware(
+            datetime.combine(day, seance.heure_debut_prevue), tz,
+        ) + timedelta(seconds=offset_seconds)
+        sortie = timezone.make_aware(
+            datetime.combine(day, seance.heure_fin_prevue), tz,
+        )
+        return entree, sortie
+
+    if seance.demarree_le and seance.terminee_le:
+        entree = seance.demarree_le + timedelta(seconds=offset_seconds)
+        return entree, seance.terminee_le
+
+    entree = (seance.demarree_le or timezone.now()) + timedelta(seconds=offset_seconds)
+    prevu_min = _session_prevu_minutes(seance)
+    if prevu_min > 0:
+        sortie = entree + timedelta(minutes=prevu_min)
+    else:
+        sortie = entree + timedelta(hours=4)
+    return entree, sortie
 
 
 def duree_minutes_effective(pointage, *, now=None):

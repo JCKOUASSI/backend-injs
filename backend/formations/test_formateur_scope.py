@@ -1,4 +1,4 @@
-"""Périmètre formateurs : liste et CRUD doivent partager la même logique d'accès."""
+"""Périmètre formateurs : pool global pour le secrétariat, règles d'assignation inchangées."""
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -51,10 +51,10 @@ class FormateurScopeTest(TestCase):
         self.formateur_via_module.refresh_from_db()
         self.assertEqual(self.formateur_via_module.telephone, '0102030405')
 
-    def test_formateur_list_excludes_out_of_scope(self):
+    def test_formateur_list_includes_all_formateurs_for_secretariat(self):
         self.client.force_authenticate(user=self.sec_user)
         res = self.client.get('/api/formations/formateurs/list/')
         self.assertEqual(res.status_code, 200)
         ids = {row['id'] for row in res.data['results']}
         self.assertIn(self.formateur_via_module.pk, ids)
-        self.assertNotIn(self.formateur_other.pk, ids)
+        self.assertIn(self.formateur_other.pk, ids)

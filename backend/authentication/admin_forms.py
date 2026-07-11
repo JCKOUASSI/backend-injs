@@ -1,7 +1,7 @@
 from django.contrib.auth.forms import (
     AdminPasswordChangeForm as BaseAdminPasswordChangeForm,
+    AdminUserCreationForm as BaseAdminUserCreationForm,
     UserChangeForm as BaseUserChangeForm,
-    UserCreationForm as BaseUserCreationForm,
 )
 
 from .models import User
@@ -20,8 +20,8 @@ def _validate_groups_field(groups):
     return groups
 
 
-class UserCreationForm(BaseUserCreationForm):
-    class Meta(BaseUserCreationForm.Meta):
+class UserCreationForm(BaseAdminUserCreationForm):
+    class Meta(BaseAdminUserCreationForm.Meta):
         model = User
         fields = ('username',)
 

@@ -41,7 +41,6 @@ def archives_stats_api(request):
         sec = request.user.secretariat
         modules_qs = modules_qs.filter(secretariat=sec)
         participants_qs = participants_qs.filter(secretariat=sec)
-        formateurs_qs = formateurs_qs.filter(secretariats=sec)
     elif request.user.is_authenticated and request.user.role == 'ENCADRANT':
         modules_qs = modules_qs.filter(superviseur=request.user)
         participant_ids = ModuleParticipant.objects.filter(

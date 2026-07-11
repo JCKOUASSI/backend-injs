@@ -221,10 +221,7 @@ def dashboard_stats(request):
     )
 
     formateurs_qs = Formateur.objects.all()
-    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-        sec = request.user.secretariat
-        formateurs_qs = formateurs_qs.filter(secretariats=sec)
-    elif request.user.role == 'ENCADRANT':
+    if request.user.role == 'ENCADRANT':
         formateurs_qs = formateurs_qs.filter(modules_assignes__module__in=modules_qs).distinct()
     total_formateurs = formateurs_qs.count()
 

@@ -169,7 +169,11 @@ def participant_accessible(user, pk):
 
 
 def formateurs_queryset_for_user(user, queryset=None):
-    """Formateurs visibles selon le périmètre opérationnel de l'utilisateur."""
+    """Formateurs visibles selon le périmètre opérationnel de l'utilisateur.
+
+    Secrétariat : pool global (tous les formateurs). Les règles d'assignation
+    aux modules (conflits groupe/jour/horaire) restent appliquées à l'assignation.
+    """
     qs = queryset if queryset is not None else Formateur.objects.all()
     if not (user and user.is_authenticated):
         return qs.none()
@@ -178,16 +182,10 @@ def formateurs_queryset_for_user(user, queryset=None):
     if roles & GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
         return qs
 
-    parts = []
     if roles & SECRETARIAT_ROLES:
-        sec = user.secretariat
-        if sec:
-            parts.append(
-                qs.filter(
-                    Q(secretariats=sec)
-                    | Q(modules_assignes__module__secretariat=sec)
-                ).distinct()
-            )
+        return qs
+
+    parts = []
     if 'ENCADRANT' in roles:
         parts.append(qs.filter(modules_assignes__module__superviseur=user).distinct())
 

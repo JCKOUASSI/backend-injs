@@ -7,6 +7,7 @@ from django.utils.html import format_html
 from admin_mixins import AuditLogAdminMixin, UserAdminScopeMixin
 from presences.models import AuditLog
 
+from .admin_badge_accounts import AdminBadgeAccountsMixin
 from .admin_forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from .models import User
 from .role_groups import GROUP_NAME_TO_ROLE, ROLE_GROUP_NAMES, ROLE_LABELS, get_user_role, get_user_roles
@@ -48,7 +49,13 @@ class RoleGroupAdmin(BaseGroupAdmin, admin.ModelAdmin):
 
 
 @admin.register(User)
-class UserAdmin(UserAdminScopeMixin, AuditLogAdminMixin, BaseUserAdmin, admin.ModelAdmin):
+class UserAdmin(
+    AdminBadgeAccountsMixin,
+    UserAdminScopeMixin,
+    AuditLogAdminMixin,
+    BaseUserAdmin,
+    admin.ModelAdmin,
+):
     form = UserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm

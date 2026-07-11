@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.template.response import TemplateResponse
 
 from config.admin_dashboard import admin_dashboard_callback
+from authentication.admin_badge_accounts import attach_provision_badge_accounts_urls
 from config.admin_guide import attach_admin_guide_urls
 
 
@@ -52,3 +53,4 @@ def setup_admin_site():
 
     admin.site.logout = custom_logout.__get__(admin.site, type(admin.site))
     attach_admin_guide_urls()
+    attach_provision_badge_accounts_urls()

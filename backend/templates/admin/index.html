@@ -227,6 +227,10 @@
                 <span class="dfrc-bento-card-title">{% trans "Utilisateurs" %}</span>
                 <span class="dfrc-bento-card-subtitle">{% trans "Comptes, rôles et accès" %}</span>
             </a>
+            <a class="dfrc-bento-card" href="{% url 'admin:authentication_provision_badge_accounts' %}">
+                <span class="dfrc-bento-card-title">{% trans "Comptes badge manquants" %}</span>
+                <span class="dfrc-bento-card-subtitle">{% trans "Créer les comptes auditeurs et formateurs sans User" %}</span>
+            </a>
             <a class="dfrc-bento-card" href="{% url 'admin:presences_devicebinding_changelist' %}">
                 <span class="dfrc-bento-card-title">{% trans "Liaisons appareils" %}</span>
                 <span class="dfrc-bento-card-subtitle">{% trans "Appareils mobiles autorisés" %}</span>

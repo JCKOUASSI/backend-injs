@@ -1,5 +1,7 @@
 """
 Forçage en masse des entrées (auditeurs, formateurs, encadrants) — 80–95 % aléatoire par séance.
+Chaque badgeage forcé enregistre entrée + sortie sur le créneau planifié complet
+(voir ``presences.duree.rattrapage_creneau_timestamps``).
 Utilisé par l'API et les commandes manage.py force_badgeage_*.
 """
 import random
@@ -10,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from formations.models import Module, ModuleParticipant, ModuleFormateur, SessionModule
+from .duree import rattrapage_creneau_timestamps
 from .models import Pointage, AuditLog, _log_audit
 
 TAUX_MIN_DEFAULT = 0.80
@@ -87,10 +90,58 @@ def force_entree_auditeur(
     timestamp_entree=None,
     ignore_constraints=False,
 ):
-    """Crée une entrée forcée auditeur (alias)."""
+    """Crée une entrée forcée auditeur (alias). Préférer ``force_presence_auditeur``."""
     return force_entree_personne(
         formation, seance, participant, 'participant', date_journee, motif,
         request=request, timestamp_entree=timestamp_entree, ignore_constraints=ignore_constraints,
+    )
+
+
+def force_presence_auditeur(
+    formation,
+    seance,
+    participant,
+    date_journee,
+    motif,
+    *,
+    request=None,
+    timestamp_entree=None,
+    timestamp_sortie=None,
+    ignore_constraints=False,
+    offset_seconds=0,
+    audit_extra=None,
+):
+    """Présence forcée auditeur : entrée + sortie = durée planifiée de la séance."""
+    _prepare_seance_for_rattrapage(seance)
+    default_entree, default_sortie = rattrapage_creneau_timestamps(seance, offset_seconds=offset_seconds)
+    ts_entree = timestamp_entree or default_entree
+    ts_sortie = timestamp_sortie or default_sortie
+
+    pointage, err = force_entree_personne(
+        formation,
+        seance,
+        participant,
+        'participant',
+        date_journee,
+        motif,
+        request=request,
+        timestamp_entree=ts_entree,
+        ignore_constraints=ignore_constraints,
+        audit_extra=audit_extra,
+    )
+    if err:
+        return None, err
+
+    return force_sortie_pointage(
+        formation,
+        pointage,
+        seance,
+        participant,
+        'participant',
+        motif,
+        request=request,
+        timestamp_sortie=ts_sortie,
+        creneau_complet=True,
     )
 
 
@@ -105,6 +156,7 @@ def force_entree_personne(
     request=None,
     timestamp_entree=None,
     ignore_constraints=False,
+    audit_extra=None,
 ):
     """Entrée forcée pour auditeur, formateur ou encadrant."""
     v = _views()
@@ -153,8 +205,8 @@ def force_entree_personne(
         extra={
             'acteur_role': getattr(getattr(request, 'user', None), 'role', 'SYSTEM'),
             'motif': motif,
-            'bulk_force_auditeurs': True,
             'ignore_constraints': ignore_constraints,
+            **(audit_extra or {}),
         },
     )
     return pointage, None
@@ -170,14 +222,32 @@ def force_sortie_pointage(
     *,
     request=None,
     timestamp_sortie=None,
+    creneau_complet=False,
 ):
     """Clôture un pointage ouvert (sortie forcée DFRC)."""
     if pointage.timestamp_sortie:
         return pointage, None
 
     v = _views()
-    ts_sortie_raw = timestamp_sortie or seance.terminee_le or timezone.now()
-    pointage.timestamp_sortie = v._clamp_to_seance(ts_sortie_raw, seance)
+    if creneau_complet or (
+        type_personne == 'participant'
+        and pointage.statut == Pointage.Statut.FORCE_DFRC
+        and timestamp_sortie is None
+    ):
+        ts_entree, ts_sortie = rattrapage_creneau_timestamps(seance)
+        pointage.timestamp_entree = v._clamp_to_seance(ts_entree, seance)
+        pointage.timestamp_sortie = v._clamp_to_seance(
+            timestamp_sortie or ts_sortie, seance,
+        )
+    elif type_personne == 'participant' and pointage.statut == Pointage.Statut.FORCE_DFRC:
+        ts_entree, ts_sortie_default = rattrapage_creneau_timestamps(seance)
+        pointage.timestamp_entree = v._clamp_to_seance(ts_entree, seance)
+        pointage.timestamp_sortie = v._clamp_to_seance(
+            timestamp_sortie or ts_sortie_default, seance,
+        )
+    else:
+        ts_sortie_raw = timestamp_sortie or seance.terminee_le or timezone.now()
+        pointage.timestamp_sortie = v._clamp_to_seance(ts_sortie_raw, seance)
     pointage.statut = Pointage.Statut.FORCE_DFRC
     pointage.calculer_duree()
     pointage.save(update_fields=['timestamp_sortie', 'statut', 'duree_presence_minutes', 'updated_at'])
@@ -246,7 +316,6 @@ def run_rattrapage_badgeage(
     seance_date = session.date_journee
     _prepare_seance_for_rattrapage(session)
 
-    base_ts = session.demarree_le or timezone.now()
     offset = 0
     counts = {'created': 0, 'sorties': 0, 'skipped': 0, 'errors': []}
 
@@ -259,20 +328,34 @@ def run_rattrapage_badgeage(
                 counts['skipped'] += 1
                 continue
 
-            ts_entree = base_ts + timedelta(seconds=offset)
             offset += 2
 
-            pointage, err = force_entree_personne(
-                formation,
-                session,
-                participant,
-                'participant',
-                seance_date,
-                motif,
-                request=request,
-                timestamp_entree=ts_entree,
-                ignore_constraints=ignore_constraints,
-            )
+            if with_sortie:
+                pointage, err = force_presence_auditeur(
+                    formation,
+                    session,
+                    participant,
+                    seance_date,
+                    motif,
+                    request=request,
+                    ignore_constraints=ignore_constraints,
+                    offset_seconds=offset - 2,
+                )
+            else:
+                ts_entree, _ = rattrapage_creneau_timestamps(
+                    session, offset_seconds=offset - 2,
+                )
+                pointage, err = force_entree_personne(
+                    formation,
+                    session,
+                    participant,
+                    'participant',
+                    seance_date,
+                    motif,
+                    request=request,
+                    timestamp_entree=ts_entree,
+                    ignore_constraints=ignore_constraints,
+                )
             if err:
                 counts['errors'].append({
                     'matricule': getattr(participant, 'matricule', ''),
@@ -282,27 +365,8 @@ def run_rattrapage_badgeage(
                 continue
 
             counts['created'] += 1
-
-            if with_sortie and pointage:
-                ts_sortie = session.terminee_le or (ts_entree + timedelta(hours=4))
-                _, err_sortie = force_sortie_pointage(
-                    formation,
-                    pointage,
-                    session,
-                    participant,
-                    'participant',
-                    motif,
-                    request=request,
-                    timestamp_sortie=ts_sortie,
-                )
-                if err_sortie:
-                    counts['errors'].append({
-                        'matricule': getattr(participant, 'matricule', ''),
-                        'nom': f'{participant.nom} {participant.prenom}'.strip(),
-                        'detail': err_sortie,
-                    })
-                else:
-                    counts['sorties'] += 1
+            if with_sortie and pointage and pointage.timestamp_sortie:
+                counts['sorties'] += 1
 
     return counts
 
@@ -390,9 +454,10 @@ def run_bulk_force_seance(
     taux_max=TAUX_MAX_DEFAULT,
     types=('participant', 'formateur', 'encadrant'),
 ):
-    """Force 80–95 % des absents par type sur une séance. Retourne compteurs par type."""
+    """Force 80–95 % des absents par type sur une séance (entrée + sortie, créneau planifié)."""
     seance_date = seance.date_journee
     _prepare_seance_for_force(seance, ignore_constraints=ignore_constraints)
+    _prepare_seance_for_rattrapage(seance)
 
     if not ignore_constraints and _views()._has_unfinished_previous_session(seance):
         return {'skipped': True, 'detail': 'Séance précédente non terminée.', 'auditeurs': 0, 'formateurs': 0, 'encadrants': 0}
@@ -406,21 +471,36 @@ def run_bulk_force_seance(
     if 'encadrant' in types:
         pools.append(('encadrant', 'encadrants', absents_encadrants_for_seance, lambda p: p))
 
-    base_ts = timezone.now()
     offset = 0
     for type_str, key, absent_fn, identity in pools:
         absents = absent_fn(seance, ignore_constraints=ignore_constraints)
         for person in _sample_absents(absents, taux_min, taux_max):
-            ts = base_ts + timedelta(seconds=offset)
             offset += 3
-            _, err = force_entree_personne(
-                formation, seance, person, type_str, seance_date, motif,
-                request=request, timestamp_entree=ts, ignore_constraints=ignore_constraints,
-            )
+            if type_str == 'participant':
+                pointage, err = force_presence_auditeur(
+                    formation, seance, person, seance_date, motif,
+                    request=request, ignore_constraints=ignore_constraints,
+                    offset_seconds=offset - 3,
+                    audit_extra={'bulk_force_auditeurs': True},
+                )
+            else:
+                ts_entree, ts_sortie = rattrapage_creneau_timestamps(
+                    seance, offset_seconds=offset - 3,
+                )
+                pointage, err = force_entree_personne(
+                    formation, seance, person, type_str, seance_date, motif,
+                    request=request, timestamp_entree=ts_entree,
+                    ignore_constraints=ignore_constraints,
+                )
+                if not err and pointage:
+                    _, err = force_sortie_pointage(
+                        formation, pointage, seance, person, type_str, motif,
+                        request=request, timestamp_sortie=ts_sortie,
+                    )
             if err:
                 counts['erreurs'].append({'type': type_str, 'detail': err})
-            else:
-                counts[key] += 1
+                continue
+            counts[key] += 1
 
     counts['skipped'] = False
     return counts
@@ -546,7 +626,7 @@ def run_bulk_force_badgeage_auditeurs(
         }, 400
 
     return {
-        'detail': f'{total_badges} entrée(s) auditeur(s) forcée(s) sur {len(sessions_result)} séance(s).',
+        'detail': f'{total_badges} présence(s) auditeur(s) forcée(s) sur {len(sessions_result)} séance(s).',
         'sessions': sessions_result,
         'total_badges': total_badges,
         'totals': totals,
@@ -607,7 +687,7 @@ def run_bulk_force_application(
     total_badges = totals['auditeurs'] + totals['formateurs'] + totals['encadrants']
     return {
         'detail': (
-            f'{total_badges} entrée(s) forcée(s) — '
+            f'{total_badges} présence(s) forcée(s) — '
             f'{totals["auditeurs"]} aud. · {totals["formateurs"]} form. · {totals["encadrants"]} enc. '
             f'sur {seance_count} séance(s).'
         ),

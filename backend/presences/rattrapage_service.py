@@ -8,16 +8,14 @@ effectifs attendus de cette cohorte.
 La présence est matérialisée par un ``Pointage`` forcé, réutilisant
 l'infrastructure de badgeage forcé existante.
 """
-from datetime import timedelta
-
 from django.db import transaction
-from django.utils import timezone
 
 from .bulk_force_auditeurs import (
-    _prepare_seance_for_rattrapage,
     force_entree_personne,
+    force_presence_auditeur,
     force_sortie_pointage,
 )
+from .duree import rattrapage_creneau_timestamps
 from .models import AuditLog, Pointage, Rattrapage, _log_audit
 
 
@@ -70,36 +68,45 @@ def generer_presence_rattrapage(rattrapage, *, request=None, with_sortie=True, m
         )
         created = False
         if pointage is None:
-            _prepare_seance_for_rattrapage(seance)
-            pointage, err = force_entree_personne(
-                formation,
-                seance,
-                participant,
-                'participant',
-                seance_date,
-                motif_final,
-                request=request,
-                ignore_constraints=True,
-            )
-            if err:
-                raise RattrapageError(err)
-            created = True
-
-            if with_sortie and pointage and not pointage.timestamp_sortie:
-                ts_sortie = seance.terminee_le or (
-                    pointage.timestamp_entree + timedelta(hours=4)
-                    if pointage.timestamp_entree else timezone.now()
-                )
-                force_sortie_pointage(
+            if with_sortie:
+                pointage, err = force_presence_auditeur(
                     formation,
-                    pointage,
+                    seance,
+                    participant,
+                    seance_date,
+                    motif_final,
+                    request=request,
+                    ignore_constraints=True,
+                )
+            else:
+                ts_entree, _ = rattrapage_creneau_timestamps(seance)
+                pointage, err = force_entree_personne(
+                    formation,
                     seance,
                     participant,
                     'participant',
+                    seance_date,
                     motif_final,
                     request=request,
-                    timestamp_sortie=ts_sortie,
+                    timestamp_entree=ts_entree,
+                    ignore_constraints=True,
                 )
+            if err:
+                raise RattrapageError(err)
+            created = True
+        elif with_sortie and not pointage.timestamp_sortie:
+            _, err = force_sortie_pointage(
+                formation,
+                pointage,
+                seance,
+                participant,
+                'participant',
+                motif_final,
+                request=request,
+                creneau_complet=True,
+            )
+            if err:
+                raise RattrapageError(err)
 
         rattrapage.pointage = pointage
         rattrapage.statut = Rattrapage.Statut.EFFECTUE

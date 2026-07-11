@@ -95,10 +95,9 @@ class FormateurAdminScopeMixin(AdminScopeMixin):
             return qs
 
         roles = get_user_roles(request.user)
-        secretariat = getattr(request.user, 'secretariat', None)
 
-        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'} and secretariat:
-            return qs.filter(secretariats=secretariat).distinct()
+        if roles & {'SECRETARIAT', 'CHEF_SECRETARIAT'}:
+            return qs
 
         if 'ENCADRANT' in roles:
             return qs.none()

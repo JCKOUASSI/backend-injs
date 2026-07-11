@@ -704,6 +704,80 @@ class BadgeAccountProvisionTests(TestCase):
         self.assertIn('SYGEP-CPFAE', html)
 
 
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class BadgeProvisionMissingTests(TestCase):
+
+    def setUp(self):
+        from formations.models import (
+            Formation, Formateur, Module, ModuleFormateur, ModuleParticipant, Participant,
+        )
+
+        formation = Formation.objects.create(formation='F provision')
+        module = Module.objects.create(formation=formation, intitule='M provision', statut='EN_COURS')
+
+        self.participant = Participant.objects.create(
+            matricule='FNCP26-200',
+            nom='Diallo',
+            prenom='Mariam',
+            email='mariam@example.com',
+        )
+        self.formateur = Formateur.objects.create(
+            numerobadge='F0200',
+            nom='Koné',
+            prenom='Paul',
+            email='paul@example.com',
+        )
+        ModuleParticipant.objects.create(module=module, participant=self.participant)
+        ModuleFormateur.objects.create(module=module, formateur=self.formateur)
+
+        self.participant_sans_module = Participant.objects.create(
+            matricule='FNCP26-999',
+            nom='Seul',
+            prenom='Sans',
+        )
+
+    def test_participants_sans_compte_excludes_linked_and_unenrolled(self):
+        from formations.models import Participant
+        from authentication.badge_provision import participants_sans_compte, formateurs_sans_compte
+
+        qs = participants_sans_compte()
+        self.assertEqual(list(qs.values_list('matricule', flat=True)), ['FNCP26-200'])
+        self.assertNotIn('FNCP26-999', list(qs.values_list('matricule', flat=True)))
+
+        linked = User.objects.create_user(
+            username='linked-auditeur',
+            password='pass12345',
+            role=User.Role.AUDITEUR,
+            matricule='FNCP26-200',
+        )
+        Participant.objects.filter(user=linked).exclude(pk=self.participant.pk).delete()
+        self.participant.user = linked
+        self.participant.save(update_fields=['user'])
+        self.assertEqual(participants_sans_compte().count(), 0)
+        self.assertEqual(formateurs_sans_compte().count(), 1)
+
+    def test_provision_missing_creates_only_unlinked_accounts(self):
+        from authentication.badge_provision import (
+            participants_sans_compte,
+            provision_missing_badge_accounts,
+        )
+
+        stats = provision_missing_badge_accounts()
+        self.participant.refresh_from_db()
+        self.formateur.refresh_from_db()
+
+        self.assertEqual(stats['auditeurs']['created'], 1)
+        self.assertEqual(stats['formateurs']['created'], 1)
+        self.assertIsNotNone(self.participant.user_id)
+        self.assertIsNotNone(self.formateur.user_id)
+        self.assertEqual(len(mail.outbox), 2)
+
+        stats_again = provision_missing_badge_accounts()
+        self.assertEqual(stats_again['auditeurs']['created'], 0)
+        self.assertEqual(stats_again['formateurs']['created'], 0)
+        self.assertEqual(participants_sans_compte().count(), 0)
+
+
 class UserListScopeTests(TestCase):
 
     def setUp(self):
