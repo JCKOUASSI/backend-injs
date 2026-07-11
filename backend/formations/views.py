@@ -3,8 +3,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -269,16 +271,42 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Participant.objects.filter(secretariat=sec).filter(grade_q)
         return Participant.objects.all()
 
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except IntegrityError as exc:
+            raise ValidationError({
+                'matricule': ['Ce matricule est déjà utilisé.'],
+            }) from exc
+
     def perform_update(self, serializer):
         user = self.request.user
-        instance = None
-        if user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            matricule = serializer.validated_data.get('matricule', serializer.instance.matricule)
-            secretariat = _resolve_secretariat_from_matricule(matricule)
+        instance = serializer.instance
+        matricule_changed = (
+            'matricule' in serializer.validated_data
+            and serializer.validated_data['matricule'] != instance.matricule
+        )
+
+        secretariat = None
+        if user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT') and matricule_changed:
+            from formations.participant_matricule import secretariat_from_matricule_for_actor
+
+            secretariat = secretariat_from_matricule_for_actor(
+                serializer.validated_data['matricule'],
+                user,
+            )
+
+        with transaction.atomic():
             if secretariat is not None:
                 instance = serializer.save(secretariat=secretariat)
-        if instance is None:
-            instance = serializer.save()
+            else:
+                instance = serializer.save()
+
+            if matricule_changed and instance.user_id:
+                from formations.participant_matricule import sync_participant_user_after_matricule_change
+
+                sync_participant_user_after_matricule_change(instance)
+
         _log_audit(
             action=AuditLog.Action.PARTICIPANT_UPDATE,
             request=self.request,

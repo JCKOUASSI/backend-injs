@@ -417,8 +417,11 @@ class Participant(models.Model):
         verbose_name_plural = 'Auditeurs'
 
     def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+
+        self.matricule = (self.matricule or '').strip()
         if not self.matricule:
-            raise ValueError('Le matricule est obligatoire pour un participant.')
+            raise ValidationError('Le matricule est obligatoire pour un participant.')
         super().save(*args, **kwargs)
 
     def __str__(self):
