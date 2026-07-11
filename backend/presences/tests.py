@@ -452,7 +452,7 @@ class ScanModuleExclusivityTest(TestCase):
 
         res = self.client.post(
             '/api/scan/secure/',
-            {'token_qr': str(self.token_seance_2.token)},
+            {'token_qr': str(self.token_seance_2.token), 'device_id': 'test-device-scan-excl'},
             format='json',
         )
 
@@ -478,7 +478,7 @@ class ScanModuleExclusivityTest(TestCase):
 
         res = self.client.post(
             '/api/scan/secure/',
-            {'token_qr': str(self.token_seance_2.token)},
+            {'token_qr': str(self.token_seance_2.token), 'device_id': 'test-device-scan-fiche'},
             format='json',
         )
 

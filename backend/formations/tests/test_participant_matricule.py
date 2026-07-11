@@ -68,19 +68,22 @@ class ParticipantMatriculeSyncTests(TestCase):
         self.sec_fab = Secretariat.objects.create(numero=1, nom='FAB', type=ref_type)
         ref_type_fac = RefTypeSecretariat.objects.create(libelle='FAC')
         self.sec_fac = Secretariat.objects.create(numero=2, nom='FAC', type=ref_type_fac)
-        self.user = User.objects.create_user(
-            username='M0001',
-            password='pass12345',
-            role=User.Role.AUDITEUR,
-            matricule='M0001',
-        )
+        # Fiche d'abord : la création du compte AUDITEUR déclenche sync_user_profile_links
+        # qui rattache (ou créerait en doublon) un Participant au même matricule.
         self.participant = Participant.objects.create(
-            matricule='M0001',
+            matricule='MAT-SYNC-001',
             nom='Traore',
             prenom='Fatou',
             secretariat=self.sec_fab,
-            user=self.user,
         )
+        self.user = User.objects.create_user(
+            username='MAT-SYNC-001',
+            password='pass12345',
+            role=User.Role.AUDITEUR,
+            matricule='MAT-SYNC-001',
+        )
+        self.participant.refresh_from_db()
+        self.assertEqual(self.participant.user_id, self.user.id)
 
     def test_secretariat_reassigned_from_matricule_prefix(self):
         secretariat = secretariat_from_matricule_for_actor('FNCP26-777', self.admin)
