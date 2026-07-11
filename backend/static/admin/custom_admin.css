@@ -965,6 +965,149 @@ body.sygep-filter-panel-open {
     padding: 12px 0;
 }
 
+.dfrc-chart-svg-scroll {
+    overflow-x: auto;
+    margin: 0 -4px;
+    padding: 0 4px;
+}
+
+.dfrc-chart-svg {
+    display: block;
+    max-width: 100%;
+}
+
+.dfrc-chart-donut {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dfrc-chart-body--donut {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.dfrc-chart-svg--donut {
+    flex-shrink: 0;
+}
+
+.dfrc-chart-legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.dfrc-chart-legend-item {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.45rem 0.55rem;
+    margin-bottom: 0.45rem;
+    font-size: 0.76rem;
+}
+
+.dfrc-chart-legend-item:last-child {
+    margin-bottom: 0;
+}
+
+.dfrc-chart-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.dfrc-chart-legend-label {
+    color: #475569;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.dfrc-chart-legend-value {
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+}
+
+.dfrc-chart-legend-pct {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.dfrc-chart-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.dfrc-chart-stacked-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.dfrc-chart-stacked-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.dfrc-chart-stacked-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sygep-text);
+}
+
+.dfrc-chart-stacked-meta {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sygep-muted);
+    flex-shrink: 0;
+}
+
+.dfrc-chart-stacked-track {
+    display: flex;
+    height: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+
+.dfrc-chart-stacked-seg {
+    height: 100%;
+    min-width: 0;
+    transition: width 0.45s ease;
+}
+
+.dfrc-chart-stacked-seg--present {
+    background: linear-gradient(90deg, #15803d, #22c55e);
+}
+
+.dfrc-chart-stacked-seg--absent {
+    background: linear-gradient(90deg, #c2410c, #fb923c);
+}
+
+.dfrc-chart-stacked-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.25rem;
+    font-size: 11px;
+    color: var(--sygep-muted);
+}
+
+.dfrc-chart-stacked-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 .dfrc-quick-action-btn {
     display: inline-flex;
     align-items: center;

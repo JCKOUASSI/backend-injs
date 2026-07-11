@@ -42,44 +42,24 @@
                 <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--action">bar_chart</span>
                 <div>
                     <h2 class="dfrc-chart-title">{% trans "Pointages par mois" %}</h2>
-                    <p class="dfrc-chart-subtitle">{% trans "6 derniers mois" %}</p>
+                    <p class="dfrc-chart-subtitle">{% trans "Histogramme — 6 derniers mois" %}</p>
                 </div>
             </header>
             <div class="dfrc-chart-body">
-                {% for row in admin_charts.pointages_mensuels %}
-                <div class="dfrc-chart-row">
-                    <span class="dfrc-chart-label">{{ row.label }}</span>
-                    <div class="dfrc-chart-bar-wrap">
-                        <div class="dfrc-chart-bar dfrc-chart-bar--action{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
-                    </div>
-                    <span class="dfrc-chart-meta">{{ row.value }}</span>
-                </div>
-                {% empty %}
-                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
-                {% endfor %}
+                {% include "admin/includes/chart_histogram.html" with chart=admin_charts.pointages_mensuels title=_("Pointages par mois") %}
             </div>
         </article>
 
         <article class="dfrc-chart-card">
             <header class="dfrc-chart-header">
-                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">percent</span>
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">stacked_bar_chart</span>
                 <div>
                     <h2 class="dfrc-chart-title">{% trans "Taux de présence" %}</h2>
-                    <p class="dfrc-chart-subtitle">{% trans "6 derniers mois" %}</p>
+                    <p class="dfrc-chart-subtitle">{% trans "Bandes empilées — présents / absents" %}</p>
                 </div>
             </header>
             <div class="dfrc-chart-body">
-                {% for row in admin_charts.taux_presence %}
-                <div class="dfrc-chart-row">
-                    <span class="dfrc-chart-label">{{ row.label }}</span>
-                    <div class="dfrc-chart-bar-wrap">
-                        <div class="dfrc-chart-bar dfrc-chart-bar--nav{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
-                    </div>
-                    <span class="dfrc-chart-meta" title="{{ row.detail }}">{{ row.display }}%</span>
-                </div>
-                {% empty %}
-                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
-                {% endfor %}
+                {% include "admin/includes/chart_stacked_bars.html" with rows=admin_charts.taux_presence %}
             </div>
         </article>
 
@@ -88,44 +68,24 @@
                 <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">event</span>
                 <div>
                     <h2 class="dfrc-chart-title">{% trans "Séances par mois" %}</h2>
-                    <p class="dfrc-chart-subtitle">{% trans "Séances comptabilisables" %}</p>
+                    <p class="dfrc-chart-subtitle">{% trans "Histogramme — séances comptabilisables" %}</p>
                 </div>
             </header>
             <div class="dfrc-chart-body">
-                {% for row in admin_charts.sessions_mensuelles %}
-                <div class="dfrc-chart-row">
-                    <span class="dfrc-chart-label">{{ row.label }}</span>
-                    <div class="dfrc-chart-bar-wrap">
-                        <div class="dfrc-chart-bar dfrc-chart-bar--nav{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%"></div>
-                    </div>
-                    <span class="dfrc-chart-meta">{{ row.value }}</span>
-                </div>
-                {% empty %}
-                <p class="dfrc-chart-empty">{% trans "Aucune donnée sur la période." %}</p>
-                {% endfor %}
+                {% include "admin/includes/chart_histogram.html" with chart=admin_charts.sessions_mensuelles title=_("Séances par mois") %}
             </div>
         </article>
 
-        <article class="dfrc-chart-card dfrc-chart-card--wide">
+        <article class="dfrc-chart-card">
             <header class="dfrc-chart-header">
                 <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--action">pie_chart</span>
                 <div>
                     <h2 class="dfrc-chart-title">{% trans "Pointages par statut" %}</h2>
-                    <p class="dfrc-chart-subtitle">{% trans "Répartition globale" %}</p>
+                    <p class="dfrc-chart-subtitle">{% trans "Camembert — répartition globale" %}</p>
                 </div>
             </header>
-            <div class="dfrc-chart-body">
-                {% for row in admin_charts.pointages_par_statut %}
-                <div class="dfrc-chart-row">
-                    <span class="dfrc-chart-label dfrc-chart-label--wide">{{ row.label }}</span>
-                    <div class="dfrc-chart-bar-wrap">
-                        <div class="dfrc-chart-bar{% if row.value %} dfrc-chart-bar--visible{% endif %}" style="width: {{ row.pct_width }}%; background: {{ row.color }}"></div>
-                    </div>
-                    <span class="dfrc-chart-meta">{{ row.value }}</span>
-                </div>
-                {% empty %}
-                <p class="dfrc-chart-empty">{% trans "Aucun pointage enregistré." %}</p>
-                {% endfor %}
+            <div class="dfrc-chart-body dfrc-chart-body--donut">
+                {% include "admin/includes/chart_donut.html" with chart=admin_charts.pointages_par_statut title=_("Pointages par statut") %}
             </div>
         </article>
     </section>
