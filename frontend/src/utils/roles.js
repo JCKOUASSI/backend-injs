@@ -55,8 +55,29 @@ export const FINANCE_MODULE_ROLES = ['FINANCE', 'DIRECTION', 'ARCHIVE']
 /** Consultation globale en lecture seule (fiches, données archivées). */
 export const ARCHIVE_CONSULT_ROLES = ['ARCHIVE', 'DIRECTION', ...ADMIN_LEVEL_ROLES]
 
-/** Navigation opérationnelle + consultation globale (cours, auditeurs, fiches). */
-export const OPERATION_VIEW_ROLES = [...STAFF_WEB_ROLES, 'DIRECTION', 'ARCHIVE']
+/** Personnel web hors module Finance (aligné OPERATIONAL_WEB_ROLES backend). */
+export const OPERATIONAL_WEB_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+  'ARCHIVE',
+  'ENCADRANT',
+  'SUPERVISEUR',
+]
+
+/** Navigation opérationnelle + consultation globale (cours, fiches module). */
+export const OPERATION_VIEW_ROLES = [...OPERATIONAL_WEB_ROLES]
+
+/** Liste / fiche auditeurs (aligné PARTICIPANT_LIST_ROLES + CanListParticipants backend). */
+export const PARTICIPANT_LIST_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'ARCHIVE',
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+  'ENCADRANT',
+]
 
 /** Exports finance formateurs / encadrants (sans paramétrage). */
 export const FINANCE_EXPORT_ROLES = ['FINANCE', 'DIRECTION', 'ARCHIVE']
@@ -179,6 +200,10 @@ export function canCreateParticipant(role) {
 
 export function canManageParticipant(role) {
   return PARTICIPANT_MANAGE_ROLES.includes(role)
+}
+
+export function canListParticipants(user) {
+  return hasAppRole(user, PARTICIPANT_LIST_ROLES)
 }
 
 export function canViewPresences(role) {
