@@ -3,8 +3,10 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -15,6 +17,7 @@ from .models import Formation, Participant, Secretariat, ModuleParticipant, Modu
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import formation_accessible, participants_queryset_for_user, formateurs_queryset_for_user
+from .api_access import IsOperationalWebStaff
 from .formateur_assignment import check_formateur_groupe_jour_conflict
 from .qr_helpers import get_session_for_qr
 from .serializers import (
@@ -269,16 +272,42 @@ class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
             return Participant.objects.filter(secretariat=sec).filter(grade_q)
         return Participant.objects.all()
 
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except IntegrityError as exc:
+            raise ValidationError({
+                'matricule': ['Ce matricule est déjà utilisé.'],
+            }) from exc
+
     def perform_update(self, serializer):
         user = self.request.user
-        instance = None
-        if user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            matricule = serializer.validated_data.get('matricule', serializer.instance.matricule)
-            secretariat = _resolve_secretariat_from_matricule(matricule)
+        instance = serializer.instance
+        matricule_changed = (
+            'matricule' in serializer.validated_data
+            and serializer.validated_data['matricule'] != instance.matricule
+        )
+
+        secretariat = None
+        if user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT') and matricule_changed:
+            from formations.participant_matricule import secretariat_from_matricule_for_actor
+
+            secretariat = secretariat_from_matricule_for_actor(
+                serializer.validated_data['matricule'],
+                user,
+            )
+
+        with transaction.atomic():
             if secretariat is not None:
                 instance = serializer.save(secretariat=secretariat)
-        if instance is None:
-            instance = serializer.save()
+            else:
+                instance = serializer.save()
+
+            if matricule_changed and instance.user_id:
+                from formations.participant_matricule import sync_participant_user_after_matricule_change
+
+                sync_participant_user_after_matricule_change(instance)
+
         _log_audit(
             action=AuditLog.Action.PARTICIPANT_UPDATE,
             request=self.request,
@@ -501,10 +530,9 @@ def remove_formateur_from_formation(request, pk, formateur_id):
 @permission_classes([IsAuthenticated])
 def list_formateurs_of_formation(request, pk):
     """Lister les formateurs assignés à une formation."""
-    try:
-        formation = Formation.objects.get(pk=pk)
-    except Formation.DoesNotExist:
-        return Response({'detail': 'Formation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    formation = formation_accessible(request.user, pk)
+    if not formation:
+        return Response({'detail': 'Formation introuvable ou non autorisée.'}, status=status.HTTP_404_NOT_FOUND)
 
     formateurs = Formateur.objects.filter(modules_assignes__module__formation=formation).distinct()
     return Response(FormateurSerializer(formateurs, many=True).data)
@@ -657,7 +685,7 @@ def get_active_qr(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def qr_image(request, pk):
     """Génère l'image PNG du QR code actif d'une formation (A4 printable)."""
     import io
@@ -744,7 +772,7 @@ def qr_image(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
 def session_qr_image(request, pk, session_pk):
     """Génère l'image PNG du QR code actif d'une séance spécifique."""
     import io

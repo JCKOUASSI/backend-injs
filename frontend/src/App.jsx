@@ -51,6 +51,8 @@ import {
   FINANCE_EXPORT_ROLES,
   FINANCE_SETTINGS_ROLES,
   OPERATION_VIEW_ROLES,
+  OPERATIONAL_WEB_ROLES,
+  PARTICIPANT_LIST_ROLES,
   ARCHIVE_CONSULT_ROLES,
   PRESENCE_VIEW_ROLES,
 } from './utils/roles'
@@ -94,7 +96,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceModule = hasAppRole(user, FINANCE_MODULE_ROLES) && !isArchiveRole
   const canViewFinanceDashboard = hasAppRole(user, FINANCE_EXPORT_ROLES) && !isArchiveRole
   const canViewFinanceSettings = hasAppRole(user, FINANCE_SETTINGS_ROLES)
-  const canViewParticipants = hasAppRole(user, OPERATION_VIEW_ROLES)
+  const canViewParticipants = hasAppRole(user, PARTICIPANT_LIST_ROLES)
   const canViewRattrapages = hasAppRole(user, PRESENCE_VIEW_ROLES)
   const canViewFormateurs = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'])
     || canViewFinanceModule
@@ -402,7 +404,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/participants" element={
-            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
+            <ProtectedRoute allowedRoles={PARTICIPANT_LIST_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
                 <Participants />
               </Layout>
@@ -423,7 +425,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/dashboard" element={
-            <ProtectedRoute allowedRoles={[...OPERATION_VIEW_ROLES, 'FINANCE']}>
+            <ProtectedRoute allowedRoles={OPERATIONAL_WEB_ROLES}>
               <DashboardRoute />
             </ProtectedRoute>
           } />

@@ -1,5 +1,6 @@
 """Permission inter-plateformes pour les endpoints de synchronisation SVEVCPFAE."""
 import os
+import secrets
 
 from rest_framework.permissions import BasePermission
 
@@ -19,4 +20,4 @@ class IsInterPlatformServiceAccount(BasePermission):
         if not auth_header.startswith('Api-Key '):
             return False
         provided = auth_header[len('Api-Key '):]
-        return provided == expected
+        return secrets.compare_digest(provided, expected)

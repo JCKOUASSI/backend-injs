@@ -142,6 +142,22 @@ class ParticipantSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at']
 
+    def validate_matricule(self, value):
+        from formations.participant_matricule import normalize_matricule, validate_participant_matricule
+
+        matricule = normalize_matricule(value)
+        linked_user_id = None
+        if self.instance and self.instance.user_id:
+            linked_user_id = self.instance.user_id
+        try:
+            return validate_participant_matricule(
+                matricule,
+                participant_id=getattr(self.instance, 'pk', None),
+                linked_user_id=linked_user_id,
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.messages[0]) from exc
+
 
 class FormateurSerializer(serializers.ModelSerializer):
     secretariats = serializers.PrimaryKeyRelatedField(

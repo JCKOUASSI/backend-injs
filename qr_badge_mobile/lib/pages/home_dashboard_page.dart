@@ -115,13 +115,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
     return sorted.first;
   }
 
-  int _ouvertsSansSortie(List<Map<String, dynamic>> items) {
-    return items
-        .where((m) =>
-            m['timestamp_entree'] != null && m['timestamp_sortie'] == null)
-        .length;
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -129,10 +122,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
     _maybeReloadFromTick(session.historyRefreshTick);
     final items = _pointages();
     final dernier = _dernierPointage(items);
-    final aVerifier = _ouvertsSansSortie(items) +
-        (session.gpsGranted ? 0 : 1) +
-        (session.heartbeatGpsBlocked ? 1 : 0);
-    final systemOk = session.gpsGranted && !session.heartbeatGpsBlocked;
 
     String dernierSousTitre = 'Aucun scan enregistré.';
     if (dernier != null) {
@@ -232,22 +221,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
             )
           else ...[
             HomeSummaryCard(
-              icon: Icons.verified_user,
-              iconBg: AppColors.iconQrBg,
-              iconColor: AppColors.ciGreenDark,
-              title: 'Statut du système',
-              subtitle: systemOk
-                  ? 'Tout fonctionne correctement.'
-                  : 'Vérifiez le GPS et la connexion.',
-              trailing: StatusPill(
-                label: systemOk ? 'Opérationnel' : 'À vérifier',
-                color: systemOk ? AppColors.ciGreenDark : AppColors.ciOrangeDark,
-                backgroundColor:
-                    systemOk ? AppColors.navIndicator : AppColors.badgeOrangeBg,
-                icon: systemOk ? Icons.check : Icons.warning_amber_rounded,
-              ),
-            ),
-            HomeSummaryCard(
               icon: Icons.phonelink_lock,
               iconBg: AppColors.iconQrBg,
               iconColor: AppColors.ciGreenDark,
@@ -258,7 +231,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
                 children: [
                   if (dernier != null)
                     const StatusPill(
-                      label: 'Aucun problème',
+                      label: 'Enregistré',
                       color: AppColors.ciGreenDark,
                       backgroundColor: AppColors.navIndicator,
                       icon: Icons.check,
@@ -271,22 +244,6 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
               ),
               onTap: widget.onOpenHistory,
             ),
-            if (aVerifier > 0)
-              HomeSummaryCard(
-                icon: Icons.warning_amber_rounded,
-                iconBg: AppColors.badgeOrangeBg,
-                iconColor: AppColors.ciOrangeDark,
-                title: 'Éléments à vérifier',
-                subtitle:
-                    '$aVerifier élément${aVerifier > 1 ? 's' : ''} nécessitent votre attention.',
-                trailing: const StatusPill(
-                  label: 'À vérifier',
-                  color: AppColors.ciOrangeDark,
-                  backgroundColor: AppColors.badgeOrangeBg,
-                  icon: Icons.warning_amber_rounded,
-                ),
-                onTap: widget.onOpenHistory,
-              ),
           ],
         ],
       ),

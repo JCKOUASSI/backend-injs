@@ -21,6 +21,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Count, Subquery, OuterRef, Value, IntegerField
+from django.db import IntegrityError, transaction
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -1296,7 +1297,6 @@ def participant_create(request):
             prenom=request.POST['prenom'],
             email=request.POST.get('email', ''),
             telephone=request.POST.get('telephone', ''),
-            organisation=request.POST.get('organisation', ''),
             secretariat=sec,
         )
         messages.success(request, "Participant créé.")
@@ -1314,17 +1314,44 @@ def participant_create(request):
 def participant_edit(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
     if request.method == 'POST':
-        participant.matricule = request.POST.get('matricule', participant.matricule).strip() or participant.matricule
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from formations.participant_matricule import (
+            normalize_matricule,
+            secretariat_from_matricule_for_actor,
+            sync_participant_user_after_matricule_change,
+            validate_participant_matricule,
+        )
+
+        new_matricule = normalize_matricule(
+            request.POST.get('matricule', participant.matricule),
+        ) or participant.matricule
+        try:
+            validate_participant_matricule(
+                new_matricule,
+                participant_id=participant.pk,
+                linked_user_id=participant.user_id,
+            )
+        except DjangoValidationError as exc:
+            messages.error(request, exc.messages[0])
+            return redirect('web-participants')
+
+        matricule_changed = new_matricule != participant.matricule
+        participant.matricule = new_matricule
         participant.nom = request.POST['nom']
         participant.prenom = request.POST['prenom']
         participant.email = request.POST.get('email', '')
         participant.telephone = request.POST.get('telephone', '')
-        participant.organisation = request.POST.get('organisation', '')
-        if request.user.role not in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
-            secretariat = _resolve_secretariat_from_matricule(participant.matricule)
-            if secretariat is not None:
-                participant.secretariat = secretariat
-        participant.save()
+        secretariat = secretariat_from_matricule_for_actor(participant.matricule, request.user)
+        if secretariat is not None:
+            participant.secretariat = secretariat
+        try:
+            with transaction.atomic():
+                participant.save()
+                if matricule_changed and participant.user_id:
+                    sync_participant_user_after_matricule_change(participant)
+        except IntegrityError:
+            messages.error(request, 'Ce matricule est déjà utilisé.')
+            return redirect('web-participants')
         messages.success(request, "Participant modifié.")
         _log_audit(
             action=AuditLog.Action.PARTICIPANT_UPDATE,

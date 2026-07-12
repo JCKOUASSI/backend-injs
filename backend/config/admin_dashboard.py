@@ -4,6 +4,8 @@ from django.db.models import Count
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from config.admin_charts import build_donut, build_histogram, build_stacked_bars
+
 _MOIS_FR = (
     'jan.', 'fév.', 'mars', 'avr.', 'mai', 'juin',
     'juil.', 'août', 'sep.', 'oct.', 'nov.', 'déc.',
@@ -24,55 +26,41 @@ def _mois_label(cle_mois):
     return f'{_MOIS_FR[month - 1]} {year}'
 
 
-def _bar_rows(items, *, value_key='value', max_value=None):
-    values = [item[value_key] for item in items]
-    peak = max_value or (max(values) if values else 0) or 1
-    rows = []
-    for item in items:
-        value = item[value_key]
-        pct = round(value / peak * 100, 1) if peak else 0
-        rows.append({
-            **item,
-            'pct': pct,
-            'pct_width': f'{pct:.1f}',
-        })
-    return rows
-
-
 def _build_admin_charts():
     from presences.models import Pointage
     from statistiques.views import _historique_mensuel
 
     historique = _historique_mensuel(mois=6)
 
-    pointages_mensuels = _bar_rows([
+    pointages_mensuels = build_histogram([
         {
             'label': _mois_label(item['mois']),
             'value': item['total'],
         }
         for item in historique['pointages_par_mois']
-    ])
+    ], color='#15803d')
 
-    taux_presence = _bar_rows([
+    taux_presence = build_stacked_bars([
         {
             'label': _mois_label(item['mois']),
-            'value': round(item['total'], 1),
-            'display': f"{item['total']:.1f}".replace('.', ','),
+            'presents': item['presents'],
+            'absents': item['absents'],
+            'display': f"{item['total']:.1f}".replace('.', ',') + '%',
             'detail': _('{p} présents / {a} absents').format(
                 p=item['presents'],
                 a=item['absents'],
             ),
         }
         for item in historique['taux_presence_par_mois']
-    ], max_value=100)
+    ])
 
-    sessions_mensuelles = _bar_rows([
+    sessions_mensuelles = build_histogram([
         {
             'label': _mois_label(item['mois']),
             'value': item['total'],
         }
         for item in historique['sessions_par_mois']
-    ])
+    ], color='#0369a1')
 
     statut_labels = dict(Pointage.Statut.choices)
     statut_rows = list(
@@ -80,17 +68,15 @@ def _build_admin_charts():
         .annotate(value=Count('id'))
         .order_by('-value')
     )
-    statut_peak = sum(row['value'] for row in statut_rows) or 1
-    pointages_par_statut = [
+    pointages_par_statut = build_donut([
         {
             'label': statut_labels.get(row['statut'], row['statut']),
             'value': row['value'],
-            'pct': round(row['value'] / statut_peak * 100, 1),
-            'pct_width': f"{round(row['value'] / statut_peak * 100, 1):.1f}",
             'color': _STATUT_COLORS.get(row['statut'], '#64748b'),
         }
         for row in statut_rows
-    ]
+        if row['value']
+    ])
 
     return {
         'pointages_mensuels': pointages_mensuels,

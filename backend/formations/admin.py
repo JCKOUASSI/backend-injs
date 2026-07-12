@@ -1,6 +1,10 @@
 from django.contrib import admin
+from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django import forms
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Count, Exists, OuterRef
+from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path, reverse
@@ -184,6 +188,26 @@ class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, admin.ModelAd
         return getattr(obj, '_nb_modules', obj.modules.count())
 
 
+class ParticipantAdminForm(forms.ModelForm):
+    class Meta:
+        model = Participant
+        fields = '__all__'
+
+    def clean_matricule(self):
+        from formations.participant_matricule import normalize_matricule, validate_participant_matricule
+
+        matricule = normalize_matricule(self.cleaned_data.get('matricule'))
+        linked_user = self.cleaned_data.get('user') or getattr(self.instance, 'user', None)
+        try:
+            return validate_participant_matricule(
+                matricule,
+                participant_id=self.instance.pk,
+                linked_user_id=getattr(linked_user, 'pk', None),
+            )
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages[0]) from exc
+
+
 @admin.register(Participant)
 class ParticipantAdmin(
     AdminRattrapageBadgeageMixin,
@@ -191,6 +215,7 @@ class ParticipantAdmin(
     AuditLogAdminMixin,
     admin.ModelAdmin,
 ):
+    form = ParticipantAdminForm
     audit_action_create = AuditLog.Action.PARTICIPANT_CREATE
     audit_action_update = AuditLog.Action.PARTICIPANT_UPDATE
     audit_action_delete = AuditLog.Action.PARTICIPANT_DELETE
@@ -245,6 +270,30 @@ class ParticipantAdmin(
 
     def _audit_cible(self, obj):
         return ('participant', obj.matricule or str(obj.pk), f"{obj.nom} {obj.prenom}".strip())
+
+    def save_model(self, request, obj, form, change):
+        matricule_changed = change and 'matricule' in form.changed_data
+        if matricule_changed:
+            from formations.participant_matricule import (
+                secretariat_from_matricule_for_actor,
+                sync_participant_user_after_matricule_change,
+            )
+
+            secretariat = secretariat_from_matricule_for_actor(obj.matricule, request.user)
+            if secretariat is not None:
+                obj.secretariat = secretariat
+
+        try:
+            with transaction.atomic():
+                super().save_model(request, obj, form, change)
+                if matricule_changed and obj.user_id:
+                    sync_participant_user_after_matricule_change(obj)
+        except IntegrityError as exc:
+            messages.error(
+                request,
+                _('Impossible d’enregistrer ce matricule : il est déjà utilisé.'),
+            )
+            raise ValidationError({'matricule': _('Ce matricule est déjà utilisé.')}) from exc
 
 
 @admin.register(ModuleParticipant)

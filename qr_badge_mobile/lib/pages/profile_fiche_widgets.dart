@@ -262,10 +262,10 @@ class _StatsGrid extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _StatTile(
-                icon: Icons.warning_amber_rounded,
-                value: _n('nb_a_verifier'),
-                label: 'À vérifier',
-                color: AppColors.ciOrangeDark,
+                icon: Icons.pending_outlined,
+                value: _n('nb_seances_en_cours'),
+                label: 'En cours',
+                color: AppColors.ciBlue,
               ),
             ),
           ],
