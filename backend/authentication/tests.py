@@ -590,6 +590,44 @@ class AuditeurProfileSyncTests(TestCase):
         self.assertEqual(user.matricule, 'ENC-001')
         self.assertEqual(resp.data['profil']['type_personne'], 'encadrant')
 
+    def test_my_fiche_secretariat_encadrant_dual_role(self):
+        ensure_role_groups()
+        user = User.objects.create_user(
+            username='ENC-DUAL',
+            password='pass12345',
+            first_name='Jean',
+            last_name='Dupont',
+            role=User.Role.SECRETARIAT,
+            matricule='ENC-DUAL',
+        )
+        user.groups.set([
+            Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.SECRETARIAT]),
+            Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.ENCADRANT]),
+        ])
+        user.refresh_from_db()
+        self.assertEqual(user.role, User.Role.SECRETARIAT)
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        resp = client.get('/api/me/fiche/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['profil']['type_personne'], 'encadrant')
+
+    def test_my_fiche_superviseur_role(self):
+        user = User.objects.create_user(
+            username='SUP-FICHE',
+            password='pass12345',
+            first_name='Marc',
+            last_name='Super',
+            role=User.Role.SUPERVISEUR,
+            matricule='SUP-FICHE',
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        resp = client.get('/api/me/fiche/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['profil']['type_personne'], 'encadrant')
+
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class BadgeAccountProvisionTests(TestCase):

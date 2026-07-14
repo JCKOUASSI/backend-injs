@@ -5,7 +5,10 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.test import APIClient
 from rest_framework import status
+from django.contrib.auth.models import Group
+
 from authentication.models import User
+from authentication.role_groups import ROLE_GROUP_NAMES, ensure_role_groups
 from formations.models import (
     Formation,
     Module,
@@ -695,6 +698,98 @@ class SecureScanFormateurEncadrantTest(TestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data.get('type_personne'), 'encadrant')
+
+    def test_secure_scan_secretariat_encadrant_dual_role(self):
+        ensure_role_groups()
+        user = make_user('sec-enc-mobile', role=User.Role.SECRETARIAT)
+        user.matricule = 'ENC002'
+        user.save(update_fields=['matricule'])
+        user.groups.set([
+            Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.SECRETARIAT]),
+            Group.objects.get(name=ROLE_GROUP_NAMES[User.Role.ENCADRANT]),
+        ])
+        user.refresh_from_db()
+        self.assertEqual(user.role, User.Role.SECRETARIAT)
+
+        self.client.force_authenticate(user)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data.get('code'), 'NOT_IN_LIST')
+
+        self.module.superviseur = user
+        self.module.save(update_fields=['superviseur'])
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+
+    def test_secure_scan_superviseur_role_treated_as_encadrant(self):
+        superviseur = make_user('superviseur_mobile', role='SUPERVISEUR')
+        superviseur.matricule = 'SUP001'
+        superviseur.save(update_fields=['matricule'])
+        self.module.superviseur = superviseur
+        self.module.save(update_fields=['superviseur'])
+
+        self.client.force_authenticate(superviseur)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token), 'device_id': 'test-device-sup'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+
+    def test_secure_scan_encadrant_on_module_without_superviseur(self):
+        self.module.superviseur = None
+        self.module.save(update_fields=['superviseur'])
+
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data.get('type_personne'), 'encadrant')
+
+    def test_secure_scan_encadrant_rejected_when_other_superviseur_assigned(self):
+        other = make_user('other_enc', role='ENCADRANT')
+        other.matricule = 'ENC999'
+        other.save(update_fields=['matricule'])
+        self.module.superviseur = other
+        self.module.save(update_fields=['superviseur'])
+
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.post(
+            '/api/scan/secure/',
+            {'token_qr': str(self.token.token)},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data.get('code'), 'NOT_IN_LIST')
+        self.assertIn('Demandez au secrétariat', res.data.get('detail', ''))
+
+    def test_secure_check_status_rejects_encadrant_not_assigned(self):
+        other = make_user('other_enc2', role='ENCADRANT')
+        other.matricule = 'ENC998'
+        other.save(update_fields=['matricule'])
+        self.module.superviseur = other
+        self.module.save(update_fields=['superviseur'])
+
+        self.client.force_authenticate(self.encadrant)
+        res = self.client.get(
+            '/api/scan/secure/check-status/',
+            {'token_qr': str(self.token.token)},
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data.get('code'), 'NOT_IN_LIST')
 
 
 class VolumeHoraireFicheStatsTest(TestCase):

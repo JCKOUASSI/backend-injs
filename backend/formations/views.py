@@ -168,12 +168,16 @@ def assign_superviseur(request, pk):
     serializer = AssignSuperviseurSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
+    from authentication.role_groups import user_is_mobile_encadrant
+
     try:
-        superviseur = User.objects.get(
-            pk=serializer.validated_data['superviseur_id'],
-            role='ENCADRANT',
-        )
+        superviseur = User.objects.get(pk=serializer.validated_data['superviseur_id'])
     except User.DoesNotExist:
+        return Response(
+            {'detail': 'Encadrant introuvable ou rôle incorrect.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not user_is_mobile_encadrant(superviseur):
         return Response(
             {'detail': 'Encadrant introuvable ou rôle incorrect.'},
             status=status.HTTP_400_BAD_REQUEST,

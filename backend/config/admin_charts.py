@@ -18,6 +18,7 @@ def build_histogram(items, *, height=150, color='#15803d', value_key='value'):
     for index, item in enumerate(items):
         value = item.get(value_key, 0)
         bar_h = max(6, round(value / peak * (height - 24))) if value > 0 else 0
+        bar_h = bar_h or 2
         x = 20 + index * (bar_w + 10)
         label = str(item.get('label', ''))
         bars.append({
@@ -25,7 +26,7 @@ def build_histogram(items, *, height=150, color='#15803d', value_key='value'):
             'x': x,
             'y': height - bar_h,
             'bar_w': bar_w,
-            'bar_h': bar_h or 2,
+            'bar_h': bar_h,
             'text_x': x + bar_w / 2,
             'value_y': height - bar_h - 4,
             'label_y': height + 14,
@@ -40,6 +41,32 @@ def build_histogram(items, *, height=150, color='#15803d', value_key='value'):
         'plot_height': height,
         'bars': bars,
     }
+
+
+def _donut_slice_path(cx, cy, radius, start_angle, arc):
+    """Trace une part de camembert ; gère le cas 100 % (arc complet)."""
+    if arc >= 2 * math.pi - 1e-9:
+        x1 = cx + radius * math.cos(start_angle)
+        y1 = cy + radius * math.sin(start_angle)
+        mid_angle = start_angle + math.pi
+        xm = cx + radius * math.cos(mid_angle)
+        ym = cy + radius * math.sin(mid_angle)
+        return (
+            f'M{cx:.2f} {cy:.2f} L{x1:.2f} {y1:.2f} '
+            f'A{radius:.2f} {radius:.2f} 0 1 1 {xm:.2f} {ym:.2f} '
+            f'A{radius:.2f} {radius:.2f} 0 1 1 {x1:.2f} {y1:.2f} Z'
+        )
+
+    x1 = cx + radius * math.cos(start_angle)
+    y1 = cy + radius * math.sin(start_angle)
+    end_angle = start_angle + arc
+    x2 = cx + radius * math.cos(end_angle)
+    y2 = cy + radius * math.sin(end_angle)
+    large = 1 if arc > math.pi else 0
+    return (
+        f'M{cx:.2f} {cy:.2f} L{x1:.2f} {y1:.2f} '
+        f'A{radius:.2f} {radius:.2f} 0 {large} 1 {x2:.2f} {y2:.2f} Z'
+    )
 
 
 def build_donut(items, *, size=None, value_key='value'):
@@ -62,20 +89,12 @@ def build_donut(items, *, size=None, value_key='value'):
         if not value:
             continue
         arc = (value / total) * 2 * math.pi
-        x1 = cx + radius * math.cos(angle)
-        y1 = cy + radius * math.sin(angle)
-        angle += arc
-        x2 = cx + radius * math.cos(angle)
-        y2 = cy + radius * math.sin(angle)
-        large = 1 if arc > math.pi else 0
         slices.append({
             **item,
-            'path': (
-                f'M{cx:.2f} {cy:.2f} L{x1:.2f} {y1:.2f} '
-                f'A{radius:.2f} {radius:.2f} 0 {large} 1 {x2:.2f} {y2:.2f} Z'
-            ),
+            'path': _donut_slice_path(cx, cy, radius, angle, arc),
             'pct': round(value / total * 100),
         })
+        angle += arc
 
     if not slices:
         return None

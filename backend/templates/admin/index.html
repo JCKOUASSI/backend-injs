@@ -30,6 +30,9 @@
                 </span>
             </div>
             <span class="dfrc-stat-value">{{ stat.value }}</span>
+            {% if stat.detail %}
+            <span class="dfrc-stat-detail">{{ stat.detail }}</span>
+            {% endif %}
         </a>
         {% endfor %}
     </div>
@@ -45,7 +48,7 @@
                     <p class="dfrc-chart-subtitle">{% trans "Histogramme — 6 derniers mois" %}</p>
                 </div>
             </header>
-            <div class="dfrc-chart-body">
+            <div class="dfrc-chart-body dfrc-chart-body--histogram">
                 {% include "admin/includes/chart_histogram.html" with chart=admin_charts.pointages_mensuels title=_("Pointages par mois") %}
             </div>
         </article>
@@ -71,12 +74,14 @@
                     <p class="dfrc-chart-subtitle">{% trans "Histogramme — séances comptabilisables" %}</p>
                 </div>
             </header>
-            <div class="dfrc-chart-body">
+            <div class="dfrc-chart-body dfrc-chart-body--histogram">
                 {% include "admin/includes/chart_histogram.html" with chart=admin_charts.sessions_mensuelles title=_("Séances par mois") %}
             </div>
         </article>
+    </section>
 
-        <article class="dfrc-chart-card">
+    <section class="dfrc-charts-grid dfrc-charts-grid--donuts">
+        <article class="dfrc-chart-card dfrc-chart-card--donut">
             <header class="dfrc-chart-header">
                 <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--action">pie_chart</span>
                 <div>
@@ -85,7 +90,20 @@
                 </div>
             </header>
             <div class="dfrc-chart-body dfrc-chart-body--donut">
-                {% include "admin/includes/chart_donut.html" with chart=admin_charts.pointages_par_statut title=_("Pointages par statut") %}
+                {% include "admin/includes/chart_donut.html" with chart=admin_charts.pointages_par_statut title=_("Pointages par statut") empty_message=_("Aucun pointage enregistré.") %}
+            </div>
+        </article>
+
+        <article class="dfrc-chart-card dfrc-chart-card--donut">
+            <header class="dfrc-chart-header">
+                <span class="material-symbols-outlined dfrc-chart-icon dfrc-chart-icon--nav">smartphone</span>
+                <div>
+                    <h2 class="dfrc-chart-title">{% trans "Adoption mobile auditeurs" %}</h2>
+                    <p class="dfrc-chart-subtitle">{% trans "Camembert — badgeage vs appareil lié" %}</p>
+                </div>
+            </header>
+            <div class="dfrc-chart-body dfrc-chart-body--donut">
+                {% include "admin/includes/chart_donut.html" with chart=admin_charts.auditeurs_mobile title=_("Adoption mobile auditeurs") empty_message=_("Aucun auditeur connecté sur mobile.") %}
             </div>
         </article>
     </section>

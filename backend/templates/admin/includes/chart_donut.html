@@ -18,15 +18,6 @@
         />
         {% endfor %}
         <circle cx="{{ chart.cx }}" cy="{{ chart.cy }}" r="{{ chart.inner_r }}" fill="#fff" />
-        <text
-            x="{{ chart.cx }}"
-            y="{{ chart.cy }}"
-            text-anchor="middle"
-            dominant-baseline="central"
-            font-size="14"
-            font-weight="700"
-            fill="#1e293b"
-        >{{ chart.total }}</text>
     </svg>
     <ul class="dfrc-chart-legend">
         {% for slice in chart.slices %}
@@ -40,5 +31,5 @@
     </ul>
 </div>
 {% else %}
-<p class="dfrc-chart-empty">{% trans "Aucun pointage enregistré." %}</p>
+<p class="dfrc-chart-empty">{{ empty_message|default:_("Aucun pointage enregistré.") }}</p>
 {% endif %}

@@ -19,7 +19,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
-from authentication.role_groups import get_user_role
+from authentication.role_groups import get_user_role, user_in_roles, user_is_mobile_encadrant
 from authentication.throttles import ScanRateThrottle, OfflineDataRateThrottle
 from formations.models import (
     Formation, Participant, Module, ModuleParticipant, ModuleFormateur,
@@ -442,10 +442,9 @@ def _resolve_authenticated_personne(user, *, ensure_profile=False):
         from authentication.profile_sync import sync_user_profile_links
         sync_user_profile_links(user)
 
-    role = getattr(user, 'role', None)
-
-    if role == 'ENCADRANT':
-        if not user.matricule:
+    if user_is_mobile_encadrant(user):
+        matricule = (user.matricule or user.username or '').strip()
+        if not matricule:
             return None, None, Response(
                 {
                     'code': 'NO_MATRICULE',
@@ -455,7 +454,7 @@ def _resolve_authenticated_personne(user, *, ensure_profile=False):
             )
         return user, 'encadrant', None
 
-    if role == 'FORMATEUR':
+    if user_in_roles(user, {'FORMATEUR'}):
         formateur = Formateur.objects.filter(user_id=user.pk).first()
         if formateur:
             return formateur, 'formateur', None
@@ -483,6 +482,27 @@ def _resolve_authenticated_personne(user, *, ensure_profile=False):
         {
             'code': 'NO_PROFILE',
             'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _encadrant_can_badge_module(user, module):
+    """Encadrant autorisé s'il supervise le module ou si aucun encadrant n'est assigné."""
+    if module.superviseur_id == user.pk:
+        return True
+    return module.superviseur_id is None
+
+
+def _encadrant_not_in_list_response(module):
+    return Response(
+        {
+            'code': 'NOT_IN_LIST',
+            'detail': (
+                "Vous n'êtes pas encadrant de ce module. "
+                'Demandez au secrétariat de vous assigner au module '
+                f'« {module.intitule} ».'
+            ),
         },
         status=status.HTTP_403_FORBIDDEN,
     )
@@ -944,12 +964,8 @@ def secure_scan_view(request):
                 status=status.HTTP_403_FORBIDDEN,
             )
     elif type_str == 'encadrant':
-        if seance.module.superviseur_id != personne.id:
-            return Response(
-                {'code': 'NOT_IN_LIST',
-                 'detail': 'Vous n\'êtes pas encadrant de ce module.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
     else:
         from .participant_scope import participant_for_module
         inscrit = participant_for_module(user, seance.module, seance=seance)
@@ -1273,8 +1289,8 @@ def secure_scan_heartbeat(request):
         if not ModuleFormateur.objects.filter(module=seance.module, formateur=personne).exists():
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas assigné(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
     elif type_str == 'encadrant':
-        if seance.module.superviseur_id != personne.id:
-            return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas encadrant de ce module."}, status=status.HTTP_403_FORBIDDEN)
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
     else:
         from .participant_scope import participant_for_module
         inscrit = participant_for_module(user, seance.module, seance=seance)
@@ -3181,6 +3197,9 @@ def secure_check_badge_status(request):
         inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is not None:
             personne = inscrit
+    elif type_str == 'encadrant':
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
 
     today = timezone.localdate()
     session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)
