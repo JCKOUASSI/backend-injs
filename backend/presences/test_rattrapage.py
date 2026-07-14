@@ -12,7 +12,7 @@ from statistiques.effectifs import aggregation_seances_modules, participant_ids_
 
 from .models import Pointage, Rattrapage
 from .bulk_force_auditeurs import run_rattrapage_badgeage
-from .rattrapage_service import annuler_rattrapage, generer_presence_rattrapage
+from .rattrapage_service import annuler_rattrapage, generer_presence_rattrapage, lier_rattrapage_au_badge
 from .views import _resolve_personne
 
 
@@ -52,6 +52,45 @@ class RattrapageFlowTest(TestCase):
             seance_manquee=self.seance_a,
             motif='Absence justifiée',
         )
+
+    def test_badge_naturel_lie_rattrapage(self):
+        """Un badge réel sur la séance d'accueil passe le rattrapage en effectué."""
+        from datetime import timedelta
+        from formations.models import QRToken
+
+        rattrapage = self._make_rattrapage()
+        self.seance_b.demarree_le = timezone.now()
+        self.seance_b.save(update_fields=['demarree_le'])
+        token = QRToken.objects.create(
+            session=self.seance_b,
+            expire_at=timezone.now() + timedelta(hours=1),
+            actif=True,
+        )
+        from rest_framework.test import APIClient
+        client = APIClient()
+        res = client.post('/api/scan/', {
+            'token_qr': str(token.token),
+            'numero_participant': self.p.matricule,
+        }, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+
+        rattrapage.refresh_from_db()
+        self.assertEqual(rattrapage.statut, Rattrapage.Statut.EFFECTUE)
+        self.assertIsNotNone(rattrapage.pointage_id)
+
+    def test_lier_rattrapage_au_badge_idempotent(self):
+        rattrapage = self._make_rattrapage()
+        pointage = Pointage.objects.create(
+            participant=self.p,
+            session=self.seance_b,
+            date_journee=timezone.localdate(),
+            timestamp_entree=timezone.now(),
+            statut=Pointage.Statut.EN_COURS,
+        )
+        lier_rattrapage_au_badge(self.p, self.seance_b, pointage)
+        rattrapage.refresh_from_db()
+        self.assertEqual(rattrapage.pointage_id, pointage.id)
+        self.assertEqual(rattrapage.statut, Rattrapage.Statut.EFFECTUE)
 
     def test_scan_bloque_sans_rattrapage(self):
         """Sans rattrapage, l'auditeur du groupe 1 est refusé sur le module du groupe 2."""
@@ -192,6 +231,21 @@ class RattrapageApiTest(TestCase):
         self.user = User.objects.create_user(username='dfrc', password='pass', role='CPFAE_ADMIN')
         self.client = APIClient()
         self.client.force_authenticate(self.user)
+
+    def test_create_sans_generation_presence(self):
+        """Par défaut, le rattrapage reste planifié : l'auditeur doit badger."""
+        res = self.client.post('/api/rattrapages/', {
+            'participant_id': self.p.id,
+            'seance_rattrapage_id': self.seance_b.id,
+            'motif': 'Absence justifiée',
+        }, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        cree = res.data['created'][0]
+        self.assertEqual(cree['statut'], 'PLANIFIE')
+        self.assertIsNone(cree['pointage_id'])
+        self.assertFalse(
+            Pointage.objects.filter(session=self.seance_b, participant=self.p).exists(),
+        )
 
     def test_create_avec_generation_presence(self):
         res = self.client.post('/api/rattrapages/', {

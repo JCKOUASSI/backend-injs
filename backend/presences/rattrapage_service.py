@@ -45,6 +45,32 @@ def _audit_rattrapage(action, rattrapage, request=None, extra=None):
     )
 
 
+def lier_rattrapage_au_badge(participant, seance, pointage, *, request=None):
+    """Associe un badge naturel au rattrapage planifié sur cette séance."""
+    rattrapage = (
+        Rattrapage.objects
+        .filter(
+            participant=participant,
+            seance_rattrapage=seance,
+            statut=Rattrapage.Statut.PLANIFIE,
+        )
+        .first()
+    )
+    if rattrapage is None:
+        return None
+
+    rattrapage.pointage = pointage
+    rattrapage.statut = Rattrapage.Statut.EFFECTUE
+    rattrapage.save(update_fields=['pointage', 'statut', 'updated_at'])
+    _audit_rattrapage(
+        AuditLog.Action.RATTRAPAGE_PRESENCE,
+        rattrapage,
+        request=request,
+        extra={'via_badge': True, 'pointage_created': True},
+    )
+    return rattrapage
+
+
 def generer_presence_rattrapage(rattrapage, *, request=None, with_sortie=True, motif=None):
     """Force la présence de l'auditeur sur la séance de rattrapage et la lie.
 

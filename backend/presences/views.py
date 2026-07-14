@@ -140,7 +140,7 @@ def _formateur_in_module_by_badge(module, formateur_candidates):
     return mf.formateur if mf else None
 
 
-def _resolve_personne(numero, formation, module=None):
+def _resolve_personne(numero, formation, module=None, seance=None):
     """
     Résout un numéro (auditeur, formateur, encadrant) vers la personne et vérifie l'inscription.
     Retourne (personne, type_str, personne_data, error_response).
@@ -269,11 +269,15 @@ def _resolve_personne(numero, formation, module=None):
     if not participant_in_scope and module_scope is not None:
         # Autoriser un rattrapage inter-cohorte planifié sur ce module (l'auditeur
         # n'est pas inscrit mais dispose d'un rattrapage actif pour ce module).
-        participant_in_scope = Rattrapage.objects.filter(
-            participant=participant,
-            seance_rattrapage__module=module_scope,
-            statut=Rattrapage.Statut.PLANIFIE,
-        ).exists()
+        rattrapage_filter = {
+            'participant': participant,
+            'statut': Rattrapage.Statut.PLANIFIE,
+        }
+        if seance is not None:
+            rattrapage_filter['seance_rattrapage'] = seance
+        else:
+            rattrapage_filter['seance_rattrapage__module'] = module_scope
+        participant_in_scope = Rattrapage.objects.filter(**rattrapage_filter).exists()
     if not participant_in_scope:
         module_label = _module_scan_label(module_scope)
         return None, None, None, Response(
@@ -663,7 +667,7 @@ def scan_view(request):
 
     # 2. Résoudre la personne (participant ou formateur)
     personne, type_str, personne_data, err = _resolve_personne(
-        data['numero_participant'], formation, seance.module
+        data['numero_participant'], formation, seance.module, seance=seance
     )
     if err:
         return err
@@ -812,6 +816,10 @@ def scan_view(request):
 
         pointage = Pointage.objects.create(**create_kwargs)
 
+        if type_str == 'participant':
+            from .rattrapage_service import lier_rattrapage_au_badge
+            lier_rattrapage_au_badge(personne, seance, pointage, request=request)
+
         _log_audit(
             action=AuditLog.Action.SCAN_ENTREE,
             request=request,
@@ -944,7 +952,7 @@ def secure_scan_view(request):
             )
     else:
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is None:
             return Response(
                 {'code': 'NOT_IN_LIST',
@@ -1148,6 +1156,10 @@ def secure_scan_view(request):
 
         pointage = Pointage.objects.create(**create_kwargs)
 
+        if type_str == 'participant':
+            from .rattrapage_service import lier_rattrapage_au_badge
+            lier_rattrapage_au_badge(personne, seance, pointage, request=request)
+
         _log_audit(
             action=AuditLog.Action.SCAN_SECURE_ENTREE,
             request=request,
@@ -1265,7 +1277,7 @@ def secure_scan_heartbeat(request):
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas encadrant de ce module."}, status=status.HTTP_403_FORBIDDEN)
     else:
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is None:
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas inscrit(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
         personne = inscrit
@@ -3166,7 +3178,7 @@ def secure_check_badge_status(request):
     # Aligne sur la fiche réellement inscrite au module (compte rattaché à une autre fiche).
     if type_str == 'participant':
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is not None:
             personne = inscrit
 

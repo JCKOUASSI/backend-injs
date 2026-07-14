@@ -74,7 +74,7 @@ def participant_in_module_by_matricule(module, numero_upper, numero_compact):
     return None
 
 
-def participant_for_module(user, module):
+def participant_for_module(user, module, seance=None):
     """Fiche Participant de l'utilisateur réellement inscrite au module donné.
 
     Contrairement à ``primary_participant_for_user`` (qui choisit une fiche
@@ -130,16 +130,14 @@ def participant_for_module(user, module):
 
     ids = participant_ids_for_user(user)
     if ids:
-        rattrapage = (
-            Rattrapage.objects
-            .filter(
-                participant_id__in=ids,
-                seance_rattrapage__module=module,
-                statut=Rattrapage.Statut.PLANIFIE,
-            )
-            .select_related('participant')
-            .first()
+        rattrapage_qs = Rattrapage.objects.filter(
+            participant_id__in=ids,
+            seance_rattrapage__module=module,
+            statut=Rattrapage.Statut.PLANIFIE,
         )
+        if seance is not None:
+            rattrapage_qs = rattrapage_qs.filter(seance_rattrapage=seance)
+        rattrapage = rattrapage_qs.select_related('participant').first()
         if rattrapage is not None:
             return rattrapage.participant
     return None
