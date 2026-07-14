@@ -32,24 +32,49 @@ class LoginRateThrottle(SimpleRateThrottle):
 
 
 class ScanRateThrottle(SimpleRateThrottle):
-    """Throttling anti spam sur l'endpoint public de scan QR."""
+    """Throttling anti spam sur les endpoints de scan QR.
+
+    - Compte authentifié (app mobile) : quota par utilisateur (+ appareil si fourni),
+      pour éviter qu'une salle entière partage le même plafond derrière un NAT WiFi.
+    - Scan public (web) : quota par IP + token QR.
+    """
 
     scope = 'scan'
 
+    def _request_value(self, request, key):
+        try:
+            val = (request.data or {}).get(key, '')
+            if val:
+                return str(val).strip()
+        except Exception:
+            pass
+        if hasattr(request, 'POST'):
+            val = request.POST.get(key, '')
+            if val:
+                return str(val).strip()
+        return ''
+
+    def _scan_device_id(self, request):
+        return self._request_value(request, 'device_id')
+
     def get_cache_key(self, request, view):
+        user = getattr(request, 'user', None)
+        if user is not None and getattr(user, 'is_authenticated', False):
+            device_id = self._scan_device_id(request)
+            device_key = device_id[:64] if device_id else 'no-device'
+            return f'scan:user:{user.pk}:{device_key}'
+
         ip = _client_ip(request)
         if not ip:
             return None
 
-        token = ''
-        try:
-            token = (request.data or {}).get('token_qr', '')
-        except Exception:
-            token = ''
+        token = self._request_value(request, 'token_qr')
+        if not token:
+            query_params = getattr(request, 'query_params', None) or getattr(request, 'GET', None) or {}
+            token = query_params.get('token_qr', '') or ''
 
-        # On limite l'impact par IP + token (utile contre de multiples scans concurrents).
         token_key = str(token).split('-')[0] if token else 'no-token'
-        return f'scan:{ip}:{token_key}'
+        return f'scan:ip:{ip}:{token_key}'
 
 
 class OfflineDataRateThrottle(SimpleRateThrottle):

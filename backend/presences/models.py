@@ -70,6 +70,10 @@ class Pointage(models.Model):
         indexes = [
             models.Index(fields=['date_journee', 'session'], name='pointage_date_session_idx'),
             models.Index(fields=['session', 'participant'], name='pointage_session_part_idx'),
+            models.Index(fields=['session', 'formateur'], name='pointage_session_form_idx'),
+            models.Index(fields=['session', 'encadrant'], name='pointage_session_enc_idx'),
+            models.Index(fields=['participant', 'date_journee'], name='pointage_part_date_idx'),
+            models.Index(fields=['statut', 'timestamp_sortie'], name='pointage_statut_sortie_idx'),
         ]
 
     @property

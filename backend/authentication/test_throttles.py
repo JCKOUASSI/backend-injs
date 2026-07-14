@@ -1,0 +1,51 @@
+"""Tests unitaires pour le throttling scan."""
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, SimpleTestCase
+
+from authentication.throttles import ScanRateThrottle
+
+User = get_user_model()
+
+
+class ScanRateThrottleKeyTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.throttle = ScanRateThrottle()
+
+    def test_authenticated_request_keys_by_user_not_ip(self):
+        user = User(pk=42, username='auditeur42')
+        request = self.factory.post(
+            '/api/scan/secure/',
+            {'token_qr': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'device_id': 'phone-abc'},
+        )
+        request.user = user
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertEqual(key, 'scan:user:42:phone-abc')
+
+    def test_different_users_get_different_keys_same_ip(self):
+        request_a = self.factory.post('/api/scan/secure/', {'device_id': 'dev1'})
+        request_a.user = User(pk=1, username='a')
+        request_a.META['REMOTE_ADDR'] = '192.168.1.1'
+
+        request_b = self.factory.post('/api/scan/secure/', {'device_id': 'dev2'})
+        request_b.user = User(pk=2, username='b')
+        request_b.META['REMOTE_ADDR'] = '192.168.1.1'
+
+        key_a = self.throttle.get_cache_key(request_a, view=None)
+        key_b = self.throttle.get_cache_key(request_b, view=None)
+        self.assertNotEqual(key_a, key_b)
+
+    def test_anonymous_request_keys_by_ip_and_token(self):
+        request = self.factory.post(
+            '/api/scan/',
+            {'token_qr': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'numero': 'P001'},
+        )
+        request.user = AnonymousUser()
+        request.META['REMOTE_ADDR'] = '203.0.113.9'
+
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertEqual(key, 'scan:ip:203.0.113.9:aaaaaaaa')
