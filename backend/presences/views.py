@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Q
@@ -18,7 +19,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsDFRC, IsDFRCOrEncadrant, IsSecretariatOrEncadrantOrDFRC, IsSecretariatOrDFRC
-from authentication.role_groups import get_user_role
+from authentication.role_groups import get_user_role, user_in_roles, user_is_mobile_encadrant
 from authentication.throttles import ScanRateThrottle, OfflineDataRateThrottle
 from formations.models import (
     Formation, Participant, Module, ModuleParticipant, ModuleFormateur,
@@ -122,7 +123,24 @@ def _participant_personne_data(participant):
     }
 
 
-def _resolve_personne(numero, formation, module=None):
+def _formateur_in_module_by_badge(module, formateur_candidates):
+    """Formateur inscrit au module correspondant au badge scanné (lookup SQL)."""
+    formateur_filters = Q()
+    for candidate in formateur_candidates:
+        formateur_filters |= Q(formateur__numerobadge__iexact=candidate)
+    if not formateur_filters:
+        return None
+    mf = (
+        ModuleFormateur.objects
+        .filter(module=module)
+        .filter(formateur_filters)
+        .select_related('formateur')
+        .first()
+    )
+    return mf.formateur if mf else None
+
+
+def _resolve_personne(numero, formation, module=None, seance=None):
     """
     Résout un numéro (auditeur, formateur, encadrant) vers la personne et vérifie l'inscription.
     Retourne (personne, type_str, personne_data, error_response).
@@ -141,27 +159,19 @@ def _resolve_personne(numero, formation, module=None):
 
     # 1. Priorité module : auditeurs inscrits sur la séance scannée (évite les faux négatifs).
     if module_scope is not None:
-        for insc in (
-            ModuleParticipant.objects
-            .filter(module=module_scope)
-            .select_related('participant')
-        ):
-            p = insc.participant
-            if p and _matricule_matches_value(p.matricule, numero_upper, numero_compact):
-                return p, 'participant', _participant_personne_data(p), None
+        from .participant_scope import participant_in_module_by_matricule
 
-        for mf in (
-            ModuleFormateur.objects
-            .filter(module=module_scope)
-            .select_related('formateur')
-        ):
-            f = mf.formateur
-            if f and _formateur_matches_badge(f, formateur_candidates):
-                return f, 'formateur', {
-                    'numero': f.numerobadge,
-                    'nom': f.nom,
-                    'prenom': f.prenom,
-                }, None
+        p = participant_in_module_by_matricule(module_scope, numero_upper, numero_compact)
+        if p:
+            return p, 'participant', _participant_personne_data(p), None
+
+        f = _formateur_in_module_by_badge(module_scope, formateur_candidates)
+        if f:
+            return f, 'formateur', {
+                'numero': f.numerobadge,
+                'nom': f.nom,
+                'prenom': f.prenom,
+            }, None
 
         if module_scope.superviseur_id:
             sup = module_scope.superviseur
@@ -224,21 +234,27 @@ def _resolve_personne(numero, formation, module=None):
             if module_scope is not None
             else {'module__formation': formation}
         )
-        for insc in (
-            ModuleParticipant.objects
-            .filter(**enroll_filter)
-            .select_related('participant')
-            .only(
-                'participant__id',
-                'participant__matricule',
-                'participant__nom',
-                'participant__prenom',
+        if module_scope is not None:
+            from .participant_scope import participant_in_module_by_matricule
+            participant = participant_in_module_by_matricule(
+                module_scope, numero_upper, numero_compact
             )
-        ):
-            p = insc.participant
-            if p and _normalize_scan_identifier(p.matricule) == numero_compact:
-                participant = p
-                break
+        else:
+            for insc in (
+                ModuleParticipant.objects
+                .filter(**enroll_filter)
+                .select_related('participant')
+                .only(
+                    'participant__id',
+                    'participant__matricule',
+                    'participant__nom',
+                    'participant__prenom',
+                )
+            ):
+                p = insc.participant
+                if p and _normalize_scan_identifier(p.matricule) == numero_compact:
+                    participant = p
+                    break
     if participant is None:
         return None, None, None, Response(
             {'code': 'PARTICIPANT_NOT_FOUND',
@@ -253,11 +269,15 @@ def _resolve_personne(numero, formation, module=None):
     if not participant_in_scope and module_scope is not None:
         # Autoriser un rattrapage inter-cohorte planifié sur ce module (l'auditeur
         # n'est pas inscrit mais dispose d'un rattrapage actif pour ce module).
-        participant_in_scope = Rattrapage.objects.filter(
-            participant=participant,
-            seance_rattrapage__module=module_scope,
-            statut=Rattrapage.Statut.PLANIFIE,
-        ).exists()
+        rattrapage_filter = {
+            'participant': participant,
+            'statut': Rattrapage.Statut.PLANIFIE,
+        }
+        if seance is not None:
+            rattrapage_filter['seance_rattrapage'] = seance
+        else:
+            rattrapage_filter['seance_rattrapage__module'] = module_scope
+        participant_in_scope = Rattrapage.objects.filter(**rattrapage_filter).exists()
     if not participant_in_scope:
         module_label = _module_scan_label(module_scope)
         return None, None, None, Response(
@@ -285,6 +305,29 @@ def _pointage_filter(personne, type_personne, formation, **extra):
         base['participant'] = personne
     base.update(extra)
     return base
+
+
+def _daily_completed_sessions_stats(personne, type_personne, formation, date_journee):
+    """Durée totale et nombre de sessions terminées pour la journée (agrégat SQL)."""
+    stats = Pointage.objects.filter(
+        **_pointage_filter(
+            personne, type_personne, formation,
+            date_journee=date_journee,
+            timestamp_sortie__isnull=False,
+        )
+    ).aggregate(
+        total_jour=Sum('duree_presence_minutes'),
+        nb_sessions=Count('id'),
+    )
+    return float(stats['total_jour'] or 0), stats['nb_sessions'] or 0
+
+
+def _should_log_heartbeat_audit(previous_heartbeat_at):
+    """Réduit les écritures AuditLog : un heartbeat OK n'est tracé que périodiquement."""
+    interval = int(getattr(settings, 'MOBILE_HEARTBEAT_AUDIT_INTERVAL_SECONDS', 600))
+    if previous_heartbeat_at is None:
+        return True
+    return (timezone.now() - previous_heartbeat_at).total_seconds() >= interval
 
 
 def _create_pointage_kwargs(personne, type_personne, session, **extra):
@@ -386,19 +429,22 @@ def _clamp_to_seance(ts, seance):
     return clamp_to_seance(ts, seance)
 
 
-def _resolve_authenticated_personne(user):
+def _resolve_authenticated_personne(user, *, ensure_profile=False):
     """Retourne (personne, type_str, error_response).
 
     La résolution se fait d'abord par rôle utilisateur pour éviter qu'un encadrant
     ou formateur avec un profil auditeur résiduel soit traité comme participant.
+
+    ``ensure_profile=True`` synchronise les fiches métier (login, my_fiche) ;
+    le chemin scan/heartbeat l'omet volontairement pour limiter la charge DB.
     """
-    from authentication.profile_sync import sync_user_profile_links
+    if ensure_profile:
+        from authentication.profile_sync import sync_user_profile_links
+        sync_user_profile_links(user)
 
-    sync_user_profile_links(user)
-    role = getattr(user, 'role', None)
-
-    if role == 'ENCADRANT':
-        if not user.matricule:
+    if user_is_mobile_encadrant(user):
+        matricule = (user.matricule or user.username or '').strip()
+        if not matricule:
             return None, None, Response(
                 {
                     'code': 'NO_MATRICULE',
@@ -408,7 +454,7 @@ def _resolve_authenticated_personne(user):
             )
         return user, 'encadrant', None
 
-    if role == 'FORMATEUR':
+    if user_in_roles(user, {'FORMATEUR'}):
         formateur = Formateur.objects.filter(user_id=user.pk).first()
         if formateur:
             return formateur, 'formateur', None
@@ -420,9 +466,15 @@ def _resolve_authenticated_personne(user):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    from .participant_scope import link_user_to_primary_participant
-
-    participant = link_user_to_primary_participant(user)
+    participant = Participant.objects.filter(user_id=user.pk).first()
+    if participant is None:
+        mat_filters = Q()
+        for raw in (getattr(user, 'matricule', ''), getattr(user, 'username', '')):
+            val = (raw or '').strip()
+            if val:
+                mat_filters |= Q(matricule__iexact=val)
+        if mat_filters:
+            participant = Participant.objects.filter(mat_filters).first()
     if participant:
         return participant, 'participant', None
 
@@ -430,6 +482,27 @@ def _resolve_authenticated_personne(user):
         {
             'code': 'NO_PROFILE',
             'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _encadrant_can_badge_module(user, module):
+    """Encadrant autorisé s'il supervise le module ou si aucun encadrant n'est assigné."""
+    if module.superviseur_id == user.pk:
+        return True
+    return module.superviseur_id is None
+
+
+def _encadrant_not_in_list_response(module):
+    return Response(
+        {
+            'code': 'NOT_IN_LIST',
+            'detail': (
+                "Vous n'êtes pas encadrant de ce module. "
+                'Demandez au secrétariat de vous assigner au module '
+                f'« {module.intitule} ».'
+            ),
         },
         status=status.HTTP_403_FORBIDDEN,
     )
@@ -614,7 +687,7 @@ def scan_view(request):
 
     # 2. Résoudre la personne (participant ou formateur)
     personne, type_str, personne_data, err = _resolve_personne(
-        data['numero_participant'], formation, seance.module
+        data['numero_participant'], formation, seance.module, seance=seance
     )
     if err:
         return err
@@ -675,17 +748,9 @@ def scan_view(request):
                 extra={'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0)},
             )
 
-            sessions_jour = Pointage.objects.filter(
-                **_pointage_filter(
-                    personne, type_str, formation,
-                    date_journee=today,
-                    timestamp_sortie__isnull=False,
-                )
+            total_jour, nb_sessions = _daily_completed_sessions_stats(
+                personne, type_str, formation, today
             )
-            total_jour = sum(
-                float(s.duree_presence_minutes or 0) for s in sessions_jour
-            )
-            nb_sessions = sessions_jour.count()
 
             return Response({
                 'action': 'SORTIE',
@@ -770,6 +835,10 @@ def scan_view(request):
         )
 
         pointage = Pointage.objects.create(**create_kwargs)
+
+        if type_str == 'participant':
+            from .rattrapage_service import lier_rattrapage_au_badge
+            lier_rattrapage_au_badge(personne, seance, pointage, request=request)
 
         _log_audit(
             action=AuditLog.Action.SCAN_ENTREE,
@@ -895,15 +964,11 @@ def secure_scan_view(request):
                 status=status.HTTP_403_FORBIDDEN,
             )
     elif type_str == 'encadrant':
-        if seance.module.superviseur_id != personne.id:
-            return Response(
-                {'code': 'NOT_IN_LIST',
-                 'detail': 'Vous n\'êtes pas encadrant de ce module.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
     else:
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is None:
             return Response(
                 {'code': 'NOT_IN_LIST',
@@ -978,17 +1043,9 @@ def secure_scan_view(request):
                 extra={'duree_minutes': float(pointage_ouvert.duree_presence_minutes or 0)},
             )
 
-            sessions_jour = Pointage.objects.filter(
-                **_pointage_filter(
-                    personne, type_str, formation,
-                    date_journee=today,
-                    timestamp_sortie__isnull=False,
-                )
+            total_jour, nb_sessions = _daily_completed_sessions_stats(
+                personne, type_str, formation, today
             )
-            total_jour = sum(
-                float(s.duree_presence_minutes or 0) for s in sessions_jour
-            )
-            nb_sessions = sessions_jour.count()
 
             return Response({
                 'action': 'SORTIE',
@@ -1115,6 +1172,10 @@ def secure_scan_view(request):
 
         pointage = Pointage.objects.create(**create_kwargs)
 
+        if type_str == 'participant':
+            from .rattrapage_service import lier_rattrapage_au_badge
+            lier_rattrapage_au_badge(personne, seance, pointage, request=request)
+
         _log_audit(
             action=AuditLog.Action.SCAN_SECURE_ENTREE,
             request=request,
@@ -1228,11 +1289,11 @@ def secure_scan_heartbeat(request):
         if not ModuleFormateur.objects.filter(module=seance.module, formateur=personne).exists():
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas assigné(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
     elif type_str == 'encadrant':
-        if seance.module.superviseur_id != personne.id:
-            return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas encadrant de ce module."}, status=status.HTTP_403_FORBIDDEN)
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
     else:
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is None:
             return Response({'code': 'NOT_IN_LIST', 'detail': "Vous n'êtes pas inscrit(e) à ce module."}, status=status.HTTP_403_FORBIDDEN)
         personne = inscrit
@@ -1262,6 +1323,7 @@ def secure_scan_heartbeat(request):
         seance.module, latitude, longitude, accuracy_m
     )
     outside_limit = max(1, int(getattr(settings, 'MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)))
+    previous_heartbeat_at = pointage.last_heartbeat_at
 
     pointage.last_heartbeat_at = timezone.now()
     pointage.last_latitude = latitude
@@ -1286,23 +1348,24 @@ def secure_scan_heartbeat(request):
                 'updated_at',
             ]
         )
-        _log_audit(
-            action=AuditLog.Action.SCAN_HEARTBEAT,
-            request=request,
-            cible_type=type_str,
-            cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
-            cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
-            formation=formation,
-            pointage=pointage,
-            device_id=device_id,
-            extra={
-                'distance_m': round(distance_m, 1) if distance_m is not None else None,
-                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
-                'accuracy_m': accuracy_m,
-                'battery_level': battery_level,
-                'is_charging': is_charging,
-            },
-        )
+        if _should_log_heartbeat_audit(previous_heartbeat_at):
+            _log_audit(
+                action=AuditLog.Action.SCAN_HEARTBEAT,
+                request=request,
+                cible_type=type_str,
+                cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+                cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+                formation=formation,
+                pointage=pointage,
+                device_id=device_id,
+                extra={
+                    'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                    'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+                    'accuracy_m': accuracy_m,
+                    'battery_level': battery_level,
+                    'is_charging': is_charging,
+                },
+            )
         return Response(
             {
                 'detail': 'Heartbeat enregistré.',
@@ -1391,27 +1454,28 @@ def secure_scan_heartbeat(request):
         ]
     )
 
-    _log_audit(
-        action=AuditLog.Action.SCAN_HEARTBEAT,
-        request=request,
-        cible_type=type_str,
-        cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
-        cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
-        formation=formation,
-        pointage=pointage,
-        device_id=device_id,
-        extra={
-            'geofence_code': geo_code,
-            'geofence_detail': geo_detail,
-            'distance_m': round(distance_m, 1) if distance_m is not None else None,
-            'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
-            'accuracy_m': accuracy_m,
-            'battery_level': battery_level,
-            'is_charging': is_charging,
-            'outside_geofence_count': pointage.outside_geofence_count,
-            'outside_geofence_limit': outside_limit,
-        },
-    )
+    if _should_log_heartbeat_audit(previous_heartbeat_at):
+        _log_audit(
+            action=AuditLog.Action.SCAN_HEARTBEAT,
+            request=request,
+            cible_type=type_str,
+            cible_numero=getattr(personne, 'matricule', None) or getattr(personne, 'numerobadge', None) or '',
+            cible_nom=(getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or '') + ' ' + (getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''),
+            formation=formation,
+            pointage=pointage,
+            device_id=device_id,
+            extra={
+                'geofence_code': geo_code,
+                'geofence_detail': geo_detail,
+                'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+                'accuracy_m': accuracy_m,
+                'battery_level': battery_level,
+                'is_charging': is_charging,
+                'outside_geofence_count': pointage.outside_geofence_count,
+                'outside_geofence_limit': outside_limit,
+            },
+        )
 
     return Response(
         {
@@ -1722,7 +1786,7 @@ def my_fiche(request):
     if getattr(user, 'must_change_password', False):
         return _password_change_required_response()
 
-    personne, type_str, err = _resolve_authenticated_personne(user)
+    personne, type_str, err = _resolve_authenticated_personne(user, ensure_profile=True)
     if err:
         return err
 
@@ -3130,9 +3194,12 @@ def secure_check_badge_status(request):
     # Aligne sur la fiche réellement inscrite au module (compte rattaché à une autre fiche).
     if type_str == 'participant':
         from .participant_scope import participant_for_module
-        inscrit = participant_for_module(user, seance.module)
+        inscrit = participant_for_module(user, seance.module, seance=seance)
         if inscrit is not None:
             personne = inscrit
+    elif type_str == 'encadrant':
+        if not _encadrant_can_badge_module(user, seance.module):
+            return _encadrant_not_in_list_response(seance.module)
 
     today = timezone.localdate()
     session_filter = _pointage_filter(personne, type_str, formation, date_journee=today)

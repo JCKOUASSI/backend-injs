@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
+import '../services/api_client.dart';
 import '../services/device_telemetry_service.dart';
 import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
@@ -436,16 +437,19 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     } catch (e) {
       setState(() => _loadingScan = false);
       if (mounted) {
+        final isBusiness = e is ApiBusinessException;
         await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Serveur injoignable'),
+            title: Text(isBusiness ? 'Badgeage impossible' : 'Serveur injoignable'),
             content: Text(
-              'Impossible de vérifier le statut de badgeage.\n\n'
-              '${e.toString().replaceFirst('Exception: ', '')}\n\n'
-              'Vérifiez que le téléphone et l\u2019ordinateur sont sur le même réseau '
-              'et que API_BASE_URL dans app.env pointe vers l\u2019IP LAN du Mac '
-              '(ex. http://192.168.x.x:8001).',
+              isBusiness
+                  ? e.toString()
+                  : 'Impossible de vérifier le statut de badgeage.\n\n'
+                      '${e.toString().replaceFirst('Exception: ', '')}\n\n'
+                      'Vérifiez que le téléphone et l\u2019ordinateur sont sur le même réseau '
+                      'et que API_BASE_URL dans app.env pointe vers l\u2019IP LAN du Mac '
+                      '(ex. http://192.168.x.x:8001).',
             ),
             actions: [
               FilledButton(
@@ -559,8 +563,12 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
           ),
         );
       }
+    } on ApiBusinessException catch (e) {
+      setState(() => _error = e.toString());
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      setState(
+        () => _error = e.toString().replaceFirst('Exception: ', ''),
+      );
     } finally {
       if (mounted) {
         setState(() => _loadingScan = false);

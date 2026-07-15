@@ -4,7 +4,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 
-from authentication.role_groups import user_in_roles
+from authentication.role_groups import user_in_roles, user_is_mobile_encadrant
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def _ensure_user_matricule(user):
 
 def _sync_encadrant_user_link(user):
     """Assure un matricule sur le compte encadrant (la fiche métier est le User lui-même)."""
-    if not user_in_roles(user, {'ENCADRANT'}):
+    if not user_is_mobile_encadrant(user):
         return
     _ensure_user_matricule(user)
 

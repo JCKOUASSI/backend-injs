@@ -26,6 +26,66 @@ def _mois_label(cle_mois):
     return f'{_MOIS_FR[month - 1]} {year}'
 
 
+def auditeurs_mobile_breakdown():
+    """Répartition auditeurs mobile : badgés, connectés sans badge, badgés sans liaison."""
+    from formations.models import Participant
+
+    connecte_ids = set(
+        Participant.objects.filter(
+            user__device_bindings__is_active=True,
+        ).values_list('pk', flat=True)
+    )
+    badgeur_ids = set(
+        Participant.objects.filter(
+            pointages__device_id__gt='',
+        ).values_list('pk', flat=True)
+    )
+
+    badge_et_connecte = len(connecte_ids & badgeur_ids)
+    connecte_sans_badge = len(connecte_ids - badgeur_ids)
+    badge_sans_liaison = len(badgeur_ids - connecte_ids)
+
+    return {
+        'badgeurs': len(badgeur_ids),
+        'connectes': len(connecte_ids),
+        'badge_et_connecte': badge_et_connecte,
+        'connecte_sans_badge': connecte_sans_badge,
+        'badge_sans_liaison': badge_sans_liaison,
+    }
+
+
+def auditeurs_mobile_counts():
+    """Auditeurs liés à un appareil mobile vs auditeurs ayant badgé via l'app."""
+    breakdown = auditeurs_mobile_breakdown()
+    return breakdown['badgeurs'], breakdown['connectes']
+
+
+def _build_auditeurs_mobile_donut():
+    breakdown = auditeurs_mobile_breakdown()
+    items = []
+
+    if breakdown['badge_et_connecte']:
+        items.append({
+            'label': _('Badgé mobile'),
+            'value': breakdown['badge_et_connecte'],
+            'color': '#15803d',
+        })
+    if breakdown['connecte_sans_badge']:
+        items.append({
+            'label': _('Appareil lié, sans badge'),
+            'value': breakdown['connecte_sans_badge'],
+            'color': '#0369a1',
+        })
+    if breakdown['badge_sans_liaison']:
+        items.append({
+            'label': _('Badgé, liaison inactive'),
+            'value': breakdown['badge_sans_liaison'],
+            'color': '#ea580c',
+        })
+
+    return build_donut(items)
+
+
 def _build_admin_charts():
     from presences.models import Pointage
     from statistiques.views import _historique_mensuel
@@ -78,11 +138,14 @@ def _build_admin_charts():
         if row['value']
     ])
 
+    auditeurs_mobile = _build_auditeurs_mobile_donut()
+
     return {
         'pointages_mensuels': pointages_mensuels,
         'taux_presence': taux_presence,
         'sessions_mensuelles': sessions_mensuelles,
         'pointages_par_statut': pointages_par_statut,
+        'auditeurs_mobile': auditeurs_mobile,
     }
 
 
@@ -100,6 +163,8 @@ def admin_dashboard_callback(request, context):
         greeting = _('Bon après-midi')
     else:
         greeting = _('Bonsoir')
+
+    badgeurs_mobile, connectes_mobile = auditeurs_mobile_counts()
 
     stats = [
         {
@@ -126,6 +191,13 @@ def admin_dashboard_callback(request, context):
             'value': Pointage.objects.count(),
             'icon': 'fingerprint',
             'link': 'admin:presences_pointage_changelist',
+        },
+        {
+            'label': _('Auditeurs mobile'),
+            'value': f'{badgeurs_mobile} / {connectes_mobile}',
+            'detail': _('badgeage · appareil lié'),
+            'icon': 'smartphone',
+            'link': 'admin:presences_devicebinding_changelist',
         },
     ]
 

@@ -32,6 +32,15 @@ class AdminChartsTests(SimpleTestCase):
         self.assertEqual(chart['slices'][0]['pct'], 75)
         self.assertTrue(chart['slices'][0]['path'].startswith('M'))
 
+    def test_build_donut_single_full_slice(self):
+        chart = build_donut([
+            {'label': 'Badgé, liaison inactive', 'value': 2, 'color': '#ea580c'},
+        ])
+        self.assertEqual(chart['total'], 2)
+        self.assertEqual(len(chart['slices']), 1)
+        self.assertEqual(chart['slices'][0]['pct'], 100)
+        self.assertEqual(chart['slices'][0]['path'].count('A'), 2)
+
     def test_build_stacked_bars(self):
         rows = build_stacked_bars([
             {'label': 'jan.', 'presents': 80, 'absents': 20},

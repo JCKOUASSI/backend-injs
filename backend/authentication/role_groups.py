@@ -33,6 +33,12 @@ DUAL_ACCESS_ROLES = frozenset({
     User.Role.CPFAE_ADMIN,
 })
 
+# Rôles encadrants reconnus pour le badgeage mobile (legacy SUPERVISEUR inclus).
+MOBILE_ENCADRANT_ROLES = frozenset({
+    User.Role.ENCADRANT,
+    User.Role.SUPERVISEUR,
+})
+
 # Rôles réservés à l'application mobile (pas de plateforme web ni admin Django).
 MOBILE_ONLY_ROLES = frozenset({
     User.Role.AUDITEUR,
@@ -401,6 +407,11 @@ def user_in_roles(user, role_set):
     if not roles:
         return False
     return bool(roles & frozenset(role_set))
+
+
+def user_is_mobile_encadrant(user):
+    """True si le compte peut badger en tant qu'encadrant sur l'app mobile."""
+    return user_in_roles(user, MOBILE_ENCADRANT_ROLES)
 
 
 def validate_role_combination(roles):

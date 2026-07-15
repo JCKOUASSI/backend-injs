@@ -15,7 +15,7 @@ const emptyForm = {
   participant: null,
   seances: [],
   motif: '',
-  generer_presence: true,
+  generer_presence: false,
 }
 
 function cohorteLabel(obj) {
@@ -576,7 +576,7 @@ export default function Rattrapages() {
                     onChange={(e) => setForm({ ...form, generer_presence: e.target.checked })}
                   />
                   <label className="form-check-label" htmlFor="generer_presence">
-                    Générer immédiatement la présence (badgeage forcé sur la séance)
+                    Forcer la présence immédiatement (sans badgeage de l&apos;auditeur)
                   </label>
                 </div>
                 <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 6, padding: '0.5rem 0.75rem', marginTop: '0.75rem' }}>

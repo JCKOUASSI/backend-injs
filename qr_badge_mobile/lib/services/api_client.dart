@@ -214,13 +214,20 @@ class ApiClient {
       '[qr_badge.api] $method $path \u2192 HTTP ${res.statusCode} uri=$uri body=$bodyPreview',
     );
     if (json['code']?.toString() == 'PASSWORD_CHANGE_REQUIRED') {
-      throw Exception(
-        json['detail']?.toString() ??
-            'Vous devez changer votre mot de passe avant de continuer.',
+      throw ApiBusinessException(
+        'PASSWORD_CHANGE_REQUIRED',
+        json['detail']?.toString(),
       );
     }
     if (json['code']?.toString() == 'NO_PROFILE') {
       throw NoProfileException(json['detail']?.toString());
+    }
+    final code = json['code']?.toString();
+    if (code != null && code.isNotEmpty) {
+      throw ApiBusinessException(
+        code,
+        json['detail']?.toString(),
+      );
     }
     final detail = json['detail']?.toString() ??
         json['message']?.toString() ??
@@ -241,6 +248,54 @@ class ApiClient {
     }
     return null;
   }
+}
+
+/// Message utilisateur pour les codes d'erreur métier renvoyés par l'API.
+String friendlyApiMessage(String code, [String? detail]) {
+  switch (code) {
+    case 'NOT_IN_LIST':
+      if (detail != null && detail.contains('encadrant')) {
+        return detail;
+      }
+      return detail ??
+          'Vous n\u2019\u00eates pas autoris\u00e9(e) pour ce module.';
+    case 'NO_MATRICULE':
+      return detail ??
+          'Aucun matricule sur votre compte encadrant. '
+          'Contactez le secr\u00e9tariat.';
+    case 'LOCATION_REQUIRED':
+      return 'Activez la g\u00e9olocalisation pour badger cette s\u00e9ance '
+          '(p\u00e9rim\u00e8tre obligatoire sur le site).';
+    case 'OUT_OF_GEOFENCE':
+      return detail ??
+          'Vous \u00eates hors du p\u00e9rim\u00e8tre autoris\u00e9 pour badger. '
+          'Rapprochez-vous du site de formation.';
+    case 'LOCATION_INVALID':
+      return detail ??
+          'Coordonn\u00e9es GPS invalides. R\u00e9essayez apr\u00e8s avoir '
+          'actualis\u00e9 la position.';
+    case 'PASSWORD_CHANGE_REQUIRED':
+      return detail ??
+          'Vous devez changer votre mot de passe avant de continuer.';
+    case 'DEVICE_REQUIRED':
+      return detail ??
+          'Identifiant appareil manquant. Reconnectez-vous \u00e0 l\u2019application.';
+    case 'DEVICE_LOCKED':
+      return detail ??
+          'Cet appareil est d\u00e9j\u00e0 li\u00e9 \u00e0 un autre compte.';
+    default:
+      return detail ?? 'Erreur ($code).';
+  }
+}
+
+/// Erreur m\u00e9tier renvoy\u00e9e par l'API avec un code JSON explicite.
+class ApiBusinessException implements Exception {
+  const ApiBusinessException(this.code, [this.detail]);
+  final String code;
+  final String? detail;
+
+  @override
+  String toString() => friendlyApiMessage(code, detail);
 }
 
 /// Exception levée quand une requête d\u00e9passe [_kTimeout].

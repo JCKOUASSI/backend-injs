@@ -139,6 +139,8 @@ DATABASES = {
         'TEST': {
             'NAME': f'test_{_postgres_db}',
         },
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
@@ -210,7 +212,7 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
     'DEFAULT_THROTTLE_RATES': {
         'login': os.environ.get('THROTTLE_LOGIN_RATE', '20/min'),
-        'scan': os.environ.get('THROTTLE_SCAN_RATE', '30/min'),
+        'scan': os.environ.get('THROTTLE_SCAN_RATE', '60/min'),
         'offline_data': os.environ.get('THROTTLE_OFFLINE_DATA_RATE', '60/min'),
     },
 }
@@ -243,6 +245,9 @@ MOBILE_HEARTBEAT_DISABLED = os.environ.get(
 ).lower() in ('true', '1', 'yes')
 MOBILE_HEARTBEAT_INTERVAL_SECONDS = int(
     os.environ.get('MOBILE_HEARTBEAT_INTERVAL_SECONDS', 60)
+)
+MOBILE_HEARTBEAT_AUDIT_INTERVAL_SECONDS = int(
+    os.environ.get('MOBILE_HEARTBEAT_AUDIT_INTERVAL_SECONDS', 600)
 )
 MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES = int(
     os.environ.get('MOBILE_HEARTBEAT_SUSPECT_TIMEOUT_MINUTES', 60)

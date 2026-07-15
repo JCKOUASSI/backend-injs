@@ -28,6 +28,7 @@ from .role_groups import (
     get_user_roles,
     user_has_perm,
     user_in_roles,
+    user_is_mobile_encadrant,
     users_with_roles,
 )
 from .throttles import LoginRateThrottle
@@ -126,7 +127,7 @@ def login_view(request):
         )
         return Response({'detail': detail}, status=status.HTTP_403_FORBIDDEN)
 
-    if user_in_roles(user, ('AUDITEUR', 'FORMATEUR', 'ENCADRANT')):
+    if user_in_roles(user, ('AUDITEUR', 'FORMATEUR')) or user_is_mobile_encadrant(user):
         from .profile_sync import sync_user_profile_links
         sync_user_profile_links(user)
 

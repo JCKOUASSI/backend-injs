@@ -4450,10 +4450,16 @@ def module_assign_superviseur(request, formation_pk, module_pk):
     superviseur_id = request.data.get('superviseur_id')
     superviseur = None
     if superviseur_id not in (None, '', 0, '0'):
+        from authentication.role_groups import user_is_mobile_encadrant
         User = get_user_model()
         try:
-            superviseur = User.objects.get(pk=superviseur_id, role='ENCADRANT')
+            superviseur = User.objects.get(pk=superviseur_id)
         except User.DoesNotExist:
+            return Response(
+                {'detail': 'Encadrant introuvable ou rôle incorrect.'},
+                status=400,
+            )
+        if not user_is_mobile_encadrant(superviseur):
             return Response(
                 {'detail': 'Encadrant introuvable ou rôle incorrect.'},
                 status=400,

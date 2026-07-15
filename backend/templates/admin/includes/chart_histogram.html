@@ -1,10 +1,11 @@
 {% load i18n %}
 {% if chart %}
-<div class="dfrc-chart-svg-scroll">
+<div class="dfrc-chart-svg-scroll dfrc-chart-svg-scroll--histogram">
     <svg
         class="dfrc-chart-svg dfrc-chart-svg--histogram"
-        width="{{ chart.width }}"
-        height="{{ chart.height }}"
+        viewBox="0 0 {{ chart.width }} {{ chart.height }}"
+        width="100%"
+        preserveAspectRatio="xMidYMax meet"
         role="img"
         aria-label="{{ title }}"
     >
