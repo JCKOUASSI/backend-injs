@@ -20,6 +20,7 @@ from .access import formation_accessible, participants_queryset_for_user, format
 from .api_access import IsOperationalWebStaff
 from .formateur_assignment import check_formateur_groupe_jour_conflict
 from .qr_helpers import get_session_for_qr
+from .serializer_querysets import secretariat_queryset_for_serializer
 from .serializers import (
     FormationListSerializer,
     FormationDetailSerializer,
@@ -906,9 +907,11 @@ class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class SecretariatListCreateView(generics.ListCreateAPIView):
     """DFRC/Secrétariat : lister et créer des secrétariats."""
-    queryset = Secretariat.objects.select_related('responsable').all()
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
+
+    def get_queryset(self):
+        return secretariat_queryset_for_serializer()
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -923,9 +926,11 @@ class SecretariatListCreateView(generics.ListCreateAPIView):
 
 class SecretariatDetailView(generics.RetrieveUpdateDestroyAPIView):
     """DFRC/Secrétariat : détail / modifier / supprimer un secrétariat."""
-    queryset = Secretariat.objects.select_related('responsable').all()
     serializer_class = SecretariatSerializer
     permission_classes = [IsSecretariatOrDFRC]
+
+    def get_queryset(self):
+        return secretariat_queryset_for_serializer()
 
     def perform_update(self, serializer):
         instance = serializer.save()

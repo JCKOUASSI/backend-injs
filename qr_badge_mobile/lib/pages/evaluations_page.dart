@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
 import '../services/evaluation_service.dart';
 import '../theme/qr_badge_theme.dart';
+import '../utils/user_facing_error.dart';
 import '../widgets/empty_state_view.dart';
 
 class EvaluationsPage extends StatefulWidget {
@@ -46,8 +47,14 @@ class _EvaluationsPageState extends State<EvaluationsPage>
         ),
       );
       if (mounted) setState(() => _questionnaires = list);
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+    } catch (e, st) {
+      logErrorForDebug('evaluations.load', e, st);
+      if (mounted) {
+        setState(() => _error = userFacingErrorMessage(
+              e,
+              context: UserErrorContext.evaluations,
+            ));
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -285,10 +292,20 @@ class _EvaluationFormPageState extends State<_EvaluationFormPage> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      logErrorForDebug('evaluations.submit', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ciDanger),
+          SnackBar(
+            content: Text(
+              userFacingErrorMessage(
+                e,
+                context: UserErrorContext.evaluations,
+                fallback: 'Impossible d\u2019envoyer l\u2019évaluation.',
+              ),
+            ),
+            backgroundColor: AppColors.ciDanger,
+          ),
         );
       }
     } finally {

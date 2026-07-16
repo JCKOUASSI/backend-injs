@@ -228,7 +228,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'GPS indisponible — le suivi de pr\u00e9sence est suspendu.',
+                        'GPS indisponible — suivi suspendu.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange.shade900,
@@ -247,8 +247,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ],
                 ),
               ),
-            ),
-          if (!session.gpsGranted)
+            )
+          else if (!session.gpsGranted)
             Material(
               color: Colors.orange.shade50,
               child: Padding(
@@ -261,7 +261,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'GPS non autoris\u00e9 \u2014 le scan ne fonctionnera pas correctement.',
+                        'GPS non autorisé.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange.shade900,

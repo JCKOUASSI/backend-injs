@@ -104,6 +104,40 @@ class SecretariatModelTest(TestCase):
         self.assertNotEqual(s1.numero, s2.numero)
 
 
+class SecretariatListAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = make_user('admin_sec', role='CPFAE_ADMIN')
+        self.client.force_authenticate(user=self.admin)
+        self.f = make_formation()
+        self.sec_a = Secretariat.objects.create(nom='Sec A')
+        self.sec_b = Secretariat.objects.create(nom='Sec B')
+        p1 = make_participant(matricule='SA001', nom='Alpha', prenom='A')
+        p2 = make_participant(matricule='SA002', nom='Beta', prenom='B')
+        p1.secretariat = self.sec_a
+        p1.save(update_fields=['secretariat'])
+        p2.secretariat = self.sec_a
+        p2.save(update_fields=['secretariat'])
+        make_module(self.f, intitule='Mod A', secretariat=self.sec_a)
+        make_module(self.f, intitule='Mod B', secretariat=self.sec_b)
+
+    def test_list_returns_annotated_counts(self):
+        res = self.client.get('/api/formations/secretariats/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.data.get('results', res.data)
+        by_id = {row['id']: row for row in data}
+        self.assertEqual(by_id[self.sec_a.id]['nb_participants'], 2)
+        self.assertEqual(by_id[self.sec_a.id]['nb_modules'], 1)
+        self.assertEqual(by_id[self.sec_a.id]['nb_formations'], 1)
+        self.assertEqual(by_id[self.sec_b.id]['nb_participants'], 0)
+        self.assertEqual(by_id[self.sec_b.id]['nb_modules'], 1)
+
+    def test_list_query_count_bounded(self):
+        with self.assertNumQueries(3):
+            self.client.get('/api/formations/secretariats/')
+
+
 # ──────────────────────────────────────────
 # API — authentification requise
 # ──────────────────────────────────────────

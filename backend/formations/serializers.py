@@ -56,9 +56,9 @@ class ModuleSerializer(serializers.ModelSerializer):
 
 
 class SecretariatSerializer(serializers.ModelSerializer):
-    nb_participants = serializers.IntegerField(read_only=True)
-    nb_formations = serializers.IntegerField(read_only=True)
-    nb_modules = serializers.IntegerField(read_only=True)
+    nb_participants = serializers.SerializerMethodField()
+    nb_formations = serializers.SerializerMethodField()
+    nb_modules = serializers.SerializerMethodField()
     membres = serializers.SerializerMethodField()
 
     class Meta:
@@ -72,6 +72,21 @@ class SecretariatSerializer(serializers.ModelSerializer):
                 "Le responsable doit avoir le rôle Chef Secrétariat."
             )
         return value
+
+    def get_nb_participants(self, obj):
+        if hasattr(obj, '_nb_participants'):
+            return obj._nb_participants
+        return obj.nb_participants
+
+    def get_nb_formations(self, obj):
+        if hasattr(obj, '_nb_formations'):
+            return obj._nb_formations
+        return obj.nb_formations
+
+    def get_nb_modules(self, obj):
+        if hasattr(obj, '_nb_modules'):
+            return obj._nb_modules
+        return obj.nb_modules
 
     def get_membres(self, obj):
         return [

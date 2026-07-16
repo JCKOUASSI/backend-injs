@@ -137,7 +137,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
         final prefix =
             sameDay ? 'Aujourd\'hui' : DateFormat('d MMMM', 'fr_FR').format(dt);
         dernierSousTitre =
-            '$prefix à ${DateFormat.Hm('fr_FR').format(dt.toLocal())} / Aucun problème détecté.';
+            '$prefix à ${DateFormat.Hm('fr_FR').format(dt.toLocal())}';
       }
     }
 
@@ -159,17 +159,10 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bonjour, ${_displayName(session)} \u{1F44B}',
+                      'Bonjour, ${_displayName(session)}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Voici un résumé de votre activité.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
                           ),
                     ),
                   ],
@@ -178,37 +171,11 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
             ],
           ),
           const SizedBox(height: 16),
-          if (session.isSecureHeartbeatRunning) ...[
-            HomeSummaryCard(
-              icon: Icons.sensors,
-              iconBg: AppColors.navIndicator,
-              iconColor: AppColors.ciGreenDark,
-              title: 'Session en cours',
-              subtitle: session.openSessionChipLabel ??
-                  'Suivi de présence actif — pensez à badger votre sortie.',
-              trailing: const StatusPill(
-                label: 'En salle',
-                color: AppColors.ciGreenDark,
-                backgroundColor: AppColors.navIndicator,
-                icon: Icons.check_circle,
-              ),
-              onTap: widget.onOpenScanner,
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (widget.onOpenScanner != null)
+          if (session.isSecureHeartbeatRunning && widget.onOpenScanner != null)
             FilledButton.icon(
               onPressed: widget.onOpenScanner,
-              icon: Icon(
-                session.isSecureHeartbeatRunning
-                    ? Icons.logout
-                    : Icons.qr_code_scanner,
-              ),
-              label: Text(
-                session.isSecureHeartbeatRunning
-                    ? 'Badger ma sortie'
-                    : 'Scanner maintenant',
-              ),
+              icon: const Icon(Icons.logout),
+              label: const Text('Badger ma sortie'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
