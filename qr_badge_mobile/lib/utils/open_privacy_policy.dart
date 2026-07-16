@@ -15,13 +15,17 @@ Future<void> openPrivacyPolicy(BuildContext context, String apiBaseUrl) async {
     );
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ouverture impossible : $uri')),
+        const SnackBar(
+          content: Text('Ouverture du lien impossible. Réessayez plus tard.'),
+        ),
       );
     }
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ouverture du lien impossible : $uri')),
+        const SnackBar(
+          content: Text('Ouverture du lien impossible. Réessayez plus tard.'),
+        ),
       );
     }
   }

@@ -7,6 +7,7 @@ import '../services/api_client.dart';
 import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/auth_navigation.dart';
+import '../utils/user_facing_error.dart';
 import '../widgets/empty_state_view.dart';
 
 enum _HistoryFilter { all, entrees, sorties, alertes }
@@ -193,8 +194,12 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
         resetToAuthRoot(context);
       }
       return;
-    } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } catch (e, st) {
+      logErrorForDebug('history', e, st);
+      setState(() => _error = userFacingErrorMessage(
+            e,
+            context: UserErrorContext.history,
+          ));
     } finally {
       if (mounted) {
         setState(() => _loading = false);

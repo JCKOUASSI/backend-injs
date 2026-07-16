@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/session_provider.dart';
-import '../services/api_client.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/open_privacy_policy.dart';
-import '../utils/server_url.dart';
+import '../utils/user_facing_error.dart';
 import '../utils/auth_navigation.dart';
 import '../widgets/qr_badge_logo.dart';
 
@@ -49,27 +48,14 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
       resetToAuthRoot(context);
-    } catch (e) {
+    } catch (e, st) {
+      logErrorForDebug('login', e, st);
       final session = context.read<SessionProvider>();
-      String msg;
-      if (e is NetworkTimeoutException) {
-        msg = 'Le serveur ne r\u00e9pond pas (${e.host}:${e.port}).\n\n'
-            'V\u00e9rifiez que Django est d\u00e9marr\u00e9 et que '
-            'API_BASE_URL dans app.env est correcte.';
-      } else {
-        final raw = e.toString().replaceFirst('Exception: ', '');
-        if (isLoopbackServerUrl(session.baseUrl) &&
-            looksLikeNetworkUnreachableToHost(raw)) {
-          msg = 'Impossible de joindre le serveur\u00a0: avec 127.0.0.1 '
-              '(ou localhost), le t\u00e9l\u00e9phone se connecte \u00e0 '
-              'lui-m\u00eame, pas \u00e0 votre Mac.\n\n'
-              'Mettez l\u2019IP LAN du Mac dans API_BASE_URL (app.env), '
-              'ex. http://192.168.x.x:8001.';
-        } else {
-          msg = raw;
-        }
-      }
-      setState(() => _error = msg);
+      setState(() => _error = userFacingErrorMessage(
+            e,
+            context: UserErrorContext.login,
+            serverBaseUrl: session.baseUrl,
+          ));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -129,45 +115,11 @@ class _LoginPageState extends State<LoginPage> {
                                 color: AppColors.ciGreenDark,
                                 backgroundColor: AppColors.iconQrBg,
                               ),
-                              const SizedBox(height: 20),
-                              Text(
-                                'Bienvenue',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                    ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Connectez-vous pour badger vos présences',
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
                               const SizedBox(height: 24),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Nom d\u2019utilisateur',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _usernameCtrl,
                                 decoration: const InputDecoration(
-                                  hintText: 'Identifiant',
+                                  labelText: 'Identifiant',
                                 ),
                                 textInputAction: TextInputAction.next,
                                 validator: (v) =>
@@ -176,25 +128,11 @@ class _LoginPageState extends State<LoginPage> {
                                         : null,
                               ),
                               const SizedBox(height: 16),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Mot de passe',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _passwordCtrl,
                                 obscureText: _obscurePassword,
                                 decoration: InputDecoration(
-                                  hintText: 'Mot de passe',
+                                  labelText: 'Mot de passe',
                                   suffixIcon: IconButton(
                                     tooltip: _obscurePassword
                                         ? 'Afficher'

@@ -5,6 +5,7 @@ import '../providers/session_provider.dart';
 import '../utils/confirm_dialog.dart';
 import '../utils/auth_navigation.dart';
 import '../utils/guarded_logout.dart';
+import '../utils/user_facing_error.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -63,8 +64,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         const SnackBar(content: Text('Mot de passe mis à jour.')),
       );
       resetToAuthRoot(context);
-    } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } catch (e, st) {
+      logErrorForDebug('password', e, st);
+      setState(() => _error = userFacingErrorMessage(
+            e,
+            fallback: 'Impossible de mettre à jour le mot de passe.',
+          ));
     } finally {
       if (mounted) {
         setState(() => _loading = false);

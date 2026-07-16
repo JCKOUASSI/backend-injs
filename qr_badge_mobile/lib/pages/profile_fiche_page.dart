@@ -7,6 +7,7 @@ import '../services/api_client.dart';
 import '../services/profile_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/auth_navigation.dart';
+import '../utils/user_facing_error.dart';
 import 'change_password_page.dart';
 import '../widgets/home_summary_card.dart';
 import '../widgets/empty_state_view.dart';
@@ -105,36 +106,16 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
         resetToAuthRoot(context);
       }
       return;
-    } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } catch (e, st) {
+      logErrorForDebug('profile', e, st);
+      setState(() => _error = userFacingErrorMessage(
+            e,
+            context: UserErrorContext.profile,
+          ));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
-    }
-  }
-
-  String _roleLabel(String? role) {
-    switch (role) {
-      case 'AUDITEUR':
-        return 'Participant';
-      case 'ENCADRANT':
-        return 'Encadrant';
-      case 'FORMATEUR':
-        return 'Formateur';
-      case 'SECRETARIAT':
-      case 'CHEF_SECRETARIAT':
-        return 'Secrétariat';
-      case 'CPFAE_ADMIN':
-        return 'CPFAE';
-      case 'CHEF_CPFAE_ADMIN':
-        return 'Chef CPFAE';
-      case 'DIRECTION':
-        return 'Direction';
-      case 'ADMIN':
-        return 'Administrateur';
-      default:
-        return role ?? '—';
     }
   }
 
@@ -177,23 +158,10 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
   @override
   Widget build(BuildContext context) {
     _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
-    final isFallback = _payload?['_fallback'] == true;
 
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (isFallback)
-          Material(
-            color: Colors.orange.shade50,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text(
-                'Mode dégradé : redémarrez le serveur Django pour activer '
-                'l\u2019endpoint /api/me/fiche/.',
-                style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
-              ),
-            ),
-          ),
         Expanded(child: _buildBody(context)),
       ],
     );
@@ -323,12 +291,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                               color: AppColors.textSecondary,
                             ),
                       ),
-                      const SizedBox(height: 8),
-                      StatusPill(
-                        label: _roleLabel(user['role']?.toString()),
-                        color: AppColors.ciGreenDark,
-                        backgroundColor: AppColors.navIndicator,
-                      ),
                     ],
                   ),
                 ),
@@ -372,9 +334,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
             volumeTaux: volumeTaux,
             minutesLabel: minutesLabel,
             dernierLabel: dernierLabel,
-            volumeDescription:
-                'Heures de présence badgeées sur le volume total prévu de vos modules inscrits.'
-                '${volumeTotal > 0 ? ' (${volumeTaux.toStringAsFixed(volumeTaux == volumeTaux.roundToDouble() ? 0 : 1)} %).' : ''}',
           ),
           if (modules.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -421,8 +380,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     Map<String, dynamic> profil,
   ) =>
       [
-        _InfoRow('Identifiant', user['username']?.toString()),
-        _InfoRow('Matricule / n°', profil['numero']?.toString()),
+        _InfoRow('Matricule', profil['numero']?.toString() ?? user['matricule']?.toString()),
         _InfoRow('E-mail', user['email']?.toString()),
         _InfoRow('Téléphone', user['telephone']?.toString()),
         _InfoRow('Organisation', user['organisation']?.toString()),
@@ -461,15 +419,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     final telCtrl = TextEditingController(
       text: user['telephone']?.toString() ?? '',
     );
-    final matriculeCtrl = TextEditingController(
-      text: (user['matricule'] ?? profil['numero'] ?? '').toString(),
-    );
-    final orgCtrl = TextEditingController(
-      text: user['organisation']?.toString() ?? '',
-    );
-    final gradeCtrl = TextEditingController(
-      text: user['grade']?.toString() ?? '',
-    );
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -497,14 +446,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                       'Modifier mes informations',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Identifiant : ${user['username'] ?? '—'} · '
-                      'Rôle : ${_roleLabel(user['role']?.toString())}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
                           ),
                     ),
                     const SizedBox(height: 16),
@@ -543,30 +484,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: matriculeCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'N° matricule (badge)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: orgCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Organisation',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: gradeCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Grade',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
                     const SizedBox(height: 16),
                     FilledButton(
                       onPressed: saving
@@ -575,8 +492,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                               setModalState(() => saving = true);
                               final session = context.read<SessionProvider>();
                               try {
-                                final matricule =
-                                    matriculeCtrl.text.trim();
                                 final res = await _service.updateMyProfile(
                                   baseUrl: session.baseUrl,
                                   accessToken: session.accessToken!,
@@ -585,10 +500,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                                     'last_name': nomCtrl.text.trim(),
                                     'email': emailCtrl.text.trim(),
                                     'telephone': telCtrl.text.trim(),
-                                    'organisation': orgCtrl.text.trim(),
-                                    'grade': gradeCtrl.text.trim(),
-                                    'matricule':
-                                        matricule.isEmpty ? null : matricule,
                                   },
                                   onRefreshToken: () => session
                                       .tryRefreshToken()
@@ -604,12 +515,18 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                                   if (!context.mounted) return;
                                   resetToAuthRoot(context);
                                 }
-                              } catch (e) {
+                              } catch (e, st) {
+                                logErrorForDebug('profile.update', e, st);
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        e.toString().replaceFirst('Exception: ', ''),
+                                        userFacingErrorMessage(
+                                          e,
+                                          context: UserErrorContext.profile,
+                                          fallback:
+                                              'Impossible de mettre à jour le profil.',
+                                        ),
                                       ),
                                     ),
                                   );
@@ -634,9 +551,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     nomCtrl.dispose();
     emailCtrl.dispose();
     telCtrl.dispose();
-    matriculeCtrl.dispose();
-    orgCtrl.dispose();
-    gradeCtrl.dispose();
     if (saved == true && mounted) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Profil mis à jour.')),
@@ -719,12 +633,18 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
                               if (context.mounted) {
                                 Navigator.of(context).pop(true);
                               }
-                            } catch (e) {
+                            } catch (e, st) {
+                              logErrorForDebug('profile.finance', e, st);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      e.toString().replaceFirst('Exception: ', ''),
+                                      userFacingErrorMessage(
+                                        e,
+                                        context: UserErrorContext.profile,
+                                        fallback:
+                                            'Impossible d\u2019enregistrer les informations.',
+                                      ),
                                     ),
                                   ),
                                 );

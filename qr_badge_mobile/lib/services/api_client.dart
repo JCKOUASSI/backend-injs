@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -83,11 +84,11 @@ class ApiClient {
       rethrow;
     } on TimeoutException {
       debugPrint('[qr_badge.api] POST $path \u2192 timeout (${_kTimeout.inSeconds}s)');
-      throw NetworkTimeoutException(uri.host, uri.port);
+      throw const NetworkTimeoutException();
     } catch (e, st) {
       debugPrint('[qr_badge.api] POST $path \u2192 erreur r\u00e9seau: $e');
       debugPrint('$st');
-      rethrow;
+      throw _asNetworkException(e);
     }
   }
 
@@ -126,11 +127,11 @@ class ApiClient {
       rethrow;
     } on TimeoutException {
       debugPrint('[qr_badge.api] GET $path \u2192 timeout (${_kTimeout.inSeconds}s)');
-      throw NetworkTimeoutException(uri.host, uri.port);
+      throw const NetworkTimeoutException();
     } catch (e, st) {
       debugPrint('[qr_badge.api] GET $path \u2192 erreur r\u00e9seau: $e');
       debugPrint('$st');
-      rethrow;
+      throw _asNetworkException(e);
     }
   }
 
@@ -168,8 +169,30 @@ class ApiClient {
     } on ApiResponseException {
       rethrow;
     } on TimeoutException {
-      throw NetworkTimeoutException(uri.host, uri.port);
+      throw const NetworkTimeoutException();
+    } catch (e, st) {
+      debugPrint('[qr_badge.api] PATCH $path \u2192 erreur r\u00e9seau: $e');
+      debugPrint('$st');
+      throw _asNetworkException(e);
     }
+  }
+
+  Never _asNetworkException(Object error) {
+    if (error is NetworkTimeoutException ||
+        error is NetworkUnreachableException ||
+        error is SessionExpiredException ||
+        error is ApiResponseException ||
+        error is ApiBusinessException ||
+        error is NoProfileException) {
+      throw error;
+    }
+    if (error is SocketException ||
+        error is http.ClientException ||
+        error is HandshakeException ||
+        error is TlsException) {
+      throw const NetworkUnreachableException();
+    }
+    throw error;
   }
 
   Map<String, dynamic> _parse(
@@ -196,9 +219,8 @@ class ApiClient {
             statusCode: res.statusCode,
             path: path,
             message: res.statusCode == 404
-                ? 'Ressource introuvable ($path). '
-                    'Vérifiez que le serveur Django est à jour et redémarré.'
-                : 'Réponse HTML inattendue du serveur (HTTP ${res.statusCode}).',
+                ? 'Service indisponible.'
+                : 'Réponse inattendue du serveur.',
           );
         }
         rethrow;
@@ -300,16 +322,18 @@ class ApiBusinessException implements Exception {
 
 /// Exception levée quand une requête d\u00e9passe [_kTimeout].
 class NetworkTimeoutException implements Exception {
-  const NetworkTimeoutException(this.host, this.port);
-  final String host;
-  final int port;
+  const NetworkTimeoutException();
 
   @override
-  String toString() =>
-      'Serveur injoignable \u2014 aucune r\u00e9ponse de $host:$port '
-      'apr\u00e8s ${_kTimeout.inSeconds}\u00a0s.\n'
-      'V\u00e9rifiez que le serveur est d\u00e9marr\u00e9 et que l\u2019URL '
-      'dans \u00ab\u00a0Configurer le serveur\u00a0\u00bb est correcte.';
+  String toString() => 'Délai de connexion dépassé.';
+}
+
+/// Connexion réseau impossible (hôte injoignable, TLS, socket…).
+class NetworkUnreachableException implements Exception {
+  const NetworkUnreachableException();
+
+  @override
+  String toString() => 'Connexion au serveur impossible.';
 }
 
 /// Exception publique pour que les appelants puissent capturer la session expir\u00e9e.

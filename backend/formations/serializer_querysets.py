@@ -1,7 +1,7 @@
-"""Querysets annotés pour éviter les N+1 dans ModuleSerializer / SessionSerializer."""
+"""Querysets annotés pour éviter les N+1 dans les serializers."""
 from django.db.models import Count, Prefetch, Q
 
-from .models import Module, SessionModule
+from .models import Module, Secretariat, SessionModule
 
 
 def annotate_sessions_for_serializer(qs):
@@ -32,3 +32,13 @@ def annotate_modules_for_serializer(qs):
     ).prefetch_related(
         Prefetch('sessions', queryset=session_qs),
     )
+
+
+def secretariat_queryset_for_serializer():
+    return Secretariat.objects.select_related(
+        'responsable', 'type',
+    ).annotate(
+        _nb_participants=Count('participants', distinct=True),
+        _nb_modules=Count('modules_secretariat', distinct=True),
+        _nb_formations=Count('modules_secretariat__formation', distinct=True),
+    ).prefetch_related('membres').order_by('nom')

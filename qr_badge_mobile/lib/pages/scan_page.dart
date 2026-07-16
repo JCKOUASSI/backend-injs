@@ -10,9 +10,8 @@ import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/camera_permission.dart';
 import '../utils/confirm_dialog.dart';
-import '../utils/location_permission.dart';
+import '../utils/user_facing_error.dart';
 import '../widgets/scan_frame_overlay.dart';
-import '../widgets/session_status_banner.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key, this.isActive = true});
@@ -40,6 +39,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   // Informations de position issues de /api/scan/secure/check-status/
   Map<String, dynamic>? _statusInfo;
   bool _loadingStatus = false;
+  String? _statusError;
 
   bool _geofenceBlocksBadge() {
     final info = _statusInfo;
@@ -127,80 +127,16 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
 
   String _scanButtonLabel(bool hasToken) {
     if (_loadingScan) return 'Vérification…';
-    if (!hasToken) return 'En attente du QR code…';
+    if (!hasToken) return 'Scanner un QR code';
     if (_geofenceBlocksBadge()) return 'Zone GPS non conforme';
     final action = _statusInfo?['action_suivante']?.toString();
     if (action == 'SORTIE') return 'Badger la sortie';
     if (action == 'ENTREE') return 'Badger l\u2019entrée';
-    return 'Badger entrée / sortie';
-  }
-
-  int _scanCurrentStep(bool hasToken) {
-    if (!hasToken) return 0;
-    if (_loadingStatus || _statusInfo == null) return 1;
-    if (_geofenceBlocksBadge()) return 1;
-    return 2;
-  }
-
-  Widget _buildStepBar(bool hasToken) {
-    final current = _scanCurrentStep(hasToken);
-    const labels = ['Scanner', 'Vérifier', 'Confirmer'];
-    return Row(
-      children: [
-        for (var i = 0; i < labels.length; i++) ...[
-          if (i > 0)
-            Expanded(
-              child: Container(
-                height: 2,
-                color: i <= current
-                    ? AppColors.ciGreenDark
-                    : AppColors.borderColor,
-              ),
-            ),
-          Column(
-            children: [
-              CircleAvatar(
-                radius: 12,
-                backgroundColor: i <= current
-                    ? AppColors.ciGreenDark
-                    : AppColors.borderColor,
-                child: Text(
-                  '${i + 1}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: i <= current ? Colors.white : AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                labels[i],
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
-                      color: i <= current
-                          ? AppColors.ciGreenDark
-                          : AppColors.textSecondary,
-                    ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget? _buildSessionChip(SessionProvider session) {
-    if (!session.isSecureHeartbeatRunning) return null;
-    return const Align(
-      alignment: Alignment.centerLeft,
-      child: SessionStatusChip(),
-    );
+    return 'Badger';
   }
 
   Widget _buildBottomSheet(SessionProvider session) {
     final hasToken = _tokenQr != null && _tokenQr!.isNotEmpty;
-    final sessionChip = _buildSessionChip(session);
     return Material(
       color: AppColors.cardBg,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -221,81 +157,23 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            _buildStepBar(hasToken),
-            if (sessionChip != null) ...[
-              const SizedBox(height: 10),
-              Align(alignment: Alignment.centerLeft, child: sessionChip),
-            ],
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.iconQrBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.qr_code_scanner,
-                    color: AppColors.ciGreenDark,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Scanner',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hasToken
-                            ? 'QR code détecté. Confirmez le badgeage ci-dessous.'
-                            : 'Positionnez le QR code dans le cadre pour enregistrer une présence.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                              height: 1.35,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
             if (hasToken) ...[
               const SizedBox(height: 12),
               _GeofenceBanner(
                 info: _statusInfo,
                 loading: _loadingStatus,
+                statusError: _statusError,
                 onRefresh: _refreshStatus,
               ),
-            ],
-            if (session.isSecureHeartbeatRunning) ...[
-              const SizedBox(height: 8),
-              if (session.heartbeatGpsBlocked)
-                _InfoStrip(
-                  icon: Icons.location_off,
-                  color: Colors.orange,
-                  text:
-                      'GPS indisponible — le suivi de présence est suspendu.',
-                  actionLabel: 'Activer',
-                  onAction: () => _requestGpsForHeartbeat(session),
-                )
-              else
-                _InfoStrip(
-                  icon: Icons.sensors,
-                  color: AppColors.ciBlue,
-                  text:
-                      'Suivi de présence actif. Gardez l\u2019application au premier plan.',
-                ),
+            ] else ...[
+              const SizedBox(height: 16),
+              Text(
+                'Cadrez le QR code de la séance.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 8),
@@ -325,7 +203,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                           color: Colors.white,
                         ),
                       )
-                    : Icon(hasToken ? Icons.login : Icons.hourglass_empty),
+                    : Icon(hasToken ? Icons.login : Icons.qr_code_scanner),
                 label: Text(_scanButtonLabel(hasToken)),
               ),
             ),
@@ -333,17 +211,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         ),
       ),
     );
-  }
-
-  Future<void> _requestGpsForHeartbeat(SessionProvider session) async {
-    final granted = await quickEnableLocation();
-    if (!mounted) {
-      return;
-    }
-    session.setGpsGranted(granted);
-    if (granted) {
-      session.pulseHeartbeatNow();
-    }
   }
 
   Future<void> _resumeScan() async {
@@ -374,10 +241,21 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         accuracyM: tel.accuracyM,
       );
       if (mounted) {
-        setState(() => _statusInfo = statut);
+        setState(() {
+          _statusInfo = statut;
+          _statusError = null;
+        });
       }
-    } catch (_) {
-      // silencieux : si le serveur est injoignable, le bandeau l'indiquera via _error lors du badgeage.
+    } catch (e, st) {
+      logErrorForDebug('scan.status', e, st);
+      if (mounted) {
+        setState(() {
+          _statusError = userFacingErrorMessage(
+            e,
+            context: UserErrorContext.badgeStatus,
+          );
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _loadingStatus = false);
@@ -434,22 +312,22 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         });
         return;
       }
-    } catch (e) {
+    } catch (e, st) {
+      logErrorForDebug('scan.check', e, st);
       setState(() => _loadingScan = false);
       if (mounted) {
-        final isBusiness = e is ApiBusinessException;
         await showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: Text(isBusiness ? 'Badgeage impossible' : 'Serveur injoignable'),
+            title: Text(userFacingErrorTitle(
+              e,
+              context: UserErrorContext.badgeStatus,
+            )),
             content: Text(
-              isBusiness
-                  ? e.toString()
-                  : 'Impossible de vérifier le statut de badgeage.\n\n'
-                      '${e.toString().replaceFirst('Exception: ', '')}\n\n'
-                      'Vérifiez que le téléphone et l\u2019ordinateur sont sur le même réseau '
-                      'et que API_BASE_URL dans app.env pointe vers l\u2019IP LAN du Mac '
-                      '(ex. http://192.168.x.x:8001).',
+              userFacingErrorMessage(
+                e,
+                context: UserErrorContext.badgeStatus,
+              ),
             ),
             actions: [
               FilledButton(
@@ -537,23 +415,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
               size: 48,
             ),
             title: const Text('Scan effectué'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Action enregistrée :',
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMuted,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  confirmation,
-                  style: Theme.of(ctx).textTheme.bodyLarge,
-                ),
-              ],
-            ),
+            content: Text(confirmation),
             actions: [
               FilledButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -564,10 +426,17 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         );
       }
     } on ApiBusinessException catch (e) {
-      setState(() => _error = e.toString());
-    } catch (e) {
+      setState(() => _error = userFacingErrorMessage(
+            e,
+            context: UserErrorContext.badgeScan,
+          ));
+    } catch (e, st) {
+      logErrorForDebug('scan.badge', e, st);
       setState(
-        () => _error = e.toString().replaceFirst('Exception: ', ''),
+        () => _error = userFacingErrorMessage(
+          e,
+          context: UserErrorContext.badgeScan,
+        ),
       );
     } finally {
       if (mounted) {
@@ -605,28 +474,9 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       _tokenQr = t;
       _error = null;
       _statusInfo = null;
+      _statusError = null;
     });
     _refreshStatus();
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          duration: Duration(seconds: 2),
-          backgroundColor: AppColors.ciGreenDark,
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'QR code détecté — confirmez le badgeage.',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
   }
 
   @override
@@ -665,70 +515,32 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   }
 }
 
-class _InfoStrip extends StatelessWidget {
-  const _InfoStrip({
-    required this.icon,
-    required this.color,
-    required this.text,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String text;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          if (actionLabel != null && onAction != null)
-            TextButton(
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                foregroundColor: color,
-                visualDensity: VisualDensity.compact,
-              ),
-              onPressed: onAction,
-              child: Text(actionLabel!, style: const TextStyle(fontSize: 12)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _GeofenceBanner extends StatelessWidget {
   const _GeofenceBanner({
     required this.info,
     required this.loading,
     required this.onRefresh,
+    this.statusError,
   });
 
   final Map<String, dynamic>? info;
   final bool loading;
+  final String? statusError;
   final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    // État initial : en cours de chargement / pas encore de réponse.
+    if (statusError != null && statusError!.isNotEmpty) {
+      return _wrap(
+        context: context,
+        color: Colors.red.withValues(alpha: 0.10),
+        border: AppColors.ciDanger,
+        icon: Icons.cloud_off_outlined,
+        iconColor: AppColors.ciDanger,
+        title: statusError!,
+        trailing: _refreshBtn(),
+      );
+    }
     if (info == null) {
       return _wrap(
         context: context,
@@ -736,10 +548,7 @@ class _GeofenceBanner extends StatelessWidget {
         border: Colors.grey.shade400,
         icon: Icons.my_location,
         iconColor: AppColors.textMuted,
-        title: loading
-            ? 'Calcul de votre position en cours…'
-            : 'Position non vérifiée.',
-        subtitle: null,
+        title: loading ? 'Vérification…' : 'Position en attente',
       );
     }
 
@@ -751,9 +560,7 @@ class _GeofenceBanner extends StatelessWidget {
         border: AppColors.ciBlue,
         icon: Icons.info_outline,
         iconColor: AppColors.ciBlue,
-        title: 'Aucune zone GPS définie pour ce module.',
-        subtitle:
-            'Le badgeage ne contrôle pas la position pour cette séance.',
+        title: 'Sans contrôle GPS',
       );
     }
 
@@ -768,9 +575,7 @@ class _GeofenceBanner extends StatelessWidget {
         border: Colors.orange,
         icon: Icons.location_searching,
         iconColor: Colors.orange.shade800,
-        title: 'Position GPS indisponible.',
-        subtitle:
-            'Activez la localisation et sortez à l\u2019extérieur pour capter le signal.',
+        title: 'GPS indisponible',
         trailing: _refreshBtn(),
       );
     }
@@ -782,9 +587,7 @@ class _GeofenceBanner extends StatelessWidget {
         border: Colors.orange,
         icon: Icons.gps_not_fixed,
         iconColor: Colors.orange.shade800,
-        title: 'Signal GPS imprécis.',
-        subtitle:
-            'Sortez à l\u2019extérieur pour améliorer la précision.',
+        title: 'Signal GPS imprécis',
         trailing: _refreshBtn(),
       );
     }
@@ -796,8 +599,7 @@ class _GeofenceBanner extends StatelessWidget {
         border: AppColors.ciGreenDark,
         icon: Icons.gps_fixed,
         iconColor: AppColors.ciGreenDark,
-        title: 'Vous êtes dans la zone de badgeage.',
-        subtitle: null,
+        title: 'Dans la zone de badgeage',
         trailing: _refreshBtn(),
       );
     }
@@ -808,8 +610,7 @@ class _GeofenceBanner extends StatelessWidget {
       border: Colors.red,
       icon: Icons.wrong_location,
       iconColor: Colors.red.shade700,
-      title: 'Hors zone — rapprochez-vous du site.',
-      subtitle: null,
+      title: 'Hors zone',
       trailing: _refreshBtn(),
     );
   }

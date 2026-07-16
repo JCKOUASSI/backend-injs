@@ -149,7 +149,6 @@ class _StatsGrid extends StatelessWidget {
     required this.volumeTaux,
     required this.minutesLabel,
     required this.dernierLabel,
-    required this.volumeDescription,
   });
 
   final Map<String, dynamic> stats;
@@ -157,7 +156,6 @@ class _StatsGrid extends StatelessWidget {
   final double volumeTaux;
   final String minutesLabel;
   final String dernierLabel;
-  final String volumeDescription;
 
   String _n(String key) => stats[key]?.toString() ?? '0';
 
@@ -203,14 +201,6 @@ class _StatsGrid extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.ciGreenDark,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                volumeDescription,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.35,
                     ),
               ),
               const SizedBox(height: 10),
