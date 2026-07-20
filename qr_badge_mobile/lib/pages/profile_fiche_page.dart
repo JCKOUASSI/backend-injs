@@ -101,9 +101,8 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       setState(() => _payload = res);
     } on SessionExpiredException {
       if (mounted) {
+        resetToAuthRoot();
         await context.read<SessionProvider>().logout();
-        if (!mounted) return;
-        resetToAuthRoot(context);
       }
       return;
     } catch (e, st) {
@@ -157,7 +156,10 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
 
   @override
   Widget build(BuildContext context) {
-    _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
+    final tick = context.select<SessionProvider, int>(
+      (s) => s.historyRefreshTick,
+    );
+    _maybeReloadFromTick(tick);
 
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -407,18 +409,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     required Map<String, dynamic> profil,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
-    final prenomCtrl = TextEditingController(
-      text: (user['first_name'] ?? profil['prenom'] ?? '').toString(),
-    );
-    final nomCtrl = TextEditingController(
-      text: (user['last_name'] ?? profil['nom'] ?? '').toString(),
-    );
-    final emailCtrl = TextEditingController(
-      text: user['email']?.toString() ?? '',
-    );
-    final telCtrl = TextEditingController(
-      text: user['telephone']?.toString() ?? '',
-    );
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -426,131 +416,12 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        var saving = false;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Modifier mes informations',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: prenomCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Prénom',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: nomCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: telCtrl,
-                      keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Téléphone',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              setModalState(() => saving = true);
-                              final session = context.read<SessionProvider>();
-                              try {
-                                final res = await _service.updateMyProfile(
-                                  baseUrl: session.baseUrl,
-                                  accessToken: session.accessToken!,
-                                  data: {
-                                    'first_name': prenomCtrl.text.trim(),
-                                    'last_name': nomCtrl.text.trim(),
-                                    'email': emailCtrl.text.trim(),
-                                    'telephone': telCtrl.text.trim(),
-                                  },
-                                  onRefreshToken: () => session
-                                      .tryRefreshToken()
-                                      .then((ok) => ok ? session.accessToken : null),
-                                );
-                                session.applyUserProfile(res);
-                                if (context.mounted) {
-                                  Navigator.of(context).pop(true);
-                                }
-                              } on SessionExpiredException {
-                                if (context.mounted) {
-                                  await session.logout();
-                                  if (!context.mounted) return;
-                                  resetToAuthRoot(context);
-                                }
-                              } catch (e, st) {
-                                logErrorForDebug('profile.update', e, st);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        userFacingErrorMessage(
-                                          e,
-                                          context: UserErrorContext.profile,
-                                          fallback:
-                                              'Impossible de mettre à jour le profil.',
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } finally {
-                                if (context.mounted) {
-                                  setModalState(() => saving = false);
-                                }
-                              }
-                            },
-                      child: Text(saving ? 'Enregistrement…' : 'Enregistrer'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => _ProfileEditSheet(
+        user: user,
+        profil: profil,
+        service: _service,
+      ),
     );
-    prenomCtrl.dispose();
-    nomCtrl.dispose();
-    emailCtrl.dispose();
-    telCtrl.dispose();
     if (saved == true && mounted) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Profil mis à jour.')),
@@ -563,12 +434,6 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
     BuildContext context,
     Map<String, dynamic> profil,
   ) async {
-    final pieceCtrl = TextEditingController(
-      text: profil['numero_piece_identite']?.toString() ?? '',
-    );
-    final compteCtrl = TextEditingController(
-      text: profil['numero_compte_bancaire']?.toString() ?? '',
-    );
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -576,96 +441,11 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        var saving = false;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Informations bancaires',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: pieceCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'N° pièce d\'identité',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: compteCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'N° compte bancaire',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            setModalState(() => saving = true);
-                            final session = context.read<SessionProvider>();
-                            try {
-                              await _service.updateMySensitiveData(
-                                baseUrl: session.baseUrl,
-                                accessToken: session.accessToken!,
-                                numeroPieceIdentite: pieceCtrl.text.trim(),
-                                numeroCompteBancaire: compteCtrl.text.trim(),
-                                onRefreshToken: () => session
-                                    .tryRefreshToken()
-                                    .then((ok) => ok ? session.accessToken : null),
-                              );
-                              if (context.mounted) {
-                                Navigator.of(context).pop(true);
-                              }
-                            } catch (e, st) {
-                              logErrorForDebug('profile.finance', e, st);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      userFacingErrorMessage(
-                                        e,
-                                        context: UserErrorContext.profile,
-                                        fallback:
-                                            'Impossible d\u2019enregistrer les informations.',
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            } finally {
-                              if (context.mounted) {
-                                setModalState(() => saving = false);
-                              }
-                            }
-                          },
-                    child: Text(saving ? 'Enregistrement…' : 'Enregistrer'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => _BankingEditSheet(
+        profil: profil,
+        service: _service,
+      ),
     );
-    pieceCtrl.dispose();
-    compteCtrl.dispose();
     if (saved == true && mounted) {
       await _load(showSpinner: false);
     }

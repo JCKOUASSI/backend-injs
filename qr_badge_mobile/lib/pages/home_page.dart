@@ -81,11 +81,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _selectTab(int index) {
     setState(() => _index = index);
-    if (index == _tabAccueil ||
-        index == _tabHistorique ||
-        index == _tabProfil) {
-      context.read<SessionProvider>().requestHistoryRefresh();
-    }
   }
 
   Future<void> _requestGps(SessionProvider session) async {
@@ -97,8 +92,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
     }
   }
-
-  bool _isAuditeur(SessionProvider session) => session.evaluationsEnabled;
 
   String get _title {
     switch (_index) {
@@ -144,10 +137,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  List<PopupMenuEntry<String>> _moreMenuItems(SessionProvider session) {
-    final pendingEval = session.pendingEvaluationsCount;
+  List<PopupMenuEntry<String>> _moreMenuItems({
+    required bool showEvaluations,
+    required int pendingEval,
+  }) {
     return [
-      if (_isAuditeur(session))
+      if (showEvaluations)
         PopupMenuItem(
           value: 'evaluations',
           child: ListTile(
@@ -192,7 +187,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionProvider>();
+    final pendingEvaluationsCount = context.select<SessionProvider, int>(
+      (s) => s.pendingEvaluationsCount,
+    );
+    final heartbeatGpsBlocked = context.select<SessionProvider, bool>(
+      (s) => s.heartbeatGpsBlocked,
+    );
+    final gpsGranted = context.select<SessionProvider, bool>(
+      (s) => s.gpsGranted,
+    );
+    final heartbeatRunning = context.select<SessionProvider, bool>(
+      (s) => s.isSecureHeartbeatRunning,
+    );
+    final evaluationsEnabled = context.select<SessionProvider, bool>(
+      (s) => s.evaluationsEnabled,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.ciLight,
@@ -201,21 +210,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         title: Text(_title),
         actions: [
           Badge(
-            isLabelVisible: session.pendingEvaluationsCount > 0,
-            label: Text('${session.pendingEvaluationsCount}'),
+            isLabelVisible: pendingEvaluationsCount > 0,
+            label: Text('$pendingEvaluationsCount'),
             backgroundColor: AppColors.ciOrangeDark,
             child: PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: 'Plus',
               onSelected: _onMoreMenuSelected,
-              itemBuilder: (_) => _moreMenuItems(session),
+              itemBuilder: (_) => _moreMenuItems(
+                showEvaluations: evaluationsEnabled,
+                pendingEval: pendingEvaluationsCount,
+              ),
             ),
           ),
         ],
       ),
       body: Column(
         children: [
-          if (session.heartbeatGpsBlocked && session.isSecureHeartbeatRunning)
+          if (heartbeatGpsBlocked && heartbeatRunning)
             Material(
               color: Colors.orange.shade50,
               child: Padding(
@@ -240,7 +252,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         foregroundColor: Colors.orange.shade800,
                       ),
-                      onPressed: () => _requestGps(session),
+                      onPressed: () =>
+                          _requestGps(context.read<SessionProvider>()),
                       child: const Text('Activer',
                           style: TextStyle(fontSize: 12)),
                     ),
@@ -248,7 +261,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             )
-          else if (!session.gpsGranted)
+          else if (!gpsGranted)
             Material(
               color: Colors.orange.shade50,
               child: Padding(
@@ -273,7 +286,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         foregroundColor: Colors.orange.shade800,
                       ),
-                      onPressed: () => _requestGps(session),
+                      onPressed: () =>
+                          _requestGps(context.read<SessionProvider>()),
                       child: const Text('Activer',
                           style: TextStyle(fontSize: 12)),
                     ),
@@ -281,7 +295,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
             ),
-          if (session.isSecureHeartbeatRunning) const SessionStatusBanner(),
+          if (heartbeatRunning) const SessionStatusBanner(),
           Expanded(
             child: IndexedStack(
               index: _index,

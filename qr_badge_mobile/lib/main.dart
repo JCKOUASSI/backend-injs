@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import 'providers/session_provider.dart';
 import 'pages/splash_page.dart';
+import 'utils/app_log.dart';
+import 'utils/auth_navigation.dart';
 import 'services/background_keepalive.dart';
 import 'theme/qr_badge_theme.dart';
 
@@ -26,6 +28,7 @@ Future<void> main() async {
   } catch (e, st) {
     debugPrint('background keepalive init: $e\n$st');
   }
+  AppLog.d('app', 'QR Badge démarré');
   runApp(const QRBadgeApp());
 }
 
@@ -37,6 +40,7 @@ class QRBadgeApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => SessionProvider()..bootstrap(),
       child: MaterialApp(
+        navigatorKey: appNavigatorKey,
         title: 'QR Badge',
         debugShowCheckedModeBanner: false,
         theme: buildQrBadgeTheme(),

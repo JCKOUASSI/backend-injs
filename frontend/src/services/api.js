@@ -71,7 +71,8 @@ const request = async (method, path, body, config = {}) => {
 
   let res = await fetch(url, init)
 
-  if (res.status === 401) {
+  const isLoginRequest = path === '/auth/login/' || path.startsWith('/auth/login?')
+  if (res.status === 401 && !isLoginRequest) {
     try {
       const newToken = await refreshAccessToken()
       init.headers.Authorization = `Bearer ${newToken}`

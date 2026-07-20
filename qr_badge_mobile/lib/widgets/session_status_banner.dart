@@ -10,11 +10,16 @@ class SessionStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionProvider>();
-    if (!session.isSecureHeartbeatRunning) {
+    final running = context.select<SessionProvider, bool>(
+      (s) => s.isSecureHeartbeatRunning,
+    );
+    if (!running) {
       return const SizedBox.shrink();
     }
-    final label = session.openSessionChipLabel ?? 'Session ouverte — suivi actif';
+    final label = context.select<SessionProvider, String?>(
+          (s) => s.openSessionChipLabel,
+        ) ??
+        'Session ouverte — suivi actif';
     return Material(
       color: AppColors.navIndicator,
       child: Padding(

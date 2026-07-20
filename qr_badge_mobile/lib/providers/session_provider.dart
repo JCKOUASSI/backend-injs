@@ -12,6 +12,7 @@ import '../services/scan_service.dart';
 import '../services/storage_service.dart';
 import '../utils/dev_api_defaults.dart';
 import '../utils/device_label.dart';
+import '../utils/app_log.dart';
 import '../utils/open_session_recovery.dart';
 
 class SessionProvider extends ChangeNotifier {
@@ -22,6 +23,9 @@ class SessionProvider extends ChangeNotifier {
 
   final MobileConfigService _mobileConfig = MobileConfigService();
   final EvaluationService _evaluations = EvaluationService();
+
+  bool _loginInFlight = false;
+  Future<bool>? _refreshInFlight;
 
   Timer? _heartbeatTimer;
   String? _heartbeatTokenQr;
@@ -226,6 +230,7 @@ class SessionProvider extends ChangeNotifier {
         accuracyM: tel.accuracyM,
         batteryLevel: tel.batteryLevel,
         isCharging: tel.isCharging,
+        onRefreshToken: _refreshTokenForApi,
       );
       if (res['action']?.toString() == 'SORTIE_AUTO') {
         stopSecureSessionHeartbeat();
@@ -301,6 +306,7 @@ class SessionProvider extends ChangeNotifier {
     isBootstrapping = true;
     notifyListeners();
     baseUrl = await _resolveBaseUrlFromEnv();
+    AppLog.session('bootstrap démarré baseUrl=$baseUrl');
     accessToken = await _storage.getAccessToken();
     refreshToken = await _storage.getRefreshToken();
     username = await _storage.getUsername();
@@ -332,6 +338,9 @@ class SessionProvider extends ChangeNotifier {
       await _tryRestoreOpenSession();
     }
     isBootstrapping = false;
+    AppLog.session(
+      'bootstrap terminé auth=$isAuthenticated mustChangePassword=$mustChangePassword',
+    );
     notifyListeners();
   }
 
@@ -389,8 +398,28 @@ class SessionProvider extends ChangeNotifier {
     required String usernameInput,
     required String passwordInput,
   }) async {
+    if (_loginInFlight) {
+      AppLog.session('login ignoré (déjà en cours)');
+      return;
+    }
+    _loginInFlight = true;
+    try {
+      await _loginImpl(
+        usernameInput: usernameInput,
+        passwordInput: passwordInput,
+      );
+    } finally {
+      _loginInFlight = false;
+    }
+  }
+
+  Future<void> _loginImpl({
+    required String usernameInput,
+    required String passwordInput,
+  }) async {
     final id = deviceId ?? await _storage.getOrCreateDeviceId();
     final info = await DeviceLabel.resolve();
+    AppLog.session('login tentative user=${usernameInput.trim()} device=$id');
     late final Map<String, dynamic> payload;
     try {
       payload = await _auth.login(
@@ -401,8 +430,7 @@ class SessionProvider extends ChangeNotifier {
         deviceInfo: info,
       );
     } catch (e, st) {
-      debugPrint('[qr_badge.session] Connexion échouée: $e');
-      debugPrint('$st');
+      AppLog.error('session', 'Connexion échouée: $e', st);
       rethrow;
     }
     final access = payload['access']?.toString() ?? '';
@@ -426,6 +454,9 @@ class SessionProvider extends ChangeNotifier {
     isAuthenticated = true;
     await refreshMobileConfig();
     await refreshPendingEvaluationsCount();
+    AppLog.session(
+      'login OK user=$username mustChangePassword=$mustChangePassword',
+    );
     notifyListeners();
   }
 
@@ -458,6 +489,18 @@ class SessionProvider extends ChangeNotifier {
   /// Tente de rafraîchir le token d'accès avec le refresh token.
   /// Retourne true si le rafraîchissement a réussi, false sinon.
   Future<bool> tryRefreshToken() async {
+    if (_refreshInFlight != null) {
+      return _refreshInFlight!;
+    }
+    _refreshInFlight = _tryRefreshTokenImpl();
+    try {
+      return await _refreshInFlight!;
+    } finally {
+      _refreshInFlight = null;
+    }
+  }
+
+  Future<bool> _tryRefreshTokenImpl() async {
     final rt = refreshToken;
     if (rt == null || rt.isEmpty) {
       return false;
@@ -511,6 +554,7 @@ class SessionProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    AppLog.session('logout user=$username');
     stopSecureSessionHeartbeat();
     _remoteHeartbeatEnabled = null;
     _remoteHeartbeatIntervalSec = null;

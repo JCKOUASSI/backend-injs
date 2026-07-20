@@ -33,10 +33,8 @@ Future<bool> performGuardedLogout(BuildContext context) async {
     );
     return false;
   }
+  resetToAuthRoot();
   await context.read<SessionProvider>().logout();
-  if (context.mounted) {
-    resetToAuthRoot(context);
-  }
   return true;
 }
 
