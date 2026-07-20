@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, SimpleTestCase
 
-from authentication.throttles import ScanRateThrottle
+from authentication.throttles import LoginRateThrottle, ScanRateThrottle
 
 User = get_user_model()
 
@@ -49,3 +49,36 @@ class ScanRateThrottleKeyTests(SimpleTestCase):
 
         key = self.throttle.get_cache_key(request, view=None)
         self.assertEqual(key, 'scan:ip:203.0.113.9:aaaaaaaa')
+
+    def test_anonymous_request_uses_first_ip_from_x_forwarded_for(self):
+        request = self.factory.post(
+            '/api/scan/',
+            {'token_qr': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'numero': 'P001'},
+        )
+        request.user = AnonymousUser()
+        request.META['REMOTE_ADDR'] = '172.19.0.4'
+        request.META['HTTP_X_FORWARDED_FOR'] = '203.0.113.9, 172.19.0.4'
+
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertEqual(key, 'scan:ip:203.0.113.9:aaaaaaaa')
+
+
+class LoginRateThrottleKeyTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.throttle = LoginRateThrottle()
+
+    def test_uses_first_ip_from_x_forwarded_for(self):
+        request = self.factory.post('/api/auth/login/', {'username': 'alice'})
+        request.META['REMOTE_ADDR'] = '172.19.0.4'
+        request.META['HTTP_X_FORWARDED_FOR'] = '203.0.113.42, 172.19.0.4'
+
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertEqual(key, 'login:203.0.113.42')
+
+    def test_falls_back_to_remote_addr_without_x_forwarded_for(self):
+        request = self.factory.post('/api/auth/login/', {'username': 'alice'})
+        request.META['REMOTE_ADDR'] = '10.0.0.1'
+
+        key = self.throttle.get_cache_key(request, view=None)
+        self.assertEqual(key, 'login:10.0.0.1')
