@@ -44,6 +44,9 @@ build_android() {
     echo ""
   fi
 
+  # Évite « intermediary-bundle.aab already exists » après un build Gradle interrompu.
+  rm -rf build/app/intermediates/intermediary_bundle 2>/dev/null || true
+
   local -a args=(build appbundle --release)
   if [[ "$OBFUSCATE" == "1" ]]; then
     args+=(--obfuscate --split-debug-info=build/debug-info)

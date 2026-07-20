@@ -120,7 +120,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         if (_camera.value.isRunning) {
           await _camera.stop();
         }
-        if (stale() || !widget.isActive || _cameraPaused) {
+        if (!mounted || stale() || !widget.isActive || _cameraPaused) {
           return;
         }
         AppLog.location('scan bloqué : localisation indisponible');
@@ -128,7 +128,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         setState(() => _locationBlocked = true);
         return;
       }
-      if (stale() || !widget.isActive || _cameraPaused) {
+      if (!mounted || stale() || !widget.isActive || _cameraPaused) {
         return;
       }
       context.read<SessionProvider>().setGpsGranted(true);
@@ -138,6 +138,9 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       unawaited(_telemetry.capture());
 
       if (!_cameraPermissionOk) {
+        if (!mounted) {
+          return;
+        }
         _cameraPermissionOk = await ensureCameraPermission(context);
       }
       if (stale() || !widget.isActive || _cameraPaused) {
