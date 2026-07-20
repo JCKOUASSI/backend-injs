@@ -11,8 +11,13 @@ class ScanService {
     double? accuracyM,
     int? batteryLevel,
     bool? isCharging,
+    Future<String?> Function()? onRefreshToken,
   }) async {
-    final client = ApiClient(baseUrl: baseUrl, accessToken: accessToken);
+    final client = ApiClient(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      onRefreshToken: onRefreshToken,
+    );
     return client.post(
       '/api/scan/secure/',
       data: {
@@ -37,8 +42,13 @@ class ScanService {
     double? accuracyM,
     int? batteryLevel,
     bool? isCharging,
+    Future<String?> Function()? onRefreshToken,
   }) async {
-    final client = ApiClient(baseUrl: baseUrl, accessToken: accessToken);
+    final client = ApiClient(
+      baseUrl: baseUrl,
+      accessToken: accessToken,
+      onRefreshToken: onRefreshToken,
+    );
     return client.post(
       '/api/scan/secure/heartbeat/',
       data: {

@@ -53,4 +53,17 @@ void main() {
       contains('périmètre'),
     );
   });
+
+  test('ApiResponseException 401 conserve le message serveur', () {
+    const err = ApiResponseException(
+      statusCode: 401,
+      path: '/api/auth/login/',
+      message: 'Identifiants invalides.',
+    );
+    final msg = userFacingErrorMessage(
+      err,
+      context: UserErrorContext.login,
+    );
+    expect(msg, 'Identifiants invalides.');
+  });
 }

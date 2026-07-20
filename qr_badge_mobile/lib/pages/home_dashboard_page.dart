@@ -118,8 +118,11 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final session = context.watch<SessionProvider>();
-    _maybeReloadFromTick(session.historyRefreshTick);
+    final tick = context.select<SessionProvider, int>(
+      (s) => s.historyRefreshTick,
+    );
+    _maybeReloadFromTick(tick);
+    final session = context.read<SessionProvider>();
     final items = _pointages();
     final dernier = _dernierPointage(items);
 

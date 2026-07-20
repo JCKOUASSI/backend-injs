@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
-
 import '../services/api_client.dart';
+import 'app_log.dart';
 import 'server_url.dart';
 
 /// Contexte d'affichage pour adapter le message sans données sensibles.
@@ -16,10 +15,7 @@ enum UserErrorContext {
 
 /// Journalise l'erreur complète en debug uniquement (jamais montrée à l'utilisateur).
 void logErrorForDebug(String scope, Object error, [StackTrace? stackTrace]) {
-  debugPrint('[qr_badge.$scope] $error');
-  if (stackTrace != null) {
-    debugPrint('$stackTrace');
-  }
+  AppLog.error(scope, error, stackTrace);
 }
 
 /// Titre de dialogues d'erreur (sans détail technique).
@@ -111,7 +107,10 @@ String _apiResponseMessage(ApiResponseException error) {
   if (error.statusCode == 404) {
     return 'Service indisponible. Mettez à jour l\u2019application ou réessayez plus tard.';
   }
-  if (error.statusCode == 429) {
+  if (error.statusCode == 429 || error.statusCode == 401) {
+    return error.message;
+  }
+  if (error.message.isNotEmpty) {
     return error.message;
   }
   return 'Le serveur a renvoyé une réponse inattendue. Réessayez plus tard.';

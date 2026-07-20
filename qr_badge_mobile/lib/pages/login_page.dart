@@ -5,7 +5,6 @@ import '../providers/session_provider.dart';
 import '../theme/qr_badge_theme.dart';
 import '../utils/open_privacy_policy.dart';
 import '../utils/user_facing_error.dart';
-import '../utils/auth_navigation.dart';
 import '../widgets/qr_badge_logo.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
+  bool _submitInFlight = false;
   bool _obscurePassword = true;
   String? _error;
 
@@ -31,9 +31,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
+    if (_submitInFlight || _loading) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    _submitInFlight = true;
     setState(() {
       _loading = true;
       _error = null;
@@ -47,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) {
         return;
       }
-      resetToAuthRoot(context);
+      // SplashPage se reconstruit via SessionProvider.notifyListeners().
     } catch (e, st) {
       logErrorForDebug('login', e, st);
       final session = context.read<SessionProvider>();
@@ -57,6 +61,7 @@ class _LoginPageState extends State<LoginPage> {
             serverBaseUrl: session.baseUrl,
           ));
     } finally {
+      _submitInFlight = false;
       if (mounted) {
         setState(() => _loading = false);
       }
@@ -83,27 +88,31 @@ class _LoginPageState extends State<LoginPage> {
       ),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(
-            20,
-            8,
-            20,
-            24 + MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Material(
-                      elevation: 2,
-                      shadowColor: Colors.black12,
-                      borderRadius: BorderRadius.circular(20),
-                      color: AppColors.cardBg,
-                      child: Padding(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                24 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Material(
+                        elevation: 2,
+                        shadowColor: Colors.black12,
+                        borderRadius: BorderRadius.circular(20),
+                        color: AppColors.cardBg,
+                        child: Padding(
                         padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                         child: Form(
                           key: _formKey,
@@ -151,7 +160,11 @@ class _LoginPageState extends State<LoginPage> {
                                 validator: (v) => (v == null || v.isEmpty)
                                     ? 'Champ requis'
                                     : null,
-                                onFieldSubmitted: (_) => _submit(),
+                                onFieldSubmitted: (_) {
+                                  if (!_submitInFlight && !_loading) {
+                                    _submit();
+                                  }
+                                },
                               ),
                               if (_error != null) ...[
                                 const SizedBox(height: 8),
@@ -185,30 +198,32 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-                  ),
-                const SizedBox(height: 20),
-                TextButton.icon(
-                  onPressed: () => openPrivacyPolicy(
-                    context,
-                    context.read<SessionProvider>().baseUrl,
-                  ),
-                  icon: const Icon(
-                    Icons.verified_user_outlined,
-                    size: 18,
-                    color: AppColors.ciGreenDark,
-                  ),
-                  label: const Text(
-                    'Confidentialité',
-                    style: TextStyle(
-                      color: AppColors.ciGreenDark,
-                      decoration: TextDecoration.underline,
-                      decorationColor: AppColors.ciGreenDark,
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                    TextButton.icon(
+                      onPressed: () => openPrivacyPolicy(
+                        context,
+                        context.read<SessionProvider>().baseUrl,
+                      ),
+                      icon: const Icon(
+                        Icons.verified_user_outlined,
+                        size: 18,
+                        color: AppColors.ciGreenDark,
+                      ),
+                      label: const Text(
+                        'Confidentialité',
+                        style: TextStyle(
+                          color: AppColors.ciGreenDark,
+                          decoration: TextDecoration.underline,
+                          decorationColor: AppColors.ciGreenDark,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

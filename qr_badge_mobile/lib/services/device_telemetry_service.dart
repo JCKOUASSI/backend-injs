@@ -28,15 +28,31 @@ class DeviceTelemetryService {
 
   final Battery _battery;
 
+  DeviceTelemetry? _cached;
+  DateTime? _cachedAt;
+
+  /// Durée pendant laquelle une capture récente est réutilisée sans relire le GPS.
+  static const cacheTtl = Duration(seconds: 15);
+
   /// Récupère position (une lecture) + état batterie. Ne demande pas la localisation si déjà refusée définitivement sans nouvelle demande.
   ///
   /// Pour rester rapide, on réutilise d'abord le dernier point connu (retour
   /// quasi instantané). Un fix frais n'est demandé qu'en secours, avec un
   /// timeout court, afin de ne pas bloquer le badgeage plusieurs secondes.
+  ///
+  /// Les appels rapprochés (< [cacheTtl]) renvoient le même résultat en mémoire,
+  /// sauf si [forceRefresh] est vrai (ex. bouton « Recalculer la position »).
   Future<DeviceTelemetry> capture({
     Duration locationTimeout = const Duration(seconds: 6),
     Duration lastKnownMaxAge = const Duration(seconds: 30),
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh &&
+        _cached != null &&
+        _cachedAt != null &&
+        DateTime.now().difference(_cachedAt!) <= cacheTtl) {
+      return _cached!;
+    }
     String? locErr;
     double? lat;
     double? lng;
@@ -100,7 +116,7 @@ class DeviceTelemetryService {
       // Simulateur / bureau : souvent indisponible
     }
 
-    return DeviceTelemetry(
+    final result = DeviceTelemetry(
       latitude: lat,
       longitude: lng,
       accuracyM: acc,
@@ -108,5 +124,8 @@ class DeviceTelemetryService {
       isCharging: charging,
       locationError: locErr,
     );
+    _cached = result;
+    _cachedAt = DateTime.now();
+    return result;
   }
 }

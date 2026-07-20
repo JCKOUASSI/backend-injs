@@ -42,10 +42,11 @@ class _SplashPageState extends State<SplashPage> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        // Déclenche la demande GPS une seule fois, après le bootstrap.
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _maybeAskLocation(session),
-        );
+        if (!_locationAsked) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _maybeAskLocation(session),
+          );
+        }
         if (session.isAuthenticated) {
           if (session.mustChangePassword) {
             return const ChangePasswordPage();

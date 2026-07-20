@@ -462,3 +462,298 @@ class _ModuleCard extends StatelessWidget {
     );
   }
 }
+
+class _ProfileEditSheet extends StatefulWidget {
+  const _ProfileEditSheet({
+    required this.user,
+    required this.profil,
+    required this.service,
+  });
+
+  final Map<String, dynamic> user;
+  final Map<String, dynamic> profil;
+  final ProfileService service;
+
+  @override
+  State<_ProfileEditSheet> createState() => _ProfileEditSheetState();
+}
+
+class _ProfileEditSheetState extends State<_ProfileEditSheet> {
+  late final TextEditingController _prenomCtrl;
+  late final TextEditingController _nomCtrl;
+  late final TextEditingController _emailCtrl;
+  late final TextEditingController _telCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = widget.user;
+    final profil = widget.profil;
+    _prenomCtrl = TextEditingController(
+      text: (user['first_name'] ?? profil['prenom'] ?? '').toString(),
+    );
+    _nomCtrl = TextEditingController(
+      text: (user['last_name'] ?? profil['nom'] ?? '').toString(),
+    );
+    _emailCtrl = TextEditingController(text: user['email']?.toString() ?? '');
+    _telCtrl = TextEditingController(text: user['telephone']?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _prenomCtrl.dispose();
+    _nomCtrl.dispose();
+    _emailCtrl.dispose();
+    _telCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onSessionExpired(SessionProvider session) async {
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+    resetToAuthRoot();
+    await session.logout();
+  }
+
+  Future<void> _save() async {
+    if (_saving) {
+      return;
+    }
+    setState(() => _saving = true);
+    final session = context.read<SessionProvider>();
+    try {
+      final res = await widget.service.updateMyProfile(
+        baseUrl: session.baseUrl,
+        accessToken: session.accessToken!,
+        data: {
+          'first_name': _prenomCtrl.text.trim(),
+          'last_name': _nomCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'telephone': _telCtrl.text.trim(),
+        },
+        onRefreshToken: () => session.tryRefreshToken().then(
+              (ok) => ok ? session.accessToken : null,
+            ),
+      );
+      session.applyUserProfile(res);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } on SessionExpiredException {
+      await _onSessionExpired(session);
+    } catch (e, st) {
+      logErrorForDebug('profile.update', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              userFacingErrorMessage(
+                e,
+                context: UserErrorContext.profile,
+                fallback: 'Impossible de mettre à jour le profil.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Modifier mes informations',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _prenomCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Prénom',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _nomCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nom',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'E-mail',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _telCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Téléphone',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BankingEditSheet extends StatefulWidget {
+  const _BankingEditSheet({
+    required this.profil,
+    required this.service,
+  });
+
+  final Map<String, dynamic> profil;
+  final ProfileService service;
+
+  @override
+  State<_BankingEditSheet> createState() => _BankingEditSheetState();
+}
+
+class _BankingEditSheetState extends State<_BankingEditSheet> {
+  late final TextEditingController _pieceCtrl;
+  late final TextEditingController _compteCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final profil = widget.profil;
+    _pieceCtrl = TextEditingController(
+      text: profil['numero_piece_identite']?.toString() ?? '',
+    );
+    _compteCtrl = TextEditingController(
+      text: profil['numero_compte_bancaire']?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _pieceCtrl.dispose();
+    _compteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) {
+      return;
+    }
+    setState(() => _saving = true);
+    final session = context.read<SessionProvider>();
+    try {
+      await widget.service.updateMySensitiveData(
+        baseUrl: session.baseUrl,
+        accessToken: session.accessToken!,
+        numeroPieceIdentite: _pieceCtrl.text.trim(),
+        numeroCompteBancaire: _compteCtrl.text.trim(),
+        onRefreshToken: () => session.tryRefreshToken().then(
+              (ok) => ok ? session.accessToken : null,
+            ),
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e, st) {
+      logErrorForDebug('profile.finance', e, st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              userFacingErrorMessage(
+                e,
+                context: UserErrorContext.profile,
+                fallback: 'Impossible d\u2019enregistrer les informations.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Informations bancaires',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _pieceCtrl,
+            decoration: const InputDecoration(
+              labelText: 'N° pièce d\'identité',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _compteCtrl,
+            decoration: const InputDecoration(
+              labelText: 'N° compte bancaire',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? 'Enregistrement…' : 'Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+}

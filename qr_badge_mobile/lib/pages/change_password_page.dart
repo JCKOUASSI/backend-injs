@@ -63,7 +63,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mot de passe mis à jour.')),
       );
-      resetToAuthRoot(context);
+      resetToAuthRoot();
     } catch (e, st) {
       logErrorForDebug('password', e, st);
       setState(() => _error = userFacingErrorMessage(

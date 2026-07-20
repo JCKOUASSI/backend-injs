@@ -189,9 +189,8 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
       setState(() => _noProfile = true);
     } on SessionExpiredException {
       if (mounted) {
+        resetToAuthRoot();
         await context.read<SessionProvider>().logout();
-        if (!mounted) return;
-        resetToAuthRoot(context);
       }
       return;
     } catch (e, st) {
@@ -244,7 +243,10 @@ class _HistoryPageState extends State<HistoryPage> with AutomaticKeepAliveClient
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    _maybeReloadFromTick(context.watch<SessionProvider>().historyRefreshTick);
+    final tick = context.select<SessionProvider, int>(
+      (s) => s.historyRefreshTick,
+    );
+    _maybeReloadFromTick(tick);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }

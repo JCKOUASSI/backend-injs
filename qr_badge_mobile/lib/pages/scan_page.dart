@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -8,8 +10,10 @@ import '../services/api_client.dart';
 import '../services/device_telemetry_service.dart';
 import '../services/scan_service.dart';
 import '../theme/qr_badge_theme.dart';
+import '../utils/app_log.dart';
 import '../utils/camera_permission.dart';
 import '../utils/confirm_dialog.dart';
+import '../utils/location_permission.dart';
 import '../utils/user_facing_error.dart';
 import '../widgets/scan_frame_overlay.dart';
 
@@ -36,10 +40,22 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   /// l'utilisateur tape sur « Scanner à nouveau ».
   bool _cameraPaused = false;
 
+  /// Localisation indisponible : la caméra reste fermée jusqu'à activation GPS.
+  bool _locationBlocked = false;
+
+  /// Permissions déjà validées lors d'une ouverture précédente de l'onglet.
+  bool _locationReadyCached = false;
+  bool _cameraPermissionOk = false;
+
+  int _syncGeneration = 0;
+
   // Informations de position issues de /api/scan/secure/check-status/
   Map<String, dynamic>? _statusInfo;
+  DateTime? _statusFetchedAt;
   bool _loadingStatus = false;
   String? _statusError;
+
+  static const _statusCacheTtl = Duration(seconds: 30);
 
   bool _geofenceBlocksBadge() {
     final info = _statusInfo;
@@ -84,17 +100,125 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     if (!mounted) {
       return;
     }
+    final generation = ++_syncGeneration;
+
+    bool stale() => !mounted || generation != _syncGeneration;
+
     if (widget.isActive && !_cameraPaused) {
-      final allowed = await ensureCameraPermission(context);
-      if (!mounted || !widget.isActive || _cameraPaused) {
+      var locationOk = _locationReadyCached;
+      if (!locationOk) {
+        locationOk = await isLocationReady();
+        if (stale() || !widget.isActive || _cameraPaused) {
+          return;
+        }
+        _locationReadyCached = locationOk;
+        if (locationOk) {
+          AppLog.location('scan : localisation OK');
+        }
+      }
+      if (!locationOk) {
+        if (_camera.value.isRunning) {
+          await _camera.stop();
+        }
+        if (!mounted || stale() || !widget.isActive || _cameraPaused) {
+          return;
+        }
+        AppLog.location('scan bloqué : localisation indisponible');
+        context.read<SessionProvider>().setGpsGranted(false);
+        setState(() => _locationBlocked = true);
         return;
       }
-      if (allowed) {
-        await _camera.start();
+      if (!mounted || stale() || !widget.isActive || _cameraPaused) {
+        return;
       }
-    } else {
-      await _camera.stop();
+      context.read<SessionProvider>().setGpsGranted(true);
+      if (_locationBlocked) {
+        setState(() => _locationBlocked = false);
+      }
+      unawaited(_telemetry.capture());
+
+      if (!_cameraPermissionOk) {
+        if (!mounted) {
+          return;
+        }
+        _cameraPermissionOk = await ensureCameraPermission(context);
+      }
+      if (stale() || !widget.isActive || _cameraPaused) {
+        return;
+      }
+      if (!_cameraPermissionOk) {
+        AppLog.scan('caméra refusée');
+        return;
+      }
+      if (_camera.value.isRunning || _camera.value.isStarting) {
+        return;
+      }
+      AppLog.scan('caméra démarrée');
+      await _camera.start();
+    } else if (_cameraPaused) {
+      if (_camera.value.isRunning || _camera.value.isStarting) {
+        AppLog.scan('caméra arrêtée (après badgeage)');
+        await _camera.stop();
+      }
+    } else if (_camera.value.isRunning || _camera.value.isStarting) {
+      AppLog.scan('caméra en pause (onglet inactif)');
+      await _camera.pause();
     }
+  }
+
+  Future<void> _enableLocationAndRetry() async {
+    final granted = await ensureLocationPermission(context);
+    if (!mounted) {
+      return;
+    }
+    context.read<SessionProvider>().setGpsGranted(granted);
+    if (granted) {
+      _locationReadyCached = true;
+      setState(() => _locationBlocked = false);
+      await _syncCameraWithTab();
+    } else {
+      _locationReadyCached = false;
+    }
+  }
+
+  Widget _buildLocationRequiredPlaceholder() {
+    return ColoredBox(
+      color: Colors.black87,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_off, size: 56, color: Colors.orange.shade300),
+              const SizedBox(height: 12),
+              Text(
+                'Activez la localisation',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'La localisation est nécessaire pour scanner et badger.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white70,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _enableLocationAndRetry,
+                icon: const Icon(Icons.location_on),
+                label: const Text('Activer la localisation'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildPausedPlaceholder() {
@@ -135,7 +259,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     return 'Badger';
   }
 
-  Widget _buildBottomSheet(SessionProvider session) {
+  Widget _buildBottomSheet() {
     final hasToken = _tokenQr != null && _tokenQr!.isNotEmpty;
     return Material(
       color: AppColors.cardBg,
@@ -163,7 +287,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                 info: _statusInfo,
                 loading: _loadingStatus,
                 statusError: _statusError,
-                onRefresh: _refreshStatus,
+                onRefresh: () => _refreshStatus(forceRefresh: true),
               ),
             ] else ...[
               const SizedBox(height: 16),
@@ -218,12 +342,22 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       _cameraPaused = false;
       _tokenQr = null;
       _statusInfo = null;
+      _statusFetchedAt = null;
       _error = null;
     });
     await _syncCameraWithTab();
   }
 
-  Future<void> _refreshStatus() async {
+  Future<String?> _onRefreshToken(SessionProvider session) =>
+      session.tryRefreshToken().then((ok) => ok ? session.accessToken : null);
+
+  bool _isStatusCacheFresh() {
+    return _statusInfo != null &&
+        _statusFetchedAt != null &&
+        DateTime.now().difference(_statusFetchedAt!) <= _statusCacheTtl;
+  }
+
+  Future<void> _refreshStatus({bool forceRefresh = false}) async {
     final session = context.read<SessionProvider>();
     final token = _tokenQr?.trim() ?? '';
     if (token.isEmpty || session.accessToken == null) {
@@ -231,7 +365,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     }
     setState(() => _loadingStatus = true);
     try {
-      final tel = await _telemetry.capture();
+      final tel = await _telemetry.capture(forceRefresh: forceRefresh);
       final statut = await _scanService.checkSecureStatus(
         baseUrl: session.baseUrl,
         accessToken: session.accessToken!,
@@ -239,10 +373,12 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         latitude: tel.latitude,
         longitude: tel.longitude,
         accuracyM: tel.accuracyM,
+        onRefreshToken: () => _onRefreshToken(session),
       );
       if (mounted) {
         setState(() {
           _statusInfo = statut;
+          _statusFetchedAt = DateTime.now();
           _statusError = null;
         });
       }
@@ -291,16 +427,28 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
     String? heureEntree;
     String? seanceLabel;
     try {
-      // Capture la position avant checkSecureStatus pour cohérence avec _refreshStatus.
-      final telPre = await _telemetry.capture();
-      final statut = await _scanService.checkSecureStatus(
-        baseUrl: session.baseUrl,
-        accessToken: session.accessToken!,
-        tokenQr: token,
-        latitude: telPre.latitude,
-        longitude: telPre.longitude,
-        accuracyM: telPre.accuracyM,
-      );
+      final Map<String, dynamic> statut;
+      if (_isStatusCacheFresh()) {
+        AppLog.scan('réutilisation du statut serveur en cache');
+        statut = _statusInfo!;
+      } else {
+        final telPre = await _telemetry.capture();
+        statut = await _scanService.checkSecureStatus(
+          baseUrl: session.baseUrl,
+          accessToken: session.accessToken!,
+          tokenQr: token,
+          latitude: telPre.latitude,
+          longitude: telPre.longitude,
+          accuracyM: telPre.accuracyM,
+          onRefreshToken: () => _onRefreshToken(session),
+        );
+        if (mounted) {
+          setState(() {
+            _statusInfo = statut;
+            _statusFetchedAt = DateTime.now();
+          });
+        }
+      }
       actionSuivante = statut['action_suivante']?.toString();
       heureEntree = statut['heure_entree']?.toString();
       seanceLabel = statut['seance_intitule']?.toString();
@@ -384,10 +532,11 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         accuracyM: tel.accuracyM,
         batteryLevel: tel.batteryLevel,
         isCharging: tel.isCharging,
+        onRefreshToken: () => _onRefreshToken(session),
       );
       final action = res['action']?.toString();
       if (action == 'ENTREE') {
-        await session.refreshMobileConfig();
+        unawaited(session.refreshMobileConfig());
         session.startSecureSessionHeartbeat(
           token,
           heureEntree:
@@ -470,10 +619,12 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
       return;
     }
     HapticFeedback.mediumImpact();
+    AppLog.scan('QR détecté tokenLen=${t.length}');
     setState(() {
       _tokenQr = t;
       _error = null;
       _statusInfo = null;
+      _statusFetchedAt = null;
       _statusError = null;
     });
     _refreshStatus();
@@ -482,7 +633,6 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final session = context.watch<SessionProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -494,9 +644,14 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                 color: Colors.black,
                 child: _cameraPaused
                     ? _buildPausedPlaceholder()
-                    : MobileScanner(
+                    : _locationBlocked
+                        ? _buildLocationRequiredPlaceholder()
+                        : MobileScanner(
                         controller: _camera,
                         onDetect: (capture) {
+                          if (!widget.isActive || _cameraPaused) {
+                            return;
+                          }
                           final code = capture.barcodes.first.rawValue;
                           if (code == null || code.isEmpty) {
                             return;
@@ -505,11 +660,11 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
                         },
                       ),
               ),
-              if (!_cameraPaused) const ScanFrameOverlay(),
+              if (!_cameraPaused && !_locationBlocked) const ScanFrameOverlay(),
             ],
           ),
         ),
-        _buildBottomSheet(session),
+        _buildBottomSheet(),
       ],
     );
   }

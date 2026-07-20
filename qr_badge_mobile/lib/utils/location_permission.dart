@@ -3,6 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+/// Service GPS actif et permission accordée, sans afficher de dialogue.
+Future<bool> isLocationReady() async {
+  if (!await Geolocator.isLocationServiceEnabled()) {
+    return false;
+  }
+  final perm = await Geolocator.checkPermission();
+  return perm == LocationPermission.always ||
+      perm == LocationPermission.whileInUse;
+}
+
 /// Demande l'autorisation de localisation (runtime iOS/Android).
 /// Affiche une boîte de dialogue explicative avant le prompt système,
 /// et propose d'ouvrir les réglages si l'utilisateur a refusé définitivement.

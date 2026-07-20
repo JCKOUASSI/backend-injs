@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import '../utils/app_log.dart';
 
 /// Timeout appliqué à chaque requête réseau.
 /// 10 s est suffisant sur un LAN ; au-delà le serveur est considéré injoignable.
@@ -22,6 +23,13 @@ class ApiClient {
   /// Callback optionnel appelé quand le serveur renvoie 401.
   /// Doit retourner le nouveau token d'accès, ou null si le refresh a échoué.
   final Future<String?> Function()? onRefreshToken;
+
+  /// Endpoints d'auth où un 401 est métier (identifiants invalides, refresh
+  /// expiré) — ne jamais relancer via refresh + retry automatique.
+  static bool _mayRefreshOn401(String path) {
+    return !path.contains('/auth/login/') &&
+        !path.contains('/auth/token/refresh/');
+  }
 
   Uri _uri(String path) {
     final normalizedBase = baseUrl.endsWith('/')
@@ -52,6 +60,7 @@ class ApiClient {
     bool withAuth = true,
   }) async {
     final uri = _uri(path);
+    AppLog.api('→ POST $path');
     try {
       final res = await http
           .post(
@@ -60,11 +69,14 @@ class ApiClient {
             body: jsonEncode(data ?? <String, dynamic>{}),
           )
           .timeout(_kTimeout);
-      if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
-        debugPrint('[qr_badge.api] POST $path \u2192 401, tentative de refresh...');
+      if (res.statusCode == 401 &&
+          withAuth &&
+          onRefreshToken != null &&
+          _mayRefreshOn401(path)) {
+        AppLog.api('POST $path → 401, tentative de refresh…');
         final newToken = await onRefreshToken!();
         if (newToken != null) {
-          debugPrint('[qr_badge.api] POST $path \u2192 refresh OK, retry...');
+          AppLog.api('POST $path → refresh OK, retry…');
           final retryRes = await http
               .post(
                 uri,
@@ -74,7 +86,7 @@ class ApiClient {
               .timeout(_kTimeout);
           return _parse(retryRes, method: 'POST', path: path, uri: uri);
         }
-        debugPrint('[qr_badge.api] POST $path \u2192 refresh \u00e9chou\u00e9, session expir\u00e9e.');
+        AppLog.api('POST $path → refresh échoué, session expirée.');
         throw const SessionExpiredException();
       }
       return _parse(res, method: 'POST', path: path, uri: uri);
@@ -82,12 +94,15 @@ class ApiClient {
       rethrow;
     } on ApiResponseException {
       rethrow;
+    } on ApiBusinessException {
+      rethrow;
+    } on NoProfileException {
+      rethrow;
     } on TimeoutException {
-      debugPrint('[qr_badge.api] POST $path \u2192 timeout (${_kTimeout.inSeconds}s)');
+      AppLog.api('POST $path → timeout (${_kTimeout.inSeconds}s)');
       throw const NetworkTimeoutException();
     } catch (e, st) {
-      debugPrint('[qr_badge.api] POST $path \u2192 erreur r\u00e9seau: $e');
-      debugPrint('$st');
+      AppLog.error('api', 'POST $path → erreur réseau: $e', st);
       throw _asNetworkException(e);
     }
   }
@@ -97,6 +112,7 @@ class ApiClient {
     bool withAuth = true,
   }) async {
     final uri = _uri(path);
+    AppLog.api('→ GET $path');
     try {
       final res = await http
           .get(
@@ -104,11 +120,14 @@ class ApiClient {
             headers: _headers(withAuth: withAuth),
           )
           .timeout(_kTimeout);
-      if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
-        debugPrint('[qr_badge.api] GET $path \u2192 401, tentative de refresh...');
+      if (res.statusCode == 401 &&
+          withAuth &&
+          onRefreshToken != null &&
+          _mayRefreshOn401(path)) {
+        AppLog.api('GET $path → 401, tentative de refresh…');
         final newToken = await onRefreshToken!();
         if (newToken != null) {
-          debugPrint('[qr_badge.api] GET $path \u2192 refresh OK, retry...');
+          AppLog.api('GET $path → refresh OK, retry…');
           final retryRes = await http
               .get(
                 uri,
@@ -117,7 +136,7 @@ class ApiClient {
               .timeout(_kTimeout);
           return _parse(retryRes, method: 'GET', path: path, uri: uri);
         }
-        debugPrint('[qr_badge.api] GET $path \u2192 refresh \u00e9chou\u00e9, session expir\u00e9e.');
+        AppLog.api('GET $path → refresh échoué, session expirée.');
         throw const SessionExpiredException();
       }
       return _parse(res, method: 'GET', path: path, uri: uri);
@@ -125,12 +144,15 @@ class ApiClient {
       rethrow;
     } on ApiResponseException {
       rethrow;
+    } on ApiBusinessException {
+      rethrow;
+    } on NoProfileException {
+      rethrow;
     } on TimeoutException {
-      debugPrint('[qr_badge.api] GET $path \u2192 timeout (${_kTimeout.inSeconds}s)');
+      AppLog.api('GET $path → timeout (${_kTimeout.inSeconds}s)');
       throw const NetworkTimeoutException();
     } catch (e, st) {
-      debugPrint('[qr_badge.api] GET $path \u2192 erreur r\u00e9seau: $e');
-      debugPrint('$st');
+      AppLog.error('api', 'GET $path → erreur réseau: $e', st);
       throw _asNetworkException(e);
     }
   }
@@ -141,6 +163,7 @@ class ApiClient {
     bool withAuth = true,
   }) async {
     final uri = _uri(path);
+    AppLog.api('→ PATCH $path');
     try {
       final res = await http
           .patch(
@@ -149,7 +172,10 @@ class ApiClient {
             body: jsonEncode(data ?? <String, dynamic>{}),
           )
           .timeout(_kTimeout);
-      if (res.statusCode == 401 && withAuth && onRefreshToken != null) {
+      if (res.statusCode == 401 &&
+          withAuth &&
+          onRefreshToken != null &&
+          _mayRefreshOn401(path)) {
         final newToken = await onRefreshToken!();
         if (newToken != null) {
           final retryRes = await http
@@ -168,11 +194,14 @@ class ApiClient {
       rethrow;
     } on ApiResponseException {
       rethrow;
+    } on ApiBusinessException {
+      rethrow;
+    } on NoProfileException {
+      rethrow;
     } on TimeoutException {
       throw const NetworkTimeoutException();
     } catch (e, st) {
-      debugPrint('[qr_badge.api] PATCH $path \u2192 erreur r\u00e9seau: $e');
-      debugPrint('$st');
+      AppLog.error('api', 'PATCH $path → erreur réseau: $e', st);
       throw _asNetworkException(e);
     }
   }
@@ -227,14 +256,13 @@ class ApiClient {
       }
     }
     if (res.statusCode >= 200 && res.statusCode < 300) {
+      AppLog.api('← $method $path HTTP ${res.statusCode}');
       return json;
     }
     final bodyPreview = res.body.length > 800
-        ? '${res.body.substring(0, 800)}\u2026'
+        ? '${res.body.substring(0, 800)}…'
         : res.body;
-    debugPrint(
-      '[qr_badge.api] $method $path \u2192 HTTP ${res.statusCode} uri=$uri body=$bodyPreview',
-    );
+    AppLog.api('$method $path → HTTP ${res.statusCode} uri=$uri body=$bodyPreview');
     if (json['code']?.toString() == 'PASSWORD_CHANGE_REQUIRED') {
       throw ApiBusinessException(
         'PASSWORD_CHANGE_REQUIRED',
@@ -265,7 +293,11 @@ class ApiClient {
             : detail,
       );
     }
-    throw Exception(detail);
+    throw ApiResponseException(
+      statusCode: res.statusCode,
+      path: path,
+      message: detail,
+    );
   }
 
   String? _firstFieldError(Map<String, dynamic> body) {
