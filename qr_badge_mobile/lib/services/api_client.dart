@@ -255,6 +255,16 @@ class ApiClient {
         json['message']?.toString() ??
         _firstFieldError(json) ??
         'Erreur API (${res.statusCode})';
+    if (res.statusCode == 429) {
+      throw ApiResponseException(
+        statusCode: res.statusCode,
+        path: path,
+        message: detail.contains('Request was throttled') ||
+                detail.contains('Too Many')
+            ? 'Trop de tentatives de connexion. Patientez une minute puis réessayez.'
+            : detail,
+      );
+    }
     throw Exception(detail);
   }
 

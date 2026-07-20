@@ -6,13 +6,26 @@ logger = logging.getLogger(__name__)
 
 
 def _client_ip(request) -> str:
-    # REMOTE_ADDR est suffisant ici; si besoin, tu peux ajouter X-Forwarded-For.
+    """
+    Récupère la vraie IP du client derrière le(s) proxy(s).
+
+    codeqr-be n'est jamais exposé directement à Internet (port Docker
+    non publié, uniquement joignable depuis le réseau interne où tourne
+    Nginx Proxy Manager), donc X-Forwarded-For posé par NPM est fiable ici.
+
+    X-Forwarded-For peut contenir "client, proxy1, proxy2" — on prend le
+    premier élément (le client d'origine).
+    """
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if xff:
+        ip = xff.split(',')[0].strip()
+        if ip:
+            return ip
     return (request.META.get('REMOTE_ADDR') or '').strip()
 
 
 class LoginRateThrottle(SimpleRateThrottle):
     """Throttling anti bruteforce sur l'endpoint login."""
-
     scope = 'login'
 
     def allow_request(self, request, view):
@@ -38,7 +51,6 @@ class ScanRateThrottle(SimpleRateThrottle):
       pour éviter qu'une salle entière partage le même plafond derrière un NAT WiFi.
     - Scan public (web) : quota par IP + token QR.
     """
-
     scope = 'scan'
 
     def _request_value(self, request, key):
@@ -63,23 +75,19 @@ class ScanRateThrottle(SimpleRateThrottle):
             device_id = self._scan_device_id(request)
             device_key = device_id[:64] if device_id else 'no-device'
             return f'scan:user:{user.pk}:{device_key}'
-
         ip = _client_ip(request)
         if not ip:
             return None
-
         token = self._request_value(request, 'token_qr')
         if not token:
             query_params = getattr(request, 'query_params', None) or getattr(request, 'GET', None) or {}
             token = query_params.get('token_qr', '') or ''
-
         token_key = str(token).split('-')[0] if token else 'no-token'
         return f'scan:ip:{ip}:{token_key}'
 
 
 class OfflineDataRateThrottle(SimpleRateThrottle):
     """Throttling anti polling agressif sur l'endpoint offline-data."""
-
     scope = 'offline_data'
 
     def get_cache_key(self, request, view):
@@ -93,4 +101,3 @@ class OfflineDataRateThrottle(SimpleRateThrottle):
             ip = _client_ip(request)
             return f'offline_data:{ip}:no-token'
         return f'offline_data:{token}'
-

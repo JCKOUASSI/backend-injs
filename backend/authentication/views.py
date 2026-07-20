@@ -34,6 +34,7 @@ from .role_groups import (
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
 from presences.models import DeviceBinding, AuditLog, _log_audit
+from config.client_ip import get_client_ip
 
 User = get_user_model()
 
@@ -61,20 +62,13 @@ USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
 logger = logging.getLogger(__name__)
 
 
-def _login_client_ip(request) -> str:
-    xff = (request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
-    if xff:
-        return xff.split(',')[0].strip()
-    return (request.META.get('REMOTE_ADDR') or '').strip()
-
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
 def login_view(request):
     """Connexion — retourne access + refresh tokens.
     Si device_id est fourni (app mobile), vérifie le verrouillage appareil."""
-    client_ip = _login_client_ip(request)
+    client_ip = get_client_ip(request)
     user_agent = (request.META.get('HTTP_USER_AGENT') or '')[:200]
 
     serializer = LoginSerializer(data=request.data)

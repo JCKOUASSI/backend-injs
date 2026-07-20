@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from formations.models import Participant, Formateur, SessionModule
+from config.client_ip import get_client_ip
 
 
 class Pointage(models.Model):
@@ -251,14 +252,6 @@ class AuditLog(models.Model):
         return f"[{self.get_action_display()}] {acteur} → {self.cible_nom} ({self.timestamp:%Y-%m-%d %H:%M})"
 
 
-def _get_client_ip(request):
-    """Extrait l'IP réelle du client (derrière proxy)."""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
-
-
 def _log_audit(
     action, request, cible_type='', cible_numero='', cible_nom='',
     formation=None, pointage=None, device_id='', extra=None,
@@ -280,7 +273,7 @@ def _log_audit(
         formation=formation,
         formation_titre=formation.formation if formation else '',
         pointage=pointage,
-        ip_address=_get_client_ip(request) if request else None,
+        ip_address=get_client_ip(request) if request else None,
         device_id=device_id or '',
         extra=extra or {},
     )

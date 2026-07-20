@@ -111,6 +111,9 @@ String _apiResponseMessage(ApiResponseException error) {
   if (error.statusCode == 404) {
     return 'Service indisponible. Mettez à jour l\u2019application ou réessayez plus tard.';
   }
+  if (error.statusCode == 429) {
+    return error.message;
+  }
   return 'Le serveur a renvoyé une réponse inattendue. Réessayez plus tard.';
 }
 
