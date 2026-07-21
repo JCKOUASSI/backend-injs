@@ -78,6 +78,7 @@ class FinanceRecapModulesTest(TestCase):
         row = rows[0]
         self.assertEqual(len(row['recap_modules']), 1)
         self.assertEqual(row['recap_modules'][0]['module_intitule'], 'Déontologie')
+        self.assertEqual(row['modules_dispenses'], 'Déontologie')
         self.assertEqual(len(row['sessions_by_groupe']), 1)
         self.assertEqual(row['sessions_by_groupe'][0]['groupe'], 'GROUPE 4')
         self.assertEqual(row['sessions_by_groupe'][0]['sous_total']['sessions_count'], 1)

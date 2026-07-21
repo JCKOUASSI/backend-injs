@@ -453,7 +453,7 @@ export default function FinanceDashboard() {
                     <th>N°</th>
                     <th>Nom</th>
                     <th>Prénom</th>
-                    <th>Spécialité</th>
+                    <th>Modules dispensés</th>
                     <th>Grade(s)</th>
                     <th>Groupe(s)</th>
                     <th>Mod.</th>
@@ -474,7 +474,7 @@ export default function FinanceDashboard() {
                         <td><span className="badge-bg-info">{f.numerobadge || '-'}</span></td>
                         <td><strong>{f.nom}</strong></td>
                         <td>{f.prenom}</td>
-                        <td className="small text-muted">{f.specialite || '—'}</td>
+                        <td className="small text-muted">{f.modules_dispenses || '—'}</td>
                         <td className="small">{f.grades || '—'}</td>
                         <td className="small">{f.groupes || '—'}</td>
                         <td>{f.nb_formations ?? 0}</td>
