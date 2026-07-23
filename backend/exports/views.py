@@ -653,7 +653,7 @@ def _finance_synthese_export_context(request):
 
 def _finance_synthese_table_headers(afficher_montants, include_sensitive=False):
     headers = [
-        'N° Badge', 'Nom', 'Prénom', 'Spécialité', 'Grade(s)', 'Groupe(s)', 'Séances',
+        'N° Badge', 'Nom', 'Prénom', 'Modules dispensés', 'Grade(s)', 'Groupe(s)', 'Séances',
         'Planifié (min)', 'Réalisé (min)', 'Heures réal.', 'Taux %',
     ]
     if afficher_montants:
@@ -669,7 +669,7 @@ def _finance_synthese_table_row(row, afficher_montants, include_sensitive=False)
         row.get('numerobadge') or '-',
         row.get('nom') or '',
         row.get('prenom') or '',
-        row.get('specialite') or '-',
+        row.get('modules_dispenses') or '-',
         row.get('grades') or '-',
         row.get('groupes') or '-',
         row.get('sessions_count') or 0,
@@ -3067,7 +3067,7 @@ def export_finance_synthese_excel(request):
     total_row = start_row + len(rows) + 1
     total_values = _finance_synthese_table_row(
         {
-            'numerobadge': 'TOTAL', 'nom': '', 'prenom': '', 'specialite': '',
+            'numerobadge': 'TOTAL', 'nom': '', 'prenom': '', 'modules_dispenses': '',
             'grades': '', 'groupes': '',
             'sessions_count': totals['sessions_count'],
             'total_duree_minutes': totals['total_planned'],
@@ -3087,7 +3087,7 @@ def export_finance_synthese_excel(request):
         if col >= 7:
             cell.alignment = Alignment(horizontal='center')
 
-    col_widths = [12, 14, 14, 18, 10, 14, 8, 12, 12, 12, 8]
+    col_widths = [12, 14, 14, 32, 10, 14, 8, 12, 12, 12, 8]
     if afficher_montants:
         col_widths.append(14)
     if include_sensitive:

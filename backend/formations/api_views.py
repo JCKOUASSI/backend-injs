@@ -1722,6 +1722,25 @@ def _finance_recap_modules_for_period(modules_list, *, date_debut=None, date_fin
     return _finance_recap_par_module(modules)
 
 
+def _finance_modules_dispenses_label(modules_list, *, date_debut=None, date_fin=None):
+    """Libellé synthèse : intitulés des modules dispensés sur la période."""
+    modules = _finance_recap_modules_for_period(
+        modules_list, date_debut=date_debut, date_fin=date_fin,
+    )
+    labels = []
+    seen = set()
+    for module in modules:
+        label = str(module.get('module_intitule') or '').strip()
+        if not label:
+            continue
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        labels.append(label)
+    return ', '.join(labels) if labels else '-'
+
+
 def _finance_group_sessions_by_groupe(sessions):
     """Groupe les séances par grade/groupe avec sous-totaux."""
     groups = {}
@@ -2143,6 +2162,9 @@ def _finance_report_rows(
             'numero_compte_bancaire': formateur.numero_compte_bancaire or '',
             'observations': formateur.observations or '',
             'nb_formations': len(modules_list),
+            'modules_dispenses': _finance_modules_dispenses_label(
+                modules_list, date_debut=date_debut, date_fin=date_fin,
+            ),
             'created_at': formateur.created_at,
             'prix_heure_realisee': row_prix_heure,
             'tarifs_variables': tarifs_variables,

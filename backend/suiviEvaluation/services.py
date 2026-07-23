@@ -39,28 +39,55 @@ def _get_parametres(formation):
     }
 
 
-def _heures_prevues_module(module, participant=None):
+def _heures_prevues_module(module, participant=None, cache=None):
     """Volume horaire contractuel du module (référentiel / fiche, pas l'EDT)."""
     from formations.duree_prevue_resolve import resolve_module_volume_contractuel_heures
 
+    categorie_code = None
+    if participant is not None:
+        categorie_code = (getattr(participant, 'categorie', None) or '').strip() or None
+    cache_key = (module.id, categorie_code)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     heures, _ = resolve_module_volume_contractuel_heures(module, participant=participant)
+    if cache is not None:
+        cache[cache_key] = heures
     return heures
 
 
-def calculer_presence_module(module, participant):
+def _presence_minutes_map(formation):
+    """Une seule requête : total minutes de présence par (module_id, participant_id)."""
+    rows = Pointage.objects.filter(
+        session__module__formation=formation,
+        duree_presence_minutes__isnull=False,
+    ).values('session__module_id', 'participant_id').annotate(
+        total=Sum('duree_presence_minutes'),
+    )
+    return {
+        (row['session__module_id'], row['participant_id']): row['total']
+        for row in rows
+    }
+
+
+def calculer_presence_module(module, participant, cache=None, presence_map=None):
     """
     Retourne (heures_presence, heures_prevues, taux_presence).
     Le temps effectué est plafonné au temps prévu du module.
     """
-    heures_prevues = _heures_prevues_module(module, participant)
+    heures_prevues = _heures_prevues_module(module, participant, cache=cache)
     cap_minutes = heures_prevues * 60 if heures_prevues > 0 else 0.0
 
-    agg = Pointage.objects.filter(
-        session__module=module,
-        participant=participant,
-        duree_presence_minutes__isnull=False,
-    ).aggregate(total=Sum('duree_presence_minutes'))
-    minutes_presence = float(agg['total'] or 0)
+    if presence_map is not None:
+        minutes_presence = float(presence_map.get((module.id, participant.id), 0) or 0)
+    else:
+        agg = Pointage.objects.filter(
+            session__module=module,
+            participant=participant,
+            duree_presence_minutes__isnull=False,
+        ).aggregate(total=Sum('duree_presence_minutes'))
+        minutes_presence = float(agg['total'] or 0)
+
     if cap_minutes > 0:
         minutes_presence = min(minutes_presence, cap_minutes)
 
@@ -99,10 +126,12 @@ def est_admissible(moyenne, taux_presence, params=None):
     return float(moyenne) >= seuil_note and float(taux_presence) >= seuil_taux
 
 
-def calculer_moyenne_module(module, participant, *, save=True):
+def calculer_moyenne_module(module, participant, *, save=True, cache=None, presence_map=None):
     """Calcule et enregistre la moyenne + assiduité horaire sur un module."""
     moyenne, nb_notes = calculer_moyenne_notes_module(module, participant)
-    hp, hprev, taux = calculer_presence_module(module, participant)
+    hp, hprev, taux = calculer_presence_module(
+        module, participant, cache=cache, presence_map=presence_map,
+    )
 
     defaults = {
         'moyenne': moyenne,
@@ -187,7 +216,24 @@ def _mention_pour_moyenne(moyenne, params):
     return DecisionPedagogique.Mention.PASSABLE
 
 
-def calculer_decision(participant, formation, generer_auto=True):
+def _moyenne_generale_depuis_moyennes(moyennes_par_module):
+    """Moyenne générale pondérée à partir de MoyenneModule déjà calculées (pas de re-fetch)."""
+    somme = Decimal('0')
+    total_poids = Decimal('0')
+    for module, mm in moyennes_par_module:
+        if mm.moyenne is None:
+            continue
+        poids = module.duree_prevue_heures or Decimal('1')
+        if poids <= 0:
+            poids = Decimal('1')
+        somme += Decimal(str(mm.moyenne)) * poids
+        total_poids += poids
+    if total_poids > 0:
+        return round(float(somme / total_poids), 2)
+    return None
+
+
+def calculer_decision(participant, formation, generer_auto=True, modules=None, ref_cache=None, presence_map=None):
     """
     Décision automatique :
     - ADMIS : moyenne ≥ 12/20 ET temps effectué ≥ 80 % du temps prévu
@@ -196,14 +242,26 @@ def calculer_decision(participant, formation, generer_auto=True):
     - EN_ATTENTE : données insuffisantes
     """
     params = _get_parametres(formation)
+    if modules is None:
+        modules = list(Module.objects.filter(formation=formation))
+    if ref_cache is None:
+        ref_cache = {}
 
-    for module in Module.objects.filter(formation=formation):
-        calculer_moyenne_module(module, participant)
+    moyennes_par_module = []
+    total_presence = 0.0
+    total_prevu = 0.0
+    for module in modules:
+        mm = calculer_moyenne_module(
+            module, participant, cache=ref_cache, presence_map=presence_map,
+        )
+        moyennes_par_module.append((module, mm))
+        total_presence += mm.heures_presence or 0.0
+        total_prevu += mm.heures_prevues or 0.0
 
-    moyenne = calculer_moyenne_generale(participant, formation)
-    heures_presence, heures_prevues, taux_presence = calculer_presence_formation(
-        participant, formation,
-    )
+    moyenne = _moyenne_generale_depuis_moyennes(moyennes_par_module)
+    heures_presence = round(total_presence, 2)
+    heures_prevues = round(total_prevu, 2)
+    taux_presence = round((heures_presence / heures_prevues) * 100, 2) if heures_prevues > 0 else None
 
     decision_obj, _ = DecisionPedagogique.objects.get_or_create(
         participant=participant,
@@ -240,12 +298,19 @@ def calculer_decision(participant, formation, generer_auto=True):
 
 def calculer_decisions_formation(formation):
     """Recalcule les décisions de tous les auditeurs inscrits à au moins un module."""
+    modules = list(Module.objects.filter(formation=formation))
     participant_ids = ModuleParticipant.objects.filter(
         module__formation=formation,
     ).values_list('participant_id', flat=True).distinct()
+    participants = Participant.objects.filter(pk__in=participant_ids)
+    ref_cache = {}
+    presence_map = _presence_minutes_map(formation)
     return [
-        calculer_decision(Participant.objects.get(pk=pid), formation)
-        for pid in participant_ids
+        calculer_decision(
+            participant, formation,
+            modules=modules, ref_cache=ref_cache, presence_map=presence_map,
+        )
+        for participant in participants
     ]
 
 
