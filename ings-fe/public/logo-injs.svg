@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 90" fill="none" role="img" aria-label="INJS Abidjan">
+  <!-- Cadre en U (tige du i + queue du s) -->
+  <path d="M28 18 L28 52 Q28 68 52 68 L168 68 Q192 68 192 52 L192 18" stroke="#3349A1" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <!-- Point du i -->
+  <rect x="22" y="8" width="12" height="12" rx="2" fill="#3349A1"/>
+  <!-- Lettres injs -->
+  <text x="38" y="52" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700" fill="#3349A1">injs</text>
+  <!-- ABIDJAN -->
+  <text x="110" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" letter-spacing="3" fill="#283D85">ABIDJAN</text>
+</svg>

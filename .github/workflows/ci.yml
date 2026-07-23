@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: injs_lmd
+          POSTGRES_USER: injs
+          POSTGRES_PASSWORD: injs
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      - name: Run migrations
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: injs_lmd
+          POSTGRES_USER: injs
+          POSTGRES_PASSWORD: injs
+          DJANGO_SECRET_KEY: ci-test-key
+        run: |
+          cd backend
+          python manage.py migrate --noinput
+      - name: Seed & check
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: injs_lmd
+          POSTGRES_USER: injs
+          POSTGRES_PASSWORD: injs
+          DJANGO_SECRET_KEY: ci-test-key
+        run: |
+          cd backend
+          python manage.py seed_injs_demo
+          python manage.py check
+      - name: Run tests
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: injs_lmd
+          POSTGRES_USER: injs
+          POSTGRES_PASSWORD: injs
+          DJANGO_SECRET_KEY: ci-test-key
+        run: |
+          cd backend
+          python manage.py test_injs
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
