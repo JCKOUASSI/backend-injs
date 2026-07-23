@@ -12,7 +12,7 @@ from statistiques.effectifs import aggregation_seances_modules, participant_ids_
 
 from .models import Pointage, Rattrapage
 from .bulk_force_auditeurs import run_rattrapage_badgeage
-from .rattrapage_service import annuler_rattrapage, generer_presence_rattrapage, lier_rattrapage_au_badge
+from .rattrapage_service import annuler_rattrapage, generer_presence_rattrapage, infer_module_origine, lier_rattrapage_au_badge
 from .views import _resolve_personne
 
 
@@ -243,6 +243,8 @@ class RattrapageApiTest(TestCase):
         cree = res.data['created'][0]
         self.assertEqual(cree['statut'], 'PLANIFIE')
         self.assertIsNone(cree['pointage_id'])
+        self.assertEqual(cree['module_origine']['id'], self.mod_a.id)
+        self.assertEqual(cree['seance_manquee']['id'], self.seance_a.id)
         self.assertFalse(
             Pointage.objects.filter(session=self.seance_b, participant=self.p).exists(),
         )
@@ -297,6 +299,67 @@ class RattrapageApiTest(TestCase):
             'seance_rattrapage_id': self.seance_b.id,
         }, format='json')
         self.assertEqual(res.status_code, 409)
+
+    def test_create_bloque_deja_inscrit(self):
+        ModuleParticipant.objects.create(module=self.mod_b, participant=self.p)
+        res = self.client.post('/api/rattrapages/', {
+            'participant_id': self.p.id,
+            'seance_rattrapage_id': self.seance_b.id,
+        }, format='json')
+        self.assertEqual(res.status_code, 400, res.data)
+        self.assertIn('seance_ids', res.data)
+
+    def test_create_infer_module_origine_par_cohorte(self):
+        """Deux inscriptions « Droit » : l'origine est celle qui matche grade/groupe auditeur."""
+        mod_alt = Module.objects.create(
+            formation=self.formation,
+            intitule='Droit',
+            grade='A3',
+            groupe='GROUPE 1',
+            statut=Module.Statut.EN_COURS,
+        )
+        ModuleParticipant.objects.create(module=mod_alt, participant=self.p)
+
+        res = self.client.post('/api/rattrapages/', {
+            'participant_id': self.p.id,
+            'seance_rattrapage_id': self.seance_b.id,
+        }, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(res.data['created'][0]['module_origine']['id'], self.mod_a.id)
+        self.assertNotEqual(res.data['created'][0]['module_origine']['id'], mod_alt.id)
+
+    def test_infer_module_origine_desambiguise_grade_groupe(self):
+        mod_alt = Module.objects.create(
+            formation=self.formation,
+            intitule='Droit',
+            grade='A3',
+            groupe='GROUPE 1',
+            statut=Module.Statut.EN_COURS,
+        )
+        ModuleParticipant.objects.create(module=mod_alt, participant=self.p)
+        picked = infer_module_origine(self.p, self.seance_b)
+        self.assertIsNotNone(picked)
+        self.assertEqual(picked.id, self.mod_a.id)
+
+    def test_create_reouvre_annule(self):
+        r = Rattrapage.objects.create(
+            participant=self.p,
+            seance_rattrapage=self.seance_b,
+            statut=Rattrapage.Statut.ANNULE,
+        )
+        res = self.client.post('/api/rattrapages/', {
+            'participant_id': self.p.id,
+            'seance_rattrapage_id': self.seance_b.id,
+            'motif': 'Nouvelle planification',
+        }, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(res.data['count'], 1)
+        self.assertEqual(res.data['reactivated'], [self.seance_b.id])
+        r.refresh_from_db()
+        self.assertEqual(r.statut, Rattrapage.Statut.PLANIFIE)
+        self.assertEqual(r.motif, 'Nouvelle planification')
+        self.assertEqual(r.module_origine_id, self.mod_a.id)
+        self.assertEqual(Rattrapage.objects.filter(participant=self.p, seance_rattrapage=self.seance_b).count(), 1)
 
     def test_annuler(self):
         r = Rattrapage.objects.create(participant=self.p, seance_rattrapage=self.seance_b)

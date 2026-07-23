@@ -10,6 +10,8 @@ l'infrastructure de badgeage forcé existante.
 """
 from django.db import transaction
 
+from formations.models import Module, ModuleParticipant, SessionModule
+
 from .bulk_force_auditeurs import (
     force_entree_personne,
     force_presence_auditeur,
@@ -21,6 +23,141 @@ from .models import AuditLog, Pointage, Rattrapage, _log_audit
 
 class RattrapageError(Exception):
     """Erreur métier lors de la génération d'une présence de rattrapage."""
+
+
+def _label_variants(value):
+    """Variantes normalisées (minuscules) pour rapprocher grade/groupe."""
+    if value is None:
+        return set()
+    raw = str(value).strip()
+    if not raw:
+        return set()
+    variants = {raw.lower()}
+    upper = raw.upper()
+    if upper.startswith('GROUPE '):
+        num = upper[7:].strip()
+        if num:
+            variants.add(num.lower())
+            variants.add(f'groupe {num.lower()}')
+    elif upper.isdigit():
+        variants.add(f'groupe {upper.lower()}')
+    return variants
+
+
+def module_matches_participant_cohorte(module, participant):
+    """True si grade/groupe du module correspondent à la cohorte de l'auditeur."""
+    module_grade = (getattr(module, 'grade', None) or '').strip()
+    module_groupe = (getattr(module, 'groupe', None) or '').strip()
+    participant_grade = (getattr(participant, 'grade', None) or '').strip()
+    participant_groupe = (getattr(participant, 'groupe', None) or '').strip()
+
+    if module_grade:
+        if not participant_grade or module_grade.lower() != participant_grade.lower():
+            return False
+    if module_groupe:
+        if not participant_groupe:
+            return False
+        if not (_label_variants(module_groupe) & _label_variants(participant_groupe)):
+            return False
+    return True
+
+
+def pick_origine_module(candidates, participant):
+    """Choisit un module d'origine parmi les candidats (désambiguïsation cohorte)."""
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    filtered = [m for m in candidates if module_matches_participant_cohorte(m, participant)]
+    if len(filtered) == 1:
+        return filtered[0]
+    return None
+
+
+def participant_deja_inscrit_module(participant, module):
+    """True si l'auditeur est déjà inscrit au module (rattrapage inutile)."""
+    if participant is None or module is None:
+        return False
+    return ModuleParticipant.objects.filter(participant=participant, module=module).exists()
+
+
+def infer_module_origine(participant, seance_accueil, *, module_origine=None):
+    """Déduit le module d'origine (cours manqué) depuis les inscriptions."""
+    if module_origine is not None:
+        return module_origine
+    if participant is None or seance_accueil is None or not seance_accueil.module_id:
+        return None
+    accueil = seance_accueil.module
+    intitule = (accueil.intitule or '').strip()
+    if not intitule:
+        return None
+    candidates = list(
+        Module.objects.filter(
+            module_participants__participant=participant,
+            formation_id=accueil.formation_id,
+            intitule__iexact=intitule,
+        ).exclude(pk=accueil.pk)
+    )
+    return pick_origine_module(candidates, participant)
+
+
+def _session_sans_presence(participant, session):
+    return not Pointage.objects.filter(
+        session=session,
+        participant=participant,
+        duree_presence_minutes__isnull=False,
+    ).exists()
+
+
+def infer_seance_manquee(participant, module_origine, seance_accueil, *, seance_manquee=None):
+    """Déduit la séance manquée sur le module d'origine."""
+    if seance_manquee is not None:
+        return seance_manquee
+    if participant is None or module_origine is None or seance_accueil is None:
+        return None
+
+    base_qs = SessionModule.objects.filter(module=module_origine).order_by('date_journee', 'numero')
+
+    if seance_accueil.numero is not None:
+        same_numero = base_qs.filter(numero=seance_accueil.numero).first()
+        if same_numero and _session_sans_presence(participant, same_numero):
+            return same_numero
+
+    if seance_accueil.date_journee:
+        before_accueil = base_qs.filter(date_journee__lte=seance_accueil.date_journee)
+    else:
+        before_accueil = base_qs
+
+    for session in before_accueil:
+        if _session_sans_presence(participant, session):
+            return session
+    return None
+
+
+def reactiver_rattrapage_annule(
+    rattrapage,
+    *,
+    motif='',
+    module_origine=None,
+    seance_manquee=None,
+    cree_par=None,
+):
+    """Réouvre un rattrapage annulé (statut PLANIFIE, pointage effacé)."""
+    rattrapage.statut = Rattrapage.Statut.PLANIFIE
+    if motif:
+        rattrapage.motif = motif
+    if module_origine is not None:
+        rattrapage.module_origine = module_origine
+    if seance_manquee is not None:
+        rattrapage.seance_manquee = seance_manquee
+    if cree_par is not None:
+        rattrapage.cree_par = cree_par
+    rattrapage.pointage = None
+    update_fields = ['statut', 'motif', 'module_origine', 'seance_manquee', 'pointage', 'updated_at']
+    if cree_par is not None:
+        update_fields.append('cree_par')
+    rattrapage.save(update_fields=update_fields)
+    return rattrapage
 
 
 def _audit_rattrapage(action, rattrapage, request=None, extra=None):
