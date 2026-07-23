@@ -207,12 +207,13 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
           ) : mode === 'module' ? results.map((m) => {
             const seances = (m.seances || []).map((s) => ({ ...s, module: { id: m.id, intitule: m.intitule, cohorte: m.cohorte, formation: m.formation }, deja_inscrit: m.deja_inscrit }))
             const nbAdded = seances.filter((s) => selectedIds.has(s.id)).length
+            const allBlocked = m.deja_inscrit
             return (
               <button
                 key={m.id}
                 type="button"
-                disabled={seances.length === 0}
-                onClick={() => onAddMany(seances)}
+                disabled={seances.length === 0 || allBlocked}
+                onClick={() => { if (!allBlocked) onAddMany(seances) }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', textAlign: 'left',
                   border: 'none', background: 'transparent', padding: '0.5rem 0.8rem',
@@ -229,15 +230,23 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
             )
           }) : results.map((s) => {
             const isSel = selectedIds.has(s.id)
+            const blocked = s.deja_inscrit
             return (
               <button
                 key={s.id}
                 type="button"
-                onClick={() => { isSel ? onRemove(s.id) : onAdd(s) }}
+                disabled={blocked && !isSel}
+                onClick={() => {
+                  if (blocked && !isSel) return
+                  isSel ? onRemove(s.id) : onAdd(s)
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', textAlign: 'left',
-                  border: 'none', background: isSel ? '#f0fdf4' : 'transparent', padding: '0.5rem 0.8rem',
-                  cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                  border: 'none', background: isSel ? '#f0fdf4' : (blocked ? '#fef2f2' : 'transparent'),
+                  padding: '0.5rem 0.8rem',
+                  cursor: blocked && !isSel ? 'not-allowed' : 'pointer',
+                  opacity: blocked && !isSel ? 0.65 : 1,
+                  borderBottom: '1px solid #f1f5f9',
                 }}
               >
                 <i className={`bi ${isSel ? 'bi-check-square-fill text-success' : 'bi-square'}`}></i>
@@ -312,8 +321,18 @@ export default function Rattrapages() {
   }
 
   const addSeances = (list) => setForm((f) => {
+    const incoming = Array.isArray(list) ? list : [list]
+    const blocked = incoming.filter((s) => s.deja_inscrit)
+    if (blocked.length > 0) {
+      showToast(
+        "Séance ignorée : l'auditeur est déjà inscrit à ce module d'accueil.",
+        'error',
+      )
+    }
+    const allowed = incoming.filter((s) => !s.deja_inscrit)
+    if (allowed.length === 0) return f
     const existing = new Set(f.seances.map((s) => s.id))
-    const toAdd = (Array.isArray(list) ? list : [list]).filter((s) => !existing.has(s.id))
+    const toAdd = allowed.filter((s) => !existing.has(s.id))
     return { ...f, seances: [...f.seances, ...toAdd] }
   })
 
@@ -330,6 +349,10 @@ export default function Rattrapages() {
       setFormError('Sélectionnez un auditeur et au moins une séance de rattrapage.')
       return
     }
+    if (form.seances.some((s) => s.deja_inscrit)) {
+      setFormError("Retirez les séances où l'auditeur est déjà inscrit au module d'accueil.")
+      return
+    }
     setSaving(true)
     try {
       const res = await api.post('/rattrapages/', {
@@ -341,8 +364,11 @@ export default function Rattrapages() {
       setShowModal(false)
       const created = res.data?.count ?? 1
       const skipped = res.data?.skipped?.length || 0
+      const reactivated = res.data?.reactivated?.length || 0
       showToast(
-        `${created} rattrapage(s) créé(s)${skipped ? ` — ${skipped} ignoré(s) (déjà existant)` : ''}`,
+        `${created} rattrapage(s) créé(s)${
+          reactivated ? ` (${reactivated} réactivé(s))` : ''
+        }${skipped ? ` — ${skipped} ignoré(s) (déjà existant)` : ''}`,
       )
       load()
     } catch (err) {
