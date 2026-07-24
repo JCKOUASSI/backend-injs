@@ -18,6 +18,10 @@ from .rattrapage_service import (
     RattrapageError,
     annuler_rattrapage,
     generer_presence_rattrapage,
+    infer_module_origine,
+    infer_seance_manquee,
+    participant_deja_inscrit_module,
+    reactiver_rattrapage_annule,
 )
 
 
@@ -148,39 +152,113 @@ def rattrapage_list_create(request):
     module_origine = None
     if data.get('module_origine_id'):
         module_origine = Module.objects.filter(pk=data['module_origine_id']).first()
+        if module_origine is None:
+            return Response(
+                {'detail': "Module d'origine introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not ModuleParticipant.objects.filter(
+            participant=participant, module=module_origine,
+        ).exists():
+            return Response(
+                {'detail': "L'auditeur n'est pas inscrit au module d'origine indiqué."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
     seance_manquee = None
     if data.get('seance_manquee_id'):
         seance_manquee = SessionModule.objects.filter(pk=data['seance_manquee_id']).first()
+        if seance_manquee is None:
+            return Response(
+                {'detail': 'Séance manquée introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
     motif = (data.get('motif') or '').strip()
     generer = str(data.get('generer_presence', '')).lower() in ('1', 'true', 'yes', 'on')
 
+    deja_inscrit_ids = [
+        s.id for s in seances
+        if participant_deja_inscrit_module(participant, s.module)
+    ]
+    if deja_inscrit_ids:
+        return Response(
+            {
+                'detail': (
+                    "L'auditeur est déjà inscrit au module d'accueil — "
+                    "le rattrapage inter-cohorte n'est pas nécessaire."
+                ),
+                'seance_ids': deja_inscrit_ids,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     from .models import AuditLog, _log_audit
 
-    created, skipped, errors = [], [], []
+    created, skipped, reactivated, errors = [], [], [], []
     for seance in seances:
-        if Rattrapage.objects.filter(participant=participant, seance_rattrapage=seance).exists():
-            skipped.append(seance.id)
-            continue
+        if module_origine and seance.module_id == module_origine.id:
+            return Response(
+                {'detail': "Le module d'origine ne peut pas être le module d'accueil."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        rattrapage = Rattrapage.objects.create(
+        origine = infer_module_origine(participant, seance, module_origine=module_origine)
+        manquee = infer_seance_manquee(
+            participant,
+            origine,
+            seance,
+            seance_manquee=seance_manquee if len(seances) == 1 else None,
+        )
+
+        existing = Rattrapage.objects.filter(
             participant=participant,
             seance_rattrapage=seance,
-            module_origine=module_origine,
-            seance_manquee=seance_manquee if len(seances) == 1 else None,
-            motif=motif,
-            cree_par=request.user,
-        )
-        module = rattrapage.module_rattrapage
-        _log_audit(
-            action=AuditLog.Action.RATTRAPAGE_CREATE,
-            request=request,
-            cible_type='participant',
-            cible_numero=participant.matricule or str(participant.pk),
-            cible_nom=f"{participant.nom} {participant.prenom}".strip(),
-            formation=module.formation if module else None,
-            extra={'rattrapage_id': rattrapage.pk, 'via_api': True},
-        )
+        ).first()
+        if existing:
+            if existing.statut == Rattrapage.Statut.ANNULE:
+                rattrapage = reactiver_rattrapage_annule(
+                    existing,
+                    motif=motif,
+                    module_origine=origine,
+                    seance_manquee=manquee,
+                    cree_par=request.user,
+                )
+                reactivated.append(seance.id)
+                _log_audit(
+                    action=AuditLog.Action.RATTRAPAGE_CREATE,
+                    request=request,
+                    cible_type='participant',
+                    cible_numero=participant.matricule or str(participant.pk),
+                    cible_nom=f"{participant.nom} {participant.prenom}".strip(),
+                    formation=seance.module.formation if seance.module_id else None,
+                    extra={
+                        'rattrapage_id': rattrapage.pk,
+                        'via_api': True,
+                        'reactivated': True,
+                    },
+                )
+            else:
+                skipped.append(seance.id)
+                continue
+        else:
+            rattrapage = Rattrapage.objects.create(
+                participant=participant,
+                seance_rattrapage=seance,
+                module_origine=origine,
+                seance_manquee=manquee,
+                motif=motif,
+                cree_par=request.user,
+            )
+            module = rattrapage.module_rattrapage
+            _log_audit(
+                action=AuditLog.Action.RATTRAPAGE_CREATE,
+                request=request,
+                cible_type='participant',
+                cible_numero=participant.matricule or str(participant.pk),
+                cible_nom=f"{participant.nom} {participant.prenom}".strip(),
+                formation=module.formation if module else None,
+                extra={'rattrapage_id': rattrapage.pk, 'via_api': True},
+            )
 
         if generer:
             try:
@@ -199,7 +277,13 @@ def rattrapage_list_create(request):
         )
 
     return Response(
-        {'created': created, 'skipped': skipped, 'errors': errors, 'count': len(created)},
+        {
+            'created': created,
+            'skipped': skipped,
+            'reactivated': reactivated,
+            'errors': errors,
+            'count': len(created),
+        },
         status=status.HTTP_201_CREATED,
     )
 

@@ -6,7 +6,7 @@ Moteur de calcul — évaluation académique :
 """
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from formations.models import Module, Participant, Formation, ModuleParticipant
@@ -56,18 +56,151 @@ def _heures_prevues_module(module, participant=None, cache=None):
     return heures
 
 
+def _module_origine_id_for_rattrapage(rattrapage):
+    """Module d'origine explicite (cours manqué) d'un rattrapage."""
+    if rattrapage.module_origine_id:
+        return rattrapage.module_origine_id
+    if rattrapage.seance_manquee_id and rattrapage.seance_manquee.module_id:
+        return rattrapage.seance_manquee.module_id
+    return None
+
+
+def _infer_module_origine_id(rattrapage, enrolled_module_ids, intitule_by_module, modules_by_id=None):
+    """Repli : module d'origine de même intitulé, désambiguïsé par grade/groupe auditeur."""
+    from presences.rattrapage_service import pick_origine_module
+
+    accueil = rattrapage.seance_rattrapage.module if rattrapage.seance_rattrapage_id else None
+    participant = rattrapage.participant
+    if accueil is None or participant is None:
+        return None
+    target_intitule = (accueil.intitule or '').strip().lower()
+    if not target_intitule:
+        return None
+    candidate_ids = [
+        mid for mid in enrolled_module_ids
+        if mid != accueil.id and intitule_by_module.get(mid) == target_intitule
+    ]
+    if not candidate_ids:
+        return None
+    if modules_by_id is not None:
+        candidates = [modules_by_id[mid] for mid in candidate_ids if mid in modules_by_id]
+        picked = pick_origine_module(candidates, participant)
+        return picked.id if picked else None
+    return candidate_ids[0] if len(candidate_ids) == 1 else None
+
+
+def _rattrapage_minutes_map(formation):
+    """Minutes de rattrapage EFFECTUE créditées sur le module d'origine."""
+    from collections import defaultdict
+
+    from presences.models import Rattrapage
+
+    enrolled_by_participant = defaultdict(set)
+    for pid, mid in ModuleParticipant.objects.filter(
+        module__formation=formation,
+    ).values_list('participant_id', 'module_id'):
+        enrolled_by_participant[pid].add(mid)
+
+    intitule_by_module = {
+        mid: (intitule or '').strip().lower()
+        for mid, intitule in Module.objects.filter(formation=formation).values_list('id', 'intitule')
+    }
+    modules_by_id = {
+        m.id: m for m in Module.objects.filter(formation=formation).only('id', 'intitule', 'grade', 'groupe')
+    }
+
+    result = defaultdict(float)
+    qs = (
+        Rattrapage.objects.filter(
+            statut=Rattrapage.Statut.EFFECTUE,
+            pointage__duree_presence_minutes__isnull=False,
+        )
+        .filter(
+            Q(module_origine__formation=formation)
+            | Q(seance_manquee__module__formation=formation)
+            | Q(seance_rattrapage__module__formation=formation),
+        )
+        .select_related(
+            'pointage',
+            'module_origine',
+            'seance_manquee',
+            'seance_manquee__module',
+            'seance_rattrapage',
+            'seance_rattrapage__module',
+        )
+    )
+    for rattrapage in qs:
+        minutes = float(rattrapage.pointage.duree_presence_minutes or 0)
+        if minutes <= 0:
+            continue
+        origin_id = _module_origine_id_for_rattrapage(rattrapage)
+        if origin_id is None:
+            origin_id = _infer_module_origine_id(
+                rattrapage,
+                enrolled_by_participant.get(rattrapage.participant_id, set()),
+                intitule_by_module,
+                modules_by_id=modules_by_id,
+            )
+        if origin_id is None:
+            continue
+        result[(origin_id, rattrapage.participant_id)] += minutes
+    return dict(result)
+
+
+def _rattrapage_minutes_module_participant(module, participant):
+    """Minutes de rattrapage créditées sur un module d'origine (requête unitaire)."""
+    from presences.models import Rattrapage
+
+    total = 0.0
+    qs = (
+        Rattrapage.objects.filter(
+            participant=participant,
+            statut=Rattrapage.Statut.EFFECTUE,
+            pointage__duree_presence_minutes__isnull=False,
+        )
+        .filter(Q(module_origine=module) | Q(seance_manquee__module=module))
+        .select_related('pointage')
+    )
+    for rattrapage in qs:
+        total += float(rattrapage.pointage.duree_presence_minutes or 0)
+
+    if total <= 0 and ModuleParticipant.objects.filter(module=module, participant=participant).exists():
+        from presences.rattrapage_service import infer_module_origine
+
+        inferred = (
+            Rattrapage.objects.filter(
+                participant=participant,
+                statut=Rattrapage.Statut.EFFECTUE,
+                pointage__duree_presence_minutes__isnull=False,
+                module_origine__isnull=True,
+                seance_manquee__isnull=True,
+            )
+            .exclude(seance_rattrapage__module=module)
+            .select_related('pointage', 'seance_rattrapage', 'seance_rattrapage__module')
+        )
+        for rattrapage in inferred:
+            origin = infer_module_origine(participant, rattrapage.seance_rattrapage)
+            if origin is None or origin.id != module.id:
+                continue
+            total += float(rattrapage.pointage.duree_presence_minutes or 0)
+    return total
+
+
 def _presence_minutes_map(formation):
-    """Une seule requête : total minutes de présence par (module_id, participant_id)."""
+    """Total minutes de présence par (module_id, participant_id), rattrapages inclus."""
     rows = Pointage.objects.filter(
         session__module__formation=formation,
         duree_presence_minutes__isnull=False,
     ).values('session__module_id', 'participant_id').annotate(
         total=Sum('duree_presence_minutes'),
     )
-    return {
-        (row['session__module_id'], row['participant_id']): row['total']
+    result = {
+        (row['session__module_id'], row['participant_id']): float(row['total'] or 0)
         for row in rows
     }
+    for key, minutes in _rattrapage_minutes_map(formation).items():
+        result[key] = result.get(key, 0.0) + minutes
+    return result
 
 
 def calculer_presence_module(module, participant, cache=None, presence_map=None):
@@ -87,6 +220,7 @@ def calculer_presence_module(module, participant, cache=None, presence_map=None)
             duree_presence_minutes__isnull=False,
         ).aggregate(total=Sum('duree_presence_minutes'))
         minutes_presence = float(agg['total'] or 0)
+        minutes_presence += _rattrapage_minutes_module_participant(module, participant)
 
     if cap_minutes > 0:
         minutes_presence = min(minutes_presence, cap_minutes)
