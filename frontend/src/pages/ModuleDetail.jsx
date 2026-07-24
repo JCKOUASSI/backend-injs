@@ -15,6 +15,7 @@ import { usePickerPagination } from '../hooks/usePickerPagination'
 import Pagination from '../components/Pagination'
 import { canMutateFormations, canArchiveModuleFromUser, canSuperviseSessions, hasAppRole, NOTE_GESTION_ROLES } from '../utils/roles'
 import { formatApiErrors } from '../utils/apiErrors'
+import FormateurAssignPickerItem from '../components/formateurs/FormateurAssignPickerItem'
 import { useReferentiels } from '../hooks/useReferentiels'
 import { useVisibilityPolling } from '../hooks/useVisibilityPolling'
 import { useDebounce } from '../hooks/useDebounce'
@@ -66,6 +67,7 @@ export default function ModuleDetail() {
   const [showAddFormateur, setShowAddFormateur] = useState(false)
   const [allFormateurs, setAllFormateurs] = useState([])
   const [formateurSearch, setFormateurSearch] = useState('')
+  const [formateurAssignError, setFormateurAssignError] = useState('')
   const [formateurLoading, setFormateurLoading] = useState(false)
 
   const participantsList = module?.participants ?? []
@@ -284,6 +286,7 @@ export default function ModuleDetail() {
 
   const openAddFormateur = () => {
     setFormateurSearch('')
+    setFormateurAssignError('')
     loadAvailableFormateurs()
     setShowAddFormateur(true)
   }
@@ -299,13 +302,16 @@ export default function ModuleDetail() {
   }, [formateurSearch, showAddFormateur, formateurPicker.page])
 
   const handleAddFormateur = async (fid) => {
+    setFormateurAssignError('')
     try {
       await api.post(`/formations/${formationId}/modules/${moduleId}/formateurs/add/`, { formateur_id: fid })
       loadModule()
       loadAvailableFormateurs(formateurSearch)
       showToast('Formateur assigné')
     } catch (err) {
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible d\'assigner ce formateur.' }), 'error')
+      const message = formatApiErrors(err.response?.data, { fallback: 'Impossible d\'assigner ce formateur.' })
+      setFormateurAssignError(message)
+      showToast('Assignation refusée — voir le détail dans la fenêtre.', 'error')
     }
   }
 
@@ -1570,50 +1576,38 @@ export default function ModuleDetail() {
       {/* ── MODAL: ASSIGNER FORMATEUR ── */}
       {showAddFormateur && (
         <div className="modal-overlay" onClick={() => setShowAddFormateur(false)}>
-          <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-person-video3 me-2"></i>Assigner un formateur</h5>
               <button className="btn-close" onClick={() => setShowAddFormateur(false)}>&times;</button>
             </div>
             <div className="modal-body">
+              {formateurAssignError && (
+                <div className="alert alert-danger py-2 small" role="alert">
+                  <div className="d-flex align-items-start gap-2">
+                    <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1" aria-hidden="true"></i>
+                    <span style={{ lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{formateurAssignError}</span>
+                  </div>
+                </div>
+              )}
               <div className="input-group mb-3">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
                 <input type="text" className="form-control" placeholder="Rechercher par nom, prénom…"
-                  value={formateurSearch} onChange={e => setFormateurSearch(e.target.value)} autoFocus />
+                  value={formateurSearch} onChange={e => { setFormateurSearch(e.target.value); setFormateurAssignError('') }} autoFocus />
               </div>
               {formateurLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!formateurLoading && allFormateurs.length === 0 && (
                 <p className="text-muted text-center py-2">Aucun formateur trouvé</p>
               )}
               {!formateurLoading && allFormateurs.length > 0 && (
-                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                  <table className="table table-sm">
-                    <thead><tr><th>Nom</th><th>Prénom</th><th>Spécialité</th><th></th></tr></thead>
-                    <tbody>
-                      {allFormateurs.map(f => (
-                        <tr key={f.id} className={f.conflit_assignation ? 'table-secondary' : undefined}>
-                          <td>{f.nom}</td>
-                          <td>{f.prenom}</td>
-                          <td>{f.specialite || '—'}</td>
-                          <td>
-                            {f.conflit_assignation ? (
-                              <span
-                                className="badge text-bg-warning"
-                                title={f.conflit_assignation}
-                                style={{ cursor: 'help' }}
-                              >
-                                <i className="bi bi-calendar-x me-1"></i>Occupé
-                              </span>
-                            ) : (
-                              <button onClick={() => handleAddFormateur(f.id)} className="btn btn-outline-success btn-sm">
-                                <i className="bi bi-plus"></i>
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                  {allFormateurs.map(f => (
+                    <FormateurAssignPickerItem
+                      key={f.id}
+                      formateur={f}
+                      onAssign={handleAddFormateur}
+                    />
+                  ))}
                 </div>
               )}
               <Pagination
