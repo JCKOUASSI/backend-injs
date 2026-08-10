@@ -15,7 +15,7 @@ const STEPS = [
   },
   {
     message: 'Dernière confirmation',
-    detail: 'Seul le rôle Archiviste pourra consulter ces données. Cette action ne peut pas être annulée depuis l\'interface.',
+    detail: 'Seul le rôle Archiviste pourra consulter ces données. Le désarchivage reste possible depuis l\'espace Archives (secrétariat / direction).',
     confirmLabel: 'Archiver définitivement',
     variant: 'danger',
   },

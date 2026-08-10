@@ -65,6 +65,17 @@ function emptyDraftRow(colonnes) {
   return { notes, observations: '' }
 }
 
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export default function NotesModule() {
   const { formationId, moduleId } = useParams()
   const { showToast } = useToast()
@@ -81,6 +92,7 @@ export default function NotesModule() {
   const [showAddColonne, setShowAddColonne] = useState(false)
   const [newColonneLibelle, setNewColonneLibelle] = useState('')
   const [addingColonne, setAddingColonne] = useState(false)
+  const [printing, setPrinting] = useState(null)
   const inputRefs = useRef({})
 
   const colonnesById = Object.fromEntries(colonnes.map(c => [c.id, c]))
@@ -255,6 +267,30 @@ export default function NotesModule() {
     }
   }
 
+  const handlePrintFiche = async (participant = null) => {
+    if (dirty && !window.confirm(
+      'Des notes ne sont pas encore enregistrées : la fiche imprimée ne les contiendra pas. Continuer ?'
+    )) return
+
+    const key = participant ? `p-${participant.participant_id}` : 'module'
+    const path = participant
+      ? `/formations/${formationId}/modules/${moduleId}/notes/fiche/${participant.participant_id}/pdf/`
+      : `/formations/${formationId}/modules/${moduleId}/notes/fiche/pdf/`
+    const fallback = participant
+      ? `fiche_notes_${participant.nom}_${participant.prenom}.pdf`.replace(/\s+/g, '_')
+      : `fiche_notes_module_${moduleId}.pdf`
+
+    setPrinting(key)
+    try {
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || fallback)
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur lors de la génération de la fiche', 'error')
+    } finally {
+      setPrinting(null)
+    }
+  }
+
   const filtered = rows.filter(n =>
     !search ||
     n.nom.toLowerCase().includes(search.toLowerCase()) ||
@@ -333,6 +369,17 @@ export default function NotesModule() {
             onClick={() => setShowAddColonne(v => !v)}
           >
             <i className="bi bi-plus-lg me-1"></i>Ajouter une colonne
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => handlePrintFiche()}
+            disabled={printing !== null || rows.length === 0}
+            title="Imprimer la fiche de notes du cours (tous les auditeurs)"
+          >
+            {printing === 'module'
+              ? <><span className="spinner-border spinner-border-sm me-1"></span>Génération…</>
+              : <><i className="bi bi-printer me-1"></i>Imprimer la fiche</>}
           </button>
           <Link to={`/formations/${module?.formation ?? formationId}/modules/${moduleId}`} className="btn btn-sm btn-outline-secondary">
             <i className="bi bi-arrow-left me-1"></i>Retour au module
@@ -434,6 +481,7 @@ export default function NotesModule() {
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Admis</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700 }}>Observations</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.78rem' }}>Saisi par</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Fiche</th>
               </tr>
             </thead>
             <tbody>
@@ -546,6 +594,20 @@ export default function NotesModule() {
                           {new Date(n.updated_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                         </div>
                       )}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ padding: '2px 8px' }}
+                        onClick={() => handlePrintFiche(n)}
+                        disabled={printing !== null}
+                        title={`Imprimer la fiche de notes de ${n.nom} ${n.prenom}`}
+                      >
+                        {printing === `p-${n.participant_id}`
+                          ? <span className="spinner-border spinner-border-sm"></span>
+                          : <i className="bi bi-printer"></i>}
+                      </button>
                     </td>
                   </tr>
                 )

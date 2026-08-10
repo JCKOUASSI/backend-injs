@@ -265,6 +265,37 @@ class ModuleAPITest(TestCase):
         res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/archive/')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_unarchive_module(self):
+        self.m.archived = True
+        self.m.save(update_fields=['archived'])
+        res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/unarchive/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.m.refresh_from_db()
+        self.assertFalse(self.m.archived)
+        self.assertIsNone(self.m.archived_at)
+        self.assertIsNone(self.m.archived_by)
+
+    def test_unarchived_module_visible_in_operational_list(self):
+        self.m.archived = True
+        self.m.save(update_fields=['archived'])
+        self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/unarchive/')
+        res = self.client.get('/api/formations/list/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        module_ids = [row['module_id'] for row in res.data['results']]
+        self.assertIn(self.m.pk, module_ids)
+
+    def test_unarchive_not_archived_returns_400(self):
+        res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/unarchive/')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unarchive_forbidden_for_encadrant(self):
+        self.m.archived = True
+        self.m.save(update_fields=['archived'])
+        enc = make_user('enc_unarchive', role='ENCADRANT')
+        self.client.force_authenticate(enc)
+        res = self.client.post(f'/api/formations/{self.f.pk}/modules/{self.m.pk}/unarchive/')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_module_not_found(self):
         res = self.client.get(f'/api/formations/{self.f.pk}/modules/99999/full/')
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

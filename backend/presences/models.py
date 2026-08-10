@@ -140,6 +140,7 @@ class AuditLog(models.Model):
         MODULE_UPDATE = 'MODULE_UPDATE', 'Modification de module'
         MODULE_DELETE = 'MODULE_DELETE', 'Suppression de module'
         MODULE_ARCHIVE = 'MODULE_ARCHIVE', 'Archivage de module'
+        MODULE_UNARCHIVE = 'MODULE_UNARCHIVE', 'Désarchivage de module'
         FORMATION_QR_GENERATE = 'FORMATION_QR_GENERATE', 'Génération QR code'
         # ── Séances ──
         SEANCE_CREATE = 'SEANCE_CREATE', 'Création de séance'

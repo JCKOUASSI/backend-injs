@@ -27,6 +27,17 @@ function MentionBadge({ mention }) {
   )
 }
 
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 /** Vue lecture seule d'une liste de notes (modèle « LISTE DE NOTE » des archives). */
 function ListeNoteDocument({ module, onBack }) {
   const { showToast } = useToast()
@@ -37,6 +48,7 @@ function ListeNoteDocument({ module, onBack }) {
   const [criteres, setCriteres] = useState({ seuil_admission: 12, taux_presence_min: 80 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [printing, setPrinting] = useState(null)
 
   const fetchData = useCallback(async (signal) => {
     setLoading(true)
@@ -59,6 +71,26 @@ function ListeNoteDocument({ module, onBack }) {
     fetchData(ac.signal)
     return () => ac.abort()
   }, [fetchData])
+
+  const handlePrintFiche = async (participant = null) => {
+    const key = participant ? `p-${participant.participant_id}` : 'module'
+    const path = participant
+      ? `/formations/${formationId}/modules/${moduleId}/notes/fiche/${participant.participant_id}/pdf/`
+      : `/formations/${formationId}/modules/${moduleId}/notes/fiche/pdf/`
+    const fallback = participant
+      ? `fiche_notes_${participant.nom}_${participant.prenom}.pdf`.replace(/\s+/g, '_')
+      : `fiche_notes_module_${moduleId}.pdf`
+
+    setPrinting(key)
+    try {
+      const { blob, fileName } = await api.getBlob(path)
+      downloadBlob(blob, fileName || fallback)
+    } catch (err) {
+      showToast(err?.response?.data?.detail || 'Erreur lors de la génération de la fiche', 'error')
+    } finally {
+      setPrinting(null)
+    }
+  }
 
   const filtered = rows.filter(n =>
     !search ||
@@ -89,8 +121,15 @@ function ListeNoteDocument({ module, onBack }) {
             Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et cours effectué ≥ <strong>{criteres.taux_presence_min}%</strong>
           </p>
         </div>
-        <button className="btn btn-outline-secondary btn-sm" onClick={() => window.print()}>
-          <i className="bi bi-printer me-1"></i>Imprimer
+        <button
+          className="btn btn-outline-secondary btn-sm"
+          onClick={() => handlePrintFiche()}
+          disabled={printing !== null || rows.length === 0}
+          title="Imprimer la fiche de notes du cours (tous les auditeurs)"
+        >
+          {printing === 'module'
+            ? <><span className="spinner-border spinner-border-sm me-1"></span>Génération…</>
+            : <><i className="bi bi-printer me-1"></i>Imprimer la fiche</>}
         </button>
       </div>
 
@@ -129,6 +168,7 @@ function ListeNoteDocument({ module, onBack }) {
                 <th style={thStyle('center')}>Mention</th>
                 <th style={thStyle('center')}>Cours effectué</th>
                 <th style={thStyle('center')}>Admis</th>
+                <th style={thStyle('center')}>Fiche</th>
               </tr>
             </thead>
             <tbody>
@@ -166,6 +206,20 @@ function ListeNoteDocument({ module, onBack }) {
                           ? <span style={{ color: '#2e7d32', fontWeight: 700 }}><i className="bi bi-check-circle-fill"></i> Oui</span>
                           : <span style={{ color: '#b71c1c', fontWeight: 600 }}><i className="bi bi-x-circle"></i> Non</span>
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ padding: '2px 8px' }}
+                        onClick={() => handlePrintFiche(n)}
+                        disabled={printing !== null}
+                        title={`Imprimer la fiche de notes de ${n.nom} ${n.prenom}`}
+                      >
+                        {printing === `p-${n.participant_id}`
+                          ? <span className="spinner-border spinner-border-sm"></span>
+                          : <i className="bi bi-printer"></i>}
+                      </button>
                     </td>
                   </tr>
                 )

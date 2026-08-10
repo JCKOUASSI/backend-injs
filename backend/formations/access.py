@@ -38,6 +38,11 @@ def can_archive_module(user):
     return user_in_roles(user, MODULE_ARCHIVE_ROLES)
 
 
+def can_unarchive_module(user):
+    """Indique si l'utilisateur peut désarchiver un module (mêmes rôles que l'archivage)."""
+    return can_archive_module(user)
+
+
 def module_operational_accessible(user, module):
     """Module consultable dans les écrans opérationnels (non archivé)."""
     if module is None:
