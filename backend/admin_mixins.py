@@ -1,5 +1,6 @@
 """Mixins partagés pour l'admin Django SYGEP-CPFAE."""
 
+from django.contrib import admin
 from django.db.models import Q
 
 from authentication.role_groups import get_user_roles, user_in_roles, users_with_roles
@@ -25,6 +26,39 @@ class AdminSidebarHiddenMixin:
 
     def has_module_permission(self, request):
         return False
+
+
+class RelatedFieldPrefetchListFilter(admin.RelatedFieldListFilter):
+    """Filtre de clé étrangère qui charge les libellés des options en une requête.
+
+    `RelatedFieldListFilter` appelle `str()` sur chaque option du menu déroulant.
+    Quand le `__str__` du modèle cible traverse une relation, cela déclenche une
+    requête par option. Les sous-classes déclarent les relations à précharger.
+    """
+
+    related_select_related = ()
+
+    def field_choices(self, field, request, model_admin):
+        choice_attr = (
+            field.remote_field.get_related_field().attname
+            if hasattr(field.remote_field, 'get_related_field')
+            else 'pk'
+        )
+        queryset = field.remote_field.model._default_manager.complex_filter(
+            field.get_limit_choices_to()
+        )
+        if self.related_select_related:
+            queryset = queryset.select_related(*self.related_select_related)
+        ordering = self.field_admin_ordering(field, request, model_admin)
+        if ordering:
+            queryset = queryset.order_by(*ordering)
+        return [(getattr(obj, choice_attr), str(obj)) for obj in queryset]
+
+
+class ModuleRelatedFilter(RelatedFieldPrefetchListFilter):
+    """Pour les filtres pointant vers Module, dont le `__str__` lit la formation."""
+
+    related_select_related = ('formation',)
 
 
 class AdminScopeMixin:

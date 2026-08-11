@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Prefetch
 from django.db import IntegrityError, transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
@@ -17,6 +17,7 @@ from admin_mixins import (
     AdminSidebarHiddenMixin,
     AuditLogAdminMixin,
     FormateurAdminScopeMixin,
+    ModuleRelatedFilter,
     ParticipantAdminScopeMixin,
     admin_user_has_global_access,
     log_admin_audit,
@@ -27,6 +28,7 @@ from .models import (
     RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, SessionModule,
     FinanceSettings,
 )
+from .serializer_querysets import annotate_secretariat_counts
 from presences.models import AuditLog
 from presences.admin_rattrapage_badgeage import AdminRattrapageBadgeageMixin
 FormationFormateur = ModuleFormateur
@@ -74,24 +76,25 @@ class SecretariatAdmin(AdminScopeMixin, admin.ModelAdmin):
     admin_scope_secretariat_field = 'pk'
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.annotate(
-            _nb_participants=Count('participants', distinct=True),
-            _nb_modules=Count('modules_secretariat', distinct=True),
-            _nb_formations=Count('modules_secretariat__formation', distinct=True),
-        )
+        return annotate_secretariat_counts(super().get_queryset(request))
 
     @admin.display(description='Participants', ordering='_nb_participants')
     def nb_participants(self, obj):
-        return getattr(obj, '_nb_participants', obj.participants.count())
+        if hasattr(obj, '_nb_participants'):
+            return obj._nb_participants
+        return obj.participants.count()
 
     @admin.display(description='Modules', ordering='_nb_modules')
     def nb_modules(self, obj):
-        return getattr(obj, '_nb_modules', obj.modules_secretariat.count())
+        if hasattr(obj, '_nb_modules'):
+            return obj._nb_modules
+        return obj.modules_secretariat.count()
 
     @admin.display(description='Formations', ordering='_nb_formations')
     def nb_formations(self, obj):
-        return getattr(obj, '_nb_formations', obj.modules_secretariat.values('formation_id').distinct().count())
+        if hasattr(obj, '_nb_formations'):
+            return obj._nb_formations
+        return obj.modules_secretariat.values('formation_id').distinct().count()
     list_display = [
         'numero', 'nom', 'type', 'responsable',
         'nb_participants', 'nb_modules', 'nb_formations',
@@ -185,7 +188,9 @@ class FormationAdmin(FormationAdminScopeMixin, AuditLogAdminMixin, admin.ModelAd
 
     @admin.display(description='Nombre de modules', ordering='_nb_modules')
     def nb_modules_display(self, obj):
-        return getattr(obj, '_nb_modules', obj.modules.count())
+        if hasattr(obj, '_nb_modules'):
+            return obj._nb_modules
+        return obj.modules.count()
 
 
 class ParticipantAdminForm(forms.ModelForm):
@@ -313,7 +318,7 @@ class ModuleParticipantAdmin(
     ]
     list_filter = [
         'module__formation', 'module__grade', 'module__groupe', 'module__vague',
-        'module',
+        ('module', ModuleRelatedFilter),
     ]
     search_fields = [
         'module__intitule', 'module__formation__formation',
@@ -487,7 +492,7 @@ class ModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
 
     @admin.display(description='Séances', ordering='_nb_sessions')
     def sessions_button(self, obj):
-        count = getattr(obj, '_nb_sessions', obj.sessions.count())
+        count = obj._nb_sessions if hasattr(obj, '_nb_sessions') else obj.sessions.count()
         url = reverse('admin:formations_module_sessions', args=[obj.pk])
         label = f'Voir {count} séance(s)'
         return format_html('<a class="button" href="{}">{}</a>', url, label)
@@ -537,15 +542,17 @@ class ModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
 
     @admin.display(description='Réactiver séance')
     def reactiver_derniere_seance_button(self, obj):
-        if not getattr(obj, '_has_terminated_sessions', False):
-            if not obj.pk:
-                return '-'
+        if hasattr(obj, '_has_terminated_sessions'):
+            has_terminated = obj._has_terminated_sessions
+        elif not obj.pk:
+            return '-'
+        else:
             has_terminated = obj.sessions.filter(
                 demarree_le__isnull=False,
                 terminee_le__isnull=False,
             ).exists()
-            if not has_terminated:
-                return '-'
+        if not has_terminated:
+            return '-'
         url = reverse('admin:formations_module_reactiver_derniere_seance', args=[obj.pk])
         return format_html('<a class="button" href="{}">Réactiver dernière séance</a>', url)
 
@@ -592,7 +599,7 @@ class SessionModuleAdmin(AdminScopeMixin, AuditLogAdminMixin, admin.ModelAdmin):
         'module__grade',
         'module__groupe',
         'module__vague',
-        'module',
+        ('module', ModuleRelatedFilter),
     ]
     search_fields = [
         'intitule',
@@ -813,7 +820,7 @@ class ModuleFormateurAdmin(AdminSidebarHiddenMixin, AdminScopeMixin, admin.Model
     ]
     list_filter = [
         'module__formation', 'module__grade', 'module__groupe',
-        'module__vague', 'module',
+        'module__vague', ('module', ModuleRelatedFilter),
     ]
     search_fields = [
         'module__intitule', 'module__formation__formation',
@@ -952,14 +959,23 @@ class RefModuleAdmin(admin.ModelAdmin):
     ordering = ['intitule']
     inlines = [RefModuleVolumeHoraireInline]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            'formations',
+            Prefetch(
+                'volumes_horaires',
+                queryset=RefModuleVolumeHoraire.objects.select_related('formation', 'categorie'),
+            ),
+        )
+
     @admin.display(description='Formations')
     def formations_display(self, obj):
-        labels = list(obj.formations.values_list('intitule', flat=True).order_by('intitule'))
+        labels = sorted(formation.intitule for formation in obj.formations.all())
         return ', '.join(labels) if labels else '—'
 
     @admin.display(description='Volumes (formation × cat.)')
     def volumes_par_categorie_display(self, obj):
-        volumes = obj.volumes_horaires.select_related('formation', 'categorie').all()
+        volumes = list(obj.volumes_horaires.all())
         if not volumes:
             return '—'
         return ', '.join([

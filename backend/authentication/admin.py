@@ -68,6 +68,10 @@ class UserAdmin(
         'email', 'role_badge', 'grade', 'secretariat',
         'is_active', 'must_change_password',
     ]
+
+    def get_queryset(self, request):
+        # role_badge lit les groupes de chaque ligne : sans préchargement, une requête par ligne.
+        return super().get_queryset(request).prefetch_related('groups')
     list_filter = [
         'groups', 'is_active', 'must_change_password',
         'secretariat', 'is_staff', 'is_superuser',

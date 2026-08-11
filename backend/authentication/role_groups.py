@@ -335,9 +335,13 @@ ROLE_POLICY = {
 
 
 def _cached_user_groups(user):
-    """Noms de groupes Django de l'utilisateur (cache requête)."""
+    """Noms de groupes Django de l'utilisateur (cache requête).
+
+    Parcourt `groups.all()` afin de réutiliser un éventuel `prefetch_related`
+    du queryset appelant ; sinon le cache d'instance limite à une requête.
+    """
     if not hasattr(user, '_role_groups_cache'):
-        user._role_groups_cache = set(user.groups.values_list('name', flat=True))
+        user._role_groups_cache = {group.name for group in user.groups.all()}
     return user._role_groups_cache
 
 
