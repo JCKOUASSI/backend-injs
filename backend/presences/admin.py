@@ -8,6 +8,7 @@ from django.utils.html import format_html
 
 from admin_mixins import (
     AdminScopeMixin,
+    ModuleRelatedFilter,
     admin_user_has_global_access,
     log_admin_audit,
     pointage_remettre_en_cours_guard,
@@ -60,7 +61,7 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
         'session__module__grade',
         'session__module__groupe',
         'session__module__vague',
-        'session__module',
+        ('session__module', ModuleRelatedFilter),
     ]
     search_fields = [
         'participant__matricule', 'participant__nom', 'participant__prenom',

@@ -2,9 +2,10 @@ from django.urls import path
 from . import views
 from . import api_views
 from . import archives_api
+from . import notes_fiche_api
 from . import session_views
 from .api_views import (
-    module_list_api, module_detail_api, module_full_detail_api, module_archive_api, module_presences_api,
+    module_list_api, module_detail_api, module_full_detail_api, module_archive_api, module_unarchive_api, module_presences_api,
     module_add_participant, module_remove_participant,
     module_add_formateur, module_remove_formateur,
     module_assign_superviseur,
@@ -111,6 +112,7 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/', module_detail_api, name='api-module-detail'),
     path('<int:formation_pk>/modules/<int:module_pk>/full/', module_full_detail_api, name='api-module-full-detail'),
     path('<int:formation_pk>/modules/<int:module_pk>/archive/', module_archive_api, name='api-module-archive'),
+    path('<int:formation_pk>/modules/<int:module_pk>/unarchive/', module_unarchive_api, name='api-module-unarchive'),
     path('<int:formation_pk>/modules/<int:module_pk>/archives/cahier/', archives_api.archives_cahier_appel_api, name='api-archives-cahier'),
     path('<int:formation_pk>/modules/<int:module_pk>/presences/', module_presences_api, name='api-module-presences'),
     path('<int:formation_pk>/modules/<int:module_pk>/participants/add/', module_add_participant, name='api-module-add-participant'),
@@ -122,6 +124,8 @@ urlpatterns = [
     path('<int:formation_pk>/modules/<int:module_pk>/notes/bulk/', module_notes_bulk_api, name='api-module-notes-bulk'),
     path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/', module_notes_colonnes_api, name='api-module-notes-colonnes'),
     path('<int:formation_pk>/modules/<int:module_pk>/notes/colonnes/<int:colonne_pk>/', module_notes_colonne_delete_api, name='api-module-notes-colonne-delete'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/fiche/pdf/', notes_fiche_api.module_notes_fiche_pdf_api, name='api-module-notes-fiche-pdf'),
+    path('<int:formation_pk>/modules/<int:module_pk>/notes/fiche/<int:participant_pk>/pdf/', notes_fiche_api.module_notes_fiche_auditeur_pdf_api, name='api-module-notes-fiche-auditeur-pdf'),
     path('notes/notifications/', note_modifications_notifications_api, name='api-note-modifications-notifications'),
 
     # Session management (via module)

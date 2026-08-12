@@ -1,7 +1,10 @@
 """Querysets annotés pour éviter les N+1 dans les serializers."""
-from django.db.models import Count, Prefetch, Q
+from django.db.models import (
+    Count, IntegerField, OuterRef, Prefetch, Q, Subquery, Value,
+)
+from django.db.models.functions import Coalesce
 
-from .models import Module, Secretariat, SessionModule
+from .models import Module, Participant, Secretariat, SessionModule
 
 
 def annotate_sessions_for_serializer(qs):
@@ -34,11 +37,33 @@ def annotate_modules_for_serializer(qs):
     )
 
 
+def annotate_secretariat_counts(qs):
+    """Ajoute les compteurs d'un secrétariat via des sous-requêtes indépendantes.
+
+    Trois Count sur des relations différentes dans une même requête feraient d'abord
+    le produit participants × modules avant de dédupliquer, ce qui pousse Postgres à
+    trier sur disque.
+    """
+    def compteur(sous_requete):
+        return Coalesce(Subquery(sous_requete, output_field=IntegerField()), Value(0))
+
+    participants = (
+        Participant.objects.filter(secretariat=OuterRef('pk')).order_by().values('secretariat')
+    )
+    modules = (
+        Module.objects.filter(secretariat=OuterRef('pk')).order_by().values('secretariat')
+    )
+
+    return qs.annotate(
+        _nb_participants=compteur(participants.annotate(c=Count('id')).values('c')),
+        _nb_modules=compteur(modules.annotate(c=Count('id')).values('c')),
+        _nb_formations=compteur(
+            modules.annotate(c=Count('formation_id', distinct=True)).values('c')
+        ),
+    )
+
+
 def secretariat_queryset_for_serializer():
-    return Secretariat.objects.select_related(
-        'responsable', 'type',
-    ).annotate(
-        _nb_participants=Count('participants', distinct=True),
-        _nb_modules=Count('modules_secretariat', distinct=True),
-        _nb_formations=Count('modules_secretariat__formation', distinct=True),
+    return annotate_secretariat_counts(
+        Secretariat.objects.select_related('responsable', 'type')
     ).prefetch_related('membres').order_by('nom')

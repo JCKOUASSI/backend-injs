@@ -4,6 +4,10 @@ import { useReferentiels } from '../../hooks/useReferentiels'
 import { useDebounce } from '../../hooks/useDebounce'
 import { formatDate } from '../../utils/dates'
 import { parsePaginatedResponse } from '../../utils/paginatedResponse'
+import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../context/ToastContext'
+import { canArchiveModuleFromUser } from '../../utils/roles'
+import ConfirmModal from '../ConfirmModal'
 import Pagination from '../Pagination'
 
 const STATUT_LABELS = {
@@ -34,6 +38,9 @@ export default function ArchiveModuleBrowser({
   renderDocument,
 }) {
   const { data: refs } = useReferentiels()
+  const { user } = useAuth()
+  const { showToast } = useToast()
+  const canUnarchive = canArchiveModuleFromUser(user)
   const [filters, setFilters] = useState({
     search: '', formation_id: '', annee: '', secretariat_type: '', grade: '', groupe: '', vague: '', statut: '',
   })
@@ -47,6 +54,7 @@ export default function ArchiveModuleBrowser({
   const [total, setTotal] = useState(0)
 
   const [selected, setSelected] = useState(null)
+  const [unarchiveTarget, setUnarchiveTarget] = useState(null)
 
   const loadModules = useCallback(async (signal) => {
     setLoading(true)
@@ -74,6 +82,19 @@ export default function ArchiveModuleBrowser({
       setLoading(false)
     }
   }, [page, debouncedSearch, filters.formation_id, filters.annee, filters.secretariat_type, filters.grade, filters.groupe, filters.vague, filters.statut])
+
+  const confirmUnarchive = async () => {
+    const m = unarchiveTarget
+    if (!m) return
+    setUnarchiveTarget(null)
+    try {
+      await api.post(`/formations/${m.id}/modules/${m.module_id}/unarchive/`)
+      showToast('Module désarchivé — de nouveau visible dans les listes opérationnelles')
+      loadModules()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Erreur lors du désarchivage', 'error')
+    }
+  }
 
   useEffect(() => {
     const ac = new AbortController()
@@ -247,6 +268,15 @@ export default function ArchiveModuleBrowser({
                   >
                     <i className="bi bi-eye me-1"></i>{documentVerb}
                   </button>
+                  {canUnarchive && (
+                    <button
+                      className="btn btn-sm btn-outline-secondary w-100"
+                      style={{ marginTop: '0.35rem', fontWeight: 600 }}
+                      onClick={(e) => { e.stopPropagation(); setUnarchiveTarget(m) }}
+                    >
+                      <i className="bi bi-box-arrow-up me-1"></i>Désarchiver
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -257,6 +287,17 @@ export default function ArchiveModuleBrowser({
             </div>
           )}
         </>
+      )}
+
+      {unarchiveTarget && (
+        <ConfirmModal
+          message={`Désarchiver le module « ${unarchiveTarget.module} » ?`}
+          detail="Le module réapparaîtra dans les listes opérationnelles (Cours, secrétariat, encadrants, statistiques)."
+          confirmLabel="Désarchiver"
+          variant="primary"
+          onConfirm={confirmUnarchive}
+          onCancel={() => setUnarchiveTarget(null)}
+        />
       )}
     </div>
   )

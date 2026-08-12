@@ -34,6 +34,7 @@ FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import (
     can_archive_module,
+    can_unarchive_module,
     formateurs_queryset_for_user,
     formation_accessible,
     module_operational_accessible,
@@ -51,6 +52,8 @@ from .api_access import (
     CanListParticipants,
     IsOperationalWebStaff,
     archived_module_or_response,
+    module_for_notes_or_response,
+    module_unarchive_or_response,
     deny_finance_operational_response,
     formation_or_response,
     module_or_response,
@@ -3711,6 +3714,43 @@ def module_archive_api(request, formation_pk, module_pk):
     })
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOperationalWebStaff])
+def module_unarchive_api(request, formation_pk, module_pk):
+    """Désarchive un module : réintégré dans les listes opérationnelles."""
+    if not can_unarchive_module(request.user):
+        return Response({'detail': 'Action non autorisée.'}, status=403)
+
+    formation, module, err = module_unarchive_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    if request.user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if not request.user.secretariat or module.secretariat_id != request.user.secretariat_id:
+            return Response({'detail': 'Module hors de votre secrétariat.'}, status=403)
+
+    module.archived = False
+    module.archived_at = None
+    module.archived_by = None
+    module.save(update_fields=['archived', 'archived_at', 'archived_by'])
+
+    _log_audit(
+        action=AuditLog.Action.MODULE_UNARCHIVE,
+        request=request,
+        formation=formation,
+        extra={
+            'module_id': module.pk,
+            'module_intitule': module.intitule,
+            'formation_id': formation.pk,
+        },
+    )
+
+    return Response({
+        'detail': 'Module désarchivé avec succès.',
+        'archived': False,
+    })
+
+
 def module_presences_cache_key(module_pk):
     return f"module_presences_v1_{module_pk}"
 
@@ -3958,13 +3998,14 @@ def module_full_detail_api(request, formation_pk, module_pk):
 def module_notes_list_api(request, formation_pk, module_pk):
     """Liste les auditeurs inscrits au module avec leurs notes par colonne.
 
-    Lecture seule autorisée pour les rôles de consultation (dont ARCHIVE).
+    Lecture seule autorisée pour les rôles de consultation (dont ARCHIVE), y
+    compris sur les modules archivés consultés depuis l'espace Archives.
     """
     denied = deny_finance_operational_response(request)
     if denied:
         return denied
 
-    _, module, err = _get_module_in_formation(request.user, formation_pk, module_pk)
+    _, module, err = module_for_notes_or_response(request.user, formation_pk, module_pk)
     if err:
         return err
 

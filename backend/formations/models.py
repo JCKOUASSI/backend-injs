@@ -196,7 +196,8 @@ class RefModule(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        labels = list(self.formations.values_list('intitule', flat=True).order_by('intitule'))
+        # Parcourt all() pour réutiliser un prefetch_related éventuel de l'appelant.
+        labels = sorted(formation.intitule for formation in self.formations.all())
         if labels:
             return f"{self.intitule} ({', '.join(labels)})"
         return self.intitule

@@ -43,6 +43,8 @@ __all__ = [
     'formation_or_response',
     'module_or_response',
     'archived_module_or_response',
+    'module_for_notes_or_response',
+    'module_unarchive_or_response',
     'deny_if_not_formation_accessible',
     'deny_finance_operational_response',
 ]
@@ -102,6 +104,24 @@ def module_or_response(user, formation_pk, module_pk):
     return formation, module, None
 
 
+def module_for_notes_or_response(user, formation_pk, module_pk):
+    """Module consultable en lecture pour les notes, archivé ou non.
+
+    Les listes de notes restent consultables après archivage (espace Archives),
+    contrairement aux écrans opérationnels servis par `module_or_response`.
+    """
+    formation = Formation.objects.filter(pk=formation_pk).first()
+    if not formation:
+        return None, None, Response({'detail': 'Formation introuvable.'}, status=404)
+    try:
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Module.DoesNotExist:
+        return formation, None, Response({'detail': 'Module introuvable.'}, status=404)
+    if not _module_in_user_scope(user, module):
+        return formation, None, Response({'detail': 'Module introuvable ou non autorisé.'}, status=404)
+    return formation, module, None
+
+
 def deny_if_not_formation_accessible(user, pk):
     """Alias court pour les vues qui n'ont besoin que du garde-fou."""
     return formation_or_response(user, pk)
@@ -128,6 +148,38 @@ def archived_module_or_response(user, formation_pk, module_pk):
     if 'ENCADRANT' in roles and module.superviseur_id == user.id:
         return formation, module, None
     return formation, None, Response({'detail': 'Module archivé introuvable ou non autorisé.'}, status=404)
+
+
+def _archived_module_accessible(user, module):
+    if not (user and user.is_authenticated):
+        return False
+    roles = get_user_roles(user)
+    if roles & GLOBAL_ACCESS_ROLES or user_has_perm(user, 'authentication.global_scope'):
+        return True
+    if roles & SECRETARIAT_ROLES and user.secretariat and module.secretariat_id == user.secretariat_id:
+        return True
+    if 'ENCADRANT' in roles and module.superviseur_id == user.id:
+        return True
+    return False
+
+
+def module_unarchive_or_response(user, formation_pk, module_pk):
+    """Retourne (formation, module_archivé, None) ou (None, None, Response erreur)."""
+    formation = Formation.objects.filter(pk=formation_pk).first()
+    if not formation:
+        return None, None, Response({'detail': 'Formation introuvable.'}, status=404)
+    try:
+        module = Module.objects.get(pk=module_pk, formation=formation)
+    except Module.DoesNotExist:
+        return formation, None, Response({'detail': 'Module introuvable.'}, status=404)
+
+    if not module.archived:
+        return formation, None, Response({'detail': 'Ce module n\'est pas archivé.'}, status=400)
+
+    if not _archived_module_accessible(user, module):
+        return formation, None, Response({'detail': 'Module archivé introuvable ou non autorisé.'}, status=404)
+
+    return formation, module, None
 
 
 def deny_finance_operational_response(request):
