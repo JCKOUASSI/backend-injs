@@ -9,7 +9,7 @@ class PublicBadgePageDisabledTest(TestCase):
     def test_badge_page_returns_disabled_message(self):
         res = self.client.get('/dashboard/badge/')
         self.assertEqual(res.status_code, 403)
-        self.assertContains(res, 'Badgeage web indisponible')
+        self.assertContains(res, 'Badgeage web indisponible', status_code=403)
 
     def test_login_page_hides_badge_link(self):
         res = self.client.get('/dashboard/login/')
