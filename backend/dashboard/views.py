@@ -9,6 +9,7 @@ remplacées par le frontend React. Elles sont archivées dans views_legacy.py.
 """
 from functools import wraps
 
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib import messages
 from django.shortcuts import render, redirect
@@ -69,6 +70,8 @@ def logout_view(request):
 
 def badge_view(request):
     """Page publique de badgeage — pas de login requis."""
+    if not settings.PUBLIC_QR_SCAN_ENABLED:
+        return render(request, 'dashboard/badge_disabled.html', status=403)
     return render(request, 'dashboard/badge.html')
 
 

@@ -79,7 +79,9 @@
         <div class="text-center mt-3">
             <small class="text-muted">MEMFPMA — CPFAE 2026</small>
             <br>
+            {% if PUBLIC_QR_SCAN_ENABLED %}
             <a href="{% url 'web-badge' %}" class="text-muted small"><i class="bi bi-qr-code-scan me-1"></i>Page de badgeage</a>
+            {% endif %}
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

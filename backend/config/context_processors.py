@@ -4,6 +4,7 @@ from django.conf import settings
 def public_urls(request):
     return {
         'PUBLIC_APP_URL': getattr(settings, 'PUBLIC_APP_URL', 'https://app.sygepcfae.org'),
+        'PUBLIC_QR_SCAN_ENABLED': getattr(settings, 'PUBLIC_QR_SCAN_ENABLED', False),
     }
 
 
