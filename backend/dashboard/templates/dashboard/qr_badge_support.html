@@ -39,7 +39,9 @@
         <h2>Documents</h2>
         <p class="mb-0">
             <a href="{% url 'qr-badge-privacy' %}" class="btn btn-outline-secondary btn-sm">Politique de confidentialité</a>
+            {% if PUBLIC_QR_SCAN_ENABLED %}
             <a href="{% url 'web-badge' %}" class="btn btn-outline-secondary btn-sm">Badgeage web</a>
+            {% endif %}
         </p>
 
         <hr class="my-4">

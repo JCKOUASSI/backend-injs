@@ -37,7 +37,9 @@
         <h2>Modifications</h2>
         <p>Cette page peut être mise à jour pour refléter l’évolution du service ou des exigences réglementaires. La date de dernière mise à jour peut être précisée par votre administration sur sa version officielle.</p>
 
+        {% if PUBLIC_QR_SCAN_ENABLED %}
         <p class="mt-4 mb-0"><a href="{% url 'web-badge' %}" class="btn btn-outline-secondary btn-sm">Retour au badgeage web</a></p>
+        {% endif %}
     </div>
 </body>
 </html>

@@ -1,7 +1,31 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from formations.models import Secretariat
 from formations.views import _resolve_secretariat_from_matricule
+
+
+@override_settings(PUBLIC_QR_SCAN_ENABLED=False)
+class PublicBadgePageDisabledTest(TestCase):
+    def test_badge_page_returns_disabled_message(self):
+        res = self.client.get('/dashboard/badge/')
+        self.assertEqual(res.status_code, 403)
+        self.assertContains(res, 'Badgeage web indisponible', status_code=403)
+
+    def test_login_page_hides_badge_link(self):
+        res = self.client.get('/dashboard/login/')
+        self.assertNotContains(res, 'Page de badgeage')
+
+
+@override_settings(PUBLIC_QR_SCAN_ENABLED=True)
+class PublicBadgePageEnabledTest(TestCase):
+    def test_badge_page_renders_form(self):
+        res = self.client.get('/dashboard/badge/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Badgeage')
+
+    def test_login_page_shows_badge_link(self):
+        res = self.client.get('/dashboard/login/')
+        self.assertContains(res, 'Page de badgeage')
 
 
 class DashboardParticipantDispatchByMatriculeTest(TestCase):
