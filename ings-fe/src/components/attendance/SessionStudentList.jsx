@@ -56,6 +56,9 @@ export default function SessionStudentList({
   onForceBadge,
   forcing = false,
   onRemove,
+  allowMark = false,
+  onMarkStudent,
+  markingId = null,
   onBackToQr,
   sessionLabel = '',
   exportFilename = 'liste_etudiants_seance',
@@ -307,6 +310,26 @@ export default function SessionStudentList({
               </div>
               <div className="ssl-row-actions">
                 <span className={`ssl-pill ${meta.pillClass}`}>{meta.label}</span>
+                {allowMark && onMarkStudent && (
+                  <div className="btn-group btn-group-sm">
+                    <button
+                      type="button"
+                      className="btn btn-outline-success"
+                      disabled={markingId === a.student_id || a.status === 'present'}
+                      onClick={() => onMarkStudent(a.student_id, 'present')}
+                    >
+                      Présent
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      disabled={markingId === a.student_id || a.status === 'absent'}
+                      onClick={() => onMarkStudent(a.student_id, 'absent')}
+                    >
+                      Absent
+                    </button>
+                  </div>
+                )}
                 {onRemove && (
                   <button
                     type="button"

@@ -119,8 +119,8 @@ export default function StudentBadge() {
   return (
     <>
       <PageHeader
-        title="Badgeage présence"
-        subtitle={`Scannez le QR projeté par le professeur / l'administration — ${user?.name || 'Étudiant'}`}
+        title="Présences"
+        subtitle={`Scannez le QR projeté en salle pour pointer — ${user?.name || 'Étudiant'}`}
       />
 
       <div className="row g-4">

@@ -109,6 +109,12 @@ class Room(TimeStampedModel):
 class CourseAssignment(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='assignments')
+    supervisor = models.ForeignKey(
+        Teacher, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='supervised_assignments',
+        verbose_name='Encadrant',
+        help_text='Encadrant pédagogique (TP, stages, séances pratiques).',
+    )
     course = models.ForeignKey('academics.Course', on_delete=models.CASCADE, related_name='assignments')
     academic_year = models.ForeignKey('academics.AcademicYear', on_delete=models.CASCADE)
     promotion = models.ForeignKey('academics.Promotion', on_delete=models.CASCADE, related_name='assignments')
@@ -120,10 +126,21 @@ class CourseAssignment(TimeStampedModel):
 
 class Schedule(TimeStampedModel):
     DAYS = [(i, d) for i, d in enumerate(['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'])]
+    SESSION_KINDS = [
+        ('cm', 'Cours magistral'),
+        ('td', 'Travaux dirigés'),
+        ('tp', 'Travaux pratiques'),
+    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     assignment = models.ForeignKey(CourseAssignment, on_delete=models.CASCADE, related_name='schedules')
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, related_name='schedules')
+    supervisor = models.ForeignKey(
+        Teacher, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='supervised_schedules',
+        verbose_name='Encadrant de séance',
+    )
+    session_kind = models.CharField(max_length=5, choices=SESSION_KINDS, default='cm', db_index=True)
     day_of_week = models.PositiveSmallIntegerField(choices=DAYS)
     start_time = models.TimeField()
     end_time = models.TimeField()
@@ -131,6 +148,10 @@ class Schedule(TimeStampedModel):
 
     class Meta:
         ordering = ['day_of_week', 'start_time']
+
+    def resolved_supervisor(self):
+        """Encadrant de la séance, sinon celui de l'affectation."""
+        return self.supervisor or getattr(self.assignment, 'supervisor', None)
 
 
 class Attendance(TimeStampedModel):
@@ -142,6 +163,7 @@ class Attendance(TimeStampedModel):
     date = models.DateField(db_index=True)
     status = models.CharField(max_length=10, choices=STATUSES, default='present')
     recorded_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+    notes = models.CharField(max_length=255, blank=True)
 
     class Meta:
         unique_together = [['student', 'schedule', 'date']]
@@ -161,6 +183,11 @@ class AttendanceSession(TimeStampedModel):
     teacher_checked_in_by = models.ForeignKey(
         Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_in_sessions',
     )
+    supervisor_checked_in = models.BooleanField(default=False)
+    supervisor_checked_in_at = models.DateTimeField(null=True, blank=True)
+    supervisor_checked_in_by = models.ForeignKey(
+        Teacher, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_in_supervised_sessions',
+    )
 
     class Meta:
         unique_together = [['schedule', 'session_date']]
@@ -168,6 +195,37 @@ class AttendanceSession(TimeStampedModel):
 
     def __str__(self):
         return f'{self.schedule} — {self.session_date}'
+
+
+class StaffAttendance(TimeStampedModel):
+    """Présence formateur / encadrant pour une séance planifiée."""
+
+    ROLES = [
+        ('formateur', 'Formateur'),
+        ('encadrant', 'Encadrant'),
+    ]
+    STATUSES = Attendance.STATUSES
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='staff_attendances')
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name='staff_attendances')
+    date = models.DateField(db_index=True)
+    role = models.CharField(max_length=15, choices=ROLES, db_index=True)
+    status = models.CharField(max_length=10, choices=STATUSES, default='present')
+    recorded_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='recorded_staff_attendances',
+    )
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        unique_together = [['teacher', 'schedule', 'date', 'role']]
+        ordering = ['-date', 'role']
+        verbose_name = 'Présence personnel pédagogique'
+        verbose_name_plural = 'Présences personnel pédagogique'
+
+    def __str__(self):
+        return f'{self.get_role_display()} {self.teacher} — {self.date}'
 
 
 class RoomReservation(TimeStampedModel):

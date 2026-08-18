@@ -76,10 +76,11 @@ export default function StudentSchedule() {
                     <td key={`${d.value}-${row.start}`} className="edt-cell">
                       {(cellMap[`${d.value}|${row.start}`] || []).map((s) => (
                         <div key={s.id} className="edt-block" style={{ cursor: 'default' }}>
-                          <div className="edt-block-code">{s.course_code}</div>
+                          <div className="edt-block-code">{s.course_code} {s.session_kind ? `· ${String(s.session_kind).toUpperCase()}` : ''}</div>
                           <div className="edt-block-title">{s.course_name}</div>
                           <div className="edt-block-meta">
                             {s.room_code || 'Salle ?'} · {s.teacher_name}
+                            {s.supervisor_name ? ` · Enc. ${s.supervisor_name}` : ''}
                           </div>
                         </div>
                       ))}

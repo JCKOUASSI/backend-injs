@@ -62,7 +62,7 @@ export default function ProfDashboard() {
               headers={['Jour', 'Début', 'Fin', 'Salle', 'Affectation']}
               rows={exportRows}
             />
-            <Link to="/professeur/presence" className="btn btn-injs-primary">Ouvrir présences QR</Link>
+            <Link to="/professeur/presences" className="btn btn-injs-primary">Ouvrir les présences</Link>
           </div>
         }
       />
@@ -72,7 +72,7 @@ export default function ProfDashboard() {
           { to: '/professeur/cours', icon: FiBookOpen, label: 'Mes cours' },
           { to: '/professeur/etudiants', icon: FiUsers, label: 'Étudiants' },
           { to: '/professeur/evaluations', icon: FiAward, label: 'Saisie notes' },
-          { to: '/professeur/presence', icon: FiCheckSquare, label: 'Présences' },
+          { to: '/professeur/presences', icon: FiCheckSquare, label: 'Présences' },
           { to: '/professeur/documents', icon: FiFileText, label: 'Supports' },
         ].map((a) => (
           <div key={a.to} className="col-6 col-md-4 col-xl">
@@ -90,8 +90,8 @@ export default function ProfDashboard() {
 
       <div className="card-injs p-4 mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="fw-bold mb-0">Badgeage — mes séances du jour</h5>
-          <Link to="/professeur/presence" className="btn btn-sm btn-injs-primary">Présenter QR</Link>
+          <h5 className="fw-bold mb-0">Présences — mes séances du jour</h5>
+          <Link to="/professeur/presences" className="btn btn-sm btn-injs-primary">Ouvrir les présences</Link>
         </div>
         {(badgeStats?.upcoming_sessions || []).length === 0 ? (
           <p className="text-muted small mb-0">Aucune séance ouverte aujourd&apos;hui.</p>

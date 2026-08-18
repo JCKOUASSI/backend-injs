@@ -1,6 +1,7 @@
 import base64
 import io
 import re
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -8,7 +9,7 @@ import qrcode
 from django.conf import settings
 from django.utils import timezone
 
-from apps.faculty.models import Attendance, AttendanceSession, Schedule
+from apps.faculty.models import Attendance, AttendanceSession, Schedule, StaffAttendance
 
 SESSION_PREFIX = 'INJS:SESSION:'
 SESSION_PATTERN = re.compile(
@@ -31,7 +32,7 @@ def build_session_payload(schedule_id, session_date: date) -> str:
 
 
 def extract_session_token(raw: str) -> str:
-    """Accepte payload brut ou URL deep-link …/etudiant/badgeage?token=…"""
+    """Accepte payload brut ou URL deep-link …/etudiant/presences?token=… (alias badgeage)."""
     value = (raw or '').strip()
     if not value:
         return value
@@ -68,7 +69,7 @@ def frontend_base_url(request=None) -> str:
 
 def build_badge_url(payload: str, request=None) -> str:
     base = frontend_base_url(request)
-    return f'{base}/etudiant/badgeage?token={quote(payload, safe="")}'
+    return f'{base}/etudiant/presences?token={quote(payload, safe="")}'
 
 
 def generate_session_qr_image(data: str) -> str:
@@ -142,13 +143,36 @@ def assert_is_admin(user) -> None:
     raise SessionQrError('Seule l\'administration peut gérer les séances de badgeage', 'admin_only')
 
 
+def schedule_supervisor(schedule: Schedule):
+    return schedule.resolved_supervisor()
+
+
+def is_session_formateur(teacher, schedule: Schedule) -> bool:
+    return bool(teacher) and schedule.assignment.teacher_id == teacher.id
+
+
+def is_session_encadrant(teacher, schedule: Schedule) -> bool:
+    supervisor = schedule_supervisor(schedule)
+    return bool(teacher and supervisor and supervisor.id == teacher.id)
+
+
 def assert_can_view_session(user, schedule: Schedule) -> None:
     if user.is_superuser or user.get_group_level() <= 2:
         return
     teacher = getattr(user, 'teacher_profile', None)
-    if teacher and schedule.assignment.teacher_id == teacher.id:
+    if teacher and (is_session_formateur(teacher, schedule) or is_session_encadrant(teacher, schedule)):
         return
     raise SessionQrError('Accès non autorisé à cette séance', 'forbidden')
+
+
+def assert_can_mark_attendance(user, schedule: Schedule) -> None:
+    """Admin, formateur ou encadrant de la séance."""
+    if user.is_superuser or user.get_group_level() <= 2:
+        return
+    teacher = getattr(user, 'teacher_profile', None)
+    if teacher and (is_session_formateur(teacher, schedule) or is_session_encadrant(teacher, schedule)):
+        return
+    raise SessionQrError('Vous ne pouvez pas saisir les présences de cette séance', 'forbidden')
 
 
 def ensure_sessions_for_date(session_date: date) -> list[AttendanceSession]:
@@ -182,6 +206,15 @@ def ensure_sessions_for_date(session_date: date) -> list[AttendanceSession]:
             from apps.faculty.services.campus_ops import seed_session_roster
             try:
                 seed_session_roster(session, default_status='absent')
+            except Exception:
+                pass
+            try:
+                seed_staff_roster(session)
+            except Exception:
+                pass
+        else:
+            try:
+                seed_staff_roster(session)
             except Exception:
                 pass
         if session.is_active:
@@ -224,6 +257,12 @@ def build_session_qr_data(schedule: Schedule, session_date: date, request=None) 
         'room_code': schedule.room.code if schedule.room_id else None,
         'promotion_name': schedule.assignment.promotion.name,
         'teacher_name': schedule.assignment.teacher.user.get_full_name(),
+        'supervisor_name': (
+            schedule_supervisor(schedule).user.get_full_name()
+            if schedule_supervisor(schedule) else None
+        ),
+        'session_kind': schedule.session_kind,
+        'session_kind_display': schedule.get_session_kind_display(),
         'grace_before_minutes': GRACE_BEFORE_MINUTES,
         'grace_after_minutes': GRACE_AFTER_MINUTES,
     }
@@ -343,11 +382,50 @@ def force_badge_students(session, student_ids, recorded_by=None, motif='', statu
     }
 
 
+def seed_staff_roster(session, recorded_by=None, default_status='absent'):
+    """Pré-enregistre formateur et encadrant (absent) pour la séance."""
+    if not session:
+        return {'created': 0}
+    schedule = session.schedule
+    created = 0
+    staff = [
+        ('formateur', schedule.assignment.teacher),
+        ('encadrant', schedule_supervisor(schedule)),
+    ]
+    for role, person in staff:
+        if not person:
+            continue
+        _, was_created = StaffAttendance.objects.get_or_create(
+            teacher=person,
+            schedule=schedule,
+            date=session.session_date,
+            role=role,
+            defaults={'status': default_status, 'recorded_by': recorded_by},
+        )
+        if was_created:
+            created += 1
+    return {'created': created, 'session_id': str(session.id)}
+
+
+def record_staff_attendance(*, teacher, schedule, session_date, role, recorded_by=None, status='present'):
+    attendance, created = StaffAttendance.objects.get_or_create(
+        teacher=teacher,
+        schedule=schedule,
+        date=session_date,
+        role=role,
+        defaults={'status': status, 'recorded_by': recorded_by},
+    )
+    if not created and attendance.status != status:
+        attendance.status = status
+        attendance.recorded_by = recorded_by
+        attendance.save(update_fields=['status', 'recorded_by', 'updated_at'])
+    return attendance, created
+
+
 def check_in_teacher(*, teacher, schedule: Schedule, session_date: date) -> AttendanceSession:
-    if schedule.assignment.teacher_id != teacher.id:
-        raise SessionQrError('Ce cours ne vous est pas assigné', 'wrong_teacher')
+    if not is_session_formateur(teacher, schedule):
+        raise SessionQrError('Ce cours ne vous est pas assigné comme formateur', 'wrong_teacher')
     validate_session_date(schedule, session_date)
-    # Formateur : fenêtre un peu plus large (peut préparer la salle)
     session = get_active_session(schedule, session_date)
     if not session.teacher_checked_in:
         session.teacher_checked_in = True
@@ -356,18 +434,234 @@ def check_in_teacher(*, teacher, schedule: Schedule, session_date: date) -> Atte
         session.save(update_fields=[
             'teacher_checked_in', 'teacher_checked_in_at', 'teacher_checked_in_by', 'updated_at',
         ])
+    record_staff_attendance(
+        teacher=teacher, schedule=schedule, session_date=session_date,
+        role='formateur', recorded_by=teacher.user, status='present',
+    )
+    seed_staff_roster(session, recorded_by=teacher.user)
     return session
+
+
+def check_in_supervisor(*, teacher, schedule: Schedule, session_date: date) -> AttendanceSession:
+    if not is_session_encadrant(teacher, schedule):
+        raise SessionQrError('Vous n\'êtes pas encadrant de cette séance', 'wrong_supervisor')
+    validate_session_date(schedule, session_date)
+    session = get_active_session(schedule, session_date)
+    if not session.supervisor_checked_in:
+        session.supervisor_checked_in = True
+        session.supervisor_checked_in_at = timezone.now()
+        session.supervisor_checked_in_by = teacher
+        session.save(update_fields=[
+            'supervisor_checked_in', 'supervisor_checked_in_at', 'supervisor_checked_in_by', 'updated_at',
+        ])
+    record_staff_attendance(
+        teacher=teacher, schedule=schedule, session_date=session_date,
+        role='encadrant', recorded_by=teacher.user, status='present',
+    )
+    seed_staff_roster(session, recorded_by=teacher.user)
+    return session
+
+
+def check_in_staff(*, teacher, schedule: Schedule, session_date: date) -> dict:
+    """Badgeage formateur et/ou encadrant selon le rôle sur le créneau."""
+    is_formateur = is_session_formateur(teacher, schedule)
+    is_encadrant = is_session_encadrant(teacher, schedule)
+    if not is_formateur and not is_encadrant:
+        raise SessionQrError('Ce cours ne vous est pas assigné', 'wrong_teacher')
+
+    session = None
+    roles = []
+    if is_formateur:
+        session = check_in_teacher(teacher=teacher, schedule=schedule, session_date=session_date)
+        roles.append('formateur')
+    if is_encadrant:
+        session = check_in_supervisor(teacher=teacher, schedule=schedule, session_date=session_date)
+        roles.append('encadrant')
+    role = 'formateur_encadrant' if len(roles) > 1 else roles[0]
+    return {
+        'session': session,
+        'role': role,
+        'roles': roles,
+        'teacher_checked_in': session.teacher_checked_in,
+        'supervisor_checked_in': session.supervisor_checked_in,
+    }
+
+
+def mark_student_attendances(session, student_ids, status='present', recorded_by=None, notes=''):
+    """Saisie manuelle des présences étudiants (formateur / encadrant / admin)."""
+    if status not in dict(Attendance.STATUSES):
+        raise SessionQrError('Statut de présence invalide', 'invalid_status')
+    if not student_ids:
+        raise SessionQrError('Aucun étudiant sélectionné', 'no_students')
+
+    from apps.students.models import Student
+
+    promotion = session.schedule.assignment.promotion
+    students = list(
+        Student.objects.filter(
+            id__in=student_ids,
+            promotion=promotion,
+            status='active',
+        ).select_related('user')
+    )
+    found = {str(s.id) for s in students}
+    missing = [sid for sid in student_ids if str(sid) not in found]
+    if missing:
+        raise SessionQrError(
+            'Certains étudiants ne font pas partie de la promotion de la séance.',
+            'student_not_in_promotion',
+        )
+
+    updated = created = 0
+    results = []
+    for student in students:
+        attendance, was_created = Attendance.objects.get_or_create(
+            student=student,
+            schedule=session.schedule,
+            date=session.session_date,
+            defaults={'status': status, 'recorded_by': recorded_by, 'notes': notes},
+        )
+        if was_created:
+            created += 1
+        elif attendance.status != status or (notes and attendance.notes != notes):
+            attendance.status = status
+            attendance.recorded_by = recorded_by
+            if notes:
+                attendance.notes = notes
+            attendance.save(update_fields=['status', 'recorded_by', 'notes', 'updated_at'])
+            updated += 1
+        results.append({
+            'student_id': str(student.id),
+            'matricule': student.matricule,
+            'name': student.user.get_full_name(),
+            'status': status,
+            'status_label': presence_status_label(student.gender, status),
+        })
+    return {
+        'marked': created + updated,
+        'created': created,
+        'updated': updated,
+        'status': status,
+        'students': results,
+        'session_id': str(session.id),
+    }
+
+
+def notify_session_absences(session):
+    """Notifie les étudiants encore absents à la fermeture de séance."""
+    from apps.notifications.models import Notification
+
+    course = session.schedule.assignment.course
+    absents = Attendance.objects.filter(
+        schedule=session.schedule,
+        date=session.session_date,
+        status='absent',
+    ).select_related('student__user')
+    created = 0
+    for row in absents:
+        _, was = Notification.objects.get_or_create(
+            recipient=row.student.user,
+            notification_type='absence',
+            title=f'Absence — {course.code} ({session.session_date.isoformat()})',
+            defaults={
+                'message': (
+                    f"Vous êtes marqué(e) absent(e) au cours {course.name} "
+                    f"du {session.session_date.isoformat()}."
+                ),
+                'data': {
+                    'schedule_id': str(session.schedule_id),
+                    'session_id': str(session.id),
+                    'date': session.session_date.isoformat(),
+                },
+            },
+        )
+        if was:
+            created += 1
+    return created
+
+
+def absence_report(*, promotion=None, academic_year=None, student=None, teaching_unit=None):
+    """Taux d'absence étudiants (seuil LMD) pour une promo / UE."""
+    from django.conf import settings
+
+    qs = Attendance.objects.all()
+    if student:
+        qs = qs.filter(student=student)
+    if promotion:
+        qs = qs.filter(student__promotion=promotion)
+    if academic_year:
+        qs = qs.filter(schedule__assignment__academic_year=academic_year)
+    if teaching_unit:
+        qs = qs.filter(schedule__assignment__course__teaching_unit=teaching_unit)
+
+    qs = qs.select_related('student__user', 'schedule__assignment__course')
+    by_student = defaultdict(lambda: {'present': 0, 'absent': 0, 'late': 0, 'excused': 0, 'total': 0})
+    for row in qs:
+        bucket = by_student[str(row.student_id)]
+        bucket['name'] = row.student.user.get_full_name()
+        bucket['matricule'] = row.student.matricule
+        bucket['student_id'] = str(row.student_id)
+        bucket['total'] += 1
+        bucket[row.status] = bucket.get(row.status, 0) + 1
+
+    max_rate = float(getattr(settings, 'LMD_MAX_ABSENCE_RATE', 0.25))
+    results = []
+    for data in by_student.values():
+        total = data['total'] or 1
+        rate = round(data.get('absent', 0) / total, 3)
+        data['absence_rate'] = rate
+        data['absence_rate_percent'] = round(rate * 100, 1)
+        data['exceeds_threshold'] = rate > max_rate
+        results.append(data)
+    results.sort(key=lambda r: r['absence_rate'], reverse=True)
+    return {
+        'threshold': max_rate,
+        'count': len(results),
+        'exceeding': sum(1 for r in results if r['exceeds_threshold']),
+        'results': results,
+    }
+
+
+def staff_session_payload(session) -> dict:
+    if not session:
+        return {
+            'teacher_checked_in': False,
+            'supervisor_checked_in': False,
+            'staff': [],
+        }
+    rows = StaffAttendance.objects.filter(
+        schedule=session.schedule, date=session.session_date,
+    ).select_related('teacher__user')
+    return {
+        'teacher_checked_in': session.teacher_checked_in,
+        'supervisor_checked_in': session.supervisor_checked_in,
+        'staff': [
+            {
+                'teacher_id': str(r.teacher_id),
+                'name': r.teacher.user.get_full_name(),
+                'role': r.role,
+                'role_display': r.get_role_display(),
+                'status': r.status,
+                'status_display': r.get_status_display(),
+            }
+            for r in rows
+        ],
+    }
 
 
 def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
     """KPIs badgeage pour tableaux de bord admin / professeur / étudiant."""
+    from django.db.models import Q
+
     day = session_date or timezone.localdate()
     ensure_sessions_for_date(day)
 
     sessions_qs = AttendanceSession.objects.filter(session_date=day).select_related(
         'schedule__assignment__course',
         'schedule__assignment__teacher',
+        'schedule__assignment__supervisor',
         'schedule__assignment__promotion',
+        'schedule__supervisor',
         'schedule__room',
     )
 
@@ -376,7 +670,11 @@ def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
     is_admin = user.is_superuser or user.get_group_level() <= 2
 
     if teacher and not is_admin:
-        sessions_qs = sessions_qs.filter(schedule__assignment__teacher=teacher)
+        sessions_qs = sessions_qs.filter(
+            Q(schedule__assignment__teacher=teacher)
+            | Q(schedule__supervisor=teacher)
+            | Q(schedule__assignment__supervisor=teacher)
+        )
     elif student and not is_admin:
         sessions_qs = sessions_qs.filter(schedule__assignment__promotion_id=student.promotion_id)
 
@@ -395,6 +693,12 @@ def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
     rate = round(100 * present / total_roster, 1) if total_roster else 0
 
     teacher_ok = open_sessions.filter(teacher_checked_in=True).count()
+    supervisor_ok = open_sessions.filter(supervisor_checked_in=True).count()
+    staff_rows = StaffAttendance.objects.filter(date=day, schedule_id__in=schedule_ids)
+    formateurs_present = staff_rows.filter(role='formateur').exclude(status='absent').count()
+    encadrants_present = staff_rows.filter(role='encadrant').exclude(status='absent').count()
+    staff_total = staff_rows.count()
+    staff_rate = round(100 * staff_rows.exclude(status='absent').count() / staff_total, 1) if staff_total else 0
 
     my_today = None
     if student:
@@ -448,6 +752,8 @@ def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
             'start_time': s.schedule.start_time.strftime('%H:%M'),
             'end_time': s.schedule.end_time.strftime('%H:%M'),
             'teacher_checked_in': s.teacher_checked_in,
+            'supervisor_checked_in': s.supervisor_checked_in,
+            'session_kind': s.schedule.session_kind,
             'present_count': Attendance.objects.filter(
                 schedule=s.schedule, date=day,
             ).exclude(status='absent').count(),
@@ -459,6 +765,10 @@ def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
         'sessions_open': open_sessions.count(),
         'sessions_closed': closed,
         'teachers_badged': teacher_ok,
+        'supervisors_badged': supervisor_ok,
+        'formateurs_present': formateurs_present,
+        'encadrants_present': encadrants_present,
+        'staff_attendance_rate': staff_rate,
         'present': present,
         'absent': absent,
         'late': late,

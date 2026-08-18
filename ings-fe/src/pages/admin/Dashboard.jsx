@@ -158,7 +158,7 @@ export default function AdminDashboard() {
           { to: '/admin/notes', icon: FiAward, label: 'Notes & Jury' },
           { to: '/admin/ue', icon: FiClipboard, label: 'UE / ECUE' },
           { to: '/admin/salles', icon: FiMap, label: 'Salles' },
-          { to: '/admin/badgeage', icon: FiCheckSquare, label: 'Badgeage' },
+          { to: '/admin/presences', icon: FiCheckSquare, label: 'Présences' },
           { to: '/admin/rapports', icon: FiBarChart2, label: 'Rapports' },
           { to: '/admin/formations', icon: FiBookOpen, label: 'Formations' },
           { to: '/admin/admissions', icon: FiUserCheck, label: 'Admissions' },
@@ -188,8 +188,8 @@ export default function AdminDashboard() {
 
       <div className="card-injs p-4 mb-4">
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <h5 className="fw-bold mb-0">Badgeage du jour</h5>
-          <Link to="/admin/badgeage" className="btn btn-sm btn-injs-primary">Présenter les QR</Link>
+          <h5 className="fw-bold mb-0">Présences du jour</h5>
+          <Link to="/admin/presences" className="btn btn-sm btn-injs-primary">Ouvrir les présences</Link>
         </div>
         <div className="row g-3 mb-2">
           <div className="col-md-3 small"><strong>{badgeStats?.sessions_open ?? 0}</strong> séances ouvertes</div>

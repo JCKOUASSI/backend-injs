@@ -13,6 +13,7 @@ import {
   fetchSessionRoster,
   checkInSession,
   fetchAttendanceDashboardStats,
+  markSessionStudents,
 } from '../../api/faculty'
 
 function todayIso() {
@@ -30,6 +31,7 @@ export default function ProfAttendance() {
   const [roster, setRoster] = useState(null)
   const [rosterLoading, setRosterLoading] = useState(false)
   const [rosterReturnSession, setRosterReturnSession] = useState(null)
+  const [markingId, setMarkingId] = useState(null)
 
   const { data: sessions, loading, error, reload } = useFetch(
     () => fetchAttendanceSessions({ session_date: sessionDate, is_active: true }),
@@ -99,6 +101,22 @@ export default function ProfAttendance() {
     if (session) openSession(session)
   }
 
+  const handleMarkStudent = async (studentId, status) => {
+    if (!rosterSession) return
+    setMarkingId(studentId)
+    try {
+      await markSessionStudents(rosterSession.id, [studentId], { status })
+      showToast(status === 'present' ? 'Présence enregistrée' : 'Absence enregistrée', 'success')
+      setRoster(await fetchSessionRoster(rosterSession.id))
+      reload()
+      reloadStats()
+    } catch (err) {
+      showToast(err.message || 'Saisie impossible', 'danger')
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
   const handleTeacherBadge = async () => {
     const tok = qrData?.payload || qrData?.badge_url
     if (!tok) return
@@ -119,8 +137,8 @@ export default function ProfAttendance() {
   return (
     <>
       <PageHeader
-        title="Présences — Badgeage QR"
-        subtitle="Affichez le QR en salle pour que vos étudiants badgeent (même principe SYGEP)"
+        title="Présences"
+        subtitle="Affichez le QR en salle, pointer votre présence (formateur / encadrant) et suivre les étudiants"
       />
 
       <div className="row g-3 mb-4">
@@ -146,6 +164,12 @@ export default function ProfAttendance() {
           <div className="card-injs p-3 text-center">
             <div className="fs-4 fw-bold">{stats?.teachers_badged ?? '—'}</div>
             <div className="small text-muted">Formateur badgé</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold">{stats?.supervisors_badged ?? '—'}</div>
+            <div className="small text-muted">Encadrant badgé</div>
           </div>
         </div>
       </div>
@@ -181,8 +205,14 @@ export default function ProfAttendance() {
               </div>
               <div className="small mt-1">
                 {s.teacher_checked_in
-                  ? <span className="grade-badge grade-valid">Vous avez badgé</span>
+                  ? <span className="grade-badge grade-valid">Formateur badgé</span>
                   : <span className="grade-badge grade-pending">Badgeage formateur en attente</span>}
+                {s.supervisor_name && (
+                  s.supervisor_checked_in
+                    ? <span className="grade-badge grade-valid ms-1">Encadrant badgé</span>
+                    : <span className="grade-badge grade-pending ms-1">Encadrant en attente</span>
+                )}
+                {s.session_kind_display && <span className="badge bg-secondary ms-1">{s.session_kind_display}</span>}
                 <span className="text-muted ms-2">{s.present_count} étudiant(s)</span>
               </div>
             </div>
@@ -241,6 +271,9 @@ export default function ProfAttendance() {
           roster={roster}
           loading={rosterLoading}
           allowForce={false}
+          allowMark
+          onMarkStudent={handleMarkStudent}
+          markingId={markingId}
           onBackToQr={backToQrFromRoster}
           sessionLabel={rosterSession
             ? `${rosterSession.course_code} ${rosterSession.course_name || ''} — ${rosterSession.session_date || ''}`.trim()

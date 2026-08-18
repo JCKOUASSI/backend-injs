@@ -10,6 +10,7 @@ INJS_TEST_PACKAGES = [
     'apps.academics.tests',
     'apps.reports.tests',
     'apps.core.tests',
+    'apps.faculty.tests',
 ]
 
 

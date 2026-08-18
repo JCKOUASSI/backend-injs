@@ -86,7 +86,7 @@ export default function SessionQrPresenter({
           <p className="small text-muted mt-2 mb-0">
             Les étudiants scannent ce QR avec leur téléphone
             <br />
-            (ouvre automatiquement la page Badgeage)
+            (ouvre automatiquement la page Présences)
           </p>
           <p className="small font-monospace text-break mt-2 mb-0" style={{ fontSize: '0.7rem' }}>
             {qrData.badge_url || qrData.payload}
@@ -97,11 +97,25 @@ export default function SessionQrPresenter({
             <div className="fs-2 fw-bold text-primary">{presentCount}</div>
             <div className="small text-muted">Badgé(e)s / {totalCount}</div>
             {summary?.teacher_checked_in != null && (
-              <div className="mt-2">
+              <div className="mt-2 d-flex flex-wrap justify-content-center gap-1">
                 {summary.teacher_checked_in
                   ? <span className="badge bg-success">Formateur badgé</span>
                   : <span className="badge bg-warning text-dark">Formateur non badgé</span>}
+                {summary.supervisor_name && (
+                  summary.supervisor_checked_in
+                    ? <span className="badge bg-success">Encadrant badgé</span>
+                    : <span className="badge bg-warning text-dark">Encadrant non badgé</span>
+                )}
               </div>
+            )}
+            {(summary?.staff || []).length > 0 && (
+              <ul className="list-unstyled small mt-2 mb-0">
+                {summary.staff.map((p) => (
+                  <li key={`${p.role}-${p.teacher_id}`}>
+                    {p.role_display} : {p.name} — {p.status_display}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
@@ -110,11 +124,13 @@ export default function SessionQrPresenter({
               type="button"
               className="btn btn-outline-primary w-100"
               onClick={onTeacherBadge}
-              disabled={teacherBadging || summary?.teacher_checked_in}
+              disabled={teacherBadging || (summary?.teacher_checked_in && summary?.supervisor_checked_in)}
             >
-              {summary?.teacher_checked_in
-                ? 'Présence formateur enregistrée'
-                : (teacherBadging ? 'Badgeage…' : 'Badger ma présence (formateur)')}
+              {teacherBadging
+                ? 'Badgeage…'
+                : (summary?.teacher_checked_in || summary?.supervisor_checked_in)
+                  ? 'Présence pédagogique enregistrée'
+                  : 'Badger ma présence (formateur / encadrant)'}
             </button>
           )}
         </div>

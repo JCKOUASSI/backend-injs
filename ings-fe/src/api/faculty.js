@@ -216,6 +216,26 @@ export async function generateSchedule(payload) {
   return apiPost('/faculty/schedules/generate/', payload)
 }
 
+export async function markSessionStudents(sessionId, studentIds, payload = {}) {
+  return apiPost(`/faculty/attendance-sessions/${sessionId}/mark-students/`, {
+    student_ids: studentIds,
+    ...payload,
+  })
+}
+
+export async function fetchAbsenceReport(params = {}) {
+  return apiGet('/faculty/attendances/absence-report/', params)
+}
+
+export async function fetchStaffAttendances(params = {}) {
+  const data = await apiGet('/faculty/staff-attendances/', { page_size: 100, ...params })
+  return data.results || []
+}
+
+export async function fetchMyStaffHistory() {
+  return apiGet('/faculty/attendances/my-staff-history/')
+}
+
 export async function fetchAssignments(params = {}) {
   const data = await apiGet('/faculty/assignments/', { page_size: 200, ...params })
   return data.results || []

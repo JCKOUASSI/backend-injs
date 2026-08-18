@@ -191,8 +191,8 @@ export default function AdminAttendance() {
   return (
     <>
       <PageHeader
-        title="Badgeage — QR séances"
-        subtitle="Présentez le QR aux étudiants (vidéoprojecteur) · affectation auto · contrôle live"
+        title="Présences"
+        subtitle="QR en salle, listes d'étudiants, formateurs et encadrants"
       />
 
       <div className="row g-3 mb-4">
@@ -218,6 +218,12 @@ export default function AdminAttendance() {
           <div className="card-injs p-3 text-center">
             <div className="fs-4 fw-bold">{stats?.teachers_badged ?? '—'}</div>
             <div className="small text-muted">Formateurs badgés</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold">{stats?.supervisors_badged ?? stats?.encadrants_present ?? '—'}</div>
+            <div className="small text-muted">Encadrants badgés</div>
           </div>
         </div>
       </div>
@@ -254,11 +260,14 @@ export default function AdminAttendance() {
                 {s.day_display} {s.session_date} — {String(s.start_time).slice(0, 5)}–{String(s.end_time).slice(0, 5)}
                 {(s.room_code || s.room_name) && ` — ${[s.room_code, s.room_name].filter(Boolean).join(' ')}`}
                 {s.teacher_name && ` — ${s.teacher_name}`}
+                {s.supervisor_name && ` — Enc. ${s.supervisor_name}`}
                 {s.promotion_name && ` — ${s.promotion_name}`}
               </div>
               <div className="small mt-1">
                 <span className="grade-badge grade-valid me-2">QR prêt</span>
                 {s.teacher_checked_in && <span className="badge bg-success me-2">Formateur badgé</span>}
+                {s.supervisor_checked_in && <span className="badge bg-success me-2">Encadrant badgé</span>}
+                {s.session_kind_display && <span className="badge bg-secondary me-2">{s.session_kind_display}</span>}
                 <span className="text-muted">{s.roster_count ?? 0} étudiant(s) · {s.present_count} présent(s)</span>
               </div>
             </div>

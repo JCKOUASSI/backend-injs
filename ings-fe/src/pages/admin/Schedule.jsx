@@ -37,7 +37,7 @@ const TIME_ROWS = [
   { start: '16:00', end: '18:00' },
 ]
 
-const EMPTY_ASSIGN = { teacher: '', course: '', academic_year: '', promotion: '' }
+const EMPTY_ASSIGN = { teacher: '', supervisor: '', course: '', academic_year: '', promotion: '' }
 const EMPTY_SLOT = {
   assignment: '',
   day_of_week: 0,
@@ -98,6 +98,9 @@ export default function AdminSchedule() {
     max_sessions_per_day: 3,
     auto_seed_roster: true,
     seed_weeks: 1,
+    auto_assign_teachers: true,
+    generate_all: false,
+    open_sessions: true,
   })
   const [saving, setSaving] = useState(false)
   const [rosterDate, setRosterDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -124,7 +127,11 @@ export default function AdminSchedule() {
     ev.preventDefault()
     setSaving(true)
     try {
-      await createAssignment({ ...assignForm, is_primary: true })
+      await createAssignment({
+        ...assignForm,
+        supervisor: assignForm.supervisor || null,
+        is_primary: true,
+      })
       showToast('Affectation créée', 'success')
       setShowAssign(false)
       setAssignForm(EMPTY_ASSIGN)
@@ -170,28 +177,44 @@ export default function AdminSchedule() {
   }
 
   const handleGenerate = async (dryRun = false) => {
-    if (!promotion || !year) {
-      showToast('Sélectionnez une promotion et une année', 'warning')
+    if (!year && !currentYear) {
+      showToast('Sélectionnez une année académique', 'warning')
+      return
+    }
+    if (!genForm.generate_all && !promotion) {
+      showToast('Sélectionnez une promotion, ou cochez « toutes les promotions »', 'warning')
       return
     }
     setSaving(true)
     try {
       const res = await generateSchedule({
-        promotion,
-        academic_year: year,
+        promotion: genForm.generate_all ? undefined : promotion,
+        academic_year: year || currentYear?.id,
+        generate_all: genForm.generate_all,
         replace_existing: genForm.replace_existing,
         max_sessions_per_day: genForm.max_sessions_per_day,
         dry_run: dryRun,
         auto_seed_roster: genForm.auto_seed_roster,
+        auto_assign_teachers: genForm.auto_assign_teachers,
+        open_sessions: genForm.open_sessions,
         seed_weeks: genForm.seed_weeks,
       })
       let msg = dryRun
         ? `Prévisualisation : ${res.created} créneau(x), ${res.failures?.length || 0} échec(s)`
         : `Génération : ${res.created} créneau(x) créés`
+      if (res.assignments_created) {
+        msg += ` — ${res.assignments_created} affectation(s) formateur/encadrant`
+      }
       if (!dryRun && res.roster) {
         msg += ` — ${res.roster.attendances_created} affectation(s) étudiant(s)`
       }
-      showToast(msg, res.failures?.length ? 'warning' : 'success')
+      if (!dryRun && res.sessions?.sessions_opened) {
+        msg += ` — ${res.sessions.sessions_opened} séance(s) de présence`
+      }
+      if (res.failed_promotions) {
+        msg += ` — ${res.failed_promotions} promotion(s) en échec`
+      }
+      showToast(msg, res.failures?.length || res.failed_promotions ? 'warning' : 'success')
       if (!dryRun) {
         setShowGenerate(false)
         refreshAll()
@@ -291,7 +314,7 @@ export default function AdminSchedule() {
     <>
       <PageHeader
         title="Emploi du temps INJS"
-        subtitle="Grille hebdomadaire LMD — génération, conflits salle/enseignant/promotion"
+        subtitle="Grille hebdomadaire LMD — génération auto, formateurs, encadrants, conflits"
         action={
           <div className="widget-actions">
             <button type="button" className="btn btn-outline-secondary btn-sm" onClick={refreshAll}>
@@ -381,10 +404,18 @@ export default function AdminSchedule() {
                             style={{ borderLeftColor: colorForCode(s.course_code) }}
                             onClick={() => openSlot(s)}
                           >
-                            <div className="edt-block-code">{s.course_code}</div>
+                            <div className="edt-block-code">
+                              {s.course_code}
+                              {s.session_kind && (
+                                <span className="badge bg-light text-dark ms-1" style={{ fontSize: '0.6rem' }}>
+                                  {(s.session_kind_display || s.session_kind).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
                             <div className="edt-block-title">{s.course_name}</div>
                             <div className="edt-block-meta">
                               {s.room_code || 'Sans salle'} · {s.teacher_name?.split(' ').slice(-1)[0]}
+                              {s.supervisor_name ? ` · Enc. ${s.supervisor_name.split(' ').slice(-1)[0]}` : ''}
                               {typeof s.effectif === 'number' ? ` · ${s.effectif} étud.` : ''}
                             </div>
                           </button>
@@ -441,9 +472,10 @@ export default function AdminSchedule() {
         {selected && (
           <>
             <dl className="detail-view mb-3">
-              <div className="detail-row"><dt>Cours</dt><dd>{selected.course_name}</dd></div>
+              <div className="detail-row"><dt>Cours</dt><dd>{selected.course_name} {selected.session_kind_display ? `(${selected.session_kind_display})` : ''}</dd></div>
               <div className="detail-row"><dt>Horaire</dt><dd>{selected.start_time}–{selected.end_time}</dd></div>
-              <div className="detail-row"><dt>Enseignant</dt><dd>{selected.teacher_name}</dd></div>
+              <div className="detail-row"><dt>Formateur</dt><dd>{selected.teacher_name}</dd></div>
+              <div className="detail-row"><dt>Encadrant</dt><dd>{selected.supervisor_name || '—'}</dd></div>
               <div className="detail-row"><dt>Promotion</dt><dd>{selected.promotion_name} ({selected.effectif ?? '—'} étudiants)</dd></div>
               <div className="detail-row"><dt>Salle</dt><dd>{selected.room_code ? `${selected.room_code} — ${selected.room_name}` : 'Non affectée'}</dd></div>
             </dl>
@@ -529,7 +561,7 @@ export default function AdminSchedule() {
       <Modal
         show={showAssign}
         onClose={() => setShowAssign(false)}
-        title="Affectation enseignant ↔ cours ↔ promotion"
+        title="Affectation formateur / encadrant ↔ cours ↔ promotion"
         footer={
           <>
             <button type="button" className="btn btn-outline-secondary" onClick={() => setShowAssign(false)}>Annuler</button>
@@ -543,6 +575,13 @@ export default function AdminSchedule() {
             <select className="form-select" required value={assignForm.teacher} onChange={(e) => setAssignForm({ ...assignForm, teacher: e.target.value })}>
               <option value="">—</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
+            </select>
+          </div>
+          <div className="col-12">
+            <label className="form-label">Encadrant (TP / séances pratiques)</label>
+            <select className="form-select" value={assignForm.supervisor} onChange={(e) => setAssignForm({ ...assignForm, supervisor: e.target.value })}>
+              <option value="">Aucun</option>
+              {teachers.filter((t) => t.id !== assignForm.teacher).map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
             </select>
           </div>
           <div className="col-12">
@@ -633,13 +672,32 @@ export default function AdminSchedule() {
         }
       >
         <p className="small text-muted">
-          Moteur inspiré EMPCPFAE : placement glouton par difficulté (TP → TD → CM),
-          scoring salles (capacité, type, équilibrage), contrôle enseignant/promotion.
+          Génère l&apos;EDT à partir de la maquette (volumes CM/TD/TP semestriels → créneaux hebdo),
+          affecte formateurs et encadrants (TP), place les salles et ouvre les séances de présence.
         </p>
         <div className="row g-3">
+          <div className="col-12">
+            <div className="form-check">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="genAll"
+                checked={genForm.generate_all}
+                onChange={(e) => setGenForm({ ...genForm, generate_all: e.target.checked })}
+              />
+              <label className="form-check-label" htmlFor="genAll">
+                Toutes les promotions actives
+              </label>
+            </div>
+          </div>
           <div className="col-md-6">
-            <label className="form-label">Promotion *</label>
-            <select className="form-select" value={promotion} onChange={(e) => setPromotion(e.target.value)}>
+            <label className="form-label">Promotion {genForm.generate_all ? '' : '*'}</label>
+            <select
+              className="form-select"
+              value={promotion}
+              disabled={genForm.generate_all}
+              onChange={(e) => setPromotion(e.target.value)}
+            >
               <option value="">—</option>
               {(promotions || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -661,6 +719,34 @@ export default function AdminSchedule() {
               value={genForm.max_sessions_per_day}
               onChange={(e) => setGenForm({ ...genForm, max_sessions_per_day: Number(e.target.value) })}
             />
+          </div>
+          <div className="col-12">
+            <div className="form-check">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="autoTeachers"
+                checked={genForm.auto_assign_teachers}
+                onChange={(e) => setGenForm({ ...genForm, auto_assign_teachers: e.target.checked })}
+              />
+              <label className="form-check-label" htmlFor="autoTeachers">
+                Créer automatiquement les affectations formateur / encadrant (maquette)
+              </label>
+            </div>
+          </div>
+          <div className="col-12">
+            <div className="form-check">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="openSess"
+                checked={genForm.open_sessions}
+                onChange={(e) => setGenForm({ ...genForm, open_sessions: e.target.checked })}
+              />
+              <label className="form-check-label" htmlFor="openSess">
+                Ouvrir les séances de présence (étudiants, formateurs, encadrants)
+              </label>
+            </div>
           </div>
           <div className="col-12">
             <div className="form-check">
@@ -705,7 +791,8 @@ export default function AdminSchedule() {
           )}
         </div>
         <p className="small text-warning mt-3 mb-0">
-          Prérequis : créer les affectations enseignant ↔ ECUE ↔ promotion avant de générer.
+          Les volumes CM/TD/TP de la maquette sont convertis en créneaux hebdomadaires (semestre 15 semaines).
+          Un encadrant distinct est affecté aux séances TP lorsqu&apos;un second enseignant est disponible.
         </p>
       </Modal>
     </>

@@ -357,7 +357,11 @@ class Command(BaseCommand):
                     promotion=promo_l1,
                     defaults={'is_primary': True},
                 )
-                for day_idx, start_h, end_h in ((0, 8, 10), (2, 14, 16)):
+                kone = User.objects.filter(email='prof.kone@demo.injs.ci').first()
+                if kone and hasattr(kone, 'teacher_profile') and not assignment.supervisor_id:
+                    assignment.supervisor = kone.teacher_profile
+                    assignment.save(update_fields=['supervisor', 'updated_at'])
+                for day_idx, start_h, end_h, kind in ((0, 8, 10, 'cm'), (2, 14, 16, 'td')):
                     Schedule.objects.get_or_create(
                         assignment=assignment,
                         day_of_week=day_idx,
@@ -366,8 +370,25 @@ class Command(BaseCommand):
                             'room': room_amphi,
                             'end_time': time(end_h, 0),
                             'is_active': True,
+                            'session_kind': kind,
                         },
                     )
+                gym = (
+                    Room.objects.filter(institution=inst, room_type='gym').first()
+                    or Room.objects.filter(institution=inst, room_type='sport').first()
+                )
+                Schedule.objects.get_or_create(
+                    assignment=assignment,
+                    day_of_week=4,
+                    start_time=time(8, 0),
+                    defaults={
+                        'room': gym or room_amphi,
+                        'end_time': time(10, 0),
+                        'is_active': True,
+                        'session_kind': 'tp',
+                        'supervisor': assignment.supervisor,
+                    },
+                )
 
         # Notes demo CC/CT pour étudiants L1
         if exam_evaluations:

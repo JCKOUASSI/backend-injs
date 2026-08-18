@@ -88,8 +88,8 @@ export default function StudentDashboard() {
           { to: '/etudiant/notes', icon: FiAward, label: 'Notes & crédits' },
           { to: '/etudiant/documents', icon: FiFileText, label: 'Relevés PDF' },
           { to: '/etudiant/paiements', icon: FiCreditCard, label: 'Paiements' },
-          { to: '/etudiant/badgeage', icon: FiCheckSquare, label: 'Badgeage' },
           { to: '/etudiant/emploi-du-temps', icon: FiCalendar, label: 'EDT' },
+          { to: '/etudiant/presences', icon: FiCheckSquare, label: 'Présences' },
           { to: '/etudiant/inscriptions', icon: FiBookOpen, label: 'Inscriptions' },
         ].map((a) => (
           <div key={a.to} className="col-6 col-md-4 col-xl-2">
@@ -107,8 +107,8 @@ export default function StudentDashboard() {
 
       <div className="card-injs p-4 mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <h5 className="fw-bold mb-0">Badgeage aujourd&apos;hui</h5>
-          <Link to="/etudiant/badgeage" className="btn btn-sm btn-injs-primary">Scanner QR</Link>
+          <h5 className="fw-bold mb-0">Présences aujourd&apos;hui</h5>
+          <Link to="/etudiant/presences" className="btn btn-sm btn-injs-primary">Pointer ma présence</Link>
         </div>
         {(badgeStats?.my_today || []).length === 0 ? (
           <p className="text-muted small mb-0">Aucune séance rosterée pour aujourd&apos;hui — scannez le QR en cours.</p>

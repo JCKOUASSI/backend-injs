@@ -7,15 +7,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
+from django.db.models import Q
+
 from apps.faculty.models import (
     Teacher, Room, CourseAssignment, Schedule, Attendance, AttendanceSession,
-    RoomReservation, MaintenanceTicket, EquipmentAsset,
+    RoomReservation, MaintenanceTicket, EquipmentAsset, StaffAttendance,
 )
 from apps.faculty.serializers import (
     TeacherSerializer, RoomSerializer, CourseAssignmentSerializer,
     ScheduleSerializer, AttendanceSerializer, SessionQrSerializer,
     CheckInSerializer, AttendanceSessionSerializer, AttendanceSessionCreateSerializer,
     RoomReservationSerializer, MaintenanceTicketSerializer, EquipmentAssetSerializer,
+    StaffAttendanceSerializer,
 )
 from apps.faculty.services.session_qr import (
     build_session_qr_data,
@@ -23,10 +26,16 @@ from apps.faculty.services.session_qr import (
     assert_can_view_session,
     assert_is_admin,
     check_in_student,
-    check_in_teacher,
+    check_in_staff,
     ensure_sessions_for_date,
     attendance_dashboard_stats,
     force_badge_students,
+    mark_student_attendances,
+    notify_session_absences,
+    absence_report,
+    seed_staff_roster,
+    staff_session_payload,
+    assert_can_mark_attendance,
     SessionQrError,
 )
 from apps.faculty.services.campus_ops import (
@@ -45,10 +54,19 @@ from apps.faculty.services.campus_ops import (
 from apps.faculty.services.planning import (
     detect_conflicts,
     generate_for_promotion,
+    generate_for_academic_year,
     timetable_grid,
     PlanningError,
 )
 from apps.core.mixins import ExportMixin
+
+
+def _truthy(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ('1', 'true', 'yes', 'on')
 
 
 class TeacherViewSet(ExportMixin, viewsets.ModelViewSet):
@@ -180,22 +198,24 @@ class RoomViewSet(ExportMixin, viewsets.ModelViewSet):
 
 
 class CourseAssignmentViewSet(viewsets.ModelViewSet):
-    queryset = CourseAssignment.objects.select_related('teacher', 'course', 'promotion').all()
+    queryset = CourseAssignment.objects.select_related(
+        'teacher__user', 'supervisor__user', 'course', 'promotion', 'academic_year',
+    ).all()
     serializer_class = CourseAssignmentSerializer
     permission_module = 'faculty'
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['teacher', 'academic_year', 'promotion']
+    filterset_fields = ['teacher', 'supervisor', 'academic_year', 'promotion']
 
 
 class ScheduleViewSet(viewsets.ModelViewSet):
     queryset = Schedule.objects.select_related(
-        'assignment__course', 'assignment__teacher__user', 'assignment__promotion',
-        'assignment__academic_year', 'room',
+        'assignment__course', 'assignment__teacher__user', 'assignment__supervisor__user',
+        'assignment__promotion', 'assignment__academic_year', 'room', 'supervisor__user',
     ).filter(is_active=True)
     serializer_class = ScheduleSerializer
     permission_module = 'faculty'
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['assignment', 'day_of_week', 'room']
+    filterset_fields = ['assignment', 'day_of_week', 'room', 'session_kind']
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -205,7 +225,11 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         if promotion:
             qs = qs.filter(assignment__promotion=promotion)
         if teacher:
-            qs = qs.filter(assignment__teacher=teacher)
+            qs = qs.filter(
+                Q(assignment__teacher=teacher)
+                | Q(supervisor=teacher)
+                | Q(assignment__supervisor=teacher)
+            )
         if academic_year:
             qs = qs.filter(assignment__academic_year=academic_year)
         return qs
@@ -350,33 +374,48 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='generate')
     def generate(self, request):
         """
-        Génération automatique EDT pour une promotion (best_effort, style EMPCPFAE).
-        Body: promotion, academic_year, replace_existing?, dry_run?, max_sessions_per_day?
+        Génération automatique EDT pour une promotion (ou toutes).
+        Body: academic_year, promotion?, generate_all?, replace_existing?, dry_run?,
+              auto_assign_teachers?, open_sessions?, max_sessions_per_day?
         """
         from apps.academics.models import Promotion, AcademicYear
-        promo_id = request.data.get('promotion')
         year_id = request.data.get('academic_year')
-        if not promo_id or not year_id:
+        promo_id = request.data.get('promotion')
+        generate_all = _truthy(request.data.get('generate_all'))
+        if not year_id:
             return Response(
-                {'detail': 'Paramètres promotion et academic_year requis'},
+                {'detail': 'Paramètre academic_year requis'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        promotion = Promotion.objects.filter(pk=promo_id).first()
-        year = AcademicYear.objects.filter(pk=year_id).first()
-        if not promotion or not year:
-            return Response({'detail': 'Promotion ou année introuvable'}, status=status.HTTP_404_NOT_FOUND)
-        try:
-            result = generate_for_promotion(
-                promotion=promotion,
-                academic_year=year,
-                replace_existing=bool(request.data.get('replace_existing')),
-                max_sessions_per_day=int(request.data.get('max_sessions_per_day') or 3),
-                dry_run=bool(request.data.get('dry_run')),
-                auto_seed_roster=bool(request.data.get('auto_seed_roster', True)),
-                seed_from_date=request.data.get('seed_from_date'),
-                seed_weeks=int(request.data.get('seed_weeks') or 1),
-                recorded_by=request.user,
+        if not generate_all and not promo_id:
+            return Response(
+                {'detail': 'Paramètres promotion et academic_year requis (ou generate_all=true)'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+        year = AcademicYear.objects.filter(pk=year_id).first()
+        if not year:
+            return Response({'detail': 'Année académique introuvable'}, status=status.HTTP_404_NOT_FOUND)
+
+        kwargs = {
+            'replace_existing': _truthy(request.data.get('replace_existing')),
+            'max_sessions_per_day': int(request.data.get('max_sessions_per_day') or 3),
+            'dry_run': _truthy(request.data.get('dry_run')),
+            'auto_seed_roster': _truthy(request.data.get('auto_seed_roster'), default=True),
+            'seed_from_date': request.data.get('seed_from_date'),
+            'seed_weeks': int(request.data.get('seed_weeks') or 1),
+            'recorded_by': request.user,
+            'auto_assign_teachers': _truthy(request.data.get('auto_assign_teachers'), default=True),
+            'semester_weeks': int(request.data.get('semester_weeks') or 15),
+            'open_sessions': _truthy(request.data.get('open_sessions'), default=True),
+        }
+        try:
+            if generate_all:
+                result = generate_for_academic_year(year, **kwargs)
+            else:
+                promotion = Promotion.objects.filter(pk=promo_id).first()
+                if not promotion:
+                    return Response({'detail': 'Promotion introuvable'}, status=status.HTTP_404_NOT_FOUND)
+                result = generate_for_promotion(promotion=promotion, academic_year=year, **kwargs)
         except PlanningError as exc:
             return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
         return Response(result)
@@ -411,7 +450,11 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             return qs
         teacher = getattr(user, 'teacher_profile', None)
         if teacher:
-            return qs.filter(schedule__assignment__teacher=teacher)
+            return qs.filter(
+                Q(schedule__assignment__teacher=teacher)
+                | Q(schedule__supervisor=teacher)
+                | Q(schedule__assignment__supervisor=teacher)
+            )
         return qs.none()
 
     def list(self, request, *args, **kwargs):
@@ -457,6 +500,11 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         payload = {**output, **qr_data}
         if roster_info:
             payload['roster'] = roster_info
+        try:
+            payload['staff_roster'] = seed_staff_roster(session, recorded_by=request.user)
+        except Exception:
+            payload['staff_roster'] = None
+        payload.update(staff_session_payload(session))
         return Response(payload, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
@@ -492,6 +540,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         data = build_session_qr_data(session.schedule, session.session_date, request=request)
         data['session_id'] = session.id
         data['teacher_checked_in'] = session.teacher_checked_in
+        data['supervisor_checked_in'] = session.supervisor_checked_in
         return Response(SessionQrSerializer(data).data)
 
     @action(detail=True, methods=['post'], url_path='close')
@@ -503,7 +552,10 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_403_FORBIDDEN)
         session.is_active = False
         session.save(update_fields=['is_active', 'updated_at'])
-        return Response(AttendanceSessionSerializer(session).data)
+        notified = notify_session_absences(session)
+        data = AttendanceSessionSerializer(session).data
+        data['absences_notified'] = notified
+        return Response(data)
 
     @action(detail=True, methods=['post'], url_path='force-badge')
     def force_badge(self, request, pk=None):
@@ -604,6 +656,32 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
             return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': f"{result['removed']} étudiant(s) retiré(s)", **result})
 
+    @action(detail=True, methods=['post'], url_path='mark-students')
+    def mark_students(self, request, pk=None):
+        """Saisie manuelle des présences (formateur, encadrant ou admin)."""
+        session = self.get_object()
+        try:
+            assert_can_mark_attendance(request.user, session.schedule)
+        except SessionQrError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_403_FORBIDDEN)
+        student_ids = request.data.get('student_ids') or []
+        if isinstance(student_ids, str):
+            student_ids = [s.strip() for s in student_ids.split(',') if s.strip()]
+        try:
+            result = mark_student_attendances(
+                session,
+                student_ids,
+                status=request.data.get('status', 'present'),
+                recorded_by=request.user,
+                notes=request.data.get('notes') or '',
+            )
+        except SessionQrError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'message': f"{result['marked']} présence(s) mise(s) à jour",
+            **result,
+        })
+
 
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related(
@@ -615,7 +693,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filterset_fields = ['student', 'schedule', 'date', 'status']
 
     def get_permissions(self):
-        if self.action in ('check_in', 'dashboard_stats', 'my_history'):
+        if self.action in ('check_in', 'dashboard_stats', 'my_history', 'absence_report', 'my_staff_history'):
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -672,21 +750,28 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
             if teacher:
-                session = check_in_teacher(
+                result = check_in_staff(
                     teacher=teacher,
                     schedule=schedule,
                     session_date=session_date,
                 )
+                session = result['session']
                 return Response({
-                    'role': 'formateur',
-                    'message': 'Badgeage formateur enregistré',
+                    'role': result['role'],
+                    'roles': result['roles'],
+                    'message': (
+                        'Badgeage encadrant enregistré'
+                        if result['role'] == 'encadrant'
+                        else 'Badgeage formateur enregistré'
+                    ),
                     'course_name': schedule.assignment.course.name,
                     'session_date': session_date,
                     'teacher_checked_in': session.teacher_checked_in,
+                    'supervisor_checked_in': session.supervisor_checked_in,
                 })
 
             return Response(
-                {'detail': 'Profil étudiant ou formateur requis pour badger'},
+                {'detail': 'Profil étudiant, formateur ou encadrant requis pour badger'},
                 status=status.HTTP_403_FORBIDDEN,
             )
         except SessionQrError as exc:
@@ -726,19 +811,75 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             attendances.exclude(status='absent'),
             many=True,
         ).data
+        staff = staff_session_payload(session)
+        supervisor = schedule.resolved_supervisor()
         return Response({
             'schedule': schedule_id,
             'date': session_date,
             'session_open': bool(session and session.is_active),
             'teacher_checked_in': session.teacher_checked_in if session else False,
+            'supervisor_checked_in': session.supervisor_checked_in if session else False,
             'course_name': schedule.assignment.course.name,
             'course_code': schedule.assignment.course.code,
+            'session_kind': schedule.session_kind,
+            'teacher_name': schedule.assignment.teacher.user.get_full_name(),
+            'supervisor_name': supervisor.user.get_full_name() if supervisor else None,
             'present': present,
             'absent': absent,
             'total': present + absent,
             'attendances': AttendanceSerializer(attendances, many=True).data,
             'present_list': present_list,
+            **staff,
         })
+
+    @action(detail=False, methods=['get'], url_path='absence-report')
+    def absence_report(self, request):
+        """Taux d'absence par étudiant (seuil LMD)."""
+        student = getattr(request.user, 'student_profile', None)
+        is_admin = request.user.is_superuser or request.user.get_group_level() <= 2
+        student_id = request.query_params.get('student')
+        if student and not is_admin:
+            student_id = str(student.id)
+        return Response(absence_report(
+            promotion=request.query_params.get('promotion'),
+            academic_year=request.query_params.get('academic_year'),
+            student=student_id,
+            teaching_unit=request.query_params.get('teaching_unit'),
+        ))
+
+    @action(detail=False, methods=['get'], url_path='my-staff-history')
+    def my_staff_history(self, request):
+        teacher = getattr(request.user, 'teacher_profile', None)
+        if not teacher:
+            return Response({'detail': 'Profil formateur / encadrant requis'}, status=status.HTTP_403_FORBIDDEN)
+        rows = StaffAttendance.objects.filter(teacher=teacher).select_related(
+            'schedule__assignment__course', 'schedule__room',
+        ).order_by('-date', 'schedule__start_time')[:50]
+        return Response({
+            'count': rows.count() if hasattr(rows, 'count') else len(rows),
+            'results': StaffAttendanceSerializer(rows, many=True).data,
+        })
+
+
+class StaffAttendanceViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StaffAttendance.objects.select_related(
+        'teacher__user', 'schedule__assignment__course', 'schedule__assignment__promotion',
+        'schedule__room',
+    ).all()
+    serializer_class = StaffAttendanceSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['teacher', 'schedule', 'date', 'role', 'status']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser or user.get_group_level() <= 2:
+            return qs
+        teacher = getattr(user, 'teacher_profile', None)
+        if teacher:
+            return qs.filter(teacher=teacher)
+        return qs.none()
 
 
 class RoomReservationViewSet(viewsets.ModelViewSet):

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import MainLayout from '../components/layout/MainLayout'
 import ProtectedRoute from './ProtectedRoute'
@@ -53,6 +53,11 @@ function HomeRedirect() {
   return <Navigate to={`/${user.role}`} replace />
 }
 
+function RedirectPreserveQuery({ to }) {
+  const { search, hash } = useLocation()
+  return <Navigate to={`${to}${search}${hash}`} replace />
+}
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -69,9 +74,10 @@ export default function AppRoutes() {
           <Route path="/admin/ue" element={<AdminUE />} />
           <Route path="/admin/notes" element={<AdminGrades />} />
           <Route path="/admin/emploi-du-temps" element={<AdminSchedule />} />
+          <Route path="/admin/presences" element={<AdminAttendance />} />
+          <Route path="/admin/badgeage" element={<RedirectPreserveQuery to="/admin/presences" />} />
           <Route path="/admin/salles" element={<AdminRooms />} />
           <Route path="/admin/stages" element={<AdminInternships />} />
-          <Route path="/admin/badgeage" element={<AdminAttendance />} />
           <Route path="/admin/reservations" element={<AdminReservations />} />
           <Route path="/admin/maintenance" element={<AdminMaintenance />} />
           <Route path="/admin/equipements" element={<AdminEquipment />} />
@@ -89,10 +95,11 @@ export default function AppRoutes() {
           <Route path="/professeur" element={<ProfDashboard />} />
           <Route path="/professeur/cours" element={<ProfCourses />} />
           <Route path="/professeur/emploi-du-temps" element={<ProfessorSchedule />} />
+          <Route path="/professeur/presences" element={<ProfAttendance />} />
+          <Route path="/professeur/presence" element={<RedirectPreserveQuery to="/professeur/presences" />} />
           <Route path="/professeur/etudiants" element={<ProfStudents />} />
           <Route path="/professeur/salles" element={<ProfessorRooms />} />
           <Route path="/professeur/evaluations" element={<ProfEvaluations />} />
-          <Route path="/professeur/presence" element={<ProfAttendance />} />
           <Route path="/professeur/stages" element={<ProfInternships />} />
           <Route path="/professeur/recherche" element={<ProfResearch />} />
           <Route path="/professeur/documents" element={<ProfDocuments />} />
@@ -106,11 +113,12 @@ export default function AppRoutes() {
           <Route path="/etudiant/notes" element={<StudentGrades />} />
           <Route path="/etudiant/cours" element={<StudentCourses />} />
           <Route path="/etudiant/emploi-du-temps" element={<StudentSchedule />} />
+          <Route path="/etudiant/presences" element={<StudentBadge />} />
+          <Route path="/etudiant/badgeage" element={<RedirectPreserveQuery to="/etudiant/presences" />} />
           <Route path="/etudiant/stages" element={<StudentInternships />} />
           <Route path="/etudiant/documents" element={<StudentDocuments />} />
           <Route path="/etudiant/paiements" element={<StudentPayments />} />
           <Route path="/etudiant/inscriptions" element={<StudentInscriptions />} />
-          <Route path="/etudiant/badgeage" element={<StudentBadge />} />
         </Route>
       </Route>
 

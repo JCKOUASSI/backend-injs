@@ -42,10 +42,10 @@ export default function ProfCourses() {
               actions={[
                 {
                   key: 'presence',
-                  title: 'Présences QR',
+                  title: 'Présences',
                   icon: FiCheckSquare,
                   className: 'btn-injs-primary',
-                  onClick: () => navigate('/professeur/presence'),
+                  onClick: () => navigate('/professeur/presences'),
                 },
               ]}
             />
@@ -74,10 +74,10 @@ export default function ProfCourses() {
                 { type: 'edit', title: 'Saisir notes', icon: FiEdit2, onClick: () => navigate('/professeur/evaluations') },
                 {
                   key: 'presence',
-                  title: 'Présences QR',
+                  title: 'Présences',
                   icon: FiCheckSquare,
                   className: 'btn-outline-success',
-                  onClick: () => navigate('/professeur/presence'),
+                  onClick: () => navigate('/professeur/presences'),
                 },
               ]}
             />

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.faculty.models import (
     Teacher, Room, CourseAssignment, Schedule, Attendance, AttendanceSession,
-    RoomReservation, MaintenanceTicket, EquipmentAsset,
+    RoomReservation, MaintenanceTicket, EquipmentAsset, StaffAttendance,
 )
 
 
@@ -42,6 +42,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class CourseAssignmentSerializer(serializers.ModelSerializer):
     teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
+    supervisor_name = serializers.CharField(source='supervisor.user.get_full_name', read_only=True, allow_null=True)
     course_name = serializers.CharField(source='course.name', read_only=True)
     course_code = serializers.CharField(source='course.code', read_only=True)
     promotion_name = serializers.CharField(source='promotion.name', read_only=True)
@@ -61,15 +62,26 @@ class ScheduleSerializer(serializers.ModelSerializer):
     course_code = serializers.CharField(source='assignment.course.code', read_only=True)
     promotion_name = serializers.CharField(source='assignment.promotion.name', read_only=True)
     teacher_name = serializers.CharField(source='assignment.teacher.user.get_full_name', read_only=True)
+    supervisor_name = serializers.SerializerMethodField()
+    supervisor_id = serializers.SerializerMethodField()
     room_name = serializers.CharField(source='room.name', read_only=True)
     room_code = serializers.CharField(source='room.code', read_only=True)
     room_building = serializers.CharField(source='room.building', read_only=True)
     room_capacity = serializers.IntegerField(source='room.capacity', read_only=True)
     day_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
+    session_kind_display = serializers.CharField(source='get_session_kind_display', read_only=True)
 
     class Meta:
         model = Schedule
         fields = '__all__'
+
+    def get_supervisor_name(self, obj):
+        person = obj.resolved_supervisor()
+        return person.user.get_full_name() if person else None
+
+    def get_supervisor_id(self, obj):
+        person = obj.resolved_supervisor()
+        return str(person.id) if person else None
 
     def validate(self, attrs):
         """Détecte les conflits de salle (même jour, plages horaires chevauchantes)."""
@@ -155,8 +167,12 @@ class SessionQrSerializer(serializers.Serializer):
     room_code = serializers.CharField(read_only=True, allow_null=True, required=False)
     promotion_name = serializers.CharField(read_only=True)
     teacher_name = serializers.CharField(read_only=True, required=False)
+    supervisor_name = serializers.CharField(read_only=True, required=False, allow_null=True)
+    session_kind = serializers.CharField(read_only=True, required=False)
+    session_kind_display = serializers.CharField(read_only=True, required=False)
     session_id = serializers.UUIDField(required=False)
     teacher_checked_in = serializers.BooleanField(required=False)
+    supervisor_checked_in = serializers.BooleanField(required=False)
     grace_before_minutes = serializers.IntegerField(required=False)
     grace_after_minutes = serializers.IntegerField(required=False)
 
@@ -180,6 +196,9 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
     course_name = serializers.CharField(source='schedule.assignment.course.name', read_only=True)
     course_code = serializers.CharField(source='schedule.assignment.course.code', read_only=True)
     teacher_name = serializers.CharField(source='schedule.assignment.teacher.user.get_full_name', read_only=True)
+    supervisor_name = serializers.SerializerMethodField()
+    session_kind = serializers.CharField(source='schedule.session_kind', read_only=True)
+    session_kind_display = serializers.CharField(source='schedule.get_session_kind_display', read_only=True)
     promotion_name = serializers.CharField(source='schedule.assignment.promotion.name', read_only=True)
     day_display = serializers.CharField(source='schedule.get_day_of_week_display', read_only=True)
     start_time = serializers.TimeField(source='schedule.start_time', read_only=True)
@@ -195,7 +214,12 @@ class AttendanceSessionSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = [
             'created_by', 'teacher_checked_in', 'teacher_checked_in_at', 'teacher_checked_in_by',
+            'supervisor_checked_in', 'supervisor_checked_in_at', 'supervisor_checked_in_by',
         ]
+
+    def get_supervisor_name(self, obj):
+        person = obj.schedule.resolved_supervisor()
+        return person.user.get_full_name() if person else None
 
     def get_present_count(self, obj):
         return Attendance.objects.filter(
@@ -252,6 +276,21 @@ class AttendanceSerializer(serializers.ModelSerializer):
         if obj.status == 'absent':
             return 'Absente' if feminine else 'Absent'
         return obj.get_status_display()
+
+
+class StaffAttendanceSerializer(serializers.ModelSerializer):
+    teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
+    employee_id = serializers.CharField(source='teacher.employee_id', read_only=True)
+    course_name = serializers.CharField(source='schedule.assignment.course.name', read_only=True)
+    course_code = serializers.CharField(source='schedule.assignment.course.code', read_only=True)
+    promotion_name = serializers.CharField(source='schedule.assignment.promotion.name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    session_kind = serializers.CharField(source='schedule.session_kind', read_only=True)
+
+    class Meta:
+        model = StaffAttendance
+        fields = '__all__'
 
 
 class RoomReservationSerializer(serializers.ModelSerializer):
