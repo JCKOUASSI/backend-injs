@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FiEdit2, FiCheck, FiX } from 'react-icons/fi'
 import PageHeader from '../../components/common/PageHeader'
 import ExportButtons from '../../components/common/ExportButtons'
 import Modal from '../../components/common/Modal'
+import PaginationBar from '../../components/common/PaginationBar'
 import { useToast } from '../../context/ToastContext'
 import { useFetch } from '../../hooks/useFetch'
 import {
@@ -78,14 +79,79 @@ function buildEcueValidations(grades, passingOverrides = {}) {
       studentScore,
       passingScore: passing,
       validated,
+      statusKey: studentScore == null ? 'pending' : validated ? 'valid' : 'invalid',
       statusLabel: studentScore == null ? 'Non noté' : validated ? 'ECUE validé' : 'ECUE invalidé',
     }
   })
 }
 
+function EcuePassingEditor({
+  row,
+  isEditing,
+  editValue,
+  setEditValue,
+  savingPass,
+  onStart,
+  onSave,
+  onCancel,
+}) {
+  if (isEditing) {
+    return (
+      <div className="d-flex align-items-center gap-1">
+        <input
+          type="number"
+          min="0"
+          max="20"
+          step="0.25"
+          className="form-control form-control-sm"
+          style={{ maxWidth: 72 }}
+          value={editValue}
+          onChange={(ev) => setEditValue(ev.target.value)}
+          disabled={savingPass}
+        />
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-success btn-icon-action"
+          title="Enregistrer"
+          aria-label="Enregistrer"
+          disabled={savingPass}
+          onClick={() => onSave(row)}
+        >
+          <FiCheck size={14} />
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-secondary btn-icon-action"
+          title="Annuler"
+          aria-label="Annuler"
+          disabled={savingPass}
+          onClick={onCancel}
+        >
+          <FiX size={14} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="d-flex align-items-center gap-2">
+      <strong>{row.passingScore}/20</strong>
+      <button
+        type="button"
+        className="btn btn-sm btn-outline-primary btn-icon-action"
+        title="Modifier la note de validation"
+        aria-label="Modifier la note de validation"
+        onClick={() => onStart(row)}
+      >
+        <FiEdit2 size={14} />
+      </button>
+    </div>
+  )
+}
+
 export default function AdminGrades() {
   const { showToast } = useToast()
-  const { data: gradesData, loading, reload: reloadGrades } = useFetch(() => fetchGrades())
+  const { data: gradesData, loading, reload: reloadGrades } = useFetch(() => fetchGrades({ page_size: 500 }))
   const { data: sessions, reload: reloadSessions } = useFetch(() => fetchExamSessions())
   const { data: deliberations, reload: reloadDelib } = useFetch(() => fetchDeliberations())
   const { data: years } = useFetch(() => fetchAcademicYears())
@@ -99,13 +165,62 @@ export default function AdminGrades() {
   const [editValue, setEditValue] = useState('')
   const [savingPass, setSavingPass] = useState(false)
 
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [viewMode, setViewMode] = useState('cards')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(15)
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim().toLowerCase())
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
   const grades = gradesData?.results || []
   const ecueRows = useMemo(
     () => buildEcueValidations(grades, passingOverrides),
     [grades, passingOverrides],
   )
 
-  const rows = ecueRows.map((e) => [
+  const counts = useMemo(() => {
+    let valid = 0
+    let invalid = 0
+    let pending = 0
+    for (const e of ecueRows) {
+      if (e.statusKey === 'valid') valid += 1
+      else if (e.statusKey === 'invalid') invalid += 1
+      else pending += 1
+    }
+    return {
+      total: ecueRows.length,
+      valid,
+      invalid,
+      pending,
+      sessions: (sessions || []).length,
+      deliberations: (deliberations || []).length,
+    }
+  }, [ecueRows, sessions, deliberations])
+
+  const filtered = useMemo(() => {
+    return ecueRows.filter((e) => {
+      if (statusFilter && e.statusKey !== statusFilter) return false
+      if (!search) return true
+      const hay = `${e.courseCode} ${e.courseName} ${e.matricule} ${e.studentName} ${e.statusLabel}`.toLowerCase()
+      return hay.includes(search)
+    })
+  }, [ecueRows, statusFilter, search])
+
+  const total = filtered.length
+  const pageItems = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const rows = filtered.map((e) => [
     e.courseCode,
     e.courseName,
     e.matricule,
@@ -114,6 +229,11 @@ export default function AdminGrades() {
     e.passingScore,
     e.statusLabel,
   ])
+
+  const setStatusAndReset = (value) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   const startEditPassing = (row) => {
     setEditingKey(row.key)
@@ -192,7 +312,9 @@ export default function AdminGrades() {
     }
   }
 
-  if (loading) return <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
+  if (loading && !gradesData) {
+    return <div className="text-center py-5"><div className="spinner-border text-primary" /></div>
+  }
 
   return (
     <>
@@ -215,72 +337,241 @@ export default function AdminGrades() {
         }
       />
 
-      <div className="row g-4 mb-4">
-        <div className="col-md-4"><div className="card-injs p-4"><h6>Validation ECUE</h6><p className="small text-muted mb-0">Moyenne CC+CT ≥ note de validation (modifiable)</p></div></div>
-        <div className="col-md-4"><div className="card-injs p-4"><h6>Validation UE</h6><p className="small text-muted mb-0">Tous ECUE ≥ seuil ou compensation (aucun &lt; 8)</p></div></div>
-        <div className="col-md-4"><div className="card-injs p-4"><h6>Validation Semestre</h6><p className="small text-muted mb-0">Compensation inter-UE si moyenne ≥ 10</p></div></div>
+      <div className="row g-3 mb-4">
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold text-primary">{counts.total}</div>
+            <div className="small text-muted">Validations ECUE</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold text-success">{counts.valid}</div>
+            <div className="small text-muted">ECUE validés</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold text-danger">{counts.invalid}</div>
+            <div className="small text-muted">ECUE invalidés</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-3">
+          <div className="card-injs p-3 text-center">
+            <div className="fs-4 fw-bold">{total}</div>
+            <div className="small text-muted">Résultats filtrés</div>
+          </div>
+        </div>
       </div>
 
-      <div className="row g-4 mb-4">
+      <div className="card-injs p-3 mb-3">
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <span className="small text-muted me-1">Statut :</span>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === '' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setStatusAndReset('')}
+          >
+            Tous ({counts.total})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'valid' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setStatusAndReset('valid')}
+          >
+            Validés <span className="opacity-75">({counts.valid})</span>
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'invalid' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setStatusAndReset('invalid')}
+          >
+            Invalidés <span className="opacity-75">({counts.invalid})</span>
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${statusFilter === 'pending' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setStatusAndReset('pending')}
+          >
+            Non notés <span className="opacity-75">({counts.pending})</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="card-injs p-3 mb-4">
+        <div className="row g-2 align-items-end">
+          <div className="col-md-5">
+            <label className="form-label small mb-1">Recherche</label>
+            <input
+              className="form-control"
+              placeholder="ECUE, matricule, étudiant…"
+              value={searchInput}
+              onChange={(ev) => setSearchInput(ev.target.value)}
+            />
+          </div>
+          <div className="col-md-4">
+            <label className="form-label small mb-1">Statut</label>
+            <select
+              className="form-select"
+              value={statusFilter}
+              onChange={(ev) => setStatusAndReset(ev.target.value)}
+            >
+              <option value="">Tous</option>
+              <option value="valid">Validés</option>
+              <option value="invalid">Invalidés</option>
+              <option value="pending">Non notés</option>
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label small mb-1">Affichage</label>
+            <div className="btn-group w-100" role="group">
+              <button
+                type="button"
+                className={`btn btn-sm ${viewMode === 'table' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+                onClick={() => setViewMode('table')}
+              >
+                Liste
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${viewMode === 'cards' ? 'btn-injs-primary' : 'btn-outline-secondary'}`}
+                onClick={() => setViewMode('cards')}
+              >
+                Cartes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-3 mb-4">
         <div className="col-lg-5">
-          <div className="card-injs p-4">
-            <h5 className="fw-bold mb-3">Sessions d&apos;examens</h5>
+          <div className="card-injs p-3 h-100">
+            <h6 className="fw-bold mb-2">Sessions d&apos;examens ({counts.sessions})</h6>
             {(sessions || []).length === 0 ? (
-              <p className="text-muted">Aucune session — créez-en une.</p>
-            ) : (sessions || []).map((s) => (
-              <div key={s.id} className="d-flex justify-content-between py-2 border-bottom">
-                <span>{s.name || s.id}</span>
-                <span className="badge-injs me-2">{translateSessionType(s.session_type)}</span>
-                <StatusBadge statut={s.status || 'ouverte'} />
+              <p className="text-muted small mb-0">Aucune session — créez-en une.</p>
+            ) : (sessions || []).slice(0, 5).map((s) => (
+              <div key={s.id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <span className="small fw-semibold text-truncate me-2">{s.name || s.id}</span>
+                <div className="d-flex align-items-center gap-1 flex-shrink-0">
+                  <span className="badge-injs">{translateSessionType(s.session_type)}</span>
+                  <StatusBadge statut={s.status || 'ouverte'} />
+                </div>
               </div>
             ))}
           </div>
         </div>
         <div className="col-lg-7">
-          <div className="card-injs p-4">
-            <h5 className="fw-bold mb-3">Délibérations</h5>
+          <div className="card-injs p-3 h-100">
+            <h6 className="fw-bold mb-2">Délibérations ({counts.deliberations})</h6>
             {(deliberations || []).length === 0 ? (
-              <p className="text-muted mb-0">Aucune délibération en base. Créez une délibération (admin / API) puis utilisez Lancer / Valider / Publier.</p>
+              <p className="text-muted small mb-0">
+                Aucune délibération en base. Créez une délibération (admin / API) puis utilisez Lancer / Valider / Publier.
+              </p>
             ) : (
-              <table className="table table-sm mb-0">
-                <thead><tr><th>Libellé</th><th>Statut</th><th /></tr></thead>
-                <tbody>
-                  {(deliberations || []).map((d) => (
-                    <tr key={d.id}>
-                      <td>{d.name || d.exam_session_name || d.id?.slice?.(0, 8)}</td>
-                      <td><StatusBadge statut={d.status || '—'} /></td>
-                      <td className="widget-actions">
-                        <button type="button" className="btn btn-sm btn-outline-primary" disabled={!!busy} onClick={() => handleDelib(d.id, 'run')}>Lancer</button>
-                        <button type="button" className="btn btn-sm btn-outline-success" disabled={!!busy} onClick={() => handleDelib(d.id, 'validate')}>Valider</button>
-                        <button type="button" className="btn btn-sm btn-injs-primary" disabled={!!busy} onClick={() => handleDelib(d.id, 'publish')}>Publier</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-responsive">
+                <table className="table table-sm mb-0 align-middle">
+                  <thead>
+                    <tr><th>Libellé</th><th>Statut</th><th className="text-end">Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {(deliberations || []).map((d) => (
+                      <tr key={d.id}>
+                        <td className="small">{d.name || d.exam_session_name || d.id?.slice?.(0, 8)}</td>
+                        <td><StatusBadge statut={d.status || '—'} /></td>
+                        <td className="text-end widget-actions">
+                          <button type="button" className="btn btn-sm btn-outline-primary" disabled={!!busy} onClick={() => handleDelib(d.id, 'run')}>Lancer</button>
+                          <button type="button" className="btn btn-sm btn-outline-success" disabled={!!busy} onClick={() => handleDelib(d.id, 'validate')}>Valider</button>
+                          <button type="button" className="btn btn-sm btn-injs-primary" disabled={!!busy} onClick={() => handleDelib(d.id, 'publish')}>Publier</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="card-injs overflow-hidden">
-        <div className="p-3 border-bottom">
-          <h5 className="fw-bold mb-0">Condition(s) de validation des ECUES</h5>
-          <p className="small text-muted mb-0 mt-1">
-            Note étudiant (CC 40 % + CT 60 %) comparée au seuil de validation ECUE (modifiable).
-          </p>
-        </div>
+      <div className="card-injs position-relative rooms-list-shell">
+        {loading && (
+          <div className="position-absolute top-0 end-0 m-2" style={{ zIndex: 3 }}>
+            <div className="spinner-border spinner-border-sm text-primary" />
+          </div>
+        )}
 
-        {!ecueRows.length ? (
-          <div className="p-4 text-muted text-center">Aucun ECUE noté pour le moment.</div>
-        ) : (
-          <div className="p-3">
-            <div className="row g-3">
-              {ecueRows.map((e) => {
-                const isEditing = editingKey === e.key
-                return (
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          disabled={loading}
+          pageSizeOptions={[10, 15, 25, 50]}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
+
+        <div className="rooms-list-body">
+          {viewMode === 'table' ? (
+            <div className="table-responsive">
+              <table className="table table-hover mb-0 align-middle">
+                <thead>
+                  <tr>
+                    <th>ECUE</th>
+                    <th>Étudiant</th>
+                    <th>Note</th>
+                    <th>Seuil</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((e) => (
+                    <tr key={e.key}>
+                      <td>
+                        <code className="small">{e.courseCode}</code>
+                        <div className="small text-muted">{e.courseName}</div>
+                      </td>
+                      <td>
+                        <div className="fw-semibold">{e.studentName}</div>
+                        <code className="small">{e.matricule}</code>
+                      </td>
+                      <td className="fw-bold">{e.studentScore != null ? `${e.studentScore}/20` : '—'}</td>
+                      <td>
+                        <EcuePassingEditor
+                          row={e}
+                          isEditing={editingKey === e.key}
+                          editValue={editValue}
+                          setEditValue={setEditValue}
+                          savingPass={savingPass}
+                          onStart={startEditPassing}
+                          onSave={savePassing}
+                          onCancel={cancelEditPassing}
+                        />
+                      </td>
+                      <td>
+                        <span className={`grade-badge ${e.statusKey === 'pending' ? 'grade-pending' : e.validated ? 'grade-valid' : 'grade-fail'}`}>
+                          {e.statusLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!pageItems.length && (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted py-4">Aucun ECUE trouvé</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-3">
+              <div className="row g-3">
+                {pageItems.map((e) => (
                   <div key={e.key} className="col-md-6 col-xl-4">
-                    <div className={`ecue-validation-card ${e.validated ? 'is-valid' : e.studentScore == null ? 'is-pending' : 'is-invalid'}`}>
+                    <div className={`ecue-validation-card h-100 ${e.validated ? 'is-valid' : e.studentScore == null ? 'is-pending' : 'is-invalid'}`}>
                       <div className="ecue-validation-head">
                         <code className="ecue-validation-code">{e.courseCode}</code>
                         <span className="ecue-validation-label">{e.courseName}</span>
@@ -295,68 +586,48 @@ export default function AdminGrades() {
                         </div>
                         <div>
                           <span className="ecue-score-caption">Note de validation</span>
-                          {isEditing ? (
-                            <div className="d-flex align-items-center gap-1 mt-1">
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                step="0.25"
-                                className="form-control form-control-sm"
-                                style={{ maxWidth: 72 }}
-                                value={editValue}
-                                onChange={(ev) => setEditValue(ev.target.value)}
-                                disabled={savingPass}
-                              />
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-success btn-icon-action"
-                                title="Enregistrer"
-                                aria-label="Enregistrer"
-                                disabled={savingPass}
-                                onClick={() => savePassing(e)}
-                              >
-                                <FiCheck size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary btn-icon-action"
-                                title="Annuler"
-                                aria-label="Annuler"
-                                disabled={savingPass}
-                                onClick={cancelEditPassing}
-                              >
-                                <FiX size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="d-flex align-items-center gap-2">
-                              <strong>{e.passingScore}/20</strong>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-primary btn-icon-action"
-                                title="Modifier la note de validation"
-                                aria-label="Modifier la note de validation"
-                                onClick={() => startEditPassing(e)}
-                              >
-                                <FiEdit2 size={14} />
-                              </button>
-                            </div>
-                          )}
+                          <div className="mt-1">
+                            <EcuePassingEditor
+                              row={e}
+                              isEditing={editingKey === e.key}
+                              editValue={editValue}
+                              setEditValue={setEditValue}
+                              savingPass={savingPass}
+                              onStart={startEditPassing}
+                              onSave={savePassing}
+                              onCancel={cancelEditPassing}
+                            />
+                          </div>
                         </div>
                       </div>
                       <div className="mt-2">
-                        <span className={`grade-badge ${e.studentScore == null ? 'grade-pending' : e.validated ? 'grade-valid' : 'grade-fail'}`}>
+                        <span className={`grade-badge ${e.statusKey === 'pending' ? 'grade-pending' : e.validated ? 'grade-valid' : 'grade-fail'}`}>
                           {e.statusLabel}
                         </span>
                       </div>
                     </div>
                   </div>
-                )
-              })}
+                ))}
+                {!pageItems.length && (
+                  <div className="col-12 text-center text-muted py-4">Aucun ECUE trouvé</div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          disabled={loading}
+          pageSizeOptions={[10, 15, 25, 50]}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
       </div>
 
       <Modal

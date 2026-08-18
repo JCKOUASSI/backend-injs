@@ -3,7 +3,7 @@ import { getMenuByRole, getRoleLabel } from '../../data/navigation'
 import { INSTITUTION } from '../../data/mockData'
 import { useAuth } from '../../context/AuthContext'
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, collapsed, onClose }) {
   const { user } = useAuth()
   const location = useLocation()
   const menu = getMenuByRole(user?.role)
@@ -11,7 +11,7 @@ export default function Sidebar({ open, onClose }) {
   return (
     <>
       {open && <div className="sidebar-overlay d-lg-none" onClick={onClose} />}
-      <aside className={`sidebar ${open ? 'open' : ''}`}>
+      <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
           <img src="/logo-INJS-ABIDJAN-1.png" alt="Logo INJS" />
           <div className="sidebar-brand">

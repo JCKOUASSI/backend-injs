@@ -119,7 +119,7 @@ export default function SettingsInstitution() {
   }
 
   return (
-    <>
+    <div className="card-injs p-4">
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
         <div>
           <h6 className="fw-bold mb-1">Institution</h6>
@@ -135,7 +135,7 @@ export default function SettingsInstitution() {
         />
       </div>
 
-      <div className="card-injs p-4 border-0 bg-transparent">
+      <div className="border rounded-3 p-4">
         <div className="d-flex flex-wrap gap-4 align-items-center">
           {logoSrc ? (
             <img
@@ -310,6 +310,6 @@ export default function SettingsInstitution() {
           </div>
         </form>
       </Modal>
-    </>
+    </div>
   )
 }

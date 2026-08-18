@@ -42,7 +42,7 @@ export default function SettingsPermissions() {
 
   return (
     <>
-      <p className="text-muted small mb-4">
+      <p className="text-muted small mb-3">
         Définissez les droits d&apos;accès par rôle. Les modifications seront appliquées au serveur lors de la connexion.
       </p>
 

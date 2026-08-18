@@ -1531,3 +1531,33 @@ h1, h2, h3, h4, h5, h6 {
 .student-ue-ecue li {
   margin-bottom: 0.15rem;
 }
+
+/* Admissions — empty states & campagnes */
+.admissions-empty {
+  color: var(--injs-text-muted);
+}
+
+.admissions-empty-icon {
+  font-size: 1.75rem;
+  color: var(--injs-primary);
+  opacity: 0.55;
+}
+
+.admissions-campaign-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(51, 73, 161, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.admissions-campaign-card:hover {
+  border-color: rgba(51, 73, 161, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.admissions-campaign-card.is-active {
+  border-color: var(--injs-primary);
+  box-shadow: 0 0 0 2px rgba(51, 73, 161, 0.15);
+  background: rgba(51, 73, 161, 0.06);
+}
