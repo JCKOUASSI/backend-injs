@@ -64,6 +64,17 @@ jobs:
           cd backend
           python manage.py test_injs
 
+      - name: Verify backend Docker image
+        run: |
+          docker build -t injs-backend-ci -f backend/Dockerfile backend
+          OWNER=$(docker run --rm --entrypoint stat injs-backend-ci -c '%U' /app/staticfiles)
+          if [ "$OWNER" != "appuser" ]; then
+            echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
+            exit 1
+          fi
+          docker run --rm --entrypoint python injs-backend-ci \
+            manage.py collectstatic --noinput --dry-run
+
   security:
     runs-on: ubuntu-latest
     steps:
