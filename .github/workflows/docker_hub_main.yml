@@ -3,10 +3,10 @@
 # Cible d’exécution : AlmaLinux x86_64 (--platform linux/amd64).
 #
 # Équivalent local :
-#   backend  : docker buildx build --platform linux/amd64 -t michaelfocus2026/injs-be:latest --push ./backend
+#   backend  : docker buildx build --platform linux/amd64 -t jckouassi/injs-be:latest --push ./backend
 #   frontend : docker buildx build --platform linux/amd64 \
 #                --build-arg VITE_API_BASE_URL=/api/v1 \
-#                -t michaelfocus2026/injs-fe:latest --push ./ings-fe
+#                -t jckouassi/injs-fe:latest --push ./ings-fe
 #
 # Secrets GitHub OBLIGATOIRES (Settings → Secrets and variables → Actions) :
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
@@ -49,8 +49,8 @@ jobs:
     name: Build & push prod (linux/amd64)
     runs-on: ubuntu-latest
     env:
-      BACKEND_IMAGE: michaelfocus2026/injs-be
-      FRONTEND_IMAGE: michaelfocus2026/injs-fe
+      BACKEND_IMAGE: jckouassi/injs-be
+      FRONTEND_IMAGE: jckouassi/injs-fe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
