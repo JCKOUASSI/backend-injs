@@ -110,14 +110,14 @@ jobs:
         run: |
           IMG="${{ steps.cfg.outputs.backend_ref }}"
           docker pull "$IMG"
-          OWNER=$(docker run --rm -e SKIP_DB_SETUP=true "$IMG" \
-            stat -c '%U' /app/staticfiles)
+          OWNER=$(docker run --rm --entrypoint stat "$IMG" \
+            -c '%U' /app/staticfiles)
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)."
             exit 1
           fi
-          docker run --rm -e SKIP_DB_SETUP=true "$IMG" \
-            python manage.py collectstatic --noinput --dry-run
+          docker run --rm --entrypoint python -e SKIP_DB_SETUP=true "$IMG" \
+            manage.py collectstatic --noinput --dry-run
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
