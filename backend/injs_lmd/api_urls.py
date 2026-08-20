@@ -15,4 +15,5 @@ urlpatterns = [
     path('documents/', include('apps.documents.urls')),
     path('messaging/', include('apps.messaging.urls')),
     path('library/', include('apps.library.urls')),
+    path('eptinjs/', include('eptinjs.urls')),
 ]

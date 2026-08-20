@@ -26,3 +26,8 @@ if os.environ.get('USE_POSTGRES', 'false').lower() != 'true':  # noqa: F405
     }
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# En local le SPA tourne sur Vite : les QR de séance doivent pointer vers lui.
+EPTINJS_BADGE_BASE_URL = os.environ.get(  # noqa: F405
+    'EPTINJS_BADGE_BASE_URL', 'http://localhost:5173',
+).rstrip('/')

@@ -9,43 +9,51 @@ import AdminStudents from '../pages/admin/Students'
 import AdminProfessors from '../pages/admin/Professors'
 import AdminDepartments from '../pages/admin/Departments'
 import AdminFormations from '../pages/admin/Formations'
+import AdminImportExcel from '../pages/admin/ImportExcel'
+import AdminReferentiels from '../pages/admin/Referentiels'
 import AdminUE from '../pages/admin/UE'
 import AdminGrades from '../pages/admin/Grades'
 import AdminInternships from '../pages/admin/Internships'
 import AdminEvents from '../pages/admin/Events'
 import AdminFinances from '../pages/admin/Finances'
 import AdminReports from '../pages/admin/Reports'
-import AdminAttendance from '../pages/admin/Attendance'
+import AdminStatistiques from '../pages/admin/Statistiques'
 import AdminSettings from '../pages/admin/Settings'
 import AdminAdmissions from '../pages/admin/Admissions'
 import AdminRooms from '../pages/admin/Rooms'
-import AdminSchedule from '../pages/admin/Schedule'
 import AdminReservations from '../pages/admin/Reservations'
 import AdminMaintenance from '../pages/admin/Maintenance'
 import AdminEquipment from '../pages/admin/Equipment'
 import AdminCampusMap from '../pages/admin/CampusMap'
 
 import ProfDashboard from '../pages/professor/Dashboard'
-import ProfCourses from '../pages/professor/Courses'
 import ProfStudents from '../pages/professor/Students'
 import ProfEvaluations from '../pages/professor/Evaluations'
-import ProfAttendance from '../pages/professor/Attendance'
 import ProfInternships from '../pages/professor/Internships'
 import ProfResearch from '../pages/professor/Research'
 import ProfDocuments from '../pages/professor/Documents'
 import ProfessorRooms from '../pages/professor/Rooms'
-import ProfessorSchedule from '../pages/professor/Schedule'
 
 import StudentDashboard from '../pages/student/Dashboard'
 import StudentParcours from '../pages/student/Parcours'
 import StudentGrades from '../pages/student/Grades'
-import StudentCourses from '../pages/student/Courses'
-import StudentSchedule from '../pages/student/Schedule'
 import StudentInternships from '../pages/student/Internships'
 import StudentDocuments from '../pages/student/Documents'
 import StudentInscriptions from '../pages/student/Inscriptions'
-import StudentBadge from '../pages/student/Badge'
 import StudentPayments from '../pages/student/Payments'
+
+// Module EPT-INJS : emplois du temps, cours (ECUE), présences et badgeage.
+import EptEmploiDuTemps from '@eptinjs/pages/admin/EmploiDuTemps'
+import EptCours from '@eptinjs/pages/admin/Cours'
+import EptCoursDetail from '@eptinjs/pages/admin/CoursDetail'
+import EptPresences from '@eptinjs/pages/admin/Presences'
+import EptProfPlanning from '@eptinjs/pages/professeur/MonEmploiDuTemps'
+import EptProfCours from '@eptinjs/pages/professeur/MesCours'
+import EptProfPresences from '@eptinjs/pages/professeur/MesPresences'
+import EptEtudiantPlanning from '@eptinjs/pages/etudiant/MonEmploiDuTemps'
+import EptEtudiantCours from '@eptinjs/pages/etudiant/MesCours'
+import EptBadgeage from '@eptinjs/pages/etudiant/Badgeage'
+import '@eptinjs/styles/eptinjs.css'
 
 function HomeRedirect() {
   const { isAuthenticated, user } = useAuth()
@@ -71,10 +79,14 @@ export default function AppRoutes() {
           <Route path="/admin/professeurs" element={<AdminProfessors />} />
           <Route path="/admin/departements" element={<AdminDepartments />} />
           <Route path="/admin/formations" element={<AdminFormations />} />
+          <Route path="/admin/import-excel" element={<AdminImportExcel />} />
+          <Route path="/admin/referentiels" element={<AdminReferentiels />} />
           <Route path="/admin/ue" element={<AdminUE />} />
+          <Route path="/admin/cours" element={<EptCours />} />
+          <Route path="/admin/cours/:offeringId" element={<EptCoursDetail />} />
           <Route path="/admin/notes" element={<AdminGrades />} />
-          <Route path="/admin/emploi-du-temps" element={<AdminSchedule />} />
-          <Route path="/admin/presences" element={<AdminAttendance />} />
+          <Route path="/admin/emploi-du-temps" element={<EptEmploiDuTemps />} />
+          <Route path="/admin/presences" element={<EptPresences />} />
           <Route path="/admin/badgeage" element={<RedirectPreserveQuery to="/admin/presences" />} />
           <Route path="/admin/salles" element={<AdminRooms />} />
           <Route path="/admin/stages" element={<AdminInternships />} />
@@ -84,6 +96,7 @@ export default function AppRoutes() {
           <Route path="/admin/carte-campus" element={<AdminCampusMap />} />
           <Route path="/admin/evenements" element={<AdminEvents />} />
           <Route path="/admin/finances" element={<AdminFinances />} />
+          <Route path="/admin/statistiques" element={<AdminStatistiques />} />
           <Route path="/admin/rapports" element={<AdminReports />} />
           <Route path="/admin/parametres" element={<AdminSettings />} />
           <Route path="/admin/admissions" element={<AdminAdmissions />} />
@@ -93,9 +106,13 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute allowedRoles={['professeur']} />}>
         <Route element={<MainLayout />}>
           <Route path="/professeur" element={<ProfDashboard />} />
-          <Route path="/professeur/cours" element={<ProfCourses />} />
-          <Route path="/professeur/emploi-du-temps" element={<ProfessorSchedule />} />
-          <Route path="/professeur/presences" element={<ProfAttendance />} />
+          <Route path="/professeur/cours" element={<EptProfCours />} />
+          <Route
+            path="/professeur/cours/:offeringId"
+            element={<EptCoursDetail baseRetour="/professeur/cours" />}
+          />
+          <Route path="/professeur/emploi-du-temps" element={<EptProfPlanning />} />
+          <Route path="/professeur/presences" element={<EptProfPresences />} />
           <Route path="/professeur/presence" element={<RedirectPreserveQuery to="/professeur/presences" />} />
           <Route path="/professeur/etudiants" element={<ProfStudents />} />
           <Route path="/professeur/salles" element={<ProfessorRooms />} />
@@ -111,9 +128,13 @@ export default function AppRoutes() {
           <Route path="/etudiant" element={<StudentDashboard />} />
           <Route path="/etudiant/parcours" element={<StudentParcours />} />
           <Route path="/etudiant/notes" element={<StudentGrades />} />
-          <Route path="/etudiant/cours" element={<StudentCourses />} />
-          <Route path="/etudiant/emploi-du-temps" element={<StudentSchedule />} />
-          <Route path="/etudiant/presences" element={<StudentBadge />} />
+          <Route path="/etudiant/cours" element={<EptEtudiantCours />} />
+          <Route
+            path="/etudiant/cours/:offeringId"
+            element={<EptCoursDetail peutGerer={false} baseRetour="/etudiant/cours" />}
+          />
+          <Route path="/etudiant/emploi-du-temps" element={<EptEtudiantPlanning />} />
+          <Route path="/etudiant/presences" element={<EptBadgeage />} />
           <Route path="/etudiant/badgeage" element={<RedirectPreserveQuery to="/etudiant/presences" />} />
           <Route path="/etudiant/stages" element={<StudentInternships />} />
           <Route path="/etudiant/documents" element={<StudentDocuments />} />

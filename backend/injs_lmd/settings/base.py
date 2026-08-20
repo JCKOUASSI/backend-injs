@@ -2,8 +2,16 @@
 from datetime import timedelta
 from pathlib import Path
 import os
+import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Module EPT-INJS (emplois du temps / présences / badgeages) : le code vit hors
+# de backend/apps, dans eptinjs/ à la racine du dépôt.
+EPTINJS_ROOT = BASE_DIR.parent / 'eptinjs'
+EPTINJS_BACKEND_DIR = EPTINJS_ROOT / 'backend'
+if EPTINJS_BACKEND_DIR.is_dir() and str(EPTINJS_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(EPTINJS_BACKEND_DIR))
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-change-in-production-injs-2026')
 
@@ -46,6 +54,8 @@ INSTALLED_APPS = [
     'apps.documents',
     'apps.messaging',
     'apps.library',
+    # Module externe eptinjs/
+    'eptinjs',
 ]
 
 MIDDLEWARE = [
@@ -281,6 +291,14 @@ LMD_MENTION_THRESHOLDS = {
     'assez_bien': float(os.environ.get('LMD_MENTION_ASSEZ_BIEN', '12.0')),
     'passable': float(os.environ.get('LMD_MENTION_PASSABLE', '10.0')),
 }
+
+# Badgeage QR — géofence campus (salles avec coordonnées)
+INJS_GEOFENCE_RADIUS_M = int(os.environ.get('INJS_GEOFENCE_RADIUS_M', '250'))
+INJS_GEOFENCE_MAX_ACCURACY_M = int(os.environ.get('INJS_GEOFENCE_MAX_ACCURACY_M', '80'))
+
+# EPT-INJS — origine du SPA encodée dans les QR de séance : le téléphone qui scanne
+# doit atterrir sur le frontend. Vide = origine de la requête (API et SPA co-hébergés).
+EPTINJS_BADGE_BASE_URL = os.environ.get('EPTINJS_BADGE_BASE_URL', '').rstrip('/')
 
 # Security headers
 SECURE_CONTENT_TYPE_NOSNIFF = True
