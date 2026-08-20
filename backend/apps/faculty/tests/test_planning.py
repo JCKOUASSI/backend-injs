@@ -153,10 +153,12 @@ class StaffAttendanceTests(TestCase):
         )
         result = check_in_staff(
             teacher=self.formateur, schedule=self.schedule, session_date=session_date,
+            badge_context={'device_id': 'device-formateur', 'device_label': 'Test F001'},
         )
         self.assertIn('formateur', result['roles'])
         enc = check_in_staff(
             teacher=self.encadrant, schedule=self.schedule, session_date=session_date,
+            badge_context={'device_id': 'device-encadrant', 'device_label': 'Test E001'},
         )
         self.assertIn('encadrant', enc['roles'])
 
