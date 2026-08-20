@@ -1,0 +1,27 @@
+# Les images backend et frontend se construisent depuis la racine du dépôt
+# (elles ont besoin de eptinjs/) : c'est ce fichier qui s'applique, et non
+# backend/.dockerignore ni ings-fe/.dockerignore.
+.git
+.github
+docs
+elements
+
+# Python
+**/__pycache__
+**/*.pyc
+**/venv
+**/.venv
+**/db.sqlite3
+**/media
+**/staticfiles
+
+# Node / frontend
+**/node_modules
+**/dist
+
+# Secrets et réglages locaux
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/credentials.json

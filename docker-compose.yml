@@ -52,14 +52,15 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command: >
       sh -c "python manage.py migrate &&
              python manage.py seed_injs_demo &&
              gunicorn injs_lmd.wsgi:application --bind 0.0.0.0:8001 --workers 4 --timeout 120"
     volumes:
       - ./backend:/app
+      - ./eptinjs:/eptinjs
       - media_data:/app/media
     ports:
       - "8001:8001"
@@ -86,11 +87,12 @@ services:
 
   celery:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A injs_lmd worker -l info
     volumes:
       - ./backend:/app
+      - ./eptinjs:/eptinjs
     environment:
       DJANGO_SETTINGS_MODULE: injs_lmd.settings.development
       USE_POSTGRES: "true"
@@ -103,11 +105,12 @@ services:
 
   celery-beat:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command: celery -A injs_lmd beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ./backend:/app
+      - ./eptinjs:/eptinjs
     environment:
       DJANGO_SETTINGS_MODULE: injs_lmd.settings.development
       USE_POSTGRES: "true"
