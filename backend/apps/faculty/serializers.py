@@ -45,9 +45,18 @@ class CourseAssignmentSerializer(serializers.ModelSerializer):
     supervisor_name = serializers.CharField(source='supervisor.user.get_full_name', read_only=True, allow_null=True)
     course_name = serializers.CharField(source='course.name', read_only=True)
     course_code = serializers.CharField(source='course.code', read_only=True)
+    teaching_unit_id = serializers.UUIDField(source='course.teaching_unit_id', read_only=True)
+    teaching_unit_code = serializers.CharField(source='course.teaching_unit.code', read_only=True)
+    teaching_unit_name = serializers.CharField(source='course.teaching_unit.name', read_only=True)
     promotion_name = serializers.CharField(source='promotion.name', read_only=True)
+    program_id = serializers.UUIDField(source='promotion.program_id', read_only=True)
+    program_name = serializers.CharField(source='promotion.program.name', read_only=True)
     academic_year_name = serializers.CharField(source='academic_year.label', read_only=True)
+    hours_cm = serializers.IntegerField(source='course.hours_cm', read_only=True)
+    hours_td = serializers.IntegerField(source='course.hours_td', read_only=True)
+    hours_tp = serializers.IntegerField(source='course.hours_tp', read_only=True)
     students_count = serializers.SerializerMethodField()
+    schedules_count = serializers.SerializerMethodField()
 
     class Meta:
         model = CourseAssignment
@@ -55,6 +64,12 @@ class CourseAssignmentSerializer(serializers.ModelSerializer):
 
     def get_students_count(self, obj):
         return obj.promotion.students.filter(status='active').count()
+
+    def get_schedules_count(self, obj):
+        count = getattr(obj, 'schedules_count', None)
+        if count is not None:
+            return count
+        return obj.schedules.filter(is_active=True).count()
 
 
 class ScheduleSerializer(serializers.ModelSerializer):
@@ -175,10 +190,17 @@ class SessionQrSerializer(serializers.Serializer):
     supervisor_checked_in = serializers.BooleanField(required=False)
     grace_before_minutes = serializers.IntegerField(required=False)
     grace_after_minutes = serializers.IntegerField(required=False)
+    geofence_required = serializers.BooleanField(required=False)
+    geofence_radius_m = serializers.IntegerField(required=False, allow_null=True)
 
 
 class CheckInSerializer(serializers.Serializer):
     session_token = serializers.CharField()
+    device_id = serializers.CharField(required=False, allow_blank=True, max_length=80)
+    device_label = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    latitude = serializers.FloatField(required=False, allow_null=True)
+    longitude = serializers.FloatField(required=False, allow_null=True)
+    accuracy_m = serializers.FloatField(required=False, allow_null=True)
 
     def validate(self, attrs):
         from apps.faculty.services.session_qr import parse_session_payload, get_schedule_or_raise, SessionQrError
@@ -189,6 +211,8 @@ class CheckInSerializer(serializers.Serializer):
             raise serializers.ValidationError({'session_token': str(exc)}) from exc
         attrs['schedule'] = schedule
         attrs['session_date'] = session_date
+        if (attrs.get('latitude') is None) ^ (attrs.get('longitude') is None):
+            raise serializers.ValidationError('latitude et longitude doivent être fournis ensemble')
         return attrs
 
 

@@ -164,6 +164,12 @@ class Attendance(TimeStampedModel):
     status = models.CharField(max_length=10, choices=STATUSES, default='present')
     recorded_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     notes = models.CharField(max_length=255, blank=True)
+    device_id = models.CharField(max_length=80, blank=True, db_index=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    accuracy_m = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    outside_geofence_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         unique_together = [['student', 'schedule', 'date']]
@@ -217,6 +223,12 @@ class StaffAttendance(TimeStampedModel):
         related_name='recorded_staff_attendances',
     )
     notes = models.CharField(max_length=255, blank=True)
+    device_id = models.CharField(max_length=80, blank=True, db_index=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    accuracy_m = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    outside_geofence_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         unique_together = [['teacher', 'schedule', 'date', 'role']]
@@ -334,3 +346,23 @@ class EquipmentAsset(TimeStampedModel):
 
     def __str__(self):
         return f'{self.code} — {self.name}'
+
+
+class BadgeDevice(TimeStampedModel):
+    """Appareil autorisé pour le badgeage QR (un actif par utilisateur)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        'accounts.User', on_delete=models.CASCADE, related_name='badge_devices',
+    )
+    device_id = models.CharField(max_length=80, db_index=True)
+    device_label = models.CharField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [['user', 'device_id']]
+        ordering = ['-last_seen_at', '-created_at']
+
+    def __str__(self):
+        return f'{self.user} — {self.device_id}'

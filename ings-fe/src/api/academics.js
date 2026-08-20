@@ -41,9 +41,33 @@ export async function fetchPrograms(params = {}) {
   return data.results
 }
 
+export async function createProgram(payload) {
+  return apiPost('/academics/programs/', payload)
+}
+
+export async function updateProgram(id, payload) {
+  return apiPatch(`/academics/programs/${id}/`, payload)
+}
+
+export async function deleteProgram(id) {
+  return apiDelete(`/academics/programs/${id}/`)
+}
+
 export async function fetchPromotions(params = {}) {
   const data = await apiGet('/academics/promotions/', { page_size: 100, ...params })
   return data.results
+}
+
+export async function createPromotion(payload) {
+  return apiPost('/academics/promotions/', payload)
+}
+
+export async function updatePromotion(id, payload) {
+  return apiPatch(`/academics/promotions/${id}/`, payload)
+}
+
+export async function deletePromotion(id) {
+  return apiDelete(`/academics/promotions/${id}/`)
 }
 
 export async function fetchSpecializations(params = {}) {
@@ -51,9 +75,50 @@ export async function fetchSpecializations(params = {}) {
   return data.results
 }
 
+export async function createSpecialization(payload) {
+  return apiPost('/academics/specializations/', payload)
+}
+
+export async function updateSpecialization(id, payload) {
+  return apiPatch(`/academics/specializations/${id}/`, payload)
+}
+
+export async function deleteSpecialization(id) {
+  return apiDelete(`/academics/specializations/${id}/`)
+}
+
 export async function fetchAcademicYears(params = {}) {
   const data = await apiGet('/academics/academic-years/', { page_size: 20, ...params })
   return data.results
+}
+
+export async function createAcademicYear(payload) {
+  return apiPost('/academics/academic-years/', payload)
+}
+
+export async function updateAcademicYear(id, payload) {
+  return apiPatch(`/academics/academic-years/${id}/`, payload)
+}
+
+export async function deleteAcademicYear(id) {
+  return apiDelete(`/academics/academic-years/${id}/`)
+}
+
+export async function fetchSemesters(params = {}) {
+  const data = await apiGet('/academics/semesters/', { page_size: 50, ...params })
+  return data.results
+}
+
+export async function createSemester(payload) {
+  return apiPost('/academics/semesters/', payload)
+}
+
+export async function updateSemester(id, payload) {
+  return apiPatch(`/academics/semesters/${id}/`, payload)
+}
+
+export async function deleteSemester(id) {
+  return apiDelete(`/academics/semesters/${id}/`)
 }
 
 export async function fetchTeachingUnits(params = {}) {
@@ -67,6 +132,30 @@ export async function fetchTeachingUnits(params = {}) {
 export async function fetchProgramCourses(params = {}) {
   const data = await apiGet('/academics/program-courses/', { page_size: 200, ...params })
   return data.results
+}
+
+export async function createProgramCourse(payload) {
+  return apiPost('/academics/program-courses/', payload)
+}
+
+export async function updateProgramCourse(id, payload) {
+  return apiPatch(`/academics/program-courses/${id}/`, payload)
+}
+
+export async function deleteProgramCourse(id) {
+  return apiDelete(`/academics/program-courses/${id}/`)
+}
+
+export async function fetchJobNomenclatures(params = {}) {
+  const data = await apiGet('/academics/job-nomenclatures/', { page_size: 200, ...params })
+  return data.results
+}
+
+export async function importReferentialFile(resource, file) {
+  const formData = new FormData()
+  formData.append('resource', resource)
+  formData.append('file', file)
+  return apiUpload('/academics/imports/referentials/', formData, 'POST')
 }
 
 export async function createTeachingUnit(payload) {
@@ -84,6 +173,14 @@ export async function deleteTeachingUnit(id) {
 export async function fetchCourses(params = {}) {
   const data = await apiGet('/academics/courses/', { page_size: 300, ...params })
   return data.results || []
+}
+
+export async function fetchCoursCatalog(params = {}) {
+  return apiGet('/academics/cours/', params)
+}
+
+export async function fetchCoursOffering(params = {}) {
+  return apiGet('/academics/cours/offering/', params)
 }
 
 export async function createCourse(payload) {

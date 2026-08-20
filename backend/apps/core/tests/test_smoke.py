@@ -44,5 +44,11 @@ class ModuleSmokeTests(TestCase):
     def test_reports_analytics(self):
         self._assert_authenticated_ok_or_empty('analytics')
 
+    def test_reports_statistics(self):
+        self._assert_authenticated_ok_or_empty('academic-statistics')
+
+    def test_academics_cours_list(self):
+        self._assert_authenticated_ok_or_empty('cours-list')
+
     def test_exams_sessions_list(self):
         self._assert_authenticated_ok_or_empty('examsession-list')

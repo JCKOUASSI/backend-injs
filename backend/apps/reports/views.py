@@ -1,43 +1,33 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Avg
 
 from apps.students.models import Student, AcademicRecord
-from apps.exams.models import Grade, Deliberation, ExamSession
-from apps.finance.models import StudentFee
+from apps.exams.models import ExamSession
 from apps.core.export import export_to_pdf, export_to_excel, export_to_word
 from apps.reports.services.transcript import build_semester_transcript, render_transcript_pdf
+from apps.reports.services.statistics import (
+    analytics_compat_payload,
+    build_academic_statistics,
+    parse_scope,
+    parse_sections,
+)
 
 
 class AnalyticsDashboardView(APIView):
     permission_module = 'reports'
 
     def get(self, request):
-        from apps.faculty.models import Teacher
-        total_students = Student.objects.filter(status='active').count()
-        total_teachers = Teacher.objects.filter(is_active=True).count()
-        pending_fees = StudentFee.objects.filter(status='pending').count()
-        paid_fees = StudentFee.objects.filter(status='paid').count()
-        avg_grade = Grade.objects.filter(score__isnull=False).aggregate(avg=Avg('score'))['avg']
+        return Response(analytics_compat_payload(parse_scope(request.query_params)))
 
-        deliberations = Deliberation.objects.filter(status='published')
-        passing_rates = []
-        for d in deliberations[:5]:
-            summary = d.results_summary or {}
-            passing_rates.append({
-                'program': d.program.name,
-                'promotion': d.promotion.name,
-                'rate': summary.get('passing_rate', 0),
-            })
 
-        return Response({
-            'total_students': total_students,
-            'total_teachers': total_teachers,
-            'pending_fees': pending_fees,
-            'paid_fees': paid_fees,
-            'average_grade': round(float(avg_grade), 2) if avg_grade else None,
-            'passing_rates': passing_rates,
-        })
+class AcademicStatisticsView(APIView):
+    """Tableau de bord statistiques LMD (KPI, pédagogie, admin, historique, alertes)."""
+    permission_module = 'reports'
+
+    def get(self, request):
+        scope = parse_scope(request.query_params)
+        sections = parse_sections(request.query_params.get('sections'))
+        return Response(build_academic_statistics(scope, sections))
 
 
 class TranscriptPDFView(APIView):

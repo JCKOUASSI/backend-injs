@@ -245,6 +245,10 @@ export async function createAssignment(payload) {
   return apiPost('/faculty/assignments/', payload)
 }
 
+export async function updateAssignment(id, payload) {
+  return apiPatch(`/faculty/assignments/${id}/`, payload)
+}
+
 export async function deleteAssignment(id) {
   await apiDelete(`/faculty/assignments/${id}/`)
   return true
@@ -432,6 +436,10 @@ export async function fetchAttendanceSessions(params = {}) {
   return data.results
 }
 
+export async function createAttendanceSession(payload) {
+  return apiPost('/faculty/attendance-sessions/', payload)
+}
+
 export async function fetchAttendanceSessionQr(sessionId) {
   return apiGet(`/faculty/attendance-sessions/${sessionId}/qr/`)
 }
@@ -440,8 +448,12 @@ export async function closeAttendanceSession(sessionId) {
   return apiPost(`/faculty/attendance-sessions/${sessionId}/close/`)
 }
 
-export async function checkInSession(sessionToken) {
-  return apiPost('/faculty/attendances/check-in/', { session_token: sessionToken })
+export async function checkInSession(sessionToken, extra = {}) {
+  return apiPost('/faculty/attendances/check-in/', { session_token: sessionToken, ...extra })
+}
+
+export async function sendAttendanceHeartbeat(sessionToken, extra = {}) {
+  return apiPost('/faculty/attendances/heartbeat/', { session_token: sessionToken, ...extra })
 }
 
 export async function fetchAttendanceDashboardStats(params = {}) {

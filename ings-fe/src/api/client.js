@@ -59,7 +59,16 @@ export async function apiRequest(path, options = {}) {
   }
 
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`
-  let res = await fetch(url, { ...fetchOptions, headers })
+  let res
+  try {
+    res = await fetch(url, { ...fetchOptions, headers })
+  } catch {
+    throw new ApiError(
+      'API indisponible. Vérifiez que le backend INJS tourne sur le port 8002 (le 8001 est souvent pris par SYGEP).',
+      0,
+      null,
+    )
+  }
 
   if (res.status === 401 && auth && retry) {
     const newToken = await refreshAccessToken()
@@ -80,7 +89,11 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!res.ok) {
-    const message = data?.detail || data?.error || data?.message || `Erreur ${res.status}`
+    const detail = data?.detail || data?.error || data?.message
+    let message = typeof detail === 'string' ? detail : `Erreur ${res.status}`
+    if (res.status === 404 && String(url).includes('login')) {
+      message = 'Service de connexion introuvable. Démarrez le backend INJS sur le port 8002 (le 8001 est souvent occupé par SYGEP).'
+    }
     throw new ApiError(message, res.status, data)
   }
 

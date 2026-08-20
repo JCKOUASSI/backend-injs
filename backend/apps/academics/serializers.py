@@ -72,9 +72,17 @@ class SemesterSerializer(serializers.ModelSerializer):
 
 
 class CourseSerializer(serializers.ModelSerializer):
+    teaching_unit_code = serializers.CharField(source='teaching_unit.code', read_only=True)
+    teaching_unit_name = serializers.CharField(source='teaching_unit.name', read_only=True)
+    teaching_unit_semester = serializers.IntegerField(source='teaching_unit.semester_number', read_only=True)
+    hours_total = serializers.SerializerMethodField()
+
     class Meta:
         model = Course
         fields = '__all__'
+
+    def get_hours_total(self, obj):
+        return (obj.hours_cm or 0) + (obj.hours_td or 0) + (obj.hours_tp or 0)
 
 
 class TeachingUnitSerializer(serializers.ModelSerializer):

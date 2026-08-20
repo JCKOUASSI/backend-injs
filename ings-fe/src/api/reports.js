@@ -5,6 +5,10 @@ export async function fetchAnalytics() {
   return apiGet('/reports/analytics/')
 }
 
+export async function fetchAcademicStatistics(params = {}) {
+  return apiGet('/reports/statistics/', params)
+}
+
 export async function downloadTranscriptPdf(studentId, params = {}) {
   const query = new URLSearchParams(params).toString()
   const path = `/reports/transcript/${studentId}/pdf/${query ? `?${query}` : ''}`

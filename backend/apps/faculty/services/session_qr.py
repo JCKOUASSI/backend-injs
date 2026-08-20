@@ -10,6 +10,13 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.faculty.models import Attendance, AttendanceSession, Schedule, StaffAttendance
+from apps.faculty.services.badge_security import (
+    apply_badge_security,
+    geofence_for_schedule,
+    log_badge_event,
+    should_audit_heartbeat,
+    stamp_badge_fields,
+)
 
 SESSION_PREFIX = 'INJS:SESSION:'
 SESSION_PATTERN = re.compile(
@@ -241,6 +248,7 @@ def get_active_session(schedule: Schedule, session_date: date) -> AttendanceSess
 def build_session_qr_data(schedule: Schedule, session_date: date, request=None) -> dict:
     payload = build_session_payload(str(schedule.id), session_date)
     badge_url = build_badge_url(payload, request=request)
+    fence = geofence_for_schedule(schedule)
     # QR encode l'URL deep-link (scan téléphone → page étudiant)
     return {
         'schedule': schedule.id,
@@ -265,6 +273,8 @@ def build_session_qr_data(schedule: Schedule, session_date: date, request=None) 
         'session_kind_display': schedule.get_session_kind_display(),
         'grace_before_minutes': GRACE_BEFORE_MINUTES,
         'grace_after_minutes': GRACE_AFTER_MINUTES,
+        'geofence_required': fence is not None,
+        'geofence_radius_m': fence[2] if fence else None,
     }
 
 
@@ -272,7 +282,7 @@ def assert_can_manage_session(user, schedule: Schedule) -> None:
     assert_can_view_session(user, schedule)
 
 
-def check_in_student(*, student, schedule: Schedule, session_date: date, recorded_by=None) -> Attendance:
+def check_in_student(*, student, schedule: Schedule, session_date: date, recorded_by=None, badge_context=None) -> Attendance:
     if student.promotion_id != schedule.assignment.promotion_id:
         raise SessionQrError('Ce cours ne concerne pas votre promotion', 'wrong_promotion')
     if student.status != 'active':
@@ -281,6 +291,7 @@ def check_in_student(*, student, schedule: Schedule, session_date: date, recorde
     validate_session_date(schedule, session_date)
     validate_session_time_window(schedule, session_date)
     get_active_session(schedule, session_date)
+    apply_badge_security(user=student.user, schedule=schedule, context=badge_context)
 
     attendance, created = Attendance.objects.get_or_create(
         student=student,
@@ -298,8 +309,23 @@ def check_in_student(*, student, schedule: Schedule, session_date: date, recorde
             start_dt = timezone.make_aware(datetime.combine(session_date, schedule.start_time), tz)
             attendance.status = 'late' if now > start_dt + timedelta(minutes=10) else 'present'
             attendance.recorded_by = recorded_by
-            attendance.save(update_fields=['status', 'recorded_by', 'updated_at'])
+            extra = stamp_badge_fields(attendance, badge_context)
+            attendance.save(update_fields=['status', 'recorded_by', 'updated_at', *extra])
             created = True
+            log_badge_event(
+                user=student.user, action='badge_check_in',
+                object_id=attendance.id, object_repr=schedule.assignment.course.code,
+                changes={'status': attendance.status, 'role': 'etudiant'},
+            )
+            return attendance, created
+    extra = stamp_badge_fields(attendance, badge_context)
+    if extra:
+        attendance.save(update_fields=[*extra, 'updated_at'])
+    log_badge_event(
+        user=student.user, action='badge_check_in',
+        object_id=attendance.id, object_repr=schedule.assignment.course.code,
+        changes={'status': attendance.status, 'role': 'etudiant', 'created': created},
+    )
     return attendance, created
 
 
@@ -407,7 +433,7 @@ def seed_staff_roster(session, recorded_by=None, default_status='absent'):
     return {'created': created, 'session_id': str(session.id)}
 
 
-def record_staff_attendance(*, teacher, schedule, session_date, role, recorded_by=None, status='present'):
+def record_staff_attendance(*, teacher, schedule, session_date, role, recorded_by=None, status='present', badge_context=None):
     attendance, created = StaffAttendance.objects.get_or_create(
         teacher=teacher,
         schedule=schedule,
@@ -418,11 +444,16 @@ def record_staff_attendance(*, teacher, schedule, session_date, role, recorded_b
     if not created and attendance.status != status:
         attendance.status = status
         attendance.recorded_by = recorded_by
-        attendance.save(update_fields=['status', 'recorded_by', 'updated_at'])
+        extra = stamp_badge_fields(attendance, badge_context)
+        attendance.save(update_fields=['status', 'recorded_by', 'updated_at', *extra])
+    elif created or badge_context:
+        extra = stamp_badge_fields(attendance, badge_context)
+        if extra:
+            attendance.save(update_fields=[*extra, 'updated_at'])
     return attendance, created
 
 
-def check_in_teacher(*, teacher, schedule: Schedule, session_date: date) -> AttendanceSession:
+def check_in_teacher(*, teacher, schedule: Schedule, session_date: date, badge_context=None) -> AttendanceSession:
     if not is_session_formateur(teacher, schedule):
         raise SessionQrError('Ce cours ne vous est pas assigné comme formateur', 'wrong_teacher')
     validate_session_date(schedule, session_date)
@@ -437,12 +468,13 @@ def check_in_teacher(*, teacher, schedule: Schedule, session_date: date) -> Atte
     record_staff_attendance(
         teacher=teacher, schedule=schedule, session_date=session_date,
         role='formateur', recorded_by=teacher.user, status='present',
+        badge_context=badge_context,
     )
     seed_staff_roster(session, recorded_by=teacher.user)
     return session
 
 
-def check_in_supervisor(*, teacher, schedule: Schedule, session_date: date) -> AttendanceSession:
+def check_in_supervisor(*, teacher, schedule: Schedule, session_date: date, badge_context=None) -> AttendanceSession:
     if not is_session_encadrant(teacher, schedule):
         raise SessionQrError('Vous n\'êtes pas encadrant de cette séance', 'wrong_supervisor')
     validate_session_date(schedule, session_date)
@@ -457,27 +489,40 @@ def check_in_supervisor(*, teacher, schedule: Schedule, session_date: date) -> A
     record_staff_attendance(
         teacher=teacher, schedule=schedule, session_date=session_date,
         role='encadrant', recorded_by=teacher.user, status='present',
+        badge_context=badge_context,
     )
     seed_staff_roster(session, recorded_by=teacher.user)
     return session
 
 
-def check_in_staff(*, teacher, schedule: Schedule, session_date: date) -> dict:
+def check_in_staff(*, teacher, schedule: Schedule, session_date: date, badge_context=None) -> dict:
     """Badgeage formateur et/ou encadrant selon le rôle sur le créneau."""
     is_formateur = is_session_formateur(teacher, schedule)
     is_encadrant = is_session_encadrant(teacher, schedule)
     if not is_formateur and not is_encadrant:
         raise SessionQrError('Ce cours ne vous est pas assigné', 'wrong_teacher')
 
+    apply_badge_security(user=teacher.user, schedule=schedule, context=badge_context)
+
     session = None
     roles = []
     if is_formateur:
-        session = check_in_teacher(teacher=teacher, schedule=schedule, session_date=session_date)
+        session = check_in_teacher(
+            teacher=teacher, schedule=schedule, session_date=session_date, badge_context=badge_context,
+        )
         roles.append('formateur')
     if is_encadrant:
-        session = check_in_supervisor(teacher=teacher, schedule=schedule, session_date=session_date)
+        session = check_in_supervisor(
+            teacher=teacher, schedule=schedule, session_date=session_date, badge_context=badge_context,
+        )
         roles.append('encadrant')
     role = 'formateur_encadrant' if len(roles) > 1 else roles[0]
+    log_badge_event(
+        user=teacher.user, action='badge_check_in',
+        object_id=session.id if session else '',
+        object_repr=schedule.assignment.course.code,
+        changes={'role': role, 'roles': roles},
+    )
     return {
         'session': session,
         'role': role,
@@ -777,4 +822,56 @@ def attendance_dashboard_stats(user, session_date: date | None = None) -> dict:
         'upcoming_sessions': upcoming,
         'present_students': present_students,
         'my_today': my_today,
+    }
+
+
+def heartbeat_presence(*, user, schedule: Schedule, session_date: date, badge_context=None) -> dict:
+    """Maintient la présence ouverte : appareil + géofence + horodatage."""
+    student = getattr(user, 'student_profile', None)
+    teacher = getattr(user, 'teacher_profile', None)
+    if not student and not teacher:
+        raise SessionQrError('Profil étudiant ou enseignant requis', 'forbidden')
+
+    apply_badge_security(user=user, schedule=schedule, context=badge_context)
+    validate_session_time_window(schedule, session_date)
+
+    if student:
+        attendance = Attendance.objects.filter(
+            student=student, schedule=schedule, date=session_date,
+        ).exclude(status='absent').first()
+        if not attendance:
+            raise SessionQrError('Aucun badgeage ouvert pour cette séance', 'not_checked_in')
+        previous = attendance.last_heartbeat_at
+        extra = stamp_badge_fields(attendance, badge_context)
+        attendance.save(update_fields=[*extra, 'updated_at'])
+        if should_audit_heartbeat(previous):
+            log_badge_event(
+                user=user, action='badge_heartbeat',
+                object_id=attendance.id, object_repr=schedule.assignment.course.code,
+                changes={'role': 'etudiant'},
+            )
+        return {
+            'role': 'etudiant',
+            'last_heartbeat_at': attendance.last_heartbeat_at,
+            'course_name': schedule.assignment.course.name,
+        }
+
+    staff = StaffAttendance.objects.filter(
+        teacher=teacher, schedule=schedule, date=session_date,
+    ).exclude(status='absent').first()
+    if not staff:
+        raise SessionQrError('Aucun badgeage ouvert pour cette séance', 'not_checked_in')
+    previous = staff.last_heartbeat_at
+    extra = stamp_badge_fields(staff, badge_context)
+    staff.save(update_fields=[*extra, 'updated_at'])
+    if should_audit_heartbeat(previous):
+        log_badge_event(
+            user=user, action='badge_heartbeat',
+            object_id=staff.id, object_repr=schedule.assignment.course.code,
+            changes={'role': staff.role},
+        )
+    return {
+        'role': staff.role,
+        'last_heartbeat_at': staff.last_heartbeat_at,
+        'course_name': schedule.assignment.course.name,
     }

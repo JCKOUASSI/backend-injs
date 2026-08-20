@@ -184,6 +184,8 @@ class Command(BaseCommand):
                 'degree_type': 'M', 'duration_semesters': 4, 'total_credits': 120,
             },
         )
+        self.stdout.write('Seeding maquette Master Management du Sport...')
+        call_command('seed_maquette_master_ms', '--replace')
 
         promo_l3, _ = Promotion.objects.get_or_create(
             program=prog_licence, name='L3-2023',

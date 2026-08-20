@@ -14,6 +14,7 @@ urlpatterns = [
     path('metrics/', include('django_prometheus.urls')),
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     path('api/v1/', include('injs_lmd.api_urls')),
+    path('api/auth/', include('apps.accounts.urls')),
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/v1/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),

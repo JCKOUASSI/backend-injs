@@ -180,6 +180,13 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 1.5rem;
 }
 
+.stat-icon-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
 .stat-icon.green { background: rgba(51, 73, 161, 0.12); color: var(--injs-primary); }
 .stat-icon.orange { background: rgba(245, 130, 32, 0.12); color: var(--injs-secondary); }
 .stat-icon.blue { background: rgba(30, 58, 95, 0.12); color: var(--injs-accent); }

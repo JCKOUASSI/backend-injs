@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from apps.faculty.models import (
     Teacher, Room, CourseAssignment, Schedule, Attendance, AttendanceSession,
@@ -36,6 +36,7 @@ from apps.faculty.services.session_qr import (
     seed_staff_roster,
     staff_session_payload,
     assert_can_mark_attendance,
+    heartbeat_presence,
     SessionQrError,
 )
 from apps.faculty.services.campus_ops import (
@@ -199,12 +200,21 @@ class RoomViewSet(ExportMixin, viewsets.ModelViewSet):
 
 class CourseAssignmentViewSet(viewsets.ModelViewSet):
     queryset = CourseAssignment.objects.select_related(
-        'teacher__user', 'supervisor__user', 'course', 'promotion', 'academic_year',
+        'teacher__user', 'supervisor__user', 'course__teaching_unit',
+        'promotion__program', 'academic_year',
+    ).annotate(
+        schedules_count=Count('schedules', filter=Q(schedules__is_active=True), distinct=True),
     ).all()
     serializer_class = CourseAssignmentSerializer
     permission_module = 'faculty'
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['teacher', 'supervisor', 'academic_year', 'promotion']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['teacher', 'supervisor', 'academic_year', 'promotion', 'course']
+    search_fields = [
+        'course__code', 'course__name', 'course__teaching_unit__code',
+        'teacher__user__first_name', 'teacher__user__last_name', 'promotion__name',
+    ]
+    ordering_fields = ['created_at', 'course__code', 'promotion__name']
+    ordering = ['course__code']
 
 
 class ScheduleViewSet(viewsets.ModelViewSet):
@@ -693,7 +703,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filterset_fields = ['student', 'schedule', 'date', 'status']
 
     def get_permissions(self):
-        if self.action in ('check_in', 'dashboard_stats', 'my_history', 'absence_report', 'my_staff_history'):
+        if self.action in ('check_in', 'heartbeat', 'dashboard_stats', 'my_history', 'absence_report', 'my_staff_history'):
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -740,6 +750,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                     schedule=schedule,
                     session_date=session_date,
                     recorded_by=request.user,
+                    badge_context=_badge_context(serializer.validated_data),
                 )
                 return Response({
                     'role': 'etudiant',
@@ -754,6 +765,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                     teacher=teacher,
                     schedule=schedule,
                     session_date=session_date,
+                    badge_context=_badge_context(serializer.validated_data),
                 )
                 session = result['session']
                 return Response({
@@ -774,6 +786,21 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {'detail': 'Profil étudiant, formateur ou encadrant requis pour badger'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        except SessionQrError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='heartbeat')
+    def heartbeat(self, request):
+        serializer = CheckInSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = heartbeat_presence(
+                user=request.user,
+                schedule=serializer.validated_data['schedule'],
+                session_date=serializer.validated_data['session_date'],
+                badge_context=_badge_context(serializer.validated_data),
+            )
+            return Response({'message': 'Heartbeat enregistré', **result})
         except SessionQrError as exc:
             return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -978,3 +1005,13 @@ class EquipmentAssetViewSet(viewsets.ModelViewSet):
             room.save(update_fields=['equipment', 'updated_at'])
             updated += 1
         return Response({'rooms_updated': updated})
+
+
+def _badge_context(data) -> dict:
+    return {
+        'device_id': data.get('device_id') or '',
+        'device_label': data.get('device_label') or '',
+        'latitude': data.get('latitude'),
+        'longitude': data.get('longitude'),
+        'accuracy_m': data.get('accuracy_m'),
+    }
