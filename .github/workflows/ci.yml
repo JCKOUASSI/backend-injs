@@ -66,7 +66,7 @@ jobs:
 
       - name: Verify backend Docker image
         run: |
-          docker build -t injs-backend-ci -f backend/Dockerfile .
+          docker build -t injs-backend-ci -f backend/Dockerfile backend
           OWNER=$(docker run --rm --entrypoint stat injs-backend-ci -c '%U' /app/staticfiles)
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"

@@ -3,14 +3,10 @@
 # Cible d’exécution : AlmaLinux x86_64 (--platform linux/amd64).
 #
 # Équivalent local :
-#   backend  : docker buildx build --platform linux/amd64 -f backend/Dockerfile \
-#                -t jckouassi/injs-be:latest --push .
-#   frontend : docker buildx build --platform linux/amd64 -f ings-fe/Dockerfile \
+#   backend  : docker buildx build --platform linux/amd64 -t jckouassi/injs-be:latest --push ./backend
+#   frontend : docker buildx build --platform linux/amd64 \
 #                --build-arg VITE_API_BASE_URL=/api/v1 \
-#                -t jckouassi/injs-fe:latest --push .
-#
-# Les deux images se construisent depuis la racine du dépôt : elles embarquent
-# le module eptinjs/, qui vit hors de backend/ et de ings-fe/.
+#                -t jckouassi/injs-fe:latest --push ./ings-fe
 #
 # Secrets GitHub OBLIGATOIRES (Settings → Secrets and variables → Actions) :
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
@@ -99,7 +95,7 @@ jobs:
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./backend
           file: ./backend/Dockerfile
           platforms: linux/amd64
           push: true
@@ -126,7 +122,7 @@ jobs:
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./ings-fe
           file: ./ings-fe/Dockerfile
           platforms: linux/amd64
           push: true
