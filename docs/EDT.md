@@ -221,13 +221,14 @@ Menu admin : **Gestion des Emplois du Temps (EDT)** → `/admin/emploi-du-temps`
 
 1. Onglet **Périodes** : créer la fenêtre (dates, rythme) et les jours fériés.
 2. **Réglages** : horaires du campus et règles de présence (retard 15 min, partiel 75 %, auto-absence).
-3. **Groupes** : TD/TP optionnels par promotion (filtre promotion en haut).
-4. Filtres en haut : période + promotion.
-5. **Génération** : prévisualiser, puis générer. Cocher « remplacer » uniquement pour les brouillons / générées.
-6. **Calendrier** : corriger salle / horaires / encadrant, publier, ouvrir le **QR badgeage**, ou annuler avec motif.
-7. **Conflits** : aucune erreur avant publication globale.
-8. **Publier** : les étudiants et le catalogue Cours voient alors les séances.
-9. La **grille hebdomadaire** reste disponible (gabarit LMD historique).
+3. **Groupes** : TD/TP optionnels par promotion, puis affectation des étudiants.
+4. **Charges** : volumes horaires ; répartir les TD/TP sur les groupes avant génération.
+5. Filtres en haut : période + promotion.
+6. **Génération** : prévisualiser, puis générer. Cocher « remplacer » uniquement pour les brouillons / générées.
+7. **Calendrier** : corriger salle / horaires / encadrant, publier, ouvrir le **QR badgeage**, ou annuler avec motif.
+8. **Conflits** : aucune erreur avant publication globale.
+9. **Publier** : les étudiants et le catalogue Cours voient alors les séances.
+10. La **grille hebdomadaire** reste disponible (gabarit LMD historique).
 
 ## Responsable pédagogique
 

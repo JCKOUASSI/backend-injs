@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiCalendar, FiAlertTriangle, FiCheckSquare, FiClock, FiLayers, FiZap, FiUsers, FiSettings } from 'react-icons/fi'
+import { FiCalendar, FiAlertTriangle, FiCheckSquare, FiClock, FiLayers, FiZap, FiUsers, FiSettings, FiBookOpen } from 'react-icons/fi'
 import PageHeader from '../../components/common/PageHeader'
 import StatCard from '../../components/common/StatCard'
 import ExportButtons from '../../components/common/ExportButtons'
@@ -13,10 +13,12 @@ import GenerationPanel from './edt/GenerationPanel'
 import ConflictsPanel from './edt/ConflictsPanel'
 import GroupsPanel from './edt/GroupsPanel'
 import SettingsPanel from './edt/SettingsPanel'
+import LoadsPanel from './edt/LoadsPanel'
 
 const TABS = [
   { id: 'calendar', label: 'Calendrier', icon: FiCalendar },
   { id: 'generate', label: 'Génération', icon: FiZap },
+  { id: 'loads', label: 'Charges', icon: FiBookOpen },
   { id: 'conflicts', label: 'Conflits', icon: FiAlertTriangle },
   { id: 'periods', label: 'Périodes', icon: FiLayers },
   { id: 'groups', label: 'Groupes', icon: FiUsers },
@@ -127,6 +129,9 @@ export default function AdminSchedule() {
       )}
       {tab === 'generate' && (
         <GenerationPanel filters={filters} onChanged={reloadDash} />
+      )}
+      {tab === 'loads' && (
+        <LoadsPanel filters={filters} />
       )}
       {tab === 'conflicts' && (
         <ConflictsPanel filters={filters} />

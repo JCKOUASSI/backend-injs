@@ -5,10 +5,10 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from apps.academics.models import Course, FormationPeriod, TeachingUnit
+from apps.academics.models import Course, FormationPeriod, Promotion, TeachingUnit
 from apps.accounts.models import User
-from apps.core.tests.test_utils import TEST_PASSWORD, create_institution_bundle
-from apps.faculty.models import CourseAssignment, Room, Seance, Teacher, TeachingLoad
+from apps.core.tests.test_utils import TEST_PASSWORD, create_institution_bundle, create_student
+from apps.faculty.models import CourseAssignment, Room, Seance, StudentGroup, Teacher, TeachingLoad
 
 
 class SeanceApiTests(TestCase):
@@ -160,3 +160,39 @@ class SeanceApiTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['late_after_minutes'], 20)
         self.assertEqual(response.data['partial_under_percent'], 80)
+
+    def test_group_member_must_belong_to_the_same_promotion(self):
+        group = StudentGroup.objects.create(promotion=self.promotion, name='Groupe A')
+        other_promo = Promotion.objects.create(
+            program=self.program, name='L1-OTHER-API', entry_year=2024, current_semester=1,
+        )
+        _, outsider = create_student(
+            email='api.out@test.ci', matricule='APIOUT',
+            program=self.program, promotion=other_promo,
+        )
+        response = self.client.post(reverse('studentgroupmember-list'), {
+            'group': str(group.id),
+            'student': str(outsider.id),
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_split_td_loads_across_groups(self):
+        TeachingLoad.objects.create(
+            period=self.period, course=self.course, promotion=self.promotion,
+            session_kind='td', hours_total=8, teacher=self.teacher,
+        )
+        StudentGroup.objects.create(promotion=self.promotion, name='A')
+        StudentGroup.objects.create(promotion=self.promotion, name='B')
+        response = self.client.post(reverse('teachingload-split-by-groups'), {
+            'period': str(self.period.id),
+            'promotion': str(self.promotion.id),
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['created'], 2)
+        self.assertEqual(response.data['deactivated'], 1)
+        self.assertEqual(
+            TeachingLoad.objects.filter(
+                period=self.period, session_kind='td', group__isnull=False, is_active=True,
+            ).count(),
+            2,
+        )

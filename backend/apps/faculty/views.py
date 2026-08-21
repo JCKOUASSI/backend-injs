@@ -5,6 +5,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 
 from django.db.models import Count, Q
@@ -1075,6 +1076,20 @@ class StudentGroupMemberViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['group', 'student']
 
+    def perform_create(self, serializer):
+        require_edt_planner(self.request.user)
+        group = serializer.validated_data['group']
+        student = serializer.validated_data['student']
+        if student.promotion_id != group.promotion_id:
+            raise ValidationError({
+                'student': 'Cet étudiant n’appartient pas à la promotion du groupe.',
+            })
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        require_edt_planner(self.request.user)
+        instance.delete()
+
 
 class GroupSchedulingConfigViewSet(viewsets.ModelViewSet):
     queryset = GroupSchedulingConfig.objects.select_related('group')
@@ -1130,6 +1145,69 @@ class TeachingLoadViewSet(viewsets.ModelViewSet):
     permission_module = 'faculty'
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['period', 'course', 'promotion', 'group', 'session_kind', 'is_active']
+
+    def perform_create(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        require_edt_planner(self.request.user)
+        instance.delete()
+
+    @action(detail=False, methods=['post'], url_path='split-by-groups')
+    def split_by_groups(self, request):
+        """Duplique les charges TD/TP promotion-entière vers chaque groupe pédagogique."""
+        require_edt_planner(request.user)
+        period_id = request.data.get('period')
+        promo_id = request.data.get('promotion')
+        if not period_id or not promo_id:
+            return Response(
+                {'detail': 'Les paramètres period et promotion sont requis.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        groups = list(StudentGroup.objects.filter(promotion_id=promo_id, is_active=True))
+        if not groups:
+            return Response(
+                {'detail': 'Créez au moins un groupe pédagogique pour cette promotion.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        loads = TeachingLoad.objects.filter(
+            period_id=period_id, promotion_id=promo_id, group__isnull=True,
+            session_kind__in=('td', 'tp'), is_active=True,
+        )
+        created = 0
+        deactivated = 0
+        for load in loads:
+            for group in groups:
+                _, was_created = TeachingLoad.objects.get_or_create(
+                    period_id=load.period_id,
+                    course_id=load.course_id,
+                    promotion_id=load.promotion_id,
+                    group=group,
+                    session_kind=load.session_kind,
+                    defaults={
+                        'hours_total': load.hours_total,
+                        'teacher': load.teacher,
+                        'supervisor': load.supervisor,
+                        'slot_mode': load.slot_mode,
+                        'preferred_room_type': load.preferred_room_type,
+                        'is_active': True,
+                    },
+                )
+                if was_created:
+                    created += 1
+            load.is_active = False
+            load.save(update_fields=['is_active', 'updated_at'])
+            deactivated += 1
+        return Response({
+            'created': created,
+            'deactivated': deactivated,
+            'groups': len(groups),
+        })
 
 
 class SeanceViewSet(ExportMixin, viewsets.ModelViewSet):

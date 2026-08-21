@@ -523,6 +523,14 @@ export async function fetchTeachingLoads(params = {}) {
   return apiGet('/faculty/teaching-loads/', { page_size: 100, ...params })
 }
 
+export async function updateTeachingLoad(id, payload) {
+  return apiPatch(`/faculty/teaching-loads/${id}/`, payload)
+}
+
+export async function splitTeachingLoadsByGroups(payload) {
+  return apiPost('/faculty/teaching-loads/split-by-groups/', payload)
+}
+
 export async function fetchStudentGroups(params = {}) {
   return apiGet('/faculty/student-groups/', { page_size: 100, ...params })
 }
@@ -533,6 +541,18 @@ export async function createStudentGroup(payload) {
 
 export async function deleteStudentGroup(id) {
   return apiDelete(`/faculty/student-groups/${id}/`)
+}
+
+export async function fetchGroupMembers(groupId) {
+  return apiGet('/faculty/student-group-members/', { group: groupId, page_size: 200 })
+}
+
+export async function addGroupMember(payload) {
+  return apiPost('/faculty/student-group-members/', payload)
+}
+
+export async function removeGroupMember(id) {
+  return apiDelete(`/faculty/student-group-members/${id}/`)
 }
 
 export async function fetchPlanningSettings(params = {}) {
