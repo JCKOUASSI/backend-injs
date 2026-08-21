@@ -121,6 +121,32 @@ export async function deleteSemester(id) {
   return apiDelete(`/academics/semesters/${id}/`)
 }
 
+export async function fetchFormationPeriods(params = {}) {
+  const data = await apiGet('/academics/formation-periods/', { page_size: 50, ...params })
+  return data
+}
+
+export async function createFormationPeriod(payload) {
+  return apiPost('/academics/formation-periods/', payload)
+}
+
+export async function updateFormationPeriod(id, payload) {
+  return apiPatch(`/academics/formation-periods/${id}/`, payload)
+}
+
+export async function fetchHolidays(params = {}) {
+  const data = await apiGet('/academics/holidays/', { page_size: 100, ...params })
+  return data
+}
+
+export async function createHoliday(payload) {
+  return apiPost('/academics/holidays/', payload)
+}
+
+export async function deleteHoliday(id) {
+  return apiDelete(`/academics/holidays/${id}/`)
+}
+
 export async function fetchTeachingUnits(params = {}) {
   const data = await apiGet('/academics/teaching-units/', { page_size: 200, ...params })
   return {

@@ -123,6 +123,29 @@ class CoursCatalogServiceTests(TestCase):
         self.assertEqual(detail['sessions'][0]['status'], 'en_cours')
         self.assertEqual(detail['session_hours'], 2.0)
 
+    def test_published_seance_marks_offering_as_planned(self):
+        from apps.faculty.models import Seance
+        CourseAssignment.objects.create(
+            teacher=self.teacher, course=self.course,
+            academic_year=self.year, promotion=self.promotion, is_primary=True,
+        )
+        Seance.objects.create(
+            course=self.course, promotion=self.promotion, teacher=self.teacher,
+            date=date(2025, 9, 15), start_time=time(8, 0), end_time=time(10, 0),
+            status='published',
+        )
+        payload = build_cours_catalog({'academic_year': str(self.year.id)})
+        row = payload['results'][0]
+        self.assertEqual(row['status'], 'planifie')
+        self.assertEqual(row['seances_count'], 1)
+        detail = get_cours_offering({
+            'academic_year': str(self.year.id),
+            'course': str(self.course.id),
+            'promotion': str(self.promotion.id),
+        })
+        self.assertEqual(len(detail['seances']), 1)
+        self.assertEqual(detail['seances'][0]['status'], 'published')
+
 
 class CoursAPITests(TestCase):
     def setUp(self):

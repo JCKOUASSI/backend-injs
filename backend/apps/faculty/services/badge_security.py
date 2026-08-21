@@ -161,6 +161,79 @@ def log_badge_event(*, user, action, object_id='', object_repr='', changes=None)
         pass
 
 
+def record_badge_event(
+    *,
+    kind,
+    source='qr',
+    actor=None,
+    attendance=None,
+    staff_attendance=None,
+    seance=None,
+    schedule=None,
+    session_date=None,
+    student=None,
+    teacher=None,
+    previous_status='',
+    new_status='',
+    reason='',
+    context=None,
+    extra=None,
+):
+    """Écrit un BadgeEvent immuable et un AuditLog générique."""
+    from apps.faculty.models import BadgeEvent
+
+    context = context or {}
+    if attendance is not None:
+        student = student or attendance.student
+        schedule = schedule or attendance.schedule
+        session_date = session_date or attendance.date
+        seance = seance or getattr(attendance, 'seance', None)
+        new_status = new_status or attendance.status
+    if staff_attendance is not None:
+        teacher = teacher or staff_attendance.teacher
+        schedule = schedule or staff_attendance.schedule
+        session_date = session_date or staff_attendance.date
+        seance = seance or getattr(staff_attendance, 'seance', None)
+        new_status = new_status or staff_attendance.status
+    if session_date is None:
+        session_date = timezone.localdate()
+
+    event = BadgeEvent.objects.create(
+        kind=kind,
+        source=source,
+        actor=actor,
+        student=student,
+        teacher=teacher,
+        attendance=attendance,
+        staff_attendance=staff_attendance,
+        seance=seance,
+        schedule=schedule,
+        session_date=session_date,
+        previous_status=previous_status or '',
+        new_status=new_status or '',
+        reason=(reason or '')[:255],
+        device_id=(context.get('device_id') or '')[:80],
+        latitude=context.get('latitude'),
+        longitude=context.get('longitude'),
+        accuracy_m=context.get('accuracy_m'),
+        extra=extra or {},
+    )
+    log_badge_event(
+        user=actor,
+        action=f'badge_{kind}',
+        object_id=event.id,
+        object_repr=str(seance or schedule or event.id),
+        changes={
+            'kind': kind,
+            'source': source,
+            'previous_status': previous_status,
+            'new_status': new_status,
+            'reason': reason or '',
+        },
+    )
+    return event
+
+
 def should_audit_heartbeat(previous_heartbeat_at) -> bool:
     if previous_heartbeat_at is None:
         return True

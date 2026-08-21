@@ -7,13 +7,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from apps.academics.models import (
     Institution, Department, Program, Promotion, AcademicYear,
     Semester, TeachingUnit, Course, ProgramCourse, Specialization,
-    StapsJobNomenclature,
+    StapsJobNomenclature, FormationPeriod, Holiday,
 )
 from apps.academics.serializers import (
     InstitutionSerializer, DepartmentSerializer, ProgramSerializer,
     PromotionSerializer, AcademicYearSerializer, SemesterSerializer,
     TeachingUnitSerializer, CourseSerializer, ProgramCourseSerializer,
     SpecializationSerializer, StapsJobNomenclatureSerializer,
+    FormationPeriodSerializer, HolidaySerializer,
 )
 from apps.core.mixins import ExportMixin
 from apps.academics.referential_import import RESOURCE_HEADERS, import_referential_workbook
@@ -364,3 +365,23 @@ class CoursViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(payload)
+
+
+class FormationPeriodViewSet(viewsets.ModelViewSet):
+    queryset = FormationPeriod.objects.select_related('academic_year', 'program', 'semester')
+    serializer_class = FormationPeriodSerializer
+    permission_module = 'academics'
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['academic_year', 'program', 'semester', 'is_active']
+    search_fields = ['label']
+    ordering_fields = ['order', 'start_date', 'label']
+
+
+class HolidayViewSet(viewsets.ModelViewSet):
+    queryset = Holiday.objects.select_related('institution')
+    serializer_class = HolidaySerializer
+    permission_module = 'academics'
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['institution', 'is_active', 'date']
+    search_fields = ['label']
+    ordering_fields = ['date', 'label']

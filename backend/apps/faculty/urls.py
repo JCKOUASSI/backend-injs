@@ -4,6 +4,9 @@ from apps.faculty.views import (
     TeacherViewSet, RoomViewSet, CourseAssignmentViewSet, ScheduleViewSet,
     AttendanceViewSet, AttendanceSessionViewSet, StaffAttendanceViewSet,
     RoomReservationViewSet, MaintenanceTicketViewSet, EquipmentAssetViewSet,
+    SeanceViewSet, TeachingLoadViewSet, StudentGroupViewSet, StudentGroupMemberViewSet,
+    PlanningSettingsViewSet, TimetableRunViewSet, GroupSchedulingConfigViewSet,
+    BadgeEventViewSet,
 )
 
 router = DefaultRouter()
@@ -17,5 +20,13 @@ router.register('staff-attendances', StaffAttendanceViewSet)
 router.register('reservations', RoomReservationViewSet)
 router.register('maintenance-tickets', MaintenanceTicketViewSet)
 router.register('equipment', EquipmentAssetViewSet)
+router.register('seances', SeanceViewSet)
+router.register('teaching-loads', TeachingLoadViewSet)
+router.register('student-groups', StudentGroupViewSet)
+router.register('student-group-members', StudentGroupMemberViewSet)
+router.register('group-scheduling-configs', GroupSchedulingConfigViewSet)
+router.register('planning-settings', PlanningSettingsViewSet)
+router.register('timetable-runs', TimetableRunViewSet)
+router.register('badge-events', BadgeEventViewSet)
 
 urlpatterns = [path('', include(router.urls))]

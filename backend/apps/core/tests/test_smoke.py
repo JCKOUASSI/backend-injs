@@ -50,5 +50,14 @@ class ModuleSmokeTests(TestCase):
     def test_academics_cours_list(self):
         self._assert_authenticated_ok_or_empty('cours-list')
 
+    def test_formation_periods_list(self):
+        self._assert_authenticated_ok_or_empty('formationperiod-list')
+
+    def test_seances_list(self):
+        self._assert_authenticated_ok_or_empty('seance-list')
+
+    def test_badge_events_list(self):
+        self._assert_authenticated_ok_or_empty('badgeevent-list')
+
     def test_exams_sessions_list(self):
         self._assert_authenticated_ok_or_empty('examsession-list')

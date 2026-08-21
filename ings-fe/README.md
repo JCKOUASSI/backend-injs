@@ -7,7 +7,7 @@ Inspirée du template **Ericsson React Admin Template for University**, adaptée
 ## Fonctionnalités
 
 ### 3 interfaces distinctes
-- **Administration** — Gestion globale (étudiants, professeurs, UE, notes, stages, finances)
+- **Administration** — Gestion globale (étudiants, professeurs, UE, EDT, notes, stages, finances)
 - **Professeurs** — Cours, évaluations CC/CT, présences, suivi stages
 - **Étudiants** — Parcours LMD, notes, emploi du temps, stages, documents
 

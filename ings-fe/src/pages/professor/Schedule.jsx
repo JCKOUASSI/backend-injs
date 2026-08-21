@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import PageHeader from '../../components/common/PageHeader'
 import { useAuth } from '../../context/AuthContext'
 import { useFetch } from '../../hooks/useFetch'
-import { fetchMyTeacherProfile, fetchScheduleGrid } from '../../api/faculty'
+import { fetchMyTeacherProfile, fetchScheduleGrid, fetchSeances } from '../../api/faculty'
+import UpcomingSeances from '../../components/edt/UpcomingSeances'
 
 const DAYS = [
   { value: 0, label: 'Lundi' },
@@ -28,6 +29,14 @@ export default function ProfessorSchedule() {
     [teacher?.id],
   )
 
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: seancesData } = useFetch(
+    () => (teacher?.id
+      ? fetchSeances({ teacher: teacher.id, visible: true, date_from: today, page_size: 20, ordering: 'date' })
+      : Promise.resolve({ results: [] })),
+    [teacher?.id],
+  )
+  const upcoming = seancesData?.results || []
   const slots = grid?.schedules || []
   const cellMap = useMemo(() => {
     const map = {}
@@ -47,6 +56,8 @@ export default function ProfessorSchedule() {
       />
       {loading && <div className="text-center py-3"><div className="spinner-border spinner-border-sm text-primary" /></div>}
       {error && <div className="alert alert-danger">{error}</div>}
+
+      <UpcomingSeances seances={upcoming} emptyText="Aucune séance publiée à venir." />
 
       <div className="card-injs edt-grid-wrap">
         <div className="table-responsive">

@@ -19,6 +19,7 @@ export default function ExportButtons({
   headers = [],
   rows = [],
   resourcePath = null,
+  resourceParams = {},
   onExport = null,
   size = 'sm',
   className = '',
@@ -33,7 +34,7 @@ export default function ExportButtons({
         return
       }
       if (resourcePath) {
-        await downloadBackendExport(resourcePath, format, filename)
+        await downloadBackendExport(resourcePath, format, filename, resourceParams)
       } else {
         if (!headers.length) {
           showToast('Aucune donnée à exporter', 'warning')

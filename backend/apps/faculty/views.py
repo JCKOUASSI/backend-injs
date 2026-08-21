@@ -12,16 +12,21 @@ from django.db.models import Count, Q
 from apps.faculty.models import (
     Teacher, Room, CourseAssignment, Schedule, Attendance, AttendanceSession,
     RoomReservation, MaintenanceTicket, EquipmentAsset, StaffAttendance,
+    Seance, TeachingLoad, StudentGroup, StudentGroupMember, PlanningSettings,
+    TimetableRun, GroupSchedulingConfig, BadgeEvent,
 )
 from apps.faculty.serializers import (
     TeacherSerializer, RoomSerializer, CourseAssignmentSerializer,
     ScheduleSerializer, AttendanceSerializer, SessionQrSerializer,
     CheckInSerializer, AttendanceSessionSerializer, AttendanceSessionCreateSerializer,
     RoomReservationSerializer, MaintenanceTicketSerializer, EquipmentAssetSerializer,
-    StaffAttendanceSerializer,
+    StaffAttendanceSerializer, SeanceSerializer, TeachingLoadSerializer,
+    StudentGroupSerializer, StudentGroupMemberSerializer, PlanningSettingsSerializer,
+    TimetableRunSerializer, GroupSchedulingConfigSerializer, BadgeEventSerializer,
 )
 from apps.faculty.services.session_qr import (
     build_session_qr_data,
+    build_seance_qr_data,
     get_schedule_or_raise,
     assert_can_view_session,
     assert_is_admin,
@@ -58,7 +63,15 @@ from apps.faculty.services.planning import (
     generate_for_academic_year,
     timetable_grid,
     PlanningError,
+    detect_seance_conflicts,
+    generate_for_period,
+    expand_schedules_for_period,
+    publish_seances,
 )
+from apps.faculty.services.edt_access import (
+    require_edt_planner, scope_seances, scope_badge_events, scope_attendances,
+)
+from apps.faculty.services.badge_security import record_badge_event
 from apps.core.mixins import ExportMixin
 
 
@@ -695,17 +708,34 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
 
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related(
-        'student__user', 'schedule__assignment__course',
-    ).all()
+        'student__user', 'schedule__assignment__course', 'seance__course',
+    ).order_by('-date', '-created_at')
     serializer_class = AttendanceSerializer
     permission_module = 'faculty'
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['student', 'schedule', 'date', 'status']
+    filterset_fields = ['student', 'schedule', 'seance', 'date', 'status']
 
     def get_permissions(self):
         if self.action in ('check_in', 'heartbeat', 'dashboard_stats', 'my_history', 'absence_report', 'my_staff_history'):
             return [IsAuthenticated()]
         return super().get_permissions()
+
+    def get_queryset(self):
+        return scope_attendances(super().get_queryset(), self.request.user)
+
+    def perform_update(self, serializer):
+        previous = serializer.instance.status
+        attendance = serializer.save()
+        if previous != attendance.status:
+            record_badge_event(
+                kind='correction',
+                source='admin' if self.request.user.get_group_level() <= 2 or self.request.user.is_superuser else 'teacher',
+                actor=self.request.user,
+                attendance=attendance,
+                previous_status=previous,
+                new_status=attendance.status,
+                reason=self.request.data.get('notes') or attendance.notes,
+            )
 
     @action(detail=False, methods=['get'], url_path='dashboard-stats')
     def dashboard_stats(self, request):
@@ -754,7 +784,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 )
                 return Response({
                     'role': 'etudiant',
-                    'message': 'Présence enregistrée',
+                    'message': 'Présence enregistrée' if created else 'Sortie enregistrée',
                     'attendance': AttendanceSerializer(attendance).data,
                     'course_name': schedule.assignment.course.name,
                     'session_date': session_date,
@@ -1015,3 +1045,286 @@ def _badge_context(data) -> dict:
         'longitude': data.get('longitude'),
         'accuracy_m': data.get('accuracy_m'),
     }
+
+
+class StudentGroupViewSet(viewsets.ModelViewSet):
+    queryset = StudentGroup.objects.select_related('promotion')
+    serializer_class = StudentGroupSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['promotion', 'is_active']
+    search_fields = ['name']
+
+
+class StudentGroupMemberViewSet(viewsets.ModelViewSet):
+    queryset = StudentGroupMember.objects.select_related('group', 'student__user')
+    serializer_class = StudentGroupMemberSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['group', 'student']
+
+
+class GroupSchedulingConfigViewSet(viewsets.ModelViewSet):
+    queryset = GroupSchedulingConfig.objects.select_related('group')
+    serializer_class = GroupSchedulingConfigSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['group']
+
+
+class PlanningSettingsViewSet(viewsets.ModelViewSet):
+    queryset = PlanningSettings.objects.select_related('period')
+    serializer_class = PlanningSettingsSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['period', 'is_global']
+
+    def perform_create(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        require_edt_planner(self.request.user)
+        instance.delete()
+
+    @action(detail=False, methods=['get', 'put', 'patch'], url_path='defaults')
+    def defaults(self, request):
+        if request.method != 'GET':
+            require_edt_planner(request.user)
+        if request.method == 'GET':
+            settings = PlanningSettings.resolve()
+            if settings._state.adding:
+                settings = PlanningSettings.set_global()
+            return Response(PlanningSettingsSerializer(settings).data)
+        payload = request.data.copy()
+        payload.pop('period', None)
+        payload.pop('id', None)
+        settings = PlanningSettings.set_global(**{
+            key: value for key, value in payload.items()
+            if key in {field.name for field in PlanningSettings._meta.fields}
+        })
+        return Response(PlanningSettingsSerializer(settings).data)
+
+
+class TeachingLoadViewSet(viewsets.ModelViewSet):
+    queryset = TeachingLoad.objects.select_related(
+        'period', 'course', 'promotion', 'group', 'teacher__user', 'supervisor__user',
+    )
+    serializer_class = TeachingLoadSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['period', 'course', 'promotion', 'group', 'session_kind', 'is_active']
+
+
+class SeanceViewSet(ExportMixin, viewsets.ModelViewSet):
+    queryset = Seance.objects.select_related(
+        'course', 'promotion', 'group', 'teacher__user', 'supervisor__user',
+        'room', 'period', 'schedule', 'teaching_load',
+    )
+    serializer_class = SeanceSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = [
+        'period', 'promotion', 'course', 'group', 'teacher', 'supervisor',
+        'room', 'status', 'session_kind', 'date', 'schedule',
+    ]
+    search_fields = ['course__code', 'course__name', 'notes']
+    ordering_fields = ['date', 'start_time', 'status']
+    export_headers = [
+        'Date', 'Début', 'Fin', 'ECUE', 'Libellé', 'Type', 'Promotion',
+        'Groupe', 'Professeur', 'Salle', 'Statut',
+    ]
+    export_title = 'Emploi du temps INJS'
+    export_filename = 'edt_seances'
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve', 'dashboard', 'qr', 'export'):
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        visible = str(params.get('visible') or '').lower()
+        if visible in ('1', 'true', 'yes'):
+            qs = qs.filter(status__in=Seance.VISIBLE_STATUSES)
+        return scope_seances(qs, self.request.user)
+
+    def get_export_rows(self):
+        rows = []
+        for seance in self.filter_queryset(self.get_queryset()).order_by('date', 'start_time'):
+            teacher = seance.teacher.user.get_full_name() if seance.teacher_id else ''
+            rows.append([
+                seance.date.isoformat(),
+                seance.start_time.strftime('%H:%M'),
+                seance.end_time.strftime('%H:%M'),
+                seance.course.code,
+                seance.course.name,
+                seance.get_session_kind_display(),
+                seance.promotion.name,
+                seance.group.name if seance.group_id else '',
+                teacher,
+                seance.room.code if seance.room_id else '',
+                seance.get_status_display(),
+            ])
+        return rows
+
+    def perform_create(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        require_edt_planner(self.request.user)
+        instance.delete()
+
+    @action(detail=False, methods=['get'], url_path='conflicts')
+    def conflicts(self, request):
+        require_edt_planner(request.user)
+        qs = self.filter_queryset(self.get_queryset())
+        items = detect_seance_conflicts(qs)
+        return Response({
+            'count': len(items),
+            'errors': sum(1 for row in items if row['severity'] == 'error'),
+            'warnings': sum(1 for row in items if row['severity'] == 'warning'),
+            'results': items,
+        })
+
+    @action(detail=False, methods=['get'], url_path='dashboard')
+    def dashboard(self, request):
+        qs = self.filter_queryset(self.get_queryset())
+        today = timezone.localdate()
+        by_status = dict(qs.values_list('status').annotate(total=Count('id')).values_list('status', 'total'))
+        return Response({
+            'total': qs.count(),
+            'published': by_status.get('published', 0),
+            'generated': by_status.get('generated', 0),
+            'in_progress': by_status.get('in_progress', 0),
+            'done': by_status.get('done', 0),
+            'cancelled': by_status.get('cancelled', 0),
+            'upcoming': qs.filter(date__gte=today).exclude(status__in=('cancelled', 'archived', 'done')).count(),
+            'conflicts': sum(
+                1 for row in detect_seance_conflicts(qs) if row['severity'] == 'error'
+            ),
+        })
+
+    @action(detail=False, methods=['post'], url_path='generate')
+    def generate(self, request):
+        require_edt_planner(request.user)
+        from apps.academics.models import FormationPeriod, Promotion
+        period_id = request.data.get('period')
+        promo_id = request.data.get('promotion')
+        if not period_id or not promo_id:
+            return Response(
+                {'detail': 'Les paramètres period et promotion sont requis.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        period = FormationPeriod.objects.filter(pk=period_id).select_related('academic_year').first()
+        promotion = Promotion.objects.filter(pk=promo_id).first()
+        if not period:
+            return Response({'detail': 'Période de formation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        if not promotion:
+            return Response({'detail': 'Promotion introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            result = generate_for_period(
+                period=period,
+                promotion=promotion,
+                replace_existing=_truthy(request.data.get('replace_existing')),
+                dry_run=_truthy(request.data.get('dry_run')),
+                mode=request.data.get('mode') or 'best_effort',
+                actor=request.user,
+                auto_create_loads=_truthy(request.data.get('auto_create_loads'), default=True),
+            )
+        except PlanningError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+    @action(detail=True, methods=['get'], url_path='qr')
+    def qr(self, request, pk=None):
+        seance = self.get_object()
+        try:
+            data = build_seance_qr_data(seance, request=request)
+            schedule = get_schedule_or_raise(str(data['schedule']))
+            assert_can_view_session(request.user, schedule)
+        except SessionQrError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(data)
+
+    @action(detail=False, methods=['post'], url_path='expand')
+    def expand(self, request):
+        require_edt_planner(request.user)
+        from apps.academics.models import FormationPeriod, Promotion
+        period = FormationPeriod.objects.filter(pk=request.data.get('period')).first()
+        promotion = Promotion.objects.filter(pk=request.data.get('promotion')).first()
+        if not period or not promotion:
+            return Response(
+                {'detail': 'Les paramètres period et promotion sont requis.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            result = expand_schedules_for_period(
+                period=period,
+                promotion=promotion,
+                replace_existing=_truthy(request.data.get('replace_existing')),
+                dry_run=_truthy(request.data.get('dry_run')),
+                actor=request.user,
+            )
+        except PlanningError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+    @action(detail=False, methods=['post'], url_path='publish')
+    def publish(self, request):
+        require_edt_planner(request.user)
+        qs = self.filter_queryset(self.get_queryset())
+        if request.data.get('ids'):
+            qs = qs.filter(id__in=request.data['ids'])
+        if request.data.get('period'):
+            qs = qs.filter(period_id=request.data['period'])
+        if request.data.get('promotion'):
+            qs = qs.filter(promotion_id=request.data['promotion'])
+        try:
+            result = publish_seances(qs, actor=request.user)
+        except PlanningError as exc:
+            return Response({'detail': str(exc), 'code': exc.code}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class BadgeEventViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BadgeEvent.objects.select_related(
+        'actor', 'student__user', 'teacher__user',
+        'attendance', 'staff_attendance',
+        'seance__course', 'schedule__assignment__course',
+    )
+    serializer_class = BadgeEventSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['kind', 'source', 'student', 'teacher', 'seance', 'schedule', 'attendance', 'session_date']
+    ordering_fields = ['occurred_at']
+
+    def get_permissions(self):
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        return scope_badge_events(super().get_queryset(), self.request.user)
+
+
+class TimetableRunViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = TimetableRun.objects.select_related('period', 'promotion', 'actor')
+    serializer_class = TimetableRunSerializer
+    permission_module = 'faculty'
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['period', 'promotion', 'status', 'mode']

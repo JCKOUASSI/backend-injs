@@ -37,7 +37,7 @@ Plateforme nationale de gestion académique LMD pour l'INJS Côte d'Ivoire, con�
 | `accounts` | User, RBAC 5 niveaux, JWT, MFA, OAuth2/OIDC, audit |
 | `academics` | Institutions, départements, filières, UE/ECUE, spécialités STAPS, nomenclature emplois |
 | `students` | Étudiants, inscriptions, dossiers, carte QR |
-| `faculty` | Enseignants, affectations, emploi du temps, absences |
+| `faculty` | Enseignants, salles, EDT (gabarit `Schedule` + séances datées `Seance`), présences, badgeages |
 | `exams` | Examens, notes, délibérations, jurys, soutenances |
 | `admissions` | Préinscriptions, admissions, campagnes |
 | `finance` | Frais, paiements (Orange/MTN/Moov/Wave/Visa) |
@@ -101,3 +101,7 @@ Abstraction `PaymentProvider` avec implémentations:
 ## API Versioning
 
 Toutes les routes sous `/api/v1/`. Documentation Swagger: `/api/v1/docs/`
+
+## Emplois du temps
+
+Le module EDT est intégré dans `faculty` + `academics` (périodes). Détail : [EDT.md](EDT.md). Point d’entrée UI : `/admin/emploi-du-temps` sur le portail `5173`.

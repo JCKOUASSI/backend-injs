@@ -16,6 +16,7 @@ Permissions exposées en API : `{module}.{action}` (ex. `students.view`, `report
 - `Promotion`, `AcademicYear`, `Semester`
 - `TeachingUnit` (UE), `Course` (ECUE)
 - `ProgramCourse` (liaison filière ↔ UE ↔ spécialité + crédits ECTS)
+- `FormationPeriod` (fenêtre de planification EDT), `Holiday`
 - `StapsJobNomenclature` (emplois A3/A4, diplômes CAPS/CAPEPS/CAPCS/CAPCEPS)
 
 ### students
@@ -25,7 +26,9 @@ Permissions exposées en API : `{module}.{action}` (ex. `students.view`, `report
 
 ### faculty
 - `Teacher` (user FK, grade académique, département)
-- `CourseAssignment`, `Schedule`, `Room`, `Attendance`
+- `CourseAssignment`, `Schedule` (gabarit hebdomadaire), `Room`
+- `Seance` (séance datée), `TeachingLoad`, `StudentGroup`, `PlanningSettings`, `TimetableRun`
+- `Attendance`, `StaffAttendance`, `AttendanceSession`, `BadgeEvent`
 
 ### exams
 - `ExamSession` (normale/rattrapage, année, semestre)
@@ -58,6 +61,10 @@ Program 1─N ProgramCourse N─1 TeachingUnit
 ProgramCourse N─1 Specialization (optionnel, filtrage LMD)
 TeachingUnit 1─N Course (ECUE)
 Student N─1 Program, N─1 Promotion, N─1 Specialization
+FormationPeriod N─1 AcademicYear, N─1 Program
+Seance N─1 Course, N─1 Promotion, N─1 FormationPeriod
+Attendance N─1 Student, N─1 Schedule, N─1 Seance
+BadgeEvent N─1 Attendance
 Enrollment N─1 Student, N─1 AcademicYear
 Grade N─1 Student, N─1 Evaluation
 StapsJobNomenclature N─1 Specialization

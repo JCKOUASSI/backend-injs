@@ -1175,6 +1175,28 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 0.15rem;
 }
 
+.edt-tabs .nav-link {
+  color: var(--injs-primary);
+  background: #fff;
+  border: 1px solid rgba(51, 73, 161, 0.18);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.edt-tabs .nav-link.active {
+  background: var(--injs-primary);
+  color: #fff;
+  border-color: var(--injs-primary);
+}
+
+@media (max-width: 767px) {
+  .edt-tabs .nav-link {
+    font-size: 0.78rem;
+    padding: 0.35rem 0.7rem;
+  }
+}
+
 /* Liste étudiants séance (badgeage) */
 .session-student-list {
   display: flex;

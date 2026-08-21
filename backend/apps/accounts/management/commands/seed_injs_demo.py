@@ -89,7 +89,7 @@ class Command(BaseCommand):
         from apps.accounts.models import User, GroupProfile
         from apps.academics.models import (
             Institution, Department, Program, Promotion, AcademicYear,
-            Semester, TeachingUnit, Course, ProgramCourse,
+            Semester, TeachingUnit, Course, ProgramCourse, FormationPeriod,
         )
         from apps.students.models import Student, Enrollment
         from apps.faculty.models import Teacher, Room
@@ -218,6 +218,28 @@ class Command(BaseCommand):
                         'is_current': current and num == 2,
                     },
                 )
+
+        ay_current = academic_years['2025-2026']
+        sem1 = Semester.objects.filter(academic_year=ay_current, number=1).first()
+        sem2 = Semester.objects.filter(academic_year=ay_current, number=2).first()
+        FormationPeriod.objects.get_or_create(
+            academic_year=ay_current, program=prog_licence, label='Semestre 1',
+            defaults={
+                'semester': sem1,
+                'start_date': date(2025, 9, 1),
+                'end_date': date(2026, 1, 31),
+                'order': 1,
+            },
+        )
+        FormationPeriod.objects.get_or_create(
+            academic_year=ay_current, program=prog_licence, label='Semestre 2',
+            defaults={
+                'semester': sem2,
+                'start_date': date(2026, 2, 1),
+                'end_date': date(2026, 6, 30),
+                'order': 2,
+            },
+        )
 
         teaching_units = {}
 

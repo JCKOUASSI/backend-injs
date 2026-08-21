@@ -38,7 +38,7 @@ export default function StudentBadge() {
 
   const doCheckIn = useCallback(async (raw) => {
     const value = extractToken(raw)
-    if (!value.startsWith('INJS:SESSION:')) {
+    if (!value.startsWith('INJS:SESSION:') && !value.startsWith('INJS:SEANCE:')) {
       showToast('QR de séance invalide', 'warning')
       return
     }
@@ -152,7 +152,7 @@ export default function StudentBadge() {
                   rows={3}
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  placeholder="INJS:SESSION:… ou URL badgeage"
+                  placeholder="INJS:SEANCE:…, INJS:SESSION:… ou URL badgeage"
                 />
               </div>
               <button type="submit" className="btn btn-outline-primary w-100" disabled={submitting || !token.trim()}>
@@ -174,10 +174,10 @@ export default function StudentBadge() {
           <div className="card-injs p-4 h-100">
             <h6 className="fw-bold mb-3">Comment ça marche ?</h6>
             <ol className="small text-muted ps-3 mb-4">
-              <li className="mb-2">Le QR est généré pour chaque cours de l&apos;emploi du temps du jour.</li>
+              <li className="mb-2">Le QR est généré pour chaque séance publiée (EDT daté) ou créneau du jour.</li>
               <li className="mb-2">Le professeur ou l&apos;administration l&apos;affiche en plein écran en salle.</li>
               <li className="mb-2">Vous scannez pendant la fenêtre horaire du créneau (±30 min).</li>
-              <li className="mb-2">Votre présence passe automatiquement à « Présent » (ou « Retard »).</li>
+              <li className="mb-2">1er scan = entrée, 2e scan = sortie. Un retard ou une présence partielle peut s&apos;afficher.</li>
             </ol>
 
             <h6 className="fw-bold mb-2">Mes derniers badgeages</h6>
@@ -189,9 +189,17 @@ export default function StudentBadge() {
                     <strong>{a.course_name}</strong>
                     <br />
                     <span className="text-muted">{a.date}</span>
+                    {a.duration_minutes != null && (
+                      <span className="text-muted"> · {a.duration_minutes} min</span>
+                    )}
                   </span>
-                  <span className={`badge ${a.status === 'present' ? 'bg-success' : a.status === 'late' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
-                    {a.status_label || (a.status === 'present' ? 'Présent' : a.status === 'late' ? 'Retard' : a.status)}
+                  <span className={`badge ${
+                    a.status === 'present' ? 'bg-success'
+                      : a.status === 'late' ? 'bg-warning text-dark'
+                        : a.status === 'partial' ? 'bg-info text-dark'
+                          : 'bg-secondary'
+                  }`}>
+                    {a.status_label || a.status}
                   </span>
                 </li>
               ))}

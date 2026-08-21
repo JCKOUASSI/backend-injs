@@ -109,3 +109,37 @@ curl "http://localhost:8001/api/v1/academics/job-nomenclatures/?degree_type=L" \
 curl http://localhost:8001/api/v1/students/<uuid>/career_path/ \
   -H "Authorization: Bearer TOKEN"
 ```
+
+## Emplois du temps (EDT)
+
+```bash
+# Périodes de formation
+curl http://localhost:8002/api/v1/academics/formation-periods/ \
+  -H "Authorization: Bearer TOKEN"
+
+# Générer les séances d'une période × promotion
+curl -X POST http://localhost:8002/api/v1/faculty/seances/generate/ \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"period": "UUID", "promotion": "UUID"}'
+
+# Publier
+curl -X POST http://localhost:8002/api/v1/faculty/seances/publish/ \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"period": "UUID", "promotion": "UUID"}'
+
+# Calendrier (étudiants : séances publiées de leur promotion)
+curl "http://localhost:8002/api/v1/faculty/seances/?visible=true" \
+  -H "Authorization: Bearer TOKEN"
+
+# QR d’une séance publiée
+curl http://localhost:8002/api/v1/faculty/seances/UUID/qr/ \
+  -H "Authorization: Bearer TOKEN"
+
+# Journal de badgeage
+curl http://localhost:8002/api/v1/faculty/badge-events/ \
+  -H "Authorization: Bearer TOKEN"
+```
+
+Guide complet : [EDT.md](EDT.md).

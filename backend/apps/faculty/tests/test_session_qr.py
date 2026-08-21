@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
@@ -73,3 +73,61 @@ class FrontendBaseUrlTests(TestCase):
         payload = build_session_payload('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', date(2026, 7, 10))
         url = build_badge_url(payload, request=request)
         self.assertTrue(url.startswith('https://spa.injs.ci/etudiant/presences?token='))
+
+
+class SeanceQrPayloadTests(TestCase):
+    def setUp(self):
+        from apps.academics.models import Course, TeachingUnit
+        from apps.accounts.models import User
+        from apps.core.tests.test_utils import TEST_PASSWORD, create_institution_bundle
+        from apps.faculty.models import CourseAssignment, Seance, Teacher
+
+        inst, dept, program, promotion, ay = create_institution_bundle()
+        ue = TeachingUnit.objects.create(
+            code='UE-QR', name='UE QR', credits_ects=4, semester_number=1, department=dept,
+        )
+        self.course = Course.objects.create(teaching_unit=ue, code='ECUE-QR', name='ECUE QR')
+        teacher = Teacher.objects.create(
+            user=User.objects.create_user(
+                email='qr.ens@test.ci', password=TEST_PASSWORD, first_name='Q', last_name='R',
+            ),
+            employee_id='ENS-QR', department=dept, grade='assistant',
+        )
+        CourseAssignment.objects.create(
+            teacher=teacher, course=self.course, academic_year=ay, promotion=promotion,
+        )
+        self.seance = Seance.objects.create(
+            course=self.course, promotion=promotion, teacher=teacher,
+            date=date(2025, 9, 15), start_time=time(8, 0), end_time=time(10, 0),
+            status='published',
+        )
+
+    def test_parse_seance_payload_creates_schedule(self):
+        from apps.faculty.services.session_qr import build_seance_payload, parse_session_payload
+
+        payload = build_seance_payload(self.seance.id)
+        schedule_id, session_date = parse_session_payload(payload)
+        self.seance.refresh_from_db()
+        self.assertEqual(session_date, date(2025, 9, 15))
+        self.assertEqual(str(self.seance.schedule_id), schedule_id)
+        self.assertTrue(payload.startswith('INJS:SEANCE:'))
+
+    def test_draft_seance_is_rejected(self):
+        from apps.faculty.services.session_qr import build_seance_payload, parse_session_payload, SessionQrError
+
+        self.seance.status = 'draft'
+        self.seance.save(update_fields=['status'])
+        with self.assertRaises(SessionQrError) as ctx:
+            parse_session_payload(build_seance_payload(self.seance.id))
+        self.assertEqual(ctx.exception.code, 'seance_not_published')
+
+    def test_legacy_session_payload_still_parses(self):
+        from apps.faculty.services.session_qr import build_session_payload, parse_session_payload
+
+        schedule_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        parsed_id, parsed_date = parse_session_payload(
+            build_session_payload(schedule_id, date(2026, 7, 10))
+        )
+        self.assertEqual(parsed_id, schedule_id)
+        self.assertEqual(parsed_date, date(2026, 7, 10))
+

@@ -45,8 +45,8 @@ python manage.py import_nomenclature_staps --replace
 ### Tests
 
 ```bash
-python manage.py test_injs          # suite complète (48 tests)
-python manage.py test_injs apps.finance.tests  # un module seulement
+python manage.py test_injs          # suite complète
+python manage.py test_injs apps.faculty.tests  # module EDT / présences
 ```
 
 ## Comptes démo
@@ -66,7 +66,7 @@ python manage.py test_injs apps.finance.tests  # un module seulement
 
 1. Auth & RBAC (groupes Django natifs, 5 niveaux, MFA, OAuth2)
 2. Gestion étudiants (QR, inscriptions, parcours emploi)
-3. Gestion enseignants & emploi du temps
+3. Gestion enseignants & emploi du temps (EDT daté, cours, présences, badgeages)
 4. LMD STAPS (UE/ECUE, spécialités TC/EM/ES/MS/APA, crédits ECTS)
 5. Notes & délibérations (moteur LMD officiel INJS)
 6. Finance (Orange/MTN/Moov/Wave/Visa)
@@ -92,7 +92,12 @@ GET  /api/v1/auth/groups/
 GET  /api/v1/students/
 GET  /api/v1/students/{id}/card/
 GET  /api/v1/students/{id}/career_path/
+GET  /api/v1/academics/formation-periods/
 GET  /api/v1/academics/specializations/
+GET  /api/v1/faculty/seances/
+POST /api/v1/faculty/seances/generate/
+POST /api/v1/faculty/seances/publish/
+GET  /api/v1/faculty/badge-events/
 GET  /api/v1/academics/job-nomenclatures/
 GET  /api/v1/exams/grades/
 POST /api/v1/exams/deliberations/{id}/run/
@@ -118,3 +123,4 @@ k8s/              # Kubernetes manifests
 - [Architecture](docs/ARCHITECTURE.md)
 - [Schéma DB](docs/DATABASE_SCHEMA.md)
 - [API Examples](docs/API_EXAMPLES.md)
+- [EDT, cours, présences, badgeages](docs/EDT.md)

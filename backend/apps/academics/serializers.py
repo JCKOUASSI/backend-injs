@@ -2,7 +2,7 @@ from rest_framework import serializers
 from apps.academics.models import (
     Institution, Department, Program, Promotion, AcademicYear,
     Semester, TeachingUnit, Course, ProgramCourse, Specialization,
-    StapsJobNomenclature,
+    StapsJobNomenclature, FormationPeriod, Holiday,
 )
 
 
@@ -115,4 +115,22 @@ class StapsJobNomenclatureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StapsJobNomenclature
+        fields = '__all__'
+
+
+class FormationPeriodSerializer(serializers.ModelSerializer):
+    academic_year_label = serializers.CharField(source='academic_year.label', read_only=True)
+    program_name = serializers.CharField(source='program.name', read_only=True, allow_null=True)
+    weekly_rhythm_display = serializers.CharField(source='get_weekly_rhythm_display', read_only=True)
+
+    class Meta:
+        model = FormationPeriod
+        fields = '__all__'
+
+
+class HolidaySerializer(serializers.ModelSerializer):
+    institution_name = serializers.CharField(source='institution.name', read_only=True)
+
+    class Meta:
+        model = Holiday
         fields = '__all__'

@@ -2,6 +2,8 @@ from rest_framework import serializers
 from apps.faculty.models import (
     Teacher, Room, CourseAssignment, Schedule, Attendance, AttendanceSession,
     RoomReservation, MaintenanceTicket, EquipmentAsset, StaffAttendance,
+    Seance, TeachingLoad, StudentGroup, StudentGroupMember, PlanningSettings,
+    TimetableRun, GroupSchedulingConfig, BadgeEvent,
 )
 
 
@@ -295,6 +297,8 @@ class AttendanceSerializer(serializers.ModelSerializer):
             return 'Présente' if feminine else 'Présent'
         if obj.status == 'late':
             return 'En retard'
+        if obj.status == 'partial':
+            return 'Présence partielle'
         if obj.status == 'excused':
             return 'Excusée' if feminine else 'Excusé'
         if obj.status == 'absent':
@@ -352,4 +356,110 @@ class EquipmentAssetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EquipmentAsset
+        fields = '__all__'
+
+
+class StudentGroupSerializer(serializers.ModelSerializer):
+    promotion_name = serializers.CharField(source='promotion.name', read_only=True)
+    headcount = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = StudentGroup
+        fields = '__all__'
+
+
+class StudentGroupMemberSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    matricule = serializers.CharField(source='student.matricule', read_only=True)
+
+    class Meta:
+        model = StudentGroupMember
+        fields = '__all__'
+
+    def get_student_name(self, obj):
+        return obj.student.user.get_full_name()
+
+
+class GroupSchedulingConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GroupSchedulingConfig
+        fields = '__all__'
+
+
+class PlanningSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlanningSettings
+        fields = '__all__'
+        read_only_fields = ['is_global']
+
+
+class TeachingLoadSerializer(serializers.ModelSerializer):
+    course_code = serializers.CharField(source='course.code', read_only=True)
+    course_name = serializers.CharField(source='course.name', read_only=True)
+    promotion_name = serializers.CharField(source='promotion.name', read_only=True)
+    group_name = serializers.CharField(source='group.name', read_only=True, allow_null=True)
+    teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True, allow_null=True)
+    supervisor_name = serializers.CharField(source='supervisor.user.get_full_name', read_only=True, allow_null=True)
+    session_kind_display = serializers.CharField(source='get_session_kind_display', read_only=True)
+    period_label = serializers.CharField(source='period.label', read_only=True)
+
+    class Meta:
+        model = TeachingLoad
+        fields = '__all__'
+
+
+class SeanceSerializer(serializers.ModelSerializer):
+    course_code = serializers.CharField(source='course.code', read_only=True)
+    course_name = serializers.CharField(source='course.name', read_only=True)
+    promotion_name = serializers.CharField(source='promotion.name', read_only=True)
+    group_name = serializers.CharField(source='group.name', read_only=True, allow_null=True)
+    teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True, allow_null=True)
+    supervisor_name = serializers.SerializerMethodField()
+    room_code = serializers.CharField(source='room.code', read_only=True, allow_null=True)
+    room_name = serializers.CharField(source='room.name', read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    session_kind_display = serializers.CharField(source='get_session_kind_display', read_only=True)
+    period_label = serializers.CharField(source='period.label', read_only=True, allow_null=True)
+    duration_minutes = serializers.IntegerField(read_only=True)
+    day_of_week = serializers.IntegerField(read_only=True)
+    is_visible = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Seance
+        fields = '__all__'
+
+    def get_supervisor_name(self, obj):
+        person = obj.resolved_supervisor()
+        return person.user.get_full_name() if person else None
+
+
+class BadgeEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.CharField(source='actor.get_full_name', read_only=True, allow_null=True)
+    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True, allow_null=True)
+    teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True, allow_null=True)
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+    source_display = serializers.CharField(source='get_source_display', read_only=True)
+    course_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BadgeEvent
+        fields = '__all__'
+        read_only_fields = [field.name for field in BadgeEvent._meta.fields]
+
+    def get_course_code(self, obj):
+        if obj.seance_id:
+            return obj.seance.course.code
+        if obj.schedule_id:
+            return obj.schedule.assignment.course.code
+        return None
+
+
+class TimetableRunSerializer(serializers.ModelSerializer):
+    period_label = serializers.CharField(source='period.label', read_only=True)
+    promotion_name = serializers.CharField(source='promotion.name', read_only=True, allow_null=True)
+    actor_name = serializers.CharField(source='actor.get_full_name', read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = TimetableRun
         fields = '__all__'

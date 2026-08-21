@@ -13,7 +13,7 @@ from uuid import UUID
 from django.db.models import Count, Q
 
 from apps.academics.models import AcademicYear, Course, ProgramCourse, Promotion
-from apps.faculty.models import Attendance, AttendanceSession, CourseAssignment, Schedule
+from apps.faculty.models import Attendance, AttendanceSession, CourseAssignment, Schedule, Seance
 from apps.students.models import Student
 
 STATUS_LABELS = {
@@ -240,8 +240,14 @@ def get_cours_offering(params) -> dict | None:
         round(offering['estimated_semester_hours'] / volume * 100, 1) if volume else 0.0
     )
     offering['sessions'] = _serialize_sessions(schedules)
-    offering['sessions_count'] = len(offering['sessions'])
-    offering['session_hours'] = round(sum(item['hours'] for item in offering['sessions']), 2)
+    offering['seances'] = _serialize_seances(course_id, promotion_id)
+    if offering['seances']:
+        offering['sessions_count'] = len(offering['seances'])
+        offering['session_hours'] = round(sum(item['hours'] for item in offering['seances']), 2)
+    else:
+        offering['sessions_count'] = len(offering['sessions'])
+        offering['session_hours'] = round(sum(item['hours'] for item in offering['sessions']), 2)
+    offering['seances_count'] = len(offering['seances'])
     offering['volume_objectif'] = volume
     return offering
 
@@ -352,6 +358,7 @@ def _build_offerings(
     }
     session_count_by_pair = defaultdict(int)
     session_hours_by_pair = defaultdict(float)
+    seance_count_by_pair = defaultdict(int)
     if assignment_ids:
         for session in AttendanceSession.objects.filter(
             schedule__assignment_id__in=assignment_ids,
@@ -362,6 +369,16 @@ def _build_offerings(
             session_hours_by_pair[key] += slot_hours(
                 session.schedule.start_time, session.schedule.end_time,
             )
+    promo_ids = [promo.id for promo in promotions]
+    course_ids = list({course.id for course, _promo in pairs})
+    if course_ids and promo_ids:
+        for seance in Seance.objects.filter(
+            course_id__in=course_ids,
+            promotion_id__in=promo_ids,
+        ).exclude(status__in=('cancelled', 'archived')):
+            key = (seance.course_id, seance.promotion_id)
+            seance_count_by_pair[key] += 1
+            session_hours_by_pair[key] += slot_hours(seance.start_time, seance.end_time)
 
     rows = []
     for course, promo in pairs:
@@ -378,7 +395,8 @@ def _build_offerings(
         ]
         primary = _primary_assignment(serialized_assignments)
         hours_total = (course.hours_cm or 0) + (course.hours_td or 0) + (course.hours_tp or 0)
-        status = _status(serialized_assignments, len(pair_schedules))
+        seances_count = seance_count_by_pair.get((course.id, promo.id), 0)
+        status = _status(serialized_assignments, len(pair_schedules) + seances_count)
         row = {
             'id': _offering_id(course.id, promo.id, year.id),
             'course': str(course.id),
@@ -412,7 +430,8 @@ def _build_offerings(
             'students_count': student_counts.get(promo.id, 0),
             'slots_count': len(pair_schedules),
             'weekly_hours': weekly,
-            'sessions_count': session_count_by_pair.get((course.id, promo.id), 0),
+            'sessions_count': max(session_count_by_pair.get((course.id, promo.id), 0), seances_count),
+            'seances_count': seances_count,
             'session_hours': round(session_hours_by_pair.get((course.id, promo.id), 0), 2),
             'status': status,
             'status_label': STATUS_LABELS[status],
@@ -487,6 +506,34 @@ def _serialize_sessions(schedules):
             'present_count': stats.get('present', 0),
             'roster_count': stats.get('total', 0),
             'hours': hours,
+        })
+    return payload
+
+
+def _serialize_seances(course_id, promotion_id):
+    seances = list(
+        Seance.objects.filter(course_id=course_id, promotion_id=promotion_id)
+        .exclude(status__in=('cancelled', 'archived'))
+        .select_related('room', 'teacher__user', 'group', 'period')
+        .order_by('date', 'start_time')
+    )
+    payload = []
+    for seance in seances:
+        payload.append({
+            'id': str(seance.id),
+            'date': seance.date.isoformat(),
+            'start_time': seance.start_time.strftime('%H:%M'),
+            'end_time': seance.end_time.strftime('%H:%M'),
+            'session_kind': seance.session_kind,
+            'session_kind_display': seance.get_session_kind_display(),
+            'status': seance.status,
+            'status_label': seance.get_status_display(),
+            'is_visible': seance.is_visible,
+            'room_code': seance.room.code if seance.room_id else None,
+            'teacher_name': seance.teacher.user.get_full_name() if seance.teacher_id else None,
+            'group_name': seance.group.name if seance.group_id else None,
+            'period_label': seance.period.label if seance.period_id else None,
+            'hours': slot_hours(seance.start_time, seance.end_time),
         })
     return payload
 

@@ -51,7 +51,14 @@ export default function AdminCoursDetail() {
 
   const couverture = cours.coverage_pct || 0
   const creneaux = cours.schedules || []
-  const seances = cours.sessions || []
+  const seances = (cours.seances && cours.seances.length)
+    ? cours.seances.map((row) => ({
+      ...row,
+      session_date: row.date,
+      day_display: row.period_label || '',
+      is_active: row.status === 'in_progress' || row.status === 'published',
+    }))
+    : (cours.sessions || [])
   const enseignants = cours.assignments || []
 
   return (

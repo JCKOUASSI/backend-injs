@@ -5,7 +5,7 @@ from apps.academics.views import (
     AcademicYearViewSet, SemesterViewSet, TeachingUnitViewSet,
     CourseViewSet, ProgramCourseViewSet, SpecializationViewSet,
     StapsJobNomenclatureViewSet, AcademicImportViewSet, CoursViewSet,
-    ReferentielViewSet,
+    ReferentielViewSet, FormationPeriodViewSet, HolidayViewSet,
 )
 
 router = DefaultRouter()
@@ -23,5 +23,7 @@ router.register('program-courses', ProgramCourseViewSet)
 router.register('cours', CoursViewSet, basename='cours')
 router.register('referentiels', ReferentielViewSet, basename='referentiels')
 router.register('imports', AcademicImportViewSet, basename='academic-imports')
+router.register('formation-periods', FormationPeriodViewSet)
+router.register('holidays', HolidayViewSet)
 
 urlpatterns = [path('', include(router.urls))]

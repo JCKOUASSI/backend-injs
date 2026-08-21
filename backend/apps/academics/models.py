@@ -1,5 +1,6 @@
 import uuid
 from decimal import Decimal
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from apps.core.models import TimeStampedModel, SoftDeleteModel
@@ -153,6 +154,72 @@ class Semester(TimeStampedModel):
 
     def __str__(self):
         return f'{self.academic_year.label} - S{self.number}'
+
+
+class FormationPeriod(TimeStampedModel):
+    """Fenêtre calendaire sur laquelle un emploi du temps est généré puis publié."""
+
+    RHYTHMS = [
+        ('full', 'Toutes les semaines'),
+        ('w1', '1re semaine du mois'),
+        ('w1_2', '2 premières semaines du mois'),
+        ('w1_3', '3 premières semaines du mois'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    academic_year = models.ForeignKey(
+        AcademicYear, on_delete=models.CASCADE, related_name='formation_periods'
+    )
+    program = models.ForeignKey(
+        Program, on_delete=models.CASCADE, null=True, blank=True, related_name='formation_periods',
+        help_text='Vide = période commune à toutes les filières.',
+    )
+    semester = models.ForeignKey(
+        Semester, on_delete=models.SET_NULL, null=True, blank=True, related_name='formation_periods'
+    )
+    label = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    order = models.PositiveSmallIntegerField(default=0)
+    weekly_rhythm = models.CharField(max_length=10, choices=RHYTHMS, default='full')
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ['academic_year', 'order', 'start_date']
+        unique_together = [['academic_year', 'program', 'label']]
+        verbose_name = 'Période de formation'
+        verbose_name_plural = 'Périodes de formation'
+
+    def __str__(self):
+        return f'{self.label} ({self.start_date:%d/%m/%Y} → {self.end_date:%d/%m/%Y})'
+
+    def clean(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError({
+                'end_date': 'La date de fin doit être postérieure ou égale à la date de début.',
+            })
+
+    def covers(self, day):
+        return self.start_date <= day <= self.end_date
+
+
+class Holiday(TimeStampedModel):
+    """Jour férié ou journée banalisée, exclu de la génération d'emploi du temps."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='holidays')
+    date = models.DateField(db_index=True)
+    label = models.CharField(max_length=120)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ['-date']
+        unique_together = [['institution', 'date']]
+        verbose_name = 'Jour férié'
+        verbose_name_plural = 'Jours fériés'
+
+    def __str__(self):
+        return f'{self.date:%d/%m/%Y} — {self.label}'
 
 
 class TeachingUnit(TimeStampedModel, SoftDeleteModel):

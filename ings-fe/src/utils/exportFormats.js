@@ -76,10 +76,15 @@ export function exportTableToWord(filename, title, headers, rows) {
  * Télécharge un export backend ExportMixin :
  * GET /api/v1/{resource}/export/{pdf|excel|word}/
  */
-export async function downloadBackendExport(resourcePath, format, fallbackFilename = 'export_injs') {
+export async function downloadBackendExport(resourcePath, format, fallbackFilename = 'export_injs', params = {}) {
   const token = getAccessToken()
   const path = resourcePath.replace(/\/$/, '')
-  const url = `${API_BASE}${path}/export/${format}/`
+  const qs = new URLSearchParams()
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') qs.set(key, value)
+  })
+  const query = qs.toString()
+  const url = `${API_BASE}${path}/export/${format}/${query ? `?${query}` : ''}`
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })

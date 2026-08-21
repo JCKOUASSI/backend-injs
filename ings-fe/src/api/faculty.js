@@ -478,3 +478,59 @@ export function toDjangoWeekday(dateStr) {
   if (jsDay === 0) return null
   return jsDay - 1
 }
+
+export async function fetchSeances(params = {}) {
+  return apiGet('/faculty/seances/', { page_size: 100, ...params })
+}
+
+export async function fetchSeance(id) {
+  return apiGet(`/faculty/seances/${id}/`)
+}
+
+export async function updateSeance(id, payload) {
+  return apiPatch(`/faculty/seances/${id}/`, payload)
+}
+
+export async function fetchSeanceConflicts(params = {}) {
+  return apiGet('/faculty/seances/conflicts/', params)
+}
+
+export async function fetchEdtDashboard(params = {}) {
+  return apiGet('/faculty/seances/dashboard/', params)
+}
+
+export async function fetchSeanceQr(id) {
+  return apiGet(`/faculty/seances/${id}/qr/`)
+}
+
+export async function fetchBadgeEvents(params = {}) {
+  return apiGet('/faculty/badge-events/', { page_size: 50, ...params })
+}
+
+export async function generatePeriodSchedule(payload) {
+  return apiPost('/faculty/seances/generate/', payload)
+}
+
+export async function expandWeeklySchedule(payload) {
+  return apiPost('/faculty/seances/expand/', payload)
+}
+
+export async function publishSeances(payload = {}) {
+  return apiPost('/faculty/seances/publish/', payload)
+}
+
+export async function fetchTeachingLoads(params = {}) {
+  return apiGet('/faculty/teaching-loads/', { page_size: 100, ...params })
+}
+
+export async function fetchStudentGroups(params = {}) {
+  return apiGet('/faculty/student-groups/', { page_size: 100, ...params })
+}
+
+export async function fetchPlanningSettings(params = {}) {
+  return apiGet('/faculty/planning-settings/', params)
+}
+
+export async function fetchDefaultPlanningSettings() {
+  return apiGet('/faculty/planning-settings/defaults/')
+}

@@ -17,6 +17,7 @@ import {
   removeSessionStudents,
   forceSessionBadge,
   fetchAttendanceDashboardStats,
+  fetchBadgeEvents,
 } from '../../api/faculty'
 
 function todayIso() {
@@ -45,6 +46,10 @@ export default function AdminAttendance() {
   )
   const { data: stats } = useFetch(
     () => fetchAttendanceDashboardStats({ date: sessionDate }),
+    [sessionDate],
+  )
+  const { data: badgeEvents } = useFetch(
+    () => fetchBadgeEvents({ session_date: sessionDate, page_size: 40 }),
     [sessionDate],
   )
 
@@ -285,6 +290,49 @@ export default function AdminAttendance() {
           </div>
         </div>
       ))}
+
+      <div className="card-injs p-4 mt-2">
+        <h6 className="fw-bold mb-3">Journal de badgeage — {sessionDate}</h6>
+        {(badgeEvents?.results || []).length === 0 ? (
+          <p className="small text-muted mb-0">Aucun événement pour cette date.</p>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Type</th>
+                  <th>Source</th>
+                  <th>Personne</th>
+                  <th>ECUE</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(badgeEvents.results || []).map((row) => (
+                  <tr key={row.id}>
+                    <td className="small text-nowrap">
+                      {row.occurred_at
+                        ? new Date(row.occurred_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                        : '—'}
+                    </td>
+                    <td><span className="badge bg-light text-dark">{row.kind_display || row.kind}</span></td>
+                    <td className="small">{row.source_display || row.source}</td>
+                    <td className="small">{row.student_name || row.teacher_name || row.actor_name || '—'}</td>
+                    <td><code>{row.course_code || '—'}</code></td>
+                    <td className="small">
+                      {row.previous_status && row.new_status
+                        ? `${row.previous_status} → ${row.new_status}`
+                        : (row.new_status || '—')}
+                      {row.reason ? <div className="text-muted">{row.reason}</div> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <Modal
         show={!!activeSession}

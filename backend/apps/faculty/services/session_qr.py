@@ -9,19 +9,33 @@ import qrcode
 from django.conf import settings
 from django.utils import timezone
 
-from apps.faculty.models import Attendance, AttendanceSession, Schedule, StaffAttendance
+from apps.faculty.models import (
+    Attendance, AttendanceSession, CourseAssignment, Schedule, StaffAttendance, Seance,
+)
+from apps.faculty.services.attendance_eval import (
+    apply_evaluation,
+    planned_window,
+    resolve_attendance_rules,
+    auto_absent_deadline,
+)
 from apps.faculty.services.badge_security import (
     apply_badge_security,
     geofence_for_schedule,
     log_badge_event,
+    record_badge_event,
     should_audit_heartbeat,
     stamp_badge_fields,
 )
 
 SESSION_PREFIX = 'INJS:SESSION:'
+SEANCE_PREFIX = 'INJS:SEANCE:'
 SESSION_PATTERN = re.compile(
     r'^INJS:SESSION:(?P<schedule_id>[0-9a-f-]{36}):(?P<session_date>\d{4}-\d{2}-\d{2})$'
 )
+SEANCE_PATTERN = re.compile(
+    r'^INJS:SEANCE:(?P<seance_id>[0-9a-f-]{36})$'
+)
+BADGEABLE_SEANCE_STATUSES = ('published', 'validated', 'in_progress')
 
 # Fenêtre de badgeage (style SYGEP, adaptée campus INJS)
 GRACE_BEFORE_MINUTES = 30
@@ -36,6 +50,10 @@ class SessionQrError(Exception):
 
 def build_session_payload(schedule_id, session_date: date) -> str:
     return f'{SESSION_PREFIX}{schedule_id}:{session_date.isoformat()}'
+
+
+def build_seance_payload(seance_id) -> str:
+    return f'{SEANCE_PREFIX}{seance_id}'
 
 
 def extract_session_token(raw: str) -> str:
@@ -57,10 +75,62 @@ def extract_session_token(raw: str) -> str:
 
 def parse_session_payload(payload: str) -> tuple[str, date]:
     token = extract_session_token(payload)
+    seance_match = SEANCE_PATTERN.match(token)
+    if seance_match:
+        seance = Seance.objects.select_related('schedule', 'course', 'promotion').filter(
+            pk=seance_match.group('seance_id'),
+        ).first()
+        if not seance:
+            raise SessionQrError('Séance introuvable', 'seance_not_found')
+        if seance.status not in BADGEABLE_SEANCE_STATUSES:
+            raise SessionQrError('Cette séance n’est pas ouverte au badgeage', 'seance_not_published')
+        schedule = ensure_schedule_for_seance(seance)
+        return str(schedule.id), seance.date
     match = SESSION_PATTERN.match(token)
     if not match:
         raise SessionQrError('QR de séance invalide', 'invalid_token')
     return match.group('schedule_id'), date.fromisoformat(match.group('session_date'))
+
+
+def ensure_schedule_for_seance(seance: Seance) -> Schedule:
+    """Rattache un gabarit hebdomadaire à la séance datée, requis par le badgeage QR."""
+    if seance.schedule_id:
+        return seance.schedule
+    assignment = (
+        CourseAssignment.objects.filter(
+            course_id=seance.course_id, promotion_id=seance.promotion_id, is_primary=True,
+        ).first()
+        or CourseAssignment.objects.filter(
+            course_id=seance.course_id, promotion_id=seance.promotion_id,
+        ).first()
+    )
+    if assignment is None and seance.teacher_id:
+        assignment = CourseAssignment.objects.filter(
+            course_id=seance.course_id, teacher_id=seance.teacher_id,
+        ).first()
+    if assignment is None:
+        raise SessionQrError(
+            'Aucun professeur affecté à cet ECUE : impossible d’ouvrir le badgeage.',
+            'no_assignment',
+        )
+    weekday = seance.date.weekday()
+    if weekday > 5:
+        raise SessionQrError('Le badgeage n’est pas prévu le dimanche', 'weekend')
+    schedule, _created = Schedule.objects.get_or_create(
+        assignment=assignment,
+        day_of_week=weekday,
+        start_time=seance.start_time,
+        end_time=seance.end_time,
+        defaults={
+            'room': seance.room,
+            'session_kind': seance.session_kind or 'cm',
+            'supervisor': seance.supervisor,
+            'is_active': True,
+        },
+    )
+    seance.schedule = schedule
+    seance.save(update_fields=['schedule', 'updated_at'])
+    return schedule
 
 
 def trusted_origins() -> set[str]:
@@ -247,27 +317,73 @@ def ensure_sessions_for_date(session_date: date) -> list[AttendanceSession]:
                 pass
         if session.is_active:
             sessions.append(session)
+
+    for seance in Seance.objects.filter(
+        date=session_date,
+        status__in=BADGEABLE_SEANCE_STATUSES,
+        is_active=True,
+    ).select_related('schedule', 'course', 'promotion'):
+        try:
+            schedule = ensure_schedule_for_seance(seance)
+        except SessionQrError:
+            continue
+        session, created = AttendanceSession.objects.get_or_create(
+            schedule=schedule,
+            session_date=session_date,
+            defaults={'is_active': True},
+        )
+        if created:
+            from apps.faculty.services.campus_ops import seed_session_roster
+            try:
+                seed_session_roster(session, default_status='absent')
+            except Exception:
+                pass
+            try:
+                seed_staff_roster(session)
+            except Exception:
+                pass
+        if session.is_active and session not in sessions:
+            sessions.append(session)
     return sessions
 
 
 def get_active_session(schedule: Schedule, session_date: date) -> AttendanceSession:
     ensure_sessions_for_date(session_date)
-    try:
-        session = AttendanceSession.objects.get(
-            schedule=schedule,
-            session_date=session_date,
-            is_active=True,
-        )
-    except AttendanceSession.DoesNotExist as exc:
+    session = AttendanceSession.objects.filter(
+        schedule=schedule,
+        session_date=session_date,
+        is_active=True,
+    ).first()
+    if session:
+        return session
+    session, created = AttendanceSession.objects.get_or_create(
+        schedule=schedule,
+        session_date=session_date,
+        defaults={'is_active': True},
+    )
+    if created:
+        from apps.faculty.services.campus_ops import seed_session_roster
+        try:
+            seed_session_roster(session, default_status='absent')
+        except Exception:
+            pass
+        try:
+            seed_staff_roster(session)
+        except Exception:
+            pass
+    if not session.is_active:
         raise SessionQrError(
             'Séance non disponible pour ce créneau. Vérifiez l\'emploi du temps.',
             'session_not_open',
-        ) from exc
+        )
     return session
 
 
 def build_session_qr_data(schedule: Schedule, session_date: date, request=None) -> dict:
-    payload = build_session_payload(str(schedule.id), session_date)
+    seance = linked_seance(schedule, session_date)
+    session_payload = build_session_payload(str(schedule.id), session_date)
+    seance_payload = build_seance_payload(seance.id) if seance else None
+    payload = seance_payload or session_payload
     badge_url = build_badge_url(payload, request=request)
     fence = geofence_for_schedule(schedule)
     # QR encode l'URL deep-link (scan téléphone → page étudiant)
@@ -275,6 +391,7 @@ def build_session_qr_data(schedule: Schedule, session_date: date, request=None) 
         'schedule': schedule.id,
         'date': session_date,
         'payload': payload,
+        'session_payload': session_payload,
         'badge_url': badge_url,
         'qr_image_base64': generate_session_qr_image(badge_url),
         'course_name': schedule.assignment.course.name,
@@ -296,11 +413,55 @@ def build_session_qr_data(schedule: Schedule, session_date: date, request=None) 
         'grace_after_minutes': GRACE_AFTER_MINUTES,
         'geofence_required': fence is not None,
         'geofence_radius_m': fence[2] if fence else None,
+        'seance': str(seance.id) if seance else None,
+        'seance_payload': seance_payload,
     }
+
+
+def build_seance_qr_data(seance: Seance, request=None) -> dict:
+    if seance.status not in BADGEABLE_SEANCE_STATUSES:
+        raise SessionQrError('Cette séance n’est pas ouverte au badgeage', 'seance_not_published')
+    schedule = ensure_schedule_for_seance(seance)
+    get_active_session(schedule, seance.date)
+    data = build_session_qr_data(schedule, seance.date, request=request)
+    data['seance'] = str(seance.id)
+    data['payload'] = build_seance_payload(seance.id)
+    data['seance_payload'] = data['payload']
+    data['badge_url'] = build_badge_url(data['payload'], request=request)
+    data['qr_image_base64'] = generate_session_qr_image(data['badge_url'])
+    return data
 
 
 def assert_can_manage_session(user, schedule: Schedule) -> None:
     assert_can_view_session(user, schedule)
+
+
+def linked_seance(schedule: Schedule, session_date: date):
+    found = Seance.objects.filter(schedule=schedule, date=session_date).first()
+    if found:
+        return found
+    assignment = getattr(schedule, 'assignment', None)
+    if assignment is None:
+        return None
+    return Seance.objects.filter(
+        course_id=assignment.course_id,
+        promotion_id=assignment.promotion_id,
+        date=session_date,
+        start_time=schedule.start_time,
+        status__in=BADGEABLE_SEANCE_STATUSES,
+    ).first()
+
+
+def apply_attendance_clock(attendance, *, schedule: Schedule, session_date: date, seance=None):
+    start, end = planned_window(session_date, schedule.start_time, schedule.end_time)
+    period = seance.period if seance is not None else None
+    apply_evaluation(
+        attendance,
+        planned_start=start,
+        planned_end=end,
+        rules=resolve_attendance_rules(period),
+    )
+    return start, end
 
 
 def check_in_student(*, student, schedule: Schedule, session_date: date, recorded_by=None, badge_context=None) -> Attendance:
@@ -314,40 +475,86 @@ def check_in_student(*, student, schedule: Schedule, session_date: date, recorde
     get_active_session(schedule, session_date)
     apply_badge_security(user=student.user, schedule=schedule, context=badge_context)
 
+    seance = linked_seance(schedule, session_date)
     attendance, created = Attendance.objects.get_or_create(
         student=student,
         schedule=schedule,
         date=session_date,
-        defaults={'status': 'present', 'recorded_by': recorded_by},
+        defaults={'status': 'present', 'recorded_by': recorded_by, 'seance': seance},
     )
-    if not created:
-        if attendance.status == 'present':
-            raise SessionQrError('Vous avez déjà badgé cette séance', 'already_scanned')
-        if attendance.status == 'absent':
-            # Late if after start
-            now = timezone.localtime()
-            tz = timezone.get_current_timezone()
-            start_dt = timezone.make_aware(datetime.combine(session_date, schedule.start_time), tz)
-            attendance.status = 'late' if now > start_dt + timedelta(minutes=10) else 'present'
-            attendance.recorded_by = recorded_by
-            extra = stamp_badge_fields(attendance, badge_context)
-            attendance.save(update_fields=['status', 'recorded_by', 'updated_at', *extra])
-            created = True
-            log_badge_event(
-                user=student.user, action='badge_check_in',
-                object_id=attendance.id, object_repr=schedule.assignment.course.code,
-                changes={'status': attendance.status, 'role': 'etudiant'},
-            )
-            return attendance, created
+    if attendance.checked_out_at:
+        raise SessionQrError('Entrée et sortie déjà enregistrées pour cette séance', 'already_scanned')
+    if attendance.checked_in_at:
+        return check_out_student(
+            student=student, schedule=schedule, session_date=session_date,
+            recorded_by=recorded_by, badge_context=badge_context,
+            attendance=attendance, seance=seance,
+        )
+
+    now = timezone.localtime()
+    attendance.checked_in_at = now
+    attendance.recorded_by = recorded_by
+    if seance and not attendance.seance_id:
+        attendance.seance = seance
     extra = stamp_badge_fields(attendance, badge_context)
-    if extra:
-        attendance.save(update_fields=[*extra, 'updated_at'])
-    log_badge_event(
-        user=student.user, action='badge_check_in',
-        object_id=attendance.id, object_repr=schedule.assignment.course.code,
-        changes={'status': attendance.status, 'role': 'etudiant', 'created': created},
+    apply_attendance_clock(attendance, schedule=schedule, session_date=session_date, seance=seance)
+    attendance.save()
+    created = True
+    record_badge_event(
+        kind='check_in',
+        source='qr',
+        actor=student.user,
+        attendance=attendance,
+        seance=seance,
+        previous_status='',
+        new_status=attendance.status,
+        context=badge_context,
+        extra={'created': created, **{k: True for k in extra}},
     )
     return attendance, created
+
+
+def check_out_student(
+    *,
+    student,
+    schedule: Schedule,
+    session_date: date,
+    recorded_by=None,
+    badge_context=None,
+    attendance=None,
+    seance=None,
+):
+    seance = seance or linked_seance(schedule, session_date)
+    attendance = attendance or Attendance.objects.filter(
+        student=student, schedule=schedule, date=session_date,
+    ).first()
+    if not attendance or not attendance.checked_in_at:
+        raise SessionQrError('Vous devez d’abord badger l’entrée', 'no_check_in')
+    if attendance.checked_out_at:
+        raise SessionQrError('Sortie déjà enregistrée', 'already_checked_out')
+
+    now = timezone.localtime()
+    start, end = planned_window(session_date, schedule.start_time, schedule.end_time)
+    rules = resolve_attendance_rules(seance.period if seance else None)
+    if now > auto_absent_deadline(end, rules['auto_absent_after_minutes']):
+        raise SessionQrError('Fenêtre de sortie terminée', 'too_late')
+
+    attendance.checked_out_at = now
+    attendance.recorded_by = recorded_by or attendance.recorded_by
+    extra = stamp_badge_fields(attendance, badge_context)
+    apply_attendance_clock(attendance, schedule=schedule, session_date=session_date, seance=seance)
+    attendance.save()
+    record_badge_event(
+        kind='check_out',
+        source='qr',
+        actor=student.user,
+        attendance=attendance,
+        seance=seance,
+        new_status=attendance.status,
+        context=badge_context,
+        extra={'duration_minutes': attendance.duration_minutes, **{k: True for k in extra}},
+    )
+    return attendance, False
 
 
 def presence_status_label(gender: str, status: str) -> str:
@@ -357,6 +564,8 @@ def presence_status_label(gender: str, status: str) -> str:
         return 'Présente' if feminine else 'Présent'
     if status == 'late':
         return 'En retard'
+    if status == 'partial':
+        return 'Présence partielle'
     if status == 'excused':
         return 'Excusée' if feminine else 'Excusé'
     if status == 'absent':
@@ -396,20 +605,39 @@ def force_badge_students(session, student_ids, recorded_by=None, motif='', statu
     updated = 0
     created = 0
     results = []
+    seance = linked_seance(session.schedule, session.session_date)
+    source = 'admin'
+    if recorded_by and not (recorded_by.is_superuser or recorded_by.get_group_level() <= 2):
+        source = 'teacher'
     for student in students:
         attendance, was_created = Attendance.objects.get_or_create(
             student=student,
             schedule=session.schedule,
             date=session.session_date,
-            defaults={'status': status, 'recorded_by': recorded_by},
+            defaults={'status': status, 'recorded_by': recorded_by, 'seance': seance},
         )
+        previous = '' if was_created else attendance.status
+        changed = was_created or attendance.status != status
         if was_created:
             created += 1
         elif attendance.status != status:
             attendance.status = status
             attendance.recorded_by = recorded_by
-            attendance.save(update_fields=['status', 'recorded_by', 'updated_at'])
+            if seance and not attendance.seance_id:
+                attendance.seance = seance
+            attendance.save()
             updated += 1
+        if changed:
+            record_badge_event(
+                kind='force',
+                source=source,
+                actor=recorded_by,
+                attendance=attendance,
+                seance=seance,
+                previous_status=previous,
+                new_status=status,
+                reason=motif,
+            )
         results.append({
             'student_id': str(student.id),
             'matricule': student.matricule,
@@ -455,22 +683,49 @@ def seed_staff_roster(session, recorded_by=None, default_status='absent'):
 
 
 def record_staff_attendance(*, teacher, schedule, session_date, role, recorded_by=None, status='present', badge_context=None):
+    seance = linked_seance(schedule, session_date)
     attendance, created = StaffAttendance.objects.get_or_create(
         teacher=teacher,
         schedule=schedule,
         date=session_date,
         role=role,
-        defaults={'status': status, 'recorded_by': recorded_by},
+        defaults={'status': status, 'recorded_by': recorded_by, 'seance': seance},
     )
-    if not created and attendance.status != status:
+    now = timezone.localtime()
+    if seance and not attendance.seance_id:
+        attendance.seance = seance
+    extra = stamp_badge_fields(attendance, badge_context)
+    kind = None
+    if not attendance.checked_in_at and status != 'absent':
+        attendance.checked_in_at = now
+        attendance.recorded_by = recorded_by
+        apply_attendance_clock(attendance, schedule=schedule, session_date=session_date, seance=seance)
+        attendance.save()
+        kind = 'check_in'
+    elif attendance.checked_in_at and not attendance.checked_out_at and status != 'absent':
+        attendance.checked_out_at = now
+        attendance.recorded_by = recorded_by or attendance.recorded_by
+        apply_attendance_clock(attendance, schedule=schedule, session_date=session_date, seance=seance)
+        attendance.save()
+        kind = 'check_out'
+    elif not created and attendance.status != status:
         attendance.status = status
         attendance.recorded_by = recorded_by
-        extra = stamp_badge_fields(attendance, badge_context)
         attendance.save(update_fields=['status', 'recorded_by', 'updated_at', *extra])
-    elif created or badge_context:
-        extra = stamp_badge_fields(attendance, badge_context)
+        kind = 'correction'
+    elif created or extra:
         if extra:
             attendance.save(update_fields=[*extra, 'updated_at'])
+    if kind:
+        record_badge_event(
+            kind=kind,
+            source='qr',
+            actor=recorded_by or teacher.user,
+            staff_attendance=attendance,
+            seance=seance,
+            new_status=attendance.status,
+            context=badge_context,
+        )
     return attendance, created
 
 
@@ -580,13 +835,19 @@ def mark_student_attendances(session, student_ids, status='present', recorded_by
 
     updated = created = 0
     results = []
+    seance = linked_seance(session.schedule, session.session_date)
+    source = 'admin'
+    if recorded_by and not (recorded_by.is_superuser or recorded_by.get_group_level() <= 2):
+        source = 'teacher'
     for student in students:
         attendance, was_created = Attendance.objects.get_or_create(
             student=student,
             schedule=session.schedule,
             date=session.session_date,
-            defaults={'status': status, 'recorded_by': recorded_by, 'notes': notes},
+            defaults={'status': status, 'recorded_by': recorded_by, 'notes': notes, 'seance': seance},
         )
+        previous = '' if was_created else attendance.status
+        changed = was_created or attendance.status != status or (notes and attendance.notes != notes)
         if was_created:
             created += 1
         elif attendance.status != status or (notes and attendance.notes != notes):
@@ -594,8 +855,21 @@ def mark_student_attendances(session, student_ids, status='present', recorded_by
             attendance.recorded_by = recorded_by
             if notes:
                 attendance.notes = notes
-            attendance.save(update_fields=['status', 'recorded_by', 'notes', 'updated_at'])
+            if seance and not attendance.seance_id:
+                attendance.seance = seance
+            attendance.save()
             updated += 1
+        if changed:
+            record_badge_event(
+                kind='correction',
+                source=source,
+                actor=recorded_by,
+                attendance=attendance,
+                seance=seance,
+                previous_status=previous,
+                new_status=status,
+                reason=notes,
+            )
         results.append({
             'student_id': str(student.id),
             'matricule': student.matricule,
