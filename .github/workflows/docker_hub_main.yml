@@ -5,7 +5,7 @@
 # Équivalent local :
 #   backend  : docker buildx build --platform linux/amd64 -t jckouassi/injs-be:latest --push ./backend
 #   frontend : docker buildx build --platform linux/amd64 \
-#                --build-arg VITE_API_BASE_URL=/api/v1 \
+#                --build-arg VITE_API_BASE_URL=https://inj.badge-qr-code.pro/api/v1 \
 #                -t jckouassi/injs-fe:latest --push ./ings-fe
 #
 # Secrets GitHub OBLIGATOIRES (Settings → Secrets and variables → Actions) :
@@ -80,7 +80,9 @@ jobs:
           FT="${{ inputs.frontend_tag }}"
           if [ -z "${BT}" ]; then BT="${DOCKER_MAIN_BACKEND_TAG:-$AUTO}"; fi
           if [ -z "${FT}" ]; then FT="${DOCKER_MAIN_FRONTEND_TAG:-$AUTO}"; fi
-          API="${DOCKER_MAIN_VITE_API_BASE_URL:-/api/v1}"
+          # Le SPA (injs.badge-qr-code.pro) et l'API (inj.badge-qr-code.pro) sont
+          # servis par deux hôtes : une URL relative ne joindrait jamais l'API.
+          API="${DOCKER_MAIN_VITE_API_BASE_URL:-https://inj.badge-qr-code.pro/api/v1}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
           echo "backend_main_ref=${BACKEND_IMAGE}:main-${BT}" >> "$GITHUB_OUTPUT"
