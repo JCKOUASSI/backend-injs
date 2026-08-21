@@ -12,6 +12,7 @@ export const ADMIN_MENU = [
   { section: 'Pédagogie LMD' },
   { path: '/admin/formations', icon: FiBookOpen, label: 'Formations (L/M/D)' },
   { path: '/admin/ue', icon: FiClipboard, label: 'Unités d\'Enseignement' },
+  { path: '/admin/cours', icon: FiBookOpen, label: 'Cours (ECUE)' },
   { path: '/admin/notes', icon: FiAward, label: 'Notes & Validation' },
   { path: '/admin/emploi-du-temps', icon: FiClock, label: 'Emplois du temps' },
   { path: '/admin/presences', icon: FiCheckSquare, label: 'Présences' },

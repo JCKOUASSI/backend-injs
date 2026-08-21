@@ -24,6 +24,8 @@ import AdminReservations from '../pages/admin/Reservations'
 import AdminMaintenance from '../pages/admin/Maintenance'
 import AdminEquipment from '../pages/admin/Equipment'
 import AdminCampusMap from '../pages/admin/CampusMap'
+import AdminCours from '../pages/admin/Cours'
+import AdminCoursDetail from '../pages/admin/CoursDetail'
 import AdminImportExcel from '../pages/admin/ImportExcel'
 import AdminReferentiels from '../pages/admin/Referentiels'
 import AdminStatistiques from '../pages/admin/Statistiques'
@@ -77,6 +79,8 @@ export default function AppRoutes() {
           <Route path="/admin/import-excel" element={<AdminImportExcel />} />
           <Route path="/admin/formations" element={<AdminFormations />} />
           <Route path="/admin/ue" element={<AdminUE />} />
+          <Route path="/admin/cours" element={<AdminCours />} />
+          <Route path="/admin/cours/:offeringId" element={<AdminCoursDetail />} />
           <Route path="/admin/notes" element={<AdminGrades />} />
           <Route path="/admin/emploi-du-temps" element={<AdminSchedule />} />
           <Route path="/admin/presences" element={<AdminAttendance />} />
