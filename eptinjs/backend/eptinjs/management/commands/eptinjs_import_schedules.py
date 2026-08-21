@@ -100,7 +100,11 @@ class Command(BaseCommand):
                 programme.volume_horaire_minutes = programme.minutes_planifiees()
                 programme.save(update_fields=['volume_horaire_minutes', 'updated_at'])
 
-        prefixe = '[simulation] ' if options['dry_run'] else ''
+        prefixe = ''
+        if options['dry_run']:
+            # get_or_create des programmes a déjà écrit : on annule tout.
+            transaction.set_rollback(True)
+            prefixe = '[simulation] '
         self.stdout.write(self.style.SUCCESS(
             f'{prefixe}{programmes_crees} programme(s) et {seances_creees} séance(s) depuis '
             f'{len(schedules)} créneau(x) hebdomadaire(s).',
