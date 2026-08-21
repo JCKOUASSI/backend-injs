@@ -14,12 +14,39 @@ from django.conf import settings
 COULEUR_INJS = getattr(settings, 'INJS_PRIMARY_COLOR', '#0D47A1')
 
 
+def origines_de_confiance() -> set[str]:
+    """Origines déjà déclarées comme légitimes par le déploiement."""
+    origines = set()
+    for reglage in ('CORS_ALLOWED_ORIGINS', 'CSRF_TRUSTED_ORIGINS'):
+        for origine in getattr(settings, reglage, None) or []:
+            origine = (origine or '').strip().rstrip('/')
+            if origine and '*' not in origine:
+                origines.add(origine)
+    return origines
+
+
+def base_badgeage(request=None) -> str:
+    """Origine du SPA, qu'ouvrira le téléphone en scannant le QR.
+
+    L'API et le SPA peuvent être servis par deux hôtes distincts : l'origine
+    utile est alors celle annoncée par le navigateur, pas celle de la requête.
+    Elle n'est retenue que si le déploiement la déclare déjà de confiance, pour
+    qu'un en-tête forgé ne puisse pas détourner le QR vers un site tiers.
+    """
+    base = (getattr(settings, 'EPTINJS_BADGE_BASE_URL', '') or '').rstrip('/')
+    if base:
+        return base
+    if request is None:
+        return ''
+    origine = (request.headers.get('Origin') or '').strip().rstrip('/')
+    if origine and origine in origines_de_confiance():
+        return origine
+    return request.build_absolute_uri('/').rstrip('/')
+
+
 def url_badgeage(token_value, request=None) -> str:
     """URL encodée dans le QR, ouverte par le téléphone de l'étudiant."""
-    base = getattr(settings, 'EPTINJS_BADGE_BASE_URL', '') or ''
-    if not base and request is not None:
-        base = request.build_absolute_uri('/').rstrip('/')
-    return f'{base}/etudiant/presences?ept_token={token_value}'
+    return f'{base_badgeage(request)}/etudiant/presences?ept_token={token_value}'
 
 
 def image_base64(contenu: str, *, taille: int = 10) -> str:

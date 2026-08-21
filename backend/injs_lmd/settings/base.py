@@ -296,8 +296,11 @@ LMD_MENTION_THRESHOLDS = {
 INJS_GEOFENCE_RADIUS_M = int(os.environ.get('INJS_GEOFENCE_RADIUS_M', '250'))
 INJS_GEOFENCE_MAX_ACCURACY_M = int(os.environ.get('INJS_GEOFENCE_MAX_ACCURACY_M', '80'))
 
-# EPT-INJS — origine du SPA encodée dans les QR de séance : le téléphone qui scanne
-# doit atterrir sur le frontend. Vide = origine de la requête (API et SPA co-hébergés).
+# EPT-INJS — origine du SPA encodée dans les QR de séance : le téléphone qui
+# scanne doit atterrir sur le frontend. Vide = déduite de l'origine annoncée par
+# le navigateur si elle est de confiance (SPA et API sur deux hôtes), sinon de
+# l'origine de la requête (SPA et API co-hébergés). À ne renseigner que pour
+# forcer une valeur particulière.
 EPTINJS_BADGE_BASE_URL = os.environ.get('EPTINJS_BADGE_BASE_URL', '').rstrip('/')
 
 # Security headers

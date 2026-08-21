@@ -11,6 +11,8 @@ INJS_TEST_PACKAGES = [
     'apps.reports.tests',
     'apps.core.tests',
     'apps.faculty.tests',
+    # Module externe eptinjs/ (emplois du temps, présences, badgeages)
+    'eptinjs.tests',
 ]
 
 
