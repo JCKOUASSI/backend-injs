@@ -527,10 +527,22 @@ export async function fetchStudentGroups(params = {}) {
   return apiGet('/faculty/student-groups/', { page_size: 100, ...params })
 }
 
+export async function createStudentGroup(payload) {
+  return apiPost('/faculty/student-groups/', payload)
+}
+
+export async function deleteStudentGroup(id) {
+  return apiDelete(`/faculty/student-groups/${id}/`)
+}
+
 export async function fetchPlanningSettings(params = {}) {
   return apiGet('/faculty/planning-settings/', params)
 }
 
 export async function fetchDefaultPlanningSettings() {
   return apiGet('/faculty/planning-settings/defaults/')
+}
+
+export async function updateDefaultPlanningSettings(payload) {
+  return apiPatch('/faculty/planning-settings/defaults/', payload)
 }

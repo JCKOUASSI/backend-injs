@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FiCalendar, FiAlertTriangle, FiCheckSquare, FiClock, FiLayers, FiZap } from 'react-icons/fi'
+import { FiCalendar, FiAlertTriangle, FiCheckSquare, FiClock, FiLayers, FiZap, FiUsers, FiSettings } from 'react-icons/fi'
 import PageHeader from '../../components/common/PageHeader'
 import StatCard from '../../components/common/StatCard'
 import ExportButtons from '../../components/common/ExportButtons'
@@ -11,12 +11,16 @@ import CalendarPanel from './edt/CalendarPanel'
 import PeriodesPanel from './edt/PeriodesPanel'
 import GenerationPanel from './edt/GenerationPanel'
 import ConflictsPanel from './edt/ConflictsPanel'
+import GroupsPanel from './edt/GroupsPanel'
+import SettingsPanel from './edt/SettingsPanel'
 
 const TABS = [
   { id: 'calendar', label: 'Calendrier', icon: FiCalendar },
   { id: 'generate', label: 'Génération', icon: FiZap },
   { id: 'conflicts', label: 'Conflits', icon: FiAlertTriangle },
   { id: 'periods', label: 'Périodes', icon: FiLayers },
+  { id: 'groups', label: 'Groupes', icon: FiUsers },
+  { id: 'settings', label: 'Réglages', icon: FiSettings },
   { id: 'weekly', label: 'Grille hebdomadaire', icon: FiClock },
 ]
 
@@ -129,6 +133,12 @@ export default function AdminSchedule() {
       )}
       {tab === 'periods' && (
         <PeriodesPanel onChanged={reloadPeriods} />
+      )}
+      {tab === 'groups' && (
+        <GroupsPanel filters={filters} />
+      )}
+      {tab === 'settings' && (
+        <SettingsPanel />
       )}
       {tab === 'weekly' && (
         <WeeklyGrid />

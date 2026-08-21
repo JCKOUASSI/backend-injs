@@ -1055,6 +1055,18 @@ class StudentGroupViewSet(viewsets.ModelViewSet):
     filterset_fields = ['promotion', 'is_active']
     search_fields = ['name']
 
+    def perform_create(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        require_edt_planner(self.request.user)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        require_edt_planner(self.request.user)
+        instance.delete()
+
 
 class StudentGroupMemberViewSet(viewsets.ModelViewSet):
     queryset = StudentGroupMember.objects.select_related('group', 'student__user')

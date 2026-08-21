@@ -134,3 +134,29 @@ class SeanceApiTests(TestCase):
         response = self.client.get(reverse('seance-qr', args=[seance.id]))
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data.get('code'), 'seance_not_published')
+
+    def test_planner_can_update_seance_room_and_times(self):
+        seance = Seance.objects.create(
+            course=self.course, promotion=self.promotion, teacher=self.teacher,
+            date=date(2025, 9, 15), start_time=time(8, 0), end_time=time(10, 0),
+            status='generated',
+        )
+        room = Room.objects.get(code='AMP-API')
+        response = self.client.patch(reverse('seance-detail', args=[seance.id]), {
+            'start_time': '09:00',
+            'end_time': '11:00',
+            'room': str(room.id),
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        seance.refresh_from_db()
+        self.assertEqual(seance.start_time, time(9, 0))
+        self.assertEqual(seance.room_id, room.id)
+
+    def test_planning_settings_defaults_can_be_updated(self):
+        response = self.client.patch(reverse('planningsettings-defaults'), {
+            'late_after_minutes': 20,
+            'partial_under_percent': 80,
+        }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['late_after_minutes'], 20)
+        self.assertEqual(response.data['partial_under_percent'], 80)

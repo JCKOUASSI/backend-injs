@@ -173,6 +173,18 @@ class EdtPermissionTests(TestCase):
         self.assertIn(str(self.draft.id), ids)
         self.assertIn(str(self.published.id), ids)
 
+    def test_teacher_without_admin_level_cannot_create_student_group(self):
+        creator = create_user_with_permission(
+            'faculty', 'create', level=3, email='perm.group.create@test.ci',
+        )
+        self.client.force_authenticate(user=creator)
+        response = self.client.post(reverse('studentgroup-list'), {
+            'promotion': str(self.promotion.id),
+            'name': 'Groupe TP',
+            'max_students': 20,
+        }, format='json')
+        self.assertEqual(response.status_code, 403)
+
     def test_seance_export_excel_respects_promotion_filter(self):
         planner = create_user_with_permission(
             'faculty', 'view', level=2, email='perm.export@test.ci',

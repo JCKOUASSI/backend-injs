@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FiRefreshCw } from 'react-icons/fi'
 import Modal from '../../../components/common/Modal'
 import ExportButtons from '../../../components/common/ExportButtons'
 import { useToast } from '../../../context/ToastContext'
 import { useFetch } from '../../../hooks/useFetch'
-import { fetchSeances, fetchSeanceQr, updateSeance, publishSeances } from '../../../api/faculty'
+import {
+  fetchSeances, fetchSeanceQr, updateSeance, publishSeances, fetchRooms, fetchTeachers,
+} from '../../../api/faculty'
 
 const STATUS_CLASS = {
   draft: 'bg-secondary',
@@ -19,6 +21,7 @@ const STATUS_CLASS = {
 
 const KIND_LABEL = { cm: 'CM', td: 'TD', tp: 'TP' }
 const QR_STATUSES = ['published', 'validated', 'in_progress']
+const LOCKED = ['cancelled', 'done', 'archived']
 
 function formatDay(value) {
   if (!value) return '—'
@@ -47,7 +50,25 @@ export default function CalendarPanel({ filters, onChanged }) {
   }), [filters.period, filters.promotion, status, from, to])
 
   const { data, loading, error, reload } = useFetch(() => fetchSeances(params), [params])
+  const { data: roomsData } = useFetch(() => fetchRooms({ page_size: 200 }), [])
+  const { data: teachersData } = useFetch(() => fetchTeachers({ page_size: 200 }), [])
   const seances = data?.results || []
+  const rooms = roomsData?.results || []
+  const teachers = teachersData?.results || []
+  const [draft, setDraft] = useState(null)
+
+  useEffect(() => {
+    if (!selected) {
+      setDraft(null)
+      return
+    }
+    setDraft({
+      start_time: String(selected.start_time || '').slice(0, 5),
+      end_time: String(selected.end_time || '').slice(0, 5),
+      room: selected.room || '',
+      supervisor: selected.supervisor || '',
+    })
+  }, [selected])
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -98,6 +119,27 @@ export default function CalendarPanel({ filters, onChanged }) {
       setQrData(data)
     } catch (err) {
       showToast(err.message || 'QR indisponible pour cette séance', 'danger')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveLogistics = async () => {
+    if (!selected || !draft) return
+    setSaving(true)
+    try {
+      const updated = await updateSeance(selected.id, {
+        start_time: draft.start_time,
+        end_time: draft.end_time,
+        room: draft.room || null,
+        supervisor: draft.supervisor || null,
+      })
+      setSelected({ ...selected, ...updated })
+      showToast('Séance mise à jour', 'success')
+      reload()
+      onChanged?.()
+    } catch (err) {
+      showToast(err.message || 'Modification impossible', 'danger')
     } finally {
       setSaving(false)
     }
@@ -222,26 +264,75 @@ export default function CalendarPanel({ filters, onChanged }) {
                 Annuler la séance
               </button>
             )}
+            {!LOCKED.includes(selected.status) && (
+              <button type="button" className="btn btn-injs-primary" disabled={saving} onClick={saveLogistics}>
+                Enregistrer
+              </button>
+            )}
             <button type="button" className="btn btn-outline-secondary" onClick={() => { setSelected(null); setQrData(null) }}>Fermer</button>
           </>
         )}
       >
-        {selected && (
+        {selected && draft && (
           <>
-            <dl className="row mb-0">
-              <dt className="col-sm-4">Horaire</dt>
-              <dd className="col-sm-8">{(selected.start_time || '').slice(0, 5)} – {(selected.end_time || '').slice(0, 5)}</dd>
-              <dt className="col-sm-4">Professeur</dt>
-              <dd className="col-sm-8">{selected.teacher_name || '—'}</dd>
-              <dt className="col-sm-4">Encadrant</dt>
-              <dd className="col-sm-8">{selected.supervisor_name || '—'}</dd>
-              <dt className="col-sm-4">Salle</dt>
-              <dd className="col-sm-8">{selected.room_code || 'Non affectée'}</dd>
+            <dl className="row mb-3">
               <dt className="col-sm-4">Période</dt>
               <dd className="col-sm-8">{selected.period_label || '—'}</dd>
+              <dt className="col-sm-4">Professeur</dt>
+              <dd className="col-sm-8">{selected.teacher_name || '—'}</dd>
               <dt className="col-sm-4">Statut</dt>
               <dd className="col-sm-8">{selected.status_display}</dd>
             </dl>
+            <div className="row g-2 mb-3">
+              <div className="col-6">
+                <label className="form-label small">Début</label>
+                <input
+                  type="time"
+                  className="form-control"
+                  disabled={LOCKED.includes(selected.status)}
+                  value={draft.start_time}
+                  onChange={(e) => setDraft({ ...draft, start_time: e.target.value })}
+                />
+              </div>
+              <div className="col-6">
+                <label className="form-label small">Fin</label>
+                <input
+                  type="time"
+                  className="form-control"
+                  disabled={LOCKED.includes(selected.status)}
+                  value={draft.end_time}
+                  onChange={(e) => setDraft({ ...draft, end_time: e.target.value })}
+                />
+              </div>
+              <div className="col-12">
+                <label className="form-label small">Salle</label>
+                <select
+                  className="form-select"
+                  disabled={LOCKED.includes(selected.status)}
+                  value={draft.room}
+                  onChange={(e) => setDraft({ ...draft, room: e.target.value })}
+                >
+                  <option value="">Non affectée</option>
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>{room.code} — {room.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-12">
+                <label className="form-label small">Encadrant</label>
+                <select
+                  className="form-select"
+                  disabled={LOCKED.includes(selected.status)}
+                  value={draft.supervisor}
+                  onChange={(e) => setDraft({ ...draft, supervisor: e.target.value })}
+                >
+                  <option value="">Aucun</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>{teacher.nom}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             {qrData?.qr_image_base64 && (
               <div className="text-center mt-3">
                 <img
