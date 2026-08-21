@@ -63,15 +63,36 @@ def parse_session_payload(payload: str) -> tuple[str, date]:
     return match.group('schedule_id'), date.fromisoformat(match.group('session_date'))
 
 
+def trusted_origins() -> set[str]:
+    """Origines que le déploiement déclare déjà légitimes."""
+    origins = set()
+    for setting_name in ('CORS_ALLOWED_ORIGINS', 'CSRF_TRUSTED_ORIGINS'):
+        for origin in getattr(settings, setting_name, None) or []:
+            origin = (origin or '').strip().rstrip('/')
+            if origin and '*' not in origin:
+                origins.add(origin)
+    return origins
+
+
 def frontend_base_url(request=None) -> str:
-    configured = getattr(settings, 'INJS_FRONTEND_URL', None) or 'http://127.0.0.1:5173'
-    if request:
-        origin = request.headers.get('Origin') or request.headers.get('Referer')
-        if origin:
-            parsed = urlparse(origin)
-            if parsed.scheme and parsed.netloc:
-                return f'{parsed.scheme}://{parsed.netloc}'
-    return configured.rstrip('/')
+    """Origine du SPA, qu'ouvrira le téléphone en scannant le QR.
+
+    Le SPA et l'API peuvent être servis par deux hôtes : l'origine utile est
+    alors celle annoncée par le navigateur, pas celle de la requête. Elle n'est
+    retenue que si le déploiement la déclare de confiance, sinon un en-tête
+    forgé suffirait à détourner le badgeage vers un site tiers.
+    """
+    configured = (getattr(settings, 'INJS_FRONTEND_URL', None) or '').strip().rstrip('/')
+    if configured:
+        return configured
+    if request is not None:
+        for header in ('Origin', 'Referer'):
+            parsed = urlparse(request.headers.get(header) or '')
+            origin = f'{parsed.scheme}://{parsed.netloc}' if parsed.scheme and parsed.netloc else ''
+            if origin and origin in trusted_origins():
+                return origin
+        return request.build_absolute_uri('/').rstrip('/')
+    return 'http://127.0.0.1:5173'
 
 
 def build_badge_url(payload: str, request=None) -> str:

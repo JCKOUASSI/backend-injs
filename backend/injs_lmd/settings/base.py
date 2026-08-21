@@ -232,6 +232,12 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
     'http://localhost:3000,http://localhost:5173,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:8080'
 ).split(',')
 
+# Origine du SPA encodée dans les QR de séance : le téléphone qui scanne doit
+# atterrir sur le frontend, servi le cas échéant par un autre hôte que l'API.
+# Vide = déduite de l'origine annoncée par le navigateur si elle figure parmi
+# les origines de confiance, sinon de l'origine de la requête.
+INJS_FRONTEND_URL = os.environ.get('INJS_FRONTEND_URL', '').strip().rstrip('/')
+
 # INJS branding
 INJS_PRIMARY_COLOR = '#0D47A1'
 INJS_SECONDARY_COLOR = '#42A5F5'
