@@ -335,9 +335,22 @@ class RefBatiment(models.Model):
 
 class RefSalle(models.Model):
     """Salles rattachées à un bâtiment (ou directement à un site)."""
+
+    class TypeLieu(models.TextChoices):
+        SALLE = 'SALLE', 'Salle'
+        AMPHI = 'AMPHI', 'Amphithéâtre'
+        GYMNASE = 'GYMNASE', 'Gymnase'
+        REUNION = 'REUNION', 'Salle de réunion'
+        CONFERENCE = 'CONFERENCE', 'Salle de conférence'
+
     site = models.ForeignKey(RefSite, on_delete=models.CASCADE, related_name='salles')
     batiment = models.ForeignKey(RefBatiment, on_delete=models.SET_NULL, null=True, blank=True, related_name='salles')
     nom = models.CharField(max_length=100)
+    type_lieu = models.CharField(max_length=20, choices=TypeLieu.choices, default=TypeLieu.SALLE)
+    capacite = models.PositiveIntegerField(null=True, blank=True)
+    equipements = models.CharField(max_length=255, blank=True, default='')
+    indisponible_du = models.DateField(null=True, blank=True)
+    indisponible_au = models.DateField(null=True, blank=True)
     actif = models.BooleanField(default=True)
 
     class Meta:
@@ -382,10 +395,10 @@ class Participant(models.Model):
     telephone2 = models.CharField(max_length=20, blank=True, default='')
     type_concours = models.CharField(max_length=100, blank=True, default='')
     libelle_concours = models.CharField(max_length=255, blank=True, default='')
-    categorie = models.CharField(max_length=10, blank=True, default='')
-    grade = models.CharField(max_length=20, blank=True, default='')
+    categorie = models.CharField(max_length=100, blank=True, default='')
+    grade = models.CharField(max_length=100, blank=True, default='')
     groupe = models.CharField(max_length=50, blank=True, default='')
-    grade_groupe = models.CharField(max_length=50, blank=True, default='')
+    grade_groupe = models.CharField(max_length=150, blank=True, default='')
     vague = models.CharField(max_length=50, blank=True, default='', help_text="Vague (PREMIERE VAGUE, DEUXIEME VAGUE…)")
     site = models.CharField(max_length=255, blank=True, default='')
     salle = models.CharField(max_length=100, blank=True, default='')
@@ -414,8 +427,8 @@ class Participant(models.Model):
 
     class Meta:
         ordering = ['nom', 'prenom']
-        verbose_name = 'Auditeur'
-        verbose_name_plural = 'Auditeurs'
+        verbose_name = 'Étudiant'
+        verbose_name_plural = 'Étudiants'
 
     def save(self, *args, **kwargs):
         from django.core.exceptions import ValidationError
@@ -592,7 +605,7 @@ class Module(models.Model):
     )
     ordre = models.PositiveSmallIntegerField(default=1, help_text="Ordre d'affichage")
 
-    grade    = models.CharField(max_length=20, blank=True, default='', help_text="Grade (A4, A3…)")
+    grade    = models.CharField(max_length=100, blank=True, default='', help_text="Grade (profil INJS ou A4, A3…)")
     groupe   = models.CharField(max_length=50, blank=True, default='', help_text="Groupe (GROUPE 1, GROUPE 2…)")
     vague    = models.CharField(max_length=50, blank=True, default='', help_text="Vague (PREMIERE VAGUE, DEUXIEME VAGUE…)")
     secretariat = models.ForeignKey(

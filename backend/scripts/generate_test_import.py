@@ -196,7 +196,7 @@ def _build_seances(wb):
         _apply(cell, hs)
 
     grp_fills = {
-        "Matin":       PatternFill('solid', fgColor='FFF2CC'),
+        "Matin":       PatternFill('solid', fgColor='FFF6CC'),
         "Après-midi":  PatternFill('solid', fgColor='DDEBF7'),
     }
     for row_i, s in enumerate(SEANCES, 2):

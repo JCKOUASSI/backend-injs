@@ -207,7 +207,7 @@ def questionnaires_disponibles(request):
     try:
         participant = request.user.participant_profile
     except Exception:
-        return Response({'detail': 'Profil auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Profil étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
     qs = Questionnaire.objects.filter(statut=Questionnaire.Statut.PUBLIE)
 
@@ -233,7 +233,7 @@ def soumettre_evaluation(request):
     try:
         participant = request.user.participant_profile
     except Exception:
-        return Response({'detail': 'Profil auditeur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'detail': 'Profil étudiant introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data.copy()
     data['participant'] = participant.pk

@@ -240,7 +240,7 @@ def export_liste_classe_pdf(blocks, meta=None):
     )
     style_title = ParagraphStyle(
         'Title', parent=styles['Title'],
-        fontSize=14, textColor=colors.HexColor('#388E3C'),
+        fontSize=14, textColor=colors.HexColor('#1A68AC'),
         alignment=TA_CENTER, spaceAfter=4,
     )
     style_sub = ParagraphStyle(
@@ -271,14 +271,14 @@ def export_liste_classe_pdf(blocks, meta=None):
     elements.append(Spacer(1, 0.25 * cm))
 
     if not blocks:
-        elements.append(Paragraph('Aucun auditeur trouvé pour les critères sélectionnés.', style_sub))
+        elements.append(Paragraph('Aucun étudiant trouvé pour les critères sélectionnés.', style_sub))
     else:
         for idx, block in enumerate(blocks):
             if idx > 0:
                 elements.append(Spacer(1, 0.4 * cm))
             elements.append(Paragraph(
                 f"<b>{block['groupe']}</b> — Grade : {block['grade']} — "
-                f"Effectif : {block['effectif']} auditeur(s)",
+                f"Effectif : {block['effectif']} étudiant(s)",
                 style_sub,
             ))
             if block.get('secretariat') and block['secretariat'] != '—':
@@ -294,7 +294,7 @@ def export_liste_classe_pdf(blocks, meta=None):
             ]
             table = Table(data, repeatRows=1, colWidths=col_widths)
             table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#388E3C')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1A68AC')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -309,9 +309,9 @@ def export_liste_classe_pdf(blocks, meta=None):
 
 def _write_liste_classe_sheet(ws, block, meta=None):
     meta = meta or {}
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
-    title_font = Font(bold=True, size=13, color='388E3C')
+    title_font = Font(bold=True, size=13, color='1A68AC')
     sub_font = Font(size=10, color='444444')
 
     row = 1
@@ -370,7 +370,7 @@ def export_liste_classe_excel(blocks, meta=None):
     if not blocks:
         ws = wb.active
         ws.title = 'Liste de classe'
-        ws['A1'] = 'Aucun auditeur trouvé pour les critères sélectionnés.'
+        ws['A1'] = 'Aucun étudiant trouvé pour les critères sélectionnés.'
     elif len(blocks) == 1:
         ws = wb.active
         ws.title = _safe_sheet_title(blocks[0]['groupe'], used_titles)

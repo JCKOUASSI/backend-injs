@@ -210,7 +210,7 @@ export default function FinanceModuleBreakdownModal({ drillType, modules, onClos
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ background: 'var(--fin-light-orange, #fff3e0)' }}>
+                  <tr style={{ background: 'var(--fin-light-orange, #fff8e0)' }}>
                     <td colSpan={(drillType === 'cout' || drillType === 'cout_prevu') ? 6 : 5}>
                       <strong>TOTAL{isFiltered ? ' (filtre)' : ''}</strong>
                       {isFiltered && (

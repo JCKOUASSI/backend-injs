@@ -325,8 +325,8 @@ function QuizEdit({ quiz: initialQuiz, onRefresh }) {
             )}
             <span style={{
               fontWeight: 700, padding: '1px 8px', borderRadius: '20px', fontSize: '0.75rem',
-              background: quiz.actif ? '#e8f5e9' : '#f5f5f5',
-              color: quiz.actif ? '#2e7d32' : '#757575',
+              background: quiz.actif ? '#e8eff5' : '#f5f5f5',
+              color: quiz.actif ? '#125a99' : '#757575',
             }}>{quiz.actif ? 'Actif' : 'Inactif'}</span>
           </div>
         </div>
@@ -433,7 +433,7 @@ function QuizEdit({ quiz: initialQuiz, onRefresh }) {
                 <label style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" checked={metaForm.actif}
                     onChange={e => setMetaForm(f => ({ ...f, actif: e.target.checked }))} />
-                  Quiz actif (visible par les auditeurs)
+                  Quiz actif (visible par les étudiants)
                 </label>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
@@ -517,12 +517,12 @@ export default function QuizTake() {
   const [quiz, setQuiz] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const isAuditeur = user?.role === 'AUDITEUR'
+  const isÉtudiant = user?.role === 'AUDITEUR'
 
   const fetchQuiz = useCallback(async () => {
     setLoading(true)
     try {
-      if (isAuditeur) {
+      if (isÉtudiant) {
         const { data } = await api.get('/evaluations/mes-quiz/')
         const q = (data || []).find(x => String(x.id) === String(id))
         if (!q) { showToast('Quiz non disponible', 'error'); navigate('/quiz'); return }

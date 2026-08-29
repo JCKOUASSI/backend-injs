@@ -6,11 +6,11 @@ import { useReferentiels } from '../hooks/useReferentiels'
 
 const STATUT_LABELS  = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS  = {
-  BROUILLON: { background: '#fff3e0', color: '#e65100' },
-  PUBLIE:    { background: '#e8f5e9', color: '#2e7d32' },
+  BROUILLON: { background: '#fff8e0', color: '#e69700' },
+  PUBLIE:    { background: '#e8eff5', color: '#125a99' },
   FERME:     { background: '#f5f5f5', color: '#616161' },
 }
-const SECTION_LABELS = { COURS: 'Cours', FORMATEUR: 'Formateur' }
+const SECTION_LABELS = { COURS: 'Module', FORMATEUR: 'Enseignant' }
 const SECTION_COLORS = {
   COURS:     { bg: '#e3f2fd', color: '#1565c0', icon: 'bi-book' },
   FORMATEUR: { bg: '#f3e5f5', color: '#6a1b9a', icon: 'bi-person-video3' },
@@ -25,9 +25,9 @@ function StarBar({ moyenne, total }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
       <div style={{ position: 'relative', width: '120px', height: '12px', borderRadius: '6px', background: '#e0e0e0', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg,#f9a825,#ff6f00)', borderRadius: '6px', transition: 'width .4s' }} />
+        <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg,#f9c925,#ffb100)', borderRadius: '6px', transition: 'width .4s' }} />
       </div>
-      <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#e65100' }}>{moyenne ?? '—'}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/5</span></span>
+      <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#e69700' }}>{moyenne ?? '—'}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/5</span></span>
       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>({total} réponse{total !== 1 ? 's' : ''})</span>
     </div>
   )
@@ -267,8 +267,8 @@ export default function EvaluationDetail() {
               <span style={{ ...STATUT_COLORS[questionnaire.statut], fontSize: '0.72rem', fontWeight: 700, padding: '2px 10px', borderRadius: '20px', letterSpacing: '0.04em' }}>
                 {STATUT_LABELS[questionnaire.statut]}
               </span>
-              <span style={{ fontSize: '0.72rem', background: '#e8f5e9', color: '#2e7d32', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
-                <i className="bi bi-layers me-1"></i>2 sections : Cours + Formateur
+              <span style={{ fontSize: '0.72rem', background: '#e8eff5', color: '#125a99', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
+                <i className="bi bi-layers me-1"></i>2 sections : Module + Enseignant
               </span>
               {(questionnaire.categories || []).map(c => (
                 <span key={c} style={{ fontSize: '0.72rem', background: '#f3e5f5', color: '#6a1b9a', padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>{c}</span>
@@ -315,11 +315,11 @@ export default function EvaluationDetail() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: editGroupes ? '0.75rem' : 0 }}>
           <div>
             <h6 style={{ margin: 0, fontWeight: 700 }}>
-              <i className="bi bi-people me-2" style={{ color: '#e65100' }}></i>
+              <i className="bi bi-people me-2" style={{ color: '#e69700' }}></i>
               Groupes ciblés
             </h6>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Ajoutez un groupe pour ouvrir le questionnaire à de nouveaux auditeurs. Les réponses existantes sont conservées.
+              Ajoutez un groupe pour ouvrir le questionnaire à de nouveaux étudiants. Les réponses existantes sont conservées.
             </p>
           </div>
           {!editGroupes ? (
@@ -338,7 +338,7 @@ export default function EvaluationDetail() {
         {editGroupes ? (
           <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignContent: 'flex-start', padding: '0.25rem' }}>
             {refGroupes.map(g => (
-              <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: groupesDraft.includes(g) ? '#e65100' : 'var(--border)', background: groupesDraft.includes(g) ? '#fff3e0' : 'transparent', color: groupesDraft.includes(g) ? '#e65100' : 'inherit', fontSize: '0.85rem', fontWeight: groupesDraft.includes(g) ? 700 : 400 }}>
+              <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: groupesDraft.includes(g) ? '#e69700' : 'var(--border)', background: groupesDraft.includes(g) ? '#fff8e0' : 'transparent', color: groupesDraft.includes(g) ? '#e69700' : 'inherit', fontSize: '0.85rem', fontWeight: groupesDraft.includes(g) ? 700 : 400 }}>
                 <input type="checkbox" style={{ display: 'none' }} checked={groupesDraft.includes(g)} onChange={() => toggleGroupeDraft(g)} />
                 {g}
               </label>
@@ -353,7 +353,7 @@ export default function EvaluationDetail() {
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Tous les groupes (aucune restriction)</span>
             ) : (
               (questionnaire.groupes || []).map(g => (
-                <span key={g} style={{ fontSize: '0.82rem', background: '#fff3e0', color: '#e65100', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
+                <span key={g} style={{ fontSize: '0.82rem', background: '#fff8e0', color: '#e69700', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
               ))
             )}
           </div>
@@ -439,7 +439,7 @@ export default function EvaluationDetail() {
                                 <span style={{ fontSize: '0.72rem', background: '#f5f5f5', color: '#616161', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>
                                   <i className={`bi ${TYPE_ICONS[q.type_question]} me-1`}></i>{TYPE_LABELS[q.type_question]}
                                 </span>
-                                {!q.obligatoire && <span style={{ fontSize: '0.72rem', background: '#fff8e1', color: '#f57f17', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>Optionnel</span>}
+                                {!q.obligatoire && <span style={{ fontSize: '0.72rem', background: '#fffae1', color: '#f5b417', padding: '1px 7px', borderRadius: '20px', fontWeight: 600 }}>Optionnel</span>}
                               </div>
                               <p style={{ margin: 0, fontWeight: 500 }}>{q.intitule}</p>
                               {q.choix && q.choix.length > 0 && (
@@ -490,9 +490,9 @@ export default function EvaluationDetail() {
                         onClick={() => setFilterGroupeRes(g)}
                         style={{
                           padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: actif ? 700 : 500,
-                          border: actif ? '2px solid #e65100' : '1px solid var(--border)',
-                          background: actif ? '#fff3e0' : 'transparent',
-                          color: actif ? '#e65100' : 'inherit',
+                          border: actif ? '2px solid #e69700' : '1px solid var(--border)',
+                          background: actif ? '#fff8e0' : 'transparent',
+                          color: actif ? '#e69700' : 'inherit',
                         }}
                       >
                         {g}
@@ -600,15 +600,15 @@ export default function EvaluationDetail() {
                     required
                     value={qForm.intitule}
                     onChange={e => setQForm(f => ({ ...f, intitule: e.target.value }))}
-                    placeholder="Ex: Comment évaluez-vous la clarté du cours ?"
+                    placeholder="Ex: Comment évaluez-vous la clarté du module ?"
                   />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label className="form-label">Section <span style={{ color: 'red' }}>*</span></label>
                     <select className="form-select" value={qForm.section} onChange={e => setQForm(f => ({ ...f, section: e.target.value }))}>
-                      <option value="COURS">Cours</option>
-                      <option value="FORMATEUR">Formateur</option>
+                      <option value="COURS">Module</option>
+                      <option value="FORMATEUR">Enseignant</option>
                     </select>
                   </div>
                   <div>

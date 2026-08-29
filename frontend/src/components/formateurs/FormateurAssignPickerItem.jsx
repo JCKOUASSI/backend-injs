@@ -8,7 +8,7 @@ export default function FormateurAssignPickerItem({ formateur, onAssign }) {
   return (
     <div
       className={`border rounded p-2 mb-2 ${occupé ? 'bg-light' : ''}`}
-      style={{ borderColor: occupé ? 'var(--ci-warning, #f59e0b)' : undefined }}
+      style={{ borderColor: occupé ? 'var(--ci-warning, #f5c10b)' : undefined }}
     >
       <div className="d-flex justify-content-between align-items-start gap-2">
         <div className="min-w-0">
@@ -20,7 +20,7 @@ export default function FormateurAssignPickerItem({ formateur, onAssign }) {
             type="button"
             onClick={() => onAssign(formateur.id)}
             className="btn btn-outline-success btn-sm flex-shrink-0"
-            title="Assigner ce formateur"
+            title="Assigner cet enseignant"
           >
             <i className="bi bi-plus"></i>
           </button>

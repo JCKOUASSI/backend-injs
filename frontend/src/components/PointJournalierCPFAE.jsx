@@ -1,14 +1,14 @@
 /**
- * Point journalier — reproduction visuelle du modèle Excel CPFAE
+ * Point journalier — reproduction visuelle du modèle Excel INJS
  * (FAC — POINT JOURNALIER CAT A, une feuille par grade).
  */
 
 const C = {
-  header: '#ED7D31',
+  header: '#EDB131',
   groupe: '#FBFDBB',
   total: '#F7FA82',
   sidebar: '#FFFF00',
-  absence: '#ED7D31',
+  absence: '#EDB131',
   absenceJour: '#BDD7EE',
   border: '#000',
 }

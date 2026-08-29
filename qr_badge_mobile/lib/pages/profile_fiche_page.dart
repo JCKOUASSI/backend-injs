@@ -121,9 +121,9 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
   String _typeLabel(String? type) {
     switch (type) {
       case 'participant':
-        return 'Auditeur';
+        return 'Étudiant';
       case 'formateur':
-        return 'Formateur';
+        return 'Enseignant';
       case 'encadrant':
         return 'Encadrant';
       default:
@@ -272,7 +272,7 @@ class _ProfileFichePageState extends State<ProfileFichePage> {
               children: [
                 const QrBadgeLogo(
                   size: 64,
-                  color: AppColors.ciGreenDark,
+                  color: AppColors.ciSuccessDark,
                   backgroundColor: AppColors.iconQrBg,
                 ),
                 const SizedBox(width: 16),

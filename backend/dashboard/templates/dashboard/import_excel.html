@@ -58,7 +58,7 @@
     <!-- Formations -->
     <div class="col-12 col-md-6 col-lg-4">
         <div class="card card-modern h-100">
-            <div class="card-header" style="background: linear-gradient(135deg, #388E3C, #43A047); color: #fff;">
+            <div class="card-header" style="background: linear-gradient(135deg, #1A68AC, #2277C1); color: #fff;">
                 <i class="bi bi-mortarboard me-2"></i>Formations
             </div>
             <div class="card-body">
@@ -75,7 +75,7 @@
                         <input type="file" name="file" class="form-control form-control-sm"
                                accept=".xlsx,.xls" required>
                     </div>
-                    <button type="submit" class="btn btn-sm w-100" style="background: #388E3C; color: #fff;">
+                    <button type="submit" class="btn btn-sm w-100" style="background: #1A68AC; color: #fff;">
                         <i class="bi bi-upload me-1"></i>Importer les formations
                     </button>
                 </form>
@@ -83,14 +83,14 @@
         </div>
     </div>
 
-    <!-- Formateurs -->
+    <!-- Enseignants -->
     <div class="col-12 col-md-6 col-lg-4">
         <div class="card card-modern h-100">
             <div class="card-header" style="background: linear-gradient(135deg, #1565C0, #1976D2); color: #fff;">
-                <i class="bi bi-person-video3 me-2"></i>Formateurs
+                <i class="bi bi-person-video3 me-2"></i>Enseignants
             </div>
             <div class="card-body">
-                <p class="text-muted small">Importer les formateurs depuis un fichier Excel.</p>
+                <p class="text-muted small">Importer les enseignants depuis un fichier Excel.</p>
                 <ul class="small text-muted mb-3">
                     <li>Numéro, Nom, Prénoms</li>
                     <li>Email, Téléphone</li>
@@ -98,13 +98,13 @@
                 </ul>
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
-                    <input type="hidden" name="type" value="formateurs">
+                    <input type="hidden" name="type" value="enseignants">
                     <div class="mb-3">
                         <input type="file" name="file" class="form-control form-control-sm"
                                accept=".xlsx,.xls" required>
                     </div>
                     <button type="submit" class="btn btn-sm w-100" style="background: #1565C0; color: #fff;">
-                        <i class="bi bi-upload me-1"></i>Importer les formateurs
+                        <i class="bi bi-upload me-1"></i>Importer les enseignants
                     </button>
                 </form>
             </div>
@@ -114,7 +114,7 @@
     <!-- Participants -->
     <div class="col-12 col-md-6 col-lg-4">
         <div class="card card-modern h-100">
-            <div class="card-header" style="background: linear-gradient(135deg, #F57C00, #E65100); color: #fff;">
+            <div class="card-header" style="background: linear-gradient(135deg, #F5B100, #E69700); color: #fff;">
                 <i class="bi bi-people me-2"></i>Participants
             </div>
             <div class="card-body">
@@ -131,7 +131,7 @@
                         <input type="file" name="file" class="form-control form-control-sm"
                                accept=".xlsx,.xls" required>
                     </div>
-                    <button type="submit" class="btn btn-sm w-100" style="background: #F57C00; color: #fff;">
+                    <button type="submit" class="btn btn-sm w-100" style="background: #F5B100; color: #fff;">
                         <i class="bi bi-upload me-1"></i>Importer les participants
                     </button>
                 </form>
@@ -151,7 +151,7 @@
                 <h6 class="fw-semibold">Ordre d'import recommandé</h6>
                 <ol class="small text-muted">
                     <li><strong>Formations</strong> d'abord (les modules doivent exister)</li>
-                    <li><strong>Formateurs</strong> ensuite</li>
+                    <li><strong>Enseignants</strong> ensuite</li>
                     <li><strong>Participants</strong> en dernier (pour que les inscriptions aux formations fonctionnent)</li>
                 </ol>
             </div>

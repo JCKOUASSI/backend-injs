@@ -125,7 +125,7 @@ export default function QuizList() {
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             {isAuditeur
               ? 'Passez le quiz pour valider la lecture des manuels ou l\'évaluation pédagogique.'
-              : 'Créez et gérez les quiz pour les auditeurs.'}
+              : 'Créez et gérez les quiz pour les étudiants.'}
           </p>
         </div>
         {!isAuditeur && (
@@ -299,7 +299,7 @@ export default function QuizList() {
                 <label style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" checked={form.actif}
                     onChange={e => setForm(f => ({ ...f, actif: e.target.checked }))} />
-                  Quiz actif (visible par les auditeurs)
+                  Quiz actif (visible par les étudiants)
                 </label>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

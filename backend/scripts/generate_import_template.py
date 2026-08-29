@@ -22,10 +22,10 @@ from openpyxl.utils import get_column_letter
 
 # ── Styles ──────────────────────────────────────────────
 header_font = Font(bold=True, color='FFFFFF', size=11)
-header_fill_green = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-header_fill_orange = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
+header_fill_green = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
+header_fill_orange = PatternFill(start_color='F5B100', end_color='F5B100', fill_type='solid')
 header_fill_blue = PatternFill(start_color='1565C0', end_color='1565C0', fill_type='solid')
-example_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+example_fill = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
 note_font = Font(italic=True, color='888888', size=9)
 thin_border = Border(
     left=Side(style='thin', color='CCCCCC'),

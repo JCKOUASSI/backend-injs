@@ -27,7 +27,7 @@
     font-size: 1.5rem;
     font-weight: 800;
     margin: 0 0 12px;
-    color: #15803d;
+    color: #0b478a;
 }
 
 .sygep-guide-content h2 {
@@ -35,8 +35,8 @@
     font-weight: 700;
     margin: 2.5rem 0 12px;
     padding-bottom: 8px;
-    border-bottom: 2px solid #e8f7ee;
-    color: #15803d;
+    border-bottom: 2px solid #e8eff7;
+    color: #0b478a;
 }
 
 .sygep-guide-content h3 {
@@ -86,8 +86,8 @@
 }
 
 .sygep-guide-content thead th {
-    background: #e8f7ee;
-    color: #15803d;
+    background: #e8eff7;
+    color: #0b478a;
     font-weight: 700;
     text-align: left;
     padding: 12px 14px;
@@ -134,15 +134,15 @@
 .sygep-guide-content blockquote {
     margin: 16px 0;
     padding: 14px 18px;
-    border-left: 4px solid #16a34a;
-    background: #e8f7ee;
+    border-left: 4px solid #0e58ab;
+    background: #e8eff7;
     border-radius: 0 12px 12px 0;
-    color: #15803d;
+    color: #0b478a;
 }
 
 .sygep-guide-content blockquote p {
     margin: 0;
-    color: #15803d;
+    color: #0b478a;
 }
 
 .sygep-guide-content hr {
@@ -152,7 +152,7 @@
 }
 
 .sygep-guide-content a {
-    color: #15803d;
+    color: #0b478a;
     font-weight: 600;
     text-decoration: none;
 }

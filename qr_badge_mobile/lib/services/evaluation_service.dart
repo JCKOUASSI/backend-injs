@@ -1,7 +1,7 @@
 import 'api_client.dart';
 
 class EvaluationService {
-  /// Récupère les questionnaires publiés accessibles à l'auditeur connecté.
+  /// Récupère les questionnaires publiés accessibles à l'étudiant connecté.
   Future<List<Map<String, dynamic>>> mesQuestionnaires({
     required String baseUrl,
     required String accessToken,
@@ -20,7 +20,7 @@ class EvaluationService {
     return [];
   }
 
-  /// Soumet les réponses d'un auditeur à un questionnaire.
+  /// Soumet les réponses d'un étudiant à un questionnaire.
   /// [questionnaire] : id du questionnaire
   /// [reponses] : liste de { question: id, note?: int, texte?: str, choix?: id, choix_multiples?: [id] }
   Future<void> soumettre({

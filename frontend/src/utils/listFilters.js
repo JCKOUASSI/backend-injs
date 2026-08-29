@@ -62,7 +62,7 @@ export const readModulesFilters = (searchParams, getTodayIso) => ({
   vague: searchParams.get('vague') || '',
   grade: searchParams.get('grade') || '',
   groupe: searchParams.get('groupe') || '',
-  date_mode: searchParams.get('date_mode') || 'today',
+  date_mode: searchParams.get('date_mode') || 'all',
   date: searchParams.get('date') || getTodayIso(),
 })
 
@@ -73,7 +73,8 @@ export const buildModulesSearchParams = (filters, page, debouncedSearch) => {
   for (const key of MODULE_FILTER_KEYS) {
     const v = merged[key]
     if (v == null || v === '') continue
-    if (key === 'date_mode' && v === 'today') continue
+    if (key === 'date_mode' && v === 'all') continue
+    if (key === 'date' && merged.date_mode !== 'date') continue
     p.set(key, v)
   }
   return p

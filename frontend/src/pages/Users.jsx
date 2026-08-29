@@ -21,8 +21,8 @@ import { SECRETARIATS_QUERY_KEY } from '../lib/queryClient'
 
 const TAB_CONFIG = {
   personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
-  auditeurs: { title: 'Comptes auditeurs', icon: 'bi-person-badge', createLabel: 'Nouveau compte auditeur', modalTitle: 'Nouveau compte auditeur' },
-  formateurs: { title: 'Comptes formateurs', icon: 'bi-person-video3', createLabel: 'Nouveau compte formateur', modalTitle: 'Nouveau compte formateur' },
+  auditeurs: { title: 'Comptes étudiants', icon: 'bi-person-badge', createLabel: 'Nouveau compte étudiant', modalTitle: 'Nouveau compte étudiant' },
+  formateurs: { title: 'Comptes enseignants', icon: 'bi-person-video3', createLabel: 'Nouveau compte enseignant', modalTitle: 'Nouveau compte enseignant' },
 }
 const emptyForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
 const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
@@ -31,6 +31,7 @@ export default function Users() {
   const { user: currentUser } = useAuth()
   const roleContext = currentUser?.role_context || {}
   const roleLabels = roleContext.labels || {}
+  const roleLabel = (role) => String(roleLabels[role] || role).replaceAll('CPFAE', 'INJS')
   const badgeAccountRoles = roleContext.badge_account_roles || ['AUDITEUR', 'FORMATEUR']
   const canManageUsers = Boolean(roleContext.can_mutate_users)
   const creatableRoles = canManageUsers ? (roleContext.manageable_roles || []) : []
@@ -47,8 +48,8 @@ export default function Users() {
   const showFormateursSection = canManageFormateurAccounts
   const availableTabs = [
     showStaffSection && { id: 'personnel', label: 'Utilisateurs', icon: 'bi-person-gear' },
-    showAuditeursSection && { id: 'auditeurs', label: 'Comptes auditeurs', icon: 'bi-person-badge' },
-    showFormateursSection && { id: 'formateurs', label: 'Comptes formateurs', icon: 'bi-person-video3' },
+    showAuditeursSection && { id: 'auditeurs', label: 'Comptes étudiants', icon: 'bi-person-badge' },
+    showFormateursSection && { id: 'formateurs', label: 'Comptes enseignants', icon: 'bi-person-video3' },
   ].filter(Boolean)
   const showTabBar = availableTabs.length > 1
   const [searchParams] = useSearchParams()
@@ -144,8 +145,8 @@ export default function Users() {
       setForm({ ...emptyForm })
       loadUsers()
       showToast(
-        form.role === 'AUDITEUR' ? 'Compte auditeur créé'
-          : form.role === 'FORMATEUR' ? 'Compte formateur créé'
+        form.role === 'AUDITEUR' ? 'Compte étudiant créé'
+          : form.role === 'FORMATEUR' ? 'Compte enseignant créé'
           : 'Utilisateur créé'
       )
     } catch (err) {
@@ -222,7 +223,7 @@ export default function Users() {
       : canManageFormateurAccounts)
   const createRoleForTab = userTab === 'auditeurs' ? 'AUDITEUR' : userTab === 'formateurs' ? 'FORMATEUR' : staffRoleOptions[0]
   const matriculeLabel = userTab === 'formateurs'
-    ? 'N° badge formateur'
+    ? 'N° badge enseignant'
     : 'N° Matricule (badge)'
 
   return (
@@ -263,7 +264,7 @@ export default function Users() {
               <div>
                 <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
                   <option value="">Tous les rôles</option>
-                  {staffFilterRoles.map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
+                  {staffFilterRoles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
                 </select>
               </div>
             )}
@@ -306,7 +307,7 @@ export default function Users() {
                       <tr key={u.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--ci-green)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--navy)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0 }}>
                               {getInitials(u)}
                             </div>
                             <strong>{getFullName(u)}</strong>
@@ -316,7 +317,7 @@ export default function Users() {
                         <td>{u.matricule || '-'}</td>
                         <td>{u.email || '-'}</td>
                         <td>
-                          <span className={`badge ${getRoleBadge(u.role)}`}>{roleLabels[u.role] || u.role}</span>
+                          <span className={`badge ${getRoleBadge(u.role)}`}>{roleLabel(u.role)}</span>
                           {u.secretariat_nom && <><br/><small className="text-muted">{u.secretariat_nom}</small></>}
                         </td>
                         <td>{u.telephone || '-'}</td>
@@ -377,7 +378,7 @@ export default function Users() {
             </div>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {formError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line', fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}>{formError}</div>}
+                {formError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line', fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}>{String(formError).replaceAll('CPFAE', 'INJS')}</div>}
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Prénom</label>
@@ -396,10 +397,10 @@ export default function Users() {
                   <div className="form-group">
                     <label className="form-label">Rôle *</label>
                     <select className="form-control" required value={form.role} onChange={e => setForm({...form, role: e.target.value, new_secretariat_nom: '', new_secretariat_type: ''})}>
-                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
+                      {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
                     </select>
                     {form.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN') && (
-                      <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
+                      <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef INJS Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
                     )}
                   </div>
                 </div>
@@ -407,7 +408,7 @@ export default function Users() {
                   <label className="form-label">{matriculeLabel}</label>
                   <input type="text" className="form-control" value={form.matricule} onChange={e => setForm({...form, matricule: e.target.value})} placeholder={userTab === 'formateurs' ? 'Ex. F0042' : undefined} />
                   {userTab === 'formateurs' && (
-                    <small className="text-muted">Doit correspondre au N° badge du formateur dans le référentiel.</small>
+                    <small className="text-muted">Doit correspondre au N° badge de l'enseignant dans le référentiel.</small>
                   )}
                 </div>
                 <div className="grid-2">
@@ -481,7 +482,7 @@ export default function Users() {
             </div>
             <form onSubmit={handleEdit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {editError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{editError}</div>}
+                {editError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{String(editError).replaceAll('CPFAE', 'INJS')}</div>}
                 <div className="form-group">
                   <label className="form-label">Rôle</label>
                   <select
@@ -491,14 +492,14 @@ export default function Users() {
                     disabled={!creatableRoles.includes(editingUser?.role)}
                   >
                     {creatableRoles.map(r => (
-                      <option key={r} value={r}>{roleLabels[r] || r}</option>
+                      <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
                   </select>
                   {!creatableRoles.includes(editingUser?.role) && (
                     <small className="text-warning"><i className="bi bi-lock me-1"></i>Rôle protégé — modification impossible.</small>
                   )}
                   {editForm.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN' && u.id !== editingUser?.id) && (
-                    <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
+                    <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef INJS Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
                   )}
                   {editForm.role === 'CHEF_SECRETARIAT' && editForm.secretariat && (() => {
                     const secId = String(editForm.secretariat)

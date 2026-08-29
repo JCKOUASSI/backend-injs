@@ -44,16 +44,16 @@ def _calculer_duree_export(pointage):
 # ──────────────────────────────────────────────
 # Couleurs branding CI
 # ──────────────────────────────────────────────
-CI_GREEN_DARK = '#388E3C'
-CI_GREEN = '#43A047'
-CI_ORANGE = '#F57C00'
-CI_LIGHT_GREEN = '#E8F5E9'
-CI_LIGHT_ORANGE = '#FFF3E0'
+CI_GREEN_DARK = '#1A68AC'
+CI_GREEN = '#2277C1'
+CI_ORANGE = '#F5B100'
+CI_LIGHT_GREEN = '#E8EFF5'
+CI_LIGHT_ORANGE = '#FFF8E0'
 
 # Modèle CPFAE — fiche de paie formateur
 CI_PAIE_BLUE = '#DDEBF7'
-CI_PAIE_ORANGE = '#FCD5B4'
-CI_PAIE_GREEN = '#A9D08E'
+CI_PAIE_ORANGE = '#FCE7B4'
+CI_PAIE_GREEN = '#77BCE7'
 
 _FINANCE_PAIE_HEADER_LEFT = [
     "MINISTERE D'ETAT,",
@@ -829,7 +829,7 @@ def _get_formation_data(pk, module_pk=None):
     for insc in attendus_formateurs:
         personnes.append(('Formateur', insc.formateur, fmt_sessions))
     for insc in attendus_participants:
-        personnes.append(('Auditeur', insc.participant, part_sessions))
+        personnes.append(('Étudiant', insc.participant, part_sessions))
 
     rows = []
     total_present_count = 0
@@ -1216,10 +1216,10 @@ def export_excel(request, pk):
     ws.title = "Présences"
 
     # Couleurs branding
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
-    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-    light_orange_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
+    orange_fill = PatternFill(start_color='F5B100', end_color='F5B100', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
+    light_orange_fill = PatternFill(start_color='FFF8E0', end_color='FFF8E0', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
     thin_border = Border(
         left=Side(style='thin', color='CCCCCC'),
@@ -1242,7 +1242,7 @@ def export_excel(request, pk):
     # Titre formation
     ws.merge_cells('A3:J3')
     ws['A3'] = f"Rapport de présence — {formation.formation}"
-    ws['A3'].font = Font(bold=True, size=14, color='388E3C')
+    ws['A3'].font = Font(bold=True, size=14, color='1A68AC')
     ws['A3'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A4:J4')
@@ -1263,7 +1263,7 @@ def export_excel(request, pk):
     if all_sf.exists():
         ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=5)
         ws.cell(row=next_row, column=1, value="Sessions superviseur")
-        ws.cell(row=next_row, column=1).font = Font(bold=True, size=10, color='F57C00')
+        ws.cell(row=next_row, column=1).font = Font(bold=True, size=10, color='F5B100')
         next_row += 1
         sf_headers = ['Date', 'Session', 'Démarrée à', 'Terminée à', 'Durée (min)']
         for col, h in enumerate(sf_headers, 1):
@@ -1287,7 +1287,7 @@ def export_excel(request, pk):
                 cell.border = thin_border
                 cell.alignment = Alignment(horizontal='center')
                 if not sf.terminee_le:
-                    cell.font = Font(bold=True, color='F57C00')
+                    cell.font = Font(bold=True, color='F5B100')
                 else:
                     cell.fill = light_orange_fill
             next_row += 1
@@ -1328,7 +1328,7 @@ def export_excel(request, pk):
             # Recap rows: light orange + bold orange
             elif is_recap:
                 cell.fill = light_orange_fill
-                cell.font = Font(bold=True, color='F57C00', size=10)
+                cell.font = Font(bold=True, color='F5B100', size=10)
             # Normal rows: alternating colors
             elif i % 2 == 1:
                 cell.fill = light_green_fill
@@ -1339,11 +1339,11 @@ def export_excel(request, pk):
             if r['statut'] == 'Absent':
                 statut_cell.font = Font(color='C62828', bold=True)
             elif 'En cours' in r['statut']:
-                statut_cell.font = Font(color='F57C00', bold=True)
+                statut_cell.font = Font(color='F5B100', bold=True)
             else:
-                statut_cell.font = Font(color='388E3C', bold=True)
+                statut_cell.font = Font(color='1A68AC', bold=True)
             if r.get('motif'):
-                ws.cell(row=row_num, column=11).font = Font(color='F57C00', italic=True, size=10)
+                ws.cell(row=row_num, column=11).font = Font(color='F5B100', italic=True, size=10)
 
     # Ligne résumé
     summary_row = data_start_row + 1 + len(rows) + 1
@@ -1567,7 +1567,7 @@ def export_pdf_module(request, module_pk):
     elements.append(Spacer(1, 0.5 * cm))
 
     elements.append(Paragraph(
-        f"<b>Résumé :</b> {stats.get('nb_participants', '-')} auditeur(s), "
+        f"<b>Résumé :</b> {stats.get('nb_participants', '-')} étudiant(s), "
         f"{stats.get('nb_formateurs', 0)} formateur(s) &nbsp;|&nbsp; "
         f"{stats.get('nb_jours', 1)} jour(s) &nbsp;|&nbsp; "
         f"Présences : {stats['nb_presents']}/{stats['nb_total']} &nbsp;|&nbsp; "
@@ -1620,10 +1620,10 @@ def export_excel_module(request, module_pk):
     ws = wb.active
     ws.title = "Présences"
 
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
-    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-    light_orange_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
+    orange_fill = PatternFill(start_color='F5B100', end_color='F5B100', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
+    light_orange_fill = PatternFill(start_color='FFF8E0', end_color='FFF8E0', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
     thin_border = Border(
         left=Side(style='thin', color='CCCCCC'),
@@ -1644,12 +1644,12 @@ def export_excel_module(request, module_pk):
 
     ws.merge_cells('A3:J3')
     ws['A3'] = f"Rapport de présence — Module : {module.intitule}"
-    ws['A3'].font = Font(bold=True, size=14, color='388E3C')
+    ws['A3'].font = Font(bold=True, size=14, color='1A68AC')
     ws['A3'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A4:J4')
     ws['A4'] = f"Formation : {formation.formation}"
-    ws['A4'].font = Font(size=11, color='388E3C')
+    ws['A4'].font = Font(size=11, color='1A68AC')
     ws['A4'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A5:J5')
@@ -1668,7 +1668,7 @@ def export_excel_module(request, module_pk):
     if all_sf.exists():
         ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=5)
         ws.cell(row=next_row, column=1, value="Séances du module")
-        ws.cell(row=next_row, column=1).font = Font(bold=True, size=10, color='F57C00')
+        ws.cell(row=next_row, column=1).font = Font(bold=True, size=10, color='F5B100')
         next_row += 1
         sf_headers = ['Date', 'Séance', 'Démarrée à', 'Terminée à', 'Durée (min)']
         for col, h in enumerate(sf_headers, 1):
@@ -1692,7 +1692,7 @@ def export_excel_module(request, module_pk):
                 cell.border = thin_border
                 cell.alignment = Alignment(horizontal='center')
                 if not sf.terminee_le:
-                    cell.font = Font(bold=True, color='F57C00')
+                    cell.font = Font(bold=True, color='F5B100')
                 else:
                     cell.fill = light_orange_fill
             next_row += 1
@@ -1728,7 +1728,7 @@ def export_excel_module(request, module_pk):
                 cell.font = Font(italic=True, size=10)
             elif is_recap:
                 cell.fill = light_orange_fill
-                cell.font = Font(bold=True, color='F57C00', size=10)
+                cell.font = Font(bold=True, color='F5B100', size=10)
             elif i % 2 == 1:
                 cell.fill = light_green_fill
 
@@ -1737,11 +1737,11 @@ def export_excel_module(request, module_pk):
             if r['statut'] == 'Absent':
                 statut_cell.font = Font(color='C62828', bold=True)
             elif 'En cours' in r['statut']:
-                statut_cell.font = Font(color='F57C00', bold=True)
+                statut_cell.font = Font(color='F5B100', bold=True)
             else:
-                statut_cell.font = Font(color='388E3C', bold=True)
+                statut_cell.font = Font(color='1A68AC', bold=True)
             if r.get('motif'):
-                ws.cell(row=row_num, column=11).font = Font(color='F57C00', italic=True, size=10)
+                ws.cell(row=row_num, column=11).font = Font(color='F5B100', italic=True, size=10)
 
     summary_row = data_start_row + 1 + len(rows) + 1
     ws.merge_cells(start_row=summary_row, start_column=1, end_row=summary_row, end_column=6)
@@ -1836,7 +1836,7 @@ def _get_session_data(session_pk):
     for fmt in attendus_formateurs_list:
         personnes.append(('Formateur', fmt, fmt_sessions))
     for insc in attendus_participants:
-        personnes.append(('Auditeur', insc.participant, part_sessions))
+        personnes.append(('Étudiant', insc.participant, part_sessions))
 
     rows = []
     total_present_count = 0
@@ -2205,10 +2205,10 @@ def export_excel_session(request, session_pk):
     ws = wb.active
     ws.title = "Présences"
 
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
-    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-    light_orange_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
+    orange_fill = PatternFill(start_color='F5B100', end_color='F5B100', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
+    light_orange_fill = PatternFill(start_color='FFF8E0', end_color='FFF8E0', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
     thin_border = Border(
         left=Side(style='thin', color='CCCCCC'),
@@ -2232,12 +2232,12 @@ def export_excel_session(request, session_pk):
     session_label = session.intitule or f"Session {session.numero}"
     ws.merge_cells('A3:J3')
     ws['A3'] = f"Rapport de présence — Session"
-    ws['A3'].font = Font(bold=True, size=14, color='388E3C')
+    ws['A3'].font = Font(bold=True, size=14, color='1A68AC')
     ws['A3'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A4:J4')
     ws['A4'] = f"{formation.formation}"
-    ws['A4'].font = Font(bold=True, size=12, color='388E3C')
+    ws['A4'].font = Font(bold=True, size=12, color='1A68AC')
     ws['A4'].alignment = Alignment(horizontal='center')
 
     ws.merge_cells('A5:J5')
@@ -2262,7 +2262,7 @@ def export_excel_session(request, session_pk):
     if _xml or _xgrade or _xgroupe:
         ws.merge_cells('A6:J6')
         ws['A6'] = f"Module : {_xml or '-'} | Grade : {_xgrade or '-'} | Groupe : {_xgroupe or '-'}"
-        ws['A6'].font = Font(bold=True, size=10, color='388E3C')
+        ws['A6'].font = Font(bold=True, size=10, color='1A68AC')
         ws['A6'].alignment = Alignment(horizontal='center')
         ws.merge_cells('A7:J7')
         ws['A7'] = (
@@ -2314,7 +2314,7 @@ def export_excel_session(request, session_pk):
                 cell.font = Font(italic=True, size=10)
             elif is_recap:
                 cell.fill = light_orange_fill
-                cell.font = Font(bold=True, color='F57C00', size=10)
+                cell.font = Font(bold=True, color='F5B100', size=10)
             elif i % 2 == 1:
                 cell.fill = light_green_fill
 
@@ -2323,11 +2323,11 @@ def export_excel_session(request, session_pk):
             if r['statut'] == 'Absent':
                 statut_cell.font = Font(color='C62828', bold=True)
             elif 'En cours' in r['statut']:
-                statut_cell.font = Font(color='F57C00', bold=True)
+                statut_cell.font = Font(color='F5B100', bold=True)
             else:
-                statut_cell.font = Font(color='388E3C', bold=True)
+                statut_cell.font = Font(color='1A68AC', bold=True)
             if r.get('motif'):
-                ws.cell(row=row_num, column=11).font = Font(color='F57C00', italic=True, size=10)
+                ws.cell(row=row_num, column=11).font = Font(color='F5B100', italic=True, size=10)
 
     # Ligne résumé
     summary_row = data_start_row + 1 + len(rows) + 1
@@ -2636,8 +2636,8 @@ def export_finance_formateur_excel(request, formateur_pk):
     ws.title = "Modules dispensés"
 
     blue_fill = PatternFill(start_color='DDEBF7', end_color='DDEBF7', fill_type='solid')
-    orange_fill = PatternFill(start_color='FCD5B4', end_color='FCD5B4', fill_type='solid')
-    green_fill = PatternFill(start_color='A9D08E', end_color='A9D08E', fill_type='solid')
+    orange_fill = PatternFill(start_color='FCE7B4', end_color='FCE7B4', fill_type='solid')
+    green_fill = PatternFill(start_color='77BCE7', end_color='77BCE7', fill_type='solid')
     black_border = Border(
         left=Side(style='thin', color='000000'),
         right=Side(style='thin', color='000000'),
@@ -2998,10 +2998,10 @@ def export_finance_synthese_excel(request):
     ws = wb.active
     ws.title = 'Synthèse formateurs'
 
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
-    light_green_fill = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-    orange_fill = PatternFill(start_color='F57C00', end_color='F57C00', fill_type='solid')
-    total_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
+    light_green_fill = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
+    orange_fill = PatternFill(start_color='F5B100', end_color='F5B100', fill_type='solid')
+    total_fill = PatternFill(start_color='FFF8E0', end_color='FFF8E0', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
     thin_border = Border(
         left=Side(style='thin', color='CCCCCC'),
@@ -3019,7 +3019,7 @@ def export_finance_synthese_excel(request):
     row_idx += 1
     ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
     ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document'))
-    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
+    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='1A68AC')
     ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
     row_idx += 1
     ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
@@ -3326,9 +3326,9 @@ def export_finance_encadrants_excel(request):
     ws = wb.active
     ws.title = 'Encadrants'
 
-    green_fill = PatternFill(start_color='388E3C', end_color='388E3C', fill_type='solid')
+    green_fill = PatternFill(start_color='1A68AC', end_color='1A68AC', fill_type='solid')
     subtotal_fill = PatternFill(start_color='E3F2FD', end_color='E3F2FD', fill_type='solid')
-    total_fill = PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid')
+    total_fill = PatternFill(start_color='FFF8E0', end_color='FFF8E0', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=10)
     thin_border = Border(
         left=Side(style='thin', color='CCCCCC'),
@@ -3346,7 +3346,7 @@ def export_finance_encadrants_excel(request):
     row_idx += 1
     ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
     ws.cell(row=row_idx, column=1, value=export_opts.get('titre_document'))
-    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='388E3C')
+    ws.cell(row=row_idx, column=1).font = Font(bold=True, size=13, color='1A68AC')
     ws.cell(row=row_idx, column=1).alignment = Alignment(horizontal='center')
     row_idx += 1
     ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)

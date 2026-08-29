@@ -2,7 +2,7 @@
   FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
   Module Statistiques & Bilans
 ================================================================================
-Dernière mise à jour : 07/07/2026 17:49
+Dernière mise à jour : 26/08/2026 03:30
 Statut global         : EN COURS — fonctionnel, enrichissements continus
 ================================================================================
 
@@ -28,6 +28,20 @@ Statut global         : EN COURS — fonctionnel, enrichissements continus
  TÂCHES RÉALISÉES
 ────────────────────────────────────────────────────────────────────────────────
 
+[26/08/2026] KPI « Modules / Cours » → « Modules » (une formation peut regrouper un ou plusieurs modules).
+  Fichiers modifiés :
+  · frontend/src/pages/Statistiques.jsx
+  · docs/Manuel utilisateur App Statistiques.md
+
+[26/08/2026] Libellés Statistiques : Auditeurs → Étudiants, Formateurs → Enseignants (affichage uniquement).
+  Fichiers modifiés :
+  · frontend/src/pages/Statistiques.jsx
+
+[26/08/2026] Charte visuelle Statistiques alignée sur la page de connexion INJS (navy #001a33 / fond bleu poussiéreux) : onglets, bandeaux, puces de sélection et boutons d’enregistrement. Les KPI de présence/conformité restent verts.
+  Fichiers modifiés :
+  · frontend/src/pages/Statistiques.jsx
+  · frontend/src/index.css
+  · frontend/src/styles/finance.css (filtres période partagés)
 
 [07/07/2026] Rattrapages comptés dans les statistiques de la séance d'accueil : un auditeur en rattrapage (statut PLANIFIE/EFFECTUE) devient un attendu additionnel sur sa séance d'accueil, et présent s'il a pointé. Un rattrapage annulé est exclu.
   Fichiers modifiés :

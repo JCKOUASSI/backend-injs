@@ -7,9 +7,9 @@ const STATUT_LABELS = {
   PLANIFIEE: 'Planifiée', EN_COURS: 'En cours', TERMINEE: 'Terminée', ANNULEE: 'Annulée',
 }
 const STATUT_COLORS = {
-  PLANIFIEE: { background: '#fff3e0', color: '#e65100' },
+  PLANIFIEE: { background: '#fff8e0', color: '#e69700' },
   EN_COURS:  { background: '#e3f2fd', color: '#0d47a1' },
-  TERMINEE:  { background: '#e8f5e9', color: '#2e7d32' },
+  TERMINEE:  { background: '#e8eff5', color: '#125a99' },
   ANNULEE:   { background: '#ffebee', color: '#b71c1c' },
 }
 
@@ -205,7 +205,7 @@ export default function EvaluationAcademique() {
           </p>
         </div>
         <Link to={`/formations/${formationId}/modules/${moduleId}`} className="btn btn-sm btn-outline-secondary">
-          <i className="bi bi-arrow-left me-1"></i>Retour au cours
+          <i className="bi bi-arrow-left me-1"></i>Retour au module
         </Link>
       </div>
 
@@ -213,7 +213,7 @@ export default function EvaluationAcademique() {
       <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: '1.5rem' }}>
         {[
           { key: 'epreuves', label: 'Épreuves & Notes', icon: 'bi-pencil-square' },
-          { key: 'moyennes', label: 'Moyennes du cours', icon: 'bi-calculator' },
+          { key: 'moyennes', label: 'Moyennes du module', icon: 'bi-calculator' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', padding: '0.6rem 1.1rem', cursor: 'pointer',
@@ -297,7 +297,7 @@ export default function EvaluationAcademique() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary, #f9fafb)' }}>
-                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 700 }}>Auditeur</th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 700 }}>Étudiant</th>
                       <th style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700, minWidth: 90 }}>Note /20</th>
                       <th style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Mention</th>
                       <th style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Abs.</th>
@@ -333,7 +333,7 @@ export default function EvaluationAcademique() {
                                 width: 64, textAlign: 'center', padding: '4px',
                                 border: `1.5px solid ${isValid ? 'var(--border)' : '#e53935'}`,
                                 borderRadius: 6, fontWeight: 600,
-                                background: d.note !== '' && isValid ? (noteNum >= 10 ? '#f1f8e9' : '#fff8f8') : '',
+                                background: d.note !== '' && isValid ? (noteNum >= 10 ? '#e9f3f8' : '#fff8f8') : '',
                               }}
                               placeholder="—"
                             />
@@ -384,7 +384,7 @@ export default function EvaluationAcademique() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary, #f9fafb)' }}>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700 }}>Auditeur</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700 }}>Étudiant</th>
                     <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Nb épreuves</th>
                     <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Coeff. total</th>
                     <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Moyenne /20</th>
@@ -397,7 +397,7 @@ export default function EvaluationAcademique() {
                       <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>{m.nb_epreuves}</td>
                       <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>{m.total_coefficients}</td>
                       <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
-                        <strong style={{ color: m.moyenne >= 10 ? '#2e7d32' : '#b71c1c' }}>
+                        <strong style={{ color: m.moyenne >= 10 ? '#125a99' : '#b71c1c' }}>
                           {m.moyenne !== null ? `${m.moyenne}/20` : '—'}
                         </strong>
                       </td>

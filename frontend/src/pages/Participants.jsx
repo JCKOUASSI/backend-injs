@@ -169,7 +169,7 @@ export default function Participants() {
       const payload = Array.isArray(response.data) ? {} : response.data
       setFilterOptions(payload.filter_options || { secretariats: [], grades: [], groupes: [], types_concours: [] })
     } catch (err) {
-      setError('Erreur lors du chargement des auditeurs')
+      setError('Erreur lors du chargement des étudiants')
       console.error(err)
     } finally { setLoading(false) }
   }
@@ -223,7 +223,7 @@ export default function Participants() {
       }
       setShowModal(false)
       loadParticipants()
-      showToast(editingId ? 'Auditeur modifié' : 'Auditeur créé')
+      showToast(editingId ? 'Étudiant modifié' : 'Étudiant créé')
     } catch (err) {
       const data = err.response?.data
       if (data && typeof data === 'object') {
@@ -237,10 +237,10 @@ export default function Participants() {
 
   const handleDelete = (id) => {
     setConfirmDialog({
-      message: 'Supprimer cet auditeur ?',
+      message: 'Supprimer cet étudiant ?',
       detail: 'Cette action est définitive.',
       onConfirm: async () => {
-        try { await api.delete(`/formations/participants/${id}/`); loadParticipants(); showToast('Auditeur supprimé') }
+        try { await api.delete(`/formations/participants/${id}/`); loadParticipants(); showToast('Étudiant supprimé') }
         catch { showToast('Erreur lors de la suppression', 'error') }
       }
     })
@@ -359,7 +359,7 @@ export default function Participants() {
             )}
             {canCreate && (
               <button onClick={openCreate} className="btn btn-dfrc">
-                <i className="bi bi-plus-lg me-1"></i>Nouvel auditeur
+                <i className="bi bi-plus-lg me-1"></i>Nouvel étudiant
               </button>
             )}
             {canExportListeClasse && (
@@ -395,7 +395,7 @@ export default function Participants() {
       {/* Table */}
       <div className="card">
         <div className="card-header-bar">
-          <span><i className="bi bi-people me-2"></i>Liste des auditeurs</span>
+          <span><i className="bi bi-people me-2"></i>Liste des étudiants</span>
           <span className="badge-bg-secondary">{totalCount} résultat(s)</span>
         </div>
         <div className="card-body-flush">
@@ -446,7 +446,7 @@ export default function Participants() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="6" className="text-center py-4 text-muted">Aucun auditeur trouvé</td></tr>
+                      <tr><td colSpan="6" className="text-center py-4 text-muted">Aucun étudiant trouvé</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -491,7 +491,7 @@ export default function Participants() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" style={{ maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-person-plus me-2"></i>{editingId ? "Modifier l'auditeur" : 'Nouvel auditeur'}</h5>
+              <h5><i className="bi bi-person-plus me-2"></i>{editingId ? "Modifier l'étudiant" : 'Nouvel étudiant'}</h5>
               <button className="btn-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleSubmit}>

@@ -10,6 +10,7 @@ Usage :
 import csv
 import io
 import re
+import unicodedata
 from datetime import datetime, date
 from difflib import SequenceMatcher
 
@@ -481,12 +482,42 @@ class Command(BaseCommand):
         c = cat.strip().upper()
         if not c:
             return c
-        # Variantes collées : "FABA" -> "FAB A", "FAC B" reste "FAC B".
+        # Variantes collées CPFAE uniquement : "FABA" -> "FAB A".
+        # Ne pas découper les codes INJS (SFC, SST, SFO, SAC, SSC…).
         import re as _re
-        m = _re.fullmatch(r'([A-Z]{2,4})\s*([A-C])', c)
+        m = _re.fullmatch(r'(FAB|FAC|FAR)\s*([A-D])', c)
         if m:
             return f'{m.group(1)} {m.group(2)}'
         return c
+
+    def _fold_ascii(self, value):
+        text = unicodedata.normalize('NFKD', value or '')
+        text = ''.join(ch for ch in text if not unicodedata.combining(ch))
+        return text.casefold()
+
+    def _secretariat_type_from_participant(self, raw_categorie='', grade=''):
+        """Clé RefTypeSecretariat pour un étudiant INJS / CPFAE.
+
+        Les libellés pédagogiques (Élève Professeur, Étudiant LMD…) ne sont pas
+        des types de secrétariat : on les rattache à SET ou SFC.
+        """
+        cat = self._normalize_categorie(raw_categorie) if raw_categorie else ''
+        blob = self._fold_ascii(f'{cat} {grade or ""}')
+        if cat == 'SFC' or 'formation continue' in blob or 'formation a la carte' in blob:
+            return 'SFC'
+        if cat in (
+            'SET', 'SSC', 'SFO', 'SST', 'SAC', 'SAD', 'SAO', 'SCA', 'SCO',
+            'SCR', 'SDA', 'SDD', 'SEN', 'SEX', 'SFI', 'SGE', 'SJU', 'SND',
+            'SPR', 'SRH',
+        ):
+            return cat
+        if cat.startswith('FAB') or cat.startswith('FAC') or cat.startswith('FAR'):
+            return cat
+        if len(cat) == 1 and cat in 'ABCD':
+            return cat
+        if any(tok in blob for tok in ('eleve', 'etudiant')):
+            return 'SET'
+        return cat
 
     def _secretariat_hint_from_matricule(self, matricule):
         """Retourne le code secrétariat prioritaire selon le matricule.
@@ -1056,7 +1087,9 @@ class Command(BaseCommand):
                         first_letter = fields['grade'].strip()[:1].upper()
                         if first_letter in ('A', 'B', 'C'):
                             raw_cat = first_letter
-                    cat = self._normalize_categorie(raw_cat) if raw_cat else ''
+                    cat = self._secretariat_type_from_participant(
+                        raw_cat, fields.get('grade', ''),
+                    )
                     if cat:
                         if cat not in _secretariat_cache:
                             sec = SecretariatModel.objects.filter(type__libelle__iexact=cat).first()
@@ -1121,10 +1154,13 @@ class Command(BaseCommand):
                         if sec:
                             fields['secretariat'] = sec
 
-            fields['categorie'] = self._resolve_categorie_participant(
+            resolved_cat = self._resolve_categorie_participant(
                 fields.get('categorie', ''),
                 grade=fields.get('grade', ''),
             )
+            # Conserver les catégories INJS (Élève Professeur, Étudiant LMD…)
+            # si elles ne correspondent pas au référentiel CM/TD/TP.
+            fields['categorie'] = resolved_cat or fields.get('categorie', '')
 
             if matricule:
                 obj, created = Participant.objects.update_or_create(

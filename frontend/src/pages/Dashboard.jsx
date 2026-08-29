@@ -291,7 +291,7 @@ export default function Dashboard() {
         {isPeriodWhollyFuture(appliedVhPeriod) && (
           <div style={{
             marginTop: '0.65rem', padding: '0.55rem 0.75rem', borderRadius: 8,
-            background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', fontSize: '0.82rem',
+            background: '#fffceb', border: '1px solid #fcdf4d', color: '#92660e', fontSize: '0.82rem',
           }}>
             <i className="bi bi-info-circle me-1"/>
             Cette période n&apos;a pas encore commencé — volume horaire réalisé à 0.
@@ -329,7 +329,7 @@ export default function Dashboard() {
       <div className="headline-kpis">
         <div
           className="headline-kpi-card headline-kpi-card-main"
-          title="Nombre total de modules (cours) dans le périmètre actuel. Les sous-totaux indiquent combien sont démarrés, planifiés ou terminés."
+          title="Nombre total de modules dans le périmètre actuel. Plusieurs modules peuvent appartenir à une même formation. Les sous-totaux indiquent combien sont démarrés, planifiés ou terminés."
         >
           <div className="headline-kpi-icon">
             <i className="bi bi-mortarboard-fill"></i>
@@ -337,7 +337,7 @@ export default function Dashboard() {
           <div>
             <div className="headline-kpi-topline">
               <span className="headline-kpi-value">{stats?.total_modules || 0}</span>
-              <span className="headline-kpi-label">COURS</span>
+              <span className="headline-kpi-label">MODULES</span>
             </div>
             <div className="headline-kpi-subline">
               <span><i className="bi bi-play-circle-fill"></i> {stats?.modules_en_cours || 0} démarrés</span>
@@ -368,7 +368,7 @@ export default function Dashboard() {
         </div>
         <div
           className="headline-kpi-card headline-kpi-card-side"
-          title="Nombre total d’auditeurs (fiches participants) pris en compte dans les statistiques pour le filtre actuel (secrétariat et période le cas échéant)."
+          title="Nombre total d’étudiants (fiches participants) pris en compte dans les statistiques pour le filtre actuel (secrétariat et période le cas échéant)."
         >
           <div className="headline-kpi-icon">
             <i className="bi bi-people-fill"></i>
@@ -388,27 +388,27 @@ export default function Dashboard() {
         {(presencePeriod === 'jour'
           ? [
               {
-                label: 'Nombre Auditeurs Présents/Attendus',
+                label: 'Nombre Étudiants Présents/Attendus',
                 value: `${selectedPeriodStats.auditeursPresents || 0}/${selectedPeriodStats.auditeursAttendus || 0}`,
                 icon: 'bi-people-fill',
                 color: '#2b6cb0',
                 bg: 'rgba(43,108,178,0.1)',
-                tooltip: 'Auditeurs déjà pointés présents ce jour (ou jour de référence), par rapport au nombre attendu aux séances concernées.',
+                tooltip: 'Étudiants déjà pointés présents ce jour (ou jour de référence), par rapport au nombre attendu aux séances concernées.',
               },
               {
-                label: 'Nombre Formateurs Présents/Attendus',
+                label: 'Nombre Enseignants Présents/Attendus',
                 value: `${selectedPeriodStats.formateursPresents || 0}/${selectedPeriodStats.formateursAttendus || 0}`,
                 icon: 'bi-person-badge-fill',
-                color: '#276749',
-                bg: 'rgba(39,103,73,0.1)',
-                tooltip: 'Formateurs pointés présents ce jour par rapport au nombre attendu sur les séances du jour.',
+                color: '#11407d',
+                bg: 'rgba(17,64,125,0.1)',
+                tooltip: 'Enseignants pointés présents ce jour par rapport au nombre attendu sur les séances du jour.',
               },
               {
                 label: 'Séances planifiées',
                 value: stats?.seances_planifiees_aujourd_hui || 0,
                 icon: 'bi-calendar-event',
-                color: '#c05621',
-                bg: 'rgba(245,124,0,0.1)',
+                color: '#c08821',
+                bg: 'rgba(245,177,0,0.1)',
                 tooltip: 'Nombre de séances prévues à la date affichée dans le filtre « Jour spécifique ».',
               },
             ]
@@ -419,22 +419,22 @@ export default function Dashboard() {
                 icon: 'bi-people-fill',
                 color: '#2b6cb0',
                 bg: 'rgba(43,108,178,0.1)',
-                tooltip: 'Personnes (auditeurs et formateurs) pointées présentes sur la période choisie, par rapport au nombre attendu.',
+                tooltip: 'Personnes (étudiants et enseignants) pointées présentes sur la période choisie, par rapport au nombre attendu.',
               },
               {
                 label: `Taux de présence (${periodLabels[presencePeriod].toLowerCase()})`,
                 value: `${(selectedPeriodStats.taux || 0).toFixed(1)}%`,
                 icon: 'bi-graph-up-arrow',
-                color: '#276749',
-                bg: 'rgba(39,103,73,0.1)',
+                color: '#11407d',
+                bg: 'rgba(17,64,125,0.1)',
                 tooltip: 'Pourcentage de présence calculé sur la période sélectionnée (présents / attendus).',
               },
               {
                 label: `Absents (${periodLabels[presencePeriod].toLowerCase()})`,
                 value: `${selectedPeriodAbsence} (${selectedPeriodAbsenceRate.toFixed(1)}%)`,
                 icon: 'bi-person-x-fill',
-                color: '#c05621',
-                bg: 'rgba(245,124,0,0.1)',
+                color: '#c08821',
+                bg: 'rgba(245,177,0,0.1)',
                 tooltip: 'Nombre de personnes absentes et part d’absents sur la période (attendus − présents).',
               },
             ]).map(({ label, value, icon, color, bg, tooltip }) => (
@@ -470,8 +470,8 @@ export default function Dashboard() {
                 label: 'Pointages du jour',
                 value: stats?.pointages_aujourd_hui || 0,
                 icon: 'bi-qr-code-scan',
-                color: '#276749',
-                bg: 'rgba(39,103,73,0.1)',
+                color: '#11407d',
+                bg: 'rgba(17,64,125,0.1)',
                 tooltip: 'Nombre total d’entrées ou sorties enregistrées par badgeage QR ce jour (tous rôles confondus).',
               }]),
           {
@@ -505,8 +505,8 @@ export default function Dashboard() {
             label: 'Retard moyen (jour)',
             value: `${(stats?.retard_moyen_minutes || 0).toFixed(1)} min`,
             icon: 'bi-alarm',
-            color: '#d97706',
-            bg: 'rgba(217,119,6,0.1)',
+            color: '#d9a106',
+            bg: 'rgba(217,161,6,0.1)',
             tooltip: 'Retard moyen (en minutes) entre l’heure prévue de début de séance et le premier pointage d’entrée, sur la journée de référence.',
           },
         ].map(({ label, value, icon, color, bg, tooltip }) => (
@@ -564,17 +564,17 @@ export default function Dashboard() {
         const absents = Math.max(attendus - presents, 0)
         const tauxPresence = selected.taux
         const tauxAbsence = attendus > 0 ? Number((100 - tauxPresence).toFixed(1)) : 0
-        const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F57C00' : '#276749'
+        const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F5B100' : '#11407d'
         return (
           <div
             className="card"
             style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}
-            title="Vue d’ensemble des présences et absences (auditeurs + formateurs) pour la période sélectionnée. La barre compare présents (vert) et absents (couleur variable)."
+            title="Vue d’ensemble des présences et absences (étudiants + enseignants) pour la période sélectionnée. La barre compare présents (vert) et absents (couleur variable)."
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>
                 <i className="bi bi-person-x-fill me-2" style={{ color: absColor }}></i>
-                Présences {periodTextLabels[presencePeriod]} — personnes (auditeurs + formateurs)
+                Présences {periodTextLabels[presencePeriod]} — personnes (étudiants + enseignants)
               </span>
               {!canFilterBySecretariat && (
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -599,17 +599,17 @@ export default function Dashboard() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem', width: '100%', justifyContent: 'flex-end' }}>
-                <span><span style={{ fontWeight: 700, color: '#276749' }}>{presents}</span> <span className="text-muted">présents</span></span>
+                <span><span style={{ fontWeight: 700, color: '#11407d' }}>{presents}</span> <span className="text-muted">présents</span></span>
                 <span><span style={{ fontWeight: 700, color: absColor }}>{absents}</span> <span className="text-muted">absents</span></span>
                 <span><span style={{ fontWeight: 700, color: '#718096' }}>{attendus}</span> <span className="text-muted">attendus</span></span>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 6, height: 10, position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${tauxPresence}%`, background: 'var(--ci-green)', borderRadius: 6, transition: 'width 0.4s' }}></div>
+                <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${tauxPresence}%`, background: 'var(--ci-success)', borderRadius: 6, transition: 'width 0.4s' }}></div>
                 <div style={{ position: 'absolute', left: `${tauxPresence}%`, top: 0, height: '100%', width: `${tauxAbsence}%`, background: absColor, opacity: 0.7, borderRadius: '0 6px 6px 0', transition: 'width 0.4s' }}></div>
               </div>
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#276749', whiteSpace: 'nowrap' }}>{tauxPresence.toFixed(1)}% présents</span>
+              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#11407d', whiteSpace: 'nowrap' }}>{tauxPresence.toFixed(1)}% présents</span>
               <span style={{ fontSize: '0.82rem', fontWeight: 700, color: absColor, whiteSpace: 'nowrap' }}>{tauxAbsence.toFixed(1)}% absents</span>
             </div>
             {attendus === 0 && (
@@ -621,14 +621,14 @@ export default function Dashboard() {
         )
       })()}
 
-      {/* ── Cours débutés ── */}
+      {/* ── Modules débutés ── */}
       <div
         className="card"
-        title="Modules au statut « en cours » : site, encadrant, effectifs présents / attendus et taux de présence par cours. Cliquez sur l’œil pour ouvrir le détail du module."
+        title="Modules au statut « en cours » : site, encadrant, effectifs présents / attendus et taux de présence par module. Cliquez sur l’œil pour ouvrir le détail du module."
       >
         <div className="card-header-bar">
-          <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-green)' }}></i>
-            <strong>{user?.role === 'ENCADRANT' ? 'Mes cours débutés' : 'Cours débutés'}</strong>
+          <span><i className="bi bi-play-circle me-2" style={{ color: 'var(--ci-success)' }}></i>
+            <strong>{user?.role === 'ENCADRANT' ? 'Mes modules débutés' : 'Modules débutés'}</strong>
           </span>
           <Link to="/modules?statut=EN_COURS" className="btn btn-dfrc btn-sm">Voir tout</Link>
         </div>
@@ -638,7 +638,7 @@ export default function Dashboard() {
               <table className="table">
                 <thead><tr>
                   <th>Module</th><th>Site </th><th>Catégorie</th>
-                  <th>Encadrant</th><th>Présents / Attendus (auditeurs)</th><th>Absents</th><th>Taux présence</th><th></th>
+                  <th>Encadrant</th><th>Présents / Attendus (étudiants)</th><th>Absents</th><th>Taux présence</th><th></th>
                 </tr></thead>
                 <tbody>
                   {formationsEnCours.map((f) => {
@@ -647,21 +647,22 @@ export default function Dashboard() {
                     const absents = Math.max(attendus - presents, 0)
                     const taux = attendus > 0 ? Math.round(presents / attendus * 100) : 0
                     const tauxAbsence = attendus > 0 ? Math.round(absents / attendus * 100) : 0
-                    const tauxColor = taux >= 75 ? 'var(--ci-green)' : taux >= 50 ? 'var(--ci-orange)' : '#e53e3e'
-                    const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F57C00' : '#718096'
-                    const moduleLabel = f.module || f.intitule || f.formation || '—'
+                    const tauxColor = taux >= 75 ? 'var(--ci-success)' : taux >= 50 ? 'var(--ci-warning)' : '#e53e3e'
+                    const absColor = tauxAbsence >= 50 ? '#e53e3e' : tauxAbsence >= 25 ? '#F5B100' : '#718096'
+                    const moduleLabel = f.module || f.intitule || '—'
                     const siteLabel = [f.site, f.batiment, f.salle].filter(Boolean).join(' / ') || '—'
                     return (
-                      <tr key={f.id}>
+                      <tr key={`${f.id}-${f.module_id || ''}`}>
                         <td>
                           <div style={{ fontWeight: 600 }}>{moduleLabel}</div>
+                          {f.formation && <small className="text-muted" style={{ display: 'block' }}>{f.formation}</small>}
                           <small className="text-muted">{formatDate(f.date_debut)} — {formatDate(f.date_fin)}</small>
                         </td>
                         <td><span style={{ fontSize: '0.85rem' }}>{siteLabel}</span></td>
                         <td><span style={{ fontSize: '0.82rem', background: '#ebf4ff', color: '#2b6cb0', padding: '2px 7px', borderRadius: 4 }}>{f.categorie || f.grade || '—'}</span></td>
                         <td><span style={{ fontSize: '0.85rem' }}>{f.superviseur_nom || <span className="text-muted">Non assigné</span>}</span></td>
                         <td>
-                          <span style={{ fontWeight: 700, color: 'var(--ci-green)' }}>{presents}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--ci-success)' }}>{presents}</span>
                           <span className="text-muted"> / {attendus}</span>
                         </td>
                         <td>
@@ -710,14 +711,14 @@ export default function Dashboard() {
             title="Liste des prochaines séances planifiées (module, date et heure). Le chevron mène au détail du module."
           >
             <div className="card-header-bar">
-              <span><i className="bi bi-calendar-event me-2" style={{ color: 'var(--ci-orange)' }}></i><strong>Prochaines séances</strong></span>
+              <span><i className="bi bi-calendar-event me-2" style={{ color: 'var(--ci-warning)' }}></i><strong>Prochaines séances</strong></span>
             </div>
             <div className="card-body-flush">
               {prochainesSeances.length > 0 ? (
                 <div>
                   {prochainesSeances.map((s) => (
                     <div key={s.session_id} style={{ padding: '0.65rem 1rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ background: 'rgba(245,124,0,0.1)', color: 'var(--ci-orange)', borderRadius: 8, padding: '0.45rem 0.5rem' }}>
+                      <div style={{ background: 'rgba(245,177,0,0.1)', color: 'var(--ci-warning)', borderRadius: 8, padding: '0.45rem 0.5rem' }}>
                         <i className="bi bi-calendar3"></i>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -771,17 +772,17 @@ export default function Dashboard() {
                           <td><code style={{ fontSize: '0.78rem' }}>{pt.matricule || '—'}</code></td>
                           <td>
                             <span style={{
-                              background: pt.type === 'formateur' ? '#ebf4ff' : pt.type === 'encadrant' ? '#fffaf0' : '#f0f4ff',
+                              background: pt.type === 'formateur' ? '#ebf4ff' : pt.type === 'encadrant' ? '#fffcf0' : '#f0f4ff',
                               color: pt.type === 'formateur' ? '#2b6cb0' : pt.type === 'encadrant' ? '#9c4221' : '#4a5568',
                               borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem'
                             }}>
-                              {pt.type === 'formateur' ? 'Formateur' : pt.type === 'encadrant' ? 'Encadrant' : 'Auditeur'}
+                              {pt.type === 'formateur' ? 'Enseignant' : pt.type === 'encadrant' ? 'Encadrant' : 'Étudiant'}
                             </span>
                           </td>
                           <td style={{ fontSize: '0.82rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pt.module || '—'}</td>
                           <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{formatDate(pt.date)}</td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{fmtTime(pt.heure_entree)}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: pt.heure_sortie ? '#276749' : '#94a3b8' }}>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: pt.heure_sortie ? '#11407d' : '#94a3b8' }}>
                             {fmtTime(pt.heure_sortie)}
                           </td>
                         </tr>

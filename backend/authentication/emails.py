@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 _LOGO_DATA_URI_CACHE = None
 
 # Couleurs alignées sur frontend/src/index.css (:root --ci-*, --text-*)
-_CI_ORANGE = '#F57C00'
-_CI_ORANGE_DARK = '#E65100'
-_CI_GREEN = '#43A047'
-_CI_GREEN_DARK = '#388E3C'
-_CI_LIGHT = '#FFF8F0'
+_CI_ORANGE = '#F5B100'
+_CI_ORANGE_DARK = '#E69700'
+_CI_GREEN = '#2277C1'
+_CI_GREEN_DARK = '#1A68AC'
+_CI_LIGHT = '#FFFBF0'
 _TEXT_PRIMARY = '#1e293b'
 _TEXT_SECONDARY = '#64748b'
 _BORDER = '#e2e8f0'
@@ -27,23 +27,23 @@ _FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"
 ROLE_LABELS = {
     'ADMIN': 'Administrateur',
     'DIRECTION': 'Direction',
-    'CHEF_CPFAE_ADMIN': 'Chef CPFAE Admin',
-    'CPFAE_ADMIN': 'CPFAE Admin',
+    'CHEF_CPFAE_ADMIN': 'Chef INJS Admin',
+    'CPFAE_ADMIN': 'INJS Admin',
     'CHEF_SECRETARIAT': 'Chef Secrétariat',
     'SECRETARIAT': 'Secrétariat',
     'FINANCE': 'Finance',
     'ENCADRANT': 'Encadrant',
-    'FORMATEUR': 'Formateur',
-    'AUDITEUR': 'Auditeur',
+    'FORMATEUR': 'Enseignant',
+    'AUDITEUR': 'Étudiant',
 }
 
 
 def _logo_candidates():
     base_dir = Path(settings.BASE_DIR)
     return [
-        base_dir / 'static' / 'img' / 'logo-sygepcpfae.png',
+        base_dir / 'static' / 'img' / 'logo-injs.png',
         base_dir.parent / 'frontend' / 'src' / 'assets' / 'logo.png',
-        base_dir / 'static' / 'img' / 'logo-mfpma.jpeg',
+        base_dir / 'static' / 'img' / 'logo-sygepcpfae.png',
     ]
 
 
@@ -194,7 +194,7 @@ L'équipe DFRC — SYGEP-CPFAE
 
     {cta}
 
-    <div style="background:#FFF3E0; border-left:4px solid {_CI_ORANGE_DARK}; padding:14px 18px; border-radius:8px; margin-top:8px;">
+    <div style="background:#FFF8E0; border-left:4px solid {_CI_ORANGE_DARK}; padding:14px 18px; border-radius:8px; margin-top:8px;">
       <strong style="color:{_CI_ORANGE_DARK};">Sécurité</strong><br>
       <span style="color:{_TEXT_PRIMARY}; font-size:0.95rem; line-height:1.5;">{security_hint}</span>
     </div>
@@ -207,7 +207,7 @@ L'équipe DFRC — SYGEP-CPFAE
 
     html_message = _html_email_shell(
         title='SYGEP-CPFAE — DFRC',
-        subtitle='Gestion des présences',
+        subtitle='Institut National de la Jeunesse et des Sports',
         inner=inner,
     )
 
@@ -226,7 +226,7 @@ L'équipe DFRC — SYGEP-CPFAE
 
 
 def send_suspect_heartbeat_email(encadrant, personne_nom, personne_numero, formation_titre, module_intitule, seance_label, silence_minutes):
-    """Notifie l'encadrant d'un module qu'un auditeur n'envoie plus de signal de présence
+    """Notifie l'encadrant d'un module qu'un étudiant n'envoie plus de signal de présence
     depuis `silence_minutes` minutes et est passé en statut HORS_LIGNE_SUSPECT."""
     if not encadrant or not encadrant.email:
         return
@@ -240,7 +240,7 @@ def send_suspect_heartbeat_email(encadrant, personne_nom, personne_numero, forma
 
 Une alerte de présence nécessite votre vérification.
 
-L'auditeur suivant n'a plus envoyé de signal depuis {silence_minutes} minutes :
+L'étudiant suivant n'a plus envoyé de signal depuis {silence_minutes} minutes :
 
   Nom      : {personne_nom}
   Badge N° : {personne_numero}
@@ -260,15 +260,15 @@ L'équipe DFRC — SYGEP-CPFAE
     inner = f"""
     <p style="margin:0 0 16px; line-height:1.6;">Bonjour <strong>{encadrant_nom}</strong>,</p>
 
-    <div style="background:#FFF3E0; border-left:4px solid {_CI_ORANGE_DARK}; padding:16px 20px; border-radius:8px; margin-bottom:22px;">
-      <strong style="font-size:1.05rem; color:{_CI_ORANGE_DARK};">Auditeur hors ligne depuis {silence_minutes} minutes</strong>
+    <div style="background:#FFF8E0; border-left:4px solid {_CI_ORANGE_DARK}; padding:16px 20px; border-radius:8px; margin-bottom:22px;">
+      <strong style="font-size:1.05rem; color:{_CI_ORANGE_DARK};">Étudiant hors ligne depuis {silence_minutes} minutes</strong>
     </div>
 
     <div style="background:{_CI_LIGHT}; border:1px solid {_BORDER}; border-radius:10px; padding:20px; margin:20px 0;">
       <h3 style="margin:0 0 16px; color:{_CI_GREEN_DARK}; font-size:1.05rem;">Informations</h3>
       <table style="width:100%; border-collapse:collapse;">
         <tr>
-          <td style="padding:10px 0; color:{_TEXT_SECONDARY}; width:40%;">Auditeur</td>
+          <td style="padding:10px 0; color:{_TEXT_SECONDARY}; width:40%;">Étudiant</td>
           <td style="padding:10px 0; font-weight:700; color:{_TEXT_PRIMARY};">{personne_nom}</td>
         </tr>
         <tr style="border-top:1px solid {_BORDER};">
@@ -290,7 +290,7 @@ L'équipe DFRC — SYGEP-CPFAE
       </table>
     </div>
 
-    <p style="margin:0 0 8px; color:{_TEXT_PRIMARY}; line-height:1.6;">Veuillez vérifier la présence physique de cet auditeur en salle.</p>
+    <p style="margin:0 0 8px; color:{_TEXT_PRIMARY}; line-height:1.6;">Veuillez vérifier la présence physique de cet étudiant en salle.</p>
 
     {cta}
 

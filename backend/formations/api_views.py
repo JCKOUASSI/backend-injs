@@ -3132,7 +3132,7 @@ def _serialize_ref_module(obj):
     }
 
 
-def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None, *, required=False):
+def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None, *, required=False, replace=True):
     """Enregistre les volumes horaire (formation × catégorie)."""
     if volumes_horaires is None:
         if required:
@@ -3144,7 +3144,8 @@ def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None
     if not isinstance(volumes_horaires, (list, tuple)):
         return Response({'volumes_horaires': ['Liste invalide.']}, status=400)
     allowed_formations = set(formation_ids or obj.formations.values_list('id', flat=True))
-    obj.volumes_horaires.all().delete()
+    if replace:
+        obj.volumes_horaires.all().delete()
     created = 0
     for item in volumes_horaires:
         if not isinstance(item, dict):
@@ -3174,11 +3175,18 @@ def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None
             return Response({'volumes_horaires': ['Volume horaire invalide.']}, status=400)
         if vh < 0:
             return Response({'volumes_horaires': ['Volume horaire négatif.']}, status=400)
-        obj.volumes_horaires.create(
-            formation_id=fid,
-            categorie_id=cid,
-            volume_horaire=vh,
-        )
+        if replace:
+            obj.volumes_horaires.create(
+                formation_id=fid,
+                categorie_id=cid,
+                volume_horaire=vh,
+            )
+        else:
+            obj.volumes_horaires.update_or_create(
+                formation_id=fid,
+                categorie_id=cid,
+                defaults={'volume_horaire': vh},
+            )
         created += 1
     if required and created == 0:
         return Response(
@@ -3188,7 +3196,7 @@ def _apply_ref_module_volumes_horaires(obj, volumes_horaires, formation_ids=None
     return None
 
 
-def _apply_ref_module_formations(obj, formation_ids):
+def _apply_ref_module_formations(obj, formation_ids, *, merge=False):
     """Associe une ou plusieurs formations au module référentiel."""
     if formation_ids is None:
         return None
@@ -3205,7 +3213,11 @@ def _apply_ref_module_formations(obj, formation_ids):
     valid_ids = set(RefFormation.objects.filter(id__in=ids).values_list('id', flat=True))
     if len(valid_ids) != len(set(ids)):
         return Response({'formations': ['Une ou plusieurs formations sont introuvables.']}, status=400)
-    obj.formations.set(ids)
+    if merge:
+        current = set(obj.formations.values_list('id', flat=True))
+        obj.formations.set(current | valid_ids)
+    else:
+        obj.formations.set(ids)
     return None
 
 
@@ -3223,11 +3235,33 @@ def ref_module_list(request):
     intitule = RefModule.normalize_intitule(request.data.get('intitule', ''))
     if not intitule:
         return Response({'intitule': ['Intitulé obligatoire.']}, status=400)
-    if RefModule.objects.filter(intitule__iexact=intitule).exists():
-        return Response(
-            {'detail': f'Un module « {intitule} » existe déjà dans le référentiel.'},
-            status=400,
+    existing = RefModule.objects.filter(intitule__iexact=intitule).first()
+    if existing:
+        # Un intitulé = une entrée catalogue ; on rattache les formations supplémentaires.
+        obj = existing
+        if 'actif' in request.data:
+            obj.actif = request.data.get('actif', obj.actif)
+            obj.save(update_fields=['actif'])
+        err = _apply_ref_module_formations(obj, request.data.get('formation_ids'), merge=True)
+        if err:
+            return err
+        formation_ids = list(obj.formations.values_list('id', flat=True))
+        err = _apply_ref_module_volumes_horaires(
+            obj,
+            request.data.get('volumes_horaires', request.data.get('volumes_par_categorie', [])),
+            formation_ids=formation_ids,
+            required=False,
+            replace=False,
         )
+        if err:
+            return err
+        obj = RefModule.objects.prefetch_related(
+            'formations',
+            'volumes_horaires',
+            'volumes_horaires__categorie',
+            'volumes_horaires__formation',
+        ).get(pk=obj.pk)
+        return Response(_serialize_ref_module(obj), status=200)
     obj = RefModule.objects.create(
         intitule=intitule,
         actif=request.data.get('actif', True),
@@ -3267,7 +3301,10 @@ def ref_module_detail(request, pk):
                 return Response({'intitule': ['Intitulé obligatoire.']}, status=400)
             if RefModule.objects.filter(intitule__iexact=intitule).exclude(pk=obj.pk).exists():
                 return Response(
-                    {'detail': f'Un module « {intitule} » existe déjà dans le référentiel.'},
+                    {'detail': (
+                        f'Un module « {intitule} » existe déjà dans le référentiel. '
+                        'Ouvrez cette entrée pour lui rattacher d’autres formations.'
+                    )},
                     status=400,
                 )
             obj.intitule = intitule
@@ -3392,19 +3429,132 @@ def ref_batiment_detail(request, pk):
     return Response(status=204)
 
 
+def _parse_optional_pk(value):
+    if value in (None, '', False):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return False
+
+
+def _serialize_ref_salle(obj):
+    return {
+        'id': obj.id,
+        'nom': obj.nom,
+        'site_id': obj.site_id,
+        'batiment_id': obj.batiment_id,
+        'type_lieu': obj.type_lieu,
+        'capacite': obj.capacite,
+        'equipements': obj.equipements,
+        'indisponible_du': obj.indisponible_du,
+        'indisponible_au': obj.indisponible_au,
+        'actif': obj.actif,
+    }
+
+
+def _create_or_update_ref_salle(obj, data, *, exclude_pk=None):
+    nom = ' '.join(str(data.get('nom') or '').split())
+    if not nom:
+        return None, Response({'detail': 'Le nom de la salle est obligatoire.'}, status=400)
+
+    site_id = _parse_optional_pk(data.get('site_id'))
+    if site_id is False:
+        return None, Response({'detail': 'Site invalide.'}, status=400)
+    if not site_id:
+        return None, Response({'detail': 'Le site est obligatoire.'}, status=400)
+    if not RefSite.objects.filter(pk=site_id).exists():
+        return None, Response({'detail': 'Site introuvable.'}, status=400)
+
+    batiment_id = _parse_optional_pk(data.get('batiment_id'))
+    if batiment_id is False:
+        return None, Response({'detail': 'Bâtiment invalide.'}, status=400)
+    if batiment_id:
+        batiment = RefBatiment.objects.filter(pk=batiment_id).first()
+        if not batiment:
+            return None, Response({'detail': 'Bâtiment introuvable.'}, status=400)
+        if batiment.site_id != site_id:
+            return None, Response(
+                {'detail': 'Ce bâtiment n’appartient pas au site sélectionné.'},
+                status=400,
+            )
+    else:
+        batiment_id = None
+
+    type_lieu = str(data.get('type_lieu') or RefSalle.TypeLieu.SALLE).strip().upper()
+    if type_lieu not in RefSalle.TypeLieu.values:
+        type_lieu = RefSalle.TypeLieu.SALLE
+
+    capacite = data.get('capacite')
+    if capacite in (None, ''):
+        capacite = None
+    else:
+        try:
+            capacite = int(capacite)
+        except (TypeError, ValueError):
+            return None, Response({'detail': 'Capacité invalide.'}, status=400)
+        if capacite < 0:
+            return None, Response({'detail': 'La capacité ne peut pas être négative.'}, status=400)
+
+    equipements = str(data.get('equipements') or '')[:255]
+
+    dup = RefSalle.objects.filter(site_id=site_id, nom__iexact=nom)
+    if batiment_id:
+        dup = dup.filter(batiment_id=batiment_id)
+    else:
+        dup = dup.filter(batiment_id__isnull=True)
+    if exclude_pk:
+        dup = dup.exclude(pk=exclude_pk)
+    if dup.exists():
+        lieu = 'ce bâtiment' if batiment_id else 'ce site'
+        return None, Response(
+            {'detail': f'Une salle « {nom} » existe déjà pour {lieu}.'},
+            status=400,
+        )
+
+    actif = data.get('actif', True if obj is None else obj.actif)
+    fields = dict(
+        nom=nom,
+        site_id=site_id,
+        batiment_id=batiment_id,
+        type_lieu=type_lieu,
+        capacite=capacite,
+        equipements=equipements,
+        actif=actif,
+    )
+    try:
+        if obj is None:
+            obj = RefSalle.objects.create(**fields)
+        else:
+            for key, value in fields.items():
+                setattr(obj, key, value)
+            obj.save()
+    except IntegrityError as exc:
+        err = str(exc).lower()
+        if 'unique' in err or 'duplicate' in err:
+            return None, Response(
+                {'detail': f'Une salle « {nom} » existe déjà pour ce site.'},
+                status=400,
+            )
+        return None, Response(
+            {'detail': 'Impossible d’enregistrer cette salle. Vérifiez le site et le type de lieu.'},
+            status=400,
+        )
+    return obj, None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsDFRC])
 def ref_salle_list(request):
     if request.method == 'GET':
-        data = list(RefSalle.objects.values('id', 'nom', 'site_id', 'batiment_id', 'actif'))
+        data = list(RefSalle.objects.values(
+            'id', 'nom', 'site_id', 'batiment_id', 'type_lieu', 'capacite', 'equipements', 'actif',
+        ))
         return Response(data)
-    obj = RefSalle.objects.create(
-        nom=request.data.get('nom', ''),
-        site_id=request.data.get('site_id'),
-        batiment_id=request.data.get('batiment_id') or None,
-        actif=request.data.get('actif', True),
-    )
-    return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif}, status=201)
+    obj, err = _create_or_update_ref_salle(None, request.data)
+    if err:
+        return err
+    return Response(_serialize_ref_salle(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsDFRC])
@@ -3414,12 +3564,19 @@ def ref_salle_detail(request, pk):
     except RefSalle.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
-        obj.nom = request.data.get('nom', obj.nom)
-        obj.site_id = request.data.get('site_id', obj.site_id)
-        obj.batiment_id = request.data.get('batiment_id') or None
-        obj.actif = request.data.get('actif', obj.actif)
-        obj.save()
-        return Response({'id': obj.id, 'nom': obj.nom, 'site_id': obj.site_id, 'batiment_id': obj.batiment_id, 'actif': obj.actif})
+        payload = {
+            'nom': request.data.get('nom', obj.nom),
+            'site_id': request.data.get('site_id', obj.site_id),
+            'batiment_id': request.data.get('batiment_id') if 'batiment_id' in request.data else obj.batiment_id,
+            'type_lieu': request.data.get('type_lieu', obj.type_lieu),
+            'capacite': request.data.get('capacite', obj.capacite),
+            'equipements': request.data.get('equipements', obj.equipements),
+            'actif': request.data.get('actif', obj.actif),
+        }
+        obj, err = _create_or_update_ref_salle(obj, payload, exclude_pk=obj.pk)
+        if err:
+            return err
+        return Response(_serialize_ref_salle(obj))
     obj.delete()
     return Response(status=204)
 
@@ -4199,7 +4356,7 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                 continue
 
             if participant_id not in enrolled_ids:
-                errors.append({'index': idx, 'detail': 'Auditeur non inscrit à ce module.'})
+                errors.append({'index': idx, 'detail': 'Étudiant non inscrit à ce module.'})
                 continue
 
             colonne = colonnes.get(colonne_id)
@@ -4277,7 +4434,7 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                     continue
 
                 if participant_id not in enrolled_ids:
-                    errors.append({'index': f'synthese-{idx}', 'detail': 'Auditeur non inscrit.'})
+                    errors.append({'index': f'synthese-{idx}', 'detail': 'Étudiant non inscrit.'})
                     continue
 
                 observations = (item.get('observations') or '').strip()
@@ -4665,7 +4822,9 @@ def referentiels_gestion_api(request):
             'id', 'nom', 'actif', 'geofence_latitude', 'geofence_longitude', 'geofence_rayon_m',
         )),
         'batiments': list(RefBatiment.objects.order_by('nom').values('id', 'nom', 'site_id', 'actif')),
-        'salles': list(RefSalle.objects.order_by('nom').values('id', 'nom', 'site_id', 'batiment_id', 'actif')),
+        'salles': list(RefSalle.objects.order_by('nom').values(
+            'id', 'nom', 'site_id', 'batiment_id', 'type_lieu', 'capacite', 'equipements', 'actif',
+        )),
         'types_secretariat': list(RefTypeSecretariat.objects.order_by('libelle').values('id', 'libelle', 'actif')),
     })
 

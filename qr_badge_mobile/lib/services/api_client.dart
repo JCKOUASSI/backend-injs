@@ -385,7 +385,7 @@ class SessionExpiredException implements Exception {
   String toString() => 'Session expir\u00e9e. Veuillez vous reconnecter.';
 }
 
-/// Levée quand le compte n'a aucun profil auditeur/formateur/encadrant lié
+/// Levée quand le compte n'a aucun profil étudiant/formateur/encadrant lié
 /// (HTTP 403, code `NO_PROFILE`). Permet d'afficher un état vide dédié.
 class NoProfileException implements Exception {
   const NoProfileException([this.detail]);
@@ -393,7 +393,7 @@ class NoProfileException implements Exception {
   @override
   String toString() =>
       detail ??
-      'Aucun profil auditeur, formateur ou encadrant n\u2019est li\u00e9 \u00e0 ce compte.';
+      'Aucun profil étudiant, formateur ou encadrant n\u2019est li\u00e9 \u00e0 ce compte.';
 }
 
 /// Réponse HTTP non JSON (souvent une page 404 HTML Django).

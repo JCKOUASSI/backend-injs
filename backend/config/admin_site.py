@@ -11,9 +11,9 @@ from config.admin_guide import attach_admin_guide_urls
 def setup_admin_site():
     from django.conf import settings
 
-    admin.site.site_header = 'SYGEP-CPFAE'
-    admin.site.site_title = 'SYGEP-CPFAE Admin'
-    admin.site.index_title = 'Gestion des formations et présences'
+    admin.site.site_header = 'INJS LMD'
+    admin.site.site_title = 'INJS LMD Admin'
+    admin.site.index_title = 'Institut National de la Jeunesse et des Sports'
     admin.site.site_url = getattr(settings, 'PUBLIC_APP_URL', '')
     admin.site.enable_nav_sidebar = False
 

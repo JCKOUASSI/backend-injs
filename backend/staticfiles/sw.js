@@ -174,30 +174,30 @@ const OFFLINE_BADGE_HTML = `<!DOCTYPE html>
 <title>Badgeage Hors Ligne</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:linear-gradient(135deg,#388E3C 0%,#43A047 40%,#F57C00 100%);
+body{background:linear-gradient(135deg,#1A68AC 0%,#2277C1 40%,#F5B100 100%);
 min-height:100vh;display:flex;align-items:center;justify-content:center;
 font-family:'Segoe UI',system-ui,sans-serif;padding:1rem}
 .card{background:#fff;border-radius:20px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,.3);
 width:100%;max-width:460px}
 .brand{text-align:center;margin-bottom:1.5rem}
-.brand h3{color:#388E3C;font-weight:700}
+.brand h3{color:#1A68AC;font-weight:700}
 .brand p{color:#718096;font-size:.9rem;margin-top:.5rem}
-.offline-badge{background:#FFF3E0;border:2px solid #F57C00;border-radius:10px;
+.offline-badge{background:#FFF8E0;border:2px solid #F5B100;border-radius:10px;
 padding:.75rem;text-align:center;margin-bottom:1rem}
 .form-group{margin-bottom:1rem}
 label{display:block;font-weight:600;margin-bottom:.25rem;font-size:.9rem}
 input{width:100%;padding:.6rem;border:1px solid #ccc;border-radius:8px;font-size:1rem}
 .btn{width:100%;padding:.75rem;border:none;border-radius:10px;font-size:1.1rem;
 font-weight:600;cursor:pointer;color:#fff;
-background:linear-gradient(135deg,#F57C00,#E65100)}
-.btn:hover{background:linear-gradient(135deg,#E65100,#BF360C)}
+background:linear-gradient(135deg,#F5B100,#E69700)}
+.btn:hover{background:linear-gradient(135deg,#E69700,#BF360C)}
 .result{border-radius:12px;padding:1.5rem;text-align:center;margin-bottom:1rem;display:none}
 .result.show{display:block}
-.result-ok{background:#f0fff4;border:2px solid #43A047}
+.result-ok{background:#f0f7ff;border:2px solid #2277C1}
 .result-err{background:#fff5f5;border:2px solid #e53e3e}
 .result .icon{font-size:2.5rem}
 .queue{text-align:center;font-size:.85rem;color:#718096;margin-top:.5rem}
-.queue b{color:#F57C00}
+.queue b{color:#F5B100}
 </style>
 </head>
 <body>

@@ -6,8 +6,8 @@ import { useAuth } from '../context/AuthContext'
 import { PRESENCE_ACTION_ROLES } from '../utils/roles'
 
 const STATUT_BADGE = {
-  PLANIFIE: { label: 'Planifié', bg: '#fff7e8', fg: '#9a6700' },
-  EFFECTUE: { label: 'Effectué', bg: '#e8f6f1', fg: '#13624e' },
+  PLANIFIE: { label: 'Planifié', bg: '#fffae8', fg: '#9a7a00' },
+  EFFECTUE: { label: 'Effectué', bg: '#e8eef6', fg: '#09306c' },
   ANNULE: { label: 'Annulé', bg: '#fdecec', fg: '#b42318' },
 }
 
@@ -171,7 +171,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.4rem' }}>
           {selected.map((s) => (
             <span key={s.id} style={{
-              background: '#e8f6f1', border: '1px solid #a7d7c8', borderRadius: 6,
+              background: '#e8eef6', border: '1px solid #96b8e8', borderRadius: 6,
               padding: '2px 8px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
             }}>
               <i className="bi bi-calendar-event"></i>
@@ -188,7 +188,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
         className="form-control"
         placeholder={mode === 'module'
           ? 'Rechercher un module d\u2019accueil (ajoute toutes ses séances)…'
-          : 'Rechercher un cours / groupe / date… (cochez plusieurs séances)'}
+          : 'Rechercher un module / groupe / date… (cochez plusieurs séances)'}
         value={query}
         disabled={disabled}
         onFocus={() => setOpen(true)}
@@ -223,7 +223,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
                 <i className="bi bi-collection text-primary"></i>
                 <span>
                   <strong>{m.intitule}</strong> <small className="text-muted">{m.cohorte}</small>
-                  {m.deja_inscrit && <span className="text-warning ms-1" title="Déjà inscrit à ce cours">⚠ déjà inscrit</span>}
+                  {m.deja_inscrit && <span className="text-warning ms-1" title="Déjà inscrit à ce module">⚠ déjà inscrit</span>}
                   <br /><small className="text-muted">{m.formation} · {m.nb_seances} séance(s){nbAdded ? ` — ${nbAdded} déjà ajoutée(s)` : ''}</small>
                 </span>
               </button>
@@ -242,7 +242,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', textAlign: 'left',
-                  border: 'none', background: isSel ? '#f0fdf4' : (blocked ? '#fef2f2' : 'transparent'),
+                  border: 'none', background: isSel ? '#f0f6fd' : (blocked ? '#fef2f2' : 'transparent'),
                   padding: '0.5rem 0.8rem',
                   cursor: blocked && !isSel ? 'not-allowed' : 'pointer',
                   opacity: blocked && !isSel ? 0.65 : 1,
@@ -252,7 +252,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
                 <i className={`bi ${isSel ? 'bi-check-square-fill text-success' : 'bi-square'}`}></i>
                 <span>
                   <strong>{s.module?.intitule}</strong> <small className="text-muted">{s.module?.cohorte}</small>
-                  {s.deja_inscrit && <span className="text-warning ms-1" title="Déjà inscrit à ce cours">⚠ déjà inscrit</span>}
+                  {s.deja_inscrit && <span className="text-warning ms-1" title="Déjà inscrit à ce module">⚠ déjà inscrit</span>}
                   <br /><small className="text-muted">{seanceLabel(s)}</small>
                 </span>
               </button>
@@ -325,7 +325,7 @@ export default function Rattrapages() {
     const blocked = incoming.filter((s) => s.deja_inscrit)
     if (blocked.length > 0) {
       showToast(
-        "Séance ignorée : l'auditeur est déjà inscrit à ce module d'accueil.",
+        "Séance ignorée : l'étudiant est déjà inscrit à ce module d'accueil.",
         'error',
       )
     }
@@ -346,11 +346,11 @@ export default function Rattrapages() {
     e.preventDefault()
     setFormError('')
     if (!form.participant || form.seances.length === 0) {
-      setFormError('Sélectionnez un auditeur et au moins une séance de rattrapage.')
+      setFormError('Sélectionnez un étudiant et au moins une séance de rattrapage.')
       return
     }
     if (form.seances.some((s) => s.deja_inscrit)) {
-      setFormError("Retirez les séances où l'auditeur est déjà inscrit au module d'accueil.")
+      setFormError("Retirez les séances où l'étudiant est déjà inscrit au module d'accueil.")
       return
     }
     setSaving(true)
@@ -423,7 +423,7 @@ export default function Rattrapages() {
                 <i className="bi bi-arrow-left-right me-2"></i>Rattrapages
               </h6>
               <small className="text-muted">
-                Déplacer un auditeur vers la séance d&apos;une autre cohorte (groupe / grade / secrétariat) pour rattraper un cours manqué, sans modifier son groupe d&apos;origine.
+                Déplacer un étudiant vers la séance d&apos;une autre cohorte (groupe / grade / secrétariat) pour rattraper une séance manquée, sans modifier son groupe d&apos;origine.
               </small>
             </div>
             {canManage && (
@@ -451,7 +451,7 @@ export default function Rattrapages() {
               type="text"
               className="form-control form-control-sm"
               style={{ width: 220 }}
-              placeholder="Rechercher (auditeur, cours…)"
+              placeholder="Rechercher (étudiant, module…)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -470,9 +470,9 @@ export default function Rattrapages() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Auditeur</th>
+                    <th>Étudiant</th>
                     <th>Cohorte d&apos;origine</th>
-                    <th>Cours (accueil)</th>
+                    <th>Module (accueil)</th>
                     <th>Séance de rattrapage</th>
                     <th>Statut</th>
                     {canManage && <th>Actions</th>}
@@ -558,7 +558,7 @@ export default function Rattrapages() {
                   </div>
                 )}
                 <div className="form-group">
-                  <label className="form-label">Auditeur *</label>
+                  <label className="form-label">Étudiant *</label>
                   <SearchSelect
                     placeholder="Rechercher par matricule ou nom…"
                     icon="bi-person"
@@ -584,7 +584,7 @@ export default function Rattrapages() {
                   <small className="text-muted">
                     {form.participant
                       ? 'Cochez une ou plusieurs séances (plusieurs jours possibles).'
-                      : 'Sélectionnez d\u2019abord l\u2019auditeur.'}
+                      : 'Sélectionnez d\u2019abord l\u2019étudiant.'}
                   </small>
                 </div>
                 <div className="form-group">
@@ -602,12 +602,12 @@ export default function Rattrapages() {
                     onChange={(e) => setForm({ ...form, generer_presence: e.target.checked })}
                   />
                   <label className="form-check-label" htmlFor="generer_presence">
-                    Forcer la présence immédiatement (sans badgeage de l&apos;auditeur)
+                    Forcer la présence immédiatement (sans badgeage de l&apos;étudiant)
                   </label>
                 </div>
-                <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 6, padding: '0.5rem 0.75rem', marginTop: '0.75rem' }}>
+                <div style={{ background: '#fffae1', border: '1px solid #ffea82', borderRadius: 6, padding: '0.5rem 0.75rem', marginTop: '0.75rem' }}>
                   <small><i className="bi bi-info-circle me-1"></i>
-                    L&apos;auditeur garde son groupe/grade/secrétariat d&apos;origine. Les effectifs de la cohorte d&apos;accueil ne sont pas modifiés.
+                    L&apos;étudiant garde son groupe/grade/secrétariat d&apos;origine. Les effectifs de la cohorte d&apos;accueil ne sont pas modifiés.
                   </small>
                 </div>
               </div>

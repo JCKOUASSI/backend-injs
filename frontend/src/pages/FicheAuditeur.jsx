@@ -47,7 +47,7 @@ export default function FicheAuditeur() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2>Fiche auditeur — {fiche.participant_nom}</h2>
+        <h2>Fiche étudiant — {fiche.participant_nom}</h2>
         <div>
           <button className="btn btn-outline-primary btn-sm" onClick={() => download('pdf')}>Export PDF</button>
           <button className="btn btn-outline-secondary btn-sm" style={{ marginLeft: '0.5rem' }} onClick={() => download('xlsx')}>Export Excel</button>

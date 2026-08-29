@@ -18,6 +18,6 @@ def service_worker(request):
 
 def favicon(request):
     return FileResponse(
-        _static_file('img/logo-mfpma.jpeg').open('rb'),
-        content_type='image/jpeg',
+        _static_file('img/logo-injs.png').open('rb'),
+        content_type='image/png',
     )

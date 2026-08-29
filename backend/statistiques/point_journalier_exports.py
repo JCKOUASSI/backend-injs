@@ -10,12 +10,12 @@ from django.http import HttpResponse
 from .point_journalier import compute_point_journalier, MOIS_FR
 
 # Couleurs extraites du modèle CPFAE « POINT JOURNALIER CAT A » (Office theme accent2 + custom)
-FILL_HEADER = 'FFED7D31'       # Orange en-têtes (theme accent2)
+FILL_HEADER = 'FFEDB131'       # Orange en-têtes (theme accent2)
 FILL_GROUPE = 'FFFBFDBB'       # Jaune clair — ligne GROUPES
 FILL_TOTAL = 'FFF7FA82'        # Jaune — colonne TOTAL
 FILL_SIDEBAR = 'FFFFFF00'      # Jaune vif — bande SECONDE VAGUE
-FILL_ABSENCE = 'FFED7D31'      # Orange — cellules taux d'absence
-FILL_PRESENCE_JOUR = 'FFED7D31'
+FILL_ABSENCE = 'FFEDB131'      # Orange — cellules taux d'absence
+FILL_PRESENCE_JOUR = 'FFEDB131'
 FILL_ABSENCE_JOUR = 'FFBDD7EE' # Bleu clair — taux absence du jour
 FONT_ABSENCE = 'FFFFFFFF'      # Blanc — pourcentages d'absence (fond orange)
 FMT_PCT = '0.00%'

@@ -28,30 +28,37 @@ print("=" * 60)
 
 # ── 1. Utilisateurs ──────────────────────────────────────────
 admin_user, c = User.objects.get_or_create(username='admin', defaults={
-    'email': 'admin@cpfae.gouv.ci', 'first_name': 'Admin', 'last_name': 'CPFAE',
+    'email': 'admin@injs.ci', 'first_name': 'Admin', 'last_name': 'INJS',
     'role': 'ADMIN', 'is_staff': True, 'is_superuser': True,
 })
 if c: admin_user.set_password('admin123'); admin_user.save()
 print(f"{'✓' if c else '→'} admin")
 
 jck, c = User.objects.get_or_create(username='jckouassi', defaults={
-    'email': 'jck@cpfae.gouv.ci', 'first_name': 'Jean-Claude', 'last_name': 'Kouassi',
+    'email': 'jck@injs.ci', 'first_name': 'Jean-Claude', 'last_name': 'Kouassi',
     'role': 'CHEF_CPFAE_ADMIN', 'is_staff': True, 'is_superuser': True,
 })
 if c: jck.set_password('JckPcm@123'); jck.save()
 print(f"{'✓' if c else '→'} jckouassi")
 
-dfrc_user, c = User.objects.get_or_create(username='dfrc', defaults={
-    'email': 'dfrc@cpfae.gouv.ci', 'first_name': 'Marie', 'last_name': 'DUPONT',
+injs_user, c = User.objects.get_or_create(username='injs', defaults={
+    'email': 'injs@injs.ci', 'first_name': 'Responsable', 'last_name': 'INJS',
     'role': 'CPFAE_ADMIN', 'is_staff': True,
 })
-if c: dfrc_user.set_password('dfrc123'); dfrc_user.save()
-print(f"{'✓' if c else '→'} dfrc")
+if c: injs_user.set_password('injs123'); injs_user.save()
+print(f"{'✓' if c else '→'} injs")
+
+secretariat_user, c = User.objects.get_or_create(username='secretariat', defaults={
+    'email': 'secretariat@injs.ci', 'first_name': 'Secrétariat', 'last_name': 'INJS',
+    'role': 'SECRETARIAT', 'is_staff': True,
+})
+if c: secretariat_user.set_password('sec123'); secretariat_user.save()
+print(f"{'✓' if c else '→'} secretariat")
 
 superviseurs = []
 for d in [
-    {'username': 'superviseur1', 'first_name': 'Jean',   'last_name': 'MARTIN',  'email': 'jean.martin@cpfae.gouv.ci'},
-    {'username': 'superviseur2', 'first_name': 'Sophie', 'last_name': 'BERNARD', 'email': 'sophie.bernard@cpfae.gouv.ci'},
+    {'username': 'superviseur1', 'first_name': 'Jean',   'last_name': 'MARTIN',  'email': 'jean.martin@injs.ci'},
+    {'username': 'superviseur2', 'first_name': 'Sophie', 'last_name': 'BERNARD', 'email': 'sophie.bernard@injs.ci'},
 ]:
     u, c = User.objects.get_or_create(username=d['username'], defaults={**d, 'role': 'ENCADRANT'})
     if c: u.set_password('sup123'); u.save()

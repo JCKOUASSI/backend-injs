@@ -116,8 +116,8 @@ class ModuleParticipantInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['participant']
     readonly_fields = ['inscrit_le']
-    verbose_name = "Auditeur inscrit"
-    verbose_name_plural = "Auditeurs inscrits"
+    verbose_name = "Étudiant inscrit"
+    verbose_name_plural = "Étudiants inscrits"
 
 
 class ModuleFormateurInline(admin.TabularInline):
@@ -155,7 +155,7 @@ class SessionModuleInline(admin.TabularInline):
     @admin.display(description='État')
     def etat_seance(self, obj):
         if obj.demarree_le and not obj.terminee_le:
-            label, bg, fg = 'En cours', '#e8f6f1', '#13624e'
+            label, bg, fg = 'En cours', '#e8eef6', '#09306c'
         elif obj.terminee_le:
             label, bg, fg = 'Terminée', '#eef6fc', '#0f4c81'
         else:
@@ -891,11 +891,11 @@ class QRTokenAdmin(AdminScopeMixin, admin.ModelAdmin):
         if not obj.actif:
             label, bg, fg = 'Désactivé', '#fdecec', '#b42318'
         elif obj.is_expired:
-            label, bg, fg = 'Expiré', '#fff7e8', '#9a6700'
+            label, bg, fg = 'Expiré', '#fffae8', '#9a7a00'
         elif obj.session.est_terminee:
-            label, bg, fg = 'Séance terminée', '#fff7e8', '#9a6700'
+            label, bg, fg = 'Séance terminée', '#fffae8', '#9a7a00'
         else:
-            label, bg, fg = 'Valide', '#e8f6f1', '#13624e'
+            label, bg, fg = 'Valide', '#e8eef6', '#09306c'
         return format_html(
             '<span style="background:{};color:{};padding:3px 8px;'
             'border-radius:999px;font-weight:600;font-size:11px;">{}</span>',
@@ -1020,7 +1020,7 @@ class RefBatimentAdmin(AdminSidebarHiddenMixin, admin.ModelAdmin):
 
 @admin.register(RefSalle)
 class RefSalleAdmin(AdminSidebarHiddenMixin, admin.ModelAdmin):
-    list_display = ['nom', 'site', 'batiment', 'actif']
+    list_display = ['nom', 'site', 'batiment', 'type_lieu', 'capacite', 'actif']
     search_fields = ['nom', 'site__nom', 'batiment__nom']
     list_filter = ['site', 'batiment', 'actif']
     autocomplete_fields = ['site', 'batiment']

@@ -36,7 +36,7 @@ class ScanFrameOverlay extends StatelessWidget {
   List<Widget> _corners(double w, double h) {
     const len = 28.0;
     const thick = 4.0;
-    const color = AppColors.ciGreen;
+    const color = AppColors.ciSuccess;
     Widget corner(Alignment align, {bool top = true, bool left = true}) {
       return Align(
         alignment: align,

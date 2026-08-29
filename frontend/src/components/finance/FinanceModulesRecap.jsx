@@ -48,7 +48,7 @@ export default function FinanceModulesRecap({ modules, formatDuration }) {
               <td style={{ textAlign: 'right', fontWeight: 600 }}>
                 {formatMoney(m.montant_prevu ?? 0)} F
               </td>
-              <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--fin-green)' }}>
+              <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--fin-accent)' }}>
                 {formatMoney(m.montant_realise ?? 0)} F
               </td>
             </tr>

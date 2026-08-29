@@ -399,7 +399,7 @@ export default function FinanceParametrage() {
                   value={exportSettings.export_organisme}
                   onChange={(e) => setExportField('export_organisme', e.target.value)}
                   disabled={!canEdit || saving}
-                  placeholder="CPFAE"
+                  placeholder="INJS"
                 />
               </div>
               <div className="col-md-6">
@@ -455,7 +455,7 @@ export default function FinanceParametrage() {
                   placeholder={'Pour toute information complémentaire, veuillez contacter :\nNom et téléphone du contact 1\nNom et téléphone du contact 2'}
                 />
                 <p className="text-muted small mb-0 mt-1">
-                  Une ligne par phrase ou contact. Laissez vide pour conserver les contacts par défaut du CPFAE.
+                  Une ligne par phrase ou contact. Laissez vide pour conserver les contacts par défaut de l'INJS.
                 </p>
               </div>
             </div>
@@ -487,7 +487,7 @@ export default function FinanceParametrage() {
                   placeholder="MINISTERE D'ETAT, MINISTERE DE LA FONCTION PUBLIQUE… Bouaké / Abidjan : coordonnées"
                 />
                 <p className="text-muted small mb-0 mt-1">
-                  Affiché en bas de la fiche PDF/Excel formateur (sous les contacts). Laissez vide pour le texte CPFAE par défaut.
+                  Affiché en bas de la fiche PDF/Excel formateur (sous les contacts). Laissez vide pour le texte INJS par défaut.
                 </p>
               </div>
             </div>

@@ -130,8 +130,8 @@ export default function FormationDetail() {
       const res = await api.get(`/formations/${id}/formateurs/`)
       setFormateurs(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
-      console.error('Chargement formateurs formation:', err)
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les formateurs.' }), 'error')
+      console.error('Chargement enseignants formation:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger les enseignants.' }), 'error')
     }
   }
 
@@ -150,8 +150,8 @@ export default function FormationDetail() {
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
     } catch (err) {
-      console.error('Chargement liste formateurs:', err)
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+      console.error('Chargement liste enseignants:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des enseignants.' }), 'error')
     } finally { setFormateurLoading(false) }
   }
 
@@ -176,7 +176,7 @@ export default function FormationDetail() {
       await api.post(`/formations/${id}/formateurs/add/`, { formateur_id: formateurId })
       loadFormateurs()
       loadAllFormateurs()
-      showToast('Formateur ajouté')
+      showToast('Enseignant ajouté')
     } catch (err) {
       showToast(err.response?.data?.detail || "Erreur lors de l'ajout", 'error')
     }
@@ -184,12 +184,12 @@ export default function FormationDetail() {
 
   const handleRemoveFormateur = (formateurId) => {
     setConfirmDialog({
-      message: 'Retirer ce formateur de la formation ?',
+      message: 'Retirer cet enseignant de la formation ?',
       onConfirm: async () => {
         try {
           await api.delete(`/formations/${id}/formateurs/${formateurId}/remove/`)
           loadFormateurs()
-          showToast('Formateur retiré')
+          showToast('Enseignant retiré')
         } catch (err) {
           showToast(err.response?.data?.detail || 'Erreur lors du retrait', 'error')
         }
@@ -356,8 +356,8 @@ export default function FormationDetail() {
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
     } catch (err) {
-      console.error('Chargement auditeurs:', err)
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+      console.error('Chargement étudiants:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des étudiants.' }), 'error')
     } finally { setAddLoading(false) }
   }
 
@@ -382,7 +382,7 @@ export default function FormationDetail() {
       await api.post(`/formations/${id}/participants/add/`, { participant_id: participantId })
       loadFormationData()
       loadAllParticipants()
-      showToast('Auditeur ajouté')
+      showToast('Étudiant ajouté')
     } catch (err) {
       showToast(err.response?.data?.detail || err.response?.data?.participant_id || "Erreur lors de l'ajout", 'error')
     }
@@ -390,12 +390,12 @@ export default function FormationDetail() {
 
   const handleRemoveParticipant = (participantId) => {
     setConfirmDialog({
-      message: 'Retirer cet auditeur de la formation ?',
+      message: 'Retirer cet étudiant de la formation ?',
       onConfirm: async () => {
         try {
           await api.delete(`/formations/${id}/participants/${participantId}/remove/`)
           loadFormationData()
-          showToast('Auditeur retiré')
+          showToast('Étudiant retiré')
         } catch (err) {
           showToast(err.response?.data?.detail || 'Erreur lors du retrait', 'error')
         }
@@ -564,10 +564,14 @@ export default function FormationDetail() {
 
   const tabStyle = (tab) => ({
     padding: '0.6rem 0.9rem', cursor: 'pointer', fontWeight: 500,
-    color: activeTab === tab ? 'var(--ci-green)' : 'var(--text-muted)',
+    color: activeTab === tab ? 'var(--ci-success)' : 'var(--text-muted)',
     background: 'none', border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
-    borderBottom: `3px solid ${activeTab === tab ? 'var(--ci-green)' : 'transparent'}`,
+    borderBottom: `3px solid ${activeTab === tab ? 'var(--ci-success)' : 'transparent'}`,
   })
+
+  const formationModules = (Array.isArray(formation.modules) && formation.modules.length)
+    ? formation.modules
+    : (formation.modules_list || [])
 
   return (
     <div>
@@ -575,7 +579,10 @@ export default function FormationDetail() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="card-header-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, fontSize: '1.05rem' }}><i className="bi bi-mortarboard me-2"></i>{formation.module || formation.formation}</span>
+            <span style={{ fontWeight: 600, fontSize: '1.05rem' }}><i className="bi bi-mortarboard me-2"></i>{formation.formation}</span>
+            {formationModules.length > 0 && (
+              <span className="badge-bg-secondary">{formationModules.length} module{formationModules.length > 1 ? 's' : ''}</span>
+            )}
             <span className={`badge ${getStatutBadge(formation.statut)}`}>{getStatutLabel(formation.statut)}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -594,8 +601,8 @@ export default function FormationDetail() {
             { key: 'info', label: 'Informations', icon: 'bi-info-circle', show: true },
             { key: 'presences', label: 'Présences', icon: 'bi-person-check', show: canViewPresencesTab },
             { key: 'seances', label: `Séances (${sessions.length})`, icon: 'bi-calendar3', show: true },
-            { key: 'participants', label: `Auditeurs (${participants.length})`, icon: 'bi-people', show: true },
-            { key: 'formateurs', label: `Formateurs (${formateurs.length})`, icon: 'bi-person-video3', show: true },
+            { key: 'participants', label: `Étudiants (${participants.length})`, icon: 'bi-people', show: true },
+            { key: 'formateurs', label: `Enseignants (${formateurs.length})`, icon: 'bi-person-video3', show: true },
           ].filter(t => t.show).map(t => (
             <button key={t.key} style={tabStyle(t.key)} onClick={() => setActiveTab(t.key)}>
               <i className={`bi ${t.icon} me-1`}></i>{t.label}
@@ -622,7 +629,7 @@ export default function FormationDetail() {
                   { icon: 'bi-clock',            label: 'Durée',     value: fmtHeuresLabel(sommeSeancesHeures(sessions)) },
                 ].map(({ icon, label, value }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <i className={`bi ${icon} me-2`} style={{ width: 18, color: 'var(--ci-orange)', flexShrink: 0 }}></i>
+                    <i className={`bi ${icon} me-2`} style={{ width: 18, color: 'var(--ci-warning)', flexShrink: 0 }}></i>
                     <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b' }}>{label}</span>
                     <span style={{ fontSize: '0.92rem' }}>{value || <span className="text-muted">—</span>}</span>
                   </div>
@@ -638,19 +645,49 @@ export default function FormationDetail() {
                 {[
                   { icon: 'bi-tag',          label: 'Catégorie',   value: formation.categorie },
                   { icon: 'bi-award',        label: 'Grade',       value: formation.grade },
-                  { icon: 'bi-book',         label: 'Module',      value: formation.module },
                   { icon: 'bi-people',       label: 'Groupe',      value: formation.groupe },
                 ].map(({ icon, label, value }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <i className={`bi ${icon} me-2`} style={{ width: 18, color: 'var(--ci-orange)', flexShrink: 0 }}></i>
+                    <i className={`bi ${icon} me-2`} style={{ width: 18, color: 'var(--ci-warning)', flexShrink: 0 }}></i>
                     <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b' }}>{label}</span>
                     <span style={{ fontSize: '0.92rem' }}>{value || <span className="text-muted">—</span>}</span>
                   </div>
                 ))}
 
+                <div style={{ display: 'flex', alignItems: 'flex-start', padding: '0.55rem 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <i className="bi bi-book me-2" style={{ width: 18, color: 'var(--ci-warning)', flexShrink: 0, marginTop: 2 }}></i>
+                  <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b', flexShrink: 0 }}>Module(s)</span>
+                  <div>
+                    {formationModules.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                        {formationModules.map(m => (
+                          <Link
+                            key={m.id}
+                            to={`/formations/${id}/modules/${m.id}`}
+                            state={listNavState}
+                            style={{
+                              background: '#f5f3ff', color: '#5b21b6',
+                              border: '1px solid #ddd6fe', borderRadius: 6,
+                              padding: '0.15rem 0.55rem', fontSize: '0.82rem', fontWeight: 500,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            {m.intitule}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>
+                      Une formation peut regrouper un ou plusieurs modules.
+                    </div>
+                  </div>
+                </div>
+
                 {/* Encadrant */}
                 <div style={{ display: 'flex', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <i className="bi bi-person-badge me-2" style={{ width: 18, color: 'var(--ci-orange)', flexShrink: 0 }}></i>
+                  <i className="bi bi-person-badge me-2" style={{ width: 18, color: 'var(--ci-warning)', flexShrink: 0 }}></i>
                   <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b' }}>Encadrant</span>
                   <span style={{ fontSize: '0.92rem' }}>
                     {formation.superviseur_nom || <span className="text-muted">—</span>}
@@ -664,14 +701,14 @@ export default function FormationDetail() {
 
                 {/* Formateurs */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', padding: '0.55rem 0' }}>
-                  <i className="bi bi-person-video3 me-2" style={{ width: 18, color: 'var(--ci-orange)', flexShrink: 0, marginTop: 2 }}></i>
-                  <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b', flexShrink: 0 }}>Formateur(s)</span>
+                  <i className="bi bi-person-video3 me-2" style={{ width: 18, color: 'var(--ci-warning)', flexShrink: 0, marginTop: 2 }}></i>
+                  <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.88rem', color: '#64748b', flexShrink: 0 }}>Enseignant(s)</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                     {formation.formateurs?.length > 0
                       ? formation.formateurs.map(f => (
                           <span key={f.id} style={{
-                            background: '#f0fff4', color: '#276749',
-                            border: '1px solid #c6f6d5', borderRadius: 6,
+                            background: '#f0f7ff', color: '#11407d',
+                            border: '1px solid #c6ddf6', borderRadius: 6,
                             padding: '0.15rem 0.55rem', fontSize: '0.82rem', fontWeight: 500,
                           }}>
                             <i className="bi bi-person-fill me-1"></i>{f.prenom} {f.nom}
@@ -685,15 +722,15 @@ export default function FormationDetail() {
           </div>
 
           <div className="col-lg-4">
-            <div className="card" style={{ borderTop: '4px solid var(--ci-green)' }}>
+            <div className="card" style={{ borderTop: '4px solid var(--ci-success)' }}>
               <div className="card-body text-center" style={{ padding: '1.5rem 1rem' }}>
                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 1, color: '#94a3b8', marginBottom: '1rem' }}>Résumé</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   {[
-                    { value: sessions.length,      label: 'Séances',   color: 'var(--ci-green)',  icon: 'bi-calendar3' },
-                    { value: participants.length,   label: 'Auditeurs', color: 'var(--ci-blue)',   icon: 'bi-people' },
+                    { value: sessions.length,      label: 'Séances',   color: 'var(--ci-success)',  icon: 'bi-calendar3' },
+                    { value: participants.length,   label: 'Étudiants', color: 'var(--ci-blue)',   icon: 'bi-people' },
                     { value: sessions.filter(s => s.terminee).length, label: 'Terminées', color: '#805ad5', icon: 'bi-check-circle' },
-                    { value: formation.formateurs?.length || 0, label: 'Formateurs', color: 'var(--ci-orange)', icon: 'bi-person-video3' },
+                    { value: formation.formateurs?.length || 0, label: 'Enseignants', color: 'var(--ci-warning)', icon: 'bi-person-video3' },
                   ].map(({ value, label, color, icon }) => (
                     <div key={label} style={{ background: '#f8fafc', borderRadius: 10, padding: '0.85rem 0.5rem' }}>
                       <i className={`bi ${icon}`} style={{ color, fontSize: '1.1rem' }}></i>
@@ -705,7 +742,7 @@ export default function FormationDetail() {
               </div>
             </div>
 
-            <div className="card" style={{ borderTop: '4px solid var(--ci-orange)' }}>
+            <div className="card" style={{ borderTop: '4px solid var(--ci-warning)' }}>
               <div className="card-body" style={{ padding: '1rem' }}>
                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 1, color: '#94a3b8', marginBottom: '0.75rem' }}>Statut</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -775,7 +812,7 @@ export default function FormationDetail() {
                 <input
                   type="text"
                   className="form-control form-control-sm"
-                  placeholder="Rechercher un auditeur…"
+                  placeholder="Rechercher un étudiant…"
                   style={{ width: 220 }}
                   value={presenceSearch}
                   onChange={e => setPresenceSearch(e.target.value)}
@@ -809,11 +846,11 @@ export default function FormationDetail() {
             const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
             const fmtMin = (m) => m != null ? `${Math.round(m)} min` : '—'
             const matricule = (p) => p.matricule || p.numero_matricule || p.numero || '—'
-            const personLabel = (p) => (p.type_personne === 'formateur' ? 'Formateur' : p.type_personne === 'encadrant' ? 'Encadrant' : 'Auditeur')
+            const personLabel = (p) => (p.type_personne === 'formateur' ? 'Enseignant' : p.type_personne === 'encadrant' ? 'Encadrant' : 'Étudiant')
             const personIcon = (p) => (p.type_personne === 'formateur' ? 'bi-person-video3' : p.type_personne === 'encadrant' ? 'bi-person-badge' : 'bi-person')
             const personBadgeStyle = (p) => {
               if (p.type_personne === 'formateur') return { background: '#ebf8ff', color: '#2b6cb0', border: '1px solid #bee3f8' }
-              if (p.type_personne === 'encadrant') return { background: '#fff7e6', color: '#9c4221', border: '1px solid #fbd38d' }
+              if (p.type_personne === 'encadrant') return { background: '#fffae6', color: '#9c4221', border: '1px solid #fbe38d' }
               return { background: '#f7fafc', color: '#4a5568', border: '1px solid #e2e8f0' }
             }
             const searchFilter = (p) => {
@@ -829,7 +866,7 @@ export default function FormationDetail() {
             const presentsFiltres = (dashboard.presents || []).filter(searchFilter)
             const absentsFiltres = (dashboard.absents || []).filter(searchFilter)
             const taux = dashboard.taux_presence ?? 0
-            const tauxColor = taux >= 75 ? 'var(--ci-green)' : taux >= 50 ? 'var(--ci-orange)' : '#e53e3e'
+            const tauxColor = taux >= 75 ? 'var(--ci-success)' : taux >= 50 ? 'var(--ci-warning)' : '#e53e3e'
 
             return (
               <>
@@ -853,7 +890,7 @@ export default function FormationDetail() {
                       {[
                         { label: labelAttendus, sub: subAttendus, value: dashboard.total_attendus, color: '#64748b', icon: 'bi-people',        bg: '#f8fafc' },
                         { label: 'En salle',    sub: null, value: dashboard.en_salle?.length || 0,  color: '#2b6cb0', icon: 'bi-person-check',  bg: '#ebf8ff' },
-                        { label: 'Présents',    sub: null, value: dashboard.presents?.length || 0,  color: '#276749', icon: 'bi-check-circle',  bg: '#f0fff4' },
+                        { label: 'Présents',    sub: null, value: dashboard.presents?.length || 0,  color: '#11407d', icon: 'bi-check-circle',  bg: '#f0f7ff' },
                         { label: 'Absents',     sub: null, value: dashboard.absents?.length || 0,   color: '#c53030', icon: 'bi-person-x',      bg: '#fff5f5' },
                         { label: 'Taux présence', sub: null, value: `${taux}%`,                     color: tauxColor,  icon: 'bi-graph-up',     bg: '#fefce8' },
                       ].map(({ label, sub, value, color, icon, bg }) => (
@@ -897,7 +934,7 @@ export default function FormationDetail() {
                                       {personLabel(p)}
                                     </span>
                                     {p.rattrapage && (
-                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                      <span style={{ marginLeft: 4, background: '#fef6c7', color: '#92660e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Étudiant d'une autre cohorte en rattrapage sur cette séance">
                                         <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
                                       </span>
                                     )}
@@ -935,8 +972,8 @@ export default function FormationDetail() {
                 {/* ── Présents (sortis) ── */}
                 {presentsFiltres.length > 0 && (
                   <div className="card">
-                    <div className="card-header-bar" style={{ background: '#f0fff4' }}>
-                      <span style={{ color: '#276749', fontWeight: 600 }}>
+                    <div className="card-header-bar" style={{ background: '#f0f7ff' }}>
+                      <span style={{ color: '#11407d', fontWeight: 600 }}>
                         <i className="bi bi-check-circle me-2"></i>Présents — sortis ({presentsFiltres.length}{presenceSearch ? ` / ${dashboard.presents.length}` : ''})
                       </span>
                     </div>
@@ -958,7 +995,7 @@ export default function FormationDetail() {
                                       {personLabel(p)}
                                     </span>
                                     {p.rattrapage && (
-                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                      <span style={{ marginLeft: 4, background: '#fef6c7', color: '#92660e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Étudiant d'une autre cohorte en rattrapage sur cette séance">
                                         <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
                                       </span>
                                     )}
@@ -970,7 +1007,7 @@ export default function FormationDetail() {
                                 <td style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(p.timestamp_entree)}</td>
                                 <td style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{fmtTime(p.timestamp_sortie)}</td>
                                 <td>
-                                  <span style={{ background: '#c6f6d5', color: '#276749', borderRadius: 5, padding: '2px 8px', fontSize: '0.82rem', fontWeight: 600 }}>
+                                  <span style={{ background: '#c6ddf6', color: '#11407d', borderRadius: 5, padding: '2px 8px', fontSize: '0.82rem', fontWeight: 600 }}>
                                     {fmtMin(p.duree_presence_minutes)}
                                   </span>
                                 </td>
@@ -1010,7 +1047,7 @@ export default function FormationDetail() {
                                       {personLabel(p)}
                                     </span>
                                     {p.rattrapage && (
-                                      <span style={{ marginLeft: 4, background: '#fef3c7', color: '#92400e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Auditeur d'une autre cohorte en rattrapage sur cette séance">
+                                      <span style={{ marginLeft: 4, background: '#fef6c7', color: '#92660e', borderRadius: 999, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 600 }} title="Étudiant d'une autre cohorte en rattrapage sur cette séance">
                                         <i className="bi bi-arrow-left-right me-1"></i>Rattrapage
                                       </span>
                                     )}
@@ -1146,7 +1183,7 @@ export default function FormationDetail() {
           {/* Barre d'export globale */}
           <div className="card">
             <div className="card-body" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 600, color: 'var(--ci-green-dark)' }}>
+              <span style={{ fontWeight: 600, color: 'var(--ci-success-dark)' }}>
                 <i className="bi bi-download me-2"></i>Exporter toutes les séances :
               </span>
               <button onClick={() => handleExport('pdf')} className="btn btn-outline-danger btn-sm" title="Exporter PDF toutes séances">
@@ -1173,18 +1210,18 @@ export default function FormationDetail() {
               const { label: moduleLabel, sessions: moduleSessions } = group
               return (
               <div className="card" key={moduleKey}>
-                <div className="card-header-bar" style={{ background: '#f0fdf4' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--ci-green-dark)' }}>
+                <div className="card-header-bar" style={{ background: '#f0f6fd' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--ci-success-dark)' }}>
                     <i className="bi bi-book me-2"></i>
                     <Link
                       to={`/formations/${id}/modules/${moduleKey}`}
                       state={listNavState}
-                      style={{ color: 'var(--ci-green-dark)', textDecoration: 'none' }}
+                      style={{ color: 'var(--ci-success-dark)', textDecoration: 'none' }}
                       title="Voir le détail du module"
                     >
                       {moduleLabel}
                     </Link>
-                    <span className="badge ms-2" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+                    <span className="badge ms-2" style={{ background: '#d1e3fa', color: '#082a5d', fontSize: '0.78rem' }}>
                       {moduleSessions.length} séance{moduleSessions.length > 1 ? 's' : ''}
                     </span>
                   </span>
@@ -1287,14 +1324,14 @@ export default function FormationDetail() {
             <div className="card">
               <div className="card-body">
                 <button onClick={openAddParticipant} className="btn btn-dfrc btn-sm">
-                  <i className="bi bi-person-plus me-1"></i>Ajouter un auditeur
+                  <i className="bi bi-person-plus me-1"></i>Ajouter un étudiant
                 </button>
               </div>
             </div>
           )}
           <div className="card">
             <div className="card-header-bar">
-              <span><i className="bi bi-people me-2"></i>Auditeurs inscrits ({participants.length})</span>
+              <span><i className="bi bi-people me-2"></i>Étudiants inscrits ({participants.length})</span>
             </div>
             <div className="card-body-flush">
               {participants.length > 0 ? (
@@ -1334,7 +1371,7 @@ export default function FormationDetail() {
               ) : (
                 <div className="text-center py-4 text-muted">
                   <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
-                  <p className="mt-2">Aucun auditeur inscrit</p>
+                  <p className="mt-2">Aucun étudiant inscrit</p>
                 </div>
               )}
             </div>
@@ -1349,14 +1386,14 @@ export default function FormationDetail() {
             <div className="card">
               <div className="card-body">
                 <button onClick={openAddFormateur} className="btn btn-dfrc btn-sm">
-                  <i className="bi bi-person-plus me-1"></i>Ajouter un formateur
+                  <i className="bi bi-person-plus me-1"></i>Ajouter un enseignant
                 </button>
               </div>
             </div>
           )}
           <div className="card">
             <div className="card-header-bar">
-              <span><i className="bi bi-person-video3 me-2"></i>Formateurs assignés ({formateurs.length})</span>
+              <span><i className="bi bi-person-video3 me-2"></i>Enseignants assignés ({formateurs.length})</span>
             </div>
             <div className="card-body-flush">
               {formateurs.length > 0 ? (
@@ -1365,7 +1402,7 @@ export default function FormationDetail() {
                   <table className="table">
                     <thead><tr><th>Numéro</th><th>Nom</th><th>Prénom</th><th>Spécialité</th><th>Adresse e-mail</th><th>Téléphone</th>{canEdit && <th>Actions</th>}</tr></thead>
                     <tbody>
-                      {formateursPager.pageItems.map((f) => (
+                      {enseignantsPager.pageItems.map((f) => (
                         <tr key={f.id}>
                           <td><span className="badge-bg-info">{f.numerobadge || '-'}</span></td>
                           <td><strong>{f.nom}</strong></td>
@@ -1386,17 +1423,17 @@ export default function FormationDetail() {
                   </table>
                 </div>
                 <Pagination
-                  page={formateursPager.page}
-                  totalPages={formateursPager.totalPages}
-                  onPageChange={formateursPager.setPage}
-                  totalItems={formateursPager.totalItems}
-                  pageSize={formateursPager.pageSize}
+                  page={enseignantsPager.page}
+                  totalPages={enseignantsPager.totalPages}
+                  onPageChange={enseignantsPager.setPage}
+                  totalItems={enseignantsPager.totalItems}
+                  pageSize={enseignantsPager.pageSize}
                 />
                 </>
               ) : (
                 <div className="text-center py-4 text-muted">
                   <i className="bi bi-person-video3" style={{ fontSize: '2rem' }}></i>
-                  <p className="mt-2">Aucun formateur assigné</p>
+                  <p className="mt-2">Aucun enseignant assigné</p>
                 </div>
               )}
             </div>
@@ -1536,7 +1573,7 @@ export default function FormationDetail() {
                           <tr
                             key={s.id}
                             onClick={() => setSelectedSup(String(s.id))}
-                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0f6fd' : undefined }}
                           >
                             <td>{fullName}</td>
                             <td>{s.username}</td>
@@ -1567,12 +1604,12 @@ export default function FormationDetail() {
         </div>
       )}
 
-      {/* ── MODAL: Add formateur ── */}
+      {/* ── MODAL: Add enseignant ── */}
       {showAddFormateur && (
         <div className="modal-overlay" onClick={() => setShowAddFormateur(false)}>
           <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-person-plus me-2"></i>Ajouter un formateur</h5>
+              <h5><i className="bi bi-person-plus me-2"></i>Ajouter un enseignant</h5>
               <button className="btn-close" onClick={() => setShowAddFormateur(false)}>&times;</button>
             </div>
             <div className="modal-body">
@@ -1583,7 +1620,7 @@ export default function FormationDetail() {
               </div>
               {formateurLoading && <div className="text-center text-muted py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!formateurLoading && allFormateurs.length === 0 && (
-                <p className="text-muted text-center py-2">Aucun formateur disponible</p>
+                <p className="text-muted text-center py-2">Aucun enseignant disponible</p>
               )}
               {!formateurLoading && allFormateurs.length > 0 && (
                 <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>
@@ -1607,11 +1644,11 @@ export default function FormationDetail() {
                 </div>
               )}
               <Pagination
-                page={formateurPicker.page}
-                totalPages={formateurPicker.totalPages}
-                onPageChange={formateurPicker.setPage}
-                totalItems={formateurPicker.totalCount}
-                pageSize={formateurPicker.pageSize}
+                page={enseignantPicker.page}
+                totalPages={enseignantPicker.totalPages}
+                onPageChange={enseignantPicker.setPage}
+                totalItems={enseignantPicker.totalCount}
+                pageSize={enseignantPicker.pageSize}
               />
             </div>
             <div className="modal-footer">
@@ -1624,14 +1661,14 @@ export default function FormationDetail() {
       {/* Motif popup pour badgeage forcé */}
       {forceMotifDialog && (() => {
         const jourPasse = isJourPasse(dashboardDate)
-        const isAuditeur = (forceMotifDialog.personne.type_personne || 'participant') === 'participant'
+        const isÉtudiant = (forceMotifDialog.personne.type_personne || 'participant') === 'participant'
         return (
           <div className="modal-overlay" onClick={() => setForceMotifDialog(null)}>
             <div className="modal-content" style={{ maxWidth: '460px' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <h5>
                   {forceMotifDialog.action === 'ENTREE'
-                    ? (isAuditeur
+                    ? (isÉtudiant
                       ? <><i className="bi bi-person-check me-2 text-success"></i>Forcer la présence</>
                       : <><i className="bi bi-box-arrow-in-right me-2 text-success"></i>Badger l'entrée</>)
                     : <><i className="bi bi-box-arrow-right me-2 text-warning"></i>Fermer la session</>}
@@ -1641,18 +1678,18 @@ export default function FormationDetail() {
               <div className="modal-body">
                 <p className="mb-3" style={{ color: '#4a5568' }}>
                   {forceMotifDialog.action === 'ENTREE'
-                    ? (isAuditeur
+                    ? (isÉtudiant
                       ? <>Présence forcée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong> — durée planifiée de la séance.</>
                       : <>Badgeage forcé de l'entrée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong>.</>)
                     : <>Sortie forcée pour <strong>{forceMotifDialog.personne.nom} {forceMotifDialog.personne.prenom}</strong>.</>}
                   {jourPasse && (
-                    <span className="badge ms-2" style={{ background: '#FFF3E0', color: '#7B3500', border: '1px solid #F57C00', fontSize: '0.78rem' }}>
+                    <span className="badge ms-2" style={{ background: '#FFF8E0', color: '#7B5500', border: '1px solid #F5B100', fontSize: '0.78rem' }}>
                       <i className="bi bi-clock-history me-1"></i>Jour passé — {dashboardDate}
                     </span>
                   )}
                 </p>
 
-                {isAuditeur && forceMotifDialog.action === 'ENTREE' && !jourPasse && (
+                {isÉtudiant && forceMotifDialog.action === 'ENTREE' && !jourPasse && (
                   <p style={{ fontSize: '0.85rem', color: '#475569', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.75rem', marginBottom: '0.75rem' }}>
                     <i className="bi bi-info-circle me-1"></i>
                     Entrée et sortie seront enregistrées sur <strong>toute la durée planifiée de la séance</strong> (horaires EDT).
@@ -1713,7 +1750,7 @@ export default function FormationDetail() {
                   onClick={submitForceMotif}
                 >
                   {forceMotifDialog.action === 'ENTREE'
-                    ? (isAuditeur
+                    ? (isÉtudiant
                       ? <><i className="bi bi-person-check me-1"></i>Confirmer la présence</>
                       : <><i className="bi bi-box-arrow-in-right me-1"></i>Confirmer le badgeage</>)
                     : <><i className="bi bi-box-arrow-right me-1"></i>Confirmer la sortie</>}
@@ -1728,7 +1765,7 @@ export default function FormationDetail() {
         <div className="modal-overlay" onClick={() => setShowAddParticipant(false)}>
           <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-person-plus me-2"></i>Ajouter un auditeur</h5>
+              <h5><i className="bi bi-person-plus me-2"></i>Ajouter un étudiant</h5>
               <button className="btn-close" onClick={() => setShowAddParticipant(false)}>&times;</button>
             </div>
             <div className="modal-body">
@@ -1739,7 +1776,7 @@ export default function FormationDetail() {
               </div>
               {addLoading && <div className="text-center text-muted py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!addLoading && allParticipants.length === 0 && (
-                <p className="text-muted text-center py-2">Aucun auditeur disponible</p>
+                <p className="text-muted text-center py-2">Aucun étudiant disponible</p>
               )}
               {!addLoading && allParticipants.length > 0 && (
                 <div style={{ maxHeight: '320px', overflowY: 'auto', overflowX: 'auto' }}>

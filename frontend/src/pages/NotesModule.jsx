@@ -12,10 +12,10 @@ const MENTION_LABELS = {
   '':          '—',
 }
 const MENTION_COLORS = {
-  TRES_BIEN:   { background: '#e8f5e9', color: '#1b5e20' },
+  TRES_BIEN:   { background: '#e8eff5', color: '#093f70' },
   BIEN:        { background: '#e3f2fd', color: '#0d47a1' },
   ASSEZ_BIEN:  { background: '#e8eaf6', color: '#283593' },
-  PASSABLE:    { background: '#fff8e1', color: '#f57f17' },
+  PASSABLE:    { background: '#fffae1', color: '#f5b417' },
   INSUFFISANT: { background: '#ffebee', color: '#b71c1c' },
   '':          { background: '#f5f5f5', color: '#9e9e9e' },
 }
@@ -347,11 +347,11 @@ export default function NotesModule() {
         <div>
           <h2 style={{ margin: 0, fontWeight: 700 }}>Notes — {module?.intitule}</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            {rows.length} auditeur{rows.length !== 1 ? 's' : ''} inscrits · {nbSaisies} avec note{nbSaisies !== 1 ? 's' : ''}
+            {rows.length} étudiant{rows.length !== 1 ? 's' : ''} inscrit{rows.length !== 1 ? 's' : ''} · {nbSaisies} avec note{nbSaisies !== 1 ? 's' : ''}
             {colonnes.length > 1 && <> · {colonnes.length} colonnes</>}
             {moyenne && <> · Moyenne&nbsp;<strong>{moyenne}/20</strong></>}
             <span style={{ display: 'block', marginTop: 4 }}>
-              Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et temps de cours effectué ≥ <strong>{criteres.taux_presence_min}%</strong>
+              Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et présence au module ≥ <strong>{criteres.taux_presence_min}%</strong>
             </span>
           </p>
         </div>
@@ -375,7 +375,7 @@ export default function NotesModule() {
             className="btn btn-outline-secondary btn-sm"
             onClick={() => handlePrintFiche()}
             disabled={printing !== null || rows.length === 0}
-            title="Imprimer la fiche de notes du cours (tous les auditeurs)"
+            title="Imprimer la fiche de notes du module (tous les étudiants)"
           >
             {printing === 'module'
               ? <><span className="spinner-border spinner-border-sm me-1"></span>Génération…</>
@@ -447,14 +447,14 @@ export default function NotesModule() {
       {rows.length === 0 ? (
         <div className="empty-state">
           <i className="bi bi-people" style={{ fontSize: '3rem', color: 'var(--text-muted)' }}></i>
-          <p>Aucun auditeur inscrit à ce module</p>
+          <p>Aucun étudiant inscrit à ce module</p>
         </div>
       ) : (
         <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary, #f9fafb)' }}>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>Auditeur</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap' }}>Étudiant</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700 }}>Grade</th>
                 {colonnes.map(c => (
                   <th key={c.id} style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700, minWidth: 110 }}>
@@ -477,7 +477,7 @@ export default function NotesModule() {
                 ))}
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Mention</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Moy. /20</th>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Cours effectué</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Présence au module</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Admis</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700 }}>Observations</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.78rem' }}>Saisi par</th>
@@ -534,7 +534,7 @@ export default function NotesModule() {
                               width: 72, textAlign: 'center', padding: '4px 6px',
                               border: `1.5px solid ${isValid ? 'var(--border)' : '#e53935'}`,
                               borderRadius: 6, fontSize: '0.9rem', fontWeight: 600,
-                              background: val !== '' && isValid ? ((normalized ?? 0) >= 10 ? '#f1f8e9' : '#fff8f8') : '',
+                              background: val !== '' && isValid ? ((normalized ?? 0) >= 10 ? '#e9f3f8' : '#fff8f8') : '',
                             }}
                             placeholder="—"
                             onKeyDown={e => {
@@ -554,13 +554,13 @@ export default function NotesModule() {
                       <MentionBadge mention={rowMention} />
                     </td>
                     <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontWeight: 700,
-                      color: moyNum !== null ? (moyNum >= criteres.seuil_admission ? '#2e7d32' : '#b71c1c') : 'var(--text-muted)' }}>
+                      color: moyNum !== null ? (moyNum >= criteres.seuil_admission ? '#125a99' : '#b71c1c') : 'var(--text-muted)' }}>
                       {moyNum !== null && !isNaN(moyNum) ? `${moyNum.toFixed(2)}` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                       {taux !== null && taux !== undefined ? (
                         <>
-                          <span style={{ fontWeight: 600, color: taux >= criteres.taux_presence_min ? '#2e7d32' : '#b71c1c' }}>
+                          <span style={{ fontWeight: 600, color: taux >= criteres.taux_presence_min ? '#125a99' : '#b71c1c' }}>
                             {taux}%
                           </span>
                           {n.heures_prevues > 0 && (
@@ -574,7 +574,7 @@ export default function NotesModule() {
                     <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                       {moyNum !== null && taux !== null && taux !== undefined ? (
                         admis
-                          ? <span style={{ color: '#2e7d32', fontWeight: 700 }}><i className="bi bi-check-circle-fill"></i> Oui</span>
+                          ? <span style={{ color: '#125a99', fontWeight: 700 }}><i className="bi bi-check-circle-fill"></i> Oui</span>
                           : <span style={{ color: '#b71c1c', fontWeight: 600 }}><i className="bi bi-x-circle"></i> Non</span>
                       ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                     </td>

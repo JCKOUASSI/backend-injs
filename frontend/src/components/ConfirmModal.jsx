@@ -1,6 +1,6 @@
 export default function ConfirmModal({ message, detail, confirmLabel = 'Confirmer', cancelLabel = 'Annuler', variant = 'danger', onConfirm, onCancel }) {
   const btnDanger = { background: '#c62828', color: '#fff', border: 'none', padding: '0.45rem 1.2rem', borderRadius: 6, fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }
-  const btnPrimary = { background: 'var(--ci-green)', color: '#fff', border: 'none', padding: '0.45rem 1.2rem', borderRadius: 6, fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }
+  const btnPrimary = { background: 'var(--ci-success)', color: '#fff', border: 'none', padding: '0.45rem 1.2rem', borderRadius: 6, fontWeight: 500, cursor: 'pointer', fontSize: '0.9rem' }
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -8,7 +8,7 @@ export default function ConfirmModal({ message, detail, confirmLabel = 'Confirme
         <div className="modal-header">
           <h5>
             <i className={`bi bi-${variant === 'danger' ? 'exclamation-triangle' : 'question-circle'} me-2`}
-               style={{ color: variant === 'danger' ? '#f59e0b' : 'var(--ci-green)' }}></i>
+               style={{ color: variant === 'danger' ? '#f5c10b' : 'var(--ci-success)' }}></i>
             Confirmation
           </h5>
           <button className="btn-close" onClick={onCancel}>&times;</button>

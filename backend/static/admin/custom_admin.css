@@ -6,15 +6,15 @@
     --sygep-bg: #ffffff;
     --sygep-surface: #ffffff;
     /* Actions de validation */
-    --sygep-action: #ea580c;
+    --sygep-action: #ea9d0c;
     --sygep-action-dark: #c2410c;
-    --sygep-action-light: #f97316;
-    --sygep-action-soft: #ffedd5;
+    --sygep-action-light: #f9b116;
+    --sygep-action-soft: #fff5d5;
     /* Navigation et identité */
-    --sygep-nav: #16a34a;
-    --sygep-nav-dark: #15803d;
-    --sygep-nav-light: #22c55e;
-    --sygep-nav-soft: #e8f7ee;
+    --sygep-nav: #0e58ab;
+    --sygep-nav-dark: #0b478a;
+    --sygep-nav-light: #116ed6;
+    --sygep-nav-soft: #e8eff7;
     /* Alias boutons / actions Django */
     --sygep-primary: var(--sygep-action);
     --sygep-primary-dark: var(--sygep-action-dark);
@@ -104,8 +104,10 @@ body.sygep-admin .breadcrumbs {
     align-items: center;
     justify-content: center;
     border-radius: 12px;
-    background: var(--sygep-nav);
+    background: #001a33;
     color: #fff;
+    object-fit: contain;
+    padding: 4px;
 }
 
 .sygep-sidebar-group {
@@ -210,7 +212,7 @@ body.sygep-admin .breadcrumbs {
     background: var(--sygep-nav);
     color: #fff;
     font-weight: 600;
-    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.28);
+    box-shadow: 0 4px 14px rgba(14,88,171, 0.28);
 }
 
 .sygep-sidebar-icon {
@@ -267,7 +269,7 @@ body.sygep-admin .breadcrumbs {
     padding: 16px 24px;
     background: var(--sygep-surface);
     border-bottom: 3px solid var(--sygep-nav);
-    box-shadow: 0 2px 12px rgba(22, 163, 74, 0.08);
+    box-shadow: 0 2px 12px rgba(14,88,171, 0.08);
     position: sticky;
     top: 0;
     z-index: 20;
@@ -457,14 +459,14 @@ a.button.default {
 input[type="submit"].default:hover,
 .submit-row input.default:hover {
     background: var(--sygep-primary-dark) !important;
-    box-shadow: 0 6px 16px rgba(234, 88, 12, 0.28);
+    box-shadow: 0 6px 16px rgba(234,157,12, 0.28);
 }
 
 a.addlink,
 .object-tools a {
     background: var(--sygep-primary-soft) !important;
     color: var(--sygep-primary-dark) !important;
-    border: 1px solid rgba(234, 88, 12, 0.22) !important;
+    border: 1px solid rgba(234,157,12, 0.22) !important;
     border-radius: var(--sygep-radius-pill) !important;
     padding: 8px 16px !important;
 }
@@ -498,7 +500,7 @@ input:focus,
 select:focus,
 textarea:focus {
     border-color: var(--sygep-primary) !important;
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18) !important;
+    box-shadow: 0 0 0 3px rgba(249,177,22, 0.18) !important;
     outline: none;
 }
 
@@ -683,13 +685,13 @@ body.sygep-filter-panel-open {
 }
 
 #result_list tbody tr:hover td {
-    background: rgba(22, 163, 74, 0.04) !important;
+    background: rgba(14,88,171, 0.04) !important;
 }
 
 #changelist .actions,
 .actions {
     background: var(--sygep-action-soft) !important;
-    border: 1px solid rgba(234, 88, 12, 0.22) !important;
+    border: 1px solid rgba(234,157,12, 0.22) !important;
     border-radius: 12px !important;
     padding: 10px 14px !important;
 }
@@ -773,7 +775,7 @@ body.sygep-filter-panel-open {
 .dfrc-stat-card:hover {
     transform: translateY(-3px);
     box-shadow: var(--sygep-shadow-hover);
-    border-color: rgba(22, 163, 74, 0.3);
+    border-color: rgba(14,88,171, 0.3);
 }
 
 .dfrc-stat-card--highlight {
@@ -1147,11 +1149,11 @@ body.sygep-filter-panel-open {
 }
 
 .dfrc-chart-stacked-seg--present {
-    background: linear-gradient(90deg, #15803d, #22c55e);
+    background: linear-gradient(90deg, #0b478a, #116ed6);
 }
 
 .dfrc-chart-stacked-seg--absent {
-    background: linear-gradient(90deg, #c2410c, #fb923c);
+    background: linear-gradient(90deg, #c2410c, #fbc23c);
 }
 
 .dfrc-chart-stacked-legend {
@@ -1199,7 +1201,7 @@ body.sygep-filter-panel-open {
 .dfrc-quick-action-btn--secondary {
     background: var(--sygep-surface);
     color: var(--sygep-nav-dark);
-    border: 1px solid rgba(22, 163, 74, 0.28);
+    border: 1px solid rgba(14,88,171, 0.28);
 }
 
 .dfrc-section {
@@ -1241,7 +1243,7 @@ body.sygep-filter-panel-open {
 }
 
 .dfrc-bento-card:hover {
-    border-color: rgba(22, 163, 74, 0.32);
+    border-color: rgba(14,88,171, 0.32);
     background: var(--sygep-surface);
     transform: translateY(-2px);
     box-shadow: var(--sygep-shadow-hover);
@@ -1301,7 +1303,7 @@ body.sygep-filter-panel-open {
 .dfrc-model-actions a {
     font-size: 12px;
     padding: 4px 14px;
-    border: 1px solid rgba(234, 88, 12, 0.2);
+    border: 1px solid rgba(234,157,12, 0.2);
     border-radius: var(--sygep-radius-pill);
     text-decoration: none;
     font-weight: 600;

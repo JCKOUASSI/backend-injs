@@ -7,7 +7,7 @@
 
   {% if participants %}
   <section class="module">
-    <h2>{% trans "Auditeurs sélectionnés dans la liste admin" %} ({{ participants|length }})</h2>
+    <h2>{% trans "Étudiants sélectionnés dans la liste admin" %} ({{ participants|length }})</h2>
     <p class="help">{% trans "Les absents cochés par défaut incluent ceux de cette sélection. Vous pouvez aussi cocher d'autres absents du module." %}</p>
     <div class="results">
       <table id="result_list">
@@ -78,7 +78,7 @@
     {% if participants_source == 'none' %}
     <p class="errornote">{{ participants_hint }}</p>
     {% if module_admin_url %}
-    <p><a href="{{ module_admin_url }}" class="button">{% trans "Ouvrir la fiche module (inscrire les auditeurs)" %}</a></p>
+    <p><a href="{{ module_admin_url }}" class="button">{% trans "Ouvrir la fiche module (inscrire les étudiants)" %}</a></p>
     {% endif %}
     {% else %}
     <p class="help">{{ participants_hint }}</p>
@@ -145,9 +145,9 @@
     </section>
 
     <section class="module" id="dfrc-attendance-section">
-      <h2>{% trans "3. Présents / absents — cocher les auditeurs à badger" %}</h2>
+      <h2>{% trans "3. Présents / absents — cocher les étudiants à badger" %}</h2>
       <p class="help" id="dfrc-attendance-help">
-        {% trans "Sélectionnez une séance ci-dessus pour afficher la liste des auditeurs du module." %}
+        {% trans "Sélectionnez une séance ci-dessus pour afficher la liste des étudiants du module." %}
       </p>
 
       {% for row in session_rows %}
@@ -185,7 +185,7 @@
               </tbody>
             </table>
             {% else %}
-            <p class="dfrc-attendance-empty">{% trans "Aucun auditeur badgé." %}</p>
+            <p class="dfrc-attendance-empty">{% trans "Aucun étudiant badgé." %}</p>
             {% endif %}
           </div>
           <div class="dfrc-attendance-col dfrc-attendance-absent">
@@ -216,9 +216,9 @@
                     {% else %}
                     <p class="dfrc-attendance-empty">
                       {% if row.nb_module_total == 0 %}
-                      {% trans "Aucun auditeur attendu sur ce module (inscriptions vides)." %}
+                      {% trans "Aucun étudiant attendu sur ce module (inscriptions vides)." %}
                       {% else %}
-                      {% trans "Tous les auditeurs du module sont déjà badgés sur cette séance." %}
+                      {% trans "Tous les étudiants du module sont déjà badgés sur cette séance." %}
                       {% endif %}
                     </p>
                     {% endif %}
@@ -258,7 +258,7 @@
     </div>
   </form>
   {% elif not module %}
-  <p class="help">{% trans "Sélectionnez un module pour afficher les séances et les auditeurs présents / absents." %}</p>
+  <p class="help">{% trans "Sélectionnez un module pour afficher les séances et les étudiants présents / absents." %}</p>
   {% endif %}
 </div>
 
@@ -318,8 +318,8 @@
     margin: 0 0 0.75rem;
     font-size: 1rem;
   }
-  .dfrc-attendance-present h3 { color: #15803d; }
-  .dfrc-attendance-absent h3 { color: #b45309; }
+  .dfrc-attendance-present h3 { color: #0b478a; }
+  .dfrc-attendance-absent h3 { color: #b47f09; }
   .dfrc-attendance-table {
     width: 100%;
     border-collapse: collapse;
@@ -335,8 +335,8 @@
     color: #64748b;
     font-style: italic;
   }
-  .dfrc-badge-ok { color: #15803d; font-weight: 700; }
-  .dfrc-badge-warn { color: #b45309; font-weight: 700; }
+  .dfrc-badge-ok { color: #0b478a; font-weight: 700; }
+  .dfrc-badge-warn { color: #b47f09; font-weight: 700; }
   #dfrc-attendance-help.dfrc-hidden { display: none; }
 </style>
 

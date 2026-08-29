@@ -27,6 +27,8 @@ export function formatApiErrors(data, { fieldLabels = DEFAULT_FIELD_LABELS, fall
     return String(detail)
   }
 
+  if (typeof data.error === 'string' && data.error.trim()) return data.error
+
   if (!data || typeof data !== 'object') return fallback
 
   const lines = Object.entries(data).map(([key, value]) => {

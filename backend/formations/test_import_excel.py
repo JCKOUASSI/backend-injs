@@ -493,3 +493,97 @@ class ImportPipelineCoherenceTest(TestCase):
         finally:
             wb.close()
         self.assertEqual(errors, [], '\n'.join(errors))
+
+
+class NormalizeCategorieImportTest(TestCase):
+    def test_codes_secretariat_injs_non_decoupes(self):
+        cmd = Command()
+        self.assertEqual(cmd._normalize_categorie('SFC'), 'SFC')
+        self.assertEqual(cmd._normalize_categorie('SST'), 'SST')
+        self.assertEqual(cmd._normalize_categorie('SFO'), 'SFO')
+        self.assertEqual(cmd._normalize_categorie('FABA'), 'FAB A')
+        self.assertEqual(cmd._normalize_categorie('FAB A'), 'FAB A')
+
+    def test_secretariat_type_from_participant_injs(self):
+        cmd = Command()
+        self.assertEqual(cmd._secretariat_type_from_participant('Élève Professeur'), 'SET')
+        self.assertEqual(cmd._secretariat_type_from_participant('Élève Maître'), 'SET')
+        self.assertEqual(cmd._secretariat_type_from_participant('Étudiant LMD'), 'SET')
+        self.assertEqual(cmd._secretariat_type_from_participant('Formation continue'), 'SFC')
+        self.assertEqual(
+            cmd._secretariat_type_from_participant('', 'FORMATION À LA CARTE'),
+            'SFC',
+        )
+        self.assertEqual(cmd._secretariat_type_from_participant('FAB A'), 'FAB A')
+        self.assertEqual(cmd._secretariat_type_from_participant('A'), 'A')
+        self.assertEqual(cmd._secretariat_type_from_participant('SFC'), 'SFC')
+        self.assertEqual(cmd._secretariat_type_from_participant('SET'), 'SET')
+
+
+class ImportParticipantsInjsSecretariatTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        set_type = RefTypeSecretariat.objects.create(libelle='SET')
+        sfc_type = RefTypeSecretariat.objects.create(libelle='SFC')
+        Secretariat.objects.create(nom='Secrétariat des étudiants', type=set_type)
+        Secretariat.objects.create(nom='Secrétariat de la formation continue', type=sfc_type)
+        formation = Formation.objects.create(formation='Licence STAPS')
+        Module.objects.create(
+            formation=formation,
+            intitule='Anatomie fonctionnelle',
+            grade='ÉLÈVE PROFESSEUR DE LYCÉE EPS',
+            groupe='GROUPE 1',
+            vague='VAGUE 2026-2027 1',
+            cycle='Licence STAPS',
+        )
+        Module.objects.create(
+            formation=formation,
+            intitule='Didactique EPS',
+            grade='FORMATION À LA CARTE',
+            groupe='GROUPE 1',
+            vague='VAGUE 2026-2027 1',
+            cycle='Licence STAPS',
+        )
+
+    def setUp(self):
+        self.cmd = Command()
+        self.cmd.stdout = _SilentStdout()
+
+    def test_eleve_professeur_maps_to_set_keeps_categorie(self):
+        from formations.models import Participant
+
+        errors = []
+        created = self.cmd._import_participants(build_participants_sheet({
+            "N° d'inscription": 'INJS26-0001',
+            'Nom': 'ZOGBO',
+            'Prénoms': 'Martine',
+            'Catégorie': 'Élève Professeur',
+            'Grade': 'ÉLÈVE PROFESSEUR DE LYCÉE EPS',
+            'Groupe': 'GROUPE 1',
+            'Vague': 'VAGUE 2026-2027 1',
+        }), errors)
+        self.assertEqual(errors, [], msg=errors)
+        self.assertEqual(created, 1)
+        participant = Participant.objects.get(matricule='INJS26-0001')
+        self.assertEqual(participant.secretariat.type.libelle, 'SET')
+        self.assertEqual(participant.categorie, 'Élève Professeur')
+
+    def test_formation_continue_maps_to_sfc(self):
+        from formations.models import Participant
+
+        errors = []
+        created = self.cmd._import_participants(build_participants_sheet({
+            "N° d'inscription": 'INJS26-0900',
+            'Nom': 'KONE',
+            'Prénoms': 'Paul',
+            'Catégorie': 'Formation continue',
+            'Grade': 'FORMATION À LA CARTE',
+            'Groupe': 'GROUPE 1',
+            'Vague': 'VAGUE 2026-2027 1',
+        }), errors)
+        self.assertEqual(errors, [], msg=errors)
+        self.assertEqual(created, 1)
+        participant = Participant.objects.get(matricule='INJS26-0900')
+        self.assertEqual(participant.secretariat.type.libelle, 'SFC')
+        self.assertEqual(participant.categorie, 'Formation continue')
+

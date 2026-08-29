@@ -1,11 +1,11 @@
 :root {
-  --ci-green: #388e3c;
-  --ci-green-light: #43a047;
-  --ci-orange: #f57c00;
+  --ci-success: #1a68ac;
+  --ci-success-light: #2277c1;
+  --ci-warning: #f5b100;
   --text: #1e293b;
   --muted: #64748b;
   --card-bg: #ffffff;
-  --page-bg: linear-gradient(145deg, #e8f5e9 0%, #fff8f0 45%, #e3f2fd 100%);
+  --page-bg: linear-gradient(145deg, #e8eff5 0%, #fffbf0 45%, #e3f2fd 100%);
 }
 
 * { box-sizing: border-box; }
@@ -35,14 +35,14 @@ body {
   width: auto;
   height: auto;
   padding: 0.5rem 1rem;
-  background: var(--ci-green);
+  background: var(--ci-success);
   color: #fff;
   z-index: 1000;
   border-radius: 8px;
 }
 
 .site-header {
-  background: linear-gradient(135deg, var(--ci-green) 0%, var(--ci-green-light) 50%, var(--ci-orange) 100%);
+  background: linear-gradient(135deg, var(--ci-success) 0%, var(--ci-success-light) 50%, var(--ci-warning) 100%);
   color: #fff;
   padding: 1.25rem 1.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
@@ -84,7 +84,7 @@ body {
 .card h2 {
   font-size: 1.05rem;
   margin: 1.35rem 0 0.5rem;
-  color: var(--ci-green);
+  color: var(--ci-success);
   font-weight: 700;
 }
 
@@ -137,8 +137,8 @@ body {
 
 .nav-cards a:hover,
 .nav-cards a:focus-visible {
-  border-color: var(--ci-green);
-  box-shadow: 0 4px 16px rgba(56, 142, 60, 0.15);
+  border-color: var(--ci-success);
+  box-shadow: 0 4px 16px rgba(26, 104, 172, 0.15);
   outline: none;
 }
 
@@ -158,7 +158,7 @@ body {
 }
 
 .site-footer a {
-  color: var(--ci-green);
+  color: var(--ci-success);
 }
 
 .badge {
@@ -167,8 +167,8 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #e8f5e9;
-  color: var(--ci-green);
+  background: #e8eff5;
+  color: var(--ci-success);
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
   margin-bottom: 0.75rem;

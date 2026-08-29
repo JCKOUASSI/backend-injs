@@ -95,6 +95,25 @@ export const LISTE_CLASSE_EXPORT_ROLES = [
 /** Paramétrage et ajustements finance (hors archiviste). */
 export const FINANCE_SETTINGS_ROLES = ['FINANCE', 'DIRECTION']
 
+/** Module Scolarité LMD — consultation (aligné IsSecretariatOrDFRC, DIRECTION en lecture). */
+export const SCOLARITE_VIEW_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'DIRECTION',
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+]
+
+/** Module Scolarité LMD — actions (candidatures, admissions, inscriptions). */
+export const SCOLARITE_MUTATION_ROLES = [
+  ...ADMIN_LEVEL_ROLES,
+  'CHEF_SECRETARIAT',
+  'SECRETARIAT',
+]
+
+export function canActScolarite(user) {
+  return hasAppRole(user, SCOLARITE_MUTATION_ROLES)
+}
+
 export const STATS_ALLOWED_ROLES = [
   ...ADMIN_LEVEL_ROLES,
   'DIRECTION',
@@ -244,10 +263,10 @@ export function isWebRoleAllowed(role) {
 
 export function webLoginForbiddenMessage(role) {
   if (role === 'AUDITEUR') {
-    return 'Les comptes auditeur sont réservés à l\'application mobile.'
+    return 'Les comptes étudiant sont réservés à l\'application mobile.'
   }
   if (role === 'FORMATEUR') {
-    return 'Les comptes formateur sont réservés à l\'application mobile.'
+    return 'Les comptes enseignant sont réservés à l\'application mobile.'
   }
   return 'Ce compte n\'a pas accès à la plateforme web.'
 }

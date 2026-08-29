@@ -358,13 +358,13 @@ class _FilterChip extends StatelessWidget {
       selected: selected,
       onSelected: (_) => onSelected(),
       selectedColor: AppColors.navIndicator,
-      checkmarkColor: AppColors.ciGreenDark,
+      checkmarkColor: AppColors.ciSuccessDark,
       labelStyle: TextStyle(
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        color: selected ? AppColors.ciGreenDark : AppColors.textPrimary,
+        color: selected ? AppColors.ciSuccessDark : AppColors.textPrimary,
       ),
       side: BorderSide(
-        color: selected ? AppColors.ciGreenDark : AppColors.borderColor,
+        color: selected ? AppColors.ciSuccessDark : AppColors.borderColor,
       ),
     );
   }
@@ -405,7 +405,7 @@ class _HistoryEntryCard extends StatelessWidget {
               ),
               child: Icon(
                 event.success ? Icons.check : Icons.info_outline,
-                color: event.success ? AppColors.ciGreenDark : AppColors.ciOrange,
+                color: event.success ? AppColors.ciSuccessDark : AppColors.ciWarning,
                 size: 24,
               ),
             ),
@@ -426,8 +426,8 @@ class _HistoryEntryCard extends StatelessWidget {
                     event.label,
                     style: TextStyle(
                       color: event.success
-                          ? AppColors.ciGreenDark
-                          : AppColors.ciOrangeDark,
+                          ? AppColors.ciSuccessDark
+                          : AppColors.ciWarningDark,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),

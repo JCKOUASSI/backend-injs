@@ -4,8 +4,8 @@ import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 
 const SECTION_CONFIG = {
-  COURS:     { label: 'Évaluation du cours',      icon: 'bi-book',          bg: '#e3f2fd', color: '#1565c0' },
-  FORMATEUR: { label: 'Évaluation du formateur',  icon: 'bi-person-video3', bg: '#f3e5f5', color: '#6a1b9a' },
+  COURS:     { label: 'Évaluation du module',      icon: 'bi-book',          bg: '#e3f2fd', color: '#1565c0' },
+  FORMATEUR: { label: "Évaluation de l'enseignant",  icon: 'bi-person-video3', bg: '#f3e5f5', color: '#6a1b9a' },
 }
 
 function StarRating({ questionId, value, onChange }) {
@@ -21,7 +21,7 @@ function StarRating({ questionId, value, onChange }) {
           onClick={() => onChange(questionId, n)}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
-            color: n <= (hovered ?? value ?? 0) ? '#f59e0b' : '#d1d5db',
+            color: n <= (hovered ?? value ?? 0) ? '#f5c10b' : '#d1d5db',
             fontSize: '1.6rem', lineHeight: 1,
           }}
         >
@@ -204,7 +204,7 @@ export default function EvaluationTake() {
           <span>{answeredObligs}/{totalObligs} obligatoires</span>
         </div>
         <div style={{ height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#2e7d32' : 'var(--primary)', borderRadius: '3px', transition: 'width .3s' }} />
+          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#125a99' : 'var(--primary)', borderRadius: '3px', transition: 'width .3s' }} />
         </div>
       </div>
 
@@ -232,7 +232,7 @@ export default function EvaluationTake() {
                     <div key={q.id} style={{
                       background: 'var(--card-bg, #fff)',
                       border: '1px solid',
-                      borderColor: isAnswered ? '#a5d6a7' : 'var(--border)',
+                      borderColor: isAnswered ? '#94c0e7' : 'var(--border)',
                       borderRadius: '10px',
                       padding: '1rem 1.25rem',
                       transition: 'border-color .2s',
@@ -244,7 +244,7 @@ export default function EvaluationTake() {
                           {q.obligatoire && <span style={{ color: 'red', marginLeft: '4px' }}>*</span>}
                         </p>
                         {isAnswered && (
-                          <i className="bi bi-check-circle-fill" style={{ color: '#2e7d32', fontSize: '1rem', flexShrink: 0 }}></i>
+                          <i className="bi bi-check-circle-fill" style={{ color: '#125a99', fontSize: '1rem', flexShrink: 0 }}></i>
                         )}
                       </div>
                       <QuestionBlock question={q} answer={answers[q.id]} onChange={handleChange} />

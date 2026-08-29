@@ -140,7 +140,7 @@ export default function Formateurs() {
         setFinancePeriodeInfo(response.data.periode)
       }
     } catch (err) {
-      setError('Erreur lors du chargement des formateurs')
+      setError('Erreur lors du chargement des enseignants')
       console.error(err)
     } finally { setLoading(false) }
   }
@@ -175,7 +175,7 @@ export default function Formateurs() {
       }
       setShowModal(false)
       loadFormateurs()
-      showToast(editingId ? 'Formateur modifié' : 'Formateur créé')
+      showToast(editingId ? 'Enseignant modifié' : 'Enseignant créé')
     } catch (err) {
       const data = err.response?.data
       if (data && typeof data === 'object') {
@@ -189,10 +189,10 @@ export default function Formateurs() {
 
   const handleDelete = (id) => {
     setConfirmDialog({
-      message: 'Supprimer ce formateur ?',
+      message: 'Supprimer cet enseignant ?',
       detail: 'Cette action est définitive.',
       onConfirm: async () => {
-        try { await api.delete(`/formations/formateurs/${id}/`); loadFormateurs(); showToast('Formateur supprimé') }
+        try { await api.delete(`/formations/formateurs/${id}/`); loadFormateurs(); showToast('Enseignant supprimé') }
         catch { showToast('Erreur lors de la suppression', 'error') }
       }
     })
@@ -249,7 +249,7 @@ export default function Formateurs() {
       const { blob, fileName } = await api.getBlob(`${base}?${q.toString()}`)
       const safeName = `${f.nom || 'formateur'}_${f.prenom || ''}`.trim().replace(/\s+/g, '_')
       downloadBlob(blob, fileName || `fiche_formateur_${safeName || f.id}.${ext}`)
-      showToast(`Fiche formateur exportée (${ext.toUpperCase()})`)
+      showToast(`Fiche enseignant exportée (${ext.toUpperCase()})`)
     } catch (err) {
       showToast(err.response?.data?.detail || 'Erreur lors de l\'export de la fiche', 'error')
     } finally {
@@ -382,7 +382,7 @@ export default function Formateurs() {
                 className="btn btn-outline-success btn-sm"
                 disabled={exportingSynthese || loading}
                 onClick={() => exportFinanceSynthese('excel')}
-                title="Fiche de paie globale Excel (tous les formateurs)"
+                title="Fiche de paie globale Excel (tous les enseignants)"
               >
                 <i className="bi bi-file-earmark-spreadsheet me-1"></i>
                 {exportingSynthese ? 'Export…' : 'Paie globale Excel'}
@@ -392,7 +392,7 @@ export default function Formateurs() {
                 className="btn btn-outline-danger btn-sm"
                 disabled={exportingSynthese || loading}
                 onClick={() => exportFinanceSynthese('pdf')}
-                title="Fiche de paie globale PDF (tous les formateurs)"
+                title="Fiche de paie globale PDF (tous les enseignants)"
               >
                 <i className="bi bi-file-earmark-pdf me-1"></i>
                 {exportingSynthese ? 'Export…' : 'Paie globale PDF'}
@@ -406,7 +406,7 @@ export default function Formateurs() {
 
       <section className="finance-section">
         <div className="finance-section-header">
-          <h2><i className="bi bi-people"></i>Suivi des formateurs</h2>
+          <h2><i className="bi bi-people"></i>Suivi des enseignants</h2>
           <span className="badge-bg-secondary">{formateurs.length} résultat(s)</span>
         </div>
         <div className="finance-table-wrap">
@@ -451,7 +451,7 @@ export default function Formateurs() {
                             <div className="finance-taux-bar-fill" style={{ width: `${Math.min(100, taux)}%` }} />
                           </div>
                         </td>
-                        <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-green)' }}>
+                        <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-accent)' }}>
                           {formatMoney(f.montant_total_realise)} F
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>
@@ -468,7 +468,7 @@ export default function Formateurs() {
                   }) : (
                     <tr>
                       <td colSpan="12">
-                        <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
+                        <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun enseignant</div>
                       </td>
                     </tr>
                   )}
@@ -493,7 +493,7 @@ export default function Formateurs() {
     return (
       <FinancePageShell
         title="Suivi Finance"
-        subtitle="Temps de cours et rémunération par formateur"
+        subtitle="Temps de cours et rémunération par enseignant"
         icon="bi-cash-stack"
         actions={<FinanceNavActions active="formateurs" />}
         period={financePeriod}
@@ -542,13 +542,13 @@ export default function Formateurs() {
             <div style={{ flex: '1 1 250px' }}>
               <div className="input-group">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder={canViewFinanceData ? 'Rechercher un formateur...' : 'Rechercher par nom, prénom ou spécialité...'}
+                <input type="text" className="form-control" placeholder={canViewFinanceData ? 'Rechercher un enseignant...' : 'Rechercher par nom, prénom ou spécialité...'}
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
             </div>
             {canDelete && (
               <button onClick={openCreate} className="btn btn-dfrc">
-                <i className="bi bi-plus-lg me-1"></i>Nouveau formateur
+                <i className="bi bi-plus-lg me-1"></i>Nouvel enseignant
               </button>
             )}
           </div>
@@ -562,7 +562,7 @@ export default function Formateurs() {
         <div className="card-header-bar">
           <span>
             <i className={`bi ${canViewFinanceData ? 'bi-calculator' : 'bi-person-video3'} me-2`}></i>
-            {canViewFinanceData ? 'Suivi des temps de cours formateurs' : 'Liste des formateurs'}
+            {canViewFinanceData ? 'Suivi des temps de cours enseignants' : 'Liste des enseignants'}
           </span>
           <span className="badge-bg-secondary">{formateurs.length} résultat(s)</span>
         </div>
@@ -651,7 +651,7 @@ export default function Formateurs() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={canViewFinanceData ? 10 : (8 + (canViewSensitive ? 2 : 0))} className="text-center py-4 text-muted">Aucun formateur trouvé</td></tr>
+                      <tr><td colSpan={canViewFinanceData ? 10 : (8 + (canViewSensitive ? 2 : 0))} className="text-center py-4 text-muted">Aucun enseignant trouvé</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -682,7 +682,7 @@ export default function Formateurs() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>{editingId ? 'Modifier le formateur' : 'Nouveau formateur'}</h5>
+              <h5>{editingId ? "Modifier l'enseignant" : 'Nouvel enseignant'}</h5>
               <button className="btn-close" onClick={() => setShowModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleSubmit}>
@@ -727,7 +727,7 @@ export default function Formateurs() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Observations <small className="text-muted">(notes internes)</small></label>
-                  <textarea className="form-control" rows={4} value={form.observations} onChange={e => setForm({...form, observations: e.target.value})} placeholder="Notes / observations sur le formateur…" />
+                  <textarea className="form-control" rows={4} value={form.observations} onChange={e => setForm({...form, observations: e.target.value})} placeholder="Notes / observations sur l'enseignant…" />
                 </div>
               </div>
               <div className="modal-footer">

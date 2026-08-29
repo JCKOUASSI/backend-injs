@@ -10,6 +10,7 @@ from ..models import (
     Formation, Module, Participant, Formateur,
     Secretariat, ModuleParticipant, ModuleFormateur, SessionModule,
     RefFormation, RefModule, RefCategorie, RefModuleVolumeHoraire,
+    RefSite, RefBatiment, RefSalle,
 )
 from ..volume_horaire import compute_dashboard_volume_horaire
 
@@ -573,6 +574,78 @@ class RefModuleFormationsAPITest(TestCase):
         }, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(set(res.data['formation_ids']), {self.f1.id, self.f2.id})
+
+    def test_create_ref_module_same_intitule_merges_formations(self):
+        first = self.client.post('/api/formations/ref/modules/', {
+            'intitule': 'Anatomie fonctionnelle',
+            'formation_ids': [self.f1.id],
+            'volumes_horaires': self._sample_volumes(self.f1.id),
+        }, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        module_id = first.data['id']
+
+        second = self.client.post('/api/formations/ref/modules/', {
+            'intitule': 'ANATOMIE FONCTIONNELLE',
+            'formation_ids': [self.f2.id],
+            'volumes_horaires': self._sample_volumes(self.f2.id),
+        }, format='json')
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.data['id'], module_id)
+        self.assertEqual(set(second.data['formation_ids']), {self.f1.id, self.f2.id})
+        self.assertEqual(RefModule.objects.filter(intitule__iexact='ANATOMIE FONCTIONNELLE').count(), 1)
+        volumes = RefModuleVolumeHoraire.objects.filter(module_id=module_id)
+        self.assertEqual(volumes.count(), 2)
+
+
+class RefSalleAPITest(TestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        u = make_user('admin_ref_salle', role='CPFAE_ADMIN')
+        self.client.force_authenticate(u)
+        self.site = RefSite.objects.create(nom='[TEST] INJS MARCORY', actif=True)
+        self.other_site = RefSite.objects.create(nom='[TEST] AUTRE SITE', actif=True)
+        self.batiment = RefBatiment.objects.create(nom='[TEST] Bâtiment A', site=self.site, actif=True)
+
+    def test_create_salle_without_batiment(self):
+        res = self.client.post('/api/formations/ref/salles/', {
+            'nom': 'SALLE DE CONFÉRENCE',
+            'site_id': self.site.id,
+            'batiment_id': None,
+            'actif': True,
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertIsNone(res.data['batiment_id'])
+        self.assertEqual(res.data['nom'], 'SALLE DE CONFÉRENCE')
+        self.assertEqual(res.data['type_lieu'], 'SALLE')
+
+    def test_create_salle_empty_batiment_id(self):
+        res = self.client.post('/api/formations/ref/salles/', {
+            'nom': 'SALLE A',
+            'site_id': str(self.site.id),
+            'batiment_id': '',
+            'actif': True,
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertIsNone(res.data['batiment_id'])
+
+    def test_create_salle_duplicate_without_batiment(self):
+        RefSalle.objects.create(nom='SALLE DE CONFÉRENCE', site=self.site, batiment=None)
+        res = self.client.post('/api/formations/ref/salles/', {
+            'nom': 'SALLE DE CONFÉRENCE',
+            'site_id': self.site.id,
+            'batiment_id': '',
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('existe déjà', res.data['detail'])
+
+    def test_create_salle_rejects_batiment_from_other_site(self):
+        res = self.client.post('/api/formations/ref/salles/', {
+            'nom': 'SALLE B',
+            'site_id': self.other_site.id,
+            'batiment_id': self.batiment.id,
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 # ──────────────────────────────────────────

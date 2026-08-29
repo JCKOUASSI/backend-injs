@@ -14,7 +14,7 @@ draw = ImageDraw.Draw(img)
 
 # Background: rounded green gradient feel
 # Solid green background
-bg_color = (56, 142, 60)  # #388E3C
+bg_color = (56, 142, 60)  # #1A68AC
 draw.rounded_rectangle([(0, 0), (SIZE - 1, SIZE - 1)], radius=200, fill=bg_color)
 
 # White QR code pattern (simplified)
@@ -46,7 +46,7 @@ draw_finder(margin, SIZE - margin - cell * 3)
 cx, cy = SIZE // 2, SIZE // 2 + 30
 r = 160
 # Orange circle
-orange = (245, 124, 0)  # #F57C00
+orange = (245, 124, 0)  # #F5B100
 draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=orange)
 
 # White checkmark in the circle

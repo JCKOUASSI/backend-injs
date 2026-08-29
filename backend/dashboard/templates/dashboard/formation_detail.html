@@ -11,8 +11,8 @@
 
 {% block content %}
 <style>
-.card-header-en-cours { background: linear-gradient(135deg, #388E3C, #43A047); color: #fff; }
-.card-header-suspendue { background: linear-gradient(135deg, #F57C00, #E65100); color: #fff; }
+.card-header-en-cours { background: linear-gradient(135deg, #1A68AC, #2277C1); color: #fff; }
+.card-header-suspendue { background: linear-gradient(135deg, #F5B100, #E69700); color: #fff; }
 @media (max-width: 768px) {
     .formation-actions { flex-wrap: wrap !important; gap: 0.5rem !important; }
     .formation-actions .btn-group { flex-wrap: wrap; }
@@ -27,7 +27,7 @@
         {% elif formation.statut == 'EN_COURS' %}
             <span class="badge badge-statut badge-en-cours"><i class="bi bi-broadcast me-1"></i>En cours</span>
         {% elif formation.statut == 'SUSPENDUE' %}
-            <span class="badge" style="background:#F57C00;color:#fff;"><i class="bi bi-pause-circle me-1"></i>Suspendue</span>
+            <span class="badge" style="background:#F5B100;color:#fff;"><i class="bi bi-pause-circle me-1"></i>Suspendue</span>
         {% else %}
             <span class="badge badge-statut badge-terminee"><i class="bi bi-check-circle me-1"></i>Terminée</span>
         {% endif %}
@@ -112,7 +112,7 @@
     <div class="col-lg-4">
         <div class="card card-modern h-100">
             <div class="card-header d-flex justify-content-between align-items-center {% if formation.statut == 'EN_COURS' %}card-header-en-cours{% elif formation.statut == 'SUSPENDUE' %}card-header-suspendue{% endif %}">
-                <span><i class="bi bi-calendar2-week me-2"></i>Agenda du cours</span>
+                <span><i class="bi bi-calendar2-week me-2"></i>Agenda du module</span>
                 {% if session_en_cours %}
                 <span class="badge bg-light text-success"><i class="bi bi-broadcast me-1"></i>En direct</span>
                 {% endif %}
@@ -295,7 +295,7 @@
                 {% if not sessions_today and not sessions_planifiees %}
                 <div class="text-center py-3">
                     {% if formation.statut == 'EN_COURS' %}
-                    <span class="badge bg-success" style="font-size: 1rem;"><i class="bi bi-broadcast me-1"></i>Cours débutés</span>
+                    <span class="badge bg-success" style="font-size: 1rem;"><i class="bi bi-broadcast me-1"></i>Modules débutés</span>
                     {% elif formation.statut == 'SUSPENDUE' %}
                     <span class="badge badge-statut badge-suspendue" style="font-size: 1rem;"><i class="bi bi-pause-circle me-1"></i>Suspendu</span>
                     {% elif formation.statut == 'TERMINEE' %}
@@ -457,12 +457,12 @@
 </div>
 
 
-<!-- Formateurs assignés -->
+<!-- Enseignants assignés -->
 <div class="card card-modern mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-person-video3 me-2"></i>Formateurs assignés ({{ formateurs|length }})</span>
-        {% if user|can_assign_formateur %}
-        <button class="btn btn-sm btn-dfrc" data-bs-toggle="modal" data-bs-target="#addFormateurModal">
+        <span><i class="bi bi-person-video3 me-2"></i>Enseignants assignés ({{ enseignants|length }})</span>
+        {% if user|can_assign_enseignant %}
+        <button class="btn btn-sm btn-dfrc" data-bs-toggle="modal" data-bs-target="#addEnseignantModal">
             <i class="bi bi-person-plus me-1"></i> Assigner
         </button>
         {% endif %}
@@ -517,7 +517,7 @@
                                 title="Forcer entrée"
                                 data-bs-toggle="modal"
                                 data-bs-target="#forcePointageModal"
-                                data-personne-id="{{ f.formateur.id }}"
+                                data-personne-id="{{ f.enseignant.id }}"
                                 data-type-personne="formateur"
                                 data-action="ENTREE"
                             >
@@ -530,7 +530,7 @@
                                 title="Forcer sortie"
                                 data-bs-toggle="modal"
                                 data-bs-target="#forcePointageModal"
-                                data-personne-id="{{ f.formateur.id }}"
+                                data-personne-id="{{ f.enseignant.id }}"
                                 data-type-personne="formateur"
                                 data-action="SORTIE"
                             >
@@ -543,7 +543,7 @@
                                 title="Forcer retour"
                                 data-bs-toggle="modal"
                                 data-bs-target="#forcePointageModal"
-                                data-personne-id="{{ f.formateur.id }}"
+                                data-personne-id="{{ f.enseignant.id }}"
                                 data-type-personne="formateur"
                                 data-action="ENTREE"
                             >
@@ -551,10 +551,10 @@
                             </button>
                             {% endif %}
                             {% if user|can_remove_formateur %}
-                            <form method="post" action="{% url 'web-formation-remove-formateur' formation.id f.formateur.id %}" class="d-inline">
+                            <form method="post" action="{% url 'web-formation-remove-enseignant' formation.id f.enseignant.id %}" class="d-inline">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Retirer"
-                                        onclick="return confirm('Retirer ce formateur ?')">
+                                        onclick="return confirm('Retirer cet enseignant ?')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
@@ -699,20 +699,20 @@
 
 
 
-<!-- Modal : Assigner formateur -->
-<div class="modal fade" id="addFormateurModal" tabindex="-1">
+<!-- Modal : Assigner enseignant -->
+<div class="modal fade" id="addEnseignantModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" action="{% url 'web-formation-add-formateur' formation.id %}">
                 {% csrf_token %}
                 <div class="modal-header">
-                    <h5 class="modal-title">Assigner un formateur</h5>
+                    <h5 class="modal-title">Assigner un enseignant</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <select name="formateur_id" class="form-select" required>
-                        <option value="">Sélectionner un formateur</option>
-                        {% for f in all_formateurs %}
+                    <select name="enseignant_id" class="form-select" required>
+                        <option value="">Sélectionner un enseignant</option>
+                        {% for f in all_enseignants %}
                         <option value="{{ f.id }}">{{ f.numerobadge }} — {{ f.nom }} {{ f.prenom }} ({{ f.specialite }})</option>
                         {% endfor %}
                     </select>

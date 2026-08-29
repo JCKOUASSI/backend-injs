@@ -469,9 +469,9 @@ FORMATIONS = [
 
 
 # ─── Styles ─────────────────────────────────────────────────────────────────
-GREEN_DARK  = 'FF1B5E20'
-GREEN_MED   = 'FF2E7D32'
-GREEN_LIGHT = 'FFE8F5E9'
+GREEN_DARK  = 'FF093F70'
+GREEN_MED   = 'FF125A99'
+GREEN_LIGHT = 'FFE8EFF5'
 GREY_LIGHT  = 'FFF5F5F5'
 WHITE       = 'FFFFFFFF'
 

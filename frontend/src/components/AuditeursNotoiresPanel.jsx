@@ -52,8 +52,8 @@ export function AuditeursNotoiresKpiStrip({ data }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.65rem',
         padding: '0.65rem 0.85rem', marginBottom: '0.85rem',
-        background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8,
-        fontSize: '0.8rem', color: '#15803d',
+        background: '#f0f6fd', border: '1px solid #bbd7f7', borderRadius: 8,
+        fontSize: '0.8rem', color: '#0b478a',
       }}>
         <i className="bi bi-check-circle-fill" style={{ fontSize: '1.1rem' }}/>
         Aucun absent notoire — tous les inscrits ont au moins une présence sur un module démarré.
@@ -65,7 +65,7 @@ export function AuditeursNotoiresKpiStrip({ data }) {
     <div style={{
       display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem 1.25rem',
       padding: '0.65rem 0.85rem', marginBottom: '0.85rem',
-      background: 'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)',
+      background: 'linear-gradient(135deg, #fef2f2 0%, #fffaed 100%)',
       border: '1px solid #fecaca', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -98,7 +98,7 @@ export function AuditeursNotoiresPanel({ data, maxHeight = 360, compact = false 
 
   if (liste.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '1.75rem', color: '#43A047', fontSize: '0.85rem' }}>
+      <div style={{ textAlign: 'center', padding: '1.75rem', color: '#2277C1', fontSize: '0.85rem' }}>
         <i className="bi bi-check-circle" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}/>
         Aucun absent notoire sur ce périmètre.
       </div>

@@ -18,7 +18,7 @@
                 <div>
                     <div class="d-flex align-items-end gap-2">
                         <span class="kpi-value">{{ stats.total_cours }}</span>
-                        <span class="kpi-label">Cours</span>
+                        <span class="kpi-label">Modules</span>
                     </div>
                     <div class="kpi-substats">
                         <span><i class="bi bi-play-circle-fill text-success"></i>{{ stats.cours_en_cours }} en cours</span>
@@ -39,7 +39,7 @@
                     <div class="d-flex align-items-end gap-2">
                         <span class="kpi-value">{{ stats.total_participants }}</span>
                     </div>
-                    <div class="kpi-label">Auditeurs</div>
+                    <div class="kpi-label">Étudiants</div>
                 </div>
             </div>
         </div>
@@ -124,7 +124,7 @@
                             <div>
                                 {% if p.formateur %}
                                 <strong>{{ p.formateur.nom }} {{ p.formateur.prenom }}</strong>
-                                <span class="badge bg-info text-white ms-1" style="font-size:.6rem">Formateur</span>
+                                <span class="badge bg-info text-white ms-1" style="font-size:.6rem">Enseignant</span>
                                 {% else %}
                                 <strong>{{ p.participant.nom }} {{ p.participant.prenom }}</strong>
                                 {% endif %}

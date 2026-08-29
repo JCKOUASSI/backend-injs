@@ -54,8 +54,22 @@ const handleResponse = async (res) => {
   return { data: text ? JSON.parse(text) : null, status: res.status }
 }
 
-const request = async (method, path, body, config = {}) => {
+/** Concatène config.params à l'URL ; les valeurs vides sont omises. */
+const buildUrl = (path, params) => {
   const url = `${API_BASE_URL}${path}`
+  if (!params) return url
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    qs.set(key, String(value))
+  }
+  const suffix = qs.toString()
+  if (!suffix) return url
+  return `${url}${url.includes('?') ? '&' : '?'}${suffix}`
+}
+
+const request = async (method, path, body, config = {}) => {
+  const url = buildUrl(path, config.params)
   const isFormData = body instanceof FormData
   const headers = {
     ...(!isFormData && body !== undefined ? { 'Content-Type': 'application/json' } : {}),

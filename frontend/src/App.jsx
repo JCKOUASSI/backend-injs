@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
-import logo from './assets/logo.png'
+import logo from './assets/logo-injs.svg'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { hasAppRole, getUserRoles } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
@@ -55,9 +55,16 @@ import {
   PARTICIPANT_LIST_ROLES,
   ARCHIVE_CONSULT_ROLES,
   PRESENCE_VIEW_ROLES,
+  SCOLARITE_VIEW_ROLES,
 } from './utils/roles'
 
 const Statistiques = lazy(() => import('./pages/Statistiques'))
+const ScolariteDashboard = lazy(() => import('./pages/scolarite/ScolariteDashboard'))
+const Candidatures = lazy(() => import('./pages/scolarite/Candidatures'))
+const AdmissionsPage = lazy(() => import('./pages/scolarite/Admissions'))
+const Inscriptions = lazy(() => import('./pages/scolarite/Inscriptions'))
+const FicheEtudiant = lazy(() => import('./pages/scolarite/FicheEtudiant'))
+const GroupesPedagogiques = lazy(() => import('./pages/scolarite/Groupes'))
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -97,6 +104,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceDashboard = hasAppRole(user, FINANCE_EXPORT_ROLES) && !isArchiveRole
   const canViewFinanceSettings = hasAppRole(user, FINANCE_SETTINGS_ROLES)
   const canViewParticipants = hasAppRole(user, PARTICIPANT_LIST_ROLES)
+  const canViewScolarite = hasAppRole(user, SCOLARITE_VIEW_ROLES)
   const canViewRattrapages = hasAppRole(user, PRESENCE_VIEW_ROLES)
   const canViewFormateurs = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'])
     || canViewFinanceModule
@@ -110,7 +118,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFinanceNotifications = hasAppRole(user, FINANCE_MODULE_ROLES) && !hasAppRole(user, ['ARCHIVE'])
   const showAppNotifications = isDirection || canViewStatistiques || canViewFinanceNotifications
 
-  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin', CPFAE_ADMIN: 'CPFAE Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Formateur', AUDITEUR: 'Auditeur' }
+  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef INJS Admin', CPFAE_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Enseignant', AUDITEUR: 'Étudiant' }
   const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
   const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
 
@@ -127,9 +135,9 @@ function Layout({ children, breadcrumb }) {
       )}
       <aside className={`sidebar${sidebarOpen ? ' show' : ''}`} id="sidebar">
         <div className="sidebar-brand">
-          <img src={logo} alt="MEMFPMA" style={{ width: '80px', marginBottom: '0.5rem' }} />
-          <h5 style={{ marginBottom: '0.1rem' }}>SYGEP-CPFAE</h5>
-          <small>DFRC — Gestion des présences</small>
+          <img src={logo} alt="INJS Abidjan" className="sidebar-logo" />
+          <h5 style={{ marginBottom: '0.1rem' }}>INJS UFR STAPS-JL</h5>
+          <small>Institut National de la Jeunesse et des Sports</small>
         </div>
 
         {user && (
@@ -137,7 +145,7 @@ function Layout({ children, breadcrumb }) {
             <small>Connecté en tant que</small><br/>
             <span className="user-name">{fullName}</span><br/>
             {hasAppRole(user, ['SECRETARIAT']) && user.secretariat_nom
-              ? <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i>{user.secretariat_nom}</small>
+              ? <small style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i>{user.secretariat_nom}</small>
               : <span className="user-role">{getUserRoles(user).map((r) => ROLE_LABELS[r] || r).join(', ') || user.role}</span>
             }
           </div>
@@ -182,8 +190,28 @@ function Layout({ children, breadcrumb }) {
           )}
           {canViewParticipants && (
             <Link to={listHref('/participants', LIST_STORAGE_KEYS.participants)} className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-people"></i> <span className="nav-label">Auditeurs</span></span>
+              <span><i className="bi bi-people"></i> <span className="nav-label">Étudiants</span></span>
             </Link>
+          )}
+          {canViewScolarite && (
+            <>
+              <div className="nav-section-title">Scolarité LMD</div>
+              <Link to="/scolarite" className={`nav-item ${path === '/scolarite' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-mortarboard"></i> <span className="nav-label">Tableau de bord</span></span>
+              </Link>
+              <Link to="/scolarite/candidatures" className={`nav-item ${isActive('/scolarite/candidatures') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-file-earmark-person"></i> <span className="nav-label">Candidatures</span></span>
+              </Link>
+              <Link to="/scolarite/admissions" className={`nav-item ${isActive('/scolarite/admissions') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-check2-circle"></i> <span className="nav-label">Admissions</span></span>
+              </Link>
+              <Link to="/scolarite/inscriptions" className={`nav-item ${isActive('/scolarite/inscriptions') || isActive('/scolarite/etudiants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-journal-check"></i> <span className="nav-label">Inscriptions</span></span>
+              </Link>
+              <Link to="/scolarite/groupes" className={`nav-item ${isActive('/scolarite/groupes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-diagram-3"></i> <span className="nav-label">Groupes</span></span>
+              </Link>
+            </>
           )}
           {canViewRattrapages && (
             <Link to="/rattrapages" className={`nav-item ${isActive('/rattrapages') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
@@ -199,7 +227,7 @@ function Layout({ children, breadcrumb }) {
               <span>
                 <i className={`bi ${canViewFinanceModule ? 'bi-cash-stack' : 'bi-person-video3'}`}></i>
                 {' '}
-                <span className="nav-label">{canViewFinanceModule ? 'Suivi Finance' : 'Formateurs'}</span>
+                <span className="nav-label">{canViewFinanceModule ? 'Suivi Finance' : 'Enseignants'}</span>
               </span>
             </Link>
           )}
@@ -256,8 +284,8 @@ function Layout({ children, breadcrumb }) {
           <Link to="/profile" className={`nav-item ${path === '/profile' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
             <span><i className="bi bi-person-circle"></i> <span className="nav-label">Mon profil</span></span>
           </Link>
-          <div className="nav-label" style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', fontSize: '0.68rem', color: 'var(--text-muted)', opacity: 0.7, lineHeight: 1.4 }}>
-            Developpé par<br/>
+          <div className="nav-label" style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+            Développé par<br/>
             <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>Ophir Technologies</span>
           </div>
         </div>
@@ -377,21 +405,21 @@ function App() {
           } />
           <Route path="/auditeurs/:participantId/formations/:formationId/fiche" element={
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche auditeur</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche étudiant</li></>}>
                 <FicheAuditeur />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formateurs/:formateurId/modules/:moduleId/fiche" element={
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche formateur</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Fiche enseignant</li></>}>
                 <FicheFormateur />
               </Layout>
             </ProtectedRoute>
           } />
           <Route path="/formations/:id" element={
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Détail</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><ModulesListLink>Cours</ModulesListLink></li><li className="separator">/</li><li>Formation</li></>}>
                 <FormationDetail />
               </Layout>
             </ProtectedRoute>
@@ -405,8 +433,58 @@ function App() {
           } />
           <Route path="/participants" element={
             <ProtectedRoute allowedRoles={PARTICIPANT_LIST_ROLES}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Auditeurs</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Étudiants</li></>}>
                 <Participants />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Scolarité</li></>}>
+                <ScolariteDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/candidatures" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Candidatures</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Candidatures />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/admissions" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Admissions</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <AdmissionsPage />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/inscriptions" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Inscriptions</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Inscriptions />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/etudiants/:id" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Fiche étudiant</li></>}>
+                <FicheEtudiant />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/groupes" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Groupes</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <GroupesPedagogiques />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />
@@ -419,7 +497,7 @@ function App() {
           } />
           <Route path="/formateurs" element={
             <ProtectedRoute allowedRoles={[...OPERATION_VIEW_ROLES, 'FINANCE']}>
-              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formateurs</li></>}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Enseignants</li></>}>
                 <Formateurs />
               </Layout>
             </ProtectedRoute>

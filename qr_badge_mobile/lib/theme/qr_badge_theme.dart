@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 abstract final class AppColors {
   // Aligné sur `frontend/src/index.css` (:root --ci-*)
-  static const Color ciOrange = Color(0xFFF57C00);
-  static const Color ciOrangeDark = Color(0xFFE65100);
-  static const Color ciGreen = Color(0xFF43A047);
-  static const Color ciGreenDark = Color(0xFF388E3C);
+  static const Color ciWarning = Color(0xFFF5B100);
+  static const Color ciWarningDark = Color(0xFFE69700);
+  static const Color ciSuccess = Color(0xFF2277C1);
+  static const Color ciSuccessDark = Color(0xFF1A68AC);
   static const Color ciWhite = Color(0xFFFFFFFF);
-  static const Color ciLight = Color(0xFFFFF8F0);
+  static const Color ciLight = Color(0xFFFFFBF0);
 
   static const Color ciDanger = Color(0xFFC62828);
   static const Color ciBlue = Color(0xFF1565C0);
@@ -19,7 +19,7 @@ abstract final class AppColors {
 
   // Aliases (compat) — éviter des changements en cascade dans les pages.
   static const Color textMuted = textSecondary;
-  static const Color accentOrange = ciOrange;
+  static const Color accentWarning = ciWarning;
 
   // Surfaces
   static const Color cardBg = ciWhite;
@@ -27,18 +27,18 @@ abstract final class AppColors {
   static const Color cardGrey = Color(0xFFF7FAFC);
 
   // Accents utilisés dans l’app mobile
-  static const Color navIndicator = Color(0xFFE8F5E9);
-  static const Color badgeOrangeBg = Color(0xFFFFF3E0);
-  static const Color badgeOrangeFg = ciOrangeDark;
-  static const Color iconQrBg = Color(0xFFE8F5E9);
+  static const Color navIndicator = Color(0xFFE8EFF5);
+  static const Color badgeWarningBg = Color(0xFFFFF8E0);
+  static const Color badgeWarningFg = ciWarningDark;
+  static const Color iconQrBg = Color(0xFFE8EFF5);
 }
 
 ThemeData buildQrBadgeTheme() {
-  const seed = AppColors.ciGreenDark;
+  const seed = AppColors.ciSuccessDark;
   final scheme = ColorScheme.fromSeed(
     seedColor: seed,
-    primary: AppColors.ciGreenDark,
-    secondary: AppColors.ciOrange,
+    primary: AppColors.ciSuccessDark,
+    secondary: AppColors.ciWarning,
     error: AppColors.ciDanger,
     brightness: Brightness.light,
   );
@@ -48,7 +48,7 @@ ThemeData buildQrBadgeTheme() {
     scaffoldBackgroundColor: AppColors.ciLight,
     dividerColor: AppColors.borderColor,
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.ciGreenDark,
+      backgroundColor: AppColors.ciSuccessDark,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
@@ -67,13 +67,13 @@ ThemeData buildQrBadgeTheme() {
         return TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-          color: selected ? AppColors.ciGreenDark : AppColors.textSecondary,
+          color: selected ? AppColors.ciSuccessDark : AppColors.textSecondary,
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
-          color: selected ? AppColors.ciGreenDark : AppColors.textSecondary,
+          color: selected ? AppColors.ciSuccessDark : AppColors.textSecondary,
           size: 24,
         );
       }),
@@ -91,13 +91,13 @@ ThemeData buildQrBadgeTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.ciOrange, width: 2),
+        borderSide: const BorderSide(color: AppColors.ciWarning, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: AppColors.ciOrange,
+        backgroundColor: AppColors.ciWarning,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

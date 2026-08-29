@@ -12,12 +12,12 @@ _MOIS_FR = (
 )
 
 _STATUT_COLORS = {
-    'EN_COURS': '#16a34a',
-    'TERMINE': '#15803d',
-    'FORCE_DFRC': '#22c55e',
-    'ABSENT_NON_BADGE': '#ea580c',
+    'EN_COURS': '#0e58ab',
+    'TERMINE': '#0b478a',
+    'FORCE_DFRC': '#116ed6',
+    'ABSENT_NON_BADGE': '#ea9d0c',
     'HORS_LIGNE_SUSPECT': '#dc2626',
-    'SORTIE_AUTO': '#f97316',
+    'SORTIE_AUTO': '#f9b116',
 }
 
 
@@ -68,7 +68,7 @@ def _build_auditeurs_mobile_donut():
         items.append({
             'label': _('Badgé mobile'),
             'value': breakdown['badge_et_connecte'],
-            'color': '#15803d',
+            'color': '#0b478a',
         })
     if breakdown['connecte_sans_badge']:
         items.append({
@@ -80,7 +80,7 @@ def _build_auditeurs_mobile_donut():
         items.append({
             'label': _('Badgé, liaison inactive'),
             'value': breakdown['badge_sans_liaison'],
-            'color': '#ea580c',
+            'color': '#ea9d0c',
         })
 
     return build_donut(items)
@@ -98,7 +98,7 @@ def _build_admin_charts():
             'value': item['total'],
         }
         for item in historique['pointages_par_mois']
-    ], color='#15803d')
+    ], color='#0b478a')
 
     taux_presence = build_stacked_bars([
         {
@@ -181,7 +181,7 @@ def admin_dashboard_callback(request, context):
             'link': 'admin:formations_module_changelist',
         },
         {
-            'label': _('Auditeurs'),
+            'label': _('Étudiants'),
             'value': Participant.objects.count(),
             'icon': 'groups',
             'link': 'admin:formations_participant_changelist',
@@ -193,7 +193,7 @@ def admin_dashboard_callback(request, context):
             'link': 'admin:presences_pointage_changelist',
         },
         {
-            'label': _('Auditeurs mobile'),
+            'label': _('Étudiants mobile'),
             'value': f'{badgeurs_mobile} / {connectes_mobile}',
             'detail': _('badgeage · appareil lié'),
             'icon': 'smartphone',

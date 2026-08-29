@@ -27,6 +27,10 @@ class CategorieReferentielTest(TestCase):
         self.assertEqual(normalize_categorie_raw('FABA'), 'FAB A')
         self.assertEqual(normalize_categorie_raw('fab a'), 'FAB A')
 
+    def test_normalize_preserve_codes_injs(self):
+        for code in ('SFC', 'SST', 'SFO', 'SAC', 'SSC', 'SEN'):
+            self.assertEqual(normalize_categorie_raw(code), code)
+
     def test_resolve_lettre_et_famille(self):
         self.assertEqual(resolve_categorie_ref('A'), 'A')
         self.assertEqual(resolve_categorie_ref('FAB A'), 'A')

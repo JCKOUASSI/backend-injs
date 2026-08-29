@@ -15,15 +15,15 @@ from .bilans import (
 )
 
 # Couleurs CPFAE (aRGB openpyxl)
-C_HEADER = 'FFFCD5B4'
-C_HEADER_DARK = 'FFF4B084'
+C_HEADER = 'FFFCE7B4'
+C_HEADER_DARK = 'FFF4CF84'
 C_GRAY = 'FFD9D9D9'
 C_BLUE = 'FF99CCFF'
 C_PINK = 'FFCCFF'
-C_GREEN = 'FFA9D08E'
+C_GREEN = 'FF77BCE7'
 C_TD_BLUE = 'FFDDEBF7'
-C_TD_TOTAL = 'FFFFD966'
-C_TD_DATA = 'FFFFFBF5'
+C_TD_TOTAL = 'FFFFE566'
+C_TD_DATA = 'FFFFFDF5'
 C_BLACK = 'FF000000'
 
 
@@ -376,10 +376,10 @@ def _pdf_effectifs_table(data, title_style, Table, TableStyle, colors, Paragraph
     ]
     t = Table(rows, repeatRows=1)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#FCD5B4')),
+        ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#FCE7B4')),
         ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#99CCFF')),
         ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#FFCCFF')),
-        ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#A9D08E')),
+        ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#77BCE7')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -435,8 +435,8 @@ def _pdf_formation_table(data, title_style, Table, TableStyle, colors, Paragraph
 
     t = Table(rows, repeatRows=1)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCD5B4')),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#FFD966')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCE7B4')),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#FFE566')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -579,7 +579,7 @@ def _export_word_html(tableaux):
             parts.append(f"<h3 style=\"text-align:center\">{tb.get('titre', 'BILAN')}</h3>")
             if tb['type'] in ('effectifs_module', 'effectifs_categorie'):
                 parts.append('<table border="1" cellpadding="4"><tr>')
-                for h in ['Auditeurs', 'Présents', 'Masculin', 'Féminin', 'Absents']:
+                for h in ['Étudiants', 'Présents', 'Masculin', 'Féminin', 'Absents']:
                     parts.append(f'<th>{h}</th>')
                 parts.append('</tr><tr>')
                 for k in ['effectifs_auditeurs', 'effectifs_presents', 'masculin', 'feminin', 'absents']:

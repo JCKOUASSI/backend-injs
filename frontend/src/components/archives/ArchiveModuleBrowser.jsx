@@ -19,9 +19,9 @@ const STATUT_LABELS = {
 
 const STATUT_COLORS = {
   PLANIFIEE: { background: '#e3f2fd', color: '#0d47a1' },
-  EN_COURS: { background: '#fff8e1', color: '#f57f17' },
+  EN_COURS: { background: '#fffae1', color: '#f5b417' },
   SUSPENDUE: { background: '#fce4ec', color: '#ad1457' },
-  TERMINEE: { background: '#e8f5e9', color: '#1b5e20' },
+  TERMINEE: { background: '#e8eff5', color: '#093f70' },
 }
 
 /**
@@ -33,7 +33,7 @@ export default function ArchiveModuleBrowser({
   title,
   description,
   icon = 'bi-folder2-open',
-  accent = '#1b5e20',
+  accent = '#001a33',
   documentVerb = 'Consulter',
   renderDocument,
 }) {
@@ -219,8 +219,8 @@ export default function ArchiveModuleBrowser({
           <p style={{ fontWeight: 600, marginTop: '1rem' }}>Aucun module archivé pour le moment</p>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 0 }}>
             Les documents n'apparaissent ici qu'après archivage par le secrétariat ou la direction
-            (bouton <strong>Archiver</strong> sur la page Cours).
-            Tant qu'aucun cours n'a été archivé, cet espace reste vide.
+            (bouton <strong>Archiver</strong> sur la page Modules).
+            Tant qu'aucun module n'a été archivé, cet espace reste vide.
           </p>
         </div>
       ) : (
@@ -251,12 +251,12 @@ export default function ArchiveModuleBrowser({
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {m.grade && <span style={badgeStyle('#e8eaf6', '#283593')}>{m.grade}</span>}
-                    {m.groupe && <span style={badgeStyle('#e0f2f1', '#00695c')}>{m.groupe}</span>}
-                    {m.vague && <span style={badgeStyle('#fff3e0', '#e65100')}>{m.vague}</span>}
+                    {m.groupe && <span style={badgeStyle('#e0f2f1', '#082961')}>{m.groupe}</span>}
+                    {m.vague && <span style={badgeStyle('#fff8e0', '#e69700')}>{m.vague}</span>}
                     {m.secretariat_nom && <span style={badgeStyle('#f3e5f5', '#6a1b9a')}><i className="bi bi-building me-1"></i>{m.secretariat_nom}</span>}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                    <span><i className="bi bi-people me-1"></i>{m.nb_participants ?? 0} auditeur{(m.nb_participants ?? 0) !== 1 ? 's' : ''}</span>
+                    <span><i className="bi bi-people me-1"></i>{m.nb_participants ?? 0} étudiant{(m.nb_participants ?? 0) !== 1 ? 's' : ''}</span>
                     {(m.date_debut || m.date_fin) && (
                       <span><i className="bi bi-calendar3 me-1"></i>{m.date_debut ? formatDate(m.date_debut) : '?'}{m.date_fin ? ` → ${formatDate(m.date_fin)}` : ''}</span>
                     )}
@@ -292,7 +292,7 @@ export default function ArchiveModuleBrowser({
       {unarchiveTarget && (
         <ConfirmModal
           message={`Désarchiver le module « ${unarchiveTarget.module} » ?`}
-          detail="Le module réapparaîtra dans les listes opérationnelles (Cours, secrétariat, encadrants, statistiques)."
+          detail="Le module réapparaîtra dans les listes opérationnelles (Modules, secrétariat, encadrants, statistiques)."
           confirmLabel="Désarchiver"
           variant="primary"
           onConfirm={confirmUnarchive}

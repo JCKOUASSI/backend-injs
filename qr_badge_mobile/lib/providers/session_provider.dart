@@ -67,7 +67,7 @@ class SessionProvider extends ChangeNotifier {
         seanceLabel: _openSessionSeanceLabel,
       );
 
-  /// Questionnaires d'évaluation non encore remplis (auditeurs).
+  /// Questionnaires d'évaluation non encore remplis (étudiants).
   int pendingEvaluationsCount = 0;
 
   /// Vrai une fois si une session ouverte a été reprise au démarrage (snackbar unique).
@@ -91,7 +91,7 @@ class SessionProvider extends ChangeNotifier {
   int? _remoteHeartbeatIntervalSec;
   bool? _remoteEvaluationsEnabled;
 
-  /// Onglet « Évaluations » visible pour les comptes auditeur (participant).
+  /// Onglet « Évaluations » visible pour les comptes étudiant (participant).
   bool get evaluationsEnabled {
     if (_remoteEvaluationsEnabled != null) {
       return _remoteEvaluationsEnabled!;

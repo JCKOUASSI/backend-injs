@@ -67,7 +67,7 @@ def export_fiche_auditeur_excel(fiche):
         raise RuntimeError('openpyxl non disponible')
     wb = Workbook()
     ws = wb.active
-    ws.title = 'Fiche Auditeur'
+    ws.title = 'Fiche Étudiant'
     ws['A1'] = f"Fiche académique — {fiche.participant.nom} {fiche.participant.prenom}"
     ws['A2'] = f"Formation: {fiche.formation.formation}"
     ws['A1'].font = Font(bold=True)

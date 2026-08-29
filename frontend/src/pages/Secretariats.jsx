@@ -118,7 +118,7 @@ export default function Secretariats() {
   const getTypeBadge = (typeId) => {
     const t = typesSecretariat.find(x => x.id === typeId)
     if (!t) return null
-    const colors = ['#1565C0', '#2E7D32', '#E65100', '#6A1B9A', '#00838F']
+    const colors = ['#1565C0', '#125A99', '#E69700', '#6A1B9A', '#00838F']
     const idx = typesSecretariat.indexOf(t)
     return { label: t.libelle, color: colors[idx % colors.length] }
   }
@@ -167,7 +167,7 @@ export default function Secretariats() {
                     <th>Nom</th>
                     <th>Type</th>
                     <th>Membres</th>
-                    <th>Auditeurs</th>
+                    <th>Étudiants</th>
                     <th>Modules</th>
                     <th>Actions</th>
                   </tr>
@@ -193,7 +193,7 @@ export default function Secretariats() {
                           <button
                             className="btn btn-outline-secondary btn-sm"
                             onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-                            title="Membres de l'équipe (secrétariat, encadrants…) — hors comptes auditeurs"
+                            title="Membres de l'équipe (secrétariat, encadrants…) — hors comptes étudiants"
                           >
                             <i className={`bi bi-${expanded === s.id ? 'chevron-up' : 'people'} me-1`}></i>
                             {equipe.length}
@@ -227,8 +227,8 @@ export default function Secretariats() {
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', padding: '0.4rem 0' }}>
                                 {equipe.map(m => (
                                   <span key={m.id} style={{
-                                    background: m.is_active ? '#e8f5e9' : '#fce4ec',
-                                    border: `1px solid ${m.is_active ? '#a5d6a7' : '#f48fb1'}`,
+                                    background: m.is_active ? '#e8eff5' : '#fce4ec',
+                                    border: `1px solid ${m.is_active ? '#94c0e7' : '#f48fb1'}`,
                                     borderRadius: 4, padding: '2px 8px', fontSize: '0.8rem'
                                   }}>
                                     <i className="bi bi-person me-1"></i>{m.nom}
@@ -240,7 +240,7 @@ export default function Secretariats() {
                             ) : (
                               <small className="text-muted">
                                 <i className="bi bi-info-circle me-1"></i>
-                                Aucun membre d&apos;équipe (secrétariat, encadrants…). Rattachez-les depuis <strong>Utilisateurs</strong>. Les comptes badge <strong>Auditeur</strong> et <strong>Formateur</strong> sont listés dans <strong>Utilisateurs</strong> — onglets dédiés.
+                                Aucun membre d&apos;équipe (secrétariat, encadrants…). Rattachez-les depuis <strong>Utilisateurs</strong>. Les comptes badge <strong>Étudiant</strong> et <strong>Enseignant</strong> sont listés dans <strong>Utilisateurs</strong> — onglets dédiés.
                               </small>
                             )}
                           </td>
@@ -292,14 +292,14 @@ export default function Secretariats() {
                       <option key={t.id} value={t.id}>{t.libelle}</option>
                     ))}
                   </select>
-                  <small className="text-muted">Le type détermine les grades d'auditeurs visibles pour ce secrétariat.</small>
+                  <small className="text-muted">Le type détermine les grades d'étudiants visibles pour ce secrétariat.</small>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Description</label>
                   <textarea className="form-control" rows="2"
                     value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                 </div>
-                <div style={{ background: '#fff8e1', border: '1px solid #ffe082', borderRadius: 6, padding: '0.5rem 0.75rem' }}>
+                <div style={{ background: '#fffae1', border: '1px solid #ffea82', borderRadius: 6, padding: '0.5rem 0.75rem' }}>
                   <small><i className="bi bi-info-circle me-1"></i>
                     Après création, allez dans <strong>Utilisateurs</strong> pour assigner des utilisateurs à ce secrétariat.
                   </small>

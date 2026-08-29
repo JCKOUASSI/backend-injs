@@ -514,7 +514,7 @@ def _merge_session_events(sessions_by_id):
 def ensure_audit_edt_slots(module, merged, *, dry_run=False):
     """
     Crée les créneaux EDT (date, numéro) absents du survivant mais présents dans l'audit.
-    Copie horaires prévus depuis un module parallèle (#372…) si disponible.
+    Copie horaires prévus depuis un module parallèle (#0b578e…) si disponible.
     """
     stats = {'created': 0}
     intitule = module.intitule

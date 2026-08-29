@@ -16,16 +16,16 @@ except Exception:
 
 _HEADER_LINES = [
     "RÉPUBLIQUE DE CÔTE D'IVOIRE",
-    "Ministère de la Fonction Publique et de la Modernisation de l'Administration",
-    "Direction de la Formation et du Renforcement des Capacités (DFRC)",
-    "Centre de Perfectionnement des Fonctionnaires et Agents de l'État — CPFAE",
+    "Ministère de la Promotion des Sports et du Développement de l'Économie Sportive",
+    "Institut National de la Jeunesse et des Sports (INJS)",
+    "UFR STAPS-JL — Système LMD",
 ]
 
-CI_GREEN_DARK = colors.HexColor('#388E3C')
-CI_LIGHT_GREEN = colors.HexColor('#E8F5E9')
+CI_GREEN_DARK = colors.HexColor('#1A68AC')
+CI_LIGHT_GREEN = colors.HexColor('#E8EFF5')
 GREY_LINE = colors.HexColor('#9E9E9E')
 ROW_ALT = colors.HexColor('#F7F7F7')
-ADMIS_GREEN = colors.HexColor('#1B5E20')
+ADMIS_GREEN = colors.HexColor('#093F70')
 REFUSE_RED = colors.HexColor('#B71C1C')
 
 MENTION_LABELS = {
@@ -275,7 +275,7 @@ def build_fiche_module_pdf(data):
             refuse_cells.append((admis_col, index))
 
     if len(table_data) == 1:
-        elements.append(Paragraph('Aucun auditeur inscrit à ce module.', styles['normal']))
+        elements.append(Paragraph('Aucun étudiant inscrit à ce module.', styles['normal']))
     else:
         table = Table(
             table_data,
@@ -308,7 +308,7 @@ def build_fiche_module_pdf(data):
     stats = data['stats']
     elements.append(Spacer(1, 8))
     elements.append(Paragraph(
-        f"<b>{stats['total']}</b> auditeur(s) inscrit(s) · <b>{stats['notes']}</b> noté(s)"
+        f"<b>{stats['total']}</b> étudiant(s) inscrit(s) · <b>{stats['notes']}</b> noté(s)"
         f" · Moyenne de classe : <b>{_fmt_note(stats['moyenne_classe'])}/20</b>"
         f" · Admis : <b>{stats['admis']}</b> · Non admis : <b>{stats['non_admis']}</b>",
         styles['normal'],
@@ -353,7 +353,7 @@ def build_fiche_auditeur_pdf(data):
     elements.append(Paragraph(f"{row['nom']} {row['prenom']}", styles['subtitle']))
     elements.append(Spacer(1, 10))
 
-    elements.append(Paragraph("Auditeur", styles['section']))
+    elements.append(Paragraph("Étudiant", styles['section']))
     elements += _meta_table([
         ('N° inscription', row['matricule']),
         ('Grade', row['grade']),

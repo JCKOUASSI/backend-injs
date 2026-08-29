@@ -172,7 +172,7 @@ export default function QRCodeModal({
               <canvas ref={canvasRef} />
             </div>
             {token && !loading && scopeLabel && (
-              <p className="fw-semibold mb-2" style={{ color: '#388E3C' }}>
+              <p className="fw-semibold mb-2" style={{ color: 'var(--navy)' }}>
                 {scopeLabel}
               </p>
             )}

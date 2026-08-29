@@ -51,7 +51,7 @@ const HERO_KPIS = [
     kpiKey: 'total_duree_realisee_minutes',
     format: 'duration',
     evolutionKey: 'total_duree_realisee_minutes',
-    sub: (kpis) => `${kpis.formateurs_actifs ?? 0} formateur(s) actif(s)`,
+    sub: (kpis) => `${kpis.formateurs_actifs ?? 0} enseignant(s) actif(s)`,
   },
   {
     id: 'taux',
@@ -88,7 +88,7 @@ const KPI_GROUPS = [
     title: 'Effectifs',
     iconClass: 'finance-kpi-card-icon--people',
     items: [
-      { key: 'total_formateurs', label: 'Formateurs', icon: 'bi-person-video3' },
+      { key: 'total_formateurs', label: 'Enseignants', icon: 'bi-person-video3' },
       { key: 'formateurs_actifs', label: 'Actifs', icon: 'bi-person-check' },
       { key: 'formateurs_inactifs', label: 'Inactifs', icon: 'bi-person-dash' },
     ],
@@ -105,7 +105,7 @@ const KPI_GROUPS = [
     title: 'Moyenne',
     iconClass: 'finance-kpi-card-icon--time',
     items: [
-      { key: 'moyenne_heures_realisees_par_formateur', label: 'Moy. h / actif', format: 'hours', icon: 'bi-graph-up' },
+      { key: 'moyenne_heures_realisees_par_enseignant', label: 'Moy. h / actif', format: 'hours', icon: 'bi-graph-up' },
     ],
   },
 ]
@@ -239,7 +239,7 @@ export default function FinanceDashboard() {
   return (
     <FinancePageShell
       title="Tableau de Bord Finance"
-      subtitle="Suivi des temps de cours et rémunération des formateurs"
+      subtitle="Suivi des temps de cours et rémunération des enseignants"
       icon="bi-speedometer2"
       actions={<FinanceNavActions active="dashboard" />}
       period={period}
@@ -354,7 +354,7 @@ export default function FinanceDashboard() {
                   <div className="finance-table-wrap">
                     <table className="finance-table">
                       <thead>
-                        <tr><th>Spécialité</th><th style={{ textAlign: 'right' }}>Formateurs</th></tr>
+                        <tr><th>Spécialité</th><th style={{ textAlign: 'right' }}>Enseignants</th></tr>
                       </thead>
                       <tbody>
                         {specialites.map((s) => (
@@ -364,7 +364,7 @@ export default function FinanceDashboard() {
                               <span
                                 className="badge-bg-info"
                                 style={{ cursor: 'pointer' }}
-                                title="Voir les formateurs"
+                                title="Voir les enseignants"
                                 onClick={() => setSpecialiteDrill(s)}
                               >{s.count}</span>
                             </td>
@@ -380,7 +380,7 @@ export default function FinanceDashboard() {
 
           <section className="finance-section">
             <div className="finance-section-header">
-              <h2><i className="bi bi-trophy"></i>Classement formateurs</h2>
+              <h2><i className="bi bi-trophy"></i>Classement enseignants</h2>
             </div>
             <div className="finance-rank-tabs">
               {[
@@ -403,7 +403,7 @@ export default function FinanceDashboard() {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Formateur</th>
+                    <th>Enseignant</th>
                     <th>Spécialité</th>
                     <th>Séances</th>
                     <th>{activeRank.label}</th>
@@ -438,7 +438,7 @@ export default function FinanceDashboard() {
 
           <section className="finance-section">
             <div className="finance-section-header">
-              <h2><i className="bi bi-table"></i>Fiche de paie globale — synthèse formateurs</h2>
+              <h2><i className="bi bi-table"></i>Fiche de paie globale — synthèse enseignants</h2>
               <span className="badge-bg-secondary">
                 {synthese.length} formateur(s)
                 {syntheseTotalPages > 1 && (
@@ -490,7 +490,7 @@ export default function FinanceDashboard() {
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_minutes)}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>{fmtDuration(f.total_duree_realisee_minutes)}</td>
-                        <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-green)' }}>
+                        <td style={{ whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--fin-accent)' }}>
                           {formatMoney(f.montant_total_realise)} F
                         </td>
                       </tr>
@@ -498,7 +498,7 @@ export default function FinanceDashboard() {
                   }) : (
                     <tr>
                       <td colSpan="13">
-                        <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun formateur</div>
+                        <div className="finance-empty"><i className="bi bi-inbox"></i>Aucun enseignant</div>
                       </td>
                     </tr>
                   )}
@@ -544,7 +544,7 @@ export default function FinanceDashboard() {
                 </div>
                 <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                   {(specialiteDrill.formateurs || []).length === 0 ? (
-                    <p className="text-muted">Aucun formateur.</p>
+                    <p className="text-muted">Aucun enseignant.</p>
                   ) : (
                     <table className="finance-table">
                       <thead>

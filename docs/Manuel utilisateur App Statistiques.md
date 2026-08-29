@@ -112,7 +112,7 @@ Les rôles **SECRETARIAT** et **CHEF_SECRETARIAT** voient automatiquement les do
 | **Point Journalier** | Calendrier | Point journalier quotidien CPFAE |
 | **Alertes** | Cloche | Seuils et surveillance visuelle |
 
-L'onglet actif est souligné en **vert** (#43A047).
+L'onglet actif est souligné en **vert** (#2277C1).
 
 ---
 
@@ -169,7 +169,7 @@ Chaque jauge indique : valeur actuelle, seuils ⚠ et 🔴, niveau (Conforme / A
 | Carte | Intitulé | Signification |
 |-------|----------|---------------|
 | 1 | **Formations** | Nombre de formations actives dans le périmètre |
-| 2 | **Modules / Cours** | Nombre de modules |
+| 2 | **Modules** | Nombre de modules (plusieurs modules peuvent appartenir à une même formation) |
 | 3 | **Auditeurs** | Participants inscrits |
 | 4 | **Formateurs** | Encadrants référencés |
 | 5 | **Séances totales** | Sessions programmées |
@@ -345,7 +345,7 @@ Compteur en tête de liste : `X bilans · Par Module` (ou Catégorie / Formation
 | 4 | **FEMININ** | Présentes femmes + % des présents |
 | 5 | **ABSENTS** | Absents + % de l'effectif total |
 
-**Couleurs en-têtes :** orange (#FCD5B4), gris (genre), bleu (M), rose (F), vert (Absents).
+**Couleurs en-têtes :** orange (#FCE7B4), gris (genre), bleu (M), rose (F), vert (Absents).
 
 **Calcul :** un auditeur est « présent » s'il possède au moins un pointage au statut présent sur les séances filtrées (année, mois ou date calendrier).
 
@@ -581,6 +581,9 @@ Réservée aux **validateurs / administrateurs** :
 | 2.2.2 | 16/06/2026 | Règle absents notoires : module démarré + aucune présence enregistrée (ou motif notoire) |
 | 2.2.3 | 16/06/2026 | Point journalier : colonnes GROUPES limitées aux groupes avec séance le jour J (MATIN/SOIR) |
 | 2.2.4 | 16/06/2026 | Bilans effectifs (module / catégorie / matière) : aucun tableau si aucune séance comptabilisable sur la période |
+| 2.2.5 | 26/08/2026 | Charte visuelle alignée sur la page de connexion INJS (navy / bleu poussiéreux) : onglets, bandeaux de section et boutons d’action. Les indicateurs de conformité / présence restent en vert. |
+| 2.2.6 | 26/08/2026 | Libellés INJS : « Auditeurs » → « Étudiants », « Formateurs » → « Enseignants » (KPI, cartes, tableaux). Les codes API restent inchangés. |
+| 2.2.7 | 26/08/2026 | KPI « Modules / Cours » → « Modules » : une formation peut regrouper un ou plusieurs modules. |
 
 ---
 

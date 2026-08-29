@@ -101,7 +101,7 @@ export default function FinanceEncadrants() {
       <div className="finance-card mb-3">
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <p className="text-muted small mb-0">
-            Rapport basé sur les modules supervisés (encadrant assigné au cours).
+            Rapport basé sur les modules supervisés (encadrant assigné au module).
           </p>
           <div className="d-flex flex-wrap gap-2">
             <button

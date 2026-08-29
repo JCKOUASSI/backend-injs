@@ -6,14 +6,14 @@ import ConfirmModal from '../components/ConfirmModal'
 
 const ROLE_LABELS = {
   DIRECTION: 'Direction',
-  CHEF_CPFAE_ADMIN: 'Chef CPFAE Admin',
-  CPFAE_ADMIN: 'CPFAE Admin',
+  CHEF_CPFAE_ADMIN: 'Chef INJS Admin',
+  CPFAE_ADMIN: 'INJS Admin',
   CHEF_SECRETARIAT: 'Chef Secrétariat',
   SECRETARIAT: 'Secrétariat',
   FINANCE: 'Finance',
   ENCADRANT: 'Encadrant',
-  FORMATEUR: 'Formateur',
-  AUDITEUR: 'Auditeur',
+  FORMATEUR: 'Enseignant',
+  AUDITEUR: 'Étudiant',
 }
 
 const emptyForm = {

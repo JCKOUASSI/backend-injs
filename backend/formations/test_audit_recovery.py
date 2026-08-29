@@ -49,7 +49,7 @@ class AuditRecoveryMatchingTest(TestCase):
             for day in (self.d15, self.d16, self.d17):
                 SessionModule.objects.create(module=mod, date_journee=day, numero=2)
 
-        # #372 a déjà les horaires (survivant du doublon #312)
+        # #0b578e a déjà les horaires (survivant du doublon #312)
         stop_312 = timezone.make_aware(datetime(2026, 6, 15, 17, 25, 54))
         start_312 = timezone.make_aware(datetime(2026, 6, 15, 13, 5, 32))
         s372 = SessionModule.objects.get(module=self.surv_372, date_journee=self.d15, numero=2)

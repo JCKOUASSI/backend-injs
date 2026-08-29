@@ -7,11 +7,11 @@ import { useReferentiels } from '../hooks/useReferentiels'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import Pagination from '../components/Pagination'
 
-const CIBLE_LABELS = { COURS: 'Évaluation du cours', FORMATEUR: 'Évaluation du formateur' }
+const CIBLE_LABELS = { COURS: 'Évaluation du module', FORMATEUR: "Évaluation de l'enseignant" }
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS = {
-  BROUILLON: { background: '#fff3e0', color: '#e65100' },
-  PUBLIE:    { background: '#e8f5e9', color: '#2e7d32' },
+  BROUILLON: { background: '#fff8e0', color: '#e69700' },
+  PUBLIE:    { background: '#e8eff5', color: '#125a99' },
   FERME:     { background: '#f5f5f5', color: '#616161' },
 }
 
@@ -70,7 +70,7 @@ function AuditeurEvaluationList() {
                       const sc = SECTION_COLORS[s]
                       return (
                         <span key={s} style={{ fontSize: '0.75rem', background: sc.bg, color: sc.color, padding: '2px 10px', borderRadius: '20px', fontWeight: 600 }}>
-                          <i className={`bi ${sc.icon} me-1`}></i>{s === 'COURS' ? 'Cours' : 'Formateur'}
+                          <i className={`bi ${sc.icon} me-1`}></i>{s === 'COURS' ? 'Module' : 'Enseignant'}
                         </span>
                       )
                     })}
@@ -212,7 +212,7 @@ export default function EvaluationList() {
         <div>
           <h2 style={{ margin: 0, fontWeight: 700 }}>Évaluations</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Gérez les questionnaires d'évaluation des cours et formateurs
+            Gérez les questionnaires d'évaluation des modules et enseignants
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -231,8 +231,8 @@ export default function EvaluationList() {
           onChange={e => setFilters(f => ({ ...f, cible: e.target.value }))}
         >
           <option value="">Toutes les cibles</option>
-          <option value="COURS">Cours</option>
-          <option value="FORMATEUR">Formateur</option>
+          <option value="COURS">Module</option>
+          <option value="FORMATEUR">Enseignant</option>
         </select>
         <select
           className="form-select form-select-sm"
@@ -302,7 +302,7 @@ export default function EvaluationList() {
                       <span key={g} style={{ fontSize: '0.72rem', background: '#e8eaf6', color: '#283593', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
                     ))}
                     {(q.groupes || []).map(g => (
-                      <span key={g} style={{ fontSize: '0.72rem', background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
+                      <span key={g} style={{ fontSize: '0.72rem', background: '#fff8e0', color: '#e69700', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
                     ))}
                   </div>
                   <h4 style={{ margin: 0, fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', color: 'var(--primary)' }}
@@ -395,8 +395,8 @@ export default function EvaluationList() {
                 <div>
                   <label className="form-label" style={{ fontWeight: 600 }}>Cible <span style={{ color: 'red' }}>*</span></label>
                   <select className="form-select" value={form.cible} onChange={e => setForm(f => ({ ...f, cible: e.target.value }))}>
-                    <option value="COURS">Cours</option>
-                    <option value="FORMATEUR">Formateur</option>
+                    <option value="COURS">Module</option>
+                    <option value="FORMATEUR">Enseignant</option>
                   </select>
                 </div>
 
@@ -451,7 +451,7 @@ export default function EvaluationList() {
                   </label>
                   <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignContent: 'flex-start', padding: '0.25rem' }}>
                     {refGroupes.map(g => (
-                      <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: form.groupes.includes(g) ? '#e65100' : 'var(--border)', background: form.groupes.includes(g) ? '#fff3e0' : 'transparent', color: form.groupes.includes(g) ? '#e65100' : 'inherit', fontSize: '0.85rem', fontWeight: form.groupes.includes(g) ? 700 : 400, transition: 'all .15s' }}>
+                      <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: form.groupes.includes(g) ? '#e69700' : 'var(--border)', background: form.groupes.includes(g) ? '#fff8e0' : 'transparent', color: form.groupes.includes(g) ? '#e69700' : 'inherit', fontSize: '0.85rem', fontWeight: form.groupes.includes(g) ? 700 : 400, transition: 'all .15s' }}>
                         <input type="checkbox" style={{ display: 'none' }} checked={form.groupes.includes(g)} onChange={() => toggleItem('groupes', g)} />
                         {g}
                       </label>

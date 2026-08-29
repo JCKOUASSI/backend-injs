@@ -291,7 +291,7 @@ def export_pdf_fac(data):
         ])
     t = Table(rows, repeatRows=1)
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCD5B4')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCE7B4')),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('FONTSIZE', (0, 0), (-1, -1), 7),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -314,7 +314,7 @@ def export_pdf_fac(data):
     if len(abs_rows) > 1:
         t2 = Table(abs_rows, repeatRows=1)
         t2.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCD5B4')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FCE7B4')),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ('FONTSIZE', (0, 0), (-1, -1), 7),
         ]))

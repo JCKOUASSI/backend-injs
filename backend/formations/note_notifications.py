@@ -38,7 +38,7 @@ def notifier_modification_note(modificateur, participant, module, colonne, ancie
         return
 
     auteur_nom = modificateur.get_full_name() or modificateur.username
-    auditeur_nom = f'{participant.nom} {participant.prenom}'.strip() or participant.matricule or 'Auditeur'
+    auditeur_nom = f'{participant.nom} {participant.prenom}'.strip() or participant.matricule or 'Étudiant'
     module_lib = module.intitule or str(module)
     colonne_lib = colonne.libelle
     old_str = f'{ancienne_note}' if ancienne_note is not None else '—'

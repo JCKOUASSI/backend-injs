@@ -153,7 +153,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
             children: [
               const QrBadgeLogo(
                 size: 52,
-                color: AppColors.ciGreenDark,
+                color: AppColors.ciSuccessDark,
                 backgroundColor: AppColors.iconQrBg,
               ),
               const SizedBox(width: 14),
@@ -193,7 +193,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
             HomeSummaryCard(
               icon: Icons.phonelink_lock,
               iconBg: AppColors.iconQrBg,
-              iconColor: AppColors.ciGreenDark,
+              iconColor: AppColors.ciSuccessDark,
               title: 'Dernier scan',
               subtitle: dernierSousTitre,
               trailing: Row(
@@ -202,7 +202,7 @@ class _HomeDashboardPageState extends State<HomeDashboardPage>
                   if (dernier != null)
                     const StatusPill(
                       label: 'Enregistré',
-                      color: AppColors.ciGreenDark,
+                      color: AppColors.ciSuccessDark,
                       backgroundColor: AppColors.navIndicator,
                       icon: Icons.check,
                     ),

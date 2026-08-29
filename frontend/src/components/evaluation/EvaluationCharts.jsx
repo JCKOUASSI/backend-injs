@@ -1,5 +1,5 @@
-const CHART_COLORS = ['#4f46e5', '#e65100', '#26a69a', '#6a1b9a', '#1565c0', '#c62828', '#558b2f', '#ff8f00']
-const NOTE_COLORS = ['#ef5350', '#ff8f00', '#fdd835', '#66bb6a', '#26a69a']
+const CHART_COLORS = ['#4f46e5', '#e69700', '#0f4fbd', '#6a1b9a', '#1565c0', '#c62828', '#0f70ab', '#ffbf00']
+const NOTE_COLORS = ['#ef5350', '#ffbf00', '#fde135', '#4895d9', '#0f4fbd']
 
 export function ChartEmpty({ label = 'Aucune donnée' }) {
   return (
@@ -133,7 +133,7 @@ export function HorizontalBarChart({ data, labelKey = 'label', valueKey = 'value
 }
 
 /** Tendance temporelle (soumissions par jour) */
-export function TrendChart({ data, valueKey = 'nb', color = '#26a69a', height = 140 }) {
+export function TrendChart({ data, valueKey = 'nb', color = '#0f4fbd', height = 140 }) {
   if (!data?.length) return <ChartEmpty label="Pas encore de tendance (soumissions)" />
 
   const max = Math.max(...data.map(d => d[valueKey] || 0), 1)

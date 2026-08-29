@@ -28,8 +28,8 @@ const DECISION_LABELS = {
 }
 
 const DECISION_COLORS = {
-  ADMIS: { background: '#e8f5e9', color: '#1b5e20' },
-  AJOURNE: { background: '#fff3e0', color: '#e65100' },
+  ADMIS: { background: '#e8eff5', color: '#093f70' },
+  AJOURNE: { background: '#fff8e0', color: '#e69700' },
   EXCLUSION: { background: '#ffebee', color: '#b71c1c' },
   EN_ATTENTE: { background: '#f5f5f5', color: '#616161' },
 }
@@ -730,7 +730,7 @@ export default function ParticipantDetailModal({
                   {notesLoading ? (
                     <div className="loading py-4"><div className="spinner"></div></div>
                   ) : modules?.length === 0 ? (
-                    <div className="finance-empty"><i className="bi bi-pencil-square"></i>Aucun cours inscrit</div>
+                    <div className="finance-empty"><i className="bi bi-pencil-square"></i>Aucun module inscrit</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -961,7 +961,7 @@ export default function ParticipantDetailModal({
                                     </div>
                                     <div className="text-muted small mt-2">
                                       <i className="bi bi-info-circle me-1"></i>
-                                      Admis si moyenne ≥ {seuilNote}/20 et temps de cours effectué ≥ {seuilTaux}%
+                                      Admis si moyenne ≥ {seuilNote}/20 et présence au module ≥ {seuilTaux}%
                                     </div>
                                     {canManageNotes && (
                                       <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>

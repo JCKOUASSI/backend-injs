@@ -7,7 +7,7 @@ class QrBadgeLogo extends StatelessWidget {
   const QrBadgeLogo({
     super.key,
     this.size = 48,
-    this.color = AppColors.ciGreenDark,
+    this.color = AppColors.ciSuccessDark,
     this.backgroundColor,
   });
 

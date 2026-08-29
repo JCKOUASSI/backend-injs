@@ -77,7 +77,7 @@
                     <td>{{ u.email|default:"-" }}</td>
                     <td>
                         <span class="badge"
-                              style="{% if u.role == 'DIRECTION' %}background:#fa5f5f;{% elif u.role == 'CHEF_CPFAE_ADMIN' or u.role == 'CPFAE_ADMIN' %}background:#ef5ce3;{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}background:#388E3C;{% elif u.role == 'ENCADRANT' %}background:#F57C00;{% else %}background:#43A047;{% endif %}">
+                              style="{% if u.role == 'DIRECTION' %}background:#fa5f5f;{% elif u.role == 'CHEF_CPFAE_ADMIN' or u.role == 'CPFAE_ADMIN' %}background:#ef5ce3;{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}background:#1A68AC;{% elif u.role == 'ENCADRANT' %}background:#F5B100;{% else %}background:#2277C1;{% endif %}">
                             {{ role_labels|get_item:u.role|default:u.role }}
                         </span>
                     </td>

@@ -30,12 +30,12 @@ class SessionStatusBanner extends StatelessWidget {
               width: 8,
               height: 8,
               decoration: const BoxDecoration(
-                color: AppColors.ciGreenDark,
+                color: AppColors.ciSuccessDark,
                 shape: BoxShape.circle,
               ),
             ),
             const SizedBox(width: 10),
-            Icon(Icons.sensors, size: 18, color: AppColors.ciGreenDark),
+            Icon(Icons.sensors, size: 18, color: AppColors.ciSuccessDark),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -43,7 +43,7 @@ class SessionStatusBanner extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.ciGreenDark.withValues(alpha: 0.95),
+                  color: AppColors.ciSuccessDark.withValues(alpha: 0.95),
                 ),
               ),
             ),
@@ -70,7 +70,7 @@ class SessionStatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.navIndicator,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.ciGreenDark.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.ciSuccessDark.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -79,7 +79,7 @@ class SessionStatusChip extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: const BoxDecoration(
-              color: AppColors.ciGreenDark,
+              color: AppColors.ciSuccessDark,
               shape: BoxShape.circle,
             ),
           ),
@@ -88,7 +88,7 @@ class SessionStatusChip extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.ciGreenDark,
+                  color: AppColors.ciSuccessDark,
                 ),
           ),
         ],

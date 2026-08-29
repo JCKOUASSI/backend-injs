@@ -89,6 +89,8 @@ INSTALLED_APPS = [
     'dashboard',
     'statistiques',
     'suiviEvaluation',
+    'scolarite.apps.ScolariteConfig',
+    'admissions.apps.AdmissionsConfig',
 ]
 
 MIDDLEWARE = [
@@ -187,6 +189,12 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
+    # Stockage des fichiers uploadés (pièces justificatives de candidature).
+    # Le dossier MEDIA_ROOT n'est pas servi par le serveur web : l'accès aux
+    # documents passe obligatoirement par une vue authentifiée.
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
@@ -308,8 +316,8 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 
 # drf-spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'SYGEP-CPFAE API',
-    'DESCRIPTION': 'API de gestion des formations, participants et badgeage QR.',
+    'TITLE': 'INJS API',
+    'DESCRIPTION': 'API de gestion LMD, scolarité, formations, participants et badgeage QR de l\'INJS.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }

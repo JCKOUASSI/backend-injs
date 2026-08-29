@@ -16,8 +16,8 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'ADMIN', 'Administrateur'
         DIRECTION = 'DIRECTION', 'Direction'
-        CHEF_CPFAE_ADMIN = 'CHEF_CPFAE_ADMIN', 'Chef CPFAE Admin'
-        CPFAE_ADMIN = 'CPFAE_ADMIN', 'CPFAE Admin'
+        CHEF_CPFAE_ADMIN = 'CHEF_CPFAE_ADMIN', 'Chef INJS Admin'
+        CPFAE_ADMIN = 'CPFAE_ADMIN', 'INJS Admin'
         CHEF_SECRETARIAT = 'CHEF_SECRETARIAT', 'Chef Secrétariat'
         SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
         FINANCE = 'FINANCE', 'Finance'
@@ -25,7 +25,7 @@ class User(AbstractUser):
         ENCADRANT = 'ENCADRANT', 'Encadrant'
         SUPERVISEUR = 'SUPERVISEUR', 'Superviseur'
         FORMATEUR = 'FORMATEUR', 'Formateur'
-        AUDITEUR = 'AUDITEUR', 'Auditeur'
+        AUDITEUR = 'AUDITEUR', 'Étudiant'
 
     role = models.CharField(
         max_length=30,

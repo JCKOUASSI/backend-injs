@@ -152,7 +152,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             trailing: pendingEval > 0
                 ? Badge(
                     label: Text('$pendingEval'),
-                    backgroundColor: AppColors.ciOrangeDark,
+                    backgroundColor: AppColors.ciWarningDark,
                   )
                 : null,
           ),
@@ -212,7 +212,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Badge(
             isLabelVisible: pendingEvaluationsCount > 0,
             label: Text('$pendingEvaluationsCount'),
-            backgroundColor: AppColors.ciOrangeDark,
+            backgroundColor: AppColors.ciWarningDark,
             child: PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: 'Plus',

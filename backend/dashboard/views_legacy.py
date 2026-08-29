@@ -813,7 +813,7 @@ def formation_change_statut(request, pk):
             session_ouverte.terminee_le = now
             session_ouverte.save(update_fields=['terminee_le'])
         formation.modules.filter(statut='EN_COURS').update(statut='SUSPENDUE')
-        messages.success(request, "Cours suspendu. Vous pourrez reprendre \u00e0 tout moment.")
+        messages.success(request, "Module suspendu. Vous pourrez reprendre à tout moment.")
         _log_audit(
             action=AuditLog.Action.FORMATION_STATUT,
             request=request,
@@ -1814,7 +1814,7 @@ def download_sessions_template(request, pk):
 
     # En-têtes
     headers = ['Date', 'Numéro', 'Intitulé', 'Heure début', 'Heure fin', 'Auto-démarrage']
-    header_fill = PatternFill(start_color='1B5E20', end_color='1B5E20', fill_type='solid')
+    header_fill = PatternFill(start_color='093F70', end_color='093F70', fill_type='solid')
     header_font = Font(bold=True, color='FFFFFF', size=11)
     thin_border = Border(
         left=Side(style='thin'), right=Side(style='thin'),

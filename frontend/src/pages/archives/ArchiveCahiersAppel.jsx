@@ -4,7 +4,7 @@ import { useToast } from '../../context/ToastContext'
 import { formatDate } from '../../utils/dates'
 import ArchiveModuleBrowser from '../../components/archives/ArchiveModuleBrowser'
 
-const ACCENT = '#2e7d32'
+const ACCENT = '#001a33'
 
 function _downloadBlob(blob, fileName) {
   const url = window.URL.createObjectURL(blob)
@@ -98,7 +98,7 @@ function CahierAppelDocument({ module, onBack }) {
             {module.secretariat_nom && <> · {module.secretariat_nom}</>}
           </p>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-            {participants.length} auditeur{participants.length !== 1 ? 's' : ''} · {sessions.length} séance{sessions.length !== 1 ? 's' : ''}
+            {participants.length} étudiant{participants.length !== 1 ? 's' : ''} · {sessions.length} séance{sessions.length !== 1 ? 's' : ''}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -114,7 +114,7 @@ function CahierAppelDocument({ module, onBack }) {
       <div style={{ marginBottom: '1rem' }}>
         <input
           className="form-control"
-          placeholder="Rechercher un auditeur…"
+          placeholder="Rechercher un étudiant…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ maxWidth: 360 }}
@@ -126,7 +126,7 @@ function CahierAppelDocument({ module, onBack }) {
       ) : participants.length === 0 ? (
         <div className="empty-state">
           <i className="bi bi-people" style={{ fontSize: '3rem', color: 'var(--text-muted)' }}></i>
-          <p>Aucun auditeur inscrit à ce module.</p>
+          <p>Aucun étudiant inscrit à ce module.</p>
         </div>
       ) : sessions.length === 0 ? (
         <div className="empty-state">
@@ -139,7 +139,7 @@ function CahierAppelDocument({ module, onBack }) {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary, #f9fafb)' }}>
                 <th style={{ ...thStyle('left'), position: 'sticky', left: 0, background: 'var(--bg-secondary, #f9fafb)', zIndex: 1 }}>#</th>
-                <th style={{ ...thStyle('left'), position: 'sticky', left: 36, background: 'var(--bg-secondary, #f9fafb)', zIndex: 1 }}>Auditeur</th>
+                <th style={{ ...thStyle('left'), position: 'sticky', left: 36, background: 'var(--bg-secondary, #f9fafb)', zIndex: 1 }}>Étudiant</th>
                 {sessions.map(s => (
                   <th key={s.id} style={{ ...thStyle('center'), minWidth: 64 }} title={s.intitule || `Séance ${s.numero}`}>
                     <div style={{ fontSize: '0.72rem' }}>{s.date ? formatDate(s.date) : `S${s.numero}`}</div>
@@ -167,13 +167,13 @@ function CahierAppelDocument({ module, onBack }) {
                       return (
                         <td key={s.id} style={{ ...tdStyle, textAlign: 'center' }}>
                           {present
-                            ? <i className="bi bi-check-circle-fill" style={{ color: '#2e7d32' }} title="Présent"></i>
+                            ? <i className="bi bi-check-circle-fill" style={{ color: '#125a99' }} title="Présent"></i>
                             : <span style={{ color: '#cfcfcf' }} title="Absent">—</span>}
                         </td>
                       )
                     })}
                     <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600 }}>{nbPres}/{sessions.length}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: taux >= 80 ? '#2e7d32' : (taux >= 50 ? '#f57f17' : '#b71c1c') }}>{taux}%</td>
+                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: taux >= 80 ? '#125a99' : (taux >= 50 ? '#f5b417' : '#b71c1c') }}>{taux}%</td>
                   </tr>
                 )
               })}

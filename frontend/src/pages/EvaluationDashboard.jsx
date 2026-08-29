@@ -9,8 +9,8 @@ import Pagination from '../components/Pagination'
 
 const STATUT_LABELS = { BROUILLON: 'Brouillon', PUBLIE: 'Publié', FERME: 'Fermé' }
 const STATUT_COLORS = {
-  BROUILLON: { background: '#fff3e0', color: '#e65100' },
-  PUBLIE:    { background: '#e8f5e9', color: '#2e7d32' },
+  BROUILLON: { background: '#fff8e0', color: '#e69700' },
+  PUBLIE:    { background: '#e8eff5', color: '#125a99' },
   FERME:     { background: '#f5f5f5', color: '#616161' },
 }
 
@@ -36,8 +36,8 @@ function StatutBar({ brouillon, publie, ferme }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
       {[
-        { label: 'Brouillon', val: brouillon, color: '#e65100', bg: '#fff3e0' },
-        { label: 'Publié',    val: publie,    color: '#2e7d32', bg: '#e8f5e9' },
+        { label: 'Brouillon', val: brouillon, color: '#e69700', bg: '#fff8e0' },
+        { label: 'Publié',    val: publie,    color: '#125a99', bg: '#e8eff5' },
         { label: 'Fermé',     val: ferme,     color: '#616161', bg: '#f5f5f5' },
       ].map(({ label, val, color, bg }) => (
         <div key={label}>
@@ -188,7 +188,7 @@ export default function EvaluationDashboard() {
         <div>
           <h2 style={{ margin: 0, fontWeight: 700 }}>Évaluations</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Gérez les questionnaires d'évaluation des cours et formateurs
+            Gérez les questionnaires d'évaluation des modules et enseignants
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
@@ -210,8 +210,8 @@ export default function EvaluationDashboard() {
               {/* KPIs principaux */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <KpiCard icon="bi-clipboard-check" label="Total questionnaires" value={kpis.total}     color="#4f46e5" />
-                <KpiCard icon="bi-send"            label="Publiés"              value={kpis.publie}    color="#2e7d32" sub="En cours de réponse" />
-                <KpiCard icon="bi-pencil-square"   label="Brouillons"           value={kpis.brouillon} color="#e65100" sub="En cours de rédaction" />
+                <KpiCard icon="bi-send"            label="Publiés"              value={kpis.publie}    color="#125a99" sub="En cours de réponse" />
+                <KpiCard icon="bi-pencil-square"   label="Brouillons"           value={kpis.brouillon} color="#e69700" sub="En cours de rédaction" />
                 <KpiCard icon="bi-lock"            label="Fermés"               value={kpis.ferme}     color="#616161" sub="Réponses clôturées" />
               </div>
 
@@ -235,7 +235,7 @@ export default function EvaluationDashboard() {
                     Questions au total
                   </h6>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>{kpis.questions}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>2 sections par questionnaire : cours + formateur</div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>2 sections par questionnaire : cours + enseignant</div>
                 </div>
               </div>
 
@@ -348,7 +348,7 @@ export default function EvaluationDashboard() {
                           <span key={g} style={{ fontSize: '0.72rem', background: '#e8eaf6', color: '#283593', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
                         ))}
                         {(q.groupes || []).map(g => (
-                          <span key={g} style={{ fontSize: '0.72rem', background: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
+                          <span key={g} style={{ fontSize: '0.72rem', background: '#fff8e0', color: '#e69700', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{g}</span>
                         ))}
                       </div>
                       <h4 style={{ margin: 0, fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', color: 'var(--primary)' }}
@@ -472,7 +472,7 @@ export default function EvaluationDashboard() {
                   </label>
                   <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignContent: 'flex-start', padding: '0.25rem' }}>
                     {refGroupes.map(g => (
-                      <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: form.groupes.includes(g) ? '#e65100' : 'var(--border)', background: form.groupes.includes(g) ? '#fff3e0' : 'transparent', color: form.groupes.includes(g) ? '#e65100' : 'inherit', fontSize: '0.85rem', fontWeight: form.groupes.includes(g) ? 700 : 400, transition: 'all .15s' }}>
+                      <label key={g} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', border: '1.5px solid', borderColor: form.groupes.includes(g) ? '#e69700' : 'var(--border)', background: form.groupes.includes(g) ? '#fff8e0' : 'transparent', color: form.groupes.includes(g) ? '#e69700' : 'inherit', fontSize: '0.85rem', fontWeight: form.groupes.includes(g) ? 700 : 400, transition: 'all .15s' }}>
                         <input type="checkbox" style={{ display: 'none' }} checked={form.groupes.includes(g)} onChange={() => toggleItem('groupes', g)} />
                         {g}
                       </label>

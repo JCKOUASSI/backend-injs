@@ -80,7 +80,7 @@ export function FinanceNavActions({ active, pendingAjustements = 0 }) {
         to={financeNavHref('/formateurs')}
         className={`btn btn-sm ${active === 'formateurs' ? 'btn-finance-accent' : ''}`}
       >
-        <i className="bi bi-people me-1"></i>Formateurs
+        <i className="bi bi-people me-1"></i>Enseignants
       </Link>
       <Link
         to={financeNavHref('/finance-encadrants')}

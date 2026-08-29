@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext'
 
 const STAT_CARDS = [
   { key: 'modules', label: 'Modules archivés', icon: 'bi-journal-bookmark', color: '#1565c0' },
-  { key: 'participants', label: 'Auditeurs', icon: 'bi-people', color: '#2e7d32' },
-  { key: 'formateurs', label: 'Formateurs', icon: 'bi-person-video3', color: '#6a1b9a' },
+  { key: 'participants', label: 'Étudiants', icon: 'bi-people', color: '#125a99' },
+  { key: 'formateurs', label: 'Enseignants', icon: 'bi-person-video3', color: '#6a1b9a' },
 ]
 
 const DOC_CARDS = [
@@ -22,12 +22,12 @@ const DOC_CARDS = [
     label: "Cahiers d'appel",
     desc: "Registres de présence (émargement) par séance, avec export PDF/Excel.",
     icon: 'bi-journal-check',
-    color: '#2e7d32',
+    color: '#125a99',
   },
 ]
 
 const QUICK_LINKS = [
-  { to: '/participants', label: 'Auditeurs', icon: 'bi-people' },
+  { to: '/participants', label: 'Étudiants', icon: 'bi-people' },
   { to: '/statistiques', label: 'Statistiques', icon: 'bi-bar-chart-line' },
 ]
 
@@ -58,7 +58,7 @@ export default function ArchivesDashboard() {
     <div>
       {/* En-tête */}
       <div style={{
-        background: 'linear-gradient(120deg, #1b5e20 0%, #2e7d32 100%)',
+        background: 'linear-gradient(120deg, #001a33 0%, #0a2a4d 100%)',
         borderRadius: 18, padding: '1.75rem 2rem', color: '#fff', marginBottom: '1.5rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
@@ -89,14 +89,14 @@ export default function ArchivesDashboard() {
       </div>
 
       {counts.modules === 0 && (
-        <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.75rem', borderLeft: '4px solid #f59e0b', background: '#fffbeb' }}>
-          <p style={{ margin: 0, fontWeight: 600, color: '#92400e' }}>
-            <i className="bi bi-info-circle me-2"></i>Aucun cours archivé pour l'instant
+        <div className="card" style={{ padding: '1.25rem 1.5rem', marginBottom: '1.75rem', borderLeft: '4px solid #f5c10b', background: '#fffceb' }}>
+          <p style={{ margin: 0, fontWeight: 600, color: '#92660e' }}>
+            <i className="bi bi-info-circle me-2"></i>Aucun module archivé pour l'instant
           </p>
-          <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#78350f' }}>
-            En tant qu'<strong>archiviste</strong>, vous consultez ici les cours déjà transférés aux archives.
+          <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#78540f' }}>
+            En tant qu'<strong>archiviste</strong>, vous consultez ici les modules déjà transférés aux archives.
             L'archivage est effectué par le <strong>secrétariat</strong> ou la <strong>direction</strong> depuis la page
-            <strong> Cours</strong> (bouton orange « Archiver », avec 3 confirmations).
+            <strong> Modules</strong> (bouton orange « Archiver », avec 3 confirmations).
           </p>
         </div>
       )}

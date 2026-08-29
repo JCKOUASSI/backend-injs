@@ -312,9 +312,9 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
     @admin.display(description="Statut")
     def statut_badge(self, obj):
         colors = {
-            Pointage.Statut.EN_COURS: ("#e8f6f1", "#13624e"),
+            Pointage.Statut.EN_COURS: ("#e8eef6", "#09306c"),
             Pointage.Statut.TERMINE: ("#eef6fc", "#0f4c81"),
-            Pointage.Statut.FORCE_DFRC: ("#fff7e8", "#9a6700"),
+            Pointage.Statut.FORCE_DFRC: ("#fffae8", "#9a7a00"),
             Pointage.Statut.ABSENT_NON_BADGE: ("#fdecec", "#b42318"),
             Pointage.Statut.HORS_LIGNE_SUSPECT: ("#fce8ff", "#7e22ce"),
             Pointage.Statut.SORTIE_AUTO: ("#fff1f2", "#be123c"),
@@ -331,7 +331,7 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
             return "—"
         url = reverse('admin:presences_pointage_remettre_en_cours', args=[obj.pk])
         return format_html(
-            '<a href="{}" style="font-weight:600;" onclick="return confirm(\'Confirmer la remise en cours de cet auditeur ?\')">Remettre en cours</a>',
+            '<a href="{}" style="font-weight:600;" onclick="return confirm(\'Confirmer la remise en cours de cet étudiant ?\')">Remettre en cours</a>',
             url,
         )
 
@@ -343,7 +343,7 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
             return "Ce pointage est deja en cours."
         url = reverse('admin:presences_pointage_remettre_en_cours', args=[obj.pk])
         return format_html(
-            '<a class="button" href="{}" onclick="return confirm(\'Confirmer la remise en cours de cet auditeur ?\')">Remettre en cours</a>',
+            '<a class="button" href="{}" onclick="return confirm(\'Confirmer la remise en cours de cet étudiant ?\')">Remettre en cours</a>',
             url,
         )
 
@@ -498,10 +498,10 @@ class RattrapageAdmin(AdminScopeMixin, admin.ModelAdmin):
     readonly_fields = ['cree_par', 'created_at', 'updated_at']
     actions = ['action_generer_presence', 'action_annuler']
     fieldsets = (
-        ("Auditeur", {
+        ("Étudiant", {
             'fields': ('participant',),
             'description': (
-                "L'auditeur garde son groupe/grade/secrétariat d'origine : "
+                "L'étudiant garde son groupe/grade/secrétariat d'origine : "
                 "aucune inscription n'est créée sur la cohorte d'accueil."
             ),
         }),
@@ -521,7 +521,7 @@ class RattrapageAdmin(AdminScopeMixin, admin.ModelAdmin):
         }),
     )
 
-    @admin.display(description="Auditeur", ordering='participant__nom')
+    @admin.display(description="Étudiant", ordering='participant__nom')
     def participant_label(self, obj):
         p = obj.participant
         cohorte = ' / '.join(x for x in (p.grade, p.groupe) if x)
@@ -559,8 +559,8 @@ class RattrapageAdmin(AdminScopeMixin, admin.ModelAdmin):
     @admin.display(description="Statut")
     def statut_badge(self, obj):
         colors = {
-            Rattrapage.Statut.PLANIFIE: ("#fff7e8", "#9a6700"),
-            Rattrapage.Statut.EFFECTUE: ("#e8f6f1", "#13624e"),
+            Rattrapage.Statut.PLANIFIE: ("#fffae8", "#9a7a00"),
+            Rattrapage.Statut.EFFECTUE: ("#e8eef6", "#09306c"),
             Rattrapage.Statut.ANNULE: ("#fdecec", "#b42318"),
         }
         bg, fg = colors.get(obj.statut, ("#f3f4f6", "#374151"))

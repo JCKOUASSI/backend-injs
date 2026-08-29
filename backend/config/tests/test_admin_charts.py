@@ -24,8 +24,8 @@ class AdminChartsTests(SimpleTestCase):
 
     def test_build_donut_slices(self):
         chart = build_donut([
-            {'label': 'Présent', 'value': 75, 'color': '#16a34a'},
-            {'label': 'Absent', 'value': 25, 'color': '#ea580c'},
+            {'label': 'Présent', 'value': 75, 'color': '#0e58ab'},
+            {'label': 'Absent', 'value': 25, 'color': '#ea9d0c'},
         ])
         self.assertEqual(chart['total'], 100)
         self.assertEqual(len(chart['slices']), 2)
@@ -34,7 +34,7 @@ class AdminChartsTests(SimpleTestCase):
 
     def test_build_donut_single_full_slice(self):
         chart = build_donut([
-            {'label': 'Badgé, liaison inactive', 'value': 2, 'color': '#ea580c'},
+            {'label': 'Badgé, liaison inactive', 'value': 2, 'color': '#ea9d0c'},
         ])
         self.assertEqual(chart['total'], 2)
         self.assertEqual(len(chart['slices']), 1)

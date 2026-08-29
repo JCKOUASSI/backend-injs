@@ -15,8 +15,8 @@ function formatDate(iso) {
 
 const SOURCE_META = {
   notes: { label: 'Notes', icon: 'bi-pencil-square', color: '#1565C0' },
-  rapports: { label: 'Rapports', icon: 'bi-file-earmark-text', color: '#2e7d32' },
-  finance: { label: 'Finance', icon: 'bi-cash-coin', color: '#F57C00' },
+  rapports: { label: 'Rapports', icon: 'bi-file-earmark-text', color: '#125a99' },
+  finance: { label: 'Finance', icon: 'bi-cash-coin', color: '#F5B100' },
 }
 
 function normalizeItems(data, source) {
@@ -202,7 +202,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
               const style = {
                 display: 'block', width: '100%', textAlign: 'left', border: 'none',
                 borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
-                padding: '0.65rem 0.85rem', background: n.lu ? '#fff' : '#fff8e1',
+                padding: '0.65rem 0.85rem', background: n.lu ? '#fff' : '#fffae1',
                 textDecoration: 'none', color: 'inherit',
               }
               if (href) {

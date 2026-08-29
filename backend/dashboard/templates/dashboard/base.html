@@ -4,25 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}CPFAE{% endblock %} — SYGEP-CPFAE</title>
-    <link rel="icon" type="image/jpeg" href="{% static 'img/logo-mfpma.jpeg' %}" />
+    <title>{% block title %}INJS{% endblock %} — INJS LMD</title>
+    <link rel="icon" type="image/png" href="{% static 'img/logo-injs.png' %}" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         :root {
-            --ci-orange: #F57C00;
-            --ci-orange-dark: #E65100;
-            --ci-green: #43A047;
-            --ci-green-dark: #388E3C;
+            --ci-warning: #F5B100;
+            --ci-warning-dark: #E69700;
+            --ci-success: #2277C1;
+            --ci-success-dark: #1A68AC;
             --ci-white: #FFFFFF;
-            --ci-light: #FFF8F0;
-            --ci-success: #43A047;
-            --ci-warning: #F57C00;
+            --ci-light: #FFFBF0;
+            --ci-success: #2277C1;
+            --ci-warning: #F5B100;
             --ci-danger: #C62828;
         }
         body { background: var(--ci-light); font-family: 'Segoe UI', system-ui, sans-serif; }
         .sidebar {
-            background: linear-gradient(180deg, var(--ci-green-dark) 0%, var(--ci-green) 100%);
+            background: linear-gradient(180deg, var(--ci-success-dark) 0%, var(--ci-success) 100%);
             min-height: 100vh; width: 260px; position: fixed; top: 0; left: 0; z-index: 100;
             transition: transform 0.3s;
         }
@@ -35,7 +35,7 @@
         }
         .sidebar .nav-link:hover, .sidebar .nav-link.active {
             color: #fff; background: rgba(255,255,255,0.08);
-            border-left-color: var(--ci-orange);
+            border-left-color: var(--ci-warning);
         }
         .sidebar .nav-link i { width: 24px; text-align: center; margin-right: 0.5rem; }
         .main-content { margin-left: 260px; padding: 0; min-height: 100vh; }
@@ -99,15 +99,15 @@
         }
         .badge-statut { font-size: 0.75rem; padding: 0.3em 0.7em; border-radius: 6px; font-weight: 600; }
         .badge-planifiee { background: #ebf4ff; color: #2b6cb0; }
-        .badge-en-cours { background: #f0fff4; color: #276749; }
-        .badge-suspendue { background: #FFF3E0; color: #E65100; }
+        .badge-en-cours { background: #f0f7ff; color: #11407d; }
+        .badge-suspendue { background: #FFF8E0; color: #E69700; }
         .badge-terminee { background: #f7fafc; color: #718096; }
-        .badge-en-salle { background: #fefcbf; color: #975a16; }
+        .badge-en-salle { background: #fefcbf; color: #977516; }
         .badge-absent { background: #fff5f5; color: #c53030; }
-        .badge-present { background: #f0fff4; color: #276749; }
+        .badge-present { background: #f0f7ff; color: #11407d; }
         .table-modern { border-collapse: separate; border-spacing: 0; }
         .table-modern thead th {
-            background: var(--ci-green-dark); color: #fff; font-size: 0.8rem;
+            background: var(--ci-success-dark); color: #fff; font-size: 0.8rem;
             text-transform: uppercase; letter-spacing: 0.5px; padding: 0.8rem 1rem;
             border: none;
         }
@@ -120,16 +120,16 @@
             background: #fff; border-bottom: 1px solid #edf2f7;
             padding: 1rem 1.25rem; font-weight: 600;
         }
-        .btn-dfrc { background: var(--ci-orange); color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.2rem; }
-        .btn-dfrc:hover { background: var(--ci-orange-dark); color: #fff; }
+        .btn-dfrc { background: var(--ci-warning); color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.2rem; }
+        .btn-dfrc:hover { background: var(--ci-warning-dark); color: #fff; }
         .progress-ring { width: 120px; height: 120px; }
         .user-badge { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem 1rem; margin: 0.5rem 1rem; }
         .user-badge small { color: rgba(255,255,255,0.6); }
         .user-badge span { color: #fff; font-weight: 600; font-size: 0.85rem; }
         .bg-role-direction { background: #7B1FA2; }
-        .bg-role-dfrc { background: var(--ci-green-dark); }
-        .bg-role-superviseur { background: var(--ci-orange); }
-        .bg-role-participant { background: var(--ci-green); }
+        .bg-role-dfrc { background: var(--ci-success-dark); }
+        .bg-role-superviseur { background: var(--ci-warning); }
+        .bg-role-participant { background: var(--ci-success); }
         .sidebar .brand-logo { max-height: 55px; margin-bottom: 0.5rem; }
         .sidebar-overlay {
             display: none; position: fixed; inset: 0;
@@ -157,9 +157,9 @@
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
         <div class="brand text-center">
-            <img src="{% static 'img/logo-mfpma.jpeg' %}" alt="Logo" class="brand-logo">
+            <img src="{% static 'img/logo-injs.png' %}" alt="INJS Abidjan" class="brand-logo">
             <h5 class="mt-1">SYGEP-CPFAE</h5>
-            <small>CPFAE — Gestion des présences</small>
+            <small>Institut National de la Jeunesse et des Sports</small>
         </div>
 
         {% if user.is_authenticated %}
@@ -197,7 +197,7 @@
             <li class="nav-item">
                 <a class="nav-link d-flex justify-content-between align-items-center {% if 'formateur' in request.resolver_match.url_name %}active{% endif %}"
                    href="{% url 'web-formateurs' %}">
-                    <span><i class="bi bi-person-video3"></i> Formateurs</span>
+                    <span><i class="bi bi-person-video3"></i> Enseignants</span>
                     {% if sidebar_formateurs_count %}<span class="badge bg-secondary bg-opacity-75 rounded-pill">{{ sidebar_formateurs_count }}</span>{% endif %}
                 </a>
             </li>
@@ -247,7 +247,7 @@
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">{{ user.get_full_name }}</span>
-                <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:0.8rem;background:var(--ci-green);">
+                <div class="rounded-circle text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:0.8rem;background:var(--ci-success);">
                     {{ user.first_name.0 }}{{ user.last_name.0 }}
                 </div>
             </div>

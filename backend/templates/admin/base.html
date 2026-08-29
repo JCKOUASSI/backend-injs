@@ -7,7 +7,9 @@
 {% block dark-mode-vars %}{% endblock %}
 {% block extrastyle %}{% endblock %}
 {% if LANGUAGE_BIDI %}<link rel="stylesheet" href="{% block stylesheet_rtl %}{% static "admin/css/rtl.css" %}{% endblock %}">{% endif %}
-{% block extrahead %}{% endblock %}
+{% block extrahead %}
+<link rel="icon" type="image/png" href="{% static 'img/logo-injs.png' %}">
+{% endblock %}
 {% block responsive %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{% static "admin/css/responsive.css" %}">
@@ -25,8 +27,8 @@
   <aside class="sygep-sidebar" id="sygep-sidebar">
     <div class="sygep-sidebar-brand">
       <a href="{% url 'admin:index' %}" class="sygep-brand-link">
-        <span class="sygep-brand-icon material-symbols-outlined">school</span>
-        <span class="sygep-brand-text">{{ site_header|default:"SYGEP-CPFAE" }}</span>
+        <img src="{% static 'img/logo-injs.png' %}" alt="INJS Abidjan" class="sygep-brand-icon">
+        <span class="sygep-brand-text">{{ site_header|default:"INJS LMD" }}</span>
       </a>
     </div>
     {% if admin_sidebar_navigation %}

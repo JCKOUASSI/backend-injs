@@ -21,8 +21,8 @@ const RAPPORT_TYPES = [
 
 const STATUT_META = {
   BROUILLON: { label: 'Brouillon', bg: '#f1f5f9', color: '#475569' },
-  EN_VALIDATION: { label: 'En validation', bg: '#fff8e1', color: '#f57f17' },
-  VALIDE: { label: 'Validé', bg: '#e8f5e9', color: '#2e7d32' },
+  EN_VALIDATION: { label: 'En validation', bg: '#fffae1', color: '#f5b417' },
+  VALIDE: { label: 'Validé', bg: '#e8eff5', color: '#125a99' },
   PUBLIE: { label: 'Publié', bg: '#e3f2fd', color: '#1565c0' },
   REJETE: { label: 'Rejeté', bg: '#ffebee', color: '#c62828' },
 }
@@ -263,7 +263,7 @@ export default function RapportsWorkflowPanel({
         marginBottom: '0.75rem',
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', flex: 1 }}>
-          <i className="bi bi-file-earmark-check me-2" style={{ color: '#2e7d32' }}/>
+          <i className="bi bi-file-earmark-check me-2" style={{ color: '#125a99' }}/>
           Rapports périodiques — validation
         </h3>
         <button type="button" className="btn btn-sm btn-outline-secondary" onClick={fetchList} disabled={loading}>
@@ -305,7 +305,7 @@ export default function RapportsWorkflowPanel({
               style={{
                 display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
                 padding: '0.6rem 0.85rem', borderBottom: '1px solid #f1f5f9',
-                background: selectedId === r.id ? '#f0fdf4' : '#fff',
+                background: selectedId === r.id ? '#f0f6fd' : '#fff',
               }}
             >
               <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e293b', marginBottom: '0.2rem' }}>
@@ -383,7 +383,7 @@ export default function RapportsWorkflowPanel({
                     { label: 'Assiduité', value: `${kpis.taux_presence ?? '—'} %` },
                     { label: 'Exéc. VH', value: `${kpis.taux_execution_vh ?? '—'} %` },
                     { label: 'Séances', value: kpis.nb_seances ?? '—' },
-                    { label: 'Auditeurs', value: kpis.nb_auditeurs ?? '—' },
+                    { label: 'Étudiants', value: kpis.nb_auditeurs ?? '—' },
                   ].map(k => (
                     <div key={k.label} style={{ background: '#f8fafc', borderRadius: 8, padding: '0.5rem 0.65rem' }}>
                       <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{k.label}</div>

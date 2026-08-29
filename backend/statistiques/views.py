@@ -852,7 +852,7 @@ INDICATEUR_META = {
         'unite': '%',
         'inverse': False,
         'icone': 'bi-person-check',
-        'couleur': '#43A047',
+        'couleur': '#2277C1',
         'aide': (
             'Places présentes ÷ places attendues sur les séances terminées du périmètre. '
             'Mesure l\'assiduité séance par séance (dashboard, alertes, historique).'
@@ -873,7 +873,7 @@ INDICATEUR_META = {
         'unite': '%',
         'inverse': True,
         'icone': 'bi-box-arrow-right',
-        'couleur': '#F57C00',
+        'couleur': '#F5B100',
         'aide': (
             'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits. '
             'Distinct des absents notoires (jamais badgés).'
@@ -910,7 +910,7 @@ INDICATEUR_META = {
         'inverse': True,
         'icone': 'bi-people-fill',
         'couleur': '#7B1FA2',
-        'aide': 'Remplissage moyen des groupes (référence 40 auditeurs/groupe). Au-delà de 95 %, risque de surcharge.',
+        'aide': 'Remplissage moyen des groupes (référence 40 étudiants/groupe). Au-delà de 95 %, risque de surcharge.',
         'echelle_max': 100,
     },
 }

@@ -19,7 +19,8 @@ def normalize_categorie_raw(raw):
     c = (raw or '').strip().upper()
     if not c:
         return ''
-    m = re.fullmatch(r'([A-Z]{2,4})\s*([A-D])', c)
+    # Uniquement FAB/FAC/FAR + lettre (FABA → FAB A). Ne pas casser SFC, SST, SAC…
+    m = re.fullmatch(r'(FAB|FAC|FAR)\s*([A-D])', c)
     if m:
         return f'{m.group(1)} {m.group(2)}'
     return c

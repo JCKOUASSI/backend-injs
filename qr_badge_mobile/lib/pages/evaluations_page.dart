@@ -139,7 +139,7 @@ class _QuestionnaireCard extends StatelessWidget {
                   runSpacing: 4,
                   children: [
                     _Pill(
-                      label: cible == 'COURS' ? 'Cours' : 'Formateur',
+                      label: cible == 'COURS' ? 'Module' : 'Enseignant',
                       color: AppColors.ciBlue,
                       bg: const Color(0xFFE3F2FD),
                       icon: cible == 'COURS' ? Icons.book_outlined : Icons.person_outline,
@@ -288,7 +288,7 @@ class _EvaluationFormPageState extends State<_EvaluationFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Évaluation soumise avec succès !'),
-            backgroundColor: AppColors.ciGreenDark,
+            backgroundColor: AppColors.ciSuccessDark,
           ),
         );
       }
@@ -416,7 +416,7 @@ class _QuestionWidget extends StatelessWidget {
               children: [
                 TextSpan(
                   text: '${index + 1}. ',
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ciGreenDark),
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ciSuccessDark),
                 ),
                 TextSpan(text: question['intitule']?.toString() ?? ''),
                 if (obligatoire)
@@ -462,7 +462,7 @@ class _NoteSelector extends StatelessWidget {
             children: [
               Icon(
                 selected ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: selected ? AppColors.ciOrange : AppColors.borderColor,
+                color: selected ? AppColors.ciWarning : AppColors.borderColor,
                 size: 36,
               ),
               Text(
@@ -470,7 +470,7 @@ class _NoteSelector extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                  color: selected ? AppColors.ciOrange : AppColors.textSecondary,
+                  color: selected ? AppColors.ciWarning : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -536,7 +536,7 @@ class _ChoixUniqueSelector extends StatelessWidget {
             title: Text(c['libelle']?.toString() ?? '', style: const TextStyle(fontSize: 14)),
             contentPadding: EdgeInsets.zero,
             dense: true,
-            activeColor: AppColors.ciGreenDark,
+            activeColor: AppColors.ciSuccessDark,
           );
         }).toList(),
       ),
@@ -574,7 +574,7 @@ class _ChoixMultipleSelector extends StatelessWidget {
           title: Text(c['libelle']?.toString() ?? '', style: const TextStyle(fontSize: 14)),
           contentPadding: EdgeInsets.zero,
           dense: true,
-          activeColor: AppColors.ciGreenDark,
+          activeColor: AppColors.ciSuccessDark,
         );
       }).toList(),
     );

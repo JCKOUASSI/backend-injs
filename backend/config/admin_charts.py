@@ -3,7 +3,7 @@
 import math
 
 
-def build_histogram(items, *, height=150, color='#15803d', value_key='value'):
+def build_histogram(items, *, height=150, color='#0b478a', value_key='value'):
     """Histogramme vertical (barres) — retourne dimensions et barres SVG."""
     if not items:
         return None

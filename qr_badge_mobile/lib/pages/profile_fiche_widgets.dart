@@ -67,7 +67,7 @@ class _SectionTitle extends StatelessWidget {
             Text(
               trailing!,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.ciGreenDark,
+                    color: AppColors.ciSuccessDark,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -176,7 +176,7 @@ class _StatsGrid extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.schedule, size: 20, color: AppColors.ciGreenDark),
+                  Icon(Icons.schedule, size: 20, color: AppColors.ciSuccessDark),
                   const SizedBox(width: 8),
                   Text(
                     'Volume horaire',
@@ -190,7 +190,7 @@ class _StatsGrid extends StatelessWidget {
                     tauxDisplay,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: AppColors.ciGreenDark,
+                          color: AppColors.ciSuccessDark,
                         ),
                   ),
                 ],
@@ -200,7 +200,7 @@ class _StatsGrid extends StatelessWidget {
                 volumeLabel,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.ciGreenDark,
+                      color: AppColors.ciSuccessDark,
                     ),
               ),
               const SizedBox(height: 10),
@@ -210,7 +210,7 @@ class _StatsGrid extends StatelessWidget {
                   value: progress > 0 ? progress : null,
                   minHeight: 6,
                   backgroundColor: AppColors.navIndicator,
-                  color: AppColors.ciGreenDark,
+                  color: AppColors.ciSuccessDark,
                 ),
               ),
             ],
@@ -224,7 +224,7 @@ class _StatsGrid extends StatelessWidget {
                 icon: Icons.qr_code_scanner,
                 value: _n('nb_badgeages'),
                 label: 'Badgeages',
-                color: AppColors.ciGreenDark,
+                color: AppColors.ciSuccessDark,
               ),
             ),
             const SizedBox(width: 10),
@@ -233,7 +233,7 @@ class _StatsGrid extends StatelessWidget {
                 icon: Icons.check_circle_outline,
                 value: _n('nb_seances_terminees'),
                 label: 'Séances terminées',
-                color: AppColors.ciGreenDark,
+                color: AppColors.ciSuccessDark,
               ),
             ),
           ],
@@ -271,7 +271,7 @@ class _StatsGrid extends StatelessWidget {
                 minutesLabel,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.ciGreenDark,
+                      color: AppColors.ciSuccessDark,
                     ),
               ),
               const SizedBox(height: 6),
@@ -399,7 +399,7 @@ class _ModuleCard extends StatelessWidget {
                         Text(
                           formation,
                           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: AppColors.ciGreenDark,
+                                color: AppColors.ciSuccessDark,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -415,7 +415,7 @@ class _ModuleCard extends StatelessWidget {
                 ),
                 StatusPill(
                   label: statut,
-                  color: AppColors.ciGreenDark,
+                  color: AppColors.ciSuccessDark,
                   backgroundColor: AppColors.navIndicator,
                 ),
               ],

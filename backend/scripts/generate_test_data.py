@@ -25,11 +25,11 @@ from openpyxl.utils import get_column_letter
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 hfont  = Font(bold=True, color='FFFFFF', size=11)
-fill_g = PatternFill(start_color='1B5E20', end_color='1B5E20', fill_type='solid')
+fill_g = PatternFill(start_color='093F70', end_color='093F70', fill_type='solid')
 fill_b = PatternFill(start_color='0D47A1', end_color='0D47A1', fill_type='solid')
-fill_o = PatternFill(start_color='E65100', end_color='E65100', fill_type='solid')
+fill_o = PatternFill(start_color='E69700', end_color='E69700', fill_type='solid')
 fill_p = PatternFill(start_color='4A148C', end_color='4A148C', fill_type='solid')
-fill_r = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+fill_r = PatternFill(start_color='E8EFF5', end_color='E8EFF5', fill_type='solid')
 thin   = Border(
     left=Side(style='thin', color='CCCCCC'), right=Side(style='thin', color='CCCCCC'),
     top=Side(style='thin', color='CCCCCC'),  bottom=Side(style='thin', color='CCCCCC'),

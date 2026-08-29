@@ -21,7 +21,7 @@ class EmptyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = iconColor ?? AppColors.ciGreenDark.withValues(alpha: 0.45);
+    final color = iconColor ?? AppColors.ciSuccessDark.withValues(alpha: 0.45);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -32,7 +32,7 @@ class EmptyStateView extends StatelessWidget {
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                color: (iconColor ?? AppColors.ciGreenDark).withValues(alpha: 0.08),
+                color: (iconColor ?? AppColors.ciSuccessDark).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 44, color: color),

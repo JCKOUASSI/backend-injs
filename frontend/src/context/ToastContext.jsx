@@ -12,7 +12,7 @@ export function ToastProvider({ children }) {
   }, [])
 
   const iconMap = { success: 'check-circle-fill', error: 'exclamation-triangle-fill', info: 'info-circle-fill' }
-  const bgMap = { success: '#2e7d32', error: '#c62828', info: '#1565C0' }
+  const bgMap = { success: '#125a99', error: '#c62828', info: '#1565C0' }
 
   return (
     <ToastContext.Provider value={{ showToast }}>

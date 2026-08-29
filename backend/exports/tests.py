@@ -293,7 +293,7 @@ class ExportDataHelpersTest(ExportFixtureMixin, TestCase):
 
     def test_get_formation_data_includes_pointage_row(self):
         _, rows, stats = _get_formation_data(self.formation.pk)
-        participant_rows = [r for r in rows if r.get('role') == 'Auditeur']
+        participant_rows = [r for r in rows if r.get('role') == 'Étudiant']
         self.assertGreaterEqual(len(participant_rows), 1)
         self.assertGreaterEqual(stats['nb_presents'], 1)
         self.assertGreater(stats['taux'], 0)

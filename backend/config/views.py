@@ -7,8 +7,8 @@ def _api_links(request):
     base = request.build_absolute_uri('/').rstrip('/')
     frontend = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
     return {
-        'application': 'SYGEP-CPFAE API',
-        'organisation': 'DFRC — Direction de la Formation et du Renforcement des Compétences',
+        'application': 'INJS LMD API',
+        'organisation': 'INJS — Institut National de la Jeunesse et des Sports',
         'version': '1.0',
         'links': {
             'frontend': frontend,
@@ -22,6 +22,8 @@ def _api_links(request):
                 'token_refresh': f'{base}/api/auth/token/refresh/',
             },
             'formations': f'{base}/api/formations/',
+            'scolarite': f'{base}/api/scolarite/',
+            'admissions': f'{base}/api/admissions/',
             'presences': f'{base}/api/scan/',
             'exports': f'{base}/api/exports/',
         },
@@ -47,7 +49,7 @@ def api_root(request):
         ('Documentation API (Swagger)', links['documentation']),
         ('Schéma OpenAPI', links['schema']),
         ('Administration Django', links['admin']),
-        ('Dashboard CPFAE', links['dashboard']),
+        ('Dashboard Direction', links['dashboard']),
         ('Connexion API', auth['login']),
         ('Formations', links['formations']),
         ('Badgeage (scan QR)', links['presences']),

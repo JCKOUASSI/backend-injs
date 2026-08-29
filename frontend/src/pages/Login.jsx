@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ADMIN_URL } from '../services/api'
-import logo from '../assets/logo.png'
+import logo from '../assets/logo-injs.svg'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -32,93 +32,107 @@ export default function Login() {
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <div className="login-brand">
-          <img src={logo} alt="MEMFPMA" style={{ width: '120px', marginBottom: '1rem' }} />
-          <h3>SYGEP-CPFAE</h3>
-          <p className="subtitle">Ministère d'Etat, Ministère de la Fonction Publique et de la Modernisation de l'Administration</p>
-          <p>DFRC - CPFAE — Gestion des présences</p>
-        </div>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label fw-semibold">Nom d'utilisateur</label>
-            <div className="input-group">
-              <span className="input-group-text"><i className="bi bi-person"></i></span>
-              <input
-                type="text"
-                className="form-control"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus
-                placeholder="Entrez votre identifiant"
-                autoComplete="username"
-              />
+      <div className="login-orb login-orb-a" aria-hidden="true" />
+      <div className="login-orb login-orb-b" aria-hidden="true" />
+      <div className="login-orb login-orb-c" aria-hidden="true" />
+      <div className="login-shell">
+        <aside className="login-panel-brand">
+          <div className="login-logo-frame">
+            <img src={logo} alt="INJS Abidjan" />
+          </div>
+          <h1>INJS UFR STAPS-JL</h1>
+          <p className="login-brand-org">Institut National de la Jeunesse et des Sports</p>
+          <p className="login-brand-place">Marcory — Abidjan, Côte d'Ivoire</p>
+          <div className="login-brand-footer">
+            <p>Système Licence — Master — Doctorat (LMD)</p>
+            <p>Année académique 2025-2026</p>
+          </div>
+        </aside>
+
+        <section className="login-panel-form">
+          <h2>Connexion</h2>
+          <p className="login-form-lead">Connectez-vous avec votre compte INJS-LMD</p>
+
+          <form onSubmit={handleSubmit}>
+            <div className="login-field">
+              <label htmlFor="login-username">Nom d'utilisateur</label>
+              <div className="login-input">
+                <i className="bi bi-person"></i>
+                <input
+                  id="login-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                  placeholder="Entrez votre identifiant"
+                  autoComplete="username"
+                />
+              </div>
             </div>
+
+            <div className="login-field">
+              <label htmlFor="login-password">Mot de passe</label>
+              <div className="login-input">
+                <i className="bi bi-lock"></i>
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="Entrez votre mot de passe"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  title={showPassword ? 'Masquer le mot de passe' : 'Voir le mot de passe'}
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Voir le mot de passe'}
+                >
+                  <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="login-error" role="alert">
+                <i className="bi bi-exclamation-triangle-fill"></i>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className="btn-login" disabled={loading}>
+              <i className="bi bi-box-arrow-in-right"></i>
+              {loading ? 'Connexion…' : 'Se connecter'}
+            </button>
+          </form>
+
+          <div className="text-center" style={{ marginTop: '1rem' }}>
+            <a href={ADMIN_URL} className="login-admin-link" title="Interface d'administration">
+              administration
+            </a>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="form-label fw-semibold">Mot de passe</label>
-            <div className="input-group">
-              <span className="input-group-text"><i className="bi bi-lock"></i></span>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className="form-control"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="Entrez votre mot de passe"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className="input-group-text"
-                onClick={() => setShowPassword(v => !v)}
-                title={showPassword ? 'Masquer le mot de passe' : 'Voir le mot de passe'}
-                style={{ cursor: 'pointer', background: '#f8fafc', border: '1px solid #cbd5e1', borderLeft: 'none' }}
-              >
-                <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-              </button>
-            </div>
+          <div className="login-demo">
+            <strong>Comptes démo</strong>
+            <p>
+              Admin : <code>admin</code> / <code>admin123</code>
+              {' · '}
+              Secrétariat : <code>secretariat</code> / <code>sec123</code>
+              {' · '}
+              INJS : <code>injs</code> / <code>injs123</code>
+            </p>
           </div>
 
-          {error && (
-            <div style={{
-              background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6,
-              color: '#b91c1c', padding: '0.6rem 0.85rem', marginBottom: '1rem',
-              fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.5rem'
-            }}>
-              <i className="bi bi-exclamation-triangle-fill"></i>
-              {error}
-            </div>
-          )}
-
-          <button type="submit" className="btn-login" disabled={loading}>
-            <i className="bi bi-box-arrow-in-right me-1"></i>
-            {loading ? 'Connexion...' : 'Se connecter'}
-          </button>
-        </form>
-
-        <div className="text-center" style={{ marginTop: '1.25rem' }}>
-          <a
-            href={ADMIN_URL}
-            className="login-admin-link"
-            title="Interface d'administration"
-          >
-            administration
-          </a>
-        </div>
-
-        <div className="text-center mt-3">
-          <small className="text-muted">MEMFPMA — DFRC — SYGEP-CPFAE</small>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
-          <small style={{ fontSize: '0.7rem', color: '#94a3b8', letterSpacing: '0.01em' }}>
-            Developpé par <span style={{ fontWeight: 600, color: '#64748b' }}>Ophir Technologies </span>
-          </small>
-        </div>
+          <div className="login-form-footer">
+            <a href={ADMIN_URL} className="login-admin-link" title="Interface d'administration">
+              administration
+            </a>
+            <span>Développé par Ophir Technologies</span>
+          </div>
+        </section>
       </div>
     </div>
   )

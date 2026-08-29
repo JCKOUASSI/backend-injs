@@ -228,7 +228,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, size: 56, color: AppColors.ciGreen),
+            const Icon(Icons.check_circle, size: 56, color: AppColors.ciSuccess),
             const SizedBox(height: 12),
             Text(
               'Scan effectué',
@@ -560,7 +560,7 @@ class _ScanPageState extends State<ScanPage> with AutomaticKeepAliveClientMixin 
           builder: (ctx) => AlertDialog(
             icon: Icon(
               Icons.check_circle,
-              color: isExit ? Colors.red.shade700 : AppColors.ciGreenDark,
+              color: isExit ? Colors.red.shade700 : AppColors.ciSuccessDark,
               size: 48,
             ),
             title: const Text('Scan effectué'),
@@ -750,10 +750,10 @@ class _GeofenceBanner extends StatelessWidget {
     if (inside) {
       return _wrap(
         context: context,
-        color: AppColors.ciGreen.withValues(alpha: 0.15),
-        border: AppColors.ciGreenDark,
+        color: AppColors.ciSuccess.withValues(alpha: 0.15),
+        border: AppColors.ciSuccessDark,
         icon: Icons.gps_fixed,
-        iconColor: AppColors.ciGreenDark,
+        iconColor: AppColors.ciSuccessDark,
         title: 'Dans la zone de badgeage',
         trailing: _refreshBtn(),
       );

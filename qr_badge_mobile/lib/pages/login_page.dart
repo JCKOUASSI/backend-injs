@@ -121,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               const QrBadgeLogo(
                                 size: 72,
-                                color: AppColors.ciGreenDark,
+                                color: AppColors.ciSuccessDark,
                                 backgroundColor: AppColors.iconQrBg,
                               ),
                               const SizedBox(height: 24),
@@ -208,14 +208,14 @@ class _LoginPageState extends State<LoginPage> {
                       icon: const Icon(
                         Icons.verified_user_outlined,
                         size: 18,
-                        color: AppColors.ciGreenDark,
+                        color: AppColors.ciSuccessDark,
                       ),
                       label: const Text(
                         'Confidentialité',
                         style: TextStyle(
-                          color: AppColors.ciGreenDark,
+                          color: AppColors.ciSuccessDark,
                           decoration: TextDecoration.underline,
-                          decorationColor: AppColors.ciGreenDark,
+                          decorationColor: AppColors.ciSuccessDark,
                         ),
                       ),
                     ),

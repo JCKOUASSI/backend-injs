@@ -150,7 +150,7 @@ def _resolve_personne(numero, formation, module=None, seance=None):
     numero_compact = _normalize_scan_identifier(numero)
     if not numero_upper and not numero_compact:
         return None, None, None, Response(
-            {'code': 'PARTICIPANT_NOT_FOUND', 'detail': 'Auditeur introuvable.'},
+            {'code': 'PARTICIPANT_NOT_FOUND', 'detail': 'Étudiant introuvable.'},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -258,7 +258,7 @@ def _resolve_personne(numero, formation, module=None, seance=None):
     if participant is None:
         return None, None, None, Response(
             {'code': 'PARTICIPANT_NOT_FOUND',
-             'detail': 'Auditeur introuvable.'},
+             'detail': 'Étudiant introuvable.'},
             status=status.HTTP_404_NOT_FOUND,
         )
     participant_in_scope = (
@@ -267,7 +267,7 @@ def _resolve_personne(numero, formation, module=None, seance=None):
         else ModuleParticipant.objects.filter(module__formation=formation, participant=participant).exists()
     )
     if not participant_in_scope and module_scope is not None:
-        # Autoriser un rattrapage inter-cohorte planifié sur ce module (l'auditeur
+        # Autoriser un rattrapage inter-cohorte planifié sur ce module (l'étudiant
         # n'est pas inscrit mais dispose d'un rattrapage actif pour ce module).
         rattrapage_filter = {
             'participant': participant,
@@ -284,7 +284,7 @@ def _resolve_personne(numero, formation, module=None, seance=None):
             {
                 'code': 'PARTICIPANT_NOT_IN_LIST',
                 'detail': (
-                    f'Auditeur non autorisé pour {module_label}. '
+                    f'Étudiant non autorisé pour {module_label}. '
                     f'Vérifiez le QR affiché (bon groupe / bon module) '
                     f'ou contactez le secrétariat.'
                 ),
@@ -481,7 +481,7 @@ def _resolve_authenticated_personne(user, *, ensure_profile=False):
     return None, None, Response(
         {
             'code': 'NO_PROFILE',
-            'detail': 'Aucun profil auditeur, formateur ou encadrant lié à ce compte.',
+            'detail': 'Aucun profil étudiant, formateur ou encadrant lié à ce compte.',
         },
         status=status.HTTP_403_FORBIDDEN,
     )

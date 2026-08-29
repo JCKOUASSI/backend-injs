@@ -7,8 +7,8 @@ const DECISION_LABELS = {
   ADMIS: 'Admis', AJOURNE: 'Ajourné', EXCLUSION: 'Exclusion', EN_ATTENTE: 'En attente',
 }
 const DECISION_COLORS = {
-  ADMIS:      { background: '#e8f5e9', color: '#1b5e20' },
-  AJOURNE:    { background: '#fff3e0', color: '#e65100' },
+  ADMIS:      { background: '#e8eff5', color: '#093f70' },
+  AJOURNE:    { background: '#fff8e0', color: '#e69700' },
   EXCLUSION:  { background: '#ffebee', color: '#b71c1c' },
   EN_ATTENTE: { background: '#f5f5f5', color: '#616161' },
 }
@@ -82,8 +82,8 @@ export default function DecisionsPedagogiques() {
         <div>
           <h2 style={{ margin: 0, fontWeight: 700 }}>Décisions pédagogiques</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            {formation?.formation} · {decisions.length} auditeur{decisions.length !== 1 ? 's' : ''}
-            · Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et cours effectué ≥ <strong>{criteres.taux_presence_min}%</strong>
+            {formation?.formation} · {decisions.length} étudiant{decisions.length !== 1 ? 's' : ''}
+            · Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et présence au module ≥ <strong>{criteres.taux_presence_min}%</strong>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -119,7 +119,7 @@ export default function DecisionsPedagogiques() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', background: 'var(--bg-secondary, #f9fafb)' }}>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700 }}>Auditeur</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700 }}>Étudiant</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Moyenne</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Présence</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Décision</th>
@@ -136,13 +136,13 @@ export default function DecisionsPedagogiques() {
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{d.participant_matricule}</div>
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
-                    <strong style={{ color: d.moyenne_generale >= criteres.seuil_admission ? '#2e7d32' : '#b71c1c' }}>
+                    <strong style={{ color: d.moyenne_generale >= criteres.seuil_admission ? '#125a99' : '#b71c1c' }}>
                       {d.moyenne_generale !== null ? `${d.moyenne_generale}/20` : '—'}
                     </strong>
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                     {d.taux_presence !== null ? (
-                      <span style={{ color: d.taux_presence >= criteres.taux_presence_min ? '#2e7d32' : '#b71c1c', fontWeight: 600 }}>
+                      <span style={{ color: d.taux_presence >= criteres.taux_presence_min ? '#125a99' : '#b71c1c', fontWeight: 600 }}>
                         {d.taux_presence}%
                       </span>
                     ) : '—'}
@@ -169,7 +169,7 @@ export default function DecisionsPedagogiques() {
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                     {d.validee_le
-                      ? <i className="bi bi-check-circle-fill" style={{ color: '#2e7d32' }} title={`Validée par ${d.validee_par_nom}`}></i>
+                      ? <i className="bi bi-check-circle-fill" style={{ color: '#125a99' }} title={`Validée par ${d.validee_par_nom}`}></i>
                       : <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>auto</span>}
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>

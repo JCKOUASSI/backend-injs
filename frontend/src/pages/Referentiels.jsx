@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
+import { formatApiErrors } from '../utils/apiErrors'
 import { invalidateReferentielsQuery } from '../hooks/useReferentiels'
 import {
   buildReferentielsSearchParams,
@@ -246,19 +247,43 @@ export default function Referentiels() {
         delete submitData.volume_horaire
         delete submitData.formations
       }
+      if (tab === 'salles' || tab === 'batiments' || tab === 'grades') {
+        ;['site_id', 'batiment_id', 'categorie_id'].forEach((key) => {
+          if (!(key in submitData)) return
+          if (submitData[key] === '' || submitData[key] == null) {
+            submitData[key] = null
+          } else {
+            const n = Number(submitData[key])
+            submitData[key] = Number.isNaN(n) ? null : n
+          }
+        })
+      }
+      if (tab === 'salles') {
+        if (submitData.capacite === '' || submitData.capacite == null) {
+          submitData.capacite = null
+        } else {
+          const n = Number(submitData.capacite)
+          submitData.capacite = Number.isNaN(n) ? null : n
+        }
+        if (!submitData.type_lieu) submitData.type_lieu = 'SALLE'
+        if (submitData.equipements == null) submitData.equipements = ''
+      }
       if (editingRow) {
         await api.put(`${url}${editingRow.id}/`, submitData)
         showToast('Modifié avec succès')
       } else {
-        await api.post(url, submitData)
-        showToast('Ajouté avec succès')
+        const res = await api.post(url, submitData)
+        if (tab === 'modules' && res.status === 200) {
+          showToast('Module déjà au référentiel — formations rattachées')
+        } else {
+          showToast('Ajouté avec succès')
+        }
       }
       setShowModal(false)
       await loadAll()
       refreshReferentielsCache()
     } catch (err) {
-      const msg = err.response?.data ? JSON.stringify(err.response.data) : 'Erreur'
-      showToast(msg, 'error')
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de l\'enregistrement' }), 'error')
     } finally { setSaving(false) }
   }
 
@@ -300,7 +325,7 @@ export default function Referentiels() {
     if (t === 'grades') return { libelle: '', categorie_id: '', actif: true }
     if (t === 'sites') return { nom: '', actif: true }
     if (t === 'batiments') return { nom: '', site_id: '', actif: true }
-    if (t === 'salles') return { nom: '', site_id: '', batiment_id: '', actif: true }
+    if (t === 'salles') return { nom: '', site_id: '', batiment_id: '', type_lieu: 'SALLE', capacite: '', equipements: '', actif: true }
     if (t === 'vagues') return { libelle: '', ordre: 1, actif: true }
     if (t === 'types_secretariat') return { libelle: '', actif: true }
     return {}
@@ -359,6 +384,7 @@ export default function Referentiels() {
         const b = data.batiments.find(x => x.id === r.batiment_id)
         return b ? b.nom : '—'
       }},
+      { key: 'type_lieu', label: 'Type', render: r => r.type_lieu || '—' },
     ],
   }
 
@@ -377,6 +403,9 @@ export default function Referentiels() {
       <div className="form-group">
         <label className="form-label">Intitulé *</label>
         <input className="form-control" required value={form.intitule || ''} onChange={f('intitule')} placeholder="Ex: Déontologie de la Fonction Publique" />
+        <small className="text-muted" style={{ display: 'block', marginTop: '0.35rem' }}>
+          L’intitulé est unique dans le catalogue. Un même module peut appartenir à plusieurs formations : cochez-les ci-dessous, ou modifiez l’entrée existante.
+        </small>
       </div>
       <div className="form-group">
         <label className="form-label">Formations *</label>
@@ -496,7 +525,7 @@ export default function Referentiels() {
     if (tab === 'sites') return (
       <div className="form-group">
         <label className="form-label">Nom *</label>
-        <input className="form-control" required value={form.nom || ''} onChange={f('nom')} placeholder="Ex: CPFAE" />
+        <input className="form-control" required value={form.nom || ''} onChange={f('nom')} placeholder="Ex: INJS" />
       </div>
     )
 
@@ -534,6 +563,24 @@ export default function Referentiels() {
             .filter(b => !form.site_id || String(b.site_id) === String(form.site_id))
             .map(b => <option key={b.id} value={b.id}>{b.nom}</option>)}
         </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Type de lieu</label>
+        <select className="form-control" value={form.type_lieu || 'SALLE'} onChange={f('type_lieu')}>
+          <option value="SALLE">Salle</option>
+          <option value="CONFERENCE">Salle de conférence</option>
+          <option value="REUNION">Salle de réunion</option>
+          <option value="AMPHI">Amphithéâtre</option>
+          <option value="GYMNASE">Gymnase</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Capacité</label>
+        <input type="number" min="0" className="form-control" value={form.capacite ?? ''} onChange={f('capacite')} placeholder="Ex: 40" />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Équipements</label>
+        <input className="form-control" value={form.equipements || ''} onChange={f('equipements')} placeholder="Ex: Vidéo-projecteur" />
       </div>
     </>)
 
@@ -573,7 +620,7 @@ export default function Referentiels() {
               padding: '0.5rem 1.1rem',
               border: 'none',
               borderRadius: '6px 6px 0 0',
-              background: tab === t.key ? 'var(--ci-green-dark)' : 'transparent',
+              background: tab === t.key ? 'var(--navy)' : 'transparent',
               color: tab === t.key ? '#fff' : 'var(--text-secondary)',
               fontWeight: tab === t.key ? 600 : 400,
               cursor: 'pointer',

@@ -248,8 +248,8 @@ export default function FinanceAjustements() {
         {showForm && (
           <div className="finance-section-body" style={{ borderTop: '1px solid #f1f5f9', background: '#fafbfc' }}>
             <div className="d-flex align-items-center gap-2 mb-3">
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--fin-green-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <i className="bi bi-pencil-square" style={{ color: 'var(--fin-green)' }}></i>
+              <span style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--fin-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="bi bi-pencil-square" style={{ color: 'var(--fin-accent)' }}></i>
               </span>
               <div>
                 <div className="fw-bold" style={{ fontSize: '0.9rem', color: '#1e293b' }}>Proposer un ajustement</div>
@@ -258,14 +258,14 @@ export default function FinanceAjustements() {
             </div>
             <form onSubmit={handlePropose}>
               <div className="row g-3">
-                {/* Formateur */}
+                {/* Enseignant */}
                 <div className="col-md-4">
                   <label className="finance-filter-field label" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b', marginBottom: '0.25rem' }}>
-                    Formateur
+                    Enseignant
                   </label>
                   {formateurSelected ? (
-                    <div className="d-flex align-items-center gap-2 p-2" style={{ background: '#e8f5e9', borderRadius: 8, border: '1px solid #a5d6a7' }}>
-                      <i className="bi bi-person-check-fill" style={{ color: 'var(--fin-green)' }}></i>
+                    <div className="d-flex align-items-center gap-2 p-2" style={{ background: '#e8eff5', borderRadius: 8, border: '1px solid #94c0e7' }}>
+                      <i className="bi bi-person-check-fill" style={{ color: 'var(--fin-accent)' }}></i>
                       <span className="fw-semibold" style={{ fontSize: '0.88rem' }}>{formateurSelected.nom} {formateurSelected.prenom}</span>
                       <span className="text-muted" style={{ fontSize: '0.78rem' }}>#{formateurSelected.numerobadge}</span>
                       <button type="button" className="btn btn-sm ms-auto py-0 px-1" style={{ color: '#64748b', background: 'transparent', border: 'none' }} onClick={clearFormateur} title="Changer">
@@ -290,9 +290,9 @@ export default function FinanceAjustements() {
                           <span className="spinner-border spinner-border-sm" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14 }} />
                         )}
                       </div>
-                      {formateurOptions.length > 0 && (
+                      {enseignantOptions.length > 0 && (
                         <ul className="list-group shadow-sm" style={{ position: 'absolute', zIndex: 999, width: '100%', maxHeight: 220, overflowY: 'auto', top: '100%', marginTop: 2, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                          {formateurOptions.map(f => (
+                          {enseignantOptions.map(f => (
                             <li key={f.id}
                               className="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3"
                               style={{ cursor: 'pointer', fontSize: '0.84rem', border: 'none', borderBottom: '1px solid #f1f5f9' }}
@@ -335,7 +335,7 @@ export default function FinanceAjustements() {
                       <option value="">
                         {formateurSelected
                           ? sessionOptions.length === 0 ? '— Aucune séance disponible —' : '— Choisir une séance —'
-                          : '— Sélectionner un formateur d\'abord —'}
+                          : '— Sélectionner un enseignant d\'abord —'}
                       </option>
                       {sessionOptions.map(s => (
                         <option key={s.session_id} value={s.session_id}>
@@ -411,7 +411,7 @@ export default function FinanceAjustements() {
               <thead>
                 <tr>
                   <th>Statut</th>
-                  <th>Formateur</th>
+                  <th>Enseignant</th>
                   <th>Séance</th>
                   <th style={{ textAlign: 'center' }}>Δ min</th>
                   <th>Avant → Après</th>

@@ -3,7 +3,7 @@ import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
-/** Colonnes feuille « Séances » — grade/groupe/vague requis pour matcher le cours. */
+/** Colonnes feuille « Séances » — grade/groupe/vague requis pour matcher le module. */
 const SEANCES_IMPORT_COLUMNS = [
   'module_titre', 'grade', 'groupe', 'vague',
   'date_journee', 'numero', 'intitule', 'heure_debut', 'heure_fin',
@@ -30,15 +30,15 @@ const FORMATEURS_IMPORT_COLUMNS = [
 /** Lignes d'exemple pour les modèles CSV (séparateur ; — compatible Excel FR). */
 const CSV_EXAMPLE_ROWS = {
   formations: [
-    [1, 'FORMATION EN ADMINISTRATION DE BASE', 'Déontologie de la Fonction Publique', 'CPFAE', '', 'SALLE A', '2026-05-05 08:00', '2026-05-09 17:00', 40, 'FAB A', 'A4', 'GROUPE 1', 'SESSION 2026'],
-    [2, 'FORMATION EN ADMINISTRATION DE BASE', 'Protocole et Savoir-vivre', 'CPFAE', '', 'SALLE A', '2026-05-12 08:00', '2026-05-13 17:00', 16, 'FAB A', 'A4', 'GROUPE 1', 'SESSION 2026'],
+    [1, 'FORMATION EN ADMINISTRATION DE BASE', 'Déontologie de la Fonction Publique', 'INJS', '', 'SALLE A', '2026-05-05 08:00', '2026-05-09 17:00', 40, 'FAB A', 'A4', 'GROUPE 1', 'SESSION 2026'],
+    [2, 'FORMATION EN ADMINISTRATION DE BASE', 'Protocole et Savoir-vivre', 'INJS', '', 'SALLE A', '2026-05-12 08:00', '2026-05-13 17:00', 16, 'FAB A', 'A4', 'GROUPE 1', 'SESSION 2026'],
   ],
   participants: [
     ['FNCP26-001', 'KOUAME', 'Jean-Marc', 'MASCULIN', '15/03/1990', 'Abidjan', 'jm.kouame@gouv.ci', '0701001001', '', 'Concours direct', 'Administrateur Civil', 'FAB A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2026', 'FORMATION EN ADMINISTRATION DE BASE'],
     ['FNCP26-002', 'DIALLO', 'Mariam', 'FEMININ', '22/07/1992', 'Bouaké', 'diallo.m@gouv.ci', '0702002002', '', 'Concours direct', 'Administrateur Civil', 'FAB A', 'A4', 'GROUPE 1', 'A4/GROUPE 1', 'SESSION 2026', 'FORMATION EN ADMINISTRATION DE BASE'],
   ],
   formateurs: [
-    ['F0001', 'CHRAIBI', 'Nadia', 'nadia.chraibi@expert.ci', '0700000001', 'Rédaction administrative', 'CPFAE'],
+    ['F0001', 'CHRAIBI', 'Nadia', 'nadia.chraibi@expert.ci', '0700000001', 'Rédaction administrative', 'INJS'],
     ['F0002', 'BERRADA', 'Karim', 'karim.berrada@expert.ci', '0700000002', 'Droit administratif', 'ENA'],
   ],
   seances: [
@@ -135,7 +135,7 @@ export default function ImportExcel() {
       <div className="card">
         <div className="card-body text-center text-muted py-5">
           <i className="bi bi-lock" style={{ fontSize: '2rem' }}></i>
-          <p className="mt-2 fw-semibold">Accès réservé au Secrétariat / CPFAE Admin</p>
+          <p className="mt-2 fw-semibold">Accès réservé au Secrétariat / INJS Admin</p>
         </div>
       </div>
     )
@@ -152,7 +152,7 @@ export default function ImportExcel() {
     try {
       const response = await api.post('/formations/import-excel/', formData)
       const data = response.data
-      const typeLabels = { formations: 'Cours', participants: 'Auditeurs', formateurs: 'Formateurs', seances: 'Séances' }
+      const typeLabels = { formations: 'Modules', participants: 'Étudiants', formateurs: 'Enseignants', seances: 'Séances' }
       const label = typeLabels[type] || type
 
       if (data.errors?.length > 0) {
@@ -190,8 +190,9 @@ export default function ImportExcel() {
               <strong>Comment importer des données ?</strong>
               <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>
                 Préparez un fichier Excel (.xlsx) avec les colonnes attendues pour chaque type, puis cliquez sur « Importer ».
-                Ordre recommandé : <strong>Cours</strong> → <strong>Formateurs</strong> → <strong>Auditeurs</strong> → <strong>Séances</strong>.
-                Les séances doivent reprendre exactement le même <em>module_titre</em>, <em>grade</em>, <em>groupe</em> et <em>vague</em> que les cours déjà importés.
+                Ordre recommandé : <strong>Modules</strong> → <strong>Enseignants</strong> → <strong>Étudiants</strong> → <strong>Séances</strong>.
+                Les séances doivent reprendre exactement le même <em>module_titre</em>, <em>grade</em>, <em>groupe</em> et <em>vague</em> que les modules déjà importés.
+                Plusieurs modules peuvent appartenir à la même formation (même valeur dans la colonne <em>Formation</em>).
               </p>
             </div>
           </div>
@@ -199,15 +200,15 @@ export default function ImportExcel() {
       </div>
 
       <div className="grid-2">
-        <ImportCard type="formations" title="Cours" icon="bi-mortarboard" color="var(--ci-green-dark)"
+        <ImportCard type="formations" title="Modules" icon="bi-mortarboard" color="var(--ci-success-dark)"
           columns={FORMATIONS_IMPORT_COLUMNS}
           examples={CSV_EXAMPLE_ROWS.formations}
           onImport={handleImport} loading={loading} />
-        <ImportCard type="participants" title="Auditeurs" icon="bi-people" color="var(--ci-blue)"
+        <ImportCard type="participants" title="Étudiants" icon="bi-people" color="var(--ci-blue)"
           columns={PARTICIPANTS_IMPORT_COLUMNS}
           examples={CSV_EXAMPLE_ROWS.participants}
           onImport={handleImport} loading={loading} />
-        <ImportCard type="formateurs" title="Formateurs" icon="bi-person-video3" color="var(--ci-orange)"
+        <ImportCard type="formateurs" title="Enseignants" icon="bi-person-video3" color="var(--ci-warning)"
           columns={FORMATEURS_IMPORT_COLUMNS}
           examples={CSV_EXAMPLE_ROWS.formateurs}
           onImport={handleImport} loading={loading} />
@@ -233,7 +234,7 @@ export default function ImportExcel() {
               <div className="mt-2" style={{ background: '#f0f4ff', borderRadius: 6, padding: '0.4rem 0.6rem' }}>
                 <small>
                   <i className="bi bi-info-circle me-1"></i>
-                  <em>module_titre</em>, <em>grade</em>, <em>groupe</em> et <em>vague</em> sont obligatoires pour rattacher chaque séance au bon cours.
+                  <em>module_titre</em>, <em>grade</em>, <em>groupe</em> et <em>vague</em> sont obligatoires pour rattacher chaque séance au bon module.
                   Date : JJ/MM/AAAA · heure : HH:MM · numéro : 1, 2, 3…
                 </small>
               </div>
@@ -241,7 +242,7 @@ export default function ImportExcel() {
                 <small className="text-muted">
                   Depuis la fiche d'une formation, l'import de séances peut se limiter à
                   <em> date_journee</em>, <em>numero</em>, <em>intitule</em>, <em>heure_debut</em>, <em>heure_fin</em>
-                  (le cours est déjà connu).
+                  (le module est déjà connu).
                 </small>
               </div>
             </div>

@@ -225,8 +225,8 @@ export default function ModuleDetail() {
       setAllParticipants(data.filter(p => !enrolled.has(p.id)))
       participantPicker.applyResponse(res.data, data.length)
     } catch (err) {
-      console.error('Chargement auditeurs module:', err)
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des auditeurs.' }), 'error')
+      console.error('Chargement étudiants module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des étudiants.' }), 'error')
     } finally { setParticipantLoading(false) }
   }
 
@@ -251,7 +251,7 @@ export default function ModuleDetail() {
       await api.post(`/formations/${formationId}/modules/${moduleId}/participants/add/`, { participant_id: pid })
       loadModule()
       loadAvailableParticipants(participantSearch)
-      showToast('Auditeur inscrit')
+      showToast('Étudiant inscrit')
     } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
   }
 
@@ -262,7 +262,7 @@ export default function ModuleDetail() {
         try {
           await api.delete(`/formations/${formationId}/modules/${moduleId}/participants/${pid}/remove/`)
           loadModule()
-          showToast('Auditeur retiré')
+          showToast('Étudiant retiré')
         } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
       }
     })
@@ -279,8 +279,8 @@ export default function ModuleDetail() {
       setAllFormateurs(data.filter(f => !assigned.has(f.id)))
       formateurPicker.applyResponse(res.data, data.length)
     } catch (err) {
-      console.error('Chargement formateurs module:', err)
-      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des formateurs.' }), 'error')
+      console.error('Chargement enseignants module:', err)
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Impossible de charger la liste des enseignants.' }), 'error')
     } finally { setFormateurLoading(false) }
   }
 
@@ -307,9 +307,9 @@ export default function ModuleDetail() {
       await api.post(`/formations/${formationId}/modules/${moduleId}/formateurs/add/`, { formateur_id: fid })
       loadModule()
       loadAvailableFormateurs(formateurSearch)
-      showToast('Formateur assigné')
+      showToast('Enseignant assigné')
     } catch (err) {
-      const message = formatApiErrors(err.response?.data, { fallback: 'Impossible d\'assigner ce formateur.' })
+      const message = formatApiErrors(err.response?.data, { fallback: 'Impossible d\'assigner cet enseignant.' })
       setFormateurAssignError(message)
       showToast('Assignation refusée — voir le détail dans la fenêtre.', 'error')
     }
@@ -322,7 +322,7 @@ export default function ModuleDetail() {
         try {
           await api.delete(`/formations/${formationId}/modules/${moduleId}/formateurs/${fid}/remove/`)
           loadModule()
-          showToast('Formateur retiré')
+          showToast('Enseignant retiré')
         } catch (err) { showToast(err.response?.data?.detail || 'Erreur', 'error') }
       }
     })
@@ -430,7 +430,7 @@ export default function ModuleDetail() {
       if (selectedPresenceSessionId !== 'ALL') {
         body.session_id = parseInt(selectedPresenceSessionId, 10)
       }
-      const res = await api.post(`/formations/${formationId}/force-badgeage-auditeurs-bulk/`, body)
+      const res = await api.post(`/formations/${formationId}/force-badgeage-étudiants-bulk/`, body)
       const sessionsInfo = (res.data.sessions || [])
         .filter(s => s.nb_badges > 0)
         .map(s => `${s.session_intitule}: ${s.nb_badges}/${s.nb_absents} (${s.taux_pct}%)`)
@@ -516,9 +516,9 @@ export default function ModuleDetail() {
 
   const tabStyle = (tab) => ({
     padding: '0.6rem 0.9rem', cursor: 'pointer', fontWeight: 500,
-    color: activeTab === tab ? 'var(--ci-green)' : 'var(--text-muted)',
+    color: activeTab === tab ? 'var(--ci-success)' : 'var(--text-muted)',
     background: 'none', border: 'none', whiteSpace: 'nowrap', flexShrink: 0,
-    borderBottom: `3px solid ${activeTab === tab ? 'var(--ci-green)' : 'transparent'}`,
+    borderBottom: `3px solid ${activeTab === tab ? 'var(--ci-success)' : 'transparent'}`,
   })
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
@@ -558,9 +558,9 @@ export default function ModuleDetail() {
             <Link
               to={`/formations/${formationId}/modules/${moduleId}/notes`}
               className="btn btn-outline-primary btn-sm"
-              title="Saisir les notes des auditeurs"
+              title="Saisir les notes des étudiants"
             >
-              <i className="bi bi-pencil-square me-1"></i>Notes auditeurs
+              <i className="bi bi-pencil-square me-1"></i>Notes étudiants
             </Link>
             )}
             {canViewDecisions && (
@@ -596,7 +596,7 @@ export default function ModuleDetail() {
               <i className="bi bi-file-earmark-excel me-1"></i>Excel — Toutes séances
             </button>
             <div style={{ fontSize: '0.82rem', color: '#94a3b8', width: '100%', textAlign: 'right' }}>
-              <i className="bi bi-mortarboard me-1"></i>{module.formation}
+              <i className="bi bi-mortarboard me-1"></i>Formation : {module.formation}
             </div>
           </div>
         </div>
@@ -606,9 +606,9 @@ export default function ModuleDetail() {
           {[
             { key: 'seances',      label: `Séances (${sessions.length})`,       icon: 'bi-calendar3' },
             { key: 'info',         label: 'Informations',                        icon: 'bi-info-circle' },
-            { key: 'participants', label: `Auditeurs (${participants.length})`,  icon: 'bi-people' },
+            { key: 'participants', label: `Étudiants (${participants.length})`,  icon: 'bi-people' },
             { key: 'presences',   label: `Présences (${presences.length})`,    icon: 'bi-check2-circle' },
-            { key: 'formateurs',  label: `Formateurs (${formateurs.length})`,   icon: 'bi-person-video3' },
+            { key: 'formateurs',  label: `Enseignants (${formateurs.length})`,   icon: 'bi-person-video3' },
           ].map(t => (
             <button key={t.key} style={tabStyle(t.key)} onClick={() => setActiveTab(t.key)}>
               <i className={`bi ${t.icon} me-1`}></i>{t.label}
@@ -624,14 +624,14 @@ export default function ModuleDetail() {
         const edtResume = fmtEdtVsObjectif(objectifHeures, planifieHeures)
         return (
         <div className="card">
-          <div className="card-header-bar" style={{ background: '#f0fdf4' }}>
-            <span style={{ fontWeight: 600, color: 'var(--ci-green-dark)' }}>
+          <div className="card-header-bar" style={{ background: '#f0f6fd' }}>
+            <span style={{ fontWeight: 600, color: 'var(--ci-success-dark)' }}>
               <i className="bi bi-calendar3 me-2"></i>Séances — {module.intitule}
-              <span className="badge ms-2" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+              <span className="badge ms-2" style={{ background: '#d1e3fa', color: '#082a5d', fontSize: '0.78rem' }}>
                 {sessions.length} séance{sessions.length > 1 ? 's' : ''}
               </span>
               {planifieHeures != null && objectifHeures != null && (
-                <span className="badge ms-2" style={{ background: '#ecfdf5', color: '#047857', fontSize: '0.78rem', fontWeight: 500 }}>
+                <span className="badge ms-2" style={{ background: '#ecf3fd', color: '#093473', fontSize: '0.78rem', fontWeight: 500 }}>
                   Σ {fmtHeuresLabel(planifieHeures) ?? '—'} / {fmtHeuresLabel(objectifHeures) ?? '—'}
                 </span>
               )}
@@ -643,7 +643,7 @@ export default function ModuleDetail() {
             )}
           </div>
           {edtResume && (
-            <div style={{ padding: '0.55rem 1rem', borderBottom: '1px solid #ecfdf5', fontSize: '0.84rem', color: '#64748b' }}>
+            <div style={{ padding: '0.55rem 1rem', borderBottom: '1px solid #ecf3fd', fontSize: '0.84rem', color: '#64748b' }}>
               <i className="bi bi-clock-history me-1"></i>{edtResume}
               <span style={{ marginLeft: '0.35rem', color: '#94a3b8' }}>
                 (Σ durées de chaque séance)
@@ -736,7 +736,7 @@ export default function ModuleDetail() {
         const dureePlanifiee = module.duree_planifiee_heures ?? sommeSeancesHeures(sessions)
         const dureeAffichee = fmtHeuresLabel(dureeContractuelle ?? dureePlanifiee)
         const dureeDetail = fmtEdtVsObjectif(dureeContractuelle, dureePlanifiee)
-        const infoRow = (icon, label, value, iconColor = 'var(--ci-orange)', extra = null) => (
+        const infoRow = (icon, label, value, iconColor = 'var(--ci-warning)', extra = null) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid #f1f5f9', gap: '0.75rem' }}>
             <i className={`bi ${icon}`} style={{ width: 18, color: iconColor, flexShrink: 0, fontSize: '1rem' }}></i>
             <span style={{ minWidth: 90, fontWeight: 600, fontSize: '0.86rem', color: '#64748b' }}>{label}</span>
@@ -756,7 +756,7 @@ export default function ModuleDetail() {
               <div className="card">
                 <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <i className="bi bi-geo-alt" style={{ color: 'var(--ci-orange)' }}></i>Lieu &amp; Calendrier
+                    <i className="bi bi-geo-alt" style={{ color: 'var(--ci-warning)' }}></i>Lieu &amp; Calendrier
                   </span>
                 </div>
                 <div style={{ padding: '0.5rem 1.2rem 0.75rem' }}>
@@ -765,7 +765,7 @@ export default function ModuleDetail() {
                   {infoRow('bi-layout-text-window-reverse', 'Salle', module.salle)}
                   {infoRow('bi-calendar',         'Début',   formatDate(module.date_debut))}
                   {infoRow('bi-calendar-check',   'Fin',     formatDate(module.date_fin))}
-                  {infoRow('bi-clock',            'Durée',   dureeAffichee, 'var(--ci-orange)', dureeDetail)}
+                  {infoRow('bi-clock',            'Durée',   dureeAffichee, 'var(--ci-warning)', dureeDetail)}
                 </div>
               </div>
 
@@ -773,7 +773,7 @@ export default function ModuleDetail() {
               <div className="card">
                 <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <span style={{ fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <i className="bi bi-people" style={{ color: 'var(--ci-orange)' }}></i>Classification &amp; Intervenants
+                    <i className="bi bi-people" style={{ color: 'var(--ci-warning)' }}></i>Classification &amp; Intervenants
                   </span>
                   {canManageModule && (
                     <button onClick={openAssignSuperviseur} className="btn btn-outline-primary btn-sm" title="Assigner un encadrant">
@@ -789,7 +789,7 @@ export default function ModuleDetail() {
                   {infoRow('bi-mortarboard',  'Formation', module.formation)}
                   {infoRow('bi-people',       'Groupe',    module.groupe)}
                   {infoRow('bi-flag',         'Vague',     module.vague)}
-                  {infoRow('bi-person-video3','Formateur', formateurs.length > 0
+                  {infoRow('bi-person-video3','Enseignant', formateurs.length > 0
                     ? formateurs.map(f => `${f.prenom} ${f.nom}`).join(', ')
                     : null)}
                   {infoRow('bi-person-gear',  'Encadrant', module.superviseur_nom)}
@@ -801,16 +801,16 @@ export default function ModuleDetail() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
               {/* Résumé stats */}
-              <div className="card" style={{ borderTop: '3px solid var(--ci-green)' }}>
+              <div className="card" style={{ borderTop: '3px solid var(--ci-success)' }}>
                 <div style={{ padding: '0.75rem 1rem', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#94a3b8', fontWeight: 600 }}>RÉSUMÉ</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', borderBottom: '1px solid #f1f5f9' }}>
                   {[
-                    { icon: 'bi-calendar3',   value: sessions.length,      label: 'SÉANCES',    color: '#16a34a' },
+                    { icon: 'bi-calendar3',   value: sessions.length,      label: 'SÉANCES',    color: '#0e58ab' },
                     { icon: 'bi-people',      value: participants.length,   label: 'AUDITEURS',  color: '#1d4ed8' },
                     { icon: 'bi-check-circle',value: nbTerminees,           label: 'TERMINÉES',  color: '#7c3aed' },
-                    { icon: 'bi-person-video3',value: formateurs.length,    label: 'FORMATEURS', color: 'var(--ci-orange)' },
+                    { icon: 'bi-person-video3',value: formateurs.length,    label: 'ENSEIGNANTS', color: 'var(--ci-warning)' },
                   ].map((c, i) => (
                     <div key={c.label} style={{
                       padding: '1.1rem 0.5rem', textAlign: 'center',
@@ -826,7 +826,7 @@ export default function ModuleDetail() {
               </div>
 
               {/* Statut */}
-              <div className="card" style={{ borderTop: '3px solid var(--ci-orange)' }}>
+              <div className="card" style={{ borderTop: '3px solid var(--ci-warning)' }}>
                 <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: '#94a3b8', fontWeight: 600 }}>STATUT</span>
                 </div>
@@ -857,7 +857,7 @@ export default function ModuleDetail() {
       {activeTab === 'participants' && (
         <div className="card">
           <div className="card-header-bar">
-            <span><i className="bi bi-people me-2"></i>Auditeurs inscrits ({participants.length})</span>
+            <span><i className="bi bi-people me-2"></i>Étudiants inscrits ({participants.length})</span>
             {canManageModule && (
               <button onClick={openAddParticipant} className="btn btn-dfrc btn-sm">
                 <i className="bi bi-person-plus me-1"></i>Inscrire
@@ -869,7 +869,7 @@ export default function ModuleDetail() {
               <div className="p-3 pb-0">
                 <input
                   className="form-control form-control-sm"
-                  placeholder="Rechercher un auditeur (nom, prénom, matricule)…"
+                  placeholder="Rechercher un étudiant (nom, prénom, matricule)…"
                   value={enrolledSearch}
                   onChange={e => setEnrolledSearch(e.target.value)}
                   style={{ maxWidth: 360 }}
@@ -913,7 +913,7 @@ export default function ModuleDetail() {
               <div className="text-center py-4 text-muted">
                 <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
                 <p className="mt-2">
-                  {participants.length > 0 ? 'Aucun auditeur ne correspond à cette recherche.' : 'Aucun auditeur inscrit'}
+                  {participants.length > 0 ? 'Aucun étudiant ne correspond à cette recherche.' : 'Aucun étudiant inscrit'}
                 </p>
               </div>
             )}
@@ -926,9 +926,9 @@ export default function ModuleDetail() {
         <div className="card">
           <div className="card-header-bar" style={{ background: '#fdf4ff' }}>
             <span style={{ fontWeight: 600, color: '#7e22ce' }}>
-              <i className="bi bi-person-video3 me-2"></i>Formateurs assignés
+              <i className="bi bi-person-video3 me-2"></i>Enseignants assignés
               <span className="badge ms-2" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.78rem' }}>
-                {formateurs.length} formateur{formateurs.length > 1 ? 's' : ''}
+                {formateurs.length} enseignant{formateurs.length > 1 ? 's' : ''}
               </span>
             </span>
             {canManageModule && (
@@ -981,7 +981,7 @@ export default function ModuleDetail() {
             ) : (
               <div className="text-center py-4 text-muted">
                 <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
-                <p className="mt-2">Aucun formateur assigné à ce module</p>
+                <p className="mt-2">Aucun enseignant assigné à ce module</p>
               </div>
             )}
           </div>
@@ -1089,10 +1089,10 @@ export default function ModuleDetail() {
                       type="button"
                       className="btn btn-success btn-sm"
                       style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                      title="Forcer l'entrée de 80 à 95 % des auditeurs absents, tirage aléatoire par séance"
+                      title="Forcer l'entrée de 80 à 95 % des étudiants absents, tirage aléatoire par séance"
                       onClick={() => { setBulkForceMotif(''); setBulkForceModal(true) }}
                     >
-                      <i className="bi bi-shuffle"></i> Forcer auditeurs (80–95 %)
+                      <i className="bi bi-shuffle"></i> Forcer étudiants (80–95 %)
                     </button>
                   )}
                 </div>
@@ -1111,9 +1111,9 @@ export default function ModuleDetail() {
               {[
                 { label: 'ATTENDUS',      value: nbAttendus, icon: 'bi-people',             bg: '#f8fafc', border: '#cbd5e1', color: '#475569' },
                 { label: 'EN SALLE',      value: nbEnSalle,  icon: 'bi-person-check',        bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8' },
-                { label: 'PRÉSENTS',      value: nbPresents, icon: 'bi-check-circle',         bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
+                { label: 'PRÉSENTS',      value: nbPresents, icon: 'bi-check-circle',         bg: '#f0f6fd', border: '#80b7f5', color: '#0b478a' },
                 { label: 'ABSENTS',       value: nbAbsents,  icon: 'bi-person-x',             bg: '#fef2f2', border: '#fca5a5', color: '#dc2626' },
-                { label: 'TAUX PRÉSENCE', value: `${taux}%`, icon: 'bi-graph-up',             bg: '#fefce8', border: '#fcd34d', color: taux < 50 ? '#dc2626' : '#d97706' },
+                { label: 'TAUX PRÉSENCE', value: `${taux}%`, icon: 'bi-graph-up',             bg: '#fefce8', border: '#fcdf4d', color: taux < 50 ? '#dc2626' : '#d9a106' },
               ].map(c => (
                 <div key={c.label} style={{ background: c.bg, border: `1.5px solid ${c.border}`, borderRadius: '12px', padding: '1rem', textAlign: 'center' }}>
                   <i className={`bi ${c.icon}`} style={{ fontSize: '1.4rem', color: c.color, display: 'block', marginBottom: '0.3rem' }}></i>
@@ -1130,7 +1130,7 @@ export default function ModuleDetail() {
                   <i className="bi bi-calendar-x" style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}></i>
                   Aucun pointage enregistré pour cette date.
                   <div style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
-                    Les auditeurs/formateurs/encadrants attendus restent visibles dans la liste des absents ci-dessous.
+                    Les étudiants/formateurs/encadrants attendus restent visibles dans la liste des absents ci-dessous.
                   </div>
                 </div>
               </div>
@@ -1180,7 +1180,7 @@ export default function ModuleDetail() {
                         <td>
                           {!pt.timestamp_sortie && (
                             <button className="btn btn-outline-warning btn-sm" title="Forcer la sortie"
-                              onClick={() => openForceModal(pt.participant_id || pt.formateur_id || pt.encadrant_id, 'SORTIE', pt.type_personne || 'participant')}>
+                              onClick={() => openForceModal(pt.participant_id || pt.enseignant_id || pt.encadrant_id, 'SORTIE', pt.type_personne || 'participant')}>
                               <i className="bi bi-box-arrow-right"></i>
                             </button>
                           )}
@@ -1216,12 +1216,12 @@ export default function ModuleDetail() {
 
                   return (
                     <div className="card" key={seance.session_id} style={{ marginBottom: '1rem' }}>
-                      <div className="card-header-bar" style={{ background: '#f0fdf4', borderBottom: '2px solid #bbf7d0' }}>
+                      <div className="card-header-bar" style={{ background: '#f0f6fd', borderBottom: '2px solid #bbd7f7' }}>
                         <span style={{ fontWeight: 600 }}>
-                          <i className="bi bi-calendar3 me-2" style={{ color: '#16a34a' }}></i>
+                          <i className="bi bi-calendar3 me-2" style={{ color: '#0e58ab' }}></i>
                           {seance.session_intitule}
                         </span>
-                        <span className="badge" style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.78rem' }}>
+                        <span className="badge" style={{ background: '#d1e3fa', color: '#082a5d', fontSize: '0.78rem' }}>
                           {nPresSeance} présence{nPresSeance > 1 ? 's' : ''}
                           {(ptsAud.length > 0 || ptsFmt.length > 0 || ptsEnc.length > 0) && (
                             <span style={{ fontWeight: 400, marginLeft: '0.35rem', opacity: 0.95 }}>
@@ -1236,7 +1236,7 @@ export default function ModuleDetail() {
                         )}
                         {ptsAud.length > 0 && (
                           <>
-                            {subBar('bi-people', 'Auditeurs', '#eff6ff', '#bfdbfe', '#1d4ed8', ptsAud.length)}
+                            {subBar('bi-people', 'Étudiants', '#eff6ff', '#bfdbfe', '#1d4ed8', ptsAud.length)}
                             <table className="table mb-0">
                               {theadPresence}
                               <tbody>{ptsAud.map(presenceRow)}</tbody>
@@ -1245,7 +1245,7 @@ export default function ModuleDetail() {
                         )}
                         {ptsFmt.length > 0 && (
                           <>
-                            {subBar('bi-person-video3', 'Formateurs', '#faf5ff', '#e9d5ff', '#6b21a8', ptsFmt.length)}
+                            {subBar('bi-person-video3', 'Enseignants', '#faf5ff', '#e9d5ff', '#6b21a8', ptsFmt.length)}
                             <table className="table mb-0">
                               {theadPresence}
                               <tbody>{ptsFmt.map(presenceRow)}</tbody>
@@ -1254,7 +1254,7 @@ export default function ModuleDetail() {
                         )}
                         {ptsEnc.length > 0 && (
                           <>
-                            {subBar('bi-person-badge', 'Encadrants', '#fffbeb', '#fde68a', '#9c4221', ptsEnc.length)}
+                            {subBar('bi-person-badge', 'Encadrants', '#fffceb', '#fdec8a', '#9c4221', ptsEnc.length)}
                             <table className="table mb-0">
                               {theadPresence}
                               <tbody>{ptsEnc.map(presenceRow)}</tbody>
@@ -1302,9 +1302,9 @@ export default function ModuleDetail() {
                       <td>{p.prenom}</td>
                       <td>
                         {p.type_personne === 'formateur'
-                          ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Formateur</span>
+                          ? <span className="badge" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: '0.72rem' }}><i className="bi bi-person-video3 me-1"></i>Enseignant</span>
                           : p.type_personne === 'encadrant'
-                            ? <span className="badge" style={{ background: '#fff7e6', color: '#9c4221', fontSize: '0.72rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
+                            ? <span className="badge" style={{ background: '#fffae6', color: '#9c4221', fontSize: '0.72rem' }}><i className="bi bi-person-badge me-1"></i>Encadrant</span>
                             : (p.grade || '—')}
                       </td>
                       {canSupervise && (
@@ -1342,7 +1342,7 @@ export default function ModuleDetail() {
                       <div className="card-body-flush">
                         {absAud.length > 0 && (
                           <>
-                            {absentSubBar('bi-people', 'Auditeurs absents', '#eff6ff', '#bfdbfe', '#1d4ed8', absAud.length)}
+                            {absentSubBar('bi-people', 'Étudiants absents', '#eff6ff', '#bfdbfe', '#1d4ed8', absAud.length)}
                             <table className="table mb-0">
                               {theadAbsent}
                               <tbody>{absAud.map(absentRow)}</tbody>
@@ -1351,7 +1351,7 @@ export default function ModuleDetail() {
                         )}
                         {absFmt.length > 0 && (
                           <>
-                            {absentSubBar('bi-person-video3', 'Formateurs absents', '#faf5ff', '#e9d5ff', '#6b21a8', absFmt.length)}
+                            {absentSubBar('bi-person-video3', 'Enseignants absents', '#faf5ff', '#e9d5ff', '#6b21a8', absFmt.length)}
                             <table className="table mb-0">
                               {theadAbsent}
                               <tbody>{absFmt.map(absentRow)}</tbody>
@@ -1360,7 +1360,7 @@ export default function ModuleDetail() {
                         )}
                         {absEnc.length > 0 && (
                           <>
-                            {absentSubBar('bi-person-badge', 'Encadrants absents', '#fffbeb', '#fde68a', '#9c4221', absEnc.length)}
+                            {absentSubBar('bi-person-badge', 'Encadrants absents', '#fffceb', '#fdec8a', '#9c4221', absEnc.length)}
                             <table className="table mb-0">
                               {theadAbsent}
                               <tbody>{absEnc.map(absentRow)}</tbody>
@@ -1376,22 +1376,22 @@ export default function ModuleDetail() {
         )
       })()}
 
-      {/* ── MODAL: FORÇAGE BADGEAGE EN MASSE (auditeurs) ── */}
+      {/* ── MODAL: FORÇAGE BADGEAGE EN MASSE (étudiants) ── */}
       {bulkForceModal && (
         <div className="modal-overlay" onClick={() => !bulkForceSaving && setBulkForceModal(false)}>
           <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-shuffle me-2"></i>Forcer le badgeage des auditeurs</h5>
+              <h5><i className="bi bi-shuffle me-2"></i>Forcer le badgeage des étudiants</h5>
               <button className="btn-close" disabled={bulkForceSaving} onClick={() => setBulkForceModal(false)}>&times;</button>
             </div>
-            <form onSubmit={handleBulkForceAuditeurs}>
+            <form onSubmit={handleBulkForceÉtudiants}>
               <div className="modal-body">
                 <p style={{ fontSize: '0.9rem', color: '#475569', marginBottom: '0.75rem' }}>
                   Pour chaque séance active du {formatDate(selectedPresenceDate)}
                   {selectedPresenceSessionId !== 'ALL' ? ' (séance sélectionnée uniquement)' : ''},
-                  un tirage aléatoire badge <strong>entre 80 % et 95 %</strong> des auditeurs encore absents.
-                  Chaque auditeur badgé reçoit la <strong>durée planifiée de la séance</strong> (horaires EDT).
-                  Les formateurs et encadrants ne sont pas concernés.
+                  un tirage aléatoire badge <strong>entre 80 % et 95 %</strong> des étudiants encore absents.
+                  Chaque étudiant badgé reçoit la <strong>durée planifiée de la séance</strong> (horaires EDT).
+                  Les enseignants et encadrants ne sont pas concernés.
                 </p>
                 <label className="form-label">Motif <span className="text-danger">*</span></label>
                 <textarea className="form-control" rows={3} required
@@ -1421,7 +1421,7 @@ export default function ModuleDetail() {
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label fw-semibold">
-                    {forceForm.type_personne === 'formateur' ? 'Formateur' : forceForm.type_personne === 'encadrant' ? 'Encadrant' : 'Auditeur'}
+                    {forceForm.type_personne === 'formateur' ? 'Enseignant' : forceForm.type_personne === 'encadrant' ? 'Encadrant' : 'Étudiant'}
                   </label>
                   {(() => {
                     const source = forceForm.type_personne === 'formateur' ? formateurs : forceForm.type_personne === 'encadrant' ? encadrantsAttendus : participants
@@ -1524,7 +1524,7 @@ export default function ModuleDetail() {
         <div className="modal-overlay" onClick={() => setShowAddParticipant(false)}>
           <div className="modal-content" style={{ maxWidth: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-person-plus me-2"></i>Inscrire un auditeur</h5>
+              <h5><i className="bi bi-person-plus me-2"></i>Inscrire un étudiant</h5>
               <button className="btn-close" onClick={() => setShowAddParticipant(false)}>&times;</button>
             </div>
             <div className="modal-body">
@@ -1535,7 +1535,7 @@ export default function ModuleDetail() {
               </div>
               {participantLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!participantLoading && allParticipants.length === 0 && (
-                <p className="text-muted text-center py-2">Aucun auditeur disponible</p>
+                <p className="text-muted text-center py-2">Aucun étudiant disponible</p>
               )}
               {!participantLoading && allParticipants.length > 0 && (
                 <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
@@ -1578,7 +1578,7 @@ export default function ModuleDetail() {
         <div className="modal-overlay" onClick={() => setShowAddFormateur(false)}>
           <div className="modal-content" style={{ maxWidth: '640px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5><i className="bi bi-person-video3 me-2"></i>Assigner un formateur</h5>
+              <h5><i className="bi bi-person-video3 me-2"></i>Assigner un enseignant</h5>
               <button className="btn-close" onClick={() => setShowAddFormateur(false)}>&times;</button>
             </div>
             <div className="modal-body">
@@ -1597,25 +1597,25 @@ export default function ModuleDetail() {
               </div>
               {formateurLoading && <div className="text-center py-2"><div className="spinner" style={{ width: 20, height: 20 }}></div></div>}
               {!formateurLoading && allFormateurs.length === 0 && (
-                <p className="text-muted text-center py-2">Aucun formateur trouvé</p>
+                <p className="text-muted text-center py-2">Aucun enseignant trouvé</p>
               )}
               {!formateurLoading && allFormateurs.length > 0 && (
                 <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
                   {allFormateurs.map(f => (
                     <FormateurAssignPickerItem
                       key={f.id}
-                      formateur={f}
+                      enseignant={f}
                       onAssign={handleAddFormateur}
                     />
                   ))}
                 </div>
               )}
               <Pagination
-                page={formateurPicker.page}
-                totalPages={formateurPicker.totalPages}
-                onPageChange={formateurPicker.setPage}
-                totalItems={formateurPicker.totalCount}
-                pageSize={formateurPicker.pageSize}
+                page={enseignantPicker.page}
+                totalPages={enseignantPicker.totalPages}
+                onPageChange={enseignantPicker.setPage}
+                totalItems={enseignantPicker.totalCount}
+                pageSize={enseignantPicker.pageSize}
               />
             </div>
             <div className="modal-footer">
@@ -1896,7 +1896,7 @@ export default function ModuleDetail() {
                           <tr
                             key={u.id}
                             onClick={() => setSelectedSup(String(u.id))}
-                            style={{ cursor: 'pointer', background: isSelected ? '#f0fdf4' : undefined }}
+                            style={{ cursor: 'pointer', background: isSelected ? '#f0f6fd' : undefined }}
                           >
                             <td>{fullName}</td>
                             <td>{u.username}</td>

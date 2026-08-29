@@ -23,7 +23,7 @@ import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoi
 import RapportsWorkflowPanel from '../components/RapportsWorkflowPanel'
 
 // ── Palettes & constantes ────────────────────────────────────────────────────
-const C = ['#43A047','#1565C0','#F57C00','#7B1FA2','#C62828','#00838F','#558B2F','#AD1457','#0277BD','#4E342E']
+const C = ['#2277C1','#1565C0','#F5B100','#7B1FA2','#C62828','#00838F','#0F70AB','#AD1457','#0277BD','#4E342E']
 
 const STATUT_LABELS = {
   TERMINE:'Terminé', EN_COURS:'En cours', FORCE_DFRC:'Forcé DFRC',
@@ -33,7 +33,7 @@ const STATUT_LABELS = {
 const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN']
 
 const RB_VIEWS = [
-  { id: 'bilans', label: 'Bilans CPFAE', icon: 'bi-table' },
+  { id: 'bilans', label: 'Bilans INJS', icon: 'bi-table' },
   { id: 'workflow', label: 'Rapports périodiques', icon: 'bi-file-earmark-check' },
 ]
 
@@ -42,12 +42,12 @@ const TAUX_PEDAGOGIE = {
   assiduite: {
     label: 'Assiduité séance',
     help: 'Places présentes ÷ places attendues sur les séances terminées du périmètre. Utilisé pour le dashboard, les alertes et l\'historique.',
-    color: '#43A047',
+    color: '#2277C1',
     getValue: (ped) => ped?.taux_presence ?? 0,
   },
   couverture: {
-    label: 'Couverture auditeurs',
-    help: 'Auditeurs ayant au moins une présence ÷ auditeurs inscrits. Aligné sur la logique des bilans CPFAE.',
+    label: 'Couverture étudiants',
+    help: 'Étudiants ayant au moins une présence ÷ étudiants inscrits. Aligné sur la logique des bilans INJS.',
     color: '#1565C0',
     getValue: (ped) => ped?.taux_couverture_auditeurs ?? ped?.taux_achevement ?? 0,
   },
@@ -60,7 +60,7 @@ const TAUX_PEDAGOGIE = {
   evenements: {
     label: 'Événements absence / suspect',
     help: 'Pointages « absent non badgé » ou « hors ligne suspect » rapportés aux inscrits (événements, pas absents notoires).',
-    color: '#F57C00',
+    color: '#F5B100',
     getValue: (ped) => ped?.taux_abandon ?? 0,
   },
 }
@@ -110,7 +110,7 @@ const TAB_SECTIONS = {
 const ALERTES_OVERVIEW_CODES = ['taux_presence', 'taux_execution_vh', 'saturation_groupe']
 
 const PJ_EXPORT_FORMATS = [
-  { fmt: 'xlsx', icon: 'bi-file-earmark-excel', label: 'Excel', col: '#217346' },
+  { fmt: 'xlsx', icon: 'bi-file-earmark-excel', label: 'Excel', col: '#0b4489' },
   { fmt: 'pdf',  icon: 'bi-file-earmark-pdf',   label: 'PDF',   col: '#C62828' },
   { fmt: 'docx', icon: 'bi-file-earmark-word',  label: 'Word',  col: '#1565C0' },
 ]
@@ -191,7 +191,7 @@ function Donut({ data, labelKey, valueKey, size = 150 }) {
   )
 }
 
-function Bars({ data, labelKey, valueKey, color='#43A047', height=150 }) {
+function Bars({ data, labelKey, valueKey, color='#2277C1', height=150 }) {
   if (!data?.length) return <Empty />
   const max = Math.max(...data.map(d=>d[valueKey]),1)
   const barW = Math.max(18, Math.min(44, Math.floor(520/data.length)-8))
@@ -257,8 +257,8 @@ function TrendBadge({ pct }) {
   return (
     <span style={{
       fontSize:'0.72rem',fontWeight:700,
-      color: up ? '#43A047' : '#C62828',
-      background: (up ? '#43A047' : '#C62828') + '14',
+      color: up ? '#2277C1' : '#C62828',
+      background: (up ? '#2277C1' : '#C62828') + '14',
       borderRadius:20,padding:'0.12rem 0.45rem',
     }}>
       {up ? '▲' : '▼'} {Math.abs(pct)}%
@@ -267,8 +267,8 @@ function TrendBadge({ pct }) {
 }
 
 const NIVEAU_ALERTE = {
-  ok:              { label: 'Conforme',       bg: '#ecfdf5', border: '#86efac', color: '#15803d', icon: 'bi-check-circle-fill' },
-  avertissement:   { label: 'Avertissement',  bg: '#fffbeb', border: '#fcd34d', color: '#b45309', icon: 'bi-exclamation-triangle-fill' },
+  ok:              { label: 'Conforme',       bg: '#ecf3fd', border: '#80b7f5', color: '#0b478a', icon: 'bi-check-circle-fill' },
+  avertissement:   { label: 'Avertissement',  bg: '#fffceb', border: '#fcdf4d', color: '#b47f09', icon: 'bi-exclamation-triangle-fill' },
   critique:        { label: 'Critique',       bg: '#fff1f2', border: '#fca5a5', color: '#b91c1c', icon: 'bi-exclamation-octagon-fill' },
   inactif:         { label: 'Surveillance off', bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', icon: 'bi-pause-circle' },
   non_configure:   { label: 'Non configuré',  bg: '#f1f5f9', border: '#cbd5e1', color: '#475569', icon: 'bi-gear' },
@@ -294,12 +294,12 @@ function SeuilGauge({ valeur, seuilAvert, seuilCrit, inverse, unite, echelleMax,
   const posCrit = Math.min(100, (seuilCrit / max) * 100)
 
   const fillColor = niveau === 'critique' ? '#C62828'
-    : niveau === 'avertissement' ? '#F57C00'
-    : niveau === 'ok' ? '#43A047' : '#94a3b8'
+    : niveau === 'avertissement' ? '#F5B100'
+    : niveau === 'ok' ? '#2277C1' : '#94a3b8'
 
   const gradStops = inverse
-    ? `#43A047 0%, #43A047 ${posAvert}%, #FCD34D ${posAvert}%, #FCD34D ${posCrit}%, #FCA5A5 ${posCrit}%, #FCA5A5 100%`
-    : `#FCA5A5 0%, #FCA5A5 ${posCrit}%, #FCD34D ${posCrit}%, #FCD34D ${posAvert}%, #43A047 ${posAvert}%, #43A047 100%`
+    ? `#2277C1 0%, #2277C1 ${posAvert}%, #FCDF4D ${posAvert}%, #FCDF4D ${posCrit}%, #FCA5A5 ${posCrit}%, #FCA5A5 100%`
+    : `#FCA5A5 0%, #FCA5A5 ${posCrit}%, #FCDF4D ${posCrit}%, #FCDF4D ${posAvert}%, #2277C1 ${posAvert}%, #2277C1 100%`
 
   return (
     <div style={{marginTop:'0.65rem'}}>
@@ -378,7 +378,7 @@ function IndicateurSurveillanceCard({ ind }) {
           background:'#f8fafc', fontSize:'0.75rem', color:'#64748b',
         }}>
           {!ind.configure
-            ? 'Seuil non configuré — initialisez les seuils CPFAE pour activer la surveillance.'
+            ? 'Seuil non configuré — initialisez les seuils INJS pour activer la surveillance.'
             : 'Surveillance désactivée pour cet indicateur.'}
         </div>
       )}
@@ -400,8 +400,8 @@ function AlertesOverviewBandeau({ items }) {
           key={a.indicateur}
           className={a.niveau === 'critique' ? 'stats-alerte-pulse' : undefined}
           style={{
-            background: a.niveau === 'critique' ? '#fff3f3' : '#fffbeb',
-            border: `1px solid ${a.niveau === 'critique' ? '#fca5a5' : '#fcd34d'}`,
+            background: a.niveau === 'critique' ? '#fff3f3' : '#fffceb',
+            border: `1px solid ${a.niveau === 'critique' ? '#fca5a5' : '#fcdf4d'}`,
             borderRadius: 8,
             padding: '0.5rem 0.85rem',
             display: 'flex',
@@ -412,7 +412,7 @@ function AlertesOverviewBandeau({ items }) {
         >
           <i
             className={`bi ${a.niveau === 'critique' ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}`}
-            style={{ color: a.niveau === 'critique' ? '#C62828' : '#F57C00', fontSize: '1rem' }}
+            style={{ color: a.niveau === 'critique' ? '#C62828' : '#F5B100', fontSize: '1rem' }}
           />
           <b style={{ color: '#1e293b' }}>{a.libelle}</b>
           <span style={{ color: '#64748b' }}>: {a.valeur}{a.unite}</span>
@@ -432,7 +432,7 @@ function buildAlertesSidebarEntries(alertesMeta, alertesList) {
 
   const sections = [
     {
-      id: 'synthese', group: 'sections', tag: 'SYN', tagColor: '#43A047', label: 'Synthèse & guide',
+      id: 'synthese', group: 'sections', tag: 'SYN', tagColor: '#2277C1', label: 'Synthèse & guide',
       icon: 'bi-shield-check', sub: `${syn.ok ?? 0} ok · ${syn.avertissement ?? 0} avert. · ${syn.critique ?? 0} crit.`,
     },
     {
@@ -440,7 +440,7 @@ function buildAlertesSidebarEntries(alertesMeta, alertesList) {
       icon: 'bi-grid-3x3', sub: `${indicateurs.length} carte${indicateurs.length > 1 ? 's' : ''} de surveillance`,
     },
     {
-      id: 'declenchees', group: 'sections', tag: 'ALT', tagColor: nbDecl ? '#C62828' : '#43A047', label: 'Alertes déclenchées',
+      id: 'declenchees', group: 'sections', tag: 'ALT', tagColor: nbDecl ? '#C62828' : '#2277C1', label: 'Alertes déclenchées',
       icon: 'bi-bell-fill', sub: nbDecl ? `${nbDecl} alerte${nbDecl > 1 ? 's' : ''} active${nbDecl > 1 ? 's' : ''}` : 'Tout conforme',
     },
     {
@@ -471,17 +471,17 @@ function AlertesSyntheseWidget({
 }) {
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 50%, #fffbeb 100%)',
+      background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 50%, #f4f7fb 100%)',
       border: '1px solid #e2e8f0', borderRadius: 12, padding: '1rem 1.15rem', marginBottom: '1rem',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
-            <i className="bi bi-shield-check me-2" style={{ color: '#43A047' }}/>
+            <i className="bi bi-shield-check me-2" style={{ color: 'var(--navy)' }}/>
             Surveillance des indicateurs
           </h3>
           <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b', maxWidth: 560 }}>
-            Les alertes comparent les KPIs en temps réel aux seuils CPFAE.
+            Les alertes comparent les KPIs en temps réel aux seuils INJS.
             {(formationId || secretariatId)
               ? ' Filtre actif appliqué aux valeurs ci-dessous.'
               : ' Vue globale — utilisez les filtres formation / secrétariat pour affiner.'}
@@ -499,8 +499,8 @@ function AlertesSyntheseWidget({
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem',
         }}>
           {[
-            { icon: 'bi-check-circle-fill', col: '#43A047', titre: 'Conforme', texte: 'La valeur respecte les seuils définis.' },
-            { icon: 'bi-exclamation-triangle-fill', col: '#F57C00', titre: 'Avertissement', texte: 'Seuil d\'attention atteint — surveiller la tendance.' },
+            { icon: 'bi-check-circle-fill', col: '#2277C1', titre: 'Conforme', texte: 'La valeur respecte les seuils définis.' },
+            { icon: 'bi-exclamation-triangle-fill', col: '#F5B100', titre: 'Avertissement', texte: 'Seuil d\'attention atteint — surveiller la tendance.' },
             { icon: 'bi-exclamation-octagon-fill', col: '#C62828', titre: 'Critique', texte: 'Action corrective recommandée rapidement.' },
             { icon: 'bi-sliders', col: '#1565C0', titre: 'Seuils', texte: '⚠ = premier palier · 🔴 = palier critique.' },
           ].map((g, i) => (
@@ -519,8 +519,8 @@ function AlertesSyntheseWidget({
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.85rem' }}>
         {[
-          { key: 'ok', label: 'Conformes', col: '#43A047', bg: '#ecfdf5' },
-          { key: 'avertissement', label: 'Avertissements', col: '#F57C00', bg: '#fffbeb' },
+          { key: 'ok', label: 'Conformes', col: '#2277C1', bg: '#ecf3fd' },
+          { key: 'avertissement', label: 'Avertissements', col: '#F5B100', bg: '#fffceb' },
           { key: 'critique', label: 'Critiques', col: '#C62828', bg: '#fff1f2' },
         ].map(p => (
           <div key={p.key} className="stats-synthese-pill" style={{
@@ -542,7 +542,7 @@ function AlertesDeclencheesWidget({ alertes }) {
   return (
     <div style={{ background: '#fff', borderRadius: 12, padding: '1.1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
       <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.8rem' }}>
-        <i className="bi bi-bell-fill me-1" style={{ color: '#F57C00' }}/>
+        <i className="bi bi-bell-fill me-1" style={{ color: '#F5B100' }}/>
         Alertes déclenchées
         {alertes?.length > 0 && (
           <span style={{
@@ -554,16 +554,16 @@ function AlertesDeclencheesWidget({ alertes }) {
       {!alertes?.length ? (
         <div style={{
           textAlign: 'center', padding: '2rem 1rem',
-          background: 'linear-gradient(180deg, #f0fdf4 0%, #fff 100%)',
-          borderRadius: 10, border: '1px solid #bbf7d0',
+          borderRadius: 10, border: '1px solid #bbd7f7',
+          background: 'linear-gradient(180deg, #f0f6fd 0%, #fff 100%)',
         }}>
           <div style={{
             width: 64, height: 64, margin: '0 auto 0.65rem', borderRadius: '50%',
-            background: '#43A04718', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#2277C118', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <i className="bi bi-check-lg" style={{ fontSize: '2rem', color: '#43A047' }}/>
+            <i className="bi bi-check-lg" style={{ fontSize: '2rem', color: '#2277C1' }}/>
           </div>
-          <div style={{ fontWeight: 700, color: '#15803d', fontSize: '0.88rem', marginBottom: '0.25rem' }}>
+          <div style={{ fontWeight: 700, color: '#0b478a', fontSize: '0.88rem', marginBottom: '0.25rem' }}>
             Tout est conforme
           </div>
           <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
@@ -572,14 +572,14 @@ function AlertesDeclencheesWidget({ alertes }) {
         </div>
       ) : alertes.map((a, i) => (
         <div key={i} className={a.niveau === 'critique' ? 'stats-alerte-pulse' : undefined} style={{
-          background: a.niveau === 'critique' ? '#fff1f2' : '#fffbeb',
-          border: `1px solid ${a.niveau === 'critique' ? '#fca5a5' : '#fcd34d'}`,
+          background: a.niveau === 'critique' ? '#fff1f2' : '#fffceb',
+          border: `1px solid ${a.niveau === 'critique' ? '#fca5a5' : '#fcdf4d'}`,
           borderRadius: 10, padding: '0.75rem 0.9rem', marginBottom: '0.5rem',
-          borderLeft: `4px solid ${a.niveau === 'critique' ? '#C62828' : '#F57C00'}`,
+          borderLeft: `4px solid ${a.niveau === 'critique' ? '#C62828' : '#F5B100'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
             <i className={`bi ${a.niveau === 'critique' ? 'bi-exclamation-octagon-fill' : 'bi-exclamation-triangle-fill'}`}
-              style={{ color: a.niveau === 'critique' ? '#C62828' : '#F57C00', fontSize: '1.1rem' }}/>
+              style={{ color: a.niveau === 'critique' ? '#C62828' : '#F5B100', fontSize: '1.1rem' }}/>
             <b style={{ fontSize: '0.85rem', color: '#1e293b', flex: 1 }}>{a.libelle}</b>
             <NiveauBadge niveau={a.niveau}/>
           </div>
@@ -608,7 +608,7 @@ function AlertesSeuilsWidget({
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
           {canValidate && alertesMeta.seuils_vides && (
             <button className="btn btn-sm btn-outline-success" onClick={initSeuilsDefaut} disabled={initSeuilsLoading}>
-              <i className="bi bi-magic me-1"/>Init. CPFAE
+              <i className="bi bi-magic me-1"/>Init. INJS
             </button>
           )}
           {canValidate && !editSeuils && seuils.length > 0 && (
@@ -642,7 +642,7 @@ function AlertesSeuilsWidget({
               {s.aide && <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '0 0 0.4rem' }}>{s.aide}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.72rem', color: '#F57C00', fontWeight: 600 }}>⚠ Avertissement</label>
+                  <label style={{ fontSize: '0.72rem', color: '#F5B100', fontWeight: 600 }}>⚠ Avertissement</label>
                   <input type="number" className="form-control form-control-sm"
                     value={seuilsForm[i].seuil_avertissement}
                     onChange={e => setSeuilsForm(f => f.map((x, j) => j === i ? { ...x, seuil_avertissement: parseFloat(e.target.value) } : x))}/>
@@ -657,7 +657,7 @@ function AlertesSeuilsWidget({
             </div>
           ))}
           <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <button className="btn btn-sm" style={{ background: '#43A047', color: '#fff', border: 'none' }} onClick={saveSeuils}>
+            <button className="btn btn-sm" style={{ background: 'var(--navy)', color: '#fff', border: 'none' }} onClick={saveSeuils}>
               <i className="bi bi-check-lg me-1"/>Enregistrer
             </button>
             <button className="btn btn-sm btn-outline-secondary" onClick={() => { setEditSeuils(false); setSeuilsForm(seuils.map(s => ({ ...s }))) }}>
@@ -671,7 +671,7 @@ function AlertesSeuilsWidget({
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 <th style={{ padding: '0.4rem 0.6rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>Indicateur</th>
-                <th style={{ padding: '0.4rem 0.6rem', color: '#F57C00', fontWeight: 600, textAlign: 'center' }}>⚠</th>
+                <th style={{ padding: '0.4rem 0.6rem', color: '#F5B100', fontWeight: 600, textAlign: 'center' }}>⚠</th>
                 <th style={{ padding: '0.4rem 0.6rem', color: '#C62828', fontWeight: 600, textAlign: 'center' }}>🔴</th>
                 <th style={{ padding: '0.4rem 0.6rem', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>Actif</th>
               </tr>
@@ -688,11 +688,11 @@ function AlertesSeuilsWidget({
                         {ind && <NiveauBadge niveau={ind.niveau}/>}
                       </div>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '0.45rem 0.6rem', color: '#F57C00', fontWeight: 700 }}>{s.seuil_avertissement}</td>
+                    <td style={{ textAlign: 'center', padding: '0.45rem 0.6rem', color: '#F5B100', fontWeight: 700 }}>{s.seuil_avertissement}</td>
                     <td style={{ textAlign: 'center', padding: '0.45rem 0.6rem', color: '#C62828', fontWeight: 700 }}>{s.seuil_critique}</td>
                     <td style={{ textAlign: 'center', padding: '0.45rem 0.6rem' }}>
                       {s.actif
-                        ? <i className="bi bi-check-circle-fill" style={{ color: '#43A047' }}/>
+                        ? <i className="bi bi-check-circle-fill" style={{ color: '#2277C1' }}/>
                         : <i className="bi bi-dash-circle" style={{ color: '#94a3b8' }}/>}
                     </td>
                   </tr>
@@ -714,11 +714,11 @@ function AlertesEnsemblePanel(props) {
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #fffbeb 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #f4f7fb 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-bell me-2" style={{ color: '#F57C00' }}/>
+          <i className="bi bi-bell me-2" style={{ color: '#F5B100' }}/>
           Alertes — tous les widgets
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -761,14 +761,14 @@ function AlertesEnsemblePanel(props) {
               Aucun seuil configuré
             </h4>
             <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: 420, margin: '0 auto 1rem' }}>
-              Initialisez les seuils CPFAE pour activer la surveillance des 6 indicateurs clés.
+              Initialisez les seuils INJS pour activer la surveillance des 6 indicateurs clés.
             </p>
             {rest.canValidate && (
-              <button className="btn btn-sm" style={{ background: '#43A047', color: '#fff', border: 'none' }}
+              <button className="btn btn-sm" style={{ background: 'var(--navy)', color: '#fff', border: 'none' }}
                 onClick={rest.initSeuilsDefaut} disabled={rest.initSeuilsLoading}>
                 {rest.initSeuilsLoading
                   ? <><span className="spinner-border spinner-border-sm me-1"/>Initialisation…</>
-                  : <><i className="bi bi-magic me-1"/>Initialiser les seuils CPFAE</>}
+                  : <><i className="bi bi-magic me-1"/>Initialiser les seuils INJS</>}
               </button>
             )}
           </div>
@@ -883,7 +883,7 @@ function AlertesStyles() {
 }
 
 /** Graphique mensuel 12 mois avec grille, axe Y et libellés français */
-function MonthTrendChart({ data, valueKey = 'total', color = '#43A047', height = 160, unit = '' }) {
+function MonthTrendChart({ data, valueKey = 'total', color = '#2277C1', height = 160, unit = '' }) {
   if (!data?.length) return <Empty />
   const max = Math.max(...data.map(d => d[valueKey] || 0), 1)
   const barW = 28
@@ -946,7 +946,7 @@ function StackedPresenceChart({ data, height = 160 }) {
   return (
     <div>
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#43A047', borderRadius: 2, marginRight: 4 }} />Présents</span>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#2277C1', borderRadius: 2, marginRight: 4 }} />Présents</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#C62828', borderRadius: 2, marginRight: 4 }} />Absents</span>
       </div>
       <div style={{ overflowX: 'auto' }}>
@@ -969,7 +969,7 @@ function StackedPresenceChart({ data, height = 160 }) {
                       <rect x={x} y={baseY - absH - presH} width={barW} height={absH} rx={absH && !presH ? 4 : 0} fill="#C62828" opacity={0.85} />
                     )}
                     {presH > 0 && (
-                      <rect x={x} y={baseY - presH} width={barW} height={presH} rx={4} fill="#43A047" opacity={0.88} />
+                      <rect x={x} y={baseY - presH} width={barW} height={presH} rx={4} fill="#2277C1" opacity={0.88} />
                     )}
                     <text x={x + barW / 2} y={baseY - presH - absH - 4} textAnchor="middle" fontSize={8} fill="#64748b">{total}</text>
                   </>
@@ -986,7 +986,7 @@ function StackedPresenceChart({ data, height = 160 }) {
   )
 }
 
-function Line({ data, labelKey, valueKey, color='#43A047', height=130 }) {
+function Line({ data, labelKey, valueKey, color='#2277C1', height=130 }) {
   if (!data?.length) return <Empty />
   const max = Math.max(...data.map(d=>d[valueKey]),1)
   const w = Math.max(320, data.length*50+60)
@@ -1015,7 +1015,7 @@ function Line({ data, labelKey, valueKey, color='#43A047', height=130 }) {
 }
 
 function TauxBar({ value, small }) {
-  const col = value>=70 ? '#43A047' : value>=40 ? '#F57C00' : '#C62828'
+  const col = value>=70 ? '#2277C1' : value>=40 ? '#F5B100' : '#C62828'
   return (
     <div style={{display:'flex',alignItems:'center',gap:'0.4rem'}}>
       <div style={{flex:1,background:'#f1f5f9',borderRadius:4,height:small?6:9,overflow:'hidden',minWidth:50}}>
@@ -1106,7 +1106,7 @@ function Card({ title, icon, children, col }) {
   return (
     <div style={{background:'#fff',borderRadius:12,padding:'1.1rem 1.3rem',boxShadow:'0 1px 4px rgba(0,0,0,0.07)',gridColumn:col}}>
       <h4 style={{fontSize:'0.85rem',fontWeight:700,color:'#1e293b',marginBottom:'0.85rem',display:'flex',alignItems:'center',gap:'0.35rem'}}>
-        <i className={`bi ${icon}`} style={{color:'#43A047'}}/>
+        <i className={`bi ${icon}`} style={{color:'var(--navy)'}}/>
         {title}
       </h4>
       {children}
@@ -1902,7 +1902,7 @@ export default function Statistiques() {
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'1.2rem',flexWrap:'wrap',gap:'0.75rem'}}>
         <div>
           <h2 style={{margin:0,fontWeight:800,color:'#1e293b',fontSize:'1.3rem'}}>
-            <i className="bi bi-bar-chart-line me-2" style={{color:'#43A047'}}/>
+            <i className="bi bi-bar-chart-line me-2" style={{color:'var(--navy)'}}/>
             Statistiques & Bilans
           </h2>
           {lastRefresh && (
@@ -1979,7 +1979,7 @@ export default function Statistiques() {
         {isPeriodWhollyFuture(appliedVhPeriod) && (
           <div style={{
             marginTop: '0.65rem', padding: '0.55rem 0.75rem', borderRadius: 8,
-            background: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e', fontSize: '0.82rem',
+            background: '#fffceb', border: '1px solid #fcdf4d', color: '#92660e', fontSize: '0.82rem',
           }}>
             <i className="bi bi-info-circle me-1"/>
             Cette période n&apos;a pas encore commencé — indicateurs clés et séances comptabilisables à 0
@@ -2051,8 +2051,8 @@ export default function Statistiques() {
           <button key={o.id} onClick={() => setOnglet(o.id)} style={{
             background:'none',border:'none',cursor:'pointer',padding:'0.55rem 0.9rem',
             fontSize:'0.82rem',fontWeight:onglet===o.id?700:500,
-            color:onglet===o.id?'#43A047':'#64748b',
-            borderBottom:onglet===o.id?'2px solid #43A047':'2px solid transparent',
+            color:onglet===o.id?'#001a33':'#64748b',
+            borderBottom:onglet===o.id?'2px solid #001a33':'2px solid transparent',
             marginBottom:'-2px',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:'0.3rem',
           }}>
             <i className={`bi ${o.icon}`}/>{o.label}
@@ -2110,7 +2110,7 @@ export default function Statistiques() {
                   style={{
                     display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                     padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                    background: overviewSelection===section.id ? '#f0fdf4' : '#fff',
+                    background: overviewSelection===section.id ? '#e8eef6' : '#fff',
                     borderBottom:'1px solid #f1f5f9',
                   }}
                 >
@@ -2189,7 +2189,7 @@ export default function Statistiques() {
         <>
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
             <span style={{fontSize:'0.78rem',color:'#64748b'}}>
-              Indicateurs pédagogiques (assiduité séance, couverture auditeurs, absences, événements)
+              Indicateurs pédagogiques (assiduité séance, couverture étudiants, absences, événements)
               {formationId && <> · <b>{(formations_liste||[]).find(f => String(f.id) === formationId)?.formation}</b></>}
               {secretariatId && <> · <b>{(secretariats_liste||[]).find(s => String(s.id) === secretariatId)?.nom}</b></>}
             </span>
@@ -2238,7 +2238,7 @@ export default function Statistiques() {
                             style={{
                               display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                               padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                              background: pedSelection===entry.id ? '#f0fdf4' : '#fff',
+                              background: pedSelection===entry.id ? '#e8eef6' : '#fff',
                               borderBottom:'1px solid #f1f5f9',
                             }}
                           >
@@ -2306,13 +2306,13 @@ export default function Statistiques() {
             <Kpi icon="bi-diagram-3"    label="Groupes actifs"       value={adm.nb_groupes}            color="#1565C0"/>
             <Kpi icon="bi-person-badge" label="Encadrants"           value={adm.nb_encadrants}          color="#7B1FA2"/>
             <Kpi icon="bi-x-square"     label="Séances annulées"     value={adm.nb_seances_annulees}    color="#C62828"/>
-            <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={adm.nb_seances_terminees} color="#00695C"
+            <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={adm.nb_seances_terminees} color="#082961"
               help={KPI_SESSIONS_COMPT.help}/>
             <Kpi icon="bi-person-x-fill" label={AUDITEURS_NOTOIRES.label}
               value={auditeursNotoires?.total ?? adm.nb_absences_notoires ?? 0} color="#C62828"
               sub={auditeursNotoires ? `${Number(auditeursNotoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}
               help={AUDITEURS_NOTOIRES.help}/>
-            <Kpi icon="bi-people-fill"  label="Moy. auditeurs/groupe" value={adm.moy_auditeurs_groupe}  color="#00838F"/>
+            <Kpi icon="bi-people-fill"  label="Moy. étudiants/groupe" value={adm.moy_auditeurs_groupe}  color="#00838F"/>
             <Kpi icon="bi-percent"      label="% Hommes"             value={`${adm.ratio_hf?.pct_hommes??0}%`} color="#1565C0"/>
             <Kpi icon="bi-percent"      label="% Femmes"             value={`${adm.ratio_hf?.pct_femmes??0}%`} color="#AD1457"/>
           </div>
@@ -2322,23 +2322,23 @@ export default function Statistiques() {
               <Donut data={adm.participants_par_sexe} labelKey="sexe" valueKey="total"/>
             </Card>
 
-            <Card title="Auditeurs par catégorie" icon="bi-bar-chart-steps">
+            <Card title="Étudiants par catégorie" icon="bi-bar-chart-steps">
               <HBars data={(adm.participants_par_categorie||[]).map(d=>({...d,categorie:d.categorie||'Non rens.'}))}
                 labelKey="categorie" valueKey="total"/>
             </Card>
 
-            <Card title="Auditeurs par grade" icon="bi-award">
+            <Card title="Étudiants par grade" icon="bi-award">
               <Bars data={(adm.participants_par_grade||[]).map(d=>({...d,grade:d.grade||'—'}))}
                 labelKey="grade" valueKey="total" color="#7B1FA2"/>
             </Card>
 
-            <Card title="Auditeurs par vague" icon="bi-layers">
+            <Card title="Étudiants par vague" icon="bi-layers">
               <Bars data={(adm.participants_par_vague||[]).map(d=>({...d,vague:d.vague||'—'}))}
-                labelKey="vague" valueKey="total" color="#F57C00"/>
+                labelKey="vague" valueKey="total" color="#F5B100"/>
             </Card>
 
-            <Card title="Charge des formateurs" icon="bi-person-video3" col="1/-1">
-              <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
+            <Card title="Charge des enseignants" icon="bi-person-video3" col="1/-1">
+              <HBars data={adm.charge_enseignants} labelKey="nom" valueKey="nb_sessions"/>
             </Card>
           </div>
 
@@ -2407,7 +2407,7 @@ export default function Statistiques() {
                       style={{
                         display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                         padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                        background: histSelection===i ? '#f0fdf4' : '#fff',
+                        background: histSelection===i ? '#e8eef6' : '#fff',
                         borderBottom:'1px solid #f1f5f9',
                         opacity: hasData ? 1 : 0.65,
                       }}
@@ -2497,7 +2497,7 @@ export default function Statistiques() {
                     style={{
                       display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                       padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                      background: secSelection===i ? '#f0fdf4' : '#fff',
+                      background: secSelection===i ? '#e8eef6' : '#fff',
                       borderBottom:'1px solid #f1f5f9',
                     }}
                   >
@@ -2553,7 +2553,7 @@ export default function Statistiques() {
         {secretariatFilterLocked && (
           <div style={{
             marginBottom: '0.75rem', padding: '0.55rem 0.85rem', borderRadius: 8,
-            background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.82rem',
+            background: '#e8eef6', border: '1px solid #c5d0e0', color: '#0a2a4d', fontSize: '0.82rem',
           }}>
             <i className="bi bi-building me-1"/>
             Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
@@ -2569,9 +2569,9 @@ export default function Statistiques() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
                 padding: '0.45rem 0.85rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                border: rbView === v.id ? '2px solid #2e7d32' : '1px solid #e2e8f0',
-                background: rbView === v.id ? '#f0fdf4' : '#fff',
-                color: rbView === v.id ? '#15803d' : '#64748b',
+                border: rbView === v.id ? '2px solid #001a33' : '1px solid #e2e8f0',
+                background: rbView === v.id ? '#e8eef6' : '#fff',
+                color: rbView === v.id ? '#001a33' : '#64748b',
               }}
             >
               <i className={`bi ${v.icon}`}/>{v.label}
@@ -2695,9 +2695,9 @@ export default function Statistiques() {
               style={{
                 display:'inline-flex', alignItems:'center', gap:'0.35rem',
                 padding:'0.45rem 0.85rem', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontWeight:600,
-                border: rbDimension===d.id ? '2px solid #43A047' : '1px solid #e2e8f0',
-                background: rbDimension===d.id ? '#f0fdf4' : '#fff',
-                color: rbDimension===d.id ? '#15803d' : '#64748b',
+                border: rbDimension===d.id ? '2px solid #001a33' : '1px solid #e2e8f0',
+                background: rbDimension===d.id ? '#e8eef6' : '#fff',
+                color: rbDimension===d.id ? '#001a33' : '#64748b',
               }}
             >
               <i className={`bi ${d.icon}`}/>{d.label}
@@ -2743,7 +2743,7 @@ export default function Statistiques() {
                   style={{
                     display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                     padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                    background: rbSelection===i ? '#f0fdf4' : '#fff',
+                    background: rbSelection===i ? '#e8eef6' : '#fff',
                     borderBottom:'1px solid #f1f5f9',
                   }}
                 >
@@ -2759,7 +2759,7 @@ export default function Statistiques() {
                       </span>
                     )}
                     {b.dimension==='matiere' && (
-                      <span style={{background:'#0D948818',color:'#0D9488',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
+                      <span style={{background:'#0C3E9518',color:'#0C3E95',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
                         MAT
                       </span>
                     )}
@@ -2830,15 +2830,15 @@ export default function Statistiques() {
             style={{
               display:'flex', alignItems:'center', gap:'0.5rem', width:'100%',
               background: showFacPanel
-                ? 'linear-gradient(135deg,#fff8f0 0%,#fef3e2 100%)'
+                ? 'linear-gradient(135deg,#fffbf0 0%,#fef7e2 100%)'
                 : 'linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%)',
-              border: showFacPanel ? '2px solid #ED7D31' : '1px solid #e2e8f0',
+              border: showFacPanel ? '2px solid #EDB131' : '1px solid #e2e8f0',
               borderRadius:10, padding:'0.75rem 1rem', cursor:'pointer',
               boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
             }}
           >
             <span style={{
-              background:'#ED7D31', color:'#fff', borderRadius:6,
+              background:'#EDB131', color:'#fff', borderRadius:6,
               padding:'0.2rem 0.55rem', fontSize:'0.72rem', fontWeight:800, letterSpacing:1,
             }}>BILAN</span>
             <span style={{fontWeight:700, fontSize:'0.9rem', color:'#1e293b'}}>
@@ -2847,14 +2847,14 @@ export default function Statistiques() {
             <span style={{marginLeft:'auto', color:'#94a3b8', fontSize:'0.78rem'}}>
               Point global · VH par groupe · Absents notoires
             </span>
-            <i className={`bi bi-chevron-${showFacPanel ? 'up' : 'down'}`} style={{color:'#ED7D31', fontSize:'0.85rem'}}/>
+            <i className={`bi bi-chevron-${showFacPanel ? 'up' : 'down'}`} style={{color:'#EDB131', fontSize:'0.85rem'}}/>
           </button>
 
           {showFacPanel && (
             <div style={{
-              background:'#fff', border:'1px solid #fed7aa',
+              background:'#fff', border:'1px solid #fee8aa',
               borderTop:'none', borderRadius:'0 0 10px 10px',
-              boxShadow:'0 4px 12px rgba(237,125,49,0.08)', padding:'1rem',
+              boxShadow:'0 4px 12px rgba(237,177,49,0.08)', padding:'1rem',
             }}>
               {/* Filtres Bilan FAC */}
               <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'flex-end',marginBottom:'1rem'}}>
@@ -2901,7 +2901,7 @@ export default function Statistiques() {
                 </div>
                 <button
                   className="btn btn-sm"
-                  style={{background:'#ED7D31',color:'#fff',border:'none',minWidth:110}}
+                  style={{background:'#EDB131',color:'#fff',border:'none',minWidth:110}}
                   onClick={fetchBilanFac}
                   disabled={loadingFac || (!facFormationId && !formationId) || !facGradesSelected.length}
                 >
@@ -2916,13 +2916,13 @@ export default function Statistiques() {
               {(facFormationId || formationId) && (
                 <div style={{
                   marginBottom: '1rem', padding: '0.75rem', borderRadius: 8,
-                  background: '#fffbeb', border: '1px solid #fde68a',
+                  background: '#fffceb', border: '1px solid #fdec8a',
                 }}>
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.55rem',
                   }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92660e' }}>
                       <i className="bi bi-ui-checks me-1"/>
                       Périmètre — grades et groupes
                     </span>
@@ -2979,8 +2979,8 @@ export default function Statistiques() {
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                                 fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-                                background: facGradesSelected.includes(grade) ? '#fef3c7' : '#f8fafc',
-                                border: `1px solid ${facGradesSelected.includes(grade) ? '#f59e0b' : '#e2e8f0'}`,
+                                background: facGradesSelected.includes(grade) ? '#fef6c7' : '#f8fafc',
+                                border: `1px solid ${facGradesSelected.includes(grade) ? '#f5c10b' : '#e2e8f0'}`,
                                 borderRadius: 6, padding: '0.25rem 0.55rem',
                               }}
                             >
@@ -3014,8 +3014,8 @@ export default function Statistiques() {
                                 style={{
                                   display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                                   fontSize: '0.72rem', cursor: 'pointer',
-                                  background: facGroupesSelected.includes(g.id) ? '#ecfdf5' : '#f8fafc',
-                                  border: `1px solid ${facGroupesSelected.includes(g.id) ? '#86efac' : '#e2e8f0'}`,
+                                  background: facGroupesSelected.includes(g.id) ? '#ecf3fd' : '#f8fafc',
+                                  border: `1px solid ${facGroupesSelected.includes(g.id) ? '#80b7f5' : '#e2e8f0'}`,
                                   borderRadius: 6, padding: '0.2rem 0.45rem',
                                 }}
                               >
@@ -3049,7 +3049,7 @@ export default function Statistiques() {
                   textAlign:'center', padding:'2.5rem 1rem', color:'#94a3b8',
                   fontSize:'0.85rem', borderTop:'1px solid #f1f5f9',
                 }}>
-                  <i className="bi bi-file-earmark-bar-graph" style={{fontSize:'2.5rem',display:'block',marginBottom:'0.5rem',color:'#ED7D3166'}}/>
+                  <i className="bi bi-file-earmark-bar-graph" style={{fontSize:'2.5rem',display:'block',marginBottom:'0.5rem',color:'#EDB13166'}}/>
                   Sélectionnez une formation et cliquez sur &quot;Générer le bilan&quot;
                 </div>
               )}
@@ -3082,7 +3082,7 @@ export default function Statistiques() {
           {secretariatFilterLocked && (
             <div style={{
               marginBottom: '0.75rem', padding: '0.55rem 0.85rem', borderRadius: 8,
-              background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '0.82rem',
+              background: '#e8eef6', border: '1px solid #c5d0e0', color: '#0a2a4d', fontSize: '0.82rem',
             }}>
               <i className="bi bi-building me-1"/>
               Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
@@ -3201,15 +3201,15 @@ export default function Statistiques() {
                     style={{
                       display:'block',width:'100%',textAlign:'left',border:'none',cursor:'pointer',
                       padding:'0.55rem 0.85rem',fontSize:'0.78rem',
-                      background:pjSelection===i?'#f0fdf4':'#fff',
+                      background:pjSelection===i?'#e8eef6':'#fff',
                       borderBottom:'1px solid #f1f5f9',
                     }}>
                     <div style={{fontWeight:700,color:'#1e293b',marginBottom:'0.1rem'}}>
-                      <span style={{background:'#43A04718',color:'#43A047',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
+                      <span style={{background:'#2277C118',color:'#2277C1',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
                         CAT {tb.categorie}
                       </span>
                       {tb.grade && (
-                        <span style={{background:'#ED7D3118',color:'#ED7D31',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
+                        <span style={{background:'#EDB13118',color:'#EDB131',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
                           {tb.grade}
                         </span>
                       )}
@@ -3281,7 +3281,7 @@ export default function Statistiques() {
         <div>
           <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
             <span style={{fontSize:'0.78rem',color:'#64748b'}}>
-              Surveillance CPFAE — seuils et alertes
+              Surveillance INJS — seuils et alertes
               {formationId && <> · <b>{(formations_liste||[]).find(f => String(f.id) === formationId)?.formation}</b></>}
               {secretariatId && <> · <b>{(secretariats_liste||[]).find(s => String(s.id) === secretariatId)?.nom}</b></>}
             </span>
@@ -3327,7 +3327,7 @@ export default function Statistiques() {
                         style={{
                           display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
                           padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                          background: alertesSelection===entry.id ? '#f0fdf4' : '#fff',
+                          background: alertesSelection===entry.id ? '#e8eef6' : '#fff',
                           borderBottom:'1px solid #f1f5f9',
                         }}
                       >
@@ -3402,11 +3402,11 @@ function PointJournalierEnsemblePanel({ items, tableaux, annee, onSelectIndividu
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-grid-3x3-gap me-2" style={{ color: '#ED7D31' }}/>
+          <i className="bi bi-grid-3x3-gap me-2" style={{ color: '#EDB131' }}/>
           {items.length} tableau{items.length > 1 ? 'x' : ''} — Point journalier {annee}
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -3432,7 +3432,7 @@ function PointJournalierEnsemblePanel({ items, tableaux, annee, onSelectIndividu
               <div>
                 <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e293b' }}>
                   <span style={{
-                    background: '#ED7D3118', color: '#ED7D31', borderRadius: 4,
+                    background: '#EDB13118', color: '#EDB131', borderRadius: 4,
                     padding: '0.05rem 0.35rem', marginRight: '0.3rem', fontSize: '0.72rem',
                   }}>CAT {entry.meta?.categorie}</span>
                   {entry.meta?.date_fr} — {entry.meta?.formation}
@@ -3482,9 +3482,9 @@ function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificat
     textAlign: 'center',
     verticalAlign: 'middle',
     lineHeight: 1.2,
-    background: '#FCD5B4',
+    background: '#FCE7B4',
   }
-  const thDark = { ...th, background: '#F4B084' }
+  const thDark = { ...th, background: '#F4CF84' }
   const td = {
     padding: '0.45rem 0.35rem',
     border: '1px solid #000',
@@ -3492,10 +3492,10 @@ function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificat
     verticalAlign: 'middle',
     fontSize: '0.78rem',
     fontWeight: 700,
-    background: '#FFFBF5',
+    background: '#FFFDF5',
   }
   const tdBlue = { ...td, background: '#DDEBF7' }
-  const tdTotal = { ...td, background: '#FFD966' }
+  const tdTotal = { ...td, background: '#FFE566' }
 
   const [justifText, setJustifText] = useState(() => (
     justificatifsText || normalizeJustificatifs(data?.justificatifs)
@@ -3705,11 +3705,11 @@ const FAC_TH = {
   textAlign: 'center',
   verticalAlign: 'middle',
   lineHeight: 1.2,
-  background: '#FCE4D6',
+  background: '#FCEFD6',
   whiteSpace: 'normal',
 }
-const FAC_TH_DARK = { ...FAC_TH, background: '#F4B084' }
-const FAC_TH_ORANGE = { ...FAC_TH, background: '#ED7D31', color: '#fff' }
+const FAC_TH_DARK = { ...FAC_TH, background: '#F4CF84' }
+const FAC_TH_YELLOW = { ...FAC_TH, background: '#EDB131', color: '#fff' }
 const FAC_TD = {
   padding: '0.45rem 0.35rem',
   border: '1px solid #000',
@@ -3717,12 +3717,12 @@ const FAC_TD = {
   verticalAlign: 'middle',
   fontSize: '0.75rem',
   fontWeight: 700,
-  background: '#FFFBF5',
+  background: '#FFFDF5',
 }
 const FAC_TD_BLUE = { ...FAC_TD, background: '#DDEBF7' }
-const FAC_TD_YELLOW = { ...FAC_TD, background: '#FFD966' }
-const FAC_TD_GREEN = { ...FAC_TD, background: '#E2EFDA' }
-const FAC_TD_RED = { ...FAC_TD, background: '#FCE4D6' }
+const FAC_TD_YELLOW = { ...FAC_TD, background: '#FFE566' }
+const FAC_TD_BLUE_SOFT = { ...FAC_TD, background: '#DAE7EF' }
+const FAC_TD_RED = { ...FAC_TD, background: '#FCEFD6' }
 const FAC_TD_TEXT = { ...FAC_TD, textAlign: 'left', fontWeight: 500, fontSize: '0.7rem' }
 
 function BilanFACPointGlobalTable({ data, onMetaChange }) {
@@ -3759,7 +3759,7 @@ function BilanFACPointGlobalTable({ data, onMetaChange }) {
     } else {
       const existing = lignesMap.get(grade)
       // Sommer les valeurs numériques
-      const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes', 'effectif_auditeurs',
+      const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes', 'effectif_étudiants',
         'absents_notoires', 'groupes_termines', 'vh_total', 'vh_epuise']
       for (const k of sumKeys) {
         existing[k] = (existing[k] || 0) + (l[k] || 0)
@@ -3805,18 +3805,18 @@ function BilanFACPointGlobalTable({ data, onMetaChange }) {
             <th style={{ ...FAC_TH, minWidth: 120 }}>JUSTIFICATIFS DES ABSENCES NOTOIRES</th>
             <th style={FAC_TH}>TAUX DE PARTICIPATION</th>
             <th style={FAC_TH}>TAUX DES AUDITEURS ABSENTS NOTOIRES</th>
-            <th style={{ ...FAC_TH_ORANGE, minWidth: 55 }}>TOTAL VOLUME HORAIRE</th>
-            <th style={{ ...FAC_TH_ORANGE, minWidth: 55 }}>TOTAL VOLUME HORAIRE ÉPUISÉ</th>
-            <th style={{ ...FAC_TH_ORANGE }}>TAUX D&apos;EXÉCUTION DU VOLUME HORAIRE</th>
+            <th style={{ ...FAC_TH_YELLOW, minWidth: 55 }}>TOTAL VOLUME HORAIRE</th>
+            <th style={{ ...FAC_TH_YELLOW, minWidth: 55 }}>TOTAL VOLUME HORAIRE ÉPUISÉ</th>
+            <th style={{ ...FAC_TH_YELLOW }}>TAUX D&apos;EXÉCUTION DU VOLUME HORAIRE</th>
             <th style={{ ...FAC_TH, background: '#BDD7EE' }}>TAUX DE PRÉSENCE AUX COURS</th>
-            <th style={{ ...FAC_TH, background: '#F8CBAD' }}>TAUX D&apos;ABSENCE AUX COURS</th>
+            <th style={{ ...FAC_TH, background: '#F8E0AD' }}>TAUX D&apos;ABSENCE AUX COURS</th>
             <th style={{ ...FAC_TH, minWidth: 140 }}>DIFFICULTÉS RENCONTRÉES</th>
           </tr>
         </thead>
         <tbody>
           {lignes.map((l, i) => (
             <tr key={l.grade || i}>
-              <td style={{ ...FAC_TD, fontWeight: 800, background: '#FCE4D6' }}>
+              <td style={{ ...FAC_TD, fontWeight: 800, background: '#FCEFD6' }}>
                 {l.grade}
               </td>
               <td style={FAC_TD}>{l.effectif_secretariat ?? '—'}</td>
@@ -3824,7 +3824,7 @@ function BilanFACPointGlobalTable({ data, onMetaChange }) {
               <td style={FAC_TD}>{l.nb_groupes ?? '—'}</td>
               <td style={{ ...FAC_TD_BLUE, fontWeight: 800 }}>{l.effectif_auditeurs ?? '—'}</td>
               <td style={FAC_TD}>{l.absents_notoires ?? '—'}</td>
-              <td style={FAC_TD_GREEN}>{l.groupes_termines ?? '—'}</td>
+              <td style={FAC_TD_BLUE_SOFT}>{l.groupes_termines ?? '—'}</td>
               <td style={{ ...FAC_TD_TEXT, verticalAlign: 'top', padding: '0.35rem' }}>
                 <textarea
                   className="form-control form-control-sm"
@@ -3844,11 +3844,11 @@ function BilanFACPointGlobalTable({ data, onMetaChange }) {
               </td>
               <td style={FAC_TD_BLUE}>{pctStr(l.taux_participation)}</td>
               <td style={FAC_TD_RED}>{pctStr(l.taux_absents_notoires)}</td>
-              <td style={{ ...FAC_TD, background: '#FCE4D6', fontWeight: 800 }}>{fmtVH(l.vh_total)}</td>
-              <td style={{ ...FAC_TD, background: '#FCE4D6', fontWeight: 800 }}>{fmtVH(l.vh_epuise)}</td>
-              <td style={{ ...FAC_TD, background: '#FCE4D6' }}>{pctStr(l.taux_exec_vh)}</td>
+              <td style={{ ...FAC_TD, background: '#FCEFD6', fontWeight: 800 }}>{fmtVH(l.vh_total)}</td>
+              <td style={{ ...FAC_TD, background: '#FCEFD6', fontWeight: 800 }}>{fmtVH(l.vh_epuise)}</td>
+              <td style={{ ...FAC_TD, background: '#FCEFD6' }}>{pctStr(l.taux_exec_vh)}</td>
               <td style={{ ...FAC_TD, background: '#BDD7EE' }}>{pctStr(l.taux_presence_cours)}</td>
-              <td style={{ ...FAC_TD, background: '#F8CBAD' }}>{pctStr(l.taux_absence_cours)}</td>
+              <td style={{ ...FAC_TD, background: '#F8E0AD' }}>{pctStr(l.taux_absence_cours)}</td>
               <td style={{ ...FAC_TD_TEXT, verticalAlign: 'top', padding: '0.35rem' }}>
                 <textarea
                   className="form-control form-control-sm"
@@ -3900,7 +3900,7 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
   const VH_ROWS = [
     { key: 'vh_prevu',      label: 'VOLUME HORAIRE DU CYCLE DE FORMATION', style: FAC_TD },
     { key: 'vh_epuise',     label: 'VOLUME HORAIRE ÉPUISÉ',                style: FAC_TD },
-    { key: 'taux_execution',label: "TAUX D'EXÉCUTION (%)",                 style: FAC_TD_GREEN },
+    { key: 'taux_execution',label: "TAUX D'EXÉCUTION (%)",                 style: FAC_TD_BLUE_SOFT },
     { key: 'vh_restant',    label: 'VOLUME HORAIRE RESTANT',               style: FAC_TD },
     { key: 'taux_restant',  label: 'TAUX DU VOLUME HORAIRE RESTANT (%)',   style: FAC_TD_RED },
   ]
@@ -3932,7 +3932,7 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
             <div style={{
               fontWeight: 800, fontSize: '0.82rem', color: '#1e293b',
               marginBottom: '0.5rem', padding: '0.3rem 0.6rem',
-              background: '#FCE4D6', borderRadius: 6, display: 'inline-block',
+              background: '#FCEFD6', borderRadius: 6, display: 'inline-block',
             }}>
               Grade {gradeBlock.grade}
             </div>
@@ -3950,7 +3950,7 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
                 <tbody>
                   {VH_ROWS.map(row => (
                     <tr key={row.key}>
-                      <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 600, background: '#FFF2CC' }}>
+                      <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 600, background: '#FFF6CC' }}>
                         {row.label}
                       </td>
                       {groupes.map(g => {
@@ -3979,7 +3979,7 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
         <div style={{ marginTop: '1rem' }}>
           <div style={{
             fontWeight: 800, fontSize: '0.82rem', color: '#fff',
-            background: '#ED7D31', borderRadius: 6, padding: '0.3rem 0.6rem',
+            background: '#EDB131', borderRadius: 6, padding: '0.3rem 0.6rem',
             display: 'inline-block', marginBottom: '0.5rem',
           }}>
             RÉCAPITULATIF GLOBAL
@@ -3999,12 +3999,12 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
               <tbody>
                 {vhParGrade.map(gb => (
                   <tr key={gb.grade}>
-                    <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 700, background: '#FCE4D6' }}>
+                    <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 700, background: '#FCEFD6' }}>
                       Grade {gb.grade}
                     </td>
                     <td style={FAC_TD}>{fmtVH(gb.recap.vh_prevu)}</td>
                     <td style={FAC_TD}>{fmtVH(gb.recap.vh_epuise)}</td>
-                    <td style={FAC_TD_GREEN}>{fmtTauxPct(gb.recap.taux_execution)}</td>
+                    <td style={FAC_TD_BLUE_SOFT}>{fmtTauxPct(gb.recap.taux_execution)}</td>
                     <td style={FAC_TD}>{fmtVH(gb.recap.vh_restant)}</td>
                     <td style={FAC_TD_RED}>{fmtTauxPct(gb.recap.taux_restant)}</td>
                   </tr>
@@ -4040,7 +4040,7 @@ function BilanFACVHParGradeTable({ vhParGrade }) {
 
 function BilanFACAbsentsNotoiresTable({ absents }) {
   if (!absents?.length) return (
-    <div style={{ textAlign: 'center', padding: '2rem', color: '#43A047', fontSize: '0.85rem' }}>
+    <div style={{ textAlign: 'center', padding: '2rem', color: '#2277C1', fontSize: '0.85rem' }}>
       <i className="bi bi-check-circle" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}/>
       Aucun absent notoire enregistré.
     </div>
@@ -4063,7 +4063,7 @@ function BilanFACAbsentsNotoiresTable({ absents }) {
         </thead>
         <tbody>
           {absents.map((a, i) => (
-            <tr key={a.matricule || i} style={{ background: i % 2 === 0 ? '#FFFBF5' : '#FFF5EC' }}>
+            <tr key={a.matricule || i} style={{ background: i % 2 === 0 ? '#FFFDF5' : '#FFF9EC' }}>
               <td style={{ ...FAC_TD, fontWeight: 800 }}>{a.numero}</td>
               <td style={{ ...FAC_TD, fontFamily: 'monospace', fontSize: '0.68rem' }}>{a.matricule}</td>
               <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 700 }}>{a.nom}</td>
@@ -4093,10 +4093,10 @@ function BilanFACModulesTable({ modules }) {
   const grades = [...new Set(modules.map(m => m.grade).filter(Boolean))].sort()
 
   const STATUT_STYLE = {
-    TERMINEE:  { bg: '#E2EFDA', color: '#27ae60', label: 'Terminé' },
+    TERMINEE:  { bg: '#DAE7EF', color: '#1063c5', label: 'Terminé' },
     EN_COURS:  { bg: '#DDEBF7', color: '#1565C0', label: 'En cours' },
-    PLANIFIEE: { bg: '#FFF2CC', color: '#F57C00', label: 'Planifié' },
-    SUSPENDUE: { bg: '#FCE4D6', color: '#C62828', label: 'Suspendu' },
+    PLANIFIEE: { bg: '#FFF6CC', color: '#F5B100', label: 'Planifié' },
+    SUSPENDUE: { bg: '#FCEFD6', color: '#C62828', label: 'Suspendu' },
   }
 
   return (
@@ -4109,7 +4109,7 @@ function BilanFACModulesTable({ modules }) {
             <div style={{
               fontWeight: 800, fontSize: '0.82rem', color: '#1e293b',
               marginBottom: '0.5rem', padding: '0.3rem 0.6rem',
-              background: '#FCE4D6', borderRadius: 6, display: 'inline-block',
+              background: '#FCEFD6', borderRadius: 6, display: 'inline-block',
             }}>
               Grade {grade}
             </div>
@@ -4130,7 +4130,7 @@ function BilanFACModulesTable({ modules }) {
                   {mods.map((m, i) => {
                     const st = STATUT_STYLE[m.statut] || STATUT_STYLE.PLANIFIEE
                     return (
-                      <tr key={m.id} style={{ background: i % 2 === 0 ? '#FFFBF5' : '#fff' }}>
+                      <tr key={m.id} style={{ background: i % 2 === 0 ? '#FFFDF5' : '#fff' }}>
                         <td style={{ ...FAC_TD, textAlign: 'left', fontWeight: 600, fontSize: '0.7rem' }}>{m.intitule}</td>
                         <td style={FAC_TD}>{m.groupe || '—'}</td>
                         <td style={FAC_TD}>{m.vh_prevu ? fmtVH(m.vh_prevu) : '—'}</td>
@@ -4158,14 +4158,14 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet, onMetaChange, onE
     <div>
       {/* En-tête */}
       <div style={{
-        background: 'linear-gradient(135deg,#FFF8F0 0%,#FEF3E2 100%)',
+        background: 'linear-gradient(135deg,#FFFBF0 0%,#FEF7E2 100%)',
         borderRadius: 8, padding: '0.85rem 1rem', marginBottom: '1rem',
-        border: '1px solid #FED7AA',
+        border: '1px solid #FEE8AA',
       }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '0.75rem' }}>
           <div style={{ flex: '1 1 240px' }}>
             <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-              <i className="bi bi-file-earmark-bar-graph me-2" style={{ color: '#ED7D31' }}/>
+              <i className="bi bi-file-earmark-bar-graph me-2" style={{ color: '#EDB131' }}/>
               {data.titre}
             </h3>
             <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
@@ -4221,9 +4221,9 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet, onMetaChange, onE
               display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
               padding: '0.4rem 0.8rem', borderRadius: 7, cursor: 'pointer',
               fontSize: '0.79rem', fontWeight: 600,
-              border: sousOnglet === so.id ? '2px solid #ED7D31' : '1px solid #e2e8f0',
-              background: sousOnglet === so.id ? '#FFF8F0' : '#fff',
-              color: sousOnglet === so.id ? '#C8511B' : '#64748b',
+              border: sousOnglet === so.id ? '2px solid #EDB131' : '1px solid #e2e8f0',
+              background: sousOnglet === so.id ? '#FFFBF0' : '#fff',
+              color: sousOnglet === so.id ? '#C8891B' : '#64748b',
             }}
           >
             <i className={`bi ${so.icon}`}/>{so.label}
@@ -4295,7 +4295,7 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet, onMetaChange, onE
 const OVERVIEW_SECTION_DEFS = [
   { id: 'alertes', tag: 'ALT', tagColor: '#C62828', label: 'Surveillance', icon: 'bi-bell' },
   { id: 'kpis', tag: 'KPI', tagColor: '#1565C0', label: 'Chiffres clés', icon: 'bi-speedometer2' },
-  { id: 'pedagogie', tag: 'PED', tagColor: '#43A047', label: 'Pédagogique', icon: 'bi-mortarboard' },
+  { id: 'pedagogie', tag: 'PED', tagColor: '#2277C1', label: 'Pédagogique', icon: 'bi-mortarboard' },
   { id: 'operationnel', tag: 'OPE', tagColor: '#7B1FA2', label: 'Opérationnel', icon: 'bi-gear' },
 ]
 
@@ -4313,9 +4313,9 @@ function buildOverviewSections(alertesItems) {
   return OVERVIEW_SECTION_DEFS.map(def => ({
     ...def,
     sub: def.id === 'alertes' ? alertesSub
-      : def.id === 'kpis' ? 'Formations, modules, auditeurs, séances…'
-      : def.id === 'pedagogie' ? 'Assiduité séance, couverture auditeurs, absences'
-      : def.id === 'operationnel' ? 'Répartition H/F, charge formateurs, absents notoires'
+      : def.id === 'kpis' ? 'Formations, modules, étudiants, séances…'
+      : def.id === 'pedagogie' ? 'Assiduité séance, couverture étudiants, absences'
+      : def.id === 'operationnel' ? 'Répartition H/F, charge enseignants, absents notoires'
       : '',
   }))
 }
@@ -4327,11 +4327,11 @@ function VueEnsemblePanel({ kpis, periode, loading, pedagogiques, adm, alertesOv
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-speedometer2 me-2" style={{ color: '#43A047' }}/>
+          <i className="bi bi-speedometer2 me-2" style={{ color: 'var(--navy)' }}/>
           Vue d&apos;ensemble — synthèse
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -4374,16 +4374,16 @@ function VueEnsemblePanel({ kpis, periode, loading, pedagogiques, adm, alertesOv
           role={onSelectSection ? 'button' : undefined}
         >
           <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-book" label="Modules" value={kpis.modules} color="#2277C1" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-people" label="Étudiants" value={kpis.participants} color="#F5B100" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-person-video3" label="Enseignants" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
           <Kpi icon="bi-calendar-event" label={KPI_SESSIONS_TOTAL.label} value={kpis.sessions_total} color="#00838F"
             help={KPI_SESSIONS_TOTAL.help}/>
-          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
+          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#082961"
             help={KPI_SESSIONS_COMPT.help}/>
-          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
+          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#0F70AB"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
-            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
+            color={kpis.taux_execution_vh >= 70 ? '#2277C1' : kpis.taux_execution_vh >= 40 ? '#F5B100' : '#C62828'}
             help={KPI_VH_EXEC.help}/>
         </div>
 
@@ -4395,7 +4395,7 @@ function VueEnsemblePanel({ kpis, periode, loading, pedagogiques, adm, alertesOv
               </Card>
             </div>
             <div onClick={onSelectSection ? () => onSelectSection('operationnel') : undefined} role={onSelectSection ? 'button' : undefined} style={{ cursor: onSelectSection ? 'pointer' : undefined }}>
-              <Card title="Charge des formateurs (top 8)" icon="bi-trophy">
+              <Card title="Charge des enseignants (top 8)" icon="bi-trophy">
                 <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
               </Card>
             </div>
@@ -4431,11 +4431,11 @@ function VueOverviewDetailPanel({
   const header = (
     <div style={{
       padding: '0.65rem 0.85rem', margin: '-1rem -1rem 1rem',
-      background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+      background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
       borderBottom: '1px solid #e2e8f0',
     }}>
       <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-        <i className={`bi ${section?.icon || 'bi-speedometer2'} me-2`} style={{ color: section?.tagColor || '#43A047' }}/>
+        <i className={`bi ${section?.icon || 'bi-speedometer2'} me-2`} style={{ color: section?.tagColor || '#2277C1' }}/>
         {section?.label || sectionId}
       </h3>
       {periode?.label && (
@@ -4462,7 +4462,7 @@ function VueOverviewDetailPanel({
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b', fontSize: '0.85rem' }}>
-            <i className="bi bi-check-circle" style={{ fontSize: '2rem', color: '#43A047', display: 'block', marginBottom: '0.5rem' }}/>
+            <i className="bi bi-check-circle" style={{ fontSize: '2rem', color: '#2277C1', display: 'block', marginBottom: '0.5rem' }}/>
             Aucune alerte active sur les 3 indicateurs clés.
           </div>
         )}
@@ -4481,16 +4481,16 @@ function VueOverviewDetailPanel({
         {header}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(175px,1fr))', gap: '0.85rem' }}>
           <Kpi icon="bi-journal-bookmark" label="Formations" value={kpis.formations} color="#1565C0" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-book" label="Modules / Cours" value={kpis.modules} color="#43A047" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00" help={KPI_PERIOD_SCOPE_HELP}/>
-          <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-book" label="Modules" value={kpis.modules} color="#2277C1" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-people" label="Étudiants" value={kpis.participants} color="#F5B100" help={KPI_PERIOD_SCOPE_HELP}/>
+          <Kpi icon="bi-person-video3" label="Enseignants" value={kpis.formateurs} color="#7B1FA2" help={KPI_PERIOD_SCOPE_HELP}/>
           <Kpi icon="bi-calendar-event" label={KPI_SESSIONS_TOTAL.label} value={kpis.sessions_total} color="#00838F"
             help={KPI_SESSIONS_TOTAL.help}/>
-          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#00695C"
+          <Kpi icon="bi-calendar-check" label={KPI_SESSIONS_COMPT.label} value={kpis.sessions_terminees} color="#082961"
             help={KPI_SESSIONS_COMPT.help}/>
-          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
+          <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#0F70AB"/>
           <Kpi icon="bi-check2-all" label={KPI_VH_EXEC.label} value={`${kpis.taux_execution_vh}%`}
-            color={kpis.taux_execution_vh >= 70 ? '#43A047' : kpis.taux_execution_vh >= 40 ? '#F57C00' : '#C62828'}
+            color={kpis.taux_execution_vh >= 70 ? '#2277C1' : kpis.taux_execution_vh >= 40 ? '#F5B100' : '#C62828'}
             help={KPI_VH_EXEC.help}/>
         </div>
         <p style={{ margin: '1rem 0 0', fontSize: '0.76rem', color: '#64748b' }}>
@@ -4507,9 +4507,9 @@ function VueOverviewDetailPanel({
         {header}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
           <Kpi icon="bi-person-check" label="Inscrits" value={ped.total_inscrits} color="#1565C0"/>
-          <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#43A047"/>
+          <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#2277C1"/>
           <Kpi icon="bi-x-circle" label="Absents" value={ped.total_absents} color="#C62828"/>
-          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F57C00"
+          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F5B100"
             help={TAUX_PEDAGOGIE.evenements.help}/>
         </div>
         <PedagogieTauxPrincipaux ped={ped} auditeursNotoires={auditeursNotoires}/>
@@ -4536,7 +4536,7 @@ function VueOverviewDetailPanel({
           <Card title="Répartition Hommes / Femmes" icon="bi-gender-ambiguous">
             <Donut data={adm.participants_par_sexe} labelKey="sexe" valueKey="total"/>
           </Card>
-          <Card title="Charge des formateurs (top 8)" icon="bi-trophy" col="1/-1">
+          <Card title="Charge des enseignants (top 8)" icon="bi-trophy" col="1/-1">
             <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
           </Card>
         </div>
@@ -4585,7 +4585,7 @@ function buildPedagogieEntries(ped) {
       id: `secretariat-${r.secretariat_id}`,
       type: 'secretariat',
       tag: 'SEC',
-      tagColor: '#F57C00',
+      tagColor: '#F5B100',
       label: r.secretariat,
       sub: `${r.inscrits} inscrits · ${Number(r.taux).toFixed(1)}% prés.`,
       row: r,
@@ -4603,11 +4603,11 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-mortarboard me-2" style={{ color: '#43A047' }}/>
+          <i className="bi bi-mortarboard me-2" style={{ color: 'var(--navy)' }}/>
           Pédagogique — vue d&apos;ensemble
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -4618,9 +4618,9 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
       <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '0.8rem', marginBottom: '1.1rem' }}>
           <Kpi icon="bi-person-check" label="Inscrits" value={ped.total_inscrits} color="#1565C0"/>
-          <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#43A047"/>
+          <Kpi icon="bi-check-circle" label="Présents" value={ped.total_presents} color="#2277C1"/>
           <Kpi icon="bi-x-circle" label="Absents" value={ped.total_absents} color="#C62828"/>
-          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F57C00"
+          <Kpi icon="bi-arrow-right-circle" label="Événements" value={ped.total_abandons} color="#F5B100"
             help={TAUX_PEDAGOGIE.evenements.help}/>
         </div>
         <PedagogieTauxPrincipaux ped={ped} auditeursNotoires={an}/>
@@ -4649,12 +4649,12 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
                           key={entryId}
                           style={{ borderBottom: '1px solid #f1f5f9', cursor: onSelect ? 'pointer' : undefined }}
                           onClick={onSelect ? () => onSelect(entryId) : undefined}
-                          onMouseEnter={onSelect ? e => { e.currentTarget.style.background = '#f0fdf4' } : undefined}
+                          onMouseEnter={onSelect ? e => { e.currentTarget.style.background = '#e8eef6' } : undefined}
                           onMouseLeave={onSelect ? e => { e.currentTarget.style.background = '' } : undefined}
                         >
                           <td style={{ padding: '0.45rem 0.7rem', color: '#1e293b', maxWidth: 260 }}>{r.formation}</td>
                           <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#64748b' }}>{r.inscrits}</td>
-                          <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#43A047', fontWeight: 600 }}>{r.presents}</td>
+                          <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#2277C1', fontWeight: 600 }}>{r.presents}</td>
                           <td style={{ padding: '0.45rem 0.7rem', minWidth: 140 }}><TauxBar value={r.taux} small/></td>
                         </tr>
                       )
@@ -4686,7 +4686,7 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
             ) : <Empty label="Aucun grade renseigné"/>}
           </Card>
 
-          <Card title="Auditeurs par type de concours" icon="bi-layers">
+          <Card title="Étudiants par type de concours" icon="bi-layers">
             <HBars data={ped.par_type_concours} labelKey="type" valueKey="total"/>
           </Card>
 
@@ -4709,13 +4709,13 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
                           key={entryId}
                           style={{ borderBottom: '1px solid #f1f5f9', cursor: onSelect ? 'pointer' : undefined }}
                           onClick={onSelect ? () => onSelect(entryId) : undefined}
-                          onMouseEnter={onSelect ? e => { e.currentTarget.style.background = '#f0fdf4' } : undefined}
+                          onMouseEnter={onSelect ? e => { e.currentTarget.style.background = '#e8eef6' } : undefined}
                           onMouseLeave={onSelect ? e => { e.currentTarget.style.background = '' } : undefined}
                         >
                           <td style={{ padding: '0.45rem 0.7rem', color: '#94a3b8', textAlign: 'center' }}>{r.numero}</td>
                           <td style={{ padding: '0.45rem 0.7rem', color: '#1e293b', fontWeight: 500 }}>{r.secretariat}</td>
                           <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#64748b' }}>{r.inscrits}</td>
-                          <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#43A047', fontWeight: 600 }}>{r.presents}</td>
+                          <td style={{ textAlign: 'center', padding: '0.45rem 0.7rem', color: '#2277C1', fontWeight: 600 }}>{r.presents}</td>
                           <td style={{ padding: '0.45rem 0.7rem', minWidth: 130 }}><TauxBar value={r.taux} small/></td>
                         </tr>
                       )
@@ -4763,7 +4763,7 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat, auditeur
     }}>
       <div style={{
         padding: '0.65rem 0.85rem', margin: '-1rem -1rem 1rem',
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0',
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
@@ -4780,14 +4780,14 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat, auditeur
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <Kpi icon="bi-person-check" label="Inscrits" value={r.inscrits} color="#1565C0"/>
-        <Kpi icon="bi-check-circle" label="Présents" value={r.presents} color="#43A047"/>
+        <Kpi icon="bi-check-circle" label="Présents" value={r.presents} color="#2277C1"/>
         <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${Number(r.taux).toFixed(1)}%`} color={TAUX_PEDAGOGIE.assiduite.color} help={TAUX_PEDAGOGIE.assiduite.help}/>
         {ecart != null && (
           <Kpi
             icon="bi-arrow-left-right"
             label="Écart vs global"
             value={`${ecart > 0 ? '+' : ''}${ecart} pt`}
-            color={ecart >= 0 ? '#43A047' : '#C62828'}
+            color={ecart >= 0 ? '#2277C1' : '#C62828'}
             sub={`Moyenne globale : ${ped.taux_presence}% (assiduité séance)`}
           />
         )}
@@ -4807,7 +4807,7 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat, auditeur
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748b' }}>Présents (total)</span>
-              <b style={{ color: '#43A047' }}>{ped.total_presents}</b>
+              <b style={{ color: '#2277C1' }}>{ped.total_presents}</b>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#64748b' }}>{TAUX_PEDAGOGIE.assiduite.label} (global)</span>
@@ -4844,7 +4844,7 @@ function PedagogiqueDetailPanel({ entry, pedagogiques, onGoSecretariat, auditeur
             <button
               type="button"
               className="btn btn-sm"
-              style={{ background: '#43A047', color: '#fff', border: 'none' }}
+              style={{ background: 'var(--navy)', color: '#fff', border: 'none' }}
               onClick={() => onGoSecretariat(r.secretariat_id)}
             >
               <i className="bi bi-building me-1"/>Ouvrir l&apos;onglet Secrétariats
@@ -4870,11 +4870,11 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois, auditeursNotoires }
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-graph-up me-2" style={{ color: '#43A047' }}/>
+          <i className="bi bi-graph-up me-2" style={{ color: 'var(--navy)' }}/>
           Historique — 12 derniers mois
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -4889,11 +4889,11 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois, auditeursNotoires }
               sub={`Moy. ${resume.moy_pointages_mois}/mois actif`} color="#C62828"/>
             <Kpi icon="bi-calendar-event" label="Séances (12 mois)" value={resume.total_sessions}
               sub={resume.sessions_mois_courant != null ? `${resume.sessions_mois_courant} ce mois` : undefined} color="#1565C0"/>
-            <Kpi icon="bi-percent" label={`${TAUX_PEDAGOGIE.assiduite.label} moyen`} value={`${resume.moy_taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
+            <Kpi icon="bi-percent" label={`${TAUX_PEDAGOGIE.assiduite.label} moyen`} value={`${resume.moy_taux_presence}%`} color="#2277C1" help={TAUX_PEDAGOGIE.assiduite.help}/>
             <Kpi icon="bi-book" label="Modules actifs" value={resume.modules_actifs_dernier_mois}
               sub="Dernier mois avec séances" color="#7B1FA2"/>
             <Kpi icon="bi-graph-up-arrow" label="Pointages ce mois" value={resume.pointages_mois_courant}
-              sub={<TrendBadge pct={resume.variation_pointages_pct}/>} color="#F57C00"/>
+              sub={<TrendBadge pct={resume.variation_pointages_pct}/>} color="#F5B100"/>
           </div>
         )}
 
@@ -4905,7 +4905,7 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois, auditeursNotoires }
             <MonthTrendChart data={historique.pointages_par_mois} valueKey="total" color="#C62828"/>
           </Card>
           <Card title={`${TAUX_PEDAGOGIE.assiduite.label} mensuel`} icon="bi-percent">
-            <MonthTrendChart data={historique.taux_presence_par_mois} valueKey="total" color="#43A047" unit="%"/>
+            <MonthTrendChart data={historique.taux_presence_par_mois} valueKey="total" color="#2277C1" unit="%"/>
             <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.5rem', marginBottom: 0 }}>
               Calculé sur présents / (présents + absents) par mois.
             </p>
@@ -4917,7 +4917,7 @@ function HistoriqueEnsemblePanel({ historique, onSelectMois, auditeursNotoires }
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.4rem' }}>Nouveaux modules</p>
-                <MonthTrendChart data={historique.modules_par_mois} valueKey="total" color="#43A047" height={130}/>
+                <MonthTrendChart data={historique.modules_par_mois} valueKey="total" color="#2277C1" height={130}/>
               </div>
               <div>
                 <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '0.4rem' }}>Modules actifs</p>
@@ -4966,7 +4966,7 @@ function HistoriqueMoisPanel({ historique, monthIndex, auditeursNotoires }) {
     }}>
       <div style={{
         padding: '0.65rem 0.85rem', margin: '-1rem -1rem 1rem',
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0',
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
@@ -4978,12 +4978,12 @@ function HistoriqueMoisPanel({ historique, monthIndex, auditeursNotoires }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
         <Kpi icon="bi-qr-code-scan" label="Pointages" value={pt.total} color="#C62828"
           sub={varPt != null ? <TrendBadge pct={varPt}/> : undefined}/>
-        <Kpi icon="bi-person-check" label="Présents" value={pt.presents ?? 0} color="#43A047"/>
+        <Kpi icon="bi-person-check" label="Présents" value={pt.presents ?? 0} color="#2277C1"/>
         <Kpi icon="bi-person-x" label="Absents" value={pt.absents ?? 0} color="#C62828"/>
-        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${Number(taux?.total || 0).toFixed(1)}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
+        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${Number(taux?.total || 0).toFixed(1)}%`} color="#2277C1" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-calendar-event" label="Séances" value={sess?.total ?? 0} color="#1565C0"/>
         <Kpi icon="bi-book" label="Modules créés" value={mod?.total ?? 0} color="#7B1FA2"/>
-        <Kpi icon="bi-book-half" label="Modules actifs" value={mod?.actifs ?? 0} color="#558B2F"/>
+        <Kpi icon="bi-book-half" label="Modules actifs" value={mod?.actifs ?? 0} color="#0F70AB"/>
         <Kpi icon="bi-layers" label="Stock modules" value={mod?.cumul ?? '—'} color="#64748b"/>
       </div>
 
@@ -4997,7 +4997,7 @@ function HistoriqueMoisPanel({ historique, monthIndex, auditeursNotoires }) {
           <MonthTrendChart data={windowSlice(historique.pointages_par_mois)} valueKey="total" color="#C62828" height={140}/>
         </Card>
         <Card title={`${TAUX_PEDAGOGIE.assiduite.label} (contexte)`} icon="bi-percent">
-          <MonthTrendChart data={windowSlice(historique.taux_presence_par_mois)} valueKey="total" color="#43A047" unit="%" height={140}/>
+          <MonthTrendChart data={windowSlice(historique.taux_presence_par_mois)} valueKey="total" color="#2277C1" unit="%" height={140}/>
         </Card>
         <Card title="Séances (contexte)" icon="bi-calendar-week">
           <MonthTrendChart data={windowSlice(historique.sessions_par_mois)} valueKey="total" color="#1565C0" height={140}/>
@@ -5008,7 +5008,7 @@ function HistoriqueMoisPanel({ historique, monthIndex, auditeursNotoires }) {
 }
 
 const SEC_TABLE_HEADERS = [
-  'N°', 'Secrétariat', 'Responsable', 'Modules', 'Auditeurs', 'Formateurs', 'Séances',
+  'N°', 'Secrétariat', 'Responsable', 'Modules', 'Étudiants', 'Enseignants', 'Séances',
   'Inscrits', 'Présents', 'Assiduité séance', 'Absences', 'Abs. notoires', 'Vol.H. prévu', 'Avancement VH', 'Hommes', 'Femmes', '',
 ]
 
@@ -5037,7 +5037,7 @@ function SecretariatsComparatifTable({ secretariats, onRowClick }) {
             <tr
               key={s.secretariat_id}
               style={{ borderBottom: '1px solid #f1f5f9', cursor: onRowClick ? 'pointer' : undefined }}
-              onMouseEnter={onRowClick ? e => { e.currentTarget.style.background = '#f0fdf4' } : undefined}
+              onMouseEnter={onRowClick ? e => { e.currentTarget.style.background = '#e8eef6' } : undefined}
               onMouseLeave={onRowClick ? e => { e.currentTarget.style.background = '' } : undefined}
               onClick={onRowClick ? () => onRowClick(i) : undefined}
             >
@@ -5047,23 +5047,23 @@ function SecretariatsComparatifTable({ secretariats, onRowClick }) {
                 {s.secretariat}
               </td>
               <td style={{ padding: '0.45rem 0.65rem', color: '#64748b', whiteSpace: 'nowrap' }}>{s.responsable || '—'}</td>
-              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#43A047', fontWeight: 700 }}>{s.nb_modules}</td>
-              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#F57C00', fontWeight: 700 }}>{s.nb_participants}</td>
+              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#2277C1', fontWeight: 700 }}>{s.nb_modules}</td>
+              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#F5B100', fontWeight: 700 }}>{s.nb_participants}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#7B1FA2', fontWeight: 700 }}>{s.nb_formateurs}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#00838F', fontWeight: 700 }}>{s.nb_sessions}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#64748b' }}>{s.nb_inscrits}</td>
-              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#43A047', fontWeight: 600 }}>{s.nb_presents}</td>
+              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#2277C1', fontWeight: 600 }}>{s.nb_presents}</td>
               <td style={{ padding: '0.45rem 0.65rem', minWidth: 110 }}><TauxBar value={s.taux_presence} small/></td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#C62828', fontWeight: 600 }}>{s.nb_absences}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#C62828', fontWeight: 700 }} title={`${Number(s.pct_auditeurs_notoires || 0).toFixed(1)}% des inscrits`}>
                 {s.nb_auditeurs_notoires ?? 0}
               </td>
-              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#558B2F' }}>{fmtHeures(s.vh_prevu)}h</td>
+              <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#0F70AB' }}>{fmtHeures(s.vh_prevu)}h</td>
               <td style={{ padding: '0.45rem 0.65rem', minWidth: 80 }}><TauxBar value={s.taux_execution_vh} small/></td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#1565C0' }}>{s.ratio_hf.hommes}</td>
               <td style={{ textAlign: 'center', padding: '0.45rem 0.65rem', color: '#AD1457' }}>{s.ratio_hf.femmes}</td>
               <td style={{ padding: '0.45rem 0.65rem', textAlign: 'center' }}>
-                {onRowClick && <i className="bi bi-arrow-right-circle" style={{ color: '#43A047' }} title="Voir le détail"/>}
+                {onRowClick && <i className="bi bi-arrow-right-circle" style={{ color: 'var(--navy)' }} title="Voir le détail"/>}
               </td>
             </tr>
           ))}
@@ -5081,11 +5081,11 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-building me-2" style={{ color: '#43A047' }}/>
+          <i className="bi bi-building me-2" style={{ color: 'var(--navy)' }}/>
           {secStats.total} secrétariat{secStats.total > 1 ? 's' : ''} — vue d&apos;ensemble
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -5096,8 +5096,8 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
       <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '0.8rem', marginBottom: '1.2rem' }}>
           <Kpi icon="bi-building" label="Secrétariats" value={secStats.total} color="#1565C0"/>
-          <Kpi icon="bi-people" label="Auditeurs total" value={secretariats.reduce((s, r) => s + r.nb_participants, 0)} color="#F57C00"/>
-          <Kpi icon="bi-book" label="Modules total" value={secretariats.reduce((s, r) => s + r.nb_modules, 0)} color="#43A047"/>
+          <Kpi icon="bi-people" label="Étudiants total" value={secretariats.reduce((s, r) => s + r.nb_participants, 0)} color="#F5B100"/>
+          <Kpi icon="bi-book" label="Modules total" value={secretariats.reduce((s, r) => s + r.nb_modules, 0)} color="#2277C1"/>
           <Kpi icon="bi-qr-code-scan" label="Pointages total" value={secretariats.reduce((s, r) => s + r.nb_pointages, 0)} color="#C62828"/>
           <Kpi icon="bi-person-x-fill" label="Absents notoires" value={secStats.auditeurs_notoires?.total ?? secretariats.reduce((s, r) => s + (r.nb_auditeurs_notoires || 0), 0)} color="#C62828"
             sub={secStats.auditeurs_notoires ? `${Number(secStats.auditeurs_notoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}/>
@@ -5108,11 +5108,11 @@ function SecretariatsEnsemblePanel({ secStats, onSelectIndividuel }) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
-          <Card title="Auditeurs par secrétariat" icon="bi-people">
+          <Card title="Étudiants par secrétariat" icon="bi-people">
             <HBars data={secretariats.map(s => ({ label: s.secretariat, value: s.nb_participants }))} labelKey="label" valueKey="value"/>
           </Card>
           <Card title="Modules par secrétariat" icon="bi-book">
-            <Bars data={secretariats.map(s => ({ label: s.secretariat, value: s.nb_modules }))} labelKey="label" valueKey="value" color="#43A047"/>
+            <Bars data={secretariats.map(s => ({ label: s.secretariat, value: s.nb_modules }))} labelKey="label" valueKey="value" color="#2277C1"/>
           </Card>
           <Card title={`${TAUX_PEDAGOGIE.assiduite.label} par secrétariat`} icon="bi-percent">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
@@ -5159,7 +5159,7 @@ function SecretariatDetailPanel({ row, detail }) {
       overflow: 'hidden', minWidth: 0, padding: '1rem',
     }}>
       <div style={{
-        padding: '0.65rem 0.85rem', margin: '-1rem -1rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.65rem 0.85rem', margin: '-1rem -1rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0',
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
@@ -5174,16 +5174,16 @@ function SecretariatDetailPanel({ row, detail }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '0.8rem', marginBottom: '1.1rem' }}>
-        <Kpi icon="bi-book" label="Modules" value={kpis.modules} color="#43A047"/>
-        <Kpi icon="bi-people" label="Auditeurs" value={kpis.participants} color="#F57C00"/>
-        <Kpi icon="bi-person-video3" label="Formateurs" value={kpis.formateurs} color="#7B1FA2"/>
+        <Kpi icon="bi-book" label="Modules" value={kpis.modules} color="#2277C1"/>
+        <Kpi icon="bi-people" label="Étudiants" value={kpis.participants} color="#F5B100"/>
+        <Kpi icon="bi-person-video3" label="Enseignants" value={kpis.formateurs} color="#7B1FA2"/>
         <Kpi icon="bi-calendar-event" label="Séances" value={kpis.sessions_total} color="#00838F"/>
         <Kpi icon="bi-qr-code-scan" label="Pointages" value={kpis.pointages} color="#C62828"/>
-        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${pedagogiques.taux_presence}%`} color="#43A047" help={TAUX_PEDAGOGIE.assiduite.help}/>
+        <Kpi icon="bi-percent" label={TAUX_PEDAGOGIE.assiduite.label} value={`${pedagogiques.taux_presence}%`} color="#2277C1" help={TAUX_PEDAGOGIE.assiduite.help}/>
         <Kpi icon="bi-percent" label="Taux absence" value={`${pedagogiques.taux_absence}%`} color="#C62828"/>
         <Kpi icon="bi-person-x-fill" label="Absents notoires" value={adm.auditeurs_notoires?.total ?? 0} color="#C62828"
           sub={adm.auditeurs_notoires ? `${Number(adm.auditeurs_notoires.pct || 0).toFixed(1).replace('.', ',')}% des inscrits` : undefined}/>
-        <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#558B2F"/>
+        <Kpi icon="bi-clock-history" label="Vol. horaire prévu" value={`${fmtHeures(kpis.vh_prevu_heures)}h`} color="#0F70AB"/>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '1rem' }}>
@@ -5210,7 +5210,7 @@ function SecretariatDetailPanel({ row, detail }) {
             )
             : <Empty label="Aucune formation pour ce secrétariat"/>}
         </Card>
-        <Card title="Auditeurs par catégorie" icon="bi-bar-chart-steps">
+        <Card title="Étudiants par catégorie" icon="bi-bar-chart-steps">
           <HBars data={(adm.participants_par_categorie || []).map(d => ({ ...d, categorie: d.categorie || 'Non rens.' }))} labelKey="categorie" valueKey="total"/>
         </Card>
         <Card title="Taux par grade" icon="bi-award">
@@ -5230,7 +5230,7 @@ function SecretariatDetailPanel({ row, detail }) {
             )
             : <Empty label="Aucun grade renseigné"/>}
         </Card>
-        <Card title="Charge des formateurs" icon="bi-person-video3">
+        <Card title="Charge des enseignants" icon="bi-person-video3">
           <HBars data={adm.charge_formateurs} labelKey="nom" valueKey="nb_sessions"/>
         </Card>
       </div>
@@ -5269,11 +5269,11 @@ function BilansEnsemblePanel({ items, bilans, filtres, dimension, onSelectIndivi
       overflow: 'hidden', minWidth: 0,
     }}>
       <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)',
+        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
         borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
       }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-grid-3x3-gap me-2" style={{ color: '#43A047' }}/>
+          <i className="bi bi-grid-3x3-gap me-2" style={{ color: 'var(--navy)' }}/>
           {items.length} tableau{items.length > 1 ? 'x' : ''} — {dimLabel}
         </h3>
         <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -5358,16 +5358,16 @@ function BilanEffectifsModuleTable({ data }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
         <thead>
           <tr>
-            <th style={{ ...thBase, background: '#FCD5B4' }} rowSpan={2}>
+            <th style={{ ...thBase, background: '#FCE7B4' }} rowSpan={2}>
               EFFECTIFS<br/>DES AUDITEURS
             </th>
-            <th style={{ ...thBase, background: '#FCD5B4' }} rowSpan={2}>
+            <th style={{ ...thBase, background: '#FCE7B4' }} rowSpan={2}>
               EFFECTIFS<br/>PRESENTS
             </th>
             <th style={{ ...thBase, background: '#D9D9D9' }} colSpan={2}>
               EFFECTIFS PRESENTS PAR GENRE
             </th>
-            <th style={{ ...thBase, background: '#A9D08E' }} rowSpan={2}>
+            <th style={{ ...thBase, background: '#77BCE7' }} rowSpan={2}>
               ABSENTS
             </th>
           </tr>
@@ -5449,7 +5449,7 @@ function BilanDetailPanel({ bilan, tableau, filtres, justificatifsText, onJustif
         {tableau.nb_groupes != null && (
           <p style={{ margin: '0 0 0.65rem', fontSize: '0.78rem', color: '#64748b' }}>
             Agrégation de <strong>{tableau.nb_groupes}</strong> groupe{tableau.nb_groupes > 1 ? 's' : ''} —
-            auditeurs uniques sur tous les groupes.
+            étudiants uniques sur tous les groupes.
           </p>
         )}
         <BilanEffectifsModuleTable data={tableau} />
@@ -5491,15 +5491,15 @@ function BilanDetailPanel({ bilan, tableau, filtres, justificatifsText, onJustif
       </div>
 
       <div style={{
-        background:'#fffbeb', border:'1px dashed #fcd34d', borderRadius:10,
+        background:'#fffceb', border:'1px dashed #fcdf4d', borderRadius:10,
         padding:'1.25rem', textAlign:'center',
       }}>
-        <i className="bi bi-table" style={{fontSize:'2rem',color:'#F57C00',display:'block',marginBottom:'0.5rem'}}/>
-        <p style={{margin:0,fontSize:'0.85rem',fontWeight:700,color:'#92400e'}}>
+        <i className="bi bi-table" style={{fontSize:'2rem',color:'#F5B100',display:'block',marginBottom:'0.5rem'}}/>
+        <p style={{margin:0,fontSize:'0.85rem',fontWeight:700,color:'#92660e'}}>
           Zone tableau bilan
         </p>
         <p style={{margin:'0.35rem 0 0',fontSize:'0.78rem',color:'#64748b',maxWidth:420,marginLeft:'auto',marginRight:'auto'}}>
-          Le modèle CPFAE pour ce bilan ({dimLabel}) sera intégré ici dès validation du format.
+          Le modèle INJS pour ce bilan ({dimLabel}) sera intégré ici dès validation du format.
           Les filtres sélectionnés ci-dessus s&apos;appliqueront au tableau affiché et aux exports Excel, PDF et Word.
         </p>
       </div>

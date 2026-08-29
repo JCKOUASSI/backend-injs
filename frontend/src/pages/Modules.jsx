@@ -27,6 +27,15 @@ const emptyForm = {
 }
 
 const emptyFormationForm = { formation: '', module: '' }
+const STATUT_VALUES = ['PLANIFIEE', 'EN_COURS', 'TERMINEE', 'SUSPENDUE']
+const DATE_MODES = ['today', 'all', 'date']
+const FILTER_LABELS = {
+  statut: 'statut',
+  secretariat_type: 'secrétariat',
+  vague: 'vague',
+  grade: 'grade',
+  groupe: 'groupe',
+}
 const getTodayIso = () => {
   const now = new Date()
   const tzOffset = now.getTimezoneOffset() * 60000
@@ -60,6 +69,7 @@ export default function Modules() {
   const [formationForm, setFormationForm] = useState({ ...emptyFormationForm })
   const [savingFormation, setSavingFormation] = useState(false)
   const [formationError, setFormationError] = useState('')
+  const [lastCreatedFormationId, setLastCreatedFormationId] = useState('')
 
   const canManage = canMutateFormations(user?.role)
   const canArchive = canArchiveModuleFromUser(user)
@@ -93,6 +103,36 @@ export default function Modules() {
       }).catch(() => {})
     }
     setRefs(data)
+
+    // Une valeur de filtre absente des référentiels (lien obsolète, import modifiant
+    // les grades/groupes) reste appliquée à l'API alors qu'aucune option ne peut
+    // l'afficher ni la désélectionner : la liste paraît vide sans raison visible.
+    const allowed = {
+      statut: STATUT_VALUES,
+      secretariat_type: (data.types_secretariat || []).map(t => String(t.id)),
+      vague: (data.vagues || []).map(v => String(v.libelle)),
+      grade: (data.grades_modules || []).map(String),
+      groupe: (data.groupes || []).map(String),
+    }
+    const dropped = Object.keys(allowed).filter(key => (
+      filters[key] && allowed[key].length && !allowed[key].includes(String(filters[key]))
+    ))
+    const badMode = !DATE_MODES.includes(filters.date_mode)
+    if (dropped.length || badMode) {
+      setFilters(prev => {
+        const next = { ...prev }
+        dropped.forEach(key => { next[key] = '' })
+        if (badMode) next.date_mode = 'all'
+        return next
+      })
+      setPage(1)
+    }
+    if (dropped.length) {
+      showToast(
+        `Filtre(s) ignoré(s), valeur inconnue : ${dropped.map(k => FILTER_LABELS[k]).join(', ')}`,
+        'info',
+      )
+    }
   }, [referentielsData])
   usePersistedListQuery(
     LIST_STORAGE_KEYS.modules,
@@ -138,7 +178,7 @@ export default function Modules() {
 
   const openCreate = () => {
     setEditingModule(null)
-    setForm({ ...emptyForm })
+    setForm({ ...emptyForm, formation_id: lastCreatedFormationId })
     setFormError('')
     setShowModal(true)
   }
@@ -218,11 +258,21 @@ export default function Modules() {
     setFormationError('')
     setSavingFormation(true)
     try {
-      await api.post('/formations/', { formation: formationForm.formation, module_input: formationForm.module })
+      const res = await api.post('/formations/', { formation: formationForm.formation, module_input: formationForm.module })
+      const created = res.data
+      const title = created?.formation || created?.intitule || formationForm.formation
+      if (created?.id) {
+        setAllFormations(prev => {
+          if (prev.some(f => String(f.id) === String(created.id))) return prev
+          return [...prev, { id: created.id, formation: title }]
+        })
+        setLastCreatedFormationId(String(created.id))
+        setForm(f => ({ ...f, formation_id: String(created.id) }))
+      }
       setShowFormationModal(false)
       setFormationForm({ ...emptyFormationForm })
       loadModules()
-      showToast('Formation créée')
+      showToast('Formation créée — vous pouvez y rattacher d’autres modules')
     } catch (err) {
       const data = err.response?.data
       if (data && typeof data === 'object') {
@@ -282,14 +332,20 @@ export default function Modules() {
       {/* Filtres */}
       <div className="card">
         <div className="card-body">
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: '1 1 220px' }}>
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            rowGap: '0.5rem',
+          }}>
+            <div style={{ flex: '1 1 160px', minWidth: 140 }}>
               <input type="text" className="form-control"
                 placeholder="Rechercher un module ou une formation…"
                 value={filters.search}
                 onChange={e => { setFilters({ ...filters, search: e.target.value }); setPage(1) }} />
             </div>
-            <div>
+            <div style={{ flexShrink: 0 }}>
               <select className="form-control" value={filters.statut}
                 onChange={e => { setFilters({ ...filters, statut: e.target.value }); setPage(1) }}>
                 <option value="">Tous les statuts</option>
@@ -300,7 +356,7 @@ export default function Modules() {
               </select>
             </div>
             {!['SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT'].includes(user?.role) && refs.types_secretariat?.length > 0 && (
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <select className="form-control" value={filters.secretariat_type}
                   onChange={e => { setFilters({ ...filters, secretariat_type: e.target.value }); setPage(1) }}>
                   <option value="">Tous les secrétariats</option>
@@ -311,7 +367,7 @@ export default function Modules() {
               </div>
             )}
             {refs.vagues?.length > 0 && (
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <select className="form-control" value={filters.vague}
                   onChange={e => { setFilters({ ...filters, vague: e.target.value }); setPage(1) }}>
                   <option value="">Toutes les vagues</option>
@@ -322,7 +378,7 @@ export default function Modules() {
               </div>
             )}
             {refs.grades_modules?.length > 0 && (
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <select className="form-control" value={filters.grade}
                   onChange={e => { setFilters({ ...filters, grade: e.target.value }); setPage(1) }}>
                   <option value="">Tous les grades</option>
@@ -333,7 +389,7 @@ export default function Modules() {
               </div>
             )}
             {refs.groupes?.length > 0 && (
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <select className="form-control" value={filters.groupe}
                   onChange={e => { setFilters({ ...filters, groupe: e.target.value }); setPage(1) }}>
                   <option value="">Tous les groupes</option>
@@ -343,7 +399,7 @@ export default function Modules() {
                 </select>
               </div>
             )}
-            <div>
+            <div style={{ flexShrink: 0 }}>
               <select
                 className="form-control"
                 value={filters.date_mode}
@@ -363,7 +419,7 @@ export default function Modules() {
               </select>
             </div>
             {filters.date_mode === 'date' && (
-              <div>
+              <div style={{ flexShrink: 0 }}>
                 <input
                   type="date"
                   className="form-control"
@@ -373,7 +429,7 @@ export default function Modules() {
               </div>
             )}
             {canManage && (
-              <button onClick={openCreate} className="btn btn-dfrc">
+              <button onClick={openCreate} className="btn btn-dfrc" style={{ flexShrink: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                 <i className="bi bi-plus-lg me-1"></i>Nouveau module
               </button>
             )}
@@ -397,13 +453,13 @@ export default function Modules() {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Module</th>
+                      <th>Modules</th>
                       <th>Formation</th>
                       <th>Grade</th>
                       <th>Secrétariat</th>
                       <th>Groupe</th>
                       <th>Dates</th>
-                      <th>Auditeurs</th>
+                      <th>Étudiants</th>
                       <th>Statut</th>
                       <th>Actions</th>
                     </tr>
@@ -413,7 +469,7 @@ export default function Modules() {
                       <tr key={m.module_id || m.id}>
                         <td><strong style={{ color: '#805ad5' }}>{m.module}</strong></td>
                         <td><span style={{ fontSize: '0.82rem', color: '#64748b' }}>{m.formation}</span></td>
-                        <td><span style={{ fontSize: '0.82rem', background: '#f0fff4', color: '#276749', padding: '2px 7px', borderRadius: 4 }}>{m.grade || '—'}</span></td>
+                        <td><span style={{ fontSize: '0.82rem', background: '#f0f7ff', color: '#11407d', padding: '2px 7px', borderRadius: 4 }}>{m.grade || '—'}</span></td>
                         <td>{m.secretariat_nom
                           ? <span className="text-muted" style={{ fontSize: '0.82rem' }}>{m.secretariat_nom}</span>
                           : <span className="text-muted">-</span>}
@@ -483,7 +539,7 @@ export default function Modules() {
 
       {/* ── MODAL NOUVELLE FORMATION ── */}
       {showFormationModal && (
-        <div className="modal-overlay" onClick={() => setShowFormationModal(false)}>
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setShowFormationModal(false)}>
           <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h5><i className="bi bi-mortarboard me-2"></i>Nouvelle formation</h5>
@@ -511,6 +567,9 @@ export default function Modules() {
                   <input type="text" className="form-control" required value={formationForm.module}
                     placeholder="Ex : Droit Administratif"
                     onChange={e => setFormationForm({ ...formationForm, module: e.target.value })} />
+                  <small className="text-muted" style={{ display: 'block', marginTop: '0.35rem' }}>
+                    Vous pourrez rattacher d’autres modules à cette formation ensuite.
+                  </small>
                 </div>
               </div>
               <div className="modal-footer">
@@ -547,6 +606,18 @@ export default function Modules() {
                         <option key={f.id} value={f.id}>{f.formation}</option>
                       ))}
                     </select>
+                    <small className="text-muted" style={{ display: 'block', marginTop: '0.35rem' }}>
+                      Une formation peut regrouper un ou plusieurs modules. Choisissez une formation existante
+                      {' '}
+                      <button
+                        type="button"
+                        className="btn btn-link btn-sm p-0 align-baseline"
+                        onClick={() => { setFormationError(''); setShowFormationModal(true) }}
+                      >
+                        ou créez-en une nouvelle
+                      </button>
+                      .
+                    </small>
                   </div>
                 )}
 
