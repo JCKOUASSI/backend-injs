@@ -27,42 +27,49 @@ print("  CRÉATION DES DONNÉES DE DÉMONSTRATION")
 print("=" * 60)
 
 # ── 1. Utilisateurs ──────────────────────────────────────────
-admin_user, c = User.objects.get_or_create(username='admin', defaults={
-    'email': 'admin@injs.ci', 'first_name': 'Admin', 'last_name': 'INJS',
-    'role': 'ADMIN', 'is_staff': True, 'is_superuser': True,
-})
-if c: admin_user.set_password('admin123'); admin_user.save()
-print(f"{'✓' if c else '→'} admin")
+def reset_demo_user(username, password, **fields):
+    """Crée ou remet dans son état de démonstration un compte connu."""
+    user, created = User.objects.get_or_create(username=username, defaults=fields)
+    for field, value in fields.items():
+        setattr(user, field, value)
+    user.set_password(password)
+    user.must_change_password = False
+    user.is_active = True
+    user.save()
+    print(f"{'✓' if created else '↻'} {username}")
+    return user
 
-jck, c = User.objects.get_or_create(username='jckouassi', defaults={
-    'email': 'jck@injs.ci', 'first_name': 'Jean-Claude', 'last_name': 'Kouassi',
-    'role': 'CHEF_CPFAE_ADMIN', 'is_staff': True, 'is_superuser': True,
-})
-if c: jck.set_password('JckPcm@123'); jck.save()
-print(f"{'✓' if c else '→'} jckouassi")
 
-injs_user, c = User.objects.get_or_create(username='injs', defaults={
-    'email': 'injs@injs.ci', 'first_name': 'Responsable', 'last_name': 'INJS',
-    'role': 'CPFAE_ADMIN', 'is_staff': True,
-})
-if c: injs_user.set_password('injs123'); injs_user.save()
-print(f"{'✓' if c else '→'} injs")
-
-secretariat_user, c = User.objects.get_or_create(username='secretariat', defaults={
-    'email': 'secretariat@injs.ci', 'first_name': 'Secrétariat', 'last_name': 'INJS',
-    'role': 'SECRETARIAT', 'is_staff': True,
-})
-if c: secretariat_user.set_password('sec123'); secretariat_user.save()
-print(f"{'✓' if c else '→'} secretariat")
+admin_user = reset_demo_user(
+    'admin', 'admin123', email='admin@injs.ci', first_name='Admin', last_name='INJS',
+    role=User.Role.ADMIN, is_staff=True, is_superuser=True,
+)
+dfrc_user = reset_demo_user(
+    'dfrc', 'dfrc123', email='dfrc@injs.ci', first_name='Responsable', last_name='CPFAE',
+    role=User.Role.CPFAE_ADMIN, is_staff=True, is_superuser=False,
+)
+jck = reset_demo_user(
+    'jckouassi', 'JckPcm@123', email='jck@injs.ci', first_name='Jean-Claude', last_name='Kouassi',
+    role=User.Role.CHEF_CPFAE_ADMIN, is_staff=True, is_superuser=True,
+)
+injs_user = reset_demo_user(
+    'injs', 'injs123', email='injs@injs.ci', first_name='Responsable', last_name='INJS',
+    role=User.Role.CPFAE_ADMIN, is_staff=True, is_superuser=False,
+)
+secretariat_user = reset_demo_user(
+    'secretariat', 'sec123', email='secretariat@injs.ci', first_name='Secrétariat', last_name='INJS',
+    role=User.Role.SECRETARIAT, is_staff=True, is_superuser=False,
+)
 
 superviseurs = []
 for d in [
     {'username': 'superviseur1', 'first_name': 'Jean',   'last_name': 'MARTIN',  'email': 'jean.martin@injs.ci'},
     {'username': 'superviseur2', 'first_name': 'Sophie', 'last_name': 'BERNARD', 'email': 'sophie.bernard@injs.ci'},
 ]:
-    u, c = User.objects.get_or_create(username=d['username'], defaults={**d, 'role': 'ENCADRANT'})
-    if c: u.set_password('sup123'); u.save()
-    print(f"{'✓' if c else '→'} {d['username']}")
+    u = reset_demo_user(d['username'], 'sup123',
+                        **{key: value for key, value in d.items() if key != 'username'},
+                        role=User.Role.ENCADRANT,
+                        is_staff=False, is_superuser=False)
     superviseurs.append(u)
 
 # ── 2. Participants ───────────────────────────────────────────
@@ -81,6 +88,12 @@ participants_data = [
 participants = []
 for d in participants_data:
     p, c = Participant.objects.get_or_create(matricule=d['matricule'], defaults=d)
+    p.user = reset_demo_user(
+        p.matricule.lower(), p.matricule.lower(), email=p.email,
+        first_name=p.prenom, last_name=p.nom, role=User.Role.AUDITEUR,
+        is_staff=False, is_superuser=False, matricule=p.matricule,
+    )
+    p.save(update_fields=['user'])
     if c: print(f"  ✓ Participant {p.nom} {p.prenom}")
     participants.append(p)
 
@@ -93,6 +106,12 @@ formateurs_data = [
 formateurs = []
 for d in formateurs_data:
     f, c = Formateur.objects.get_or_create(numerobadge=d['numerobadge'], defaults=d)
+    f.user = reset_demo_user(
+        f.numerobadge.lower(), f.numerobadge.lower(), email=f.email,
+        first_name=f.prenom, last_name=f.nom, role=User.Role.FORMATEUR,
+        is_staff=False, is_superuser=False,
+    )
+    f.save(update_fields=['user'])
     if c: print(f"  ✓ Formateur {f.nom} {f.prenom}")
     formateurs.append(f)
 

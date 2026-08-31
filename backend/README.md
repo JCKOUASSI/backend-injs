@@ -58,6 +58,9 @@ Le frontend sera disponible sur `http://localhost:3000` et communiquera avec le 
 |------|----------|-------------|
 | Administrateur | `admin` | `admin123` |
 | CPFAE Admin | `dfrc` | `dfrc123` |
+| Chef CPFAE Admin | `jckouassi` | `JckPcm@123` |
+| INJS Admin | `injs` | `injs123` |
+| Secrétariat | `secretariat` | `sec123` |
 | Encadrant 1 | `superviseur1` | `sup123` |
 | Encadrant 2 | `superviseur2` | `sup123` |
 
@@ -147,10 +150,8 @@ flutter run
 
 | Rôle | Username | Mot de passe | Nom |
 |------|----------|-------------|-----|
-| Participant | `p001` | `p001` | DIALLO Amadou |
-| Participant | `p002` | `p002` | TRAORE Fatou |
-| Participant | `p003` | `p003` | COULIBALY Ibrahim |
-| Formateur | `f0001` | `f0001` | Formateur Test |
+| Participant | `p001` à `p010` | même valeur que l'identifiant | Participants P001 à P010 |
+| Formateur | `f001` à `f003` | même valeur que l'identifiant | Formateurs F001 à F003 |
 
 ### Configuration serveur
 

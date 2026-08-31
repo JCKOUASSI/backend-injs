@@ -19,3 +19,8 @@ backend/cache/
 /Manuel utilisateur App Statistiques.md
 /Manuel utilisateur App Statistiques.docx
 /Sauvegardes tâches réalisées.txt
+
+# Sauvegardes de bases de données - NE PAS VERSIONNER
+*.dump
+*.dump.sql
+backups/
