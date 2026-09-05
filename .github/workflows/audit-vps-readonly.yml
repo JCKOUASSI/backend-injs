@@ -27,7 +27,7 @@ jobs:
 
           echo "Secrets VPS présents."
 
-      - name: Diagnostiquer le format de la clé SSH
+      - name: Préparer et tester la clé SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
@@ -51,6 +51,7 @@ jobs:
               ;;
             *)
               echo "Début : FORMAT INATTENDU"
+              exit 1
               ;;
           esac
 
@@ -69,13 +70,30 @@ jobs:
               ;;
             *)
               echo "Fin : FORMAT INATTENDU"
+              exit 1
               ;;
           esac
 
           if printf '%s' "$SSH_KEY" | grep -q $'\r'; then
             echo "CRLF : détecté"
+            echo "::warning::Le secret contient des retours CRLF."
           else
             echo "CRLF : non détecté"
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          echo "=== TEST DE LA CLE SSH ==="
+
+          if ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null 2>&1; then
+            echo "Clé privée SSH : VALIDE"
+          else
+            echo "::error::VPS_SSH_KEY est présent mais n'est pas une clé privée SSH valide."
+            exit 1
           fi
 
           echo "Diagnostic terminé. Aucune clé affichée."
