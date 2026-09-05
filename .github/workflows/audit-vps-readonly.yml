@@ -27,21 +27,58 @@ jobs:
 
           echo "Secrets VPS présents."
 
-      - name: Préparer la clé SSH
+      - name: Diagnostiquer le format de la clé SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           set -euo pipefail
 
-          mkdir -p "$HOME/.ssh"
-          chmod 700 "$HOME/.ssh"
+          echo "=== DIAGNOSTIC SECURISE DE VPS_SSH_KEY ==="
+          echo "Longueur : ${#SSH_KEY} caractères"
 
-          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
-          chmod 600 "$HOME/.ssh/deploy_key"
+          case "$SSH_KEY" in
+            "-----BEGIN OPENSSH PRIVATE KEY-----"*)
+              echo "Début : format OpenSSH détecté"
+              ;;
+            "-----BEGIN RSA PRIVATE KEY-----"*)
+              echo "Début : format RSA PEM détecté"
+              ;;
+            "-----BEGIN EC PRIVATE KEY-----"*)
+              echo "Début : format EC PEM détecté"
+              ;;
+            "-----BEGIN PRIVATE KEY-----"*)
+              echo "Début : format PKCS#8 détecté"
+              ;;
+            *)
+              echo "Début : FORMAT INATTENDU"
+              ;;
+          esac
 
-          ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null
+          case "$SSH_KEY" in
+            *"-----END OPENSSH PRIVATE KEY-----")
+              echo "Fin : OK"
+              ;;
+            *"-----END RSA PRIVATE KEY-----")
+              echo "Fin : OK"
+              ;;
+            *"-----END EC PRIVATE KEY-----")
+              echo "Fin : OK"
+              ;;
+            *"-----END PRIVATE KEY-----")
+              echo "Fin : OK"
+              ;;
+            *)
+              echo "Fin : FORMAT INATTENDU"
+              ;;
+          esac
 
-          echo "Clé privée OpenSSH valide."
+          if printf '%s' "$SSH_KEY" | grep -q $'\r'; then
+            echo "CRLF : détecté"
+          else
+            echo "CRLF : non détecté"
+          fi
+
+          echo "Diagnostic terminé. Aucune clé affichée."
 
       - name: Audit VPS - LECTURE SEULE
         env:
