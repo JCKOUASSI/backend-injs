@@ -1,0 +1,235 @@
+name: AUDIT VPS - READ ONLY
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit VPS sans modification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Vérifier les secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          [ -n "$VPS_HOST" ] || { echo "::error::VPS_HOST manquant"; exit 1; }
+          [ -n "$VPS_USER" ] || { echo "::error::VPS_USER manquant"; exit 1; }
+          [ -n "$VPS_SSH_KEY" ] || { echo "::error::VPS_SSH_KEY manquant"; exit 1; }
+
+          echo "Secrets VPS présents."
+
+      - name: Préparer la clé SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null
+
+          echo "Clé privée OpenSSH valide."
+
+      - name: Audit VPS - LECTURE SEULE
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+
+          PORT="${VPS_PORT:-22}"
+
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" \
+            >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+
+          ssh \
+            -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -p "$PORT" \
+            "${VPS_USER}@${VPS_HOST}" \
+            'bash -s' <<'REMOTE'
+
+          set -u
+
+          echo "============================================================"
+          echo " AUDIT VPS INJS"
+          echo " LECTURE SEULE"
+          echo " AUCUNE MODIFICATION"
+          echo "============================================================"
+
+          echo
+          echo "=== MACHINE ==="
+          hostname
+          uname -a
+          date
+
+          echo
+          echo "=== UTILISATEUR ==="
+          whoami
+          id
+
+          echo
+          echo "=== /opt/injs ==="
+          ls -la /opt/injs 2>/dev/null || true
+
+          echo
+          echo "=== /opt/injs/injs-be ==="
+          ls -la /opt/injs/injs-be 2>/dev/null || true
+
+          echo
+          echo "=== /opt/injs/injs-fe ==="
+          ls -la /opt/injs/injs-fe 2>/dev/null || true
+
+          echo
+          echo "=== FICHIERS COMPOSE ==="
+          find /opt/injs/injs-be /opt/injs/injs-fe \
+            -maxdepth 1 -type f \
+            \( -name 'docker-compose.yml' -o -name 'compose.yml' \) \
+            -print 2>/dev/null || true
+
+          echo
+          echo "=== SERVICES COMPOSE BACKEND ==="
+          for f in \
+            /opt/injs/injs-be/docker-compose.yml \
+            /opt/injs/injs-be/compose.yml
+          do
+            if [ -f "$f" ]; then
+              echo "--- $f ---"
+              grep -E '^services:|^  [A-Za-z0-9_-]+:' "$f" || true
+            fi
+          done
+
+          echo
+          echo "=== SERVICES COMPOSE FRONTEND ==="
+          for f in \
+            /opt/injs/injs-fe/docker-compose.yml \
+            /opt/injs/injs-fe/compose.yml
+          do
+            if [ -f "$f" ]; then
+              echo "--- $f ---"
+              grep -E '^services:|^  [A-Za-z0-9_-]+:' "$f" || true
+            fi
+          done
+
+          echo
+          echo "=== ENV BACKEND : NOMS DES VARIABLES UNIQUEMENT ==="
+          if [ -f /opt/injs/injs-be/.env ]; then
+            sed -E \
+              's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1=<VALEUR_MASQUEE>/' \
+              /opt/injs/injs-be/.env
+          fi
+
+          echo
+          echo "=== ENV FRONTEND : NOMS DES VARIABLES UNIQUEMENT ==="
+          if [ -f /opt/injs/injs-fe/.env ]; then
+            sed -E \
+              's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1=<VALEUR_MASQUEE>/' \
+              /opt/injs/injs-fe/.env
+          fi
+
+          echo
+          echo "=== CONTAINERS DOCKER ==="
+          docker ps --format \
+            'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' \
+            2>/dev/null || true
+
+          echo
+          echo "=== TOUS LES CONTAINERS ==="
+          docker ps -a --format \
+            'table {{.Names}}\t{{.Image}}\t{{.Status}}' \
+            2>/dev/null || true
+
+          echo
+          echo "=== RESEAUX DOCKER ==="
+          docker network ls 2>/dev/null || true
+
+          echo
+          echo "=== RESEAU injs-net ==="
+          docker network inspect injs-net 2>/dev/null || \
+            echo "injs-net absent ou inaccessible."
+
+          echo
+          echo "=== VOLUMES DOCKER ==="
+          docker volume ls 2>/dev/null || true
+
+          echo
+          echo "=== IMAGES INJS / OPHIR / QR ==="
+          docker images --format \
+            'table {{.Repository}}\t{{.Tag}}\t{{.CreatedSince}}\t{{.Size}}' \
+            2>/dev/null | grep -Ei 'injs|ophir|qr|badge' || true
+
+          echo
+          echo "=== PORTS ==="
+          ss -lntp 2>/dev/null || true
+
+          echo
+          echo "=== NGINX ==="
+          ps aux 2>/dev/null | grep '[n]ginx' || true
+
+          echo
+          echo "=== CONFIG NGINX : FICHIERS ==="
+          find /etc/nginx \
+            -maxdepth 3 \
+            -type f \
+            \( -name '*.conf' -o -name 'nginx.conf' \) \
+            -print 2>/dev/null || true
+
+          echo
+          echo "=== NGINX : ROUTES / DOMAINES / PROXY ==="
+          find /etc/nginx \
+            -maxdepth 3 \
+            -type f \
+            \( -name '*.conf' -o -name 'nginx.conf' \) \
+            -exec grep -HEi \
+            'server_name|location /|proxy_pass|upstream|listen [0-9]+' \
+            {} \; 2>/dev/null || true
+
+          echo
+          echo "=== HTTPS injs.badge-qr-code.pro ==="
+          curl -k -I -L --max-time 10 \
+            https://injs.badge-qr-code.pro/ \
+            2>/dev/null || true
+
+          echo
+          echo "=== HTTPS inj.badge-qr-code.pro ==="
+          curl -k -I -L --max-time 10 \
+            https://inj.badge-qr-code.pro/ \
+            2>/dev/null || true
+
+          echo
+          echo "=== API injs ==="
+          curl -k -I -L --max-time 10 \
+            https://injs.badge-qr-code.pro/api/v1/ \
+            2>/dev/null || true
+
+          echo
+          echo "=== API inj ==="
+          curl -k -I -L --max-time 10 \
+            https://inj.badge-qr-code.pro/api/v1/ \
+            2>/dev/null || true
+
+          echo
+          echo "============================================================"
+          echo " FIN AUDIT"
+          echo " LECTURE SEULE"
+          echo " AUCUNE MODIFICATION EFFECTUEE"
+          echo "============================================================"
+
+          REMOTE
