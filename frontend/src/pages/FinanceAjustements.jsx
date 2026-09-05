@@ -290,9 +290,9 @@ export default function FinanceAjustements() {
                           <span className="spinner-border spinner-border-sm" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14 }} />
                         )}
                       </div>
-                      {enseignantOptions.length > 0 && (
+                      {formateurOptions.length > 0 && (
                         <ul className="list-group shadow-sm" style={{ position: 'absolute', zIndex: 999, width: '100%', maxHeight: 220, overflowY: 'auto', top: '100%', marginTop: 2, border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                          {enseignantOptions.map(f => (
+                          {formateurOptions.map(f => (
                             <li key={f.id}
                               className="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3"
                               style={{ cursor: 'pointer', fontSize: '0.84rem', border: 'none', borderBottom: '1px solid #f1f5f9' }}

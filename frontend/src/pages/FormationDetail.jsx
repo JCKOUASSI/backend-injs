@@ -1402,7 +1402,7 @@ export default function FormationDetail() {
                   <table className="table">
                     <thead><tr><th>Numéro</th><th>Nom</th><th>Prénom</th><th>Spécialité</th><th>Adresse e-mail</th><th>Téléphone</th>{canEdit && <th>Actions</th>}</tr></thead>
                     <tbody>
-                      {enseignantsPager.pageItems.map((f) => (
+                      {formateursPager.pageItems.map((f) => (
                         <tr key={f.id}>
                           <td><span className="badge-bg-info">{f.numerobadge || '-'}</span></td>
                           <td><strong>{f.nom}</strong></td>
@@ -1423,11 +1423,11 @@ export default function FormationDetail() {
                   </table>
                 </div>
                 <Pagination
-                  page={enseignantsPager.page}
-                  totalPages={enseignantsPager.totalPages}
-                  onPageChange={enseignantsPager.setPage}
-                  totalItems={enseignantsPager.totalItems}
-                  pageSize={enseignantsPager.pageSize}
+                  page={formateursPager.page}
+                  totalPages={formateursPager.totalPages}
+                  onPageChange={formateursPager.setPage}
+                  totalItems={formateursPager.totalItems}
+                  pageSize={formateursPager.pageSize}
                 />
                 </>
               ) : (
@@ -1644,11 +1644,11 @@ export default function FormationDetail() {
                 </div>
               )}
               <Pagination
-                page={enseignantPicker.page}
-                totalPages={enseignantPicker.totalPages}
-                onPageChange={enseignantPicker.setPage}
-                totalItems={enseignantPicker.totalCount}
-                pageSize={enseignantPicker.pageSize}
+                page={formateurPicker.page}
+                totalPages={formateurPicker.totalPages}
+                onPageChange={formateurPicker.setPage}
+                totalItems={formateurPicker.totalCount}
+                pageSize={formateurPicker.pageSize}
               />
             </div>
             <div className="modal-footer">

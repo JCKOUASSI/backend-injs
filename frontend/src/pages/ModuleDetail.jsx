@@ -1384,7 +1384,7 @@ export default function ModuleDetail() {
               <h5><i className="bi bi-shuffle me-2"></i>Forcer le badgeage des étudiants</h5>
               <button className="btn-close" disabled={bulkForceSaving} onClick={() => setBulkForceModal(false)}>&times;</button>
             </div>
-            <form onSubmit={handleBulkForceÉtudiants}>
+            <form onSubmit={handleBulkForceAuditeurs}>
               <div className="modal-body">
                 <p style={{ fontSize: '0.9rem', color: '#475569', marginBottom: '0.75rem' }}>
                   Pour chaque séance active du {formatDate(selectedPresenceDate)}
@@ -1611,11 +1611,11 @@ export default function ModuleDetail() {
                 </div>
               )}
               <Pagination
-                page={enseignantPicker.page}
-                totalPages={enseignantPicker.totalPages}
-                onPageChange={enseignantPicker.setPage}
-                totalItems={enseignantPicker.totalCount}
-                pageSize={enseignantPicker.pageSize}
+                page={formateurPicker.page}
+                totalPages={formateurPicker.totalPages}
+                onPageChange={formateurPicker.setPage}
+                totalItems={formateurPicker.totalCount}
+                pageSize={formateurPicker.pageSize}
               />
             </div>
             <div className="modal-footer">

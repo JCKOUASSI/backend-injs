@@ -38,7 +38,6 @@ backend/import_participants.xlsx
 backend/import_formateurs.xlsx
 backend/import_formations.xlsx
 backend/import_seances.xlsx
-backend/test_import_formations_seances.xlsx
 
 # Fichiers de données générés/localement utilisés pour les imports
 backend/modele_participants.csv
@@ -66,7 +65,6 @@ backend/import_participants.xlsx
 backend/import_formateurs.xlsx
 backend/import_formations.xlsx
 backend/import_seances.xlsx
-backend/test_import_formations_seances.xlsx
 
 # Modèles locaux générés
 backend/modele_participants.csv
@@ -100,7 +98,6 @@ backend/import_participants.xlsx
 backend/import_formateurs.xlsx
 backend/import_formations.xlsx
 backend/import_seances.xlsx
-backend/test_import_formations_seances.xlsx
 
 # Modèles locaux générés
 backend/modele_participants.csv

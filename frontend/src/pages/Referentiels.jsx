@@ -250,7 +250,7 @@ export default function Referentiels() {
         delete submitData.formations
       }
       if (tab === 'salles' || tab === 'batiments' || tab === 'grades') {
-        ;['site_id', 'batiment_id', 'categorie_id'].forEach((key) => {
+        ['site_id', 'batiment_id', 'categorie_id'].forEach((key) => {
           if (!(key in submitData)) return
           if (submitData[key] === '' || submitData[key] == null) {
             submitData[key] = null
