@@ -1,0 +1,128 @@
+# Artefacts frontend locaux (mono-repo)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+credentials_mobile.txt
+backend/credentials_mobile.txt
+backend/.local/
+backend/staticfiles/
+backend/media/
+backend/cache/
+
+# Doublons locaux (sources canoniques dans docs/)
+**/.DS_Store
+
+# Doublons locaux (sources canoniques dans docs/)
+/Manuel utilisateur App Statistiques.md
+/Manuel utilisateur App Statistiques.docx
+/Sauvegardes tâches réalisées.txt
+
+# Sauvegardes de bases de données - NE PAS VERSIONNER
+*.dump
+*.dump.sql
+backups/
+
+# ============================================================
+# INJS-LMD — FICHIERS LOCAUX / DONNEES DE TEST / DEPENDANCES
+# ============================================================
+
+# Dépendances Python embarquées accidentellement dans les assets
+qr_badge_mobile/app_review/_pydeps/
+
+# Données d'import locales pouvant contenir des données personnelles
+backend/import_participants.csv
+backend/import_participants.xlsx
+backend/import_formateurs.xlsx
+backend/import_formations.xlsx
+backend/import_seances.xlsx
+backend/test_import_formations_seances.xlsx
+
+# Fichiers de données générés/localement utilisés pour les imports
+backend/modele_participants.csv
+backend/modele_formateurs.csv
+backend/modele_formations.csv
+backend/modele_seances.csv
+
+# Archives / transcriptions héritées de l'ancien projet CPFAE
+docs/transcripts/
+
+
+# ============================================================
+# DONNEES DE TEST / IMPORT / DONNEES PERSONNELLES
+# ============================================================
+
+# Liste source contenant potentiellement des données personnelles
+backend/LISTE DES FORMATEURS FAB 2026 - 19-04-2026.numbers
+
+# Fichiers de vérification/import Excel locaux
+backend/importverif/
+
+# Anciennes données d'import de démonstration
+backend/import_participants.csv
+backend/import_participants.xlsx
+backend/import_formateurs.xlsx
+backend/import_formations.xlsx
+backend/import_seances.xlsx
+backend/test_import_formations_seances.xlsx
+
+# Modèles locaux générés
+backend/modele_participants.csv
+backend/modele_formateurs.csv
+backend/modele_formations.csv
+backend/modele_seances.csv
+
+# ============================================================
+# ANCIENS ELEMENTS SYGEP-CPFAE
+# ============================================================
+
+backend/static/img/logo-sygepcpfae.png
+backend/docs/ADMIN_DEPANNAGE.md
+backend/docs/GUIDE_ADMIN_ACTIONS.md
+docs/legal/confidentialite-plateforme-sygep.html
+scripts/transcribe_reunion_cpfae.py
+
+# ============================================================
+# DONNEES DE TEST / IMPORT / DONNEES PERSONNELLES
+# ============================================================
+
+# Liste source contenant potentiellement des données personnelles
+backend/LISTE DES FORMATEURS FAB 2026 - 19-04-2026.numbers
+
+# Fichiers de vérification/import Excel locaux
+backend/importverif/
+
+# Anciennes données d'import de démonstration
+backend/import_participants.csv
+backend/import_participants.xlsx
+backend/import_formateurs.xlsx
+backend/import_formations.xlsx
+backend/import_seances.xlsx
+backend/test_import_formations_seances.xlsx
+
+# Modèles locaux générés
+backend/modele_participants.csv
+backend/modele_formateurs.csv
+backend/modele_formations.csv
+backend/modele_seances.csv
+
+# ============================================================
+# ANCIENS ELEMENTS SYGEP-CPFAE
+# ============================================================
+
+backend/static/img/logo-sygepcpfae.png
+backend/docs/ADMIN_DEPANNAGE.md
+backend/docs/GUIDE_ADMIN_ACTIONS.md
+docs/legal/confidentialite-plateforme-sygep.html
+scripts/transcribe_reunion_cpfae.py
+
+# Workflows Docker hérités de l'ancien environnement SYGEP/QR-Badge.
+# Ils seront remplacés ultérieurement par des workflows INJS-LMD dédiés.
+.github/workflows/docker-hub-channel1.yml
+.github/workflows/docker-hub-main.yml
+
+# Sauvegardes temporaires de fichiers — jamais versionnées
+*.backup-*
+*.backup_*

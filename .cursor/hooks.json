@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": ".cursor/hooks/sync-statistiques-docs.sh"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/sync-statistiques-docs.sh",
+        "matcher": "Manuel utilisateur App Statistiques\\.md$|Fiche de travaux App - Statistiques\\.txt$|backend/statistiques/|Statistiques\\.jsx$"
+      }
+    ]
+  }
+}
