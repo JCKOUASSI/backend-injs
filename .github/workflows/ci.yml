@@ -48,6 +48,11 @@ jobs:
       - name: Installer les dépendances Python
         run: pip install -r backend/requirements.txt
 
+      - name: Collecte des fichiers statiques
+        working-directory: backend
+        run: |
+          python manage.py collectstatic --noinput
+
       - name: Migrations et tests
         working-directory: backend
         run: |
