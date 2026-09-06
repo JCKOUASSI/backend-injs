@@ -3,18 +3,18 @@ Crée (ou met à jour) les comptes utilisateurs pour tous les auditeurs inscrits
 
 Usage typique:
   python manage.py create_auditeur_accounts --dry-run
-  python manage.py create_auditeur_accounts --password OPHIR2025
+  python manage.py create_auditeur_accounts
+  python manage.py create_auditeur_accounts --password 'MotDePasseTemporaire'
 
 Le username est le numéro d'inscription (matricule) de l'auditeur.
-Le mot de passe par défaut est OPHIR2025. L'auditeur devra le changer à la première connexion.
-Le mot de passe est réinitialisé pour les comptes ciblés (sauf si --skip-existing est passé).
+Sans --password, chaque compte reçoit un mot de passe aléatoire unique (envoyé par email).
+Le changement est obligatoire à la première connexion.
 """
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from authentication.badge_accounts import (
-    DEFAULT_BADGE_PASSWORD,
     ensure_auditeur_account,
     provision_auditeur_accounts,
 )
@@ -29,8 +29,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '--password',
-            default=DEFAULT_BADGE_PASSWORD,
-            help=f'Mot de passe à appliquer (défaut: {DEFAULT_BADGE_PASSWORD}).',
+            default=None,
+            help=(
+                'Mot de passe unique à appliquer à tous les comptes. '
+                'Sans cette option, un mot de passe aléatoire est généré par compte.'
+            ),
         )
         parser.add_argument(
             '--dry-run',

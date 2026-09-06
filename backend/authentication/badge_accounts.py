@@ -1,6 +1,8 @@
 """Création automatique des comptes badge (auditeurs / formateurs) et envoi d'email."""
 
 import logging
+import secrets
+import string
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -12,7 +14,20 @@ from .emails import send_welcome_email
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-DEFAULT_BADGE_PASSWORD = 'OPHIR2025'
+_BADGE_PASSWORD_ALPHABET = (
+    string.ascii_letters + string.digits
+).replace('O', '').replace('0', '').replace('l', '').replace('I', '').replace('1', '')
+
+
+def generate_badge_password(length=14):
+    """Mot de passe aléatoire unique (jamais de secret partagé dans le code)."""
+    return ''.join(secrets.choice(_BADGE_PASSWORD_ALPHABET) for _ in range(length))
+
+
+def _resolve_badge_password(password):
+    if password:
+        return password
+    return generate_badge_password()
 
 
 def _send_welcome_email_safe(user, password, *, mobile=False):
@@ -78,7 +93,7 @@ def _formateur_linked_to_user(user):
 def ensure_auditeur_account(
     participant: Participant,
     *,
-    password: str = DEFAULT_BADGE_PASSWORD,
+    password: str | None = None,
     send_email: bool = True,
     skip_existing: bool = False,
     reset_password: bool = False,
@@ -118,6 +133,7 @@ def ensure_auditeur_account(
             participant.user = user
             participant.save(update_fields=['user'])
         else:
+            resolved_password = _resolve_badge_password(password)
             user = User(
                 username=participant.matricule,
                 email=participant.email or '',
@@ -129,12 +145,12 @@ def ensure_auditeur_account(
                 is_active=True,
                 must_change_password=True,
             )
-            user.set_password(password)
+            user.set_password(resolved_password)
             user.save()
             participant.user = user
             participant.save(update_fields=['user'])
             if send_email and user.email:
-                _send_welcome_email_safe(user, password, mobile=True)
+                _send_welcome_email_safe(user, resolved_password, mobile=True)
             return 'created'
 
     user.username = participant.matricule
@@ -146,8 +162,11 @@ def ensure_auditeur_account(
     user.secretariat = participant.secretariat
     user.is_active = True
     if reset_password:
-        user.set_password(password)
+        resolved_password = _resolve_badge_password(password)
+        user.set_password(resolved_password)
         user.must_change_password = True
+        if send_email and user.email:
+            _send_welcome_email_safe(user, resolved_password, mobile=True)
     user.save()
     return 'updated'
 
@@ -155,7 +174,7 @@ def ensure_auditeur_account(
 def ensure_formateur_account(
     formateur: Formateur,
     *,
-    password: str = DEFAULT_BADGE_PASSWORD,
+    password: str | None = None,
     send_email: bool = True,
     skip_existing: bool = False,
     reset_password: bool = False,
@@ -195,6 +214,7 @@ def ensure_formateur_account(
             formateur.user = user
             formateur.save(update_fields=['user'])
         else:
+            resolved_password = _resolve_badge_password(password)
             user = User(
                 username=formateur.numerobadge,
                 email=formateur.email or '',
@@ -205,12 +225,12 @@ def ensure_formateur_account(
                 is_active=True,
                 must_change_password=True,
             )
-            user.set_password(password)
+            user.set_password(resolved_password)
             user.save()
             formateur.user = user
             formateur.save(update_fields=['user'])
             if send_email and user.email:
-                _send_welcome_email_safe(user, password, mobile=True)
+                _send_welcome_email_safe(user, resolved_password, mobile=True)
             return 'created'
 
     user.username = formateur.numerobadge
@@ -221,8 +241,11 @@ def ensure_formateur_account(
     user.matricule = formateur.numerobadge
     user.is_active = True
     if reset_password:
-        user.set_password(password)
+        resolved_password = _resolve_badge_password(password)
+        user.set_password(resolved_password)
         user.must_change_password = True
+        if send_email and user.email:
+            _send_welcome_email_safe(user, resolved_password, mobile=True)
     user.save()
     return 'updated'
 
@@ -230,7 +253,7 @@ def ensure_formateur_account(
 def provision_auditeur_accounts(
     participant_ids,
     *,
-    password: str = DEFAULT_BADGE_PASSWORD,
+    password: str | None = None,
     send_email: bool = True,
     reset_password: bool = False,
     log=None,
@@ -278,7 +301,7 @@ def provision_auditeur_accounts(
 def provision_formateur_accounts(
     formateur_ids,
     *,
-    password: str = DEFAULT_BADGE_PASSWORD,
+    password: str | None = None,
     send_email: bool = True,
     reset_password: bool = False,
     log=None,

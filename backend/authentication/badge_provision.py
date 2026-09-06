@@ -3,7 +3,6 @@
 from formations.models import Formateur, ModuleFormateur, ModuleParticipant, Participant
 
 from .badge_accounts import (
-    DEFAULT_BADGE_PASSWORD,
     _empty_stats,
     ensure_auditeur_account,
     ensure_formateur_account,
@@ -56,7 +55,7 @@ def preview_missing_badge_accounts(formation_id=None, limit=50):
         'auditeurs': list(auditeurs_qs[:limit]),
         'formateurs': list(formateurs_qs[:limit]),
         'preview_limit': limit,
-        'default_password': DEFAULT_BADGE_PASSWORD,
+        'password_mode': 'random_per_account',
     }
 
 
@@ -65,10 +64,14 @@ def provision_missing_badge_accounts(
     formation_id=None,
     include_auditeurs=True,
     include_formateurs=True,
-    password=DEFAULT_BADGE_PASSWORD,
+    password=None,
     send_email=True,
 ):
-    """Crée les comptes User manquants (sans modifier les comptes déjà liés)."""
+    """Crée les comptes User manquants (sans modifier les comptes déjà liés).
+
+    Chaque compte reçoit un mot de passe aléatoire unique (sauf si ``password``
+    est fourni explicitement, ex. commande d'admin).
+    """
     stats = {
         'auditeurs': _empty_stats(),
         'formateurs': _empty_stats(),

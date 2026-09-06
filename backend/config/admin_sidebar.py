@@ -113,10 +113,22 @@ def get_admin_sidebar_navigation():
           'icon': 'phonelink',
           'link': reverse_lazy('admin:presences_devicebinding_changelist'),
         },
+      ],
+    },
+    {
+      'title': _('Paramètres'),
+      'separator': True,
+      'collapsible': True,
+      'items': [
         {
           'title': _('Paramètres finance'),
           'icon': 'payments',
           'link': reverse_lazy('admin:formations_financesettings_changelist'),
+        },
+        {
+          'title': _('Paramètres applicatifs'),
+          'icon': 'settings',
+          'link': reverse_lazy('admin:parametres_parametre_changelist'),
         },
       ],
     },

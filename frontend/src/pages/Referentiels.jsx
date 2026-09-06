@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
@@ -173,6 +173,8 @@ export default function Referentiels() {
   const [editingRow, setEditingRow] = useState(null)
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const importInputRef = useRef(null)
 
   const URL_MAP = {
     formations: '/formations/ref/formations/',
@@ -316,6 +318,43 @@ export default function Referentiels() {
       await loadAll()
       refreshReferentielsCache()
     } catch { showToast('Erreur', 'error') }
+  }
+
+  const handleExport = async () => {
+    setTransferring(true)
+    try {
+      const { blob, fileName } = await api.getBlob(`/formations/ref/excel/${tab}/`)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName || `referentiel_${tab}.xlsx`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      showToast('Impossible de générer le fichier Excel.', 'error')
+    } finally { setTransferring(false) }
+  }
+
+  const handleImport = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      showToast('Sélectionnez un fichier au format .xlsx.', 'error')
+      return
+    }
+    setTransferring(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.post(`/formations/ref/excel/${tab}/`, formData)
+      const { created = 0, updated = 0, processed = 0 } = res.data || {}
+      showToast(`Import terminé : ${processed} ligne(s), ${created} ajoutée(s), ${updated} mise(s) à jour.`)
+      await loadAll()
+      refreshReferentielsCache()
+    } catch (err) {
+      showToast(formatApiErrors(err.response?.data, { fallback: 'Import Excel impossible.' }), 'error')
+    } finally { setTransferring(false) }
   }
 
   const defaultForm = (t) => {
@@ -645,9 +684,18 @@ export default function Referentiels() {
 
       {/* Content */}
       <div className="card">
-        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
           <span><i className={`bi ${currentTab?.icon} me-2`}></i>{currentTab?.label}</span>
-          <span className="text-muted small">{rows.length} entrée{rows.length !== 1 ? 's' : ''}</span>
+          <div className="d-flex align-items-center gap-2">
+            <input ref={importInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="d-none" onChange={handleImport} />
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => importInputRef.current?.click()} disabled={transferring} title="Importer un fichier Excel">
+              <i className="bi bi-upload me-1"></i>Importer
+            </button>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleExport} disabled={transferring} title="Exporter au format Excel">
+              <i className="bi bi-download me-1"></i>Exporter
+            </button>
+            <span className="text-muted small">{rows.length} entrée{rows.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
         <div className="card-body" style={{ padding: 0 }}>
           {loading ? (

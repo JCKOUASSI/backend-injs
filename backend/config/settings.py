@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     'suiviEvaluation',
     'scolarite.apps.ScolariteConfig',
     'admissions.apps.AdmissionsConfig',
+    'parametres.apps.ParametresConfig',
 ]
 
 MIDDLEWARE = [

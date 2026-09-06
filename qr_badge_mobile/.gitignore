@@ -1,6 +1,6 @@
-# Secrets / surcharge locale (l’app charge surtout assets/app.env versionné)
+# Secrets / configuration locale — NE JAMAIS versionner
 .env
-
+assets/app.env
 # Miscellaneous
 *.class
 *.log

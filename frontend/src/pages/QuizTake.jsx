@@ -535,14 +535,14 @@ export default function QuizTake() {
       showToast(err?.response?.data?.detail || 'Erreur chargement quiz', 'error')
       navigate('/quiz')
     } finally { setLoading(false) }
-  }, [id, isAuditeur])
+  }, [id, isÉtudiant])
 
   useEffect(() => { fetchQuiz() }, [fetchQuiz])
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (!quiz) return null
 
-  return isAuditeur
+  return isÉtudiant
     ? <QuizPassage quiz={quiz} />
     : <QuizEdit quiz={quiz} onRefresh={fetchQuiz} />
 }

@@ -83,6 +83,7 @@ urlpatterns = [
     # Référentiels (listes déroulantes)
     path('referentiels/', api_views.referentiels_api, name='api-referentiels'),
     path('referentiels/gestion/', api_views.referentiels_gestion_api, name='api-referentiels-gestion'),
+    path('ref/excel/<str:kind>/', api_views.referentiel_excel_api, name='api-referentiel-excel'),
 
     # Référentiels CRUD
     path('ref/formations/', api_views.ref_formation_list, name='api-ref-formation-list'),

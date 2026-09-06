@@ -9,7 +9,6 @@ from django.views.decorators.http import require_http_methods
 
 from admin_mixins import admin_user_has_global_access, log_admin_audit
 
-from .badge_accounts import DEFAULT_BADGE_PASSWORD
 from .badge_provision import preview_missing_badge_accounts, provision_missing_badge_accounts
 from .role_groups import user_has_perm
 from presences.models import AuditLog
@@ -52,7 +51,6 @@ def provision_badge_accounts_view(request):
                 formation_id=formation_id,
                 include_auditeurs=include_auditeurs,
                 include_formateurs=include_formateurs,
-                password=DEFAULT_BADGE_PASSWORD,
                 send_email=True,
             )
             aud = result['auditeurs']

@@ -8,6 +8,7 @@ from datetime import timedelta, datetime, time, date
 import calendar
 import re
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.db.models import Count, Q, F, Prefetch, Case, When, Value, IntegerField
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -83,6 +84,11 @@ from .serializers import (
     QRTokenSerializer,
 )
 from .qr_helpers import get_session_for_qr
+from .referentiels_excel import (
+    ReferentielExcelError,
+    export_referentiel_xlsx,
+    import_referentiel_xlsx,
+)
 
 
 def _normalize_groupe_value(value):
@@ -4827,6 +4833,33 @@ def referentiels_gestion_api(request):
         )),
         'types_secretariat': list(RefTypeSecretariat.objects.order_by('libelle').values('id', 'libelle', 'actif')),
     })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsDFRC])
+@parser_classes([MultiPartParser])
+def referentiel_excel_api(request, kind):
+    """Télécharge ou importe un classeur .xlsx pour un référentiel."""
+    if request.method == 'GET':
+        try:
+            content = export_referentiel_xlsx(kind)
+        except ReferentielExcelError as exc:
+            return Response({'detail': str(exc)}, status=404)
+        response = HttpResponse(
+            content,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="referentiel_{kind}.xlsx"'
+        return response
+
+    uploaded = request.FILES.get('file')
+    if not uploaded or not uploaded.name.lower().endswith('.xlsx'):
+        return Response({'detail': 'Sélectionnez un fichier Excel au format .xlsx.'}, status=400)
+    try:
+        result = import_referentiel_xlsx(kind, uploaded)
+    except ReferentielExcelError as exc:
+        return Response({'detail': str(exc)}, status=400)
+    return Response(result)
 
 
 @api_view(['GET', 'POST'])
