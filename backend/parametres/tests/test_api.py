@@ -184,12 +184,14 @@ class ParametresSocleEdgeCaseTests(TestCase):
         self.client.force_authenticate(user)
         return user
 
-    def test_parametre_inactif_non_modifiable(self):
+    def test_parametre_inactif_invisible_et_non_modifiable(self):
+        # Contrat réel du ViewSet : get_queryset filtre actif=True par défaut
+        # → un paramètre désactivé disparaît (404), donc non modifiable.
         self._admin()
         self.param.actif = False
         self.param.save(update_fields=['actif'])
         res = self.client.patch(self.url, {'valeur': 'pirate'})
-        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
         self.param.refresh_from_db()
         self.assertEqual(self.param.valeur, 'initial')
         self.assertFalse(ParametreHistorique.objects.filter(parametre=self.param).exists())
@@ -223,11 +225,12 @@ class ParametresSocleEdgeCaseTests(TestCase):
         self.assertIsNone(Parametre.get_by_cle('cle_inexistante'))
         self.assertEqual(Parametre.get_by_cle('cle_inexistante', 'defaut'), 'defaut')
 
-    def test_patch_vide_ne_cree_pas_historique(self):
+    def test_patch_vide_rejete_sans_historique(self):
+        # Contrat réel du serializer : un PATCH sans champ modifiable → 400.
         self._admin()
         before = ParametreHistorique.objects.filter(parametre=self.param).count()
         res = self.client.patch(self.url, {})
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             ParametreHistorique.objects.filter(parametre=self.param).count(),
             before,
