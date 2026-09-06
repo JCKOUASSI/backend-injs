@@ -155,3 +155,80 @@ class ParametresAPIAccessTests(TestCase):
         p.refresh_from_db()
         self.assertEqual(p.valeur, '90')
         self.assertTrue(ParametreHistorique.objects.filter(parametre=p, nouvelle_valeur='90').exists())
+
+
+class ParametresSocleEdgeCaseTests(TestCase):
+    """Compléments L0/L7 : cas limites du cycle de vie et de l'audit."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.param = Parametre.objects.create(
+            cle='test_edge',
+            libelle='Cas limite',
+            categorie='general',
+            type='text',
+            valeur='initial',
+            valeur_defaut='initial',
+            modifiable=True,
+            modifiable_par_roles='["ADMIN"]',
+            lecturable_par_roles='["ADMIN", "SECRETARIAT"]',
+            actif=True,
+        )
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = f'/api/parametres/{self.param.pk}/'
+
+    def _admin(self):
+        user = make_user('admin_edge', role='ADMIN')
+        self.client.force_authenticate(user)
+        return user
+
+    def test_parametre_inactif_non_modifiable(self):
+        self._admin()
+        self.param.actif = False
+        self.param.save(update_fields=['actif'])
+        res = self.client.patch(self.url, {'valeur': 'pirate'})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.param.refresh_from_db()
+        self.assertEqual(self.param.valeur, 'initial')
+        self.assertFalse(ParametreHistorique.objects.filter(parametre=self.param).exists())
+
+    def test_adresse_ip_enregistree_dans_historique(self):
+        admin = self._admin()
+        res = self.client.patch(self.url, {'valeur': 'avec-ip'})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        hist = ParametreHistorique.objects.filter(parametre=self.param).latest('modifie_le')
+        self.assertEqual(hist.nouvelle_valeur, 'avec-ip')
+        self.assertEqual(hist.modifie_par, admin)
+        # TestClient → '127.0.0.1' ; l'important est la présence du champ renseigné.
+        self.assertTrue(hist.adresse_ip)
+
+    def test_motif_modification_persiste(self):
+        self._admin()
+        motif = 'Mise à jour réglementaire INJS'
+        self.client.patch(self.url, {'valeur': 'm2', 'motif_modification': motif})
+        hist = ParametreHistorique.objects.filter(parametre=self.param).latest('modifie_le')
+        self.assertEqual(hist.motif_modification, motif)
+
+    def test_ancienne_valeur_conservee(self):
+        self._admin()
+        self.client.patch(self.url, {'valeur': 'apres'})
+        hist = ParametreHistorique.objects.filter(parametre=self.param).latest('modifie_le')
+        self.assertEqual(hist.ancienne_valeur, 'initial')
+        self.assertEqual(hist.nouvelle_valeur, 'apres')
+
+    def test_get_by_cle_helper(self):
+        self.assertEqual(Parametre.get_by_cle('test_edge'), self.param)
+        self.assertIsNone(Parametre.get_by_cle('cle_inexistante'))
+        self.assertEqual(Parametre.get_by_cle('cle_inexistante', 'defaut'), 'defaut')
+
+    def test_patch_vide_ne_cree_pas_historique(self):
+        self._admin()
+        before = ParametreHistorique.objects.filter(parametre=self.param).count()
+        res = self.client.patch(self.url, {})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            ParametreHistorique.objects.filter(parametre=self.param).count(),
+            before,
+        )
