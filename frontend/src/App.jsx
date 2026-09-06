@@ -66,6 +66,8 @@ const AdmissionsPage = lazy(() => import('./pages/scolarite/Admissions'))
 const Inscriptions = lazy(() => import('./pages/scolarite/Inscriptions'))
 const FicheEtudiant = lazy(() => import('./pages/scolarite/FicheEtudiant'))
 const GroupesPedagogiques = lazy(() => import('./pages/scolarite/Groupes'))
+const Maquettes = lazy(() => import('./pages/scolarite/Maquettes'))
+const MaquetteDetail = lazy(() => import('./pages/scolarite/MaquetteDetail'))
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -490,6 +492,24 @@ function App() {
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Groupes</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <GroupesPedagogiques />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/maquettes" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Maquettes LMD</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Maquettes />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/maquettes/:id" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li><Link to="/scolarite/maquettes">Maquettes LMD</Link></li><li className="separator">/</li><li>Détail</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <MaquetteDetail />
                 </Suspense>
               </Layout>
             </ProtectedRoute>

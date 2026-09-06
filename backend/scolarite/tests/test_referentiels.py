@@ -228,15 +228,18 @@ class MaquetteAPITests(TestCase):
         cls.formation = RefFormation.objects.create(intitule='LICENCE STAPS')
         cls.niveau = Niveau.objects.create(code='L1', libelle='Licence 1', ordre=1)
         cls.semestre = Semestre.objects.create(niveau=cls.niveau, numero=1, libelle='S1')
+        # Lot L1 (R4) : les UE/ECUE sont créées AVANT l'activation — une
+        # maquette ACTIVE est immuable.
         cls.maquette = Maquette.objects.create(
             annee_academique=cls.annee, ref_formation=cls.formation, niveau=cls.niveau,
-            statut=Maquette.Statut.ACTIVE,
         )
         ue = UE.objects.create(
             maquette=cls.maquette, semestre=cls.semestre,
             code='UE11', intitule='Sciences du mouvement', credits=6,
         )
         ECUE.objects.create(ue=ue, code='ECUE111', intitule='Anatomie', credits=3, volume_cm=20)
+        cls.maquette.statut = Maquette.Statut.ACTIVE
+        cls.maquette.save()
 
     def setUp(self):
         self.client = APIClient()

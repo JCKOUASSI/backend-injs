@@ -45,7 +45,6 @@ class ExportEDTFixture:
         )
         maquette = Maquette.objects.create(
             annee_academique=cls.annee, ref_formation=cls.formation, niveau=cls.niveau,
-            statut=Maquette.Statut.ACTIVE,
         )
         ue = UE.objects.create(
             maquette=maquette, semestre=cls.semestre, code='UE11',
@@ -57,6 +56,9 @@ class ExportEDTFixture:
         ECUE.objects.create(
             ue=ue, code='ECUE112', intitule='Pratique', credits=3, volume_tp=30,
         )
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        maquette.statut = Maquette.Statut.ACTIVE
+        maquette.save()
 
     def setUp(self):
         self.acteur = make_user('agent_edt')

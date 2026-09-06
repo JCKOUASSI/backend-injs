@@ -213,13 +213,15 @@ class PropagationPedagogiqueTests(GroupeFixture, TestCase):
         super().setUp()
         maquette = Maquette.objects.create(
             annee_academique=self.annee, ref_formation=self.formation, niveau=self.niveau,
-            statut=Maquette.Statut.ACTIVE,
         )
         semestre = Semestre.objects.create(niveau=self.niveau, numero=1, libelle='S1')
         ue = UE.objects.create(
             maquette=maquette, semestre=semestre, code='UE11', intitule='Bases', credits=6,
         )
         ECUE.objects.create(ue=ue, code='ECUE111', intitule='Anatomie', credits=6, volume_cm=30)
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        maquette.statut = Maquette.Statut.ACTIVE
+        maquette.save()
         pedagogie_services.generer_inscriptions_pedagogiques(self.inscription)
 
     def test_le_groupe_se_propage_aux_inscriptions_pedagogiques(self):

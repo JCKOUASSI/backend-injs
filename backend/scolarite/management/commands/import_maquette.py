@@ -250,6 +250,14 @@ class Command(BaseCommand):
         except _Annulation:
             return
 
+        # Lot L1 (R4) : l'activation est différée — les maquettes sont créées
+        # en BROUILLON puis passées ACTIVE une fois UE/ECUE en place, car une
+        # maquette validée/active est immuable.
+        if options['activer']:
+            for maquette in resume['maquettes']:
+                maquette.statut = Maquette.Statut.ACTIVE
+                maquette.save()
+
         self._afficher(resume, simule=False)
 
     def _importer(self, lignes, options):
@@ -361,7 +369,6 @@ class Command(BaseCommand):
             compteurs['ecue'] += 1
 
     def _maquette(self, annee, formation, parcours, niveau, options):
-        statut = Maquette.Statut.ACTIVE if options['activer'] else Maquette.Statut.BROUILLON
         filtre = {
             'annee_academique': annee,
             'ref_formation': formation,
@@ -378,15 +385,27 @@ class Command(BaseCommand):
             )
             version = (derniere or 0) + 1
 
-        maquette, _ = Maquette.objects.update_or_create(
+        # Lot L1 (R4) : une maquette validée/active/archivée est immuable —
+        # le réimport est refusé ; il faut créer une nouvelle version.
+        existante = Maquette.objects.filter(**filtre, version=version).first()
+        if existante is not None:
+            if existante.statut in Maquette.STATUTS_VERROUILLES:
+                raise CommandError(
+                    f'Maquette {existante} verrouillée ({existante.statut}) : réimport refusé. '
+                    'Utilisez --version pour créer une nouvelle version.'
+                )
+            existante.libelle = f'{formation.intitule} – {niveau.code}'
+            existante.save()
+            return existante
+
+        # L'import crée toujours en BROUILLON : l'activation éventuelle
+        # (--activer) est appliquée après création des UE/ECUE (cf. handle).
+        return Maquette.objects.create(
             **filtre,
             version=version,
-            defaults={
-                'statut': statut,
-                'libelle': f'{formation.intitule} – {niveau.code}',
-            },
+            statut=Maquette.Statut.BROUILLON,
+            libelle=f'{formation.intitule} – {niveau.code}',
         )
-        return maquette
 
     def _afficher(self, resume, simule):
         entete = 'Simulation (aucune écriture)' if simule else 'Import terminé'

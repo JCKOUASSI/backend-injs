@@ -58,6 +58,18 @@ urlpatterns = [
     path('maquettes/<int:pk>/',                   api_views.maquette_detail,         name='scolarite-maquette-detail'),
     path('maquettes/<int:pk>/semestres/<int:semestre_id>/ecues/',
          api_views.maquette_ecues_semestre,                                          name='scolarite-maquette-ecues'),
+    # Lot L1 — écriture et workflow des maquettes (R4)
+    path('maquettes/creer/',                      api_views.maquette_create,         name='scolarite-maquette-create'),
+    path('maquettes/<int:pk>/modifier/',          api_views.maquette_update,         name='scolarite-maquette-update'),
+    path('maquettes/<int:pk>/valider/',           api_views.maquette_valider,        name='scolarite-maquette-valider'),
+    path('maquettes/<int:pk>/activer/',           api_views.maquette_activer,        name='scolarite-maquette-activer'),
+    path('maquettes/<int:pk>/archiver/',          api_views.maquette_archiver,       name='scolarite-maquette-archiver'),
+    path('maquettes/<int:pk>/cloner/',            api_views.maquette_cloner,         name='scolarite-maquette-cloner'),
+    path('maquettes/<int:pk>/journal/',           api_views.maquette_journal,        name='scolarite-maquette-journal'),
+    path('maquettes/<int:pk>/ues/',               api_views.maquette_ue_create,      name='scolarite-maquette-ue-create'),
+    path('ues/<int:pk>/',                         api_views.ue_detail,               name='scolarite-ue-detail'),
+    path('ues/<int:pk>/ecues/',                   api_views.ue_ecue_create,          name='scolarite-ue-ecue-create'),
+    path('ecues/<int:pk>/',                       api_views.ecue_detail,             name='scolarite-ecue-detail'),
 
     path('ref/<str:ressource>/',                  api_views.referentiel_list,        name='scolarite-ref-list'),
     path('ref/<str:ressource>/<int:pk>/',         api_views.referentiel_detail,      name='scolarite-ref-detail'),

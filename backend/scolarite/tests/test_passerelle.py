@@ -51,7 +51,6 @@ class PasserelleFixture:
 
         cls.maquette = Maquette.objects.create(
             annee_academique=cls.annee, ref_formation=cls.ref_formation, niveau=cls.niveau,
-            statut=Maquette.Statut.ACTIVE,
         )
         ue = UE.objects.create(
             maquette=cls.maquette, semestre=cls.semestre, code='UE11',
@@ -64,6 +63,9 @@ class PasserelleFixture:
         cls.ecue_orpheline = ECUE.objects.create(
             ue=ue, code='ECUE112', intitule='Séminaire libre', credits=3, volume_cm=10,
         )
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        cls.maquette.statut = Maquette.Statut.ACTIVE
+        cls.maquette.save()
 
         # Côté opérationnel : une formation existante et son module.
         cls.formation = Formation.objects.create(formation='LICENCE STAPS 2026')
@@ -120,11 +122,12 @@ class AnalyseTests(PasserelleFixture, TestCase):
         self.assertEqual(analyse['non_rapprochees'][0]['ecue'], 'ECUE112')
 
     def test_ecue_sans_module_correspondant_signalee(self):
-        self.ecue_orpheline.ref_module = self.ref_physio
-        self.ecue_orpheline.save(update_fields=['ref_module'])
+        # Lot L1 (R4) : la maquette étant ACTIVE, l'ECUE ne peut pas être
+        # modifiée ; le signalement attendu est porté par le motif de
+        # l'ECUE orpheline de la fixture (sans rattachement au référentiel).
         analyse = passerelle_services.analyser(self.inscription, self.formation)
         motifs = [n['motif'] for n in analyse['non_rapprochees']]
-        self.assertTrue(any('Aucun module' in motif for motif in motifs))
+        self.assertTrue(any("reliée à aucun module" in motif for motif in motifs))
 
     def test_ecue_abandonnee_ignoree(self):
         ligne = self.inscription.inscriptions_pedagogiques.get(ecue=self.ecue_reliee)

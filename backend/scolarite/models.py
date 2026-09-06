@@ -8,6 +8,7 @@ l'app ``formations`` (RefFormation, RefVague, RefSite, RefModule) par clé
 
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -543,6 +544,12 @@ class InscriptionPedagogique(models.Model):
     Rattachée à l'inscription administrative, qui porte déjà l'étudiant, l'année,
     la formation, le parcours et le niveau : ces informations ne sont pas
     dupliquées ici.
+
+    Lot L1 — dénormalisation documentée : le ``semestre`` est porté par la ligne
+    d'inscription pédagogique (et non déduit de l'ECUE → UE → semestre) afin de
+    préserver la trace du semestre réellement suivi au moment de l'inscription,
+    même si la version de maquette applicable évolue ensuite (l'ECUE reste
+    rattachée à sa version d'origine ; les nouvelles versions sont des clones).
     """
 
     class TypeEnseignement(models.TextChoices):
@@ -618,6 +625,7 @@ class Maquette(models.Model):
 
     class Statut(models.TextChoices):
         BROUILLON = 'BROUILLON', 'Brouillon'
+        VALIDEE = 'VALIDEE', 'Validée'
         ACTIVE = 'ACTIVE', 'Active'
         ARCHIVEE = 'ARCHIVEE', 'Archivée'
 
@@ -635,6 +643,18 @@ class Maquette(models.Model):
     version = models.PositiveSmallIntegerField(default=1)
     statut = models.CharField(max_length=20, choices=Statut.choices, default=Statut.BROUILLON)
     libelle = models.CharField(max_length=255, blank=True)
+    # Lot L1 — traçabilité du workflow de validation
+    validee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='maquettes_validees',
+    )
+    validee_le = models.DateTimeField(null=True, blank=True)
+    activee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='maquettes_activees',
+    )
+    activee_le = models.DateTimeField(null=True, blank=True)
+    commentaire_validation = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -648,6 +668,54 @@ class Maquette(models.Model):
         if self.parcours_id and self.ref_formation_id and self.parcours.ref_formation_id != self.ref_formation_id:
             raise ValidationError({'parcours': "Le parcours n'appartient pas à cette formation."})
 
+    # ── Lot L1 — garde-fou R4 : immutabilité des maquettes abouties ───────────
+    STATUTS_VERROUILLES = (Statut.VALIDEE, Statut.ACTIVE, Statut.ARCHIVEE)
+    # Transitions de statut autorisées une fois la maquette validée.
+    TRANSITIONS_AUTORISEES = {
+        (Statut.VALIDEE, Statut.ACTIVE),
+        (Statut.VALIDEE, Statut.ARCHIVEE),
+        (Statut.ACTIVE, Statut.ARCHIVEE),
+    }
+
+    def _verifier_immunabilite(self):
+        """R4 : à partir du statut VALIDEE, le contenu pédagogique est gelé.
+
+        Seules les transitions de statut du workflow (validation → activation
+        → archivage) sont permises. Toute autre modification impose de créer
+        une nouvelle version (clonage).
+        """
+        ancienne = Maquette.objects.filter(pk=self.pk).first()
+        if ancienne is None or ancienne.statut not in self.STATUTS_VERROUILLES:
+            return
+        fk_att = (
+            ('annee_academique', 'annee_academique_id'),
+            ('ref_formation', 'ref_formation_id'),
+            ('parcours', 'parcours_id'),
+            ('niveau', 'niveau_id'),
+        )
+        modifiees = [
+            nom for nom, att in fk_att
+            if getattr(self, att) != getattr(ancienne, att)
+        ] + [
+            nom for nom in ('libelle', 'commentaire_validation', 'version')
+            if getattr(self, nom) != getattr(ancienne, nom)
+        ]
+        if modifiees:
+            raise ValidationError(
+                f"Maquette {ancienne.get_statut_display().lower()} (v{ancienne.version}) "
+                f"immuable : champs protégés modifiés ({', '.join(modifiees)}). "
+                "Créez une nouvelle version par clonage."
+            )
+        if (ancienne.statut, self.statut) != (ancienne.statut, ancienne.statut) \
+                and (ancienne.statut, self.statut) not in self.TRANSITIONS_AUTORISEES:
+            raise ValidationError(
+                f"Transition de statut non autorisée : {ancienne.statut} → {self.statut}."
+            )
+
+    def save(self, *args, **kwargs):
+        self._verifier_immunabilite()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         base = self.libelle or f'{self.ref_formation} / {self.niveau}'
         return f'{base} – {self.annee_academique} (v{self.version})'
@@ -655,6 +723,120 @@ class Maquette(models.Model):
     @property
     def credits_total(self):
         return sum(ue.credits for ue in self.unites_enseignement.all())
+
+    # ── Lot L1 — contrôles de cohérence LMD ───────────────────────────────────
+    @property
+    def volume_horaire_total(self):
+        """Volume horaire total calculé (somme CM + TD + TP de toutes les ECUE)."""
+        return sum(
+            ecue.volume_total
+            for ue in self.unites_enseignement.all()
+            for ecue in ue.ecues.all()
+        )
+
+    def verifier_coherence(self):
+        """Contrôles de cohérence — retourne la liste des problèmes (vide = cohérente)."""
+        problemes = []
+        ues = list(
+            self.unites_enseignement.select_related('semestre').prefetch_related('ecues')
+        )
+        if not ues:
+            problemes.append("Maquette incomplète : aucune unité d'enseignement.")
+            return problemes
+        ref_modules_vus = {}
+        for ue in ues:
+            ecues = list(ue.ecues.all())
+            if not ecues:
+                problemes.append(f"UE {ue.code} : maquette incomplète (aucune ECUE).")
+            if ue.credits <= 0:
+                problemes.append(f"UE {ue.code} : crédits ECTS non renseignés.")
+            if ecues:
+                somme_ecue = sum(e.credits for e in ecues)
+                if somme_ecue != ue.credits:
+                    problemes.append(
+                        f"UE {ue.code} : la somme des crédits ECUE ({somme_ecue}) "
+                        f"ne correspond pas aux crédits de l'UE ({ue.credits})."
+                    )
+            for ecue in ecues:
+                if ecue.credits <= 0:
+                    problemes.append(f"ECUE {ecue.code} : crédits ECTS non renseignés.")
+                if ecue.coefficient <= 0:
+                    problemes.append(f"ECUE {ecue.code} : coefficient invalide.")
+                if ecue.archive:
+                    problemes.append(
+                        f"ECUE {ecue.code} archivée : une ECUE archivée ne peut pas "
+                        "figurer dans une maquette applicable."
+                    )
+                if ecue.ref_module_id:
+                    deja_vu = ref_modules_vus.get(ecue.ref_module_id)
+                    if deja_vu:
+                        problemes.append(
+                            f"Module {ecue.ref_module_id} rattaché deux fois dans la "
+                            f"maquette (ECUE {deja_vu} et {ecue.code})."
+                        )
+                    else:
+                        ref_modules_vus[ecue.ref_module_id] = ecue.code
+        return problemes
+
+    # ── Lot L1 — clonage de version (correctif d'une maquette aboutie) ────────
+    def cloner(self, utilisateur=None):
+        """Crée une nouvelle version BROUILLON copiée de cette maquette.
+
+        Les instances UE/ECUE ne sont jamais réutilisées : chaque ligne est
+        recopiée. Les ECUE archivées ne sont pas copiées (elles ne peuvent pas
+        entrer dans une nouvelle maquette). Les inscriptions pédagogiques
+        existantes restent rattachées à cette version (ECUE en PROTECT).
+        """
+        derniere = (
+            Maquette.objects.filter(
+                annee_academique=self.annee_academique,
+                ref_formation=self.ref_formation,
+                parcours=self.parcours,
+                niveau=self.niveau,
+            ).order_by('-version').values_list('version', flat=True).first()
+            or 0
+        )
+        clone = Maquette.objects.create(
+            annee_academique=self.annee_academique,
+            ref_formation=self.ref_formation,
+            parcours=self.parcours,
+            niveau=self.niveau,
+            version=derniere + 1,
+            statut=self.Statut.BROUILLON,
+            libelle=self.libelle,
+        )
+        for ue in self.unites_enseignement.prefetch_related('ecues'):
+            nouvelle_ue = UE.objects.create(
+                maquette=clone,
+                semestre=ue.semestre,
+                code=ue.code,
+                intitule=ue.intitule,
+                credits=ue.credits,
+                caractere=ue.caractere,
+                ordre=ue.ordre,
+            )
+            for ecue in ue.ecues.all():
+                if ecue.archive:
+                    continue
+                ECUE.objects.create(
+                    ue=nouvelle_ue,
+                    code=ecue.code,
+                    intitule=ecue.intitule,
+                    credits=ecue.credits,
+                    coefficient=ecue.coefficient,
+                    volume_cm=ecue.volume_cm,
+                    volume_td=ecue.volume_td,
+                    volume_tp=ecue.volume_tp,
+                    ref_module=ecue.ref_module,
+                    ordre=ecue.ordre,
+                )
+        MaquetteJournal.objects.create(
+            maquette=clone,
+            action=MaquetteJournal.Action.CLONAGE,
+            utilisateur=utilisateur,
+            detail={'source_id': self.pk, 'source_version': self.version},
+        )
+        return clone
 
 
 class UE(models.Model):
@@ -686,6 +868,23 @@ class UE(models.Model):
     def __str__(self):
         return f'{self.code} – {self.intitule}'
 
+    # ── Lot L1 — R4 : une UE suit l'immutabilité de sa maquette ──
+    def _verifier_maquette_modifiable(self):
+        if self.maquette_id and self.maquette.statut in Maquette.STATUTS_VERROUILLES:
+            raise ValidationError(
+                f"Maquette {self.maquette.statut.lower()} (v{self.maquette.version}) "
+                f"immuable : l'UE {self.code} ne peut plus être modifiée. "
+                "Créez une nouvelle version de la maquette (clonage)."
+            )
+
+    def save(self, *args, **kwargs):
+        self._verifier_maquette_modifiable()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self._verifier_maquette_modifiable()
+        return super().delete(*args, **kwargs)
+
 
 class ECUE(models.Model):
     """Élément constitutif d'une UE. Passerelle possible vers un RefModule opérationnel."""
@@ -709,6 +908,8 @@ class ECUE(models.Model):
             "aux modules à partir des inscriptions pédagogiques."
         ),
     )
+    # Lot L1 — une ECUE archivée ne peut pas entrer dans une nouvelle maquette
+    archive = models.BooleanField(default=False, db_index=True)
     ordre = models.PositiveSmallIntegerField(default=1)
 
     class Meta:
@@ -725,3 +926,54 @@ class ECUE(models.Model):
     @property
     def volume_total(self):
         return self.volume_cm + self.volume_td + self.volume_tp
+
+    # ── Lot L1 — R4 : une ECUE suit l'immutabilité de sa maquette ──
+    def _verifier_maquette_modifiable(self):
+        statut = self.ue.maquette.statut if self.ue_id and self.ue.maquette_id else None
+        if statut in Maquette.STATUTS_VERROUILLES:
+            raise ValidationError(
+                f"Maquette {statut.lower()} immuable : l'ECUE {self.code} ne peut "
+                "plus être modifiée. Créez une nouvelle version de la maquette."
+            )
+
+    def save(self, *args, **kwargs):
+        self._verifier_maquette_modifiable()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        self._verifier_maquette_modifiable()
+        return super().delete(*args, **kwargs)
+
+
+class MaquetteJournal(models.Model):
+    """Lot L1 — historique des validations et changements d'état d'une maquette."""
+
+    class Action(models.TextChoices):
+        CREATION = 'CREATION', 'Création'
+        MODIFICATION = 'MODIFICATION', 'Modification'
+        VALIDATION = 'VALIDATION', 'Validation'
+        ACTIVATION = 'ACTIVATION', 'Activation'
+        ARCHIVAGE = 'ARCHIVAGE', 'Archivage'
+        CLONAGE = 'CLONAGE', 'Clonage'
+
+    maquette = models.ForeignKey(
+        Maquette, on_delete=models.CASCADE, related_name='journal',
+    )
+    action = models.CharField(max_length=20, choices=Action.choices, db_index=True)
+    utilisateur = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='actions_maquettes',
+    )
+    horodatage = models.DateTimeField(auto_now_add=True, db_index=True)
+    detail = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-horodatage']
+        verbose_name = 'LMD – Journal de maquette'
+        verbose_name_plural = 'LMD – Journaux de maquette'
+        indexes = [
+            models.Index(fields=['maquette', 'horodatage'], name='maqjournal_maq_date_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.action} – maquette #{self.maquette_id} @ {self.horodatage:%Y-%m-%d %H:%M}'

@@ -7,6 +7,7 @@ explicites, filtrage manuel via ``request.query_params``.
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Sum
 from django.db.models.deletion import ProtectedError
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
@@ -18,6 +19,7 @@ from .models import (
     ECUE,
     Groupe,
     Maquette,
+    MaquetteJournal,
     Niveau,
     Parcours,
     RegimeEtudes,
@@ -26,6 +28,7 @@ from .models import (
     TypeFormation,
     UE,
 )
+from formations.models import RefModule
 
 # Champs exposés et acceptés en écriture pour chaque référentiel simple.
 REFERENTIEL_FIELDS = {
@@ -293,3 +296,307 @@ def maquette_ecues_semestre(request, pk, semestre_id):
         {**_serialize_ecue(ecue), 'ue_id': ecue.ue_id, 'ue_code': ecue.ue.code}
         for ecue in ecues
     ])
+
+
+# ── Lot L1 — écriture et workflow des maquettes (garde-fou R4) ────────────────
+
+
+def _journaliser_maquette(maquette, action, utilisateur, detail=None):
+    MaquetteJournal.objects.create(
+        maquette=maquette, action=action, utilisateur=utilisateur, detail=detail,
+    )
+
+
+def _serializer_maquette(maquette):
+    return {
+        'id': maquette.id,
+        'libelle': str(maquette),
+        'annee_academique_id': maquette.annee_academique_id,
+        'ref_formation_id': maquette.ref_formation_id,
+        'parcours_id': maquette.parcours_id,
+        'niveau_id': maquette.niveau_id,
+        'version': maquette.version,
+        'statut': maquette.statut,
+        'validee_par': maquette.validee_par_id,
+        'validee_le': maquette.validee_le,
+        'activee_par': maquette.activee_par_id,
+        'activee_le': maquette.activee_le,
+        'commentaire_validation': maquette.commentaire_validation,
+        'credits_total': maquette.credits_total,
+        'volume_horaire_total': str(maquette.volume_horaire_total),
+        'problemes_coherence': maquette.verifier_coherence(),
+    }
+
+
+def _get_maquette(pk):
+    return Maquette.objects.filter(pk=pk).first()
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_create(request):
+    """Création d'une maquette BROUILLON (v1, ou version suivante si existante)."""
+    annee_id = request.data.get('annee_academique_id')
+    formation_id = request.data.get('ref_formation_id')
+    niveau_id = request.data.get('niveau_id')
+    if not (annee_id and formation_id and niveau_id):
+        return Response(
+            {'error': 'annee_academique_id, ref_formation_id et niveau_id sont requis.'},
+            status=400,
+        )
+    filtre = {
+        'annee_academique_id': annee_id,
+        'ref_formation_id': formation_id,
+        'parcours_id': request.data.get('parcours_id'),
+        'niveau_id': niveau_id,
+    }
+    derniere = (
+        Maquette.objects.filter(**filtre)
+        .order_by('-version').values_list('version', flat=True).first() or 0
+    )
+    maquette = Maquette(
+        **filtre, version=derniere + 1, libelle=request.data.get('libelle', ''),
+    )
+    try:
+        maquette.full_clean(exclude=['libelle'])
+        maquette.save()
+    except ValidationError as exc:
+        return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'error': exc.messages}, status=400)
+    _journaliser_maquette(maquette, MaquetteJournal.Action.CREATION, request.user)
+    return Response(_serializer_maquette(maquette), status=201)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_update(request, pk):
+    """Édition des champs de tête — maquette BROUILLON uniquement (R4)."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut != Maquette.Statut.BROUILLON:
+        return Response(
+            {'error': f'Maquette {maquette.statut.lower()} immuable : créez une nouvelle version (clonage).'},
+            status=400,
+        )
+    for champ in ('libelle', 'commentaire_validation', 'parcours_id'):
+        if champ in request.data:
+            setattr(maquette, champ, request.data[champ])
+    try:
+        maquette.full_clean(exclude=['libelle'])
+        maquette.save()
+    except ValidationError as exc:
+        return Response(exc.message_dict if hasattr(exc, 'message_dict') else {'error': exc.messages}, status=400)
+    _journaliser_maquette(maquette, MaquetteJournal.Action.MODIFICATION, request.user)
+    return Response(_serializer_maquette(maquette))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_valider(request, pk):
+    """BROUILLON → VALIDEE : exige une maquette complète et cohérente."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut != Maquette.Statut.BROUILLON:
+        return Response({'error': f'Validation impossible : statut {maquette.statut}.'}, status=400)
+    problemes = maquette.verifier_coherence()
+    if problemes:
+        return Response({'error': 'Maquette incomplète ou incohérente.', 'problemes': problemes}, status=400)
+    maquette.statut = Maquette.Statut.VALIDEE
+    maquette.validee_par = request.user
+    maquette.validee_le = timezone.now()
+    maquette.commentaire_validation = request.data.get('commentaire', '')
+    maquette.save()
+    _journaliser_maquette(
+        maquette, MaquetteJournal.Action.VALIDATION, request.user,
+        {'commentaire': maquette.commentaire_validation},
+    )
+    return Response(_serializer_maquette(maquette))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsDFRC])
+def maquette_activer(request, pk):
+    """VALIDEE → ACTIVE — réservé DFRC ; la cohérence est revérifiée."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut != Maquette.Statut.VALIDEE:
+        return Response({'error': f'Activation impossible : statut {maquette.statut} (attendu VALIDEE).'}, status=400)
+    problemes = maquette.verifier_coherence()
+    if problemes:
+        return Response({'error': 'Maquette incohérente.', 'problemes': problemes}, status=400)
+    maquette.statut = Maquette.Statut.ACTIVE
+    maquette.activee_par = request.user
+    maquette.activee_le = timezone.now()
+    maquette.save()
+    _journaliser_maquette(maquette, MaquetteJournal.Action.ACTIVATION, request.user)
+    return Response(_serializer_maquette(maquette))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_archiver(request, pk):
+    """ACTIVE → ARCHIVEE : la version reste consultable, plus modifiable."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut != Maquette.Statut.ACTIVE:
+        return Response({'error': f'Archivage impossible : statut {maquette.statut} (attendu ACTIVE).'}, status=400)
+    maquette.statut = Maquette.Statut.ARCHIVEE
+    maquette.save()
+    _journaliser_maquette(maquette, MaquetteJournal.Action.ARCHIVAGE, request.user)
+    return Response(_serializer_maquette(maquette))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_cloner(request, pk):
+    """Crée une nouvelle version BROUILLON copiée de la maquette (R4)."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut == Maquette.Statut.BROUILLON:
+        return Response({'error': 'Un clonage se fait depuis une version aboutie (VALIDEE/ACTIVE/ARCHIVEE).'}, status=400)
+    clone = maquette.cloner(request.user)
+    return Response(_serializer_maquette(clone), status=201)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsDFRC])
+def maquette_journal(request, pk):
+    """Historique des validations et changements d'état (règle métier)."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    return Response([
+        {
+            'action': entree.action,
+            'utilisateur': entree.utilisateur.username if entree.utilisateur else None,
+            'horodatage': entree.horodatage,
+            'detail': entree.detail,
+        }
+        for entree in maquette.journal.select_related('utilisateur')
+    ])
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def maquette_ue_create(request, pk):
+    """Ajout d'une UE — maquette BROUILLON uniquement."""
+    maquette = _get_maquette(pk)
+    if maquette is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if maquette.statut != Maquette.Statut.BROUILLON:
+        return Response({'error': f'Maquette {maquette.statut.lower()} immuable.'}, status=400)
+    semestre_id = request.data.get('semestre_id')
+    code = (request.data.get('code') or '').strip()
+    if not (semestre_id and code):
+        return Response({'error': 'semestre_id et code sont requis.'}, status=400)
+    if not Semestre.objects.filter(pk=semestre_id).exists():
+        return Response({'error': 'Semestre introuvable'}, status=400)
+    try:
+        ue = UE.objects.create(
+            maquette=maquette,
+            semestre_id=semestre_id,
+            code=code,
+            intitule=request.data.get('intitule', ''),
+            credits=int(request.data.get('credits', 0) or 0),
+            caractere=request.data.get('caractere', UE.Caractere.OBLIGATOIRE),
+            ordre=int(request.data.get('ordre', maquette.unites_enseignement.count() + 1) or 1),
+        )
+    except ValidationError as exc:
+        return Response({'error': exc.messages}, status=400)
+    _journaliser_maquette(maquette, MaquetteJournal.Action.MODIFICATION, request.user,
+                          {'ajout_ue': ue.code})
+    return Response({'id': ue.id, 'code': ue.code}, status=201)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def ue_detail(request, pk):
+    """Édition / suppression d'une UE — maquette BROUILLON uniquement."""
+    ue = UE.objects.filter(pk=pk).first()
+    if ue is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    try:
+        if request.method == 'DELETE':
+            code = ue.code
+            ue.delete()
+            _journaliser_maquette(ue.maquette, MaquetteJournal.Action.MODIFICATION,
+                                  request.user, {'suppression_ue': code})
+            return Response(status=204)
+        for champ in ('intitule', 'credits', 'caractere', 'ordre', 'semestre_id'):
+            if champ in request.data:
+                setattr(ue, champ, request.data[champ])
+        ue.save()
+    except ValidationError as exc:
+        return Response({'error': exc.messages}, status=400)
+    return Response({'id': ue.id, 'code': ue.code, 'credits': ue.credits})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def ue_ecue_create(request, pk):
+    """Ajout d'une ECUE sous une UE — maquette BROUILLON uniquement."""
+    ue = UE.objects.select_related('maquette').filter(pk=pk).first()
+    if ue is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    if ue.maquette.statut != Maquette.Statut.BROUILLON:
+        return Response({'error': f'Maquette {ue.maquette.statut.lower()} immuable.'}, status=400)
+    code = (request.data.get('code') or '').strip()
+    if not code:
+        return Response({'error': 'code requis.'}, status=400)
+    ref_module = None
+    if request.data.get('ref_module_id'):
+        ref_module = RefModule.objects.filter(pk=request.data['ref_module_id']).first()
+        if ref_module is None:
+            return Response({'error': 'RefModule introuvable'}, status=400)
+    try:
+        ecue = ECUE.objects.create(
+            ue=ue,
+            code=code,
+            intitule=request.data.get('intitule', ''),
+            credits=int(request.data.get('credits', 0) or 0),
+            coefficient=request.data.get('coefficient', 1),
+            volume_cm=request.data.get('volume_cm', 0),
+            volume_td=request.data.get('volume_td', 0),
+            volume_tp=request.data.get('volume_tp', 0),
+            ref_module=ref_module,
+            ordre=int(request.data.get('ordre', ue.ecues.count() + 1) or 1),
+        )
+    except ValidationError as exc:
+        return Response({'error': exc.messages}, status=400)
+    return Response({'id': ecue.id, 'code': ecue.code}, status=201)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def ecue_detail(request, pk):
+    """Édition / suppression / archivage d'une ECUE — maquette BROUILLON uniquement.
+
+    DELETE ?mode=archive : archivage soft (l'ECUE archivée ne peut plus entrer
+    dans une nouvelle maquette — contrôle de cohérence et clonage).
+    """
+    ecue = ECUE.objects.select_related('ue__maquette').filter(pk=pk).first()
+    if ecue is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    try:
+        if request.method == 'DELETE':
+            if request.query_params.get('mode') == 'archive':
+                ecue.archive = True
+                ecue.save()
+                return Response({'detail': 'ECUE archivée.', 'archive': True})
+            ecue.delete()
+            return Response(status=204)
+        for champ in ('intitule', 'credits', 'coefficient', 'volume_cm', 'volume_td', 'volume_tp', 'ordre'):
+            if champ in request.data:
+                setattr(ecue, champ, request.data[champ])
+        if 'archive' in request.data:
+            ecue.archive = bool(request.data['archive'])
+        if 'ref_module_id' in request.data:
+            ecue.ref_module_id = request.data['ref_module_id'] or None
+        ecue.save()
+    except ValidationError as exc:
+        return Response({'error': exc.messages}, status=400)
+    return Response({'id': ecue.id, 'code': ecue.code, 'credits': ecue.credits, 'archive': ecue.archive})

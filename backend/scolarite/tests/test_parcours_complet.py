@@ -79,7 +79,6 @@ class ParcoursCompletTests(TestCase):
 
         maquette = Maquette.objects.create(
             annee_academique=cls.annee, ref_formation=cls.ref_formation, niveau=cls.l1,
-            statut=Maquette.Statut.ACTIVE,
         )
         ue = UE.objects.create(
             maquette=maquette, semestre=cls.s1, code='UE11', intitule='Bases', credits=6,
@@ -89,6 +88,9 @@ class ParcoursCompletTests(TestCase):
             ue=ue, code='ECUE111', intitule='Anatomie', credits=6,
             volume_cm=30, ref_module=cls.ref_module,
         )
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        maquette.statut = Maquette.Statut.ACTIVE
+        maquette.save()
 
         # Existant opérationnel, antérieur au module Scolarité.
         cls.formation_operationnelle = Formation.objects.create(formation='LICENCE STAPS 2026')

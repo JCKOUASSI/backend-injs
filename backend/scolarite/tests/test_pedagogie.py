@@ -46,7 +46,6 @@ class PedagogieFixture:
 
         cls.maquette = Maquette.objects.create(
             annee_academique=cls.annee, ref_formation=cls.formation, niveau=cls.niveau,
-            statut=Maquette.Statut.ACTIVE,
         )
         cls.ue_s1 = UE.objects.create(
             maquette=cls.maquette, semestre=cls.s1, code='UE11',
@@ -69,6 +68,9 @@ class PedagogieFixture:
             ue=cls.ue_s2, code='ECUE211', intitule='Physiologie de l’effort', credits=4,
             volume_cm=25,
         )
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        cls.maquette.statut = Maquette.Statut.ACTIVE
+        cls.maquette.save()
 
     def setUp(self):
         self.acteur = make_user('agent_pedagogie')
@@ -140,7 +142,9 @@ class GenerationTests(PedagogieFixture, TestCase):
             pedagogie_services.generer_inscriptions_pedagogiques(self.inscription)
 
     def test_generation_refusee_sans_maquette_active(self):
-        self.maquette.statut = Maquette.Statut.BROUILLON
+        # Lot L1 (R4) : une maquette ACTIVE ne peut pas revenir en BROUILLON ;
+        # on l'archive (transition autorisée) → plus aucune maquette ACTIVE.
+        self.maquette.statut = Maquette.Statut.ARCHIVEE
         self.maquette.save(update_fields=['statut'])
         with self.assertRaises(pedagogie_services.PedagogieImpossible):
             pedagogie_services.generer_inscriptions_pedagogiques(self.inscription)
@@ -151,13 +155,16 @@ class GenerationTests(PedagogieFixture, TestCase):
         )
         maquette_parcours = Maquette.objects.create(
             annee_academique=self.annee, ref_formation=self.formation, niveau=self.niveau,
-            parcours=parcours, statut=Maquette.Statut.ACTIVE,
+            parcours=parcours,
         )
         ue = UE.objects.create(
             maquette=maquette_parcours, semestre=self.s1, code='UE11EM',
             intitule='Spécialité EM', credits=6,
         )
         ECUE.objects.create(ue=ue, code='ECUE-EM', intitule='Didactique', credits=6, volume_cm=30)
+        # Lot L1 (R4) : activation après création des UE/ECUE.
+        maquette_parcours.statut = Maquette.Statut.ACTIVE
+        maquette_parcours.save()
 
         self.inscription.parcours = parcours
         self.inscription.save(update_fields=['parcours'])

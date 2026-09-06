@@ -126,9 +126,14 @@ export default function ScolariteDashboard() {
             {annee ? `Année académique ${annee.libelle}` : 'Aucune année académique courante définie'}
           </small>
         </div>
-        <button className="btn btn-outline-secondary btn-sm" onClick={charger}>
-          <i className="bi bi-arrow-clockwise me-1"></i>Actualiser
-        </button>
+        <div className="d-flex gap-2">
+          <Link className="btn btn-outline-primary btn-sm" to="/scolarite/maquettes">
+            <i className="bi bi-diagram-3 me-1"></i>Maquettes LMD
+          </Link>
+          <button className="btn btn-outline-secondary btn-sm" onClick={charger}>
+            <i className="bi bi-arrow-clockwise me-1"></i>Actualiser
+          </button>
+        </div>
       </div>
 
       {erreur && <div className="alert alert-danger">{erreur}</div>}
