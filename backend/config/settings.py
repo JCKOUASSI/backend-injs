@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'scolarite.apps.ScolariteConfig',
     'admissions.apps.AdmissionsConfig',
     'parametres.apps.ParametresConfig',
+    'referentiels.apps.ReferentielsConfig',
 ]
 
 MIDDLEWARE = [

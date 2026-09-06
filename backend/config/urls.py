@@ -38,6 +38,7 @@ urlpatterns = [
     path('api/scolarite/', include('scolarite.urls')),
     path('api/admissions/', include('admissions.urls')),
     path('api/parametres/', include('parametres.urls')),
+    path('api/referentiels/', include('referentiels.urls')),
 
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),
