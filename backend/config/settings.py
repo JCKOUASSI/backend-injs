@@ -30,7 +30,9 @@ ALLOWED_HOSTS = [
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 if DEBUG:
-    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1', '*'])
+    # Risque R5 — wildcard '*' supprimé : hosts stricts même en dev.
+    # L'hôte LAN de badgeage est ajouté plus bas via BADGE_BASE_URL.
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1'])
 # dé-duplication
 ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 if not ALLOWED_HOSTS:
@@ -50,6 +52,18 @@ if not BADGE_BASE_URL and DEBUG:
         BADGE_BASE_URL = f'http://{local_ip}:{DEV_SERVER_PORT}'
     except Exception:
         BADGE_BASE_URL = f'http://localhost:{DEV_SERVER_PORT}'
+
+# Risque R5 — aucun wildcard nulle part :
+# - en dev, autoriser l'hôte LAN du BADGE_BASE_URL (auto-détecté) pour le badgeage mobile ;
+# - en prod, retirer tout '*' résiduel issu des variables d'environnement (défense en profondeur).
+from urllib.parse import urlparse as _urlparse
+
+if DEBUG and BADGE_BASE_URL:
+    _badge_host = _urlparse(BADGE_BASE_URL).hostname
+    if _badge_host and _badge_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_badge_host)
+if not DEBUG and '*' in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h != '*']
 
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
@@ -209,6 +223,8 @@ AUTH_USER_MODEL = 'authentication.User'
 # Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
+    'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -295,6 +311,9 @@ if DEBUG:
     ])
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(CORS_ALLOWED_ORIGINS))
 CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']
+# Nécessaire au cookie HttpOnly du refresh JWT (credentials: 'include' côté React).
+# Les origines restent strictes (CORS_ALLOWED_ORIGINS ci-dessus, pas de allow-all).
+CORS_ALLOW_CREDENTIALS = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -339,3 +358,77 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ── Logging structuré (risque R8) ─────────────────────────────────────────────
+# Dev  : console INFO (le fichier est filtré par require_debug_false).
+# Prod : fichier rotatif uniquement, niveau WARNING minimum.
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} [{name}] {module}.{funcName}:{lineno} — {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} [{name}] {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {'()': 'django.utils.log.RequireDebugTrue'},
+        'require_debug_false': {'()': 'django.utils.log.RequireDebugFalse'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+            'filters': ['require_debug_true'],
+        },
+        'file_rotating': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'injs_lmd.log'),
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 5,
+            'encoding': 'utf-8',
+            'formatter': 'verbose',
+            'level': 'WARNING',
+            'filters': ['require_debug_false'],
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file_rotating'],
+        'level': 'INFO' if DEBUG else 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_rotating'],
+            'level': 'INFO' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'file_rotating'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Journalisation métier sensibles (audits login / scan QR).
+        'authentication': {
+            'handlers': ['console', 'file_rotating'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'presences': {
+            'handlers': ['console', 'file_rotating'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

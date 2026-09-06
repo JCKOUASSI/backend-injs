@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const response = await api.post('/auth/login/', { username, password })
-    const { access, refresh, user: userData } = response.data
+    const { access, refresh, refresh_in_cookie: refreshInCookie, user: userData } = response.data
 
     if (!canAccessWeb(userData)) {
       const err = new Error('Web access forbidden')
@@ -60,7 +60,13 @@ export function AuthProvider({ children }) {
     }
 
     localStorage.setItem('access_token', access)
-    localStorage.setItem('refresh_token', refresh)
+    if (refreshInCookie) {
+      // Risque R6 : le refresh vit dans un cookie HttpOnly — on ne le stocke
+      // plus en localStorage et on purge un éventuel résidu d'ancienne session.
+      localStorage.removeItem('refresh_token')
+    } else if (refresh) {
+      localStorage.setItem('refresh_token', refresh)
+    }
     setUser(normalizeUser({
       ...userData,
       role_context: response.data.role_context || userData.role_context || {},
@@ -70,6 +76,8 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
+    // Invalide le cookie HttpOnly du refresh côté serveur (best-effort).
+    api.post('/auth/logout/').catch(() => {})
     _clearSession()
   }
 

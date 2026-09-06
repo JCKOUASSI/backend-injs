@@ -10,6 +10,9 @@ from django.contrib.auth import authenticate, get_user_model
 from django.db import IntegrityError
 from django.db.models import Q
 
+from django.conf import settings as django_settings
+from rest_framework_simplejwt.views import TokenRefreshView as SimpleJWTTokenRefreshView
+
 from .serializers import (
     UserSerializer,
     UserCreateSerializer,
@@ -60,6 +63,71 @@ USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
 })
 
 logger = logging.getLogger(__name__)
+
+# ── Cookie HttpOnly du refresh token (risque R6 — socle L0/L7) ───────────────
+# Le web React n'utilise plus le refresh stocké en localStorage : il est posé
+# en cookie HttpOnly (illisible en JavaScript, jamais exposé à un XSS) et
+# renvoyé automatiquement sur /api/auth/token/refresh/.
+# L'app mobile Flutter conserve le refresh dans le body des réponses (stockage
+# sécurisé applicatif) — rétrocompatibilité totale des endpoints /login,
+# /token/refresh et /me est assurée.
+REFRESH_COOKIE_NAME = 'refresh_token'
+REFRESH_COOKIE_PATH = '/api/auth/'
+
+
+def _set_refresh_cookie(response, token):
+    """Pose le cookie HttpOnly du refresh token (scope limité à /api/auth/)."""
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        token,
+        max_age=int(django_settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+        httponly=True,
+        secure=not django_settings.DEBUG,
+        samesite='Lax',
+        path=REFRESH_COOKIE_PATH,
+    )
+
+
+def _delete_refresh_cookie(response):
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logout_view(request):
+    """Déconnexion web : invalide le cookie du refresh token côté navigateur.
+
+    Sans effet de bord serveur (JWT stateless, pas de blacklist activée) ;
+    le mobile continue de gérer la déconnexion localement.
+    """
+    response = Response({'detail': 'Déconnexion effectuée.'})
+    _delete_refresh_cookie(response)
+    return response
+
+
+class CookieTokenRefreshView(SimpleJWTTokenRefreshView):
+    """Rafraîchit l'access token — /api/auth/token/refresh/ (contrat inchangé).
+
+    - Web   : refresh lu depuis le cookie HttpOnly (body vide accepté).
+    - Mobile: refresh lu depuis le body JSON (comportement historique).
+    - Rotation (ROTATE_REFRESH_TOKENS=True) : le nouveau refresh est renvoyé
+      dans le body (mobile) ET reposé en cookie HttpOnly (web).
+    """
+
+    def post(self, request, *args, **kwargs):
+        data = request.data if isinstance(request.data, dict) else {}
+        if not data.get('refresh'):
+            cookie_refresh = request.COOKIES.get(REFRESH_COOKIE_NAME)
+            if cookie_refresh:
+                # DRF cache le payload parsé dans _full_data ; on l'injecte ici.
+                request._full_data = {'refresh': cookie_refresh}
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200 and isinstance(response.data, dict):
+            new_refresh = response.data.get('refresh')
+            if new_refresh:
+                response.data['refresh_in_cookie'] = True
+                _set_refresh_cookie(response, new_refresh)
+        return response
 
 
 @api_view(['POST'])
@@ -180,13 +248,18 @@ def login_view(request):
         cible_nom=user.get_full_name() or user.username,
         extra={'role': user_role, 'device_id': bool(device_id)},
     )
-    return Response({
+    response = Response({
         'access': str(refresh.access_token),
+        # Conservé pour l'app mobile (stockage sécurisé applicatif) ;
+        # le web utilise désormais le cookie HttpOnly (risque R6).
         'refresh': str(refresh),
+        'refresh_in_cookie': True,
         'must_change_password': bool(getattr(user, 'must_change_password', False)),
         'user': _user_payload(user),
         'role_context': user_role_context(user),
     })
+    _set_refresh_cookie(response, str(refresh))
+    return response
 
 
 @api_view(['GET', 'PATCH'])

@@ -4,6 +4,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from config.admin_site import setup_admin_site
 from config.views import api_root
+from config.health import health_view
 from config.static_views import service_worker, favicon
 
 setup_admin_site()
@@ -11,6 +12,9 @@ setup_admin_site()
 urlpatterns = [
     # Racine → page d'accueil API
     path('', api_root, name='root'),
+
+    # Healthcheck (supervision / load balancer)
+    path('api/health/', health_view, name='api-health'),
 
     # PWA badge + favicon (évite les 404 dans les logs navigateur)
     path('sw.js', service_worker, name='service-worker'),

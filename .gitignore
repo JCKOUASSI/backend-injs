@@ -27,6 +27,7 @@ backups/
 
 # Environnements locaux / générés - NE PAS VERSIONNER
 backend/.venv-python39-backup/
+backend/logs/
 .vscode/
 project_structure.txt
 /Save taches app-injs-lmd 2026.txt

@@ -16,6 +16,8 @@ export function setSessionExpiredCallback(cb) {
 function _onSessionExpired() {
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
+  // Best-effort : invalide le cookie HttpOnly du refresh côté serveur.
+  fetch(`${API_BASE_URL}/auth/logout/`, { method: 'POST', credentials: 'include' }).catch(() => {})
   if (_sessionExpiredCallback) {
     _sessionExpiredCallback()
   } else {
@@ -29,11 +31,31 @@ const getAuthHeaders = () => {
 }
 
 const refreshAccessToken = async () => {
+  // 1) Voie privilégiée (risque R6) : refresh dans le cookie HttpOnly.
+  //    Le cookie circule en same-site ; en dev cross-origin, le navigateur
+  //    ne l'enverra pas → on bascule sur le fallback historique.
+  try {
+    const cookieRes = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    })
+    if (cookieRes.ok) {
+      const data = await cookieRes.json()
+      localStorage.setItem('access_token', data.access)
+      return data.access
+    }
+  } catch {
+    // cookie indisponible → fallback ci-dessous
+  }
+  // 2) Fallback de transition : refresh en localStorage (ancien comportement).
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) throw new Error('No refresh token')
   const res = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ refresh: refreshToken }),
   })
   if (!res.ok) throw new Error('Refresh failed')
