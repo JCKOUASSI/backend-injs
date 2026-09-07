@@ -193,6 +193,13 @@ class Candidature(models.Model):
     )
     date_candidature = models.DateField(default=timezone.localdate)
     statut = models.CharField(max_length=30, choices=Statut.choices, default=Statut.BROUILLON)
+    # Lot L2 — campagne d'admission (nullable : dossiers hors campagne tolérés)
+    campagne = models.ForeignKey(
+        'CampagneAdmission', on_delete=models.SET_NULL,
+        related_name='candidatures', null=True, blank=True,
+        help_text="Campagne d'admission de rattachement. Une campagne clôturée "
+                  "n'accepte plus de candidature.",
+    )
     score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     observations = models.TextField(blank=True)
     date_decision = models.DateTimeField(null=True, blank=True)
@@ -241,6 +248,15 @@ class Candidature(models.Model):
     def clean(self):
         if self.parcours_id and self.ref_formation_id and self.parcours.ref_formation_id != self.ref_formation_id:
             raise ValidationError({'parcours': "Le parcours n'appartient pas à cette formation."})
+        # Lot L2 — cohérence campagne : la formation demandée doit correspondre,
+        # et une campagne non ouverte (ou clôturée) n'accepte pas de candidature.
+        if self.campagne_id:
+            campagne = self.campagne
+            if campagne.ref_formation_id != self.ref_formation_id:
+                raise ValidationError(
+                    {'campagne': "La campagne ne correspond pas à la formation demandée."}
+                )
+            campagne.verifier_ouverture_candidature()
 
     # ── Complétude du dossier ───────────────────────────────────────────────
 
@@ -398,3 +414,381 @@ class Admission(models.Model):
             self.decision in (self.Decision.ADMIS, self.Decision.ADMIS_SOUS_RESERVE)
             and not self.est_expiree
         )
+
+
+# ── Lot L2 — Campagnes et concours/sélection ─────────────────────────────────
+
+
+class CampagneAdmission(models.Model):
+    """Campagne d'admission : fenêtre de candidature par formation/parcours.
+
+    Workflow : BROUILLON → PLANIFIEE → OUVERTE ⇄ SUSPENDUE → CLOTUREE →
+    ARCHIVEE (PLANIFIEE/OUVERTE/SUSPENDUE → ANNULEE). Une campagne clôturée
+    (ou non ouverte) n'accepte plus de candidature.
+    """
+
+    class Statut(models.TextChoices):
+        BROUILLON = 'BROUILLON', 'Brouillon'
+        PLANIFIEE = 'PLANIFIEE', 'Planifiée'
+        OUVERTE = 'OUVERTE', 'Ouverte'
+        SUSPENDUE = 'SUSPENDUE', 'Suspendue'
+        CLOTUREE = 'CLOTUREE', 'Clôturée'
+        ANNULEE = 'ANNULEE', 'Annulée'
+        ARCHIVEE = 'ARCHIVEE', 'Archivée'
+
+    libelle = models.CharField(max_length=200)
+    annee_academique = models.ForeignKey(
+        'scolarite.AnneeAcademique', on_delete=models.PROTECT, related_name='campagnes',
+    )
+    ref_formation = models.ForeignKey(
+        'formations.RefFormation', on_delete=models.PROTECT, related_name='campagnes',
+    )
+    parcours = models.ForeignKey(
+        'scolarite.Parcours', on_delete=models.PROTECT,
+        related_name='campagnes', null=True, blank=True,
+    )
+    date_ouverture = models.DateField(null=True, blank=True)
+    date_fermeture = models.DateField(null=True, blank=True)
+    quota_admissibles = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Nombre de candidats déclarés admissibles.",
+    )
+    quota_admis = models.PositiveSmallIntegerField(
+        null=True, blank=True, help_text="Nombre d'admis au terme de la sélection.",
+    )
+    statut = models.CharField(max_length=20, choices=Statut.choices, default=Statut.BROUILLON)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-annee_academique__libelle', 'ref_formation__intitule']
+        verbose_name = 'Admission – Campagne'
+        verbose_name_plural = 'Admission – Campagnes'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['annee_academique', 'ref_formation', 'parcours'],
+                name='uniq_campagne_par_annee_formation_parcours',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.libelle} – {self.ref_formation} ({self.annee_academique})'
+
+    def clean(self):
+        erreurs = {}
+        if self.date_ouverture and self.date_fermeture and self.date_fermeture < self.date_ouverture:
+            erreurs['date_fermeture'] = 'La date de fermeture précède la date d’ouverture.'
+        if self.parcours_id and self.ref_formation_id and self.parcours.ref_formation_id != self.ref_formation_id:
+            erreurs['parcours'] = "Le parcours n'appartient pas à cette formation."
+        if erreurs:
+            raise ValidationError(erreurs)
+
+    # ── Workflow (machine à états déclarée dans concours_services) ──
+    def verifier_ouverture_candidature(self):
+        """Règle L2 : seule une campagne OUVERTE dans ses dates accepte une candidature."""
+        from datetime import date as _date
+
+        def _as_date(valeur):
+            return _date.fromisoformat(valeur) if isinstance(valeur, str) else valeur
+
+        aujourd_hui = timezone.localdate()
+        if self.statut != self.Statut.OUVERTE:
+            raise ValidationError(
+                f"La campagne « {self.libelle} » n'est pas ouverte "
+                f"(statut : {self.get_statut_display()}) : candidature refusée."
+            )
+        date_ouverture = _as_date(self.date_ouverture)
+        date_fermeture = _as_date(self.date_fermeture)
+        if date_ouverture and aujourd_hui < date_ouverture:
+            raise ValidationError(
+                f"La campagne « {self.libelle} » ouvre le {date_ouverture.strftime('%d/%m/%Y')}."
+            )
+        if date_fermeture and aujourd_hui > date_fermeture:
+            raise ValidationError(
+                f"La campagne « {self.libelle} » a fermé le {date_fermeture.strftime('%d/%m/%Y')}."
+            )
+
+    @property
+    def permet_inscription(self):
+        return (
+            self.decision in (self.Decision.ADMIS, self.Decision.ADMIS_SOUS_RESERVE)
+            and not self.est_expiree
+        )
+
+
+class Epreuve(models.Model):
+    """Épreuve de concours/sélection rattachée à une campagne.
+
+    Types : écrit, oral, pratique, physique. Le verrouillage fige toutes les
+    notes de l'épreuve (résultats verrouillés non modifiables).
+    """
+
+    class Type(models.TextChoices):
+        ECRIT = 'ECRIT', 'Écrit'
+        ORAL = 'ORAL', 'Oral'
+        PRATIQUE = 'PRATIQUE', 'Pratique'
+        PHYSIQUE = 'PHYSIQUE', 'Physique'
+
+    campagne = models.ForeignKey(
+        CampagneAdmission, on_delete=models.CASCADE, related_name='epreuves',
+    )
+    type = models.CharField(max_length=10, choices=Type.choices)
+    intitule = models.CharField(max_length=200)
+    date = models.DateField()
+    heure_debut = models.TimeField()
+    duree_minutes = models.PositiveSmallIntegerField(default=60)
+    centre = models.ForeignKey(
+        'formations.RefSite', on_delete=models.SET_NULL,
+        related_name='epreuves', null=True, blank=True,
+        verbose_name='Centre (site)',
+    )
+    salle = models.ForeignKey(
+        'formations.RefSalle', on_delete=models.SET_NULL,
+        related_name='epreuves', null=True, blank=True,
+    )
+    coefficient = models.DecimalField(max_digits=4, decimal_places=2, default=1)
+    verrouillee = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date', 'heure_debut']
+        verbose_name = 'Admission – Épreuve'
+        verbose_name_plural = 'Admission – Épreuves'
+
+    def __str__(self):
+        return f'{self.intitule} ({self.get_type_display()}) – {self.date}'
+
+    @property
+    def fin(self):
+        from datetime import timedelta
+        return self.debut + timedelta(minutes=self.duree_minutes)
+
+    @property
+    def debut(self):
+        from datetime import date as _date, datetime, time as _time
+        jour = self.date
+        if isinstance(jour, str):
+            jour = _date.fromisoformat(jour)
+        heure = self.heure_debut
+        if isinstance(heure, str):
+            heure = _time.fromisoformat(heure)
+        return datetime.combine(jour, heure)
+
+    def chevauche(self, autre):
+        """Vrai si deux épreuves se déroulent au même moment."""
+        return (
+            self.debut.date() == autre.debut.date()
+            and self.debut < autre.fin
+            and autre.debut < self.fin
+        )
+
+
+class SurveillanceEpreuve(models.Model):
+    """Affectation d'un surveillant à une épreuve.
+
+    Règle : un surveillant ne peut pas être affecté à deux épreuves
+    simultanées.
+    """
+
+    epreuve = models.ForeignKey(
+        Epreuve, on_delete=models.CASCADE, related_name='surveillances',
+    )
+    surveillant = models.ForeignKey(
+        'authentication.User', on_delete=models.PROTECT, related_name='surveillances',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Admission – Surveillance d’épreuve'
+        verbose_name_plural = 'Admission – Surveillances d’épreuve'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['epreuve', 'surveillant'], name='uniq_surveillance_par_epreuve',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.surveillant} – {self.epreuve}'
+
+    def clean(self):
+        if not (self.epreuve_id and self.surveillant_id):
+            return
+        conflits = [
+            s for s in SurveillanceEpreuve.objects.filter(
+                surveillant=self.surveillant,
+                epreuve__date=self.epreuve.date,
+            ).exclude(pk=self.pk).select_related('epreuve')
+            if self.epreuve.chevauche(s.epreuve)
+        ]
+        if conflits:
+            raise ValidationError(
+                {'surveillant': f"Ce surveillant est déjà affecté à l'épreuve "
+                                f"« {conflits[0].epreuve} » au même moment."}
+            )
+
+
+class ConvocationEpreuve(models.Model):
+    """Convocation d'une candidature à une épreuve + présence le jour J.
+
+    Règle : la salle de l'épreuve ne peut pas dépasser sa capacité.
+    """
+
+    epreuve = models.ForeignKey(
+        Epreuve, on_delete=models.CASCADE, related_name='convocations',
+    )
+    candidature = models.ForeignKey(
+        Candidature, on_delete=models.CASCADE, related_name='convocations',
+    )
+    presente = models.BooleanField(default=False)
+    convoque_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Admission – Convocation'
+        verbose_name_plural = 'Admission – Convocations'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['epreuve', 'candidature'], name='uniq_convocation_par_epreuve',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.candidature.numero} – {self.epreuve}'
+
+    def clean(self):
+        if not self.epreuve_id:
+            return
+        campagne = self.epreuve.campagne
+        if campagne.statut in (campagne.Statut.CLOTUREE, campagne.Statut.ANNULEE, campagne.Statut.ARCHIVEE):
+            raise ValidationError('Campagne clôturée : convocations impossible.')
+        salle = self.epreuve.salle
+        if salle and salle.capacite:
+            deja_convoques = ConvocationEpreuve.objects.filter(
+                epreuve=self.epreuve,
+            ).exclude(pk=self.pk).count()
+            if deja_convoques + 1 > salle.capacite:
+                raise ValidationError(
+                    f'Capacité de la salle « {salle.nom} » atteinte '
+                    f'({salle.capacite} places) : convocation refusée.'
+                )
+
+
+class NoteConcours(models.Model):
+    """Note d'une candidature à une épreuve. Verrouillage au niveau épreuve.
+
+    Toute correction est historisée (NoteConcoursHistorique) avec l'ancienne
+    et la nouvelle valeur.
+    """
+
+    epreuve = models.ForeignKey(
+        Epreuve, on_delete=models.CASCADE, related_name='notes',
+    )
+    candidature = models.ForeignKey(
+        Candidature, on_delete=models.CASCADE, related_name='notes_concours',
+    )
+    note = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text='Note obtenue (null = non noté).',
+    )
+    absent = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Admission – Note de concours'
+        verbose_name_plural = 'Admission – Notes de concours'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['epreuve', 'candidature'], name='uniq_note_par_epreuve',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.candidature.numero} – {self.epreuve} : {self.note if self.note is not None else "—"}'
+
+    @property
+    def est_verrouillee(self):
+        return self.epreuve.verrouillee
+
+    def save(self, *args, **kwargs):
+        ancienne = NoteConcours.objects.filter(pk=self.pk).first()
+        if ancienne and self.epreuve.verrouillee:
+            raise ValidationError(
+                f'Épreuve « {self.epreuve} » verrouillée : les résultats ne sont '
+                'plus modifiables.'
+            )
+        super().save(*args, **kwargs)
+        if ancienne and ancienne.note != self.note:
+            NoteConcoursHistorique.objects.create(
+                note=self,
+                ancienne_valeur=ancienne.note,
+                nouvelle_valeur=self.note,
+            )
+
+
+class NoteConcoursHistorique(models.Model):
+    """Lot L2 — conservation ancienne/nouvelle valeur à chaque correction."""
+
+    note = models.ForeignKey(
+        NoteConcours, on_delete=models.CASCADE, related_name='historique',
+    )
+    ancienne_valeur = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    nouvelle_valeur = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    modifie_par = models.ForeignKey(
+        'authentication.User', on_delete=models.SET_NULL,
+        related_name='corrections_notes_concours', null=True, blank=True,
+    )
+    horodatage = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-horodatage']
+        verbose_name = 'Admission – Historique de note'
+        verbose_name_plural = 'Admission – Historiques de note'
+
+    def __str__(self):
+        return f'{self.note} : {self.ancienne_valeur} → {self.nouvelle_valeur}'
+
+
+class ClassementConcours(models.Model):
+    """Rang et liste d'une candidature à l'issue d'une campagne.
+
+    Calcul reproductible (voir concours_services.calculer_classement) :
+    le recalcul régénère les lignes et trace l'opération via
+    JournalScolarite. Le résultat publié n'est plus recalculable.
+    """
+
+    class Liste(models.TextChoices):
+        ADMISSIBLE = 'ADMISSIBLE', 'Admissible'
+        LISTE_ATTENTE = 'LISTE_ATTENTE', "Liste d'attente"
+        NON_ADMIS = 'NON_ADMIS', 'Non admis'
+
+    campagne = models.ForeignKey(
+        CampagneAdmission, on_delete=models.CASCADE, related_name='classements',
+    )
+    candidature = models.ForeignKey(
+        Candidature, on_delete=models.CASCADE, related_name='classements',
+    )
+    rang = models.PositiveSmallIntegerField()
+    score_total = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    liste = models.CharField(max_length=20, choices=Liste.choices)
+    publie = models.BooleanField(default=False)
+    genere_par = models.ForeignKey(
+        'authentication.User', on_delete=models.SET_NULL,
+        related_name='classements_generes', null=True, blank=True,
+    )
+    genere_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['campagne', 'rang']
+        verbose_name = 'Admission – Classement'
+        verbose_name_plural = 'Admission – Classements'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['campagne', 'candidature'], name='uniq_classement_par_campagne',
+            ),
+            models.UniqueConstraint(
+                fields=['campagne', 'rang'], name='uniq_rang_par_campagne',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.campagne.libelle} : #{self.rang} {self.candidature.numero} ({self.liste})'

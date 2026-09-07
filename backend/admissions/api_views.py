@@ -159,7 +159,7 @@ def candidat_detail(request, pk):
 CANDIDATURE_FIELDS = [
     'annee_academique_id', 'ref_formation_id', 'parcours_id', 'niveau_id',
     'type_candidature_id', 'voie_acces_id', 'regime_id', 'vague_id',
-    'date_candidature', 'score', 'observations',
+    'date_candidature', 'score', 'observations', 'campagne_id',
 ]
 
 
@@ -174,6 +174,8 @@ def _serialize_candidature(candidature, detail=False):
         'annee_academique': candidature.annee_academique.libelle,
         'ref_formation_id': candidature.ref_formation_id,
         'ref_formation': candidature.ref_formation.intitule,
+        'campagne_id': candidature.campagne_id,
+        'campagne': candidature.campagne.libelle if candidature.campagne_id else None,
         'parcours_id': candidature.parcours_id,
         'niveau_id': candidature.niveau_id,
         'niveau': candidature.niveau.code,

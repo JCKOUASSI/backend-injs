@@ -68,6 +68,8 @@ const FicheEtudiant = lazy(() => import('./pages/scolarite/FicheEtudiant'))
 const GroupesPedagogiques = lazy(() => import('./pages/scolarite/Groupes'))
 const Maquettes = lazy(() => import('./pages/scolarite/Maquettes'))
 const MaquetteDetail = lazy(() => import('./pages/scolarite/MaquetteDetail'))
+const Campagnes = lazy(() => import('./pages/scolarite/Campagnes'))
+const CampagneDetail = lazy(() => import('./pages/scolarite/CampagneDetail'))
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -510,6 +512,24 @@ function App() {
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li><Link to="/scolarite/maquettes">Maquettes LMD</Link></li><li className="separator">/</li><li>Détail</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <MaquetteDetail />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/campagnes" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Campagnes d'admission</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Campagnes />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/campagnes/:id" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li><Link to="/scolarite/campagnes">Campagnes</Link></li><li className="separator">/</li><li>Détail</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <CampagneDetail />
                 </Suspense>
               </Layout>
             </ProtectedRoute>
