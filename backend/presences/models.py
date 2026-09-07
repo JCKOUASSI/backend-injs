@@ -61,6 +61,52 @@ class Pointage(models.Model):
         choices=Statut.choices,
         default=Statut.EN_COURS,
     )
+    # Lot L1 - assiduite (alignee sur le referentiel demande). Les 6 statuts
+    # ci-dessus decrivent le PROCESSUS de badgeage ; le statut d'assiduite
+    # ci-dessous decrit le RESULTAT pedagogique (mapping explicite, aucun
+    # statut existant renomme ni supprime, historique preserve).
+    class StatutAssiduite(models.TextChoices):
+        PRESENT = 'PRESENT', 'Present'
+        ABSENT = 'ABSENT', 'Absent'
+        RETARD = 'RETARD', 'Retard'
+        ABSENCE_JUSTIFIEE = 'ABSENCE_JUSTIFIEE', 'Absence justifiee'
+        EXCUSE = 'EXCUSE', 'Excuse'
+        NON_RENSEIGNE = 'NON_RENSEIGNE', 'Non renseigne'
+
+    statut_assiduite = models.CharField(
+        max_length=20,
+        choices=StatutAssiduite.choices,
+        null=True,
+        blank=True,
+        help_text=(
+            "Statut d'assiduité pédagogique. Null = non renseigné. "
+            "Mapping depuis le statut de processus : voir MAPPING_ASSIDUITE."
+        ),
+    )
+    annee_academique = models.ForeignKey(
+        'scolarite.AnneeAcademique',
+        on_delete=models.SET_NULL,
+        related_name='pointages_lmd',
+        null=True,
+        blank=True,
+        help_text="Année académique LMD (déduite de l'inscription de l'étudiant).",
+    )
+    groupe_lmd = models.ForeignKey(
+        'scolarite.Groupe',
+        on_delete=models.SET_NULL,
+        related_name='pointages_lmd',
+        null=True,
+        blank=True,
+        help_text="Groupe LMD (scolarite.Groupe) de l'étudiant pour cette séance.",
+    )
+    ecue_lmd = models.ForeignKey(
+        'scolarite.ECUE',
+        on_delete=models.SET_NULL,
+        related_name='pointages_lmd',
+        null=True,
+        blank=True,
+        help_text="ECUE via la passerelle Module.ref_module (chaîne LMD).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -76,6 +122,73 @@ class Pointage(models.Model):
             models.Index(fields=['participant', 'date_journee'], name='pointage_part_date_idx'),
             models.Index(fields=['statut', 'timestamp_sortie'], name='pointage_statut_sortie_idx'),
         ]
+
+    @classmethod
+    def MAPPING_ASSIDUITE(cls):
+        """Mapping explicite statut de processus -> statut d'assiduite (lot L1).
+
+        Principe : on ne qualifie une absence que lorsqu'elle est certaine ;
+        les statuts suspects (HORS_LIGNE_SUSPECT) restent NON_RENSEIGNE tant
+        qu'un agent n'a pas tranche manuellement.
+        """
+        return {
+            cls.Statut.EN_COURS: cls.StatutAssiduite.PRESENT,
+            cls.Statut.TERMINE: cls.StatutAssiduite.PRESENT,
+            cls.Statut.FORCE_DFRC: cls.StatutAssiduite.PRESENT,
+            cls.Statut.ABSENT_NON_BADGE: cls.StatutAssiduite.ABSENT,
+            cls.Statut.HORS_LIGNE_SUSPECT: cls.StatutAssiduite.NON_RENSEIGNE,
+            cls.Statut.SORTIE_AUTO: cls.StatutAssiduite.PRESENT,
+        }
+
+    def statut_assiduite_effectif(self):
+        """Assiduite effective : champ manuel si renseigne, sinon mapping."""
+        if self.statut_assiduite:
+            return self.statut_assiduite
+        return self.MAPPING_ASSIDUITE().get(self.statut, self.StatutAssiduite.NON_RENSEIGNE)
+
+    def save(self, *args, **kwargs):
+        """Lot L1 - audit de toute modification apres cloture de seance."""
+        if self.pk:
+            ancien = Pointage.objects.filter(pk=self.pk).first()
+            seance_close = bool(
+                (ancien and ancien.statut in (
+                    self.Statut.TERMINE, self.Statut.ABSENT_NON_BADGE,
+                    self.Statut.SORTIE_AUTO,
+                )) or (self.session_id and self.session.terminee_le)
+            )
+            statut_change = ancien and ancien.statut != self.statut
+            if seance_close and statut_change:
+                super().save(*args, **kwargs)
+                try:
+                    from scolarite.models import (
+                        JournalScolarite, journaliser as journal_scolarite,
+                    )
+
+                    AuditLog.objects.create(
+                        action=AuditLog.Action.POINTAGE_MODIFIE,
+                        acteur=None,
+                        acteur_label='systeme',
+                        cible_type=self.type_personne,
+                        cible_numero=getattr(self.personne, 'matricule', '') or '',
+                        cible_nom=str(self.personne or '')[:255],
+                        pointage=self,
+                        extra={
+                            'session_id': self.session_id,
+                            'ancienne_valeur': ancien.statut,
+                            'nouvelle_valeur': self.statut,
+                        },
+                    )
+                    journal_scolarite(
+                        JournalScolarite.Action.EVENEMENT_SCOLARITE,
+                        objet=self,
+                        ancienne_valeur=ancien.statut,
+                        nouvelle_valeur=self.statut,
+                        commentaire='Modification de présence après clôture',
+                    )
+                except Exception:  # noqa: BLE001 - audit best-effort
+                    pass
+                return
+        super().save(*args, **kwargs)
 
     @property
     def personne(self):
@@ -189,6 +302,8 @@ class AuditLog(models.Model):
         FINANCE_AJUSTEMENT_VALIDE = 'FINANCE_AJUSTEMENT_VALIDE', 'Validation ajustement horaire finance'
         FINANCE_AJUSTEMENT_REJETE = 'FINANCE_AJUSTEMENT_REJETE', 'Rejet ajustement horaire finance'
         FINANCE_SETTINGS_UPDATE = 'FINANCE_SETTINGS_UPDATE', 'Modification paramètres finance'
+        # Lot L1 - presences
+        POINTAGE_MODIFIE = 'POINTAGE_MODIFIE', 'Modification de presence apres cloture'
 
     action = models.CharField(max_length=40, choices=Action.choices)
 
@@ -418,3 +533,49 @@ class Rattrapage(models.Model):
             f"Rattrapage {self.participant} → {self.seance_rattrapage} "
             f"({self.get_statut_display()})"
         )
+
+
+
+class NotificationAbsence(models.Model):
+    """Lot L1 - notification in-app d'absence (seuil d'alerte depasse)."""
+
+    destinataire = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications_absence',
+        help_text="Destinataire (Direction / Secretariat).",
+    )
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='notifications_absence_emises',
+    )
+    etudiant = models.ForeignKey(
+        'scolarite.DossierEtudiant',
+        on_delete=models.CASCADE,
+        related_name='notifications_absence',
+        null=True, blank=True,
+    )
+    session = models.ForeignKey(
+        SessionModule,
+        on_delete=models.SET_NULL,
+        related_name='notifications_absence',
+        null=True, blank=True,
+    )
+    message = models.TextField()
+    niveau = models.CharField(
+        max_length=15,
+        choices=[('AVERTISSEMENT', 'Avertissement'), ('CRITIQUE', 'Critique')],
+        default='AVERTISSEMENT',
+    )
+    lue = models.BooleanField(default=False)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-cree_le']
+        verbose_name = "Notification d'absence"
+        verbose_name_plural = "Notifications d'absence"
+
+    def __str__(self):
+        return f'[{self.niveau}] {self.message[:60]}'

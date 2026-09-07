@@ -1,8 +1,14 @@
 from django.urls import path
 from . import views
 from . import rattrapage_api
+from . import stats_api
 
 urlpatterns = [
+    # Lot L1 — statistiques de présence et alertes d'absence
+    path('stats/taux/', stats_api.taux, name='presences-stats-taux'),
+    path('stats/alertes/', stats_api.alertes, name='presences-stats-alertes'),
+    path('stats/notifications/', stats_api.notifications, name='presences-stats-notifications'),
+
     # Rattrapages inter-cohorte (DFRC / Encadrant / Secrétariat)
     path('rattrapages/', rattrapage_api.rattrapage_list_create, name='rattrapage-list-create'),
     path('rattrapages/participants/', rattrapage_api.rattrapage_participants_search, name='rattrapage-participants'),
