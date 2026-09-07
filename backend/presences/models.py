@@ -304,6 +304,10 @@ class AuditLog(models.Model):
         FINANCE_SETTINGS_UPDATE = 'FINANCE_SETTINGS_UPDATE', 'Modification paramètres finance'
         # Lot L1 - presences
         POINTAGE_MODIFIE = 'POINTAGE_MODIFIE', 'Modification de presence apres cloture'
+        # Lot L1 - notes (workflow de validation)
+        NOTE_SOUMISE = 'NOTE_SOUMISE', 'Note soumise pour validation'
+        NOTE_VALIDEE = 'NOTE_VALIDEE', 'Note validée et verrouillée'
+        NOTE_CORRIGEE = 'NOTE_CORRIGEE', 'Correction de note verrouillée'
 
     action = models.CharField(max_length=40, choices=Action.choices)
 

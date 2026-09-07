@@ -1127,6 +1127,40 @@ class NoteModule(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ── Lot L1 — Workflow de validation des notes ─────────────────────────
+    class StatutValidation(models.TextChoices):
+        BROUILLON = 'BROUILLON', 'Brouillon'
+        SOUMISE = 'SOUMISE', 'Soumise'
+        VALIDEE = 'VALIDEE', 'Validée'
+
+    statut_validation = models.CharField(
+        max_length=12,
+        choices=StatutValidation.choices,
+        default=StatutValidation.BROUILLON,
+        help_text=(
+            'Statut du workflow de validation : BROUILLON → SOUMISE → VALIDEE. '
+            'Une note VALIDEE est verrouillée et ne peut plus être modifiée '
+            'directement : seule une correction auditée (avec motif) est possible.'
+        ),
+    )
+    verrouillee = models.BooleanField(
+        default=False,
+        help_text='True dès que la note est VALIDEE (verrouillée). '
+                  'Une note verrouillée n\'est plus modifiable directement.',
+    )
+    validation_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notes_modules_validees',
+        help_text='Utilisateur ayant validé (verrouillé) la note.',
+    )
+    validation_le = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Horodatage de la validation/verrouillage.',
+    )
+
     class Meta:
         verbose_name = 'Note module'
         verbose_name_plural = 'Notes modules'
@@ -1187,6 +1221,63 @@ class NoteModuleSynthese(models.Model):
 
     def __str__(self):
         return f'{self.participant} — {self.module}'
+
+
+class CorrectionNoteModule(models.Model):
+    """Historique APPEND-ONLY des corrections de notes verrouillées (lot L1).
+
+    Contrairement à `NotificationModificationNote` (notification éphémère), ce
+    modèle est la piste d'audit immuable : aucune vue/administration ne permet
+    de le modifier ou de le supprimer. Chaque correction conserve l'ancienne et
+    la nouvelle valeur ainsi que le motif obligatoire.
+    """
+
+    note = models.ForeignKey(
+        NoteModule,
+        on_delete=models.CASCADE,
+        related_name='corrections',
+    )
+    colonne = models.ForeignKey(
+        NoteModuleColonne,
+        on_delete=models.CASCADE,
+        related_name='corrections',
+    )
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.CASCADE,
+        related_name='corrections_notes',
+    )
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name='corrections_notes_modules',
+    )
+    ancienne_valeur = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    nouvelle_valeur = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    motif = models.TextField(help_text='Motif obligatoire de la correction.')
+    auteur = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='corrections_notes_modules',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Correction de note module'
+        verbose_name_plural = 'Corrections de notes modules'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['module', 'created_at']),
+            models.Index(fields=['colonne', 'participant']),
+        ]
+
+    def __str__(self):
+        return (
+            f'Correction {self.ancienne_valeur} → {self.nouvelle_valeur} '
+            f'({self.motif[:40]}…)'
+        )
 
 
 class NotificationModificationNote(models.Model):

@@ -30,7 +30,7 @@ from rest_framework.response import Response
 from presences.models import Pointage, SessionModule as PresenceSessionModule, AuditLog, _log_audit
 from presences.offline_cache import invalidate_offline_data_cache
 
-from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese, NotificationModificationNote, NotificationFinanceAjustement
+from .models import Formation, Participant, Formateur, QRToken, SessionModule, ModuleParticipant, ModuleFormateur, RefFormation, RefModule, RefSite, RefBatiment, RefSalle, RefCategorie, RefGrade, RefTypeSecretariat, RefVague, Module, FinanceSettings, FinanceAjustement, NoteModule, NoteModuleColonne, NoteModuleSynthese, CorrectionNoteModule, NotificationModificationNote, NotificationFinanceAjustement
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from .access import (
@@ -74,6 +74,7 @@ from .finance_notifications import (
     notifier_ajustement_rejete,
 )
 from .note_notifications import note_deja_enregistree, notifier_modification_note
+from .note_workflow import appliquer_workflow, actions_valides
 from .finance_tolerance import tolerance_settings_payload
 from .serializers import (
     FormationListSerializer,
@@ -4213,12 +4214,20 @@ def module_notes_list_api(request, formation_pk, module_pk):
                     'note': float(val.note),
                     'saisie_par': _user_display(val.saisie_par),
                     'updated_at': val.updated_at.isoformat(),
+                    'statut_validation': val.statut_validation,
+                    'verrouillee': val.verrouillee,
+                    'validation_par': _user_display(val.validation_par),
+                    'validation_le': val.validation_le.isoformat() if val.validation_le else None,
                 }
             else:
                 notes_by_colonne[str(cid)] = {
                     'note': None,
                     'saisie_par': _user_display(val.saisie_par) if val else None,
                     'updated_at': val.updated_at.isoformat() if val else None,
+                    'statut_validation': val.statut_validation if val else 'BROUILLON',
+                    'verrouillee': val.verrouillee if val else False,
+                    'validation_par': _user_display(val.validation_par) if val else None,
+                    'validation_le': val.validation_le.isoformat() if val and val.validation_le else None,
                 }
         rows.append({
             'participant_id': p.id,
@@ -4389,6 +4398,9 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                 existing = NoteModule.objects.filter(
                     colonne=colonne, participant_id=participant_id,
                 ).first()
+                if existing and existing.verrouillee:
+                    errors.append({'index': idx, 'detail': 'Note verrouillée : utilisez une correction motivée.'})
+                    continue
                 if note_deja_enregistree(existing):
                     participant = participants_map.get(participant_id)
                     if participant:
@@ -4401,6 +4413,9 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                 existing = NoteModule.objects.filter(
                     colonne=colonne, participant_id=participant_id,
                 ).first()
+                if existing and existing.verrouillee:
+                    errors.append({'index': idx, 'detail': 'Note verrouillée : utilisez une correction motivée.'})
+                    continue
                 if note_deja_enregistree(existing):
                     participant = participants_map.get(participant_id)
                     if participant:
@@ -4414,6 +4429,12 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
                     defaults={
                         'note': note_val,
                         'saisie_par': request.user,
+                        # Toute modification en saisie invalide une soumission en cours.
+                        'statut_validation': (
+                            NoteModule.StatutValidation.BROUILLON
+                            if existing and existing.statut_validation == NoteModule.StatutValidation.SOUMISE
+                            else existing.statut_validation if existing else NoteModule.StatutValidation.BROUILLON
+                        ),
                     },
                 )
                 note_max = float(colonne.note_max or 20)
@@ -4486,6 +4507,68 @@ def module_notes_bulk_api(request, formation_pk, module_pk):
     calculer_moyennes_module_tous(module)
 
     return Response({'saved': saved, 'errors': errors})
+
+
+@api_view(['POST'])
+@permission_classes([IsGestionNotes])
+def module_notes_workflow_api(request, formation_pk, module_pk):
+    """POST .../notes/workflow/ — cycle BROUILLON → SOUMISE → VALIDEE.
+
+    Corps : ``{'action': 'soumettre'|'annuler'|'valider'|'deverrouiller'|'corriger',
+    'items': [{'participant_id':…, 'colonne_id':…, 'note':…, 'motif':…}, …]}``.
+    Une note ``VALIDEE`` est verrouillée : seule ``corriger`` (motif obligatoire)
+    la modifie, avec trace append-only + AuditLog + JournalScolarite.
+    """
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = _get_module_in_formation(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    action = (request.data.get('action') or '').strip()
+    if action not in actions_valides():
+        return Response({
+            'detail': f'Action invalide. Actions possibles : {", ".join(actions_valides())}.',
+        }, status=400)
+
+    return Response(appliquer_workflow(module, action, request.data.get('items'), request.user))
+
+
+@api_view(['GET'])
+@permission_classes([IsGestionNotesOrReadOnly])
+def module_notes_historique_api(request, formation_pk, module_pk):
+    """GET .../notes/historique/ — corrections append-only des notes du module."""
+    denied = deny_finance_operational_response(request)
+    if denied:
+        return denied
+
+    _, module, err = module_for_notes_or_response(request.user, formation_pk, module_pk)
+    if err:
+        return err
+
+    corrections = (
+        CorrectionNoteModule.objects.filter(module=module)
+        .select_related('colonne', 'participant', 'auteur')
+        .order_by('-created_at')[:200]
+    )
+    return Response({
+        'corrections': [
+            {
+                'id': c.id,
+                'colonne': c.colonne.libelle,
+                'participant_id': c.participant_id,
+                'participant': (f"{c.participant.nom} {c.participant.prenom}").strip(),
+                'ancienne_valeur': float(c.ancienne_valeur) if c.ancienne_valeur is not None else None,
+                'nouvelle_valeur': float(c.nouvelle_valeur) if c.nouvelle_valeur is not None else None,
+                'motif': c.motif,
+                'auteur': _user_display(c.auteur),
+                'created_at': c.created_at.isoformat(),
+            }
+            for c in corrections
+        ],
+    })
 
 
 @api_view(['GET', 'PATCH'])
