@@ -60,6 +60,11 @@ urlpatterns = [
     path('edt/groupes/',                          edt_export.groupes,                name='scolarite-edt-groupes'),
     path('edt/enseignements/',                    edt_export.enseignements,          name='scolarite-edt-enseignements'),
     path('edt/etudiants/',                        edt_export.etudiants,              name='scolarite-edt-etudiants'),
+    # Lot L10 (v1.1) — extensions additives du contrat EDT
+    path('edt/indisponibilites/',                 edt_export.indisponibilites,       name='scolarite-edt-indisponibilites'),
+    path('edt/creneaux/',                         edt_export.creneaux,               name='scolarite-edt-creneaux'),
+    path('edt/affectations/',                     edt_export.affectations,           name='scolarite-edt-affectations'),
+    path('edt/espaces/<int:salle_id>/occupation/', edt_export.espaces_occupation,    name='scolarite-edt-espaces-occupation'),
 
     path('maquettes/',                            api_views.maquette_list,           name='scolarite-maquette-list'),
     path('maquettes/<int:pk>/',                   api_views.maquette_detail,         name='scolarite-maquette-detail'),

@@ -349,6 +349,12 @@ class RefSalle(models.Model):
     type_lieu = models.CharField(max_length=20, choices=TypeLieu.choices, default=TypeLieu.SALLE)
     capacite = models.PositiveIntegerField(null=True, blank=True)
     equipements = models.CharField(max_length=255, blank=True, default='')
+    # Lot L10 — types d'espaces sportifs (référentiel du lot L5)
+    type_espace = models.ForeignKey(
+        'referentiels.RefTypeEspaceSportif', on_delete=models.SET_NULL,
+        related_name='salles', null=True, blank=True,
+        help_text="Type d'espace sportif (gymnase, piscine, terrain…).",
+    )
     indisponible_du = models.DateField(null=True, blank=True)
     indisponible_au = models.DateField(null=True, blank=True)
     actif = models.BooleanField(default=True)

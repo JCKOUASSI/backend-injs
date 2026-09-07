@@ -3527,6 +3527,7 @@ def _create_or_update_ref_salle(obj, data, *, exclude_pk=None):
         capacite=capacite,
         equipements=equipements,
         actif=actif,
+        type_espace_id=data.get('type_espace_id') or None,
     )
     try:
         if obj is None:
@@ -3555,6 +3556,7 @@ def ref_salle_list(request):
     if request.method == 'GET':
         data = list(RefSalle.objects.values(
             'id', 'nom', 'site_id', 'batiment_id', 'type_lieu', 'capacite', 'equipements', 'actif',
+            'type_espace_id',
         ))
         return Response(data)
     obj, err = _create_or_update_ref_salle(None, request.data)

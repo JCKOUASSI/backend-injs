@@ -28,11 +28,13 @@ from .models import (
     AffectationGroupe,
     AnneeAcademique,
     Groupe,
+    IndisponibiliteEnseignant,
     InscriptionAdministrative,
     InscriptionPedagogique,
 )
+from admissions.models import CampagneAdmission
 
-VERSION_CONTRAT = '1.0'
+VERSION_CONTRAT = '1.1'
 
 
 def _annee_demandee(request):
@@ -86,6 +88,11 @@ def contrat(request):
             'groupes': request.build_absolute_uri('./groupes/'),
             'enseignements': request.build_absolute_uri('./enseignements/'),
             'etudiants': request.build_absolute_uri('./etudiants/'),
+            # Lot L10 (v1.1) — extensions additives
+            'indisponibilites': request.build_absolute_uri('./indisponibilites/'),
+            'creneaux': request.build_absolute_uri('./creneaux/'),
+            'affectations': request.build_absolute_uri('./affectations/'),
+            'espaces_occupation': request.build_absolute_uri('./espaces/occupation/'),
         },
         'parametres': [
             'annee_academique_id', 'ref_formation_id', 'niveau_id', 'parcours_id', 'groupe_id',
@@ -275,3 +282,169 @@ def etudiants(request):
         return _reponse_csv('edt_etudiants.csv', colonnes, lignes)
 
     return Response({'version': VERSION_CONTRAT, 'resultats': lignes})
+
+
+
+# ── Lot L10 (v1.1) — extensions additives du contrat ─────────────────────────
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def indisponibilites(request):
+    """Indisponibilités des enseignants (à éviter lors de la planification)."""
+    from scolarite.models import IndisponibiliteEnseignant
+    queryset = IndisponibiliteEnseignant.objects.select_related(
+        'enseignant',
+    ).order_by('date_debut')
+    enseignant_id = request.query_params.get('enseignant_id')
+    if enseignant_id:
+        queryset = queryset.filter(enseignant_id=enseignant_id)
+    date_debut_min = request.query_params.get('date_debut_min')
+    if date_debut_min:
+        queryset = queryset.filter(date_fin__gte=date_debut_min)
+    lignes = [
+        {
+            'enseignant_id': i.enseignant_id,
+            'enseignant': f'{i.enseignant.nom} {i.enseignant.prenom}',
+            'badge': i.enseignant.numerobadge,
+            'date_debut': i.date_debut,
+            'date_fin': i.date_fin,
+            'motif': i.motif,
+        }
+        for i in queryset
+    ]
+    if _csv_demande(request):
+        colonnes = ['enseignant_id', 'enseignant', 'badge', 'date_debut', 'date_fin', 'motif']
+        return _reponse_csv('edt_indisponibilites.csv', colonnes, lignes)
+    return Response({'version': VERSION_CONTRAT, 'resultats': lignes})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def creneaux(request):
+    """Séances planifiées du socle opérationnel (créneaux horaires connus)."""
+    from formations.models import SessionModule
+    queryset = SessionModule.objects.select_related(
+        'module__formation',
+    ).order_by('date_journee', 'heure_debut_prevue', 'numero')
+    queryset = _filtrer(queryset, request, {
+        'ref_formation_id': 'module__formation__ref_formation_id',
+        'date_min': 'date_journee__gte',
+        'date_max': 'date_journee__lte',
+    })
+    lignes = [
+        {
+            'session_id': session.pk,
+            'date_journee': session.date_journee,
+            'numero': session.numero,
+            'intitule': session.intitule,
+            'heure_debut_prevue': session.heure_debut_prevue,
+            'heure_fin_prevue': session.heure_fin_prevue,
+            'module_id': session.module_id,
+            'module': session.module.intitule,
+            'formation': session.module.formation.formation,
+            'groupe_legacy': session.module.groupe,
+        }
+        for session in queryset
+    ]
+    if _csv_demande(request):
+        colonnes = [
+            'session_id', 'date_journee', 'numero', 'intitule',
+            'heure_debut_prevue', 'heure_fin_prevue',
+            'module_id', 'module', 'formation', 'groupe_legacy',
+        ]
+        return _reponse_csv('edt_creneaux.csv', colonnes, lignes)
+    return Response({'version': VERSION_CONTRAT, 'resultats': lignes})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def affectations(request):
+    """Affectations pédagogiques LMD (ECUE × groupe × enseignant, volume, période)."""
+    from scolarite.models import AffectationPedagogique
+    annee = _annee_demandee(request)
+    queryset = AffectationPedagogique.objects.exclude(
+        statut=AffectationPedagogique.Statut.ANNULEE,
+    ).select_related(
+        'annee_academique', 'ref_formation', 'niveau', 'semestre',
+        'ue', 'ecue__ue', 'groupe', 'enseignant',
+    )
+    if annee is not None:
+        queryset = queryset.filter(annee_academique=annee)
+    queryset = _filtrer(queryset, request, {
+        'ref_formation_id': 'ref_formation_id',
+        'niveau_id': 'niveau_id',
+        'parcours_id': 'parcours_id',
+        'groupe_id': 'groupe_id',
+        'enseignant_id': 'enseignant_id',
+    })
+    lignes = [
+        {
+            'affectation_id': a.id,
+            'ecue_id': a.ecue_id,
+            'ecue_code': a.ecue.code if a.ecue_id else '',
+            'ecue_intitule': a.ecue.intitule if a.ecue_id else '',
+            'formation': a.ref_formation.intitule,
+            'parcours': a.parcours.intitule if a.parcours_id else '',
+            'niveau': a.niveau.code,
+            'semestre': a.semestre.libelle,
+            'groupe_id': a.groupe_id,
+            'groupe': a.groupe.nom if a.groupe_id else '',
+            'enseignant': f'{a.enseignant.nom} {a.enseignant.prenom}',
+            'type_enseignement': a.type_enseignement,
+            'volume_horaire': float(a.volume_horaire),
+            'date_debut': a.date_debut,
+            'date_fin': a.date_fin,
+            'statut': a.statut,
+        }
+        for a in queryset
+    ]
+    if _csv_demande(request):
+        colonnes = [
+            'affectation_id', 'ecue_id', 'ecue_code', 'ecue_intitule', 'formation',
+            'parcours', 'niveau', 'semestre', 'groupe_id', 'groupe', 'enseignant',
+            'type_enseignement', 'volume_horaire', 'date_debut', 'date_fin', 'statut',
+        ]
+        return _reponse_csv('edt_affectations.csv', colonnes, lignes)
+    return Response({'version': VERSION_CONTRAT, 'resultats': lignes})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def espaces_occupation(request, salle_id):
+    """Interface de disponibilité par espace — lecture seule (lot L10).
+
+    Retourne les occupations connues d'une salle : épreuves de concours
+    (lot L2). Aucun moteur de réservation : consultation destinée au
+    planificateur et aux modules futurs (maintenance).
+    """
+    from admissions.models import Epreuve as EpreuveConcours
+    from formations.models import RefSalle
+    salle = RefSalle.objects.filter(pk=salle_id).first()
+    if salle is None:
+        return Response({'error': 'Salle introuvable'}, status=404)
+
+    statuts_actifs = (
+        CampagneAdmission.Statut.PLANIFIEE,
+        CampagneAdmission.Statut.OUVERTE,
+        CampagneAdmission.Statut.SUSPENDUE,
+        CampagneAdmission.Statut.CLOTUREE,
+    )
+    epreuves = EpreuveConcours.objects.filter(
+        salle=salle, campagne__statut__in=statuts_actifs,
+    ).order_by('date', 'heure_debut')
+
+    return Response({
+        'salle': {'id': salle.pk, 'nom': salle.nom, 'capacite': salle.capacite},
+        'occupations': [
+            {
+                'source': 'CONCOURS',
+                'libelle': epreuve.intitule,
+                'date': epreuve.date,
+                'heure_debut': epreuve.heure_debut,
+                'duree_minutes': epreuve.duree_minutes,
+                'campagne_id': epreuve.campagne_id,
+            }
+            for epreuve in epreuves
+        ],
+    })

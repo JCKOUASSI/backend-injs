@@ -98,7 +98,7 @@ class ContratTests(ExportEDTFixture, TestCase):
         response = self.client.get('/api/scolarite/edt/')
         self.assertEqual(response.status_code, 200)
         donnees = response.json()
-        self.assertEqual(donnees['version'], '1.0')
+        self.assertEqual(donnees['version'], '1.1')
         self.assertEqual(donnees['annee_academique']['libelle'], '2026-2027')
         self.assertEqual(donnees['volumetrie']['inscriptions_validees'], 2)
 
