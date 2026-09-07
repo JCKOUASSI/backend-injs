@@ -40,6 +40,7 @@ urlpatterns = [
     path('api/parametres/', include('parametres.urls')),
     path('api/referentiels/', include('referentiels.urls')),
     path('api/equivalences/', include('equivalences.urls')),
+    path('api/enseignants/', include('scolarite.charges_urls')),
 
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),

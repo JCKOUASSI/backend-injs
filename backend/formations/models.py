@@ -481,6 +481,20 @@ class Formateur(models.Model):
     telephone = models.CharField(max_length=20, blank=True, default='')
     specialite = models.CharField(max_length=255, blank=True, default='')
     organisation = models.CharField(max_length=255, blank=True, default='')
+    # Lot L3/L7 — distinction explicite grade / fonction / statut enseignant
+    grade_ref = models.ForeignKey(
+        'RefGrade', on_delete=models.SET_NULL,
+        related_name='formateurs_lmd', null=True, blank=True,
+        verbose_name='Grade (référentiel)',
+    )
+    fonction = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Fonction administrative (ex : Chef de département).",
+    )
+    statut_enseignant = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Statut de l'enseignant (ex : Titulaire, Vacataire, Contractuel).",
+    )
     numero_piece_identite = models.CharField(
         max_length=100,
         blank=True,

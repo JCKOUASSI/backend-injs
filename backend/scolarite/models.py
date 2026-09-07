@@ -1012,3 +1012,187 @@ class MaquetteJournal(models.Model):
 
     def __str__(self):
         return f'{self.action} – maquette #{self.maquette_id} @ {self.horodatage:%Y-%m-%d %H:%M}'
+
+
+# ── Lot L3/L7 — charges pédagogiques des enseignants ─────────────────────────
+
+
+class AffectationPedagogique(models.Model):
+    """Charge pédagogique : enseignement confié à un enseignant pour une année.
+
+    Rattachée à la hiérarchie LMD (année → formation → parcours → niveau →
+    semestre → UE/ECUE → groupe) et au maquettage versionné : l'ECUE affectée
+    doit appartenir à la maquette ACTIVE de l'année/formation/niveau.
+    Ne touche ni Formateur (auquel elle se réfère par FK), ni la paie
+    formateurs (FinanceSettings / FinanceAjustement).
+    """
+
+    class Statut(models.TextChoices):
+        PROPOSEE = 'PROPOSEE', 'Proposée'
+        VALIDEE = 'VALIDEE', 'Validée'
+        PLANIFIEE = 'PLANIFIEE', 'Planifiée'
+        REALISEE = 'REALISEE', 'Réalisée'
+        ANNULEE = 'ANNULEE', 'Annulée'
+
+    class TypeEnseignement(models.TextChoices):
+        CM = 'CM', 'Cours magistral'
+        TD = 'TD', 'Travaux dirigés'
+        TP = 'TP', 'Travaux pratiques'
+        STAGE = 'STAGE', 'Stage'
+        AUTRE = 'AUTRE', 'Autre'
+
+    annee_academique = models.ForeignKey(
+        AnneeAcademique, on_delete=models.PROTECT, related_name='affectations_pedagogiques',
+    )
+    ref_formation = models.ForeignKey(
+        'formations.RefFormation', on_delete=models.PROTECT, related_name='affectations_pedagogiques',
+    )
+    parcours = models.ForeignKey(
+        Parcours, on_delete=models.PROTECT,
+        related_name='affectations_pedagogiques', null=True, blank=True,
+    )
+    niveau = models.ForeignKey(Niveau, on_delete=models.PROTECT, related_name='affectations_pedagogiques')
+    semestre = models.ForeignKey(Semestre, on_delete=models.PROTECT, related_name='affectations_pedagogiques')
+    ue = models.ForeignKey(
+        UE, on_delete=models.PROTECT, related_name='affectations_pedagogiques', null=True, blank=True,
+    )
+    ecue = models.ForeignKey(
+        ECUE, on_delete=models.PROTECT, related_name='affectations_pedagogiques', null=True, blank=True,
+    )
+    groupe = models.ForeignKey(
+        Groupe, on_delete=models.SET_NULL, related_name='affectations_pedagogiques', null=True, blank=True,
+    )
+    enseignant = models.ForeignKey(
+        'formations.Formateur', on_delete=models.PROTECT, related_name='affectations_pedagogiques',
+    )
+    type_enseignement = models.CharField(
+        max_length=10, choices=TypeEnseignement.choices, default=TypeEnseignement.CM,
+    )
+    volume_horaire = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    date_debut = models.DateField(null=True, blank=True)
+    date_fin = models.DateField(null=True, blank=True)
+    statut = models.CharField(max_length=15, choices=Statut.choices, default=Statut.PROPOSEE)
+    observations = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['semestre__numero', 'ecue__ue__ordre', 'ecue__ordre']
+        verbose_name = 'LMD – Affectation pédagogique'
+        verbose_name_plural = 'LMD – Affectations pédagogiques'
+        indexes = [
+            models.Index(fields=['annee_academique', 'enseignant']),
+            models.Index(fields=['ecue', 'statut']),
+        ]
+
+    def __str__(self):
+        return f'{self.enseignant} – {self.ecue or self.ue} ({self.volume_horaire} h)'
+
+    def _ecue_de_maquette_active(self):
+        """Vrai si l'ECUE/UE affectée appartient à la maquette ACTIVE de l'année."""
+        maquette = Maquette.objects.filter(
+            annee_academique=self.annee_academique,
+            ref_formation=self.ref_formation,
+            niveau=self.niveau,
+            statut=Maquette.Statut.ACTIVE,
+        ).first()
+        if maquette is None:
+            return False
+        if self.ecue_id:
+            return self.ecue.ue.maquette_id == maquette.pk
+        if self.ue_id:
+            return self.ue.maquette_id == maquette.pk
+        return False
+
+    def clean(self):
+        erreurs = {}
+        # Double affectation : même ECUE/groupe/type déjà confiée à un autre
+        # enseignant (affectation non annulée).
+        if self.ecue_id and self.annee_academique_id:
+            conflits = AffectationPedagogique.objects.filter(
+                annee_academique=self.annee_academique,
+                ecue=self.ecue,
+                type_enseignement=self.type_enseignement,
+            ).exclude(pk=self.pk).exclude(statut=self.Statut.ANNULEE)
+            if self.groupe_id:
+                conflits = conflits.filter(groupe=self.groupe)
+            if conflits.exclude(enseignant=self.enseignant).exists():
+                erreurs['ecue'] = (
+                    'Double affectation : cet enseignement est déjà confié à un '
+                    'autre enseignant.'
+                )
+        # Maquette incompatible : l'ECUE/UE doit appartenir à la maquette
+        # ACTIVE de l'année/formation/niveau.
+        if self.ecue_id or self.ue_id:
+            if not self._ecue_de_maquette_active():
+                erreurs['ecue'] = (
+                    'Affectation incompatible : cet enseignement ne figure pas '
+                    'dans la maquette ACTIVE de l’année/formation/niveau.'
+                )
+        # Conflit de disponibilité : période d'indisponibilité de l'enseignant.
+        if self.enseignant_id and self.date_debut and self.date_fin:
+            indispos = IndisponibiliteEnseignant.objects.filter(
+                enseignant=self.enseignant,
+                date_debut__lte=self.date_fin,
+                date_fin__gte=self.date_debut,
+            )
+            if indispos.exists():
+                erreurs['enseignant'] = (
+                    'Conflit de disponibilité : l’enseignant est indisponible '
+                    'sur cette période.'
+                )
+        if erreurs:
+            raise ValidationError(erreurs)
+
+    @classmethod
+    def volumetrie(cls, enseignant, annee):
+        """Charges d'un enseignant : affectée, validée, planifiée, réalisée."""
+        affectations = cls.objects.filter(
+            enseignant=enseignant, annee_academique=annee,
+        ).exclude(statut=cls.Statut.ANNULEE)
+        somme = lambda statut: sum(
+            float(a.volume_horaire) for a in affectations if a.statut == statut
+        )
+        return {
+            'affectee': sum(float(a.volume_horaire) for a in affectations),
+            'validee': somme(cls.Statut.VALIDEE),
+            'planifiee': somme(cls.Statut.PLANIFIEE),
+            'realisee': somme(cls.Statut.REALISEE),
+        }
+
+
+class IndisponibiliteEnseignant(models.Model):
+    """Période d'indisponibilité d'un enseignant (détection de conflits)."""
+
+    enseignant = models.ForeignKey(
+        'formations.Formateur', on_delete=models.CASCADE, related_name='indisponibilites',
+    )
+    date_debut = models.DateField()
+    date_fin = models.DateField()
+    motif = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_debut']
+        verbose_name = 'LMD – Indisponibilité d’enseignant'
+        verbose_name_plural = 'LMD – Indisponibilités d’enseignants'
+
+    def __str__(self):
+        return f'{self.enseignant} : {self.date_debut} → {self.date_fin} ({self.motif})'
+
+    def clean(self):
+        if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
+            raise ValidationError(
+                {'date_fin': 'La fin d’indisponibilité précède le début.'}
+            )
+        if self.enseignant_id and self.date_debut and self.date_fin:
+            chevauche = IndisponibiliteEnseignant.objects.filter(
+                enseignant=self.enseignant,
+                date_debut__lte=self.date_fin,
+                date_fin__gte=self.date_debut,
+            ).exclude(pk=self.pk).exists()
+            if chevauche:
+                raise ValidationError(
+                    {'date_debut': 'Une indisponibilité existe déjà sur cette période.'}
+                )
+        return f'{self.action} – maquette #{self.maquette_id} @ {self.horodatage:%Y-%m-%d %H:%M}'
