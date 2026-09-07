@@ -70,6 +70,7 @@ const Maquettes = lazy(() => import('./pages/scolarite/Maquettes'))
 const MaquetteDetail = lazy(() => import('./pages/scolarite/MaquetteDetail'))
 const Campagnes = lazy(() => import('./pages/scolarite/Campagnes'))
 const CampagneDetail = lazy(() => import('./pages/scolarite/CampagneDetail'))
+const MonEspace = lazy(() => import('./pages/scolarite/MonEspace'))
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -376,6 +377,15 @@ function App() {
           <Route path="/" element={
             <ProtectedRoute>
               <HomeRoute />
+            </ProtectedRoute>
+          } />
+          <Route path="/mon-espace" element={
+            <ProtectedRoute>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Mon espace étudiant</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <MonEspace />
+                </Suspense>
+              </Layout>
             </ProtectedRoute>
           } />
           <Route path="/profile" element={

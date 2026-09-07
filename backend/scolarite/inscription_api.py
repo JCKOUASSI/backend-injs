@@ -164,10 +164,26 @@ def inscription_detail(request, pk):
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PATCH':
         # Le statut ne se modifie que par l'endpoint de transition.
+        # Lot L1/L3 : un changement de parcours passe par le service dédié
+        # (historisation JournalScolarite + EvenementScolarite REORIENTATION).
+        nouveau_parcours_id = request.data.get('parcours_id')
+        changement_parcours = (
+            nouveau_parcours_id
+            and nouveau_parcours_id != inscription.parcours_id
+        )
         for champ in INSCRIPTION_CHAMPS:
-            if champ in request.data:
+            if champ in request.data and champ != 'parcours_id':
                 valeur = request.data[champ]
                 setattr(inscription, champ, valeur if valeur != '' else None)
+        if changement_parcours:
+            from .models import Parcours
+            nouveau_parcours = Parcours.objects.filter(pk=nouveau_parcours_id).first()
+            if nouveau_parcours is None:
+                return Response({'parcours_id': ['Parcours introuvable.']}, status=400)
+            inscription_services.changer_parcours(
+                inscription, nouveau_parcours, acteur=request.user,
+                motif=request.data.get('motif_parcours', ''),
+            )
         try:
             inscription.full_clean(exclude=['date_validation'])
         except ValidationError as erreur:
@@ -252,4 +268,89 @@ def inscription_stats(request):
         'par_formation': repartition('ref_formation', 'ref_formation__intitule'),
         'par_vague': repartition('vague', 'vague__libelle'),
         'par_categorie': repartition('categorie', 'categorie__libelle'),
+    })
+
+
+# ── Lot L1/L3 — radiation, changement de parcours, clôture d'année ───────────
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def inscription_radier(request, pk):
+    """Radie une inscription VALIDEE : statut SUSPENDUE + événement RADIATION.
+
+    Aucune donnée n'est supprimée (dossier, notes, historique intacts).
+    """
+    inscription = _inscription_queryset().filter(pk=pk).first()
+    if inscription is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    try:
+        inscription_services.radier_inscription(
+            inscription, acteur=request.user,
+            motif=request.data.get('motif', ''),
+        )
+    except inscription_services.InscriptionImpossible as erreur:
+        return Response({'error': erreur.messages}, status=400)
+    return Response(_serialize_inscription(inscription, detail=True))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def inscription_changer_parcours(request, pk):
+    """Changement de parcours — historisé (JournalScolarite + REORIENTATION)."""
+    inscription = _inscription_queryset().filter(pk=pk).first()
+    if inscription is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    from .models import Parcours
+    nouveau_parcours = Parcours.objects.filter(pk=request.data.get('parcours_id')).first()
+    if nouveau_parcours is None:
+        return Response({'error': 'Parcours introuvable.'}, status=400)
+    try:
+        inscription_services.changer_parcours(
+            inscription, nouveau_parcours, acteur=request.user,
+            motif=request.data.get('motif', ''),
+        )
+    except inscription_services.InscriptionImpossible as erreur:
+        return Response({'error': erreur.messages}, status=400)
+    return Response(_serialize_inscription(inscription, detail=True))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def annee_cloturer(request, pk):
+    """Clôture une année académique (plus aucune nouvelle inscription)."""
+    from .models import AnneeAcademique
+    from . import annee_services
+    annee = AnneeAcademique.objects.filter(pk=pk).first()
+    if annee is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    try:
+        annee_services.cloturer_annee(annee, acteur=request.user,
+                                      commentaire=request.data.get('commentaire', ''))
+    except ValidationError as erreur:
+        return Response({'error': erreur.messages}, status=400)
+    return Response({
+        'id': annee.id, 'libelle': annee.libelle,
+        'cloturee': annee.cloturee, 'date_cloture': annee.date_cloture,
+        'courante': annee.courante,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def annee_rouvrir(request, pk):
+    """Réouvre une année clôturée : elle redevient l'année courante."""
+    from .models import AnneeAcademique
+    from . import annee_services
+    annee = AnneeAcademique.objects.filter(pk=pk).first()
+    if annee is None:
+        return Response({'error': 'Introuvable'}, status=404)
+    try:
+        annee_services.rouvrir_annee(annee, acteur=request.user,
+                                     commentaire=request.data.get('commentaire', ''))
+    except ValidationError as erreur:
+        return Response({'error': erreur.messages}, status=400)
+    return Response({
+        'id': annee.id, 'libelle': annee.libelle,
+        'cloturee': annee.cloturee, 'courante': annee.courante,
     })

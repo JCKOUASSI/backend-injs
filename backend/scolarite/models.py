@@ -106,6 +106,12 @@ class AnneeAcademique(models.Model):
         help_text="Une seule année peut être courante à la fois.",
     )
     actif = models.BooleanField(default=True)
+    # Lot L1/L3 — workflow de clôture des années académiques
+    cloturee = models.BooleanField(
+        default=False,
+        help_text="Une année clôturée n'accepte plus de nouvelle inscription.",
+    )
+    date_cloture = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -458,6 +464,25 @@ class InscriptionAdministrative(models.Model):
             raise ValidationError({'parcours': "Le parcours n'appartient pas à cette formation."})
         if self.grade_id and self.categorie_id and self.grade.categorie_id != self.categorie_id:
             raise ValidationError({'grade': "Le grade n'appartient pas à cette catégorie."})
+        # Lot L1/L3 — une inscription d'une année clôturée ne peut pas être créée
+        # (les inscriptions existantes restent consultables : aucune suppression).
+        if self.annee_academique_id and self.annee_academique.cloturee and self.pk is None:
+            raise ValidationError(
+                {'annee_academique': 'Année académique clôturée : nouvelle inscription refusée.'}
+            )
+        # Lot L1/L3 — un étudiant ne peut pas avoir deux inscriptions VALIDEE
+        # pour la même année académique, même sur des formations différentes.
+        if self.statut == self.Statut.VALIDEE and self.etudiant_id and self.annee_academique_id:
+            concurrente = InscriptionAdministrative.objects.filter(
+                etudiant=self.etudiant,
+                annee_academique=self.annee_academique,
+                statut=self.Statut.VALIDEE,
+            ).exclude(pk=self.pk).exists()
+            if concurrente:
+                raise ValidationError(
+                    "Cet étudiant a déjà une inscription validée pour cette année "
+                    "académique : deux inscriptions actives simultanées sont interdites."
+                )
 
     @property
     def est_valide(self):
@@ -512,6 +537,7 @@ class EvenementScolarite(models.Model):
         CHANGEMENT_FORMATION = 'CHANGEMENT_FORMATION', 'Changement de formation'
         CHANGEMENT_GROUPE = 'CHANGEMENT_GROUPE', 'Changement de groupe'
         SUSPENSION = 'SUSPENSION', 'Suspension'
+        RADIATION = 'RADIATION', 'Radiation'
         ABANDON = 'ABANDON', 'Abandon'
         TRANSFERT = 'TRANSFERT', 'Transfert'
         DIPLOMATION = 'DIPLOMATION', 'Obtention du diplôme'

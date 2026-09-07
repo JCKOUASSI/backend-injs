@@ -1811,6 +1811,7 @@ def my_fiche(request):
     stats['nb_modules_inscrits'] = len({m.get('id') for m in modules_data if m.get('id') is not None})
 
     profil = {
+        'id': personne.pk,
         'type_personne': type_str,
         'numero': (
             getattr(personne, 'matricule', None)
@@ -2787,7 +2788,12 @@ def participant_notes_fiche_export(request, pk, fmt):
     )
 
     role = getattr(request.user, 'role', None)
-    if role not in ROLES_FICHE_EXPORT:
+    # Lot L1/L3 — un étudiant peut exporter son propre relevé de notes
+    # (Participant lié au compte authentifié).
+    propre_participant = getattr(request.user, 'participant_profile', None)
+    if role not in ROLES_FICHE_EXPORT and not (
+        propre_participant is not None and propre_participant.pk == pk
+    ):
         return Response({'detail': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
 
     participant, err = _resolve_participant_fiche_admin(request, pk)

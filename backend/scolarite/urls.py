@@ -22,6 +22,13 @@ urlpatterns = [
     path('inscriptions/<int:pk>/',                inscription_api.inscription_detail, name='scolarite-inscription-detail'),
     path('inscriptions/<int:pk>/transition/',     inscription_api.inscription_transition,
                                                                                      name='scolarite-inscription-transition'),
+    path('inscriptions/<int:pk>/radier/',         inscription_api.inscription_radier, name='scolarite-inscription-radier'),
+    path('inscriptions/<int:pk>/changer-parcours/', inscription_api.inscription_changer_parcours,
+                                                                                     name='scolarite-inscription-changer-parcours'),
+
+    # Lot L1/L3 — clôture/réouverture des années académiques
+    path('annees/<int:pk>/cloturer/',             inscription_api.annee_cloturer,    name='scolarite-annee-cloturer'),
+    path('annees/<int:pk>/rouvrir/',              inscription_api.annee_rouvrir,     name='scolarite-annee-rouvrir'),
 
     path('inscriptions/<int:pk>/pedagogie/',      pedagogie_api.inscription_pedagogique_list,
                                                                                      name='scolarite-pedagogie-list'),

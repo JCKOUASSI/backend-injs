@@ -13,6 +13,7 @@ from formations.models import Participant
 from .matricules import generer_matricule
 from .models import (
     DossierEtudiant,
+    EvenementScolarite,
     InscriptionAdministrative,
     JournalScolarite,
     StatutEtudiant,
@@ -54,6 +55,12 @@ def appliquer_transition(inscription, nouveau_statut, acteur=None, commentaire='
             f'Transition interdite : « {inscription.get_statut_display()} » ne peut pas '
             f'passer à « {InscriptionAdministrative.Statut(nouveau_statut).label} ».'
         )
+    # Lot L1/L3 — aucune validation sur une année académique clôturée.
+    if nouveau_statut == S.VALIDEE and inscription.annee_academique.cloturee:
+        raise InscriptionImpossible(
+            f'Année académique {inscription.annee_academique} clôturée : '
+            'validation d’inscription refusée.'
+        )
 
     ancien = inscription.statut
     inscription.statut = nouveau_statut
@@ -74,6 +81,79 @@ def appliquer_transition(inscription, nouveau_statut, acteur=None, commentaire='
         ancienne_valeur=ancien,
         nouvelle_valeur=nouveau_statut,
         commentaire=commentaire,
+    )
+    return inscription
+
+
+# ── Lot L1/L3 — changement de parcours, radiation, clôture d'année ───────────
+
+
+@transaction.atomic
+def changer_parcours(inscription, nouveau_parcours, acteur=None, motif=''):
+    """Change le parcours d'une inscription en historisant la décision.
+
+    Trace : JournalScolarite (ancienne/nouvelle valeur) + EvenementScolarite
+    de type REORIENTATION. Aucune donnée n'est supprimée.
+    """
+    if nouveau_parcours.ref_formation_id != inscription.ref_formation_id:
+        raise InscriptionImpossible(
+            "Le nouveau parcours n'appartient pas à la formation de l'inscription."
+        )
+    ancien = inscription.parcours
+    inscription.parcours = nouveau_parcours
+    inscription.save(update_fields=['parcours', 'updated_at'])
+    journaliser(
+        JournalScolarite.Action.INSCRIPTION_PEDAGOGIQUE_MANUELLE,
+        objet=inscription,
+        acteur=acteur,
+        ancienne_valeur=ancien.intitule if ancien else '',
+        nouvelle_valeur=nouveau_parcours.intitule,
+        commentaire=motif or 'Changement de parcours',
+        extra={'champ': 'parcours'},
+    )
+    EvenementScolarite.objects.create(
+        etudiant=inscription.etudiant,
+        inscription=inscription,
+        type_evenement=EvenementScolarite.Type.REORIENTATION,
+        ancienne_valeur=ancien.intitule if ancien else '',
+        nouvelle_valeur=nouveau_parcours.intitule,
+        commentaire=motif,
+        enregistre_par=acteur,
+    )
+    return inscription
+
+
+@transaction.atomic
+def radier_inscription(inscription, acteur=None, motif=''):
+    """Radie une inscription : statut SUSPENDUE + événement RADIATION.
+
+    La radiation n'efface jamais les données : le dossier, les notes et
+    l'historique restent intacts et consultables.
+    """
+    if inscription.statut != S.VALIDEE:
+        raise InscriptionImpossible(
+            f'Radiation impossible : l’inscription est « {inscription.get_statut_display()} » '
+            '(seule une inscription VALIDEE peut être radiée).'
+        )
+    ancien = inscription.statut
+    inscription.statut = S.SUSPENDUE
+    inscription.save(update_fields=['statut', 'updated_at'])
+    journaliser(
+        JournalScolarite.Action.INSCRIPTION_TRANSITION,
+        objet=inscription,
+        acteur=acteur,
+        ancienne_valeur=ancien,
+        nouvelle_valeur=S.SUSPENDUE,
+        commentaire=f'Radiation : {motif}' if motif else 'Radiation',
+    )
+    EvenementScolarite.objects.create(
+        etudiant=inscription.etudiant,
+        inscription=inscription,
+        type_evenement=EvenementScolarite.Type.RADIATION,
+        ancienne_valeur=ancien,
+        nouvelle_valeur=S.SUSPENDUE,
+        commentaire=motif,
+        enregistre_par=acteur,
     )
     return inscription
 
