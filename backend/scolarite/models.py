@@ -538,6 +538,7 @@ class EvenementScolarite(models.Model):
         CHANGEMENT_GROUPE = 'CHANGEMENT_GROUPE', 'Changement de groupe'
         SUSPENSION = 'SUSPENSION', 'Suspension'
         RADIATION = 'RADIATION', 'Radiation'
+        EQUIVALENCE_DISPENSE = 'EQUIVALENCE_DISPENSE', 'Équivalence ou dispense appliquée'
         ABANDON = 'ABANDON', 'Abandon'
         TRANSFERT = 'TRANSFERT', 'Transfert'
         DIPLOMATION = 'DIPLOMATION', 'Obtention du diplôme'

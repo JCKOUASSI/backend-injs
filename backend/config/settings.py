@@ -107,6 +107,7 @@ INSTALLED_APPS = [
     'admissions.apps.AdmissionsConfig',
     'parametres.apps.ParametresConfig',
     'referentiels.apps.ReferentielsConfig',
+    'equivalences.apps.EquivalencesConfig',
 ]
 
 MIDDLEWARE = [

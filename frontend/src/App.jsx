@@ -71,6 +71,7 @@ const MaquetteDetail = lazy(() => import('./pages/scolarite/MaquetteDetail'))
 const Campagnes = lazy(() => import('./pages/scolarite/Campagnes'))
 const CampagneDetail = lazy(() => import('./pages/scolarite/CampagneDetail'))
 const MonEspace = lazy(() => import('./pages/scolarite/MonEspace'))
+const Equivalences = lazy(() => import('./pages/scolarite/Equivalences'))
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -540,6 +541,15 @@ function App() {
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li><Link to="/scolarite/campagnes">Campagnes</Link></li><li className="separator">/</li><li>Détail</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <CampagneDetail />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/equivalences" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Équivalences et dispenses</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Equivalences />
                 </Suspense>
               </Layout>
             </ProtectedRoute>
