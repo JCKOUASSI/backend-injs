@@ -73,6 +73,10 @@ const CampagneDetail = lazy(() => import('./pages/scolarite/CampagneDetail'))
 const MonEspace = lazy(() => import('./pages/scolarite/MonEspace'))
 const Equivalences = lazy(() => import('./pages/scolarite/Equivalences'))
 const ChargesEnseignants = lazy(() => import('./pages/scolarite/ChargesEnseignants'))
+const Jurys = lazy(() => import('./pages/scolarite/Jurys'))
+const Graduation = lazy(() => import('./pages/scolarite/Graduation'))
+const FinancesEtudiantes = lazy(() => import('./pages/scolarite/FinancesEtudiantes'))
+
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth()
@@ -218,6 +222,27 @@ function Layout({ children, breadcrumb }) {
               </Link>
               <Link to="/scolarite/groupes" className={`nav-item ${isActive('/scolarite/groupes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
                 <span><i className="bi bi-diagram-3"></i> <span className="nav-label">Groupes</span></span>
+              </Link>
+              <Link to="/scolarite/maquettes" className={`nav-item ${isActive('/scolarite/maquettes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-layout-text-window-reverse"></i> <span className="nav-label">Maquettes LMD</span></span>
+              </Link>
+              <Link to="/scolarite/campagnes" className={`nav-item ${isActive('/scolarite/campagnes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-megaphone"></i> <span className="nav-label">Campagnes</span></span>
+              </Link>
+              <Link to="/scolarite/equivalences" className={`nav-item ${isActive('/scolarite/equivalences') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-arrow-left-right"></i> <span className="nav-label">Équivalences</span></span>
+              </Link>
+              <Link to="/scolarite/charges" className={`nav-item ${isActive('/scolarite/charges') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-person-workspace"></i> <span className="nav-label">Charges pédagogiques</span></span>
+              </Link>
+              <Link to="/scolarite/jurys" className={`nav-item ${isActive('/scolarite/jurys') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Jurys LMD</span></span>
+              </Link>
+              <Link to="/scolarite/graduation" className={`nav-item ${isActive('/scolarite/graduation') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-mortarboard-fill"></i> <span className="nav-label">Diplômation</span></span>
+              </Link>
+              <Link to="/scolarite/finances" className={`nav-item ${isActive('/scolarite/finances') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                <span><i className="bi bi-cash-coin"></i> <span className="nav-label">Finances étudiantes</span></span>
               </Link>
             </>
           )}
@@ -560,6 +585,33 @@ function App() {
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Charges pédagogiques</li></>}>
                 <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
                   <ChargesEnseignants />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/jurys" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Sessions de jury</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Jurys />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/graduation" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Diplômation</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <Graduation />
+                </Suspense>
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/scolarite/finances" element={
+            <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Finances étudiantes</li></>}>
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <FinancesEtudiantes />
                 </Suspense>
               </Layout>
             </ProtectedRoute>
