@@ -50,6 +50,20 @@ class JournalScolarite(models.Model):
         REINSCRIPTION = 'REINSCRIPTION', 'Réinscription'
         EVENEMENT_SCOLARITE = 'EVENEMENT_SCOLARITE', 'Événement de scolarité'
         SYNCHRONISATION_EDT = 'SYNCHRONISATION_EDT', 'Export vers l’emploi du temps'
+        # Lot L3 — Jurys
+        JURY_SESSION_CREEE = 'JURY_SESSION_CREEE', 'Session de jury créée'
+        JURY_TRANSITION = 'JURY_TRANSITION', 'Changement d’état d’une session de jury'
+        JURY_MEMBRE = 'JURY_MEMBRE', 'Membre de jury ajouté'
+        JURY_CALCUL = 'JURY_CALCUL', 'Propositions calculées par le moteur ECTS'
+        JURY_DECISION = 'JURY_DECISION', 'Décision de jury enregistrée'
+        JURY_PV_GENERE = 'JURY_PV_GENERE', 'PV de jury généré'
+        JURY_PUBLICATION = 'JURY_PUBLICATION', 'Décisions de jury publiées'
+        # Lot L4 — Diplômation et documents officiels
+        DIPLOME_VALIDATION_PENDING = 'DIPLOME_VALIDATION_PENDING', 'Diplôme en attente de validation'
+        DIPLOME_VALIDE = 'DIPLOME_VALIDE', 'Diplôme validé'
+        DIPLOME_REVOQUE = 'DIPLOME_REVOQUE', 'Diplôme révoqué'
+        DIPLOME_REEDITE = 'DIPLOME_REEDITE', 'Diplôme réédité'
+
 
     action = models.CharField(max_length=50, choices=Action.choices)
     objet_type = models.CharField(max_length=50, blank=True)
@@ -179,6 +193,67 @@ class Niveau(models.Model):
 
     def __str__(self):
         return self.code
+
+
+class RegleValidationLMD(models.Model):
+    """Paramétrage de validation LMD (crédits / compensation) par formation.
+
+    Utilisé par le moteur de validation (validation_services.py) et par les
+    jurys. Une règle peut cibler un niveau précis ; une règle avec ``niveau``
+    null sert de règle par défaut pour la formation.
+    """
+
+    class Compensation(models.TextChoices):
+        AUCUNE = 'AUCUNE', 'Aucune compensation'
+        SEMESTRE = 'SEMESTRE', 'Compensation au sein du semestre'
+
+    ref_formation = models.ForeignKey(
+        'formations.RefFormation', on_delete=models.CASCADE,
+        related_name='regles_validation_lmd',
+    )
+    niveau = models.ForeignKey(
+        Niveau, on_delete=models.CASCADE, related_name='regles_validation_lmd',
+        null=True, blank=True,
+        help_text='Niveau ciblé (null = règle par défaut de la formation).',
+    )
+    seuil_admission = models.DecimalField(
+        max_digits=4, decimal_places=2, default=10,
+        help_text='Moyenne /20 requise pour valider une UE ou un semestre.',
+    )
+    compensation = models.CharField(
+        max_length=12, choices=Compensation.choices, default=Compensation.SEMESTRE,
+    )
+    seuil_elim = models.DecimalField(
+        max_digits=4, decimal_places=2, null=True, blank=True,
+        help_text='Moyenne UE en dessous de ce seuil : UE non acquise, même avec compensation.',
+    )
+    credits_semestre = models.PositiveSmallIntegerField(
+        default=30, help_text='Crédits ECTS attendus par semestre.',
+    )
+    capitalisation_activee = models.BooleanField(
+        default=True, help_text='Report des crédits acquis des sessions antérieures.',
+    )
+    actif = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ref_formation', 'niveau__ordre']
+        verbose_name = 'LMD – Règle de validation'
+        verbose_name_plural = 'LMD – Règles de validation'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ref_formation', 'niveau'], name='uniq_regle_formation_niveau',
+            ),
+            models.UniqueConstraint(
+                fields=['ref_formation'], condition=Q(niveau__isnull=True),
+                name='uniq_regle_defaut_formation',
+            ),
+        ]
+
+    def __str__(self):
+        cible = self.niveau.code if self.niveau else 'défaut'
+        return f'Règle {self.ref_formation} / {cible}'
 
 
 class Parcours(models.Model):

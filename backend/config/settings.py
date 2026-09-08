@@ -108,6 +108,10 @@ INSTALLED_APPS = [
     'parametres.apps.ParametresConfig',
     'referentiels.apps.ReferentielsConfig',
     'equivalences.apps.EquivalencesConfig',
+    'jurys.apps.JurysConfig',
+    # Applications créées durant la réstauration (branche 2026-09)
+    'graduation.apps.GraduationConfig',
+    'finances_etudiantes.apps.FinancesEtudiantesConfig',  # L6 : paiements / scolarité étudiante
 ]
 
 MIDDLEWARE = [
