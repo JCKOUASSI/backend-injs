@@ -63,6 +63,12 @@ class JournalScolarite(models.Model):
         DIPLOME_VALIDE = 'DIPLOME_VALIDE', 'Diplôme validé'
         DIPLOME_REVOQUE = 'DIPLOME_REVOQUE', 'Diplôme révoqué'
         DIPLOME_REEDITE = 'DIPLOME_REEDITE', 'Diplôme réédité'
+        # Lot L5 — Stages et conventions
+        STAGE_TRANSITION = 'STAGE_TRANSITION', 'Changement de statut de convention de stage'
+        STAGE_NOTES = 'STAGE_NOTES', 'Notes de stage saisies (rapport/soutenance)'
+        STAGE_EVALUATION_MODIFIEE = 'STAGE_EVALUATION_MODIFIEE', 'Évaluation de stage modifiée'
+        STAGE_EVALUATION_VALIDEE = 'STAGE_EVALUATION_VALIDEE', 'Évaluation de stage validée'
+
 
 
     action = models.CharField(max_length=50, choices=Action.choices)

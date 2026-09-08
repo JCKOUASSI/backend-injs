@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/enseignants/', include('scolarite.charges_urls')),
     path('api/finances-etudiantes/', include('finances_etudiantes.urls')),
     path('api/graduation/', include('graduation.urls')),
+    path('api/stages/', include('stages.urls')),
 
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),

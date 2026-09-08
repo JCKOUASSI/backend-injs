@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     # Applications créées durant la réstauration (branche 2026-09)
     'graduation.apps.GraduationConfig',
     'finances_etudiantes.apps.FinancesEtudiantesConfig',  # L6 : paiements / scolarité étudiante
+    'stages.apps.StagesConfig',  # L5 : stages et conventions
 ]
 
 MIDDLEWARE = [
