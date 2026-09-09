@@ -185,111 +185,165 @@ export default function Parametres() {
   const canEdit = (row) => row.can_edit && row.modifiable
   const editing = modal?.type === 'edit' ? modal.row : null
 
+  const currentTab = CATEGORIES.find(c => c.value === tab)
+
   return (
-    <div className="container-fluid">
-      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <h4 className="mb-0"><i className="bi bi-gear me-2"></i>Paramètres</h4>
-        <input
-          type="search"
-          className="form-control"
-          style={{ maxWidth: 280 }}
-          placeholder="Rechercher un paramètre…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title"><i className="bi bi-gear me-2"></i>Paramètres</h1>
+          <p className="page-subtitle">
+            Paramètres fonctionnels de l’établissement. Les tarifs finance restent dans{' '}
+            <Link to="/finance-parametrage">Paramétrage finance</Link>.
+            Les emplois du temps sont générés dans <strong>app-ept-injs-lmd 2026</strong> puis importés dans Cours → Séances.
+          </p>
+        </div>
       </div>
 
-      <p className="text-muted small mb-3">
-        Paramètres fonctionnels de l’établissement. Les tarifs finance restent dans{' '}
-        <Link to="/finance-parametrage">Paramétrage finance</Link>.
-        Les emplois du temps sont générés dans <strong>app-ept-injs-lmd 2026</strong> puis importés dans Cours → Séances.
-      </p>
-
-      <ul className="nav nav-tabs mb-3">
-        {visibleTabs.map(c => (
-          <li className="nav-item" key={c.value}>
+      {/* Onglets catégories — style Référentiels */}
+      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color)', paddingBottom: '0' }}>
+        {visibleTabs.map(c => {
+          const count = params.filter(p => p.categorie === c.value).length
+          const active = tab === c.value
+          return (
             <button
+              key={c.value}
               type="button"
-              className={`nav-link ${tab === c.value ? 'active' : ''}`}
+              role="tab"
+              aria-selected={active}
               onClick={() => setTab(c.value)}
+              style={{
+                padding: '0.5rem 1.1rem',
+                border: 'none',
+                borderRadius: '6px 6px 0 0',
+                background: active ? 'var(--navy)' : 'transparent',
+                color: active ? '#fff' : 'var(--text-secondary)',
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                transition: 'all 0.15s',
+              }}
             >
-              <i className={`${c.icon} me-1`}></i>{c.label}
+              <i className={`bi ${c.icon} me-1`}></i>{c.label}
+              <span style={{
+                marginLeft: '0.4rem',
+                background: active ? 'rgba(255,255,255,0.25)' : 'var(--border-color)',
+                color: active ? '#fff' : 'var(--text-secondary)',
+                borderRadius: '10px',
+                padding: '0 6px',
+                fontSize: '0.75rem',
+              }}>
+                {count}
+              </span>
             </button>
-          </li>
-        ))}
-      </ul>
+          )
+        })}
+      </div>
 
       {loading ? (
         <div className="loading py-5"><div className="spinner"></div></div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-5 text-muted">
-          <i className="bi bi-inbox" style={{ fontSize: '2rem' }}></i>
-          <p className="mt-2">Aucun paramètre dans cette catégorie.</p>
-        </div>
       ) : (
-        <div className="table-responsive">
-          <table className="table table-hover align-middle">
-            <thead className="table-light">
-              <tr>
-                <th>Libellé</th>
-                <th>Clé</th>
-                <th>Type</th>
-                <th style={{ minWidth: 220 }}>Valeur</th>
-                <th style={{ width: 110 }}>Modifiable</th>
-                <th style={{ width: 160 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(row => (
-                <tr key={row.id}>
-                  <td>
-                    <div className="fw-semibold">
-                      {row.libelle}
-                      {row.est_critique && (
-                        <span className="badge bg-warning text-dark ms-2">Critique</span>
-                      )}
-                    </div>
-                    {row.description && (
-                      <small className="text-muted" style={{ display: 'block', marginTop: 2 }}>
-                        {row.description}
-                      </small>
-                    )}
-                  </td>
-                  <td><code>{row.cle}</code></td>
-                  <td>{row.type}</td>
-                  <td>{displayValue(row)}</td>
-                  <td>
-                    {row.modifiable ? (
-                      <span className="badge bg-success">Oui</span>
-                    ) : (
-                      <span className="badge bg-secondary">Non</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="btn-group">
-                      <button
-                        type="button"
-                        className="btn btn-outline-primary btn-sm"
-                        onClick={() => openEdit(row)}
-                        disabled={!canEdit(row)}
-                        title={canEdit(row) ? 'Modifier' : 'Non modifiable'}
-                      >
-                        <i className="bi bi-pencil"></i>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={() => openHistory(row)}
-                        title="Historique"
-                      >
-                        <i className="bi bi-clock-history"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <span>
+              <i className={`bi ${currentTab?.icon ?? 'bi-gear'} me-2`}></i>
+              {currentTab?.label ?? 'Paramètres'}
+            </span>
+            <div className="d-flex align-items-center gap-2">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="search"
+                  className="form-control form-control-sm"
+                  style={{ minWidth: 220, paddingLeft: '2rem' }}
+                  placeholder="Rechercher un paramètre…"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                />
+                <i className="bi bi-search" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}></i>
+              </div>
+              <span className="text-muted small">
+                {filtered.length} entrée{filtered.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            {filtered.length === 0 ? (
+              <div className="text-center py-5 text-muted">
+                <i className="bi bi-inbox" style={{ fontSize: '2rem' }}></i>
+                <p className="mt-2">Aucun paramètre dans cette catégorie.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '74%' }}>Libellé</th>
+                      <th style={{ width: '10%' }}>Statut</th>
+                      <th style={{ width: '16%', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(row => {
+                      const editable = canEdit(row)
+                      return (
+                        <tr key={row.id} style={row.modifiable ? undefined : { background: '#f6f8fb' }}>
+                          <td style={row.modifiable ? undefined : { opacity: 0.75 }}>
+                            <div className="fw-semibold">
+                              {row.libelle}
+                              {row.est_critique && (
+                                <span className="badge badge-suspendue ms-2" title="Paramètre critique — confirmation requise">
+                                  <i className="bi bi-exclamation-triangle-fill me-1"></i>Critique
+                                </span>
+                              )}
+                              {!row.modifiable && (
+                                <span className="badge bg-secondary ms-2" title="Paramètre système non modifiable">
+                                  <i className="bi bi-lock-fill me-1"></i>Verrouillé
+                                </span>
+                              )}
+                            </div>
+                            {row.description && <div className="small text-muted">{row.description}</div>}
+                            <div className="small" style={{ marginTop: '0.35rem' }}>
+                              <span
+                                className="badge badge-planifiee"
+                                style={{ maxWidth: '100%', display: 'inline-block', overflowWrap: 'anywhere', whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem', textAlign: 'left' }}
+                                title={displayValue(row)}
+                              >
+                                {displayValue(row)}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge badge-planifiee">Actif</span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div className="btn-group">
+                              <button
+                                type="button"
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={() => openEdit(row)}
+                                disabled={!editable}
+                                title={editable ? 'Modifier la valeur' : 'Non modifiable'}
+                              >
+                                <i className="bi bi-pencil"></i>
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline-secondary btn-sm"
+                                onClick={() => openHistory(row)}
+                                title="Historique des modifications"
+                              >
+                                <i className="bi bi-clock-history"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
