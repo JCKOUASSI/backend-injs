@@ -316,7 +316,7 @@ export default function Parametres() {
                             <span className="badge badge-planifiee">Actif</span>
                           </td>
                           <td style={{ textAlign: 'right' }}>
-                            <div className="btn-group">
+                            <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
                               <button
                                 type="button"
                                 className="btn btn-outline-primary btn-sm"
