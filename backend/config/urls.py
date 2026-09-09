@@ -45,6 +45,12 @@ urlpatterns = [
     path('api/finances-etudiantes/', include('finances_etudiantes.urls')),
     path('api/graduation/', include('graduation.urls')),
     path('api/stages/', include('stages.urls')),
+    # Lot L8 — Emploi du temps
+    path('api/edts/', include('edts.urls')),
+    # Lot L7 — Administration, RH, Patrimoine
+    path('api/administrations/', include('administrations.urls')),
+    path('api/rh/', include('ressources_humaines.urls')),
+    path('api/patrimoine/', include('patrimoine.urls')),
 
     # Web dashboard CPFAE
     path('dashboard/', include('dashboard.urls')),

@@ -27,6 +27,10 @@ import FinanceEncadrants from './pages/FinanceEncadrants'
 import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
 import EvaluationTake from './pages/EvaluationTake'
+import Edts from './pages/Edts'
+import EdtNew from './pages/EdtNew'
+import AffectationNew from './pages/AffectationNew'
+
 import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
@@ -751,6 +755,27 @@ function App() {
             <ProtectedRoute allowedRoles={ARCHIVE_CONSULT_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/archives">Archives</Link></li><li className="separator">/</li><li>Cahiers d'appel</li></>}>
                 <ArchiveCahiersAppel />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/edt" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Emplois du temps</li></>}>
+                <Edts />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/edt/nouveau" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/edt">Emplois du temps</Link></li><li className="separator">/</li><li>Nouvel EDT</li></>}>
+                <EdtNew />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/edt/:edtId/affectation/nouveau" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/edt">Emplois du temps</Link></li><li className="separator">/</li><li>Nouvelle affectation</li></>}>
+                <AffectationNew />
               </Layout>
             </ProtectedRoute>
           } />

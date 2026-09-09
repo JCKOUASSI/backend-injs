@@ -113,6 +113,11 @@ INSTALLED_APPS = [
     'graduation.apps.GraduationConfig',
     'finances_etudiantes.apps.FinancesEtudiantesConfig',  # L6 : paiements / scolarité étudiante
     'stages.apps.StagesConfig',  # L5 : stages et conventions
+    'administrations.apps.AdministrationsConfig',        # L7 : courriers, documents, réunions, missions
+    'ressources_humaines.apps.RessourcesHumainesConfig', # L7 : agents, services, fonctions, disponibilités
+    'patrimoine.apps.PatrimoineConfig',                  # L7 : équipements, véhicules, maintenance, réservations
+    # Lot L8 — Emploi du temps
+    'edts.apps.EdtsConfig',                              # L8 : créneaux, plannings, affectations, conflits
 ]
 
 MIDDLEWARE = [
