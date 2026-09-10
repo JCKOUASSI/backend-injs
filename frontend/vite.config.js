@@ -7,6 +7,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 3000,
     host: true,
+    proxy: {
+      // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
+      // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',
