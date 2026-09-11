@@ -42,18 +42,39 @@ function makeApiMock() {
   let meUser = null
 
   const matchRoute = (path) => {
+    // La correspondance exacte s'effectue sur le chemin sans la query string.
+    const pathOnly = path.split('?')[0]
     for (const route of routes) {
-      if (route.match instanceof RegExp ? route.match.test(path) : route.match === path) {
+      if (route.match instanceof RegExp ? route.match.test(path) : route.match === pathOnly) {
         return route
       }
     }
     return null
   }
 
+  // Une route fournit soit des données statiques, soit une fonction recevant
+  // le chemin complet (query incluse) et le corps ; elle renvoie les données,
+  // ou un objet { data, status }.
+  const produce = (route, path, body) => {
+    const raw = typeof route.data === 'function' ? route.data(path, body) : route.data
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      Object.prototype.hasOwnProperty.call(raw, 'data') &&
+      Object.prototype.hasOwnProperty.call(raw, 'status')
+    ) {
+      return { data: raw.data, status: raw.status }
+    }
+    return { data: raw, status: route.status ?? 200 }
+  }
+
   const resolve = (path) => {
-    if (path === '/auth/me/' && meUser) return ok(meUser)
+    if (path.split('?')[0] === '/auth/me/' && meUser) return ok(meUser)
     const route = matchRoute(path)
-    if (route) return ok(route.data, route.status ?? 200)
+    if (route) {
+      const { data, status } = produce(route, path)
+      return ok(data, status)
+    }
     return ok(safeData())
   }
 
@@ -61,12 +82,18 @@ function makeApiMock() {
     get: vi.fn(async (path) => resolve(path)),
     post: vi.fn(async (path, body) => {
       const route = matchRoute(path)
-      if (route) return ok(route.data ?? body ?? {}, route.status ?? 200)
+      if (route) {
+        const { data, status } = produce(route, path, body)
+        return ok(data ?? body ?? {}, status)
+      }
       return ok({})
     }),
     patch: vi.fn(async (path, body) => {
       const route = matchRoute(path)
-      if (route) return ok(route.data ?? body ?? {}, route.status ?? 200)
+      if (route) {
+        const { data, status } = produce(route, path, body)
+        return ok(data ?? body ?? {}, status)
+      }
       return ok(body ?? {})
     }),
     put: vi.fn(async (path, body) => ok(body ?? {})),
@@ -80,7 +107,11 @@ function makeApiMock() {
 
   return {
     api,
-    /** Programme une réponse GET (chemin exact ou RegExp). */
+    /**
+     * Programme une réponse (chemin exact ou RegExp). `data` est soit une
+     * valeur statique, soit une fonction `(path, body) => données | { data, status }`
+     * appelée à chaque requête (pratique pour paginer/filtrer selon la query).
+     */
     setRoute(match, data, status = 200) {
       routes.push({ match, data, status })
     },

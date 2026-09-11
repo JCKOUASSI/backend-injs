@@ -3,7 +3,8 @@
 > Document de référence du dispositif de tests du frontend web (`frontend/`, Vite + React 18).
 > Introduit par le lot **P00-04 [LOT 0]** (filet de sécurité de tests automatisés), puis
 > étendu au **[LOT 1]** (moteur de tableaux/listes génériques et formulaire de décision
-> pédagogique).
+> pédagogique) et au **[LOT 2]** (page de liste *serveur* typée `Users` : recherche
+> debounced, onglets/rôles, pagination et écritures CRUD).
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -168,8 +169,14 @@ que celui importé par les pages. Les tests unitaires du client
     `'ownKeys' on proxy: trap result did not include 'length'`).
 - **Contrôleur `apiController`** :
   - `setRoute(match, data, status = 200)` / `reset()` : `match` est une chaîne
-    (chemin exact) ou une `RegExp` ; les routes sont évaluées dans l'ordre
-    d'enregistrement (déclarer les plus spécifiques en premier) ;
+    (chemin exact, comparé **sans** la query string) ou une `RegExp` ; les
+    routes sont évaluées dans l'ordre d'enregistrement (déclarer les plus
+    spécifiques en premier). `data` est soit une valeur statique, soit une
+    **fonction `(path, body) => données | { data, status }`**, appelée à chaque
+    requête : c'est ainsi que les tests de listes paginent/filtrent en lisant
+    les paramètres de la query string (`new URL(path, base).searchParams`). Une
+    fonction qui **lève** (`throw Object.assign(new Error(), { response: { data } })`)
+    fait rejeter la promesse du client et permet de simuler une erreur HTTP ;
   - `setMe(user)` : force l'utilisateur authentifié pour les écrans ;
   - `findCall(method, matcher)` / `lastBody(method)` : introspection des appels
     (URL, méthode, corps). Les méthodes `api.*` sont des `vi.fn` : on peut aussi
@@ -202,7 +209,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (18 fichiers, 437 tests)
+### 6.2 Fichiers de test colocalisés (19 fichiers, 453 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -233,11 +240,12 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/hooks/useListReturn.test.jsx` | hook | Retour vers une liste : priorité à l'état de navigation, puis `sessionStorage`, puis chemin brut ; état `from`. |
 | `src/hooks/usePersistedListQuery.test.jsx` | hook | Synchronisation filtres/pagination → URL (`replace`) **et** `sessionStorage`, nettoyage et mise à jour quand une dépendance change. |
 
-**Page fonctionnelle (LOT 1) et smoke**
+**Pages fonctionnelles (LOT 1 & 2) et smoke**
 
 | Fichier | Niveau | Ce qui est vérifié |
 | --- | --- | --- |
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
+| `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (16 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
@@ -259,32 +267,34 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 1 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 2 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
 | `src/utils/roles.js` | **100 %** | **100 %** | **100 %** | **100 %** |
-| `src/utils/**` (hors rôles inclus) | 77 % | 77 % | 79 % | 85 % |
+| `src/utils/**` (rôles inclus) | 77 % | 77 % | 79 % | 86 % |
 | `src/services/**` | **97 %** | 97 % | 97 % | **91 %** |
 | `src/context/**` | **99 %** | 99 % | 89 % | **91 %** |
 | `src/hooks/**` | **94 %** | 94 % | 84 % | **91 %** |
 | `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
-| **Global `src/` (toutes zones)** | **32 %** | 32 % | 23 % | **61 %** |
+| `pages/Users.jsx` | **89 %** | 89 % | 49 % | **69 %** |
+| **Global `src/` (toutes zones)** | **33 %** | 33 % | 24 % | **62 %** |
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`,
-`apiErrors.js` et les trois hooks de liste testés à **100 % de lignes**.
+`apiErrors.js` et les hooks de liste testés à **100 % de lignes**.
 
 Les seuils sont déclarés dans `vitest.config.js` (`coverage.thresholds`,
-`perFile: false` pour les globes). Valeurs **relevées au LOT 1** (ordres :
-lignes, instructions, fonctions, branches) :
+`perFile: false` pour les globes). Valeurs après le LOT 2 (ordres : lignes,
+instructions, fonctions, branches) :
 
 - `src/utils/roles.js` : **100 / 100 / 100 / 100** (contrat de sécurité) ;
 - `src/utils/**` : **70 / 70 / 72 / 78** ;
 - `src/services/**` : **90 / 90 / 90 / 85** ;
 - `src/context/**` : **95 / 95 / 85 / 85** ;
 - `src/hooks/**` : **88 / 88 / 80 / 85** ;
-- plancher **global** : 30 % lignes/instructions, 20 % fonctions, 54 % branches.
+- plancher **global** : **32** % lignes/instructions, **22** % fonctions,
+  **58** % branches (relevé au LOT 2 ; il était de 30/20/54 au LOT 1).
 
 Chaque seuil est arrondi *sous* la mesure pour absorber la volatilité du
 maillage des branches. Le garde-fou est vérifié en CI : un build dont la
@@ -342,6 +352,17 @@ et de l'emploi mobile (Flutter).
 - **Libellé dupliqué entre une carte KPI cliquable et le badge d'une ligne**
   (page Décisions). Préférer `getAllByText('Ajourné')[0]` (la carte est rendue
   avant le tableau) ou restreindre avec `within(ligne.closest('tr'))`.
+- **Libellés non reliés par `htmlFor` dans certaines modales** (ex. `Users`).
+  `getByLabelText` ne trouve pas ces champs : on les récupère via leur
+  `.form-group` (helper `modalField(modal, /libellé/)` du test `Users`, qui
+  prend le `<label>` puis le `input/select` du même bloc).
+- **Recherche avec debounce** : taper ne déclenche la requête qu'après 400 ms.
+  Avec des horloges réelles, `fireEvent.change` puis
+  `waitFor(() => expect(derniersParamètres.search)…)` suffit (timeout par défaut
+  1 s) ; ne pas affirmer la requête immédiatement après la frappe.
+- **Simuler une erreur HTTP avec le mock** : deux options — une route dynamique
+  qui **lève** (le client `async` rejette alors), ou `mockRejectedValueOnce`
+  sur une méthode (consommée une seule fois, sans réinitialisation manuelle).
 - **Les tests ne changent pas la production** : pas de garde spécifique au test
   dans le code métier, pas de court-circuit `if (test)`. Les polyfils restent
   confinés à `src/test/setup.js` ; les assertions de sécurité (rôles) doivent
@@ -433,10 +454,11 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 1 :
+**Aucune page n'est dépourvue de test.** État après le LOT 2 :
 
-- deux pages disposent d'un test **fonctionnel dédié** : `Login.jsx` et
-  `DecisionsPedagogiques.jsx` (cette dernière à 100 % de lignes) ;
+- trois écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
+  `DecisionsPedagogiques.jsx` (100 % de lignes) et `Users.jsx` (89 % de lignes,
+  liste serveur complète + CRUD) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -444,19 +466,18 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **51 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
-  *comportement métier* bout-en-bout (soumission de formulaires, cas limites
-  d'API, interactions entre écrans).
+- les **50 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+  *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
 
-1. ~~Tableau générique (liste/recherche/pagination/ordre) et formulaire de
-   décision pédagogique~~ — **fait au LOT 1** (moteur de listes en unitaires +
-   page Décisions en comportement). Reste la couverture bout-en-bout d'une page
-   de liste *serveur* typée (recherche debounced, tri, navigation page suivante)
-   pour valider l'assemblage React Query + hooks + `Pagination` ;
+1. ~~Moteur de listes + décision pédagogique~~ (LOT 1) et ~~assemblage d'une
+   liste *serveur* typée (recherche debounced, filtres/onglets, pagination,
+   écritures)~~ (LOT 2, page `Users`). Le « tri » par colonne n'existe pas dans
+   les listes actuelles (ordering géré côté API) : aucun besoin à couvrir. Reste
+   la branche `Users` « création d'un secrétariat à la volée » ;
 2. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
-   jurys, finances étudiantes, référentiels ;
+   jurys, finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
 3. écrans `Statistiques` / `Dashboard` avec fixtures complètes et filtres de
    période (les points du §10.2 sur `effectiveSecretariatId` seront couverts à
    cette occasion) ;
