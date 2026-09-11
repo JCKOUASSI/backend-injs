@@ -2,6 +2,7 @@
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from authentication.models import User
@@ -21,6 +22,9 @@ def make_user(username, role='CPFAE_ADMIN', **kwargs):
 )
 class StatsDashboardCacheTests(TestCase):
     def setUp(self):
+        # Isolation : LocMemCache est partagée au niveau du LOCATION du module ;
+        # on la purge pour qu'un test précédent ne pollue pas les assertions de cache.
+        cache.clear()
         self.admin = make_user('admin_stats_cache')
         self.client = APIClient()
         self.client.force_authenticate(self.admin)
@@ -66,6 +70,9 @@ class StatsDashboardCacheTests(TestCase):
 )
 class StatsSecretariatsCacheTests(TestCase):
     def setUp(self):
+        # Isolation : LocMemCache est partagée au niveau du LOCATION du module ;
+        # on la purge pour qu'un test précédent ne pollue pas les assertions de cache.
+        cache.clear()
         self.admin = make_user('admin_sec_cache')
         self.client = APIClient()
         self.client.force_authenticate(self.admin)
@@ -102,6 +109,9 @@ class StatsSecretariatsCacheTests(TestCase):
 )
 class StatsBilansCacheTests(TestCase):
     def setUp(self):
+        # Isolation : LocMemCache est partagée au niveau du LOCATION du module ;
+        # on la purge pour qu'un test précédent ne pollue pas les assertions de cache.
+        cache.clear()
         self.admin = make_user('admin_bilans_cache')
         self.client = APIClient()
         self.client.force_authenticate(self.admin)
