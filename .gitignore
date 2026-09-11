@@ -36,3 +36,26 @@ project_structure.txt
 backend/.seed_ok
 backend/.venv/.deps_ok
 backend/db.sqlite3
+# P00-02 — données nominatives et classeurs d'import : hors dépôt
+*.numbers
+*.xlsx
+*.xls
+*.csv
+**/importverif/
+# Exception 1 : modèles vides d'import (en-têtes + 1 ligne fictive)
+!docs/modeles/
+!docs/modeles/**
+# Exception 2 : fixture synthétique de tests (générée, non nominative)
+!backend/test_import_formations_seances.xlsx
+# Secrets et bases locales
+.env
+*.sqlite3
+**/assets/app.env
+# Arena — outillage de pilotage (journaux et caches uniquement ; les scripts sont suivis)
+arena/*.log
+arena/__pycache__/
+backend/db_sandbox.sqlite3
+backend/.requirements-sans-pg.txt
+
+# Arena
+/.gitignore-arena

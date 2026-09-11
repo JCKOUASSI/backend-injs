@@ -48,6 +48,10 @@ jobs:
       - name: Installer les dépendances Python
         run: pip install -r backend/requirements.txt
 
+      - name: Hygiène du dépôt (données nominatives)
+        working-directory: backend
+        run: python manage.py check_repo_hygiene
+
       - name: Migrations et tests
         working-directory: backend
         run: |

@@ -244,7 +244,11 @@ def generate_seances():
 
 
 def main():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # P00-02 : les modèles d'import vivent dans docs/modeles/ (seul emplacement
+    # versionné pour ces fichiers ; les classeurs de données réels restent hors Git).
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.join(repo_root, 'docs', 'modeles')
+    os.makedirs(base_dir, exist_ok=True)
 
     outputs = []
 
