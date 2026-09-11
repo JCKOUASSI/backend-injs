@@ -1,0 +1,31 @@
+name: TMP regen pubspec lock
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ['arena/**']
+
+jobs:
+  regen:
+    name: Regenerate pubspec.lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.41.7"
+      - name: Regenerate lockfile
+        working-directory: qr_badge_mobile
+        run: flutter pub get
+      - name: Show diff
+        working-directory: qr_badge_mobile
+        run: |
+          git diff -- pubspec.lock | head -120 || true
+      - name: Upload regenerated lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: pubspec-lock
+          path: qr_badge_mobile/pubspec.lock
+          if-no-files-found: error
