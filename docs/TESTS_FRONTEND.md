@@ -1,7 +1,9 @@
 # Tests frontend — stratégie, harnais et couverture (Vitest)
 
 > Document de référence du dispositif de tests du frontend web (`frontend/`, Vite + React 18).
-> Introduit par le lot **P00-04 [LOT 0]** (filet de sécurité de tests automatisés).
+> Introduit par le lot **P00-04 [LOT 0]** (filet de sécurité de tests automatisés), puis
+> étendu au **[LOT 1]** (moteur de tableaux/listes génériques et formulaire de décision
+> pédagogique).
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -147,10 +149,13 @@ Les tests ne doivent pas reconstruire eux-mêmes ces providers.
   `/authentication/login/` (jeton refresh en cookie ou dans le corps).
 - `paginated(results, page, pageSize)` : réponse DRF paginée (`count/next/previous/results`).
 
-### 5.3 `mockApi.js` — double de `fetch`
+### 5.3 `mockApi.js` — double du module `services/api`
 
-Installé via `installFetch(handler)` (ou piloté par le contrôleur exporté) : il
-remplace `window.fetch` pendant le test et restaure l'original après.
+Il remplace le **module** `@/services/api` (pas `window.fetch`) via
+`vi.mock('@/services/api', …)` en tête de test, en renvoyant le même objet mock
+que celui importé par les pages. Les tests unitaires du client
+(`services/api.test.js`) prennent quant à eux le relais en simulant
+`window.fetch` directement.
 
 - **`safeData` (Proxy « donnée vide sûre »)** : tant qu'aucune route n'est
   explicitement définie, toute réponse renvoie un objet « caméléon » : accéder à
@@ -162,9 +167,13 @@ remplace `window.fetch` pendant le test et restaure l'original après.
     que `length` reste présent (sinon React/`useState` lèvent
     `'ownKeys' on proxy: trap result did not include 'length'`).
 - **Contrôleur `apiController`** :
-  - `setRoute(RegExp, data, { status, method })` / `reset()` : réponses dédiées ;
+  - `setRoute(match, data, status = 200)` / `reset()` : `match` est une chaîne
+    (chemin exact) ou une `RegExp` ; les routes sont évaluées dans l'ordre
+    d'enregistrement (déclarer les plus spécifiques en premier) ;
   - `setMe(user)` : force l'utilisateur authentifié pour les écrans ;
-  - `findCall(RegExp)` / `lastBody()` : introspection des appels (URL, méthode, corps).
+  - `findCall(method, matcher)` / `lastBody(method)` : introspection des appels
+    (URL, méthode, corps). Les méthodes `api.*` sont des `vi.fn` : on peut aussi
+    employer `mockRejectedValueOnce` pour forcer une erreur ponctuelle.
 
 > Certains écrans font des calculs numériques (ex. `Dashboard` :
 > `.toFixed()` sur les statistiques). Une donnée « vide » générique (tableau) ne
@@ -193,10 +202,12 @@ remplace `window.fetch` pendant le test et restaure l'original après.
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (10 fichiers, 360 tests)
+### 6.2 Fichiers de test colocalisés (18 fichiers, 437 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
+
+**Authentification, services et rôles (LOT 0)**
 
 | Fichier | Niveau | Ce qui est vérifié |
 | --- | --- | --- |
@@ -209,6 +220,24 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/components/Pagination.test.jsx` | composant | Navigation bornée, libellés, gestion des bornes. |
 | `src/components/ConfirmModal.test.jsx` | composant | Confirmation/annulation, action en cours, contenu. |
 | `src/hooks/useClientPagination.test.jsx` | hook | Slice, remise à la page 1 selon dépendances, bornes, tailles de page. |
+
+**Moteur de tableaux/listes génériques (LOT 1)**
+
+| Fichier | Niveau | Ce qui est vérifié |
+| --- | --- | --- |
+| `src/utils/listFilters.test.js` | unitaire | Tout le moteur de requêtes des listes : `parseListPage`, persistance `sessionStorage`/liens Retour, lecture/construction des filtres **Modules, Participants, Utilisateurs, Formateurs (+délégation finance), Référentiels, Dashboard, Secrétariats**, omission des valeurs par défaut et de la page 1. |
+| `src/utils/paginationPages.test.js` | unitaire | Numéros de page + ellipses (`buildPaginationItems`) : bornes, voisinage courant, absence de doublon, cas ≤ 9 pages. |
+| `src/utils/paginatedResponse.test.js` | unitaire | Normalisation DRF (`parsePaginatedResponse`) : tableau legacy, objet paginé, calcul du nombre de pages, réponse nulle. |
+| `src/utils/apiErrors.test.js` | unitaire | Formatage des erreurs DRF (`formatApiErrors`) : `detail`, `error`, erreurs de champ et libellés FR, fallback. Contient un test `[écart]` (§10.4). |
+| `src/hooks/usePickerPagination.test.jsx` | hook | Pagination des modales de sélection : `applyResponse` (count/total_pages), remise à la page 1 à l'ouverture, bornes. |
+| `src/hooks/useListReturn.test.jsx` | hook | Retour vers une liste : priorité à l'état de navigation, puis `sessionStorage`, puis chemin brut ; état `from`. |
+| `src/hooks/usePersistedListQuery.test.jsx` | hook | Synchronisation filtres/pagination → URL (`replace`) **et** `sessionStorage`, nettoyage et mise à jour quand une dépendance change. |
+
+**Page fonctionnelle (LOT 1) et smoke**
+
+| Fichier | Niveau | Ce qui est vérifié |
+| --- | --- | --- |
+| `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
@@ -230,29 +259,40 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure du lot 0 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 1 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
 | `src/utils/roles.js` | **100 %** | **100 %** | **100 %** | **100 %** |
+| `src/utils/**` (hors rôles inclus) | 77 % | 77 % | 79 % | 85 % |
 | `src/services/**` | **97 %** | 97 % | 97 % | **91 %** |
 | `src/context/**` | **99 %** | 99 % | 89 % | **91 %** |
-| `src/hooks/**` | 89 % | 84 % | 74 % | 89 % |
-| **Global `src/` (toutes zones)** | **32 %** | 32 % | 21 % | **57 %** |
+| `src/hooks/**` | **94 %** | 94 % | 84 % | **91 %** |
+| `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
+| **Global `src/` (toutes zones)** | **32 %** | 32 % | 23 % | **61 %** |
+
+Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
+97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`,
+`apiErrors.js` et les trois hooks de liste testés à **100 % de lignes**.
 
 Les seuils sont déclarés dans `vitest.config.js` (`coverage.thresholds`,
-`perFile: false` pour les globes) :
+`perFile: false` pour les globes). Valeurs **relevées au LOT 1** (ordres :
+lignes, instructions, fonctions, branches) :
 
 - `src/utils/roles.js` : **100 / 100 / 100 / 100** (contrat de sécurité) ;
-- `src/services/**` : lignes/instructions **80**, fonctions **85**, branches **75** ;
-- `src/context/**` : mêmes cibles **80 / 80 / 85 / 75** ;
-- `src/hooks/**` : **70 / 70 / 60 / 60** ;
-- plancher **global** : 28 % lignes/instructions, 16 % fonctions, 48 % branches
-  (calé *sous* la mesure initiale pour absorber la volatilité du maillage des
-  branches).
+- `src/utils/**` : **70 / 70 / 72 / 78** ;
+- `src/services/**` : **90 / 90 / 90 / 85** ;
+- `src/context/**` : **95 / 95 / 85 / 85** ;
+- `src/hooks/**` : **88 / 88 / 80 / 85** ;
+- plancher **global** : 30 % lignes/instructions, 20 % fonctions, 54 % branches.
+
+Chaque seuil est arrondi *sous* la mesure pour absorber la volatilité du
+maillage des branches. Le garde-fou est vérifié en CI : un build dont la
+couverture passe sous un seuil échoue (contrôle positif validé — une couverture
+artificiellement abaissée fait bien retourner un code de sortie non nul).
 
 Règle d'hygiène : **ces chiffres ne peuvent qu'augmenter.** En ajoutant des
-tests, on relèvera d'abord le plancher global puis les seuils par zone. On ne
+tests, on relève d'abord le plancher global puis les seuils par zone. On ne
 les baisse jamais pour faire passer un build ; si une évolution légitime fait
 chuter la couverture, on ajoute les tests correspondants dans le même lot.
 
@@ -293,6 +333,15 @@ et de l'emploi mobile (Flutter).
 - **Données numériques vs « données vides »** : ne pas laisser `safeData`
   répondre à un endpoint dont les champs sont exploités arithmétiquement
   (`.toFixed`, totaux, pourcentages) — injecter une fixture chiffrée.
+- **Texte interfolié dans un conteneur** (`{valeur} · <strong>…</strong>`).
+  Testing Library évalue le texte d'un élément à partir de ses seuls nœuds texte
+  directs : un fragment comme un nom de formation noyé dans un `<p>` contenant
+  d'autres `<strong>` n'est pas trouvé par correspondance *chaîne exacte*. Utiliser
+  une expression régulière (`findByText(/Licence/)`) ou réduire la portée avec
+  `within(conteneur)`.
+- **Libellé dupliqué entre une carte KPI cliquable et le badge d'une ligne**
+  (page Décisions). Préférer `getAllByText('Ajourné')[0]` (la carte est rendue
+  avant le tableau) ou restreindre avec `within(ligne.closest('tr'))`.
 - **Les tests ne changent pas la production** : pas de garde spécifique au test
   dans le code métier, pas de court-circuit `if (test)`. Les polyfils restent
   confinés à `src/test/setup.js` ; les assertions de sécurité (rôles) doivent
@@ -300,7 +349,7 @@ et de l'emploi mobile (Flutter).
 
 ---
 
-## 10. Écarts et anomalies SIGNALÉS par les tests (non corrigés au lot 0)
+## 10. Écarts et anomalies SIGNALÉS par les tests (non corrigés aux lots 0 et 1)
 
 Conformément aux contraintes, ces points sont **constatés et tracés**, pas
 corrigés en silence. Ils attendent un lot dédié (ils touchent au comportement).
@@ -344,6 +393,10 @@ Aucune de ces lignes n'est désactivée : l'avertissement reste un signal pour l
 lot qui les prendra en charge. Les corriger change le comportement (refetch),
 ce qui sort du périmètre du filet de tests.
 
+> Le LOT 1 n'a modifié **aucune logique applicative** : il n'a ajouté que des
+> tests et relevé les seuils. Les 11 avertissements ci-dessus restent donc
+> d'actualité.
+
 ### 10.3 Variables inutilisées (code mort)
 
 Il reste **38 avertissements `no-unused-vars`** préexistants (variables,
@@ -352,6 +405,15 @@ imports ou états jamais lus, ex. `currentTrimestreParts`, `exportingEncadrants`
 au lot et n'ont pas été nettoyés pour limiter le périmètre. Ils peuvent être
 supprimés sans risque dans un lot d'hygiène dédié, après vérification qu'il ne
 s'agit pas d'API publiques.
+
+### 10.4 Formatage d'une erreur `error` uniquement composée d'espaces
+
+`formatApiErrors` (`src/utils/apiErrors.js`) ignore une clé `error` qui n'est
+qu'espaces (`error.trim()` vide), puis continue et la reformate comme une
+**erreur de champ** (`error :    `) au lieu de retomber sur le message
+générique. Cas-limite sans impact sécurité, figé par un test `[écart]` dans
+`src/utils/apiErrors.test.js`. Un lot d'hygiène pourra faire retomber ce cas sur
+le fallback.
 
 ---
 
@@ -371,24 +433,33 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** En revanche, au lot 0 :
+**Aucune page n'est dépourvue de test.** État après le LOT 1 :
 
-- une seule page dispose d'un test **fonctionnel dédié** : `Login.jsx` ;
-- deux composants réutilisables ont des tests dédiés : `Pagination`,
-  `ConfirmModal` ; les autres composants ne sont exercés qu'indirectement via le
-  smoke ;
-- les **52 autres pages** sont donc couvertes en *smoke* (rendu) mais **pas en
-  comportement métier** (soumission de formulaires, tableaux génériques,
-  décisions/pédagogie, cas limites d'API).
+- deux pages disposent d'un test **fonctionnel dédié** : `Login.jsx` et
+  `DecisionsPedagogiques.jsx` (cette dernière à 100 % de lignes) ;
+- le **moteur de tableaux/listes génériques** est couvert indépendamment des
+  écrans : construction des requêtes/filtres (`listFilters`), pagination
+  (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
+  et les hooks associés (`useClientPagination`, `usePickerPagination`,
+  `useListReturn`, `usePersistedListQuery`) ;
+- composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
+  composants ne sont exercés qu'indirectement via le smoke ;
+- les **51 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+  *comportement métier* bout-en-bout (soumission de formulaires, cas limites
+  d'API, interactions entre écrans).
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
 
-1. **Tableau générique** (liste/recherche/pagination/ordre) et **formulaire de
-   décision pédagogique** (était explicitement demandé par P00-04, reporté) ;
+1. ~~Tableau générique (liste/recherche/pagination/ordre) et formulaire de
+   décision pédagogique~~ — **fait au LOT 1** (moteur de listes en unitaires +
+   page Décisions en comportement). Reste la couverture bout-en-bout d'une page
+   de liste *serveur* typée (recherche debounced, tri, navigation page suivante)
+   pour valider l'assemblage React Query + hooks + `Pagination` ;
 2. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
    jurys, finances étudiantes, référentiels ;
 3. écrans `Statistiques` / `Dashboard` avec fixtures complètes et filtres de
-   période ;
+   période (les points du §10.2 sur `effectiveSecretariatId` seront couverts à
+   cette occasion) ;
 4. composants partagés (modales, pickers, badges, panneaux de flux) ;
 5. montée progressive du plancher de couverture global (§7) et résorption des
-   points du §10.
+   points du §10 (dont l'écart `must_change_password` §10.1).
