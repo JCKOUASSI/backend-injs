@@ -9,11 +9,17 @@ const ADMIN_URL = (() => {
 })()
 
 let _sessionExpiredCallback = null
+let _sessionExpiredFired = false
 export function setSessionExpiredCallback(cb) {
   _sessionExpiredCallback = cb
+  _sessionExpiredFired = false
 }
 
 function _onSessionExpired() {
+  // Évite d'émettre dix déconnexions/logouts quand plusieurs requêtes
+  // échouent en parallèle avec une session réellement expirée.
+  if (_sessionExpiredFired) return
+  _sessionExpiredFired = true
   localStorage.removeItem('access_token')
   localStorage.removeItem('refresh_token')
   // Best-effort : invalide le cookie HttpOnly du refresh côté serveur.
@@ -27,10 +33,17 @@ function _onSessionExpired() {
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('access_token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  if (!token) return {}
+  return {
+    Authorization: `Bearer ${token}`,
+    // En-tête de secours : certaines passerelles d'aperçu (iframe) filtrent
+    // « Authorization » ; l'en-tête personnalisé X-JWT-Access est transmis et
+    // accepté par FlexibleJWTAuthentication côté Django.
+    'X-JWT-Access': token,
+  }
 }
 
-const refreshAccessToken = async () => {
+const _doRefreshAccessToken = async () => {
   // 1) Voie privilégiée (risque R6) : refresh dans le cookie HttpOnly.
   //    Le cookie circule en same-site ; en dev cross-origin, le navigateur
   //    ne l'enverra pas → on bascule sur le fallback historique.
@@ -62,6 +75,18 @@ const refreshAccessToken = async () => {
   const data = await res.json()
   localStorage.setItem('access_token', data.access)
   return data.access
+}
+
+// Single-flight : quand plusieurs requêtes reçoivent 401 en même temps
+// (chargement du dashboard), on ne lance qu'UN seul refresh partagé par tous
+// les appels, afin d'éviter une tempête de refresh et une déconnexion en cascade.
+let _refreshPromise = null
+const refreshAccessToken = () => {
+  if (!_refreshPromise) {
+    _refreshPromise = _doRefreshAccessToken()
+      .finally(() => { _refreshPromise = null })
+  }
+  return _refreshPromise
 }
 
 const handleResponse = async (res) => {
@@ -108,6 +133,10 @@ const request = async (method, path, body, config = {}) => {
   let res = await fetch(url, init)
 
   const isLoginRequest = path === '/auth/login/' || path.startsWith('/auth/login?')
+  if (isLoginRequest && res.ok) {
+    // Nouvelle session : réarmer le garde-fou d'expiration.
+    _sessionExpiredFired = false
+  }
   if (res.status === 401 && !isLoginRequest) {
     try {
       const newToken = await refreshAccessToken()

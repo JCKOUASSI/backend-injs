@@ -1,4 +1,5 @@
 import logging
+import os
 
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -75,15 +76,32 @@ REFRESH_COOKIE_NAME = 'refresh_token'
 REFRESH_COOKIE_PATH = '/api/auth/'
 
 
+def _cookie_samesite():
+    return os.environ.get('JWT_COOKIE_SAMESITE', 'Lax')
+
+
+def _cookie_secure(samesite):
+    # SameSite=None IMPOSE Secure. En aperçu derrière passerelle HTTPS, la
+    # variable d'env force Secure même si DEBUG=True (SECURE_PROXY_SSL_HEADER
+    # est alors activé et la requête est bien vue comme https).
+    forced = os.environ.get('JWT_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes')
+    if forced:
+        return True
+    if samesite == 'None':
+        return True
+    return not django_settings.DEBUG
+
+
 def _set_refresh_cookie(response, token):
     """Pose le cookie HttpOnly du refresh token (scope limité à /api/auth/)."""
+    samesite = _cookie_samesite()
     response.set_cookie(
         REFRESH_COOKIE_NAME,
         token,
         max_age=int(django_settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
         httponly=True,
-        secure=not django_settings.DEBUG,
-        samesite='Lax',
+        secure=_cookie_secure(samesite),
+        samesite=samesite,
         path=REFRESH_COOKIE_PATH,
     )
 

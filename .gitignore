@@ -31,3 +31,8 @@ backend/logs/
 .vscode/
 project_structure.txt
 /Save taches app-injs-lmd 2026.txt
+
+# Marqueurs locaux du script scripts/start_dev.sh (démo hors Docker/SQLite)
+backend/.seed_ok
+backend/.venv/.deps_ok
+backend/db.sqlite3

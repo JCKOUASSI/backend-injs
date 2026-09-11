@@ -1,17 +1,22 @@
+from django.conf import settings
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from config.admin_site import setup_admin_site
 from config.views import api_root
 from config.health import health_view
+from config.preview import spa
 from config.static_views import service_worker, favicon
 
 setup_admin_site()
 
+# En mode prévisualisation SPA, la racine sert l'application React.
+_root_view = spa if getattr(settings, 'PREVIEW_SPA', False) else api_root
+
 urlpatterns = [
-    # Racine → page d'accueil API
-    path('', api_root, name='root'),
+    # Racine → application React (PREVIEW_SPA) ou page d'accueil API
+    path('', _root_view, name='root'),
 
     # Healthcheck (supervision / load balancer)
     path('api/health/', health_view, name='api-health'),
@@ -58,3 +63,12 @@ urlpatterns = [
     # QR code images publiques (hors préfixe /api/) — routes minimales uniquement
     path('formations/', include('formations.qr_urls')),
 ]
+
+# Prévisualisation locale : sert le build React (assets + fallback SPA).
+# Placé EN DERNIER pour ne jamais masquer l'API, l'admin ou les médias.
+# Le chemin complet (y compris assets/) est passé à la vue, qui sert le
+# fichier du build s'il existe, sinon renvoie index.html (routage React).
+if getattr(settings, 'PREVIEW_SPA', False):
+    urlpatterns += [
+        re_path(r'^(?P<path>.*)$', spa, name='preview-spa-fallback'),
+    ]

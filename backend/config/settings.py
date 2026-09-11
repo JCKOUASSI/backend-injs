@@ -65,9 +65,33 @@ if DEBUG and BADGE_BASE_URL:
 if not DEBUG and '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h != '*']
 
+# Reverse proxy (preview TLS, ingress de prod) : fait confiance aux en-têtes
+# X-Forwarded-* transmis par le proxy pour générer les bonnes URL/cookies https.
+if os.environ.get('TRUST_FORWARDED_PROTO', '').lower() in ('1', 'true', 'yes'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if os.environ.get('USE_X_FORWARDED_HOST', '').lower() in ('1', 'true', 'yes'):
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+
+# Aperçu intégré en iframe cross-site : les cookies doivent être SameSite=None
+# et Secure pour être transmis (session admin, CSRF, refresh JWT). Réglable par
+# variable d'env ; en production (variable absente) le défaut Lax est conservé.
+_cookie_samesite = os.environ.get('COOKIE_SAMESITE', '').strip()
+if _cookie_samesite:
+    SESSION_COOKIE_SAMESITE = _cookie_samesite
+    CSRF_COOKIE_SAMESITE = _cookie_samesite
+    if _cookie_samesite.lower() == 'none':
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
     if origin
+]
+# Expressions régulières d'origines de confiance (ex: aperçus *.e2b.app)
+CSRF_TRUSTED_ORIGIN_REGEXES = [
+    rx for rx in os.environ.get('CSRF_TRUSTED_ORIGIN_REGEXES', '').split(',')
+    if rx
 ]
 if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
@@ -126,11 +150,22 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    # DÉMO uniquement (DEBUG + DEMO_ADMIN_AUTOLOGIN) : rend l'admin utilisable
+    # dans l'iframe d'aperçu quand les cookies tiers sont bloqués. Inerte en prod.
+    'config.demo_admin_middleware.DemoAdminAutoLoginMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+if DEBUG:
+    # Démo locale : placé APRÈS (donc exécuté en phase réponse APRÈS)
+    # XFrameOptions, il remplace DENY par un frame-ancestors permissif pour
+    # autoriser l'affichage dans l'iframe d'aperçu.
+    MIDDLEWARE.insert(
+        MIDDLEWARE.index('django.middleware.clickjacking.XFrameOptionsMiddleware'),
+        'config.dev_middleware.DevPreviewFrameMiddleware',
+    )
 
 ROOT_URLCONF = 'config.urls'
 
@@ -154,24 +189,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database — PostgreSQL
+# Database — PostgreSQL par défaut.
+# Bascules SQLite pour le développement local sans serveur PostgreSQL : USE_SQLITE=1
 _postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': _postgres_db,
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
-        'TEST': {
-            'NAME': f'test_{_postgres_db}',
-        },
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-        'CONN_HEALTH_CHECKS': True,
+if os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.environ.get('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3')),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _postgres_db,
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
+            'TEST': {
+                'NAME': f'test_{_postgres_db}',
+            },
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
+        }
+    }
 
 # Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
@@ -229,6 +273,12 @@ STORAGES = {
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Prévisualisation locale : build React servi par Django (PREVIEW_SPA=1).
+FRONTEND_DIST = os.environ.get(
+    'FRONTEND_DIST', str((BASE_DIR / '..' / 'frontend' / 'dist').resolve())
+)
+PREVIEW_SPA = os.environ.get('PREVIEW_SPA', '').lower() in ('1', 'true', 'yes')
+
 # Custom user model
 AUTH_USER_MODEL = 'authentication.User'
 
@@ -238,7 +288,9 @@ REST_FRAMEWORK = {
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Accepte Authorization: Bearer, puis X-JWT-Access de secours,
+        # puis ?access_token= (robustesse en iframe/passerelle d'aperçu).
+        'authentication.auth_classes.FlexibleJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -322,6 +374,11 @@ if DEBUG:
         f'http://192.168.100.54:{DEV_SERVER_PORT}',
     ])
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(CORS_ALLOWED_ORIGINS))
+# Expressions régulières d'origines autorisées (ex: aperçus *.e2b.app)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    rx for rx in os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',')
+    if rx
+]
 CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']
 # Nécessaire au cookie HttpOnly du refresh JWT (credentials: 'include' côté React).
 # Les origines restent strictes (CORS_ALLOWED_ORIGINS ci-dessus, pas de allow-all).

@@ -2,9 +2,36 @@ from django.db import migrations, models
 
 
 def apply_salle_columns(apps, schema_editor):
-    if schema_editor.connection.vendor != 'postgresql':
+    connection = schema_editor.connection
+    if connection.vendor != 'postgresql':
+        # Dev local (SQLITE) : les opérations d'état AddField ne créent pas la
+        # colonne physiquement dans un SeparateDatabaseAndState — on les crée ici.
+        RefSalle = apps.get_model('formations', 'RefSalle')
+        dev_fields = [
+            models.CharField(
+                choices=[
+                    ('SALLE', 'Salle'),
+                    ('AMPHI', 'Amphithéâtre'),
+                    ('GYMNASE', 'Gymnase'),
+                    ('REUNION', 'Salle de réunion'),
+                    ('CONFERENCE', 'Salle de conférence'),
+                ],
+                default='SALLE',
+                max_length=20,
+            ),
+            models.PositiveIntegerField(blank=True, null=True),
+            models.CharField(blank=True, default='', max_length=255),
+            models.DateField(blank=True, null=True),
+            models.DateField(blank=True, null=True),
+        ]
+        for name, field in zip(
+            ['type_lieu', 'capacite', 'equipements', 'indisponible_du', 'indisponible_au'],
+            dev_fields,
+        ):
+            field.set_attributes_from_name(name)
+            schema_editor.add_field(RefSalle, field)
         return
-    with schema_editor.connection.cursor() as cursor:
+    with connection.cursor() as cursor:
         cursor.execute("""
             ALTER TABLE formations_refsalle
               ADD COLUMN IF NOT EXISTS type_lieu varchar(20);

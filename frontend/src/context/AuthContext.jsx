@@ -60,12 +60,18 @@ export function AuthProvider({ children }) {
     }
 
     localStorage.setItem('access_token', access)
-    if (refreshInCookie) {
+    // En aperçu intégré (iframe cross-site), les cookies tiers peuvent être
+    // bloqués : on conserve alors aussi le refresh en stockage local pour que
+    // le rafraîchissement fonctionne par le corps de la requête. Activé par
+    // VITE_REFRESH_FALLBACK=1 à la construction ; en production le cookie
+    // HttpOnly reste la voie unique (risque R6).
+    const refreshFallback = import.meta.env.VITE_REFRESH_FALLBACK === '1'
+    if (refresh && (refreshFallback || !refreshInCookie)) {
+      localStorage.setItem('refresh_token', refresh)
+    } else if (refreshInCookie && !refreshFallback) {
       // Risque R6 : le refresh vit dans un cookie HttpOnly — on ne le stocke
       // plus en localStorage et on purge un éventuel résidu d'ancienne session.
       localStorage.removeItem('refresh_token')
-    } else if (refresh) {
-      localStorage.setItem('refresh_token', refresh)
     }
     setUser(normalizeUser({
       ...userData,

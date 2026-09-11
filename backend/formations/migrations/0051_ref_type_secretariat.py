@@ -4,6 +4,16 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def drop_type_not_null_postgres(apps, schema_editor):
+    # PostgreSQL uniquement : SQLite reconstruit la table lors de l'AlterField suivant.
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            "ALTER TABLE formations_secretariat ALTER COLUMN type DROP NOT NULL"
+        )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -36,9 +46,9 @@ class Migration(migrations.Migration):
             reverse_code=migrations.RunPython.noop,
         ),
         # Rendre le champ varchar nullable avant de le vider
-        migrations.RunSQL(
-            "ALTER TABLE formations_secretariat ALTER COLUMN type DROP NOT NULL",
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            drop_type_not_null_postgres,
+            reverse_code=migrations.RunPython.noop,
         ),
         # Vider le champ type (varchar) avant conversion en FK
         migrations.RunSQL(

@@ -2,22 +2,53 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  plugins: [react()],
-  server: {
-    port: 3000,
-    host: true,
-    proxy: {
-      // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
-      // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
+export default defineConfig(({ mode }) => {
+  // Aperçu derrière un reverse proxy TLS (ex: https://<port>-<sandbox>.e2b.app) :
+  // forcer le WebSocket HMR en WSS. En local simple, on laisse Vite décider.
+  const hmr = process.env.VITE_HMR_PROTOCOL
+    ? {
+        protocol: process.env.VITE_HMR_PROTOCOL,
+        clientPort: Number(process.env.VITE_HMR_CLIENT_PORT || 443),
+      }
+    : undefined
+
+  // Transmet au backend les en-têtes du proxy d'origine (hôte public, proto https)
+  // afin que Django génère les bonnes URL absolues et les bons cookies CSRF.
+  const forwardHeaders = (proxyReq, req) => {
+    const host = req.headers['x-forwarded-host'] || req.headers.host
+    const proto = req.headers['x-forwarded-proto'] || 'http'
+    proxyReq.setHeader('X-Forwarded-Host', host || '')
+    proxyReq.setHeader('X-Forwarded-Proto', proto)
+    proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '')
+  }
+  const proxyOpts = {
+    target: 'http://127.0.0.1:8000',
+    changeOrigin: true,
+    configure: (proxy) => {
+      proxy.on('proxyReq', forwardHeaders)
+    },
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 3000,
+      host: true,
+      allowedHosts: ['.e2b.app', 'localhost', '127.0.0.1'],
+      hmr,
+      proxy: {
+        // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
+        // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
+        '/api': proxyOpts,
+        // Admin Django legacy et fichiers servis par le backend.
+        '/admin': proxyOpts,
+        '/static': proxyOpts,
+        '/media': proxyOpts,
       },
     },
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: mode !== 'production',
-  },
-}))
+    build: {
+      outDir: 'dist',
+      sourcemap: mode !== 'production',
+    },
+  }
+})

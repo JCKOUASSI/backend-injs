@@ -1,6 +1,30 @@
 from django.db import migrations
 
 
+LEGACY_TABLES = [
+    'suiviEvaluation_historiquenotemodification',
+    'suiviEvaluation_noteepreuve',
+    'suiviEvaluation_suivimoduleauditeur',
+    'suiviEvaluation_moyennemodule',
+    'suiviEvaluation_ficheauditeuracademique_modules_suivis',
+    'suiviEvaluation_ficheauditeuracademique',
+    'suiviEvaluation_ficheformateur',
+    'suiviEvaluation_decisionpedagogique',
+    'suiviEvaluation_exportrapport',
+    'suiviEvaluation_parametresevaluation',
+    'suiviEvaluation_epreuve',
+    'suiviEvaluation_typeepreuve',
+]
+
+
+def drop_legacy_tables(apps, schema_editor):
+    # CASCADE est du syntaxe PostgreSQL ; SQLite ne le connaît pas.
+    suffix = ' CASCADE' if schema_editor.connection.vendor == 'postgresql' else ''
+    with schema_editor.connection.cursor() as cursor:
+        for table in LEGACY_TABLES:
+            cursor.execute(f'DROP TABLE IF EXISTS "{table}"{suffix}')
+
+
 class Migration(migrations.Migration):
     """
     Supprime les tables d'évaluation académique legacy (migration 0004) sur les
@@ -14,23 +38,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[
-                migrations.RunSQL(
-                    sql=(
-                        'DROP TABLE IF EXISTS "suiviEvaluation_historiquenotemodification" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_noteepreuve" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_suivimoduleauditeur" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_moyennemodule" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique_modules_suivis" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheformateur" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_decisionpedagogique" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_exportrapport" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_parametresevaluation" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_epreuve" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_typeepreuve" CASCADE;'
-                    ),
-                    reverse_sql=migrations.RunSQL.noop,
-                ),
+                migrations.RunPython(drop_legacy_tables, migrations.RunPython.noop),
             ],
             state_operations=[
                 migrations.DeleteModel(name='HistoriqueNoteModification'),
