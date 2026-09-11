@@ -1,8 +1,8 @@
-# Manuel utilisateur — App Statistiques (SYGEP-CPFAE)
+# Manuel utilisateur — App Statistiques (INJS-LMD)
 
 | | |
 |---|---|
-| **Application** | SYGEP-CPFAE — Module Statistiques & Bilans |
+| **Application** | INJS-LMD — Module Statistiques & Bilans |
 | **Version du manuel** | 2.0.1 |
 | **Dernière mise à jour** | 05/06/2026 |
 | **Public** | Administrateurs CPFAE, direction, secrétariats, encadrants autorisés |
@@ -58,7 +58,7 @@ L'écran principal comporte **8 onglets** accessibles par une barre de navigatio
 |---------|--------|
 | **Menu** | Barre latérale gauche → **Statistiques** |
 | **URL** | `/statistiques` |
-| **Authentification** | Connexion SYGEP obligatoire |
+| **Authentification** | Connexion à la plateforme INJS-LMD obligatoire |
 | **Rôles autorisés** | Voir §3 |
 
 > Si le message « Accès non autorisé » s'affiche, votre rôle ne permet pas l'accès au module : contactez un administrateur CPFAE.
@@ -127,7 +127,7 @@ L'onglet actif est souligné en **vert** (#2277C1).
 | **Groupe** | Subdivision d'un module (ex. groupe 01, 02…) |
 | **Séance / Session** | Créneau daté (MATIN ou SOIR) avec pointages |
 | **Pointage** | Enregistrement de présence/absence (badge, saisie…) |
-| **Présent** | Statuts : Terminé, Forcé DFRC, Sortie automatique |
+| **Présent** | Statuts : Terminé, Forcé par la direction (identifiant technique `FORCE_DFRC`, hérité), Sortie automatique |
 | **Absent notoire** | Inscrit à un module démarré, sans aucune présence enregistrée (ou motif notoire renseigné) |
 | **Volume horaire (VH)** | Heures prévues vs réalisées sur la période |
 | **Point journalier** | Tableau journalier par catégorie × formation × jour |
@@ -141,7 +141,7 @@ L'onglet actif est souligné en **vert** (#2277C1).
 |----------------|-----------------|
 | TERMINE | Terminé |
 | EN_COURS | En cours |
-| FORCE_DFRC | Forcé DFRC |
+| `FORCE_DFRC` | Forcé par la direction (identifiant technique hérité, renommé côté libellé au LOT 1) |
 | ABSENT_NON_BADGE | Absent non badgé |
 | HORS_LIGNE_SUSPECT | Hors ligne suspect |
 | SORTIE_AUTO | Sortie automatique |
@@ -587,7 +587,7 @@ Réservée aux **validateurs / administrateurs** :
 
 ---
 
-*Document généré pour SYGEP-CPFAE — Module Statistiques & Bilans.*  
+*Document généré pour INJS-LMD — Module Statistiques & Bilans.*  
 *Source Markdown : `docs/Manuel utilisateur App Statistiques.md`*  
 *Captures : `docs/screenshots/manuel-statistiques/`*  
 *Régénération Word : `python scripts/generate_manuel_statistiques_docx.py`*

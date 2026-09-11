@@ -299,7 +299,7 @@ def main():
     src = Path(
         sys.argv[1]
         if len(sys.argv) > 1
-        else "/Users/tobidesis/Downloads/données/Emploi du Temps A4 GROUPE 8MAJ.xlsx"
+        else "donnees/Emploi du Temps A4 GROUPE 8MAJ.xlsx"
     )
     if not src.exists():
         print("Fichier introuvable:", src, file=sys.stderr)

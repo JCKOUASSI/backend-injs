@@ -1,6 +1,10 @@
-# QR Badge (mobile + PWA)
+# Application mobile INJS — Présences (Flutter + PWA)
 
-Application Flutter pour le badgeage sécurisé (scan QR, géolocalisation, heartbeat) connectée au backend Sygep.
+Application mobile de l'**INJS-LMD 2026** (INJS Marcory) pour le badgeage sécurisé (scan QR, géolocalisation, heartbeat) connectée au backend Django/DRF INJS-LMD.
+
+> Documentation principale : [`../README.md`](../README.md) · architecture : [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
+
+> Le dossier conserve le nom technique `qr_badge_mobile/` : le renommer touche au code, à la CI et aux canaux de publication ; cette bascule est fléchée DA-12 (retrait du legacy en dernier). Flutter **3.41.7** (CI), Dart SDK **^3.10.3**, version d'application `1.0.8+12` (voir `pubspec.yaml`).
 
 ## PWA (Web)
 
@@ -19,7 +23,7 @@ cd build/web && python3 -m http.server 8080
 Pour un sous-chemin (ex. `/qr-badge/`), utilisez :
 
 ```bash
-flutter build web --base-href /qr-badge/
+flutter build web --base-href /presences/
 ```
 
 ### Limites navigateur
@@ -79,11 +83,11 @@ Conserve **`build/debug-info/`** (hors store) pour symboliser les crashs **Dart*
 
 **Play Console — politique de confidentialité** : si l’app déclare `CAMERA`, Google exige une **URL HTTPS** (Contenu de l’appli → Politique de confidentialité).
 
-Le backend Django du projet expose une page prête à l’emploi (à adapter si besoin avec ton juriste / ton administration) :
+Le backend Django expose une page prête à l'emploi (à adapter avec le juridique / l'administration). Son chemin de route est un identifiant technique hérité, renommé ultérieurement côté code (DA-12) :
 
 `https://<TON_DOMAINE>/dashboard/legal/confidentialite-qr-badge/`
 
-Remplace `<TON_DOMAINE>` par l’URL publique du serveur (ex. `sygep.example.ci`). Copie cette URL exacte dans la Play Console.
+Remplace `<TON_DOMAINE>` par l’URL publique du serveur (ex. `injs.example.ci`). Copie cette URL exacte dans la Play Console.
 
 **Dans l’app** : un lien discret « Confidentialité » (souligné, petit texte) sous le formulaire de connexion, et la même entrée dans le menu **⋮** de l’écran principal. Ouverture dans le **navigateur externe**. URL = `PRIVACY_POLICY_URL` (app.env / dart-define) ou `{API_BASE_URL}/dashboard/legal/confidentialite-qr-badge/`.
 

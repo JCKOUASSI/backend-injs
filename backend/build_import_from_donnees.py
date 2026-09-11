@@ -1,10 +1,10 @@
 """
-Génère les fichiers d'import réels depuis /Users/tobidesis/Downloads/données
+Génère les fichiers d'import réels depuis donnees
 Fichiers sources :
   - FAB 2026 PHASE 1 FICHIER COMPLET.xlsx  → participants (22 feuilles de groupes)
   - Emploi du Temps *.xlsx                 → séances (emploi du temps)
 
-Fichiers produits dans /Users/tobidesis/Downloads/données/ :
+Fichiers produits dans donnees/ :
   - import_participants_FAB2026.xlsx   → feuille "Participants"  (type=participants)
   - import_formations_FAB2026.xlsx     → feuille "Formations"    (type=formations)
   - import_seances_FAB2026.xlsx        → feuille "Emploi du temps" (type=emploi_du_temps)
@@ -15,8 +15,8 @@ from datetime import datetime, date, time
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-SRC = '/Users/tobidesis/Downloads/données'
-OUT = '/Users/tobidesis/Downloads/données'
+SRC = 'donnees'
+OUT = 'donnees'
 
 # ── Styles ────────────────────────────────────────────────────────────────────
 def _hs():

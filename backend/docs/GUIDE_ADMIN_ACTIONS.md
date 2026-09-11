@@ -1,4 +1,4 @@
-# Guide des actions — Admin Django SYGEP-CPFAE
+# Guide des actions — Admin Django INJS-LMD
 
 Manuel d’utilisation pour réaliser **chaque action métier** depuis l’interface d’administration (`/admin/`).
 
@@ -502,4 +502,4 @@ Si une liste est vide ou une action est absente, vérifier votre **groupe de rô
 
 ---
 
-*Guide opérationnel — interface admin SYGEP-CPFAE (juillet 2026).*
+*Guide opérationnel — interface admin INJS-LMD (juillet 2026).*

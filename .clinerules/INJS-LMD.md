@@ -4,9 +4,7 @@ RÈGLES CLINE — WORKSPACE INJS-LMD
 
 Ce workspace est exclusivement le projet INJS-LMD.
 
-Racine du projet :
-
-/Users/jckouassi/Sites/app-injs-lmd 2026
+Racine du projet : racine du dépôt (chemins toujours relatifs, jamais absolus).
 
 Architecture principale :
 
@@ -17,7 +15,7 @@ Architecture principale :
 * scripts/ : scripts techniques et sauvegardes
 * .clinerules/ : règles de fonctionnement de Cline
 
-Le projet ne doit pas être confondu avec une ancienne version SYGEP-CPFAE ou QR Badge.
+Le projet ne doit pas être confondu avec les anciennes versions du produit (applications antérieures de badgeage et de gestion de formation), dont aucune interface ne doit être réintroduite.
 
 ⸻
 
@@ -106,7 +104,7 @@ Ne pas remplacer arbitrairement :
 * terminologie LMD ;
 * composants existants.
 
-Ne jamais réintroduire volontairement une interface provenant d’une ancienne application QR Badge/SYGEP-CPFAE.
+Ne jamais réintroduire volontairement une interface provenant d’une des anciennes applications du produit.
 
 ⸻
 

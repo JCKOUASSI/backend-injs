@@ -1,3 +1,5 @@
+> **DOCUMENT D’ARCHIVE — NE PAS UTILISER COMME RÉFÉRENCE COURANTE.** Décrit une ancienne version du produit (badgeage QR d’époque). Référence courante : [README.md](../../README.md) et [docs/ARCHITECTURE.md](../ARCHITECTURE.md).
+
 # Manuel Utilisateur Institutionnel
 ## Badgeage Web des Auditeurs
 

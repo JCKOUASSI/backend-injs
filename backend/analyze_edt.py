@@ -1,6 +1,6 @@
 import openpyxl, os, re
 
-folder = '/Users/tobidesis/Downloads/données'
+folder = 'donnees'
 
 def find_edt_data(ws):
     all_rows = list(ws.iter_rows(values_only=True))

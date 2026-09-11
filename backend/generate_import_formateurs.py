@@ -14,7 +14,7 @@ Nettoyages appliqués :
 import sys
 import os
 
-SOURCE = '/Users/tobidesis/Downloads/données/LISTE DES FORMATEURS FAB 2026_Prod V2.xlsx'
+SOURCE = 'donnees/LISTE DES FORMATEURS FAB 2026_Prod V2.xlsx'
 OUTPUT = os.path.join(os.path.dirname(__file__), 'import_formateurs.xlsx')
 
 try:

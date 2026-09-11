@@ -1,6 +1,6 @@
 import openpyxl, os
 
-SRC = '/Users/tobidesis/Downloads/données'
+SRC = 'donnees'
 fname = 'FAB 2026 PHASE 1 FICHIER COMPLET.xlsx'
 wb = openpyxl.load_workbook(os.path.join(SRC, fname), read_only=True, data_only=True)
 

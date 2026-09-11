@@ -1,4 +1,4 @@
-# Vidéo Play Console — localisation en arrière-plan (QR Badge)
+# Vidéo Play Console — localisation en arrière-plan (application mobile INJS — Présences)
 
 Document de tournage pour le formulaire Google Play **« Accès aux données de localisation en arrière-plan »**.
 
@@ -20,10 +20,10 @@ Durée cible : **20 à 30 secondes**. Plateforme : **Android réel** (12+ recomm
 ## Prérequis avant tournage
 
 - Téléphone **Android physique** (pas émulateur).
-- App **QR Badge** installée, backend Sygep accessible.
+- Application **INJS — Présences** installée, backend INJS-LMD accessible.
 - Compte de test (auditeur, formateur ou encadrant).
 - **QR code valide** d’une séance en cours.
-- Réinitialiser les autorisations : *Paramètres → Apps → QR Badge → Autorisations → Localisation → Aucune*.
+- Réinitialiser les autorisations : *Paramètres → Apps → INJS Présences → Autorisations → Localisation → Aucune*.
 - Enregistrement **écran + voix** (OBS, enregistreur natif Android, etc.).
 
 ---
@@ -32,9 +32,9 @@ Durée cible : **20 à 30 secondes**. Plateforme : **Android réel** (12+ recomm
 
 ### Plan 1 — Divulgation « premier plan » (0:00 – 0:08)
 
-1. Ouvrir **QR Badge** (premier lancement ou après reset des permissions).
+1. Ouvrir **INJS Présences** (premier lancement ou après reset des permissions).
 2. Montrer le dialogue **« Autoriser la localisation »** :
-   > *« QR Badge a besoin de votre position GPS pour valider votre présence sur le site de formation lors du badgeage et du suivi de session. »*
+   > *« L’application INJS de présence a besoin de votre position GPS pour valider votre présence sur le site de formation lors du badgeage et du suivi de session. »*
 3. Appuyer sur **Continuer**.
 4. Montrer l’invite **système Android** → choisir **« Pendant l’utilisation de l’app »**.
 
@@ -46,7 +46,7 @@ Durée cible : **20 à 30 secondes**. Plateforme : **Android réel** (12+ recomm
 ### Plan 2 — Divulgation arrière-plan + « Toujours autoriser » (0:08 – 0:15)
 
 5. Montrer le dialogue **« Suivi en arrière-plan »** :
-   > *« Pour valider votre présence pendant toute la séance (même écran verrouillé), QR Badge a besoin de l’autorisation « Toujours autoriser » pour la position. Sur l’écran suivant, choisissez « Toujours autoriser ». »*
+   > *« Pour valider votre présence pendant toute la séance (même écran verrouillé), L’application INJS de présence a besoin de l’autorisation « Toujours autoriser » pour la position. Sur l’écran suivant, choisissez « Toujours autoriser ». »*
 6. Appuyer sur **Continuer**.
 7. Montrer l’invite système **« Autoriser tout le temps » / « Toujours autoriser »** → **accepter**.
 8. Si demandé : autorisation **Notifications** (Android 13+) → **Autoriser**.
@@ -72,13 +72,13 @@ Durée cible : **20 à 30 secondes**. Plateforme : **Android réel** (12+ recomm
 ### Plan 4 — Localisation en arrière-plan (0:22 – 0:30)
 
 14. Afficher la **notification persistante** :
-    - Titre : **« QR Badge »**
+    - Titre : **« INJS Présences »**
     - Texte : **« Suivi de présence actif »**
 15. Mettre l’app en **arrière-plan** (bouton Home) ou **verrouiller l’écran** 2–3 secondes.
 16. Rouvrir l’app : le bandeau **« Suivi de présence actif »** est toujours visible.
 
 **Voix off :**  
-*« Pendant la séance, l’app envoie périodiquement la position GPS au serveur Sygep pour attester la présence continue, même si l’application n’est pas au premier plan. Android affiche un service de localisation en notification. »*
+*« Pendant la séance, l’app envoie périodiquement la position GPS au serveur INJS-LMD pour attester la présence continue, même si l’application n’est pas au premier plan. Android affiche un service de localisation en notification. »*
 
 ---
 

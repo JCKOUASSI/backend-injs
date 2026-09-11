@@ -28,7 +28,7 @@ esac
 
 VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
 echo "═══════════════════════════════════════════════"
-echo " QR Badge — build stores (version ${VERSION})"
+echo " INJS-LMD — build stores (version ${VERSION})"
 echo "═══════════════════════════════════════════════"
 echo ""
 

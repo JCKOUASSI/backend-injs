@@ -7,7 +7,7 @@
 | Représentation | Localisation | Usage réel |
 |---|---|---|
 | ✅ Groupe LMD (source de vérité cible) | `scolarite.Groupe` (année + formation + parcours + niveau + vague + site + nom + capacité) + `AffectationGroupe` (historisé : date_debut/date_fin/active) | Socle LMD : InscriptionPedagogique.groupe, export EDT, effectifs/répartition |
-| ⚠️ Champs texte legacy | `formations.Participant.groupe` (L400) + `grade_groupe` (L401) ; `formations.Module.groupe` (L609, dans unique_together) | Socle formation continue historique (imports Excel, QR badgeage, notes) |
+| ⚠️ Champs texte legacy | `formations.Participant.groupe` (L400) + `grade_groupe` (L401) ; `formations.Module.groupe` (L609, dans unique_together) | Socle formation continue historique (imports Excel, badgeage par QR, notes) |
 
 ## Stratégie proposée (au prompt 21)
 

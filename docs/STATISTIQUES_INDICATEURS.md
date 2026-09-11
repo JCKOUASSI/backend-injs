@@ -1,4 +1,4 @@
-# Statistiques SYGEP-CPFAE — Traçabilité des indicateurs
+# Statistiques INJS-LMD — Traçabilité des indicateurs
 
 > Référence technique : origine de chaque chiffre, pourcentage et filtre affiché dans l’application **Statistiques** (juin 2026).
 

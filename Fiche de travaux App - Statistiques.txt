@@ -1,5 +1,5 @@
 ================================================================================
-  FICHE DE TRAVAUX — APP STATISTIQUES (SYGEP-CPFAE)
+  FICHE DE TRAVAUX — APP STATISTIQUES (INJS-LMD)
   Module Statistiques & Bilans
 ================================================================================
 Dernière mise à jour : 26/08/2026 03:30

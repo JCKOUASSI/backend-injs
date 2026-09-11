@@ -74,7 +74,7 @@
 ## 4. PÉDAGOGIE ✅ (maquettes + inscriptions pédagogiques)
 
 - **Objectif** : maquettes LMD versionnées, inscriptions pédagogiques (IP), passerelle ECUE↔RefModule.
-- **Acteurs** : DIRECTION/DFRC (validation), Secrétariat, ENCADRANT.
+- **Acteurs** : DIRECTION (validation — la permission code héritée `IsDFRC`), Secrétariat, ENCADRANT.
 - **Sous-modules** : maquettes versionnées, UE/ECUE, IP, passerelle.
 - **Entités** : ✅ `scolarite.Maquette` (versionnée, `ref_formation`+`niveau`, Statut BROUILLON/ACTIVE/ARCHIVEE), `UE` (Caractere, rattachée à un Semestre), `ECUE` (passerelle possible vers `RefModule`), `InscriptionPedagogique`.
 - **Endpoints réels** : `/api/scolarite/maquettes/` (+ ecues par semestre), `inscriptions/<pk>/pedagogie/` (+generer, ajouter), `pedagogie/<ligne_id>/`.

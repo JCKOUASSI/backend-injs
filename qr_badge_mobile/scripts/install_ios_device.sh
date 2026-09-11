@@ -23,6 +23,6 @@ echo "→ Installation sur $DEVICE (sans attach Xcode)…"
 flutter install -d "$DEVICE"
 
 echo ""
-echo "App installée. Ouvrez « QR Badge » sur l'iPhone."
+echo "App installée. Ouvrez l’application INJS de présence sur l’iPhone."
 echo "Pour les logs sans relancer via Xcode :"
 echo "  ./scripts/watch_logs.sh"

@@ -1,4 +1,4 @@
-# Guide de dépannage — Admin Django SYGEP-CPFAE
+# Guide de dépannage — Admin Django INJS-LMD
 
 Ce document décrit les procédures pour diagnostiquer et corriger les problèmes courants de l’interface d’administration (`/admin/`).
 

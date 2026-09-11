@@ -1,4 +1,4 @@
-# Checklist tests sur device — QR Badge mobile
+# Checklist tests sur device — application mobile INJS — Présences
 
 Environnement : iPhone / Android physique, API configurée dans `assets/app.env` (`API_BASE_URL`).
 

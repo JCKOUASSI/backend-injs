@@ -1,11 +1,11 @@
 {
-    "name": "QR Badge MFPMA",
-    "short_name": "QR Badge",
+    "name": "INJS-LMD — Présences",
+    "short_name": "INJS Présences",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1A68AC",
     "theme_color": "#1A68AC",
-    "description": "Badgeage sécurisé par QR (MFPMA) — scan, présence et historique.",
+    "description": "Badgeage sécurisé par QR de l’INJS Marcory — scan, présence et historique.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

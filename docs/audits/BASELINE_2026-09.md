@@ -314,7 +314,7 @@ Sur décision explicite du commanditaire, trois correctifs de stabilisation (hor
 | 902 exécutés / 943 détectés, **19 erreurs + 6 échecs** | **943 exécutés, 942 verts, 1 échec** |
 | feu 1 bloqué par le schéma | feu 1 bloqué par un **unique écart moteur documenté** |
 
-Le seul échec restant est `referentiels.tests.test_api.ReferentielsAPIAccessTests.test_regle4_doublon_libelle_casse_rejete` : différence de pliage Unicode entre SQLite (`LOWER()` ASCII) et PostgreSQL (plie les accents), verte en CI PostgreSQL. Il fait l'objet de l'**ADR `docs/adr/0001-unicite-libelles-insensible-casse.md`** et sera corrigé fonctionnellement en **LOT 1 (référentiels P01-02/P01-03)** ; aucun test n'est marqué ignoré pour contournement.
+Le seul échec restant est `referentiels.tests.test_api.ReferentielsAPIAccessTests.test_regle4_doublon_libelle_casse_rejete` : différence de pliage Unicode entre SQLite (`LOWER()` ASCII) et PostgreSQL (plie les accents), verte en CI PostgreSQL. Il fait l'objet de l'**[ADR-006 `docs/ADR/ADR-006-unicite-libelles-insensible-casse.md`](../ADR/ADR-006-unicite-libelles-insensible-casse.md)** et sera corrigé fonctionnellement en **LOT 1 (référentiels P01-02/P01-03)** ; aucun test n'est marqué ignoré pour contournement.
 
 État des feux après correctifs : **feu 1** = migrations/checks verts, tests 942/943 (1 écart moteur fléché LOT 1) · **feu 2** = ESLint 0 erreur et build Vite verts, tests Vitest indisponibles jusqu'à P00-04 (exception documentée) · **feu 3** = Flutter NON LEVABLE dans le sandbox (poste/CI).
 

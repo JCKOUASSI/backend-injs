@@ -135,7 +135,7 @@ def md_to_docx(md_path: Path, docx_path: Path) -> None:
     r.font.size = Pt(22)
     r.font.color.rgb = RGBColor(0x43, 0xA0, 0x47)
 
-    sub = doc.add_paragraph('SYGEP-CPFAE — Module Statistiques & Bilans')
+    sub = doc.add_paragraph('INJS-LMD — Module Statistiques & Bilans')
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sub.runs[0].font.size = Pt(14)
     sub.runs[0].italic = True

@@ -1,7 +1,7 @@
 """Extrait tous les modules/matières distincts des fichiers EDT."""
 import openpyxl, os, re
 
-SRC = '/Users/tobidesis/Downloads/données'
+SRC = 'donnees'
 
 JOURS = ('LUNDI','MARDI','MERCREDI','JEUDI','VENDREDI','SAMEDI','DIMANCHE')
 MOIS  = ('JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET',

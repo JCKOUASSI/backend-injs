@@ -1,35 +1,25 @@
-# Pages légales & confidentialité (HTML statique)
+# Documentation du projet INJS-LMD 2026
 
-Contenu prêt pour un dépôt GitHub servi via **GitHub Pages** (ou tout autre hébergement de fichiers statiques).
+Point d'entrée de toute la documentation. La présentation générale et le démarrage sont
+dans le [README racine](../README.md) ; l'architecture réelle et les décisions sont dans
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Fichiers
+## Documentation technique
 
-| Fichier | Usage |
-|---------|--------|
-| `index.html` | Redirige vers `legal/index.html`. |
-| `legal/index.html` | Sommaire avec liens vers toutes les pages. |
-| `legal/confidentialite-qr-badge-mobile.html` | **Google Play** — caméra, localisation, app mobile. |
-| `legal/confidentialite-badgeage-web.html` | Badgeage navigateur / PWA / hors ligne. |
-| `legal/confidentialite-plateforme-sygep.html` | Vue globale plateforme (web + API). |
-| `legal/donnees-personnelles-droits.html` | Droits RGPD (accès, rectification, CNIL, etc.). |
-| `legal/mentions-legales.html` | Éditeur, hébergement (modèle à compléter). |
-| `legal/politique-cookies.html` | Cookies & traceurs. |
-| `legal/assets/style.css` | Mise en forme commune. |
+| Document | Contenu |
+|---------|---------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture réelle, table modules ↔ applications, décisions DA-01 → DA-12 |
+| [ADR/](ADR/README.md) | Registre des décisions d'architecture (ADR-001 à ADR-006) |
+| [CARTOGRAPHIE_CIBLE_INJS_LMD.md](CARTOGRAPHIE_CIBLE_INJS_LMD.md) | Cartographie détaillée par module (existants / à créer / doubles représentations) |
+| [API_ENDPOINTS.md](API_ENDPOINTS.md) | Référence des endpoints REST du backend INJS-LMD |
+| [STATISTIQUES_INDICATEURS.md](STATISTIQUES_INDICATEURS.md) | Définition et traçabilité des indicateurs statistiques |
+| [SECURITE_DONNEES.md](SECURITE_DONNEES.md) | Sécurité et protection des données, jeux de données fictifs |
+| [modeles/](modeles/) | Modèles de données fictifs (jamais de données réelles dans le dépôt) |
+| [audits/BASELINE_2026-09.md](audits/BASELINE_2026-09.md) | Baseline chiffrée de référence |
+| [archives/](archives/README.md) | Documents d'époque — **« Document d'archive — ne pas utiliser »** |
 
-Remplacez les champs entre **crochets** `[…]` par les informations officielles de votre structure.
-
-## Publier avec GitHub Pages
-
-1. Poussez le dossier `docs/` sur la branche `main` (ou `master`) du dépôt GitHub.
-2. **Settings** → **Pages** → **Build and deployment** : source **Deploy from a branch**, dossier **`/docs`**, branche **`main`**.
-3. Après build, l’URL sera du type :  
-   `https://<utilisateur>.github.io/<nom-du-depot>/`  
-   Les pages légales :  
-   `https://<utilisateur>.github.io/<nom-du-depot>/legal/index.html`  
-   Pour la Play Console (politique confidentialité + caméra), utilisez par exemple :  
-   `https://<utilisateur>.github.io/<nom-du-depot>/legal/confidentialite-qr-badge-mobile.html`
-
-Le fichier **`.nojekyll`** à la racine de `docs/` évite que Jekyll ignore ou transforme des fichiers.
+> Les guides d'administration du backend (dépannage, actions courantes) se trouvent dans
+> [`../backend/docs/`](../backend/docs/).
 
 ## Manuel utilisateur — Module Statistiques
 
@@ -38,20 +28,43 @@ Le fichier **`.nojekyll`** à la racine de `docs/` évite que Jekyll ignore ou t
 | [Manuel utilisateur App Statistiques.md](./Manuel%20utilisateur%20App%20Statistiques.md) | Source Markdown (maintenue à jour par l'équipe / l'agent) |
 | [Manuel utilisateur App Statistiques.docx](./Manuel%20utilisateur%20App%20Statistiques.docx) | Version Word formatée |
 
-## API Backend
-
-| Fichier | Description |
-|---------|-------------|
-| [API_ENDPOINTS.md](./API_ENDPOINTS.md) | Référence des endpoints REST du backend SYGEPCPFAE |
-
 Régénérer le Word après modification du Markdown :
 
 ```bash
 python scripts/generate_manuel_statistiques_docx.py
 ```
 
-Un hook Cursor (`.cursor/hooks/sync-manuel-statistiques.sh`) régénère automatiquement le `.docx` à la fin de chaque session agent ou après édition du `.md`.
+## Pages légales & confidentialité (HTML statique)
 
-## HTTPS
+Contenu prêt à être servi par **GitHub Pages** (ou tout hébergement statique). Les
+**noms de fichiers** et l'URL actuellement publiée conservent une nomenclature héritée
+(ils sont référencés par les fiches des magasins d'applications) ; leur renommage se fera
+avec le rebranding des fiches stores (DA-12). Les titres et contenus visibles sont en
+revanche en terminologie INJS.
 
-GitHub Pages sert le site en **HTTPS** par défaut — compatible avec l’exigence Play Console pour l’URL de politique de confidentialité.
+| Fichier | Usage |
+|---------|--------|
+| `index.html` (racine de `docs/`) | Redirige vers `legal/index.html`. |
+| `legal/index.html` | Sommaire avec liens vers toutes les pages. |
+| `legal/confidentialite-qr-badge-mobile.html` | **Google Play / App Store** — caméra, localisation, application mobile INJS — Présences. |
+| `legal/confidentialite-badgeage-web.html` | Badgeage navigateur / PWA / hors ligne. |
+| `legal/confidentialite-plateforme-sygep.html` | Vue globale plateforme INJS-LMD (web + API). |
+| `legal/donnees-personnelles-droits.html` | Droits sur les données personnelles (accès, rectification, limitation, etc.). |
+| `legal/mentions-legales.html` | Éditeur, hébergement (modèle à compléter). |
+| `legal/politique-cookies.html` | Cookies & traceurs. |
+| `legal/assets/style.css` | Mise en forme commune. |
+
+Remplacez les champs entre **crochets** `[…]` par les informations officielles de l'INJS.
+
+### Publier avec GitHub Pages
+
+1. Pousser le dossier `docs/` sur la branche de publication du dépôt GitHub.
+2. **Settings** → **Pages** → **Build and deployment** : source **Deploy from a branch**,
+   dossier **`/docs`**.
+3. Après build, les pages légales sont du type
+   `https://<utilisateur>.github.io/<nom-du-depot>/legal/index.html`.
+   L'URL de politique de confidentialité à fournir à la Play Console (exigence caméra) est
+   celle de la page « application mobile INJS — Présences ».
+
+Le fichier **`.nojekyll`** à la racine de `docs/` évite que Jekyll ignore ou transforme des
+fichiers. GitHub Pages sert le site en **HTTPS** par défaut, comme l'exige la Play Console.

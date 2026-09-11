@@ -1,4 +1,4 @@
-# API Backend SYGEPCPFAE — Référence des endpoints
+# API Backend INJS-LMD — Référence des endpoints
 
 > **Dernière mise à jour :** juin 2026  
 > **Base URL (dev) :** `http://localhost:8001`  

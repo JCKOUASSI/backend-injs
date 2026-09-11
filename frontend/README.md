@@ -1,127 +1,79 @@
-# QR Badge - Frontend React
+# Frontend INJS-LMD — application web React
 
-This is the React frontend for the QR Badge application, a training management system.
+Interface web de l'application **INJS-LMD 2026** (INJS Marcory). Elle consomme
+uniquement l'API Django/DRF (jamais la base directement) et respecte le principe :
+l'interface ne masque pas les droits, elle les affiche selon les permissions renvoyées
+par le backend.
 
-## Architecture
+> Documentation principale : [`../README.md`](../README.md) ·
+> architecture : [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
+
+## Pile technique (versions vérifiées dans `package.json`)
+
+- Node.js **22** (CI) / **20** (image Docker de build) · npm
+- React **18.2** · React Router **6.22** · Vite **7**
+- TanStack Query **5.101** · icônes Bootstrap Icons
+- ESLint **8.56** (`eslint-plugin-react`, `react-hooks`)
+
+## Arborescence
 
 ```
 frontend/
 ├── src/
-│   ├── pages/          # Page components
-│   │   ├── Login.jsx
-│   │   ├── Dashboard.jsx
-│   │   ├── Formations.jsx
-│   │   ├── FormationDetail.jsx
-│   │   ├── Participants.jsx
-│   │   ├── Formateurs.jsx
-│   │   ├── Users.jsx
-│   │   └── ImportExcel.jsx
-│   ├── context/         # React contexts
-│   │   └── AuthContext.jsx
-│   ├── services/       # API services
-│   │   └── api.js
-│   ├── App.jsx          # Main app with routing
-│   ├── main.jsx         # Entry point
-│   └── index.css        # Global styles
-├── index.html
-├── package.json
+│   ├── pages/        # Écrans (Formations, Scolarité, Statistiques, Jurys, Finances…)
+│   ├── components/   # Composants réutilisables (dont le gabarit d'écrans, DA-08)
+│   ├── context/      # AuthContext (session JWT)
+│   ├── services/     # Client API (api.js)
+│   └── utils/        # roles.js (matrice de rôles alignée sur le backend)
+├── .env.example
+├── Dockerfile        # Build Vite servi par Nginx
 └── vite.config.js
 ```
 
-## Prerequisites
+## Démarrage
 
-- Node.js 18+ 
-- npm or yarn
-
-## Setup
-
-1. Install dependencies:
 ```bash
 cd frontend
+cp .env.example .env     # adapter VITE_API_URL si besoin
 npm install
+npm run dev              # http://localhost:3000 (Vite, HMR)
 ```
 
-2. Copier `.env.example` vers `.env` (ou `.env.local`) pour le développement :
-```bash
-cp .env.example .env
-# Adapter si besoin — URL racine de l’API Django (suffixe /api obligatoire)
-# VITE_API_URL=http://127.0.0.1:8001/api
-```
+En développement avec API séparée, `VITE_API_URL` pointe vers la racine Django (le
+préfixe `/api` est porté par le backend), par ex. `http://127.0.0.1:8001/api`, et
+`CORS_ALLOWED_ORIGINS` côté backend doit inclure `http://localhost:3000`.
 
-3. Start the development server:
-```bash
-npm run dev
-```
+En démonstration, le build peut aussi être servi par Django sous une seule origine
+(`PREVIEW_SPA=1`, voir [`../scripts/start_dev.sh`](../scripts/start_dev.sh)).
 
-The frontend will be available at `http://localhost:3000`
+## Scripts
 
-## Development
+| Commande | Rôle |
+|---|---|
+| `npm run dev` | Serveur de développement Vite |
+| `npm run build` | Build de production (`dist/`) |
+| `npm run preview` | Prévisualisation du build |
+| `npm run lint` | Analyse statique ESLint (0 erreur bloquante exigée en CI) |
 
-### Available Scripts
+> Aucun framework de tests frontend n'est encore en place dans ce lot ; son ajout est
+> prévu (tâche P00-04 du plan de refonte).
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+## Identité visuelle
 
-### API
+Les règles de couleurs (bleus INJS, accent ambre) et de glassmorphism sont celles des
+règles maîtresses du projet ; le logo utilisé est `src/assets/logo-injs.svg`. Aucun actif
+de l'ancien produit ne doit être réintroduit.
 
-There is no dev-server proxy: set `VITE_API_URL` to your Django API root (for example `http://127.0.0.1:8001/api`). Ensure `CORS_ALLOWED_ORIGINS` on the backend includes your frontend origin (for example `http://localhost:3000`).
-
-## Features
-
-- **Authentication**: JWT-based login with token refresh
-- **Dashboard**: Overview of formations, participants, and formateurs
-- **Formations Management**: List, create, edit, delete formations
-- **Sessions Management**: Start/stop sessions, generate QR codes
-- **Participants Management**: CRUD operations for participants
-- **Formateurs Management**: CRUD operations for formateurs
-- **Users Management**: User administration (DFRC only)
-- **Excel Import**: Import data from Excel files
-
-## User Roles
-
-| Role | Permissions |
-|------|-------------|
-| DIRECTION | Full access |
-| DFRC | Full access |
-| SECRETARIAT | Limited to assigned secretariat |
-| SUPERVISEUR | View assigned formations, manage sessions |
-| PARTICIPANT | View own attendance |
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/login/` - Login
-- `POST /api/auth/token/refresh/` - Refresh token
-- `GET /api/auth/me/` - Current user profile
-
-### Formations
-- `GET /api/formations/list/` - List formations (with filters)
-- `GET /api/formations/stats/` - Dashboard statistics
-- `GET /api/formations/{id}/` - Formation details
-- `POST /api/formations/{id}/assign-superviseur/` - Assign supervisor
-
-### Sessions
-- `GET /api/formations/{id}/sessions/` - List sessions
-- `POST /api/formations/{id}/sessions/new/` - Create session
-- `POST /api/formations/{id}/sessions/{session_id}/start/` - Start session
-- `POST /api/formations/{id}/sessions/{session_id}/stop/` - Stop session
-
-### Participants
-- `GET /api/formations/participants/list/` - List participants
-- `POST /api/formations/participants/` - Create participant
-- `DELETE /api/formations/participants/{id}/` - Delete participant
-
-### Formateurs
-- `GET /api/formations/formateurs/list/` - List formateurs
-- `POST /api/formations/formateurs/` - Create formateur
-- `DELETE /api/formations/formateurs/{id}/` - Delete formateur
-
-## Production Build
+## Construction Docker
 
 ```bash
-npm run build
+docker compose up --build      # voir compose.yml (build multi-stage Nginx, port 80)
 ```
 
-The built files will be in the `dist/` directory. Serve these files with any static file server or configure your backend to serve them.
+Les variables `VITE_API_URL`, `VITE_BADGE_BASE_URL` et `VERSION` sont passées en arguments
+de build (voir [`Dockerfile`](Dockerfile)).
+
+> **Note technique héritée** : certains noms d'artefacts d'infrastructure gardent un
+> libellé antérieur (image Docker `qr-badge-frontend`, dossier du client mobile). Ils ne
+> sont pas renommés en phase documentaire ; leur bascule relève de DA-12 (retrait du
+> legacy en dernier, derrière feu de bascule).

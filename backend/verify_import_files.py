@@ -4,7 +4,7 @@ Vérifie la cohérence des 3 fichiers d'import avant import en base.
 import openpyxl, os, re
 from datetime import datetime, date
 
-OUT = '/Users/tobidesis/Downloads/données'
+OUT = 'donnees'
 
 OK = '  ✅'
 WARN = '  ⚠️ '

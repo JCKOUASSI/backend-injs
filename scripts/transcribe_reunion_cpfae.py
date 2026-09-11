@@ -10,8 +10,10 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_AUDIO = Path('/Users/jckouassi/Movies/4K Video Downloader+/20260609-Seanxe CPFAE.mp3')
-FFMPEG = '/opt/homebrew/bin/ffmpeg'
+# Aucun chemin machine en dur : le fichier audio est passé avec --audio (P00-03).
+DEFAULT_AUDIO = None
+# ffmpeg est résolu via le PATH système (installations macOS Homebrew incluses).
+FFMPEG = 'ffmpeg'
 
 
 def extract_segment(src: Path, start_sec: float, duration_sec: float, out_wav: Path) -> None:
@@ -55,11 +57,13 @@ def format_timestamp(sec: float) -> str:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--audio', type=Path, default=DEFAULT_AUDIO)
+    parser.add_argument('--audio', type=Path, default=DEFAULT_AUDIO,
+                        required=DEFAULT_AUDIO is None,
+                        help="Chemin du fichier audio à transcrire (obligatoire)")
     parser.add_argument('--start', type=float, default=0, help='Début en secondes')
     parser.add_argument('--duration', type=float, default=3600, help='Durée segment (s)')
     parser.add_argument('--model', default='small')
-    parser.add_argument('--out', type=Path, default=ROOT / 'docs' / 'transcripts' / 'reunion-cpfae-segment.txt')
+    parser.add_argument('--out', type=Path, default=ROOT / 'docs' / 'archives' / 'transcripts' / 'reunion-cpfae-segment.txt')
     parser.add_argument('--offset', type=float, default=0, help='Offset horodatage affiché')
     args = parser.parse_args()
 
