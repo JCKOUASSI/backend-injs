@@ -33,21 +33,23 @@ export default defineConfig({
         'src/assets/**',
       ],
       // Seuils du « filet de sécurité » (P00-04). Ils ne peuvent que monter.
-      // Rehaussés au LOT 1 (moteur de listes + Décisions pédagogiques) puis
+      // Rehaussés au LOT 1 (moteur de listes + Décisions pédagogiques),
       // au LOT 2 (page serveur Users : recherche debounced, onglets/rôles,
-      // pagination, création/édition/suppression). Mesure au LOT 2 :
+      // pagination, CRUD) et au LOT 3 (Statistiques : isolation par
+      // secrétariat ; Dashboard : période de présence). Mesure au LOT 3 :
       //   services 97 % l. / 91 % br. ; context 99 % l. / 91 % br. ;
       //   hooks 94 % l. / 91 % br. ; utils 77 % l. / 86 % br. ;
-      //   Users 89 % l. ; global 33 % l. / 62 % br. / 24 % fn.
+      //   Users 89 % l. ; Dashboard 75 % l. ; Statistiques 25 % l. ;
+      //   global 35 % l. / 63 % br. / 25 % fn.
       // Chaque seuil est arrondi SOUS la mesure pour absorber la volatilité
       // du maillage par branches ; les lots suivants doivent les relever,
       // jamais les baisser.
       thresholds: {
         // Plancher global (filet anti-régression toutes zones confondues).
-        statements: 32,
-        branches: 58,
-        functions: 22,
-        lines: 32,
+        statements: 34,
+        branches: 60,
+        functions: 23,
+        lines: 34,
         perFile: false,
         'src/utils/roles.js': {
           statements: 100,

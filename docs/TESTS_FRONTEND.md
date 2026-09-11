@@ -3,8 +3,10 @@
 > Document de référence du dispositif de tests du frontend web (`frontend/`, Vite + React 18).
 > Introduit par le lot **P00-04 [LOT 0]** (filet de sécurité de tests automatisés), puis
 > étendu au **[LOT 1]** (moteur de tableaux/listes génériques et formulaire de décision
-> pédagogique) et au **[LOT 2]** (page de liste *serveur* typée `Users` : recherche
-> debounced, onglets/rôles, pagination et écritures CRUD).
+> pédagogique), au **[LOT 2]** (page de liste *serveur* typée `Users` : recherche
+> debounced, onglets/rôles, pagination et écritures CRUD) et au **[LOT 3]** (contrat
+> d'**isolation des données par secrétariat** dans `Statistiques`, et période de présence
+> du `Dashboard` — ce dernier a révélé un bug réel, voir §10.5).
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -118,6 +120,8 @@ src/test/
 ├── setup.js                  # polyfils jsdom + reset global
 ├── smoke/
 │   └── pages.smoke.test.jsx  # un test de montage par page (53 pages)
+├── fixtures/
+│   └── dashboard.js          # statistiques 100 % chiffrées (Dashboard/Stats)
 └── utils/
     ├── factories.js          # utilisateurs / réponses d'auth / pagination
     ├── mockApi.js            # double de l'API fetch (données « vides » sûres)
@@ -135,6 +139,15 @@ Emballe l'écran dans les **mêmes providers que la production** :
 
 Retourne en plus le conteneur et l'utilisateur courant, pour les assertions.
 Les tests ne doivent pas reconstruire eux-mêmes ces providers.
+
+> **Garder la garde d'authentification.** En production `ProtectedRoute`
+> (`App.jsx`) n'affiche la page qu'après résolution de `GET /auth/me/`. Le
+> harnais, lui, rend le composant tout de suite : pour les pages dont les
+> requêtes initiales dépendent du rôle/secrétariat (`Statistiques`,
+> `Dashboard`), envelopper le composant d'un petit `WaitForAuth` (qui lit
+> `useAuth()` et affiche un spinner le temps de la résolution), sinon une
+> requête « anonyme » parasite est émise avant que `user` soit connu. Les
+> tests `Statistiques`/`Dashboard` fournissent ce composant.
 
 ### 5.2 `factories.js`
 
@@ -185,7 +198,9 @@ que celui importé par les pages. Les tests unitaires du client
 > Certains écrans font des calculs numériques (ex. `Dashboard` :
 > `.toFixed()` sur les statistiques). Une donnée « vide » générique (tableau) ne
 > convient pas : on injecte alors une **fixture numérique** via `setRoute`
-> (voir la fixture `dashboardStats()` dans le smoke), sans modifier la page.
+> (`dashboardStats()` / `dashboardStatsWithPeriods()` dans
+> `src/test/fixtures/dashboard.js`, partagées par le smoke et les tests dédiés),
+> sans modifier la page.
 
 ### 5.4 Helpers asynchrones et d'erreur
 
@@ -209,7 +224,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (19 fichiers, 453 tests)
+### 6.2 Fichiers de test colocalisés (21 fichiers, 463 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -240,12 +255,14 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/hooks/useListReturn.test.jsx` | hook | Retour vers une liste : priorité à l'état de navigation, puis `sessionStorage`, puis chemin brut ; état `from`. |
 | `src/hooks/usePersistedListQuery.test.jsx` | hook | Synchronisation filtres/pagination → URL (`replace`) **et** `sessionStorage`, nettoyage et mise à jour quand une dépendance change. |
 
-**Pages fonctionnelles (LOT 1 & 2) et smoke**
+**Pages fonctionnelles (LOT 1, 2 & 3) et smoke**
 
 | Fichier | Niveau | Ce qui est vérifié |
 | --- | --- | --- |
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
 | `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (16 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
+| `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. |
+| `src/pages/Dashboard.test.jsx` | page | **Chargement et période de présence (4 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, et un test **`[écart]`** qui fige le bug de closure confirmé (§10.5). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
@@ -267,7 +284,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 2 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 3 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -278,14 +295,16 @@ Mesure après le LOT 2 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `src/hooks/**` | **94 %** | 94 % | 84 % | **91 %** |
 | `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
 | `pages/Users.jsx` | **89 %** | 89 % | 49 % | **69 %** |
-| **Global `src/` (toutes zones)** | **33 %** | 33 % | 24 % | **62 %** |
+| `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **79 %** |
+| `pages/Statistiques.jsx` | **25 %** | 25 % | 11 % | **58 %** |
+| **Global `src/` (toutes zones)** | **35 %** | 35 % | 25 % | **63 %** |
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`,
 `apiErrors.js` et les hooks de liste testés à **100 % de lignes**.
 
 Les seuils sont déclarés dans `vitest.config.js` (`coverage.thresholds`,
-`perFile: false` pour les globes). Valeurs après le LOT 2 (ordres : lignes,
+`perFile: false` pour les globes). Valeurs après le LOT 3 (ordres : lignes,
 instructions, fonctions, branches) :
 
 - `src/utils/roles.js` : **100 / 100 / 100 / 100** (contrat de sécurité) ;
@@ -293,8 +312,9 @@ instructions, fonctions, branches) :
 - `src/services/**` : **90 / 90 / 90 / 85** ;
 - `src/context/**` : **95 / 95 / 85 / 85** ;
 - `src/hooks/**` : **88 / 88 / 80 / 85** ;
-- plancher **global** : **32** % lignes/instructions, **22** % fonctions,
-  **58** % branches (relevé au LOT 2 ; il était de 30/20/54 au LOT 1).
+- plancher **global** : **34** % lignes/instructions, **23** % fonctions,
+  **60** % branches (relevé à chaque lot : 28/16/48 au LOT 0 → 30/20/54 au
+  LOT 1 → 32/22/58 au LOT 2 → ces valeurs au LOT 3).
 
 Chaque seuil est arrondi *sous* la mesure pour absorber la volatilité du
 maillage des branches. Le garde-fou est vérifié en CI : un build dont la
@@ -370,7 +390,7 @@ et de l'emploi mobile (Flutter).
 
 ---
 
-## 10. Écarts et anomalies SIGNALÉS par les tests (non corrigés aux lots 0 et 1)
+## 10. Écarts et anomalies SIGNALÉS par les tests (non corrigés aux lots 0 à 3)
 
 Conformément aux contraintes, ces points sont **constatés et tracés**, pas
 corrigés en silence. Ils attendent un lot dédié (ils touchent au comportement).
@@ -397,26 +417,26 @@ mémoïsée au tableau de dépendances provoquerait une boucle ; les dépendance
 données présentes pilotent déjà le (re)chargement. Quelques dépendances
 **stables** (`showToast` issu d'un `useCallback`, `navigate`) ont été ajoutées.
 
-Les 11 avertissements conservés sont des **points à confirmer**, laissés
-volontairement visibles :
+Les 11 avertissements conservés ont été **expertisés au LOT 3** par des tests
+dédiés. Résultat :
 
-| Écran | Hook / sujet | Risque potentiel |
+| Écran | Hook / sujet | Conclusion au LOT 3 |
 | --- | --- | --- |
-| `Statistiques.jsx` (5 `useCallback`) | dépendance `effectiveSecretariatId` absente | **Closure périmée possible** : une requête pourrait utiliser l'identifiant de secrétariat précédent. À confirmer fonctionnellement (changement de secrétariat). |
-| `Statistiques.jsx` (`useEffect`) | `data?.justificatifs` non listé | L'état `justificatifs` pourrait ne pas se resynchroniser quand la donnée change. |
-| `Statistiques.jsx` (`useEffect`) | expression complexe + `facGroupesVisibles` | Lisibilité / valeur à extraire dans une variable ; vérifier le redéclenchement. |
-| `Dashboard.jsx` (`useCallback`) | `presencePeriod` absent | Vérifier qu'un changement de période de présence recalcule/recharge bien. |
-| `Modules.jsx` (`useEffect`) | `filters` (objet) + `showToast` absents | Vérifier le rechargement quand les filtres changent (un autre effet s'en charge peut-être). |
-| `Users.jsx` (`useEffect`) | `availableTabs`, `userTab` absents | Vérifier la synchronisation des onglets selon les permissions. |
+| `Statistiques.jsx` (5 `useCallback`) | dépendance `effectiveSecretariatId` absente | ✅ **FAUX POSITIF confirmé par le test.** `effectiveSecretariatId = lockedSecretariatId(user) || secretariatId` : pour un compte verrouillé l'id est **constant de la session** (et un effet synchronise d'ailleurs `secretariatId` dessus) ; pour un compte qui peut filtrer, `secretariatId` — qui varie — **est bien** dans les dépendances, et les effets déclencheurs listent `secretariatId`. Aucune requête à secrétariat périmé (vérifié sur Point Journalier, Rapports, Alertes et sur le compte Chef Secrétariat). Le warning reste ouvert pour lisibilité, mais le risque de fuite de données est écarté. |
+| `Statistiques.jsx` (`useEffect`) | `data?.justificatifs` non listé | Composant présentuel `BilanPeriodeFormationTable` : la synchronisation se fait sur les clés d'identité de ligne (`titre`, `formation_id`, `annee`) ; un justificatif changeant à clés identiques est un cas très improbable. Risque **mineur**, non corrigé. |
+| `Statistiques.jsx` (`useEffect`) | expression complexe + `facGroupesVisibles` | Lisibilité uniquement (expression à extraire) ; non testé spécifiquement. |
+| `Dashboard.jsx` (`useCallback`) | `presencePeriod` absent | ❌ **VRAI BUG CONFIRMÉ** — voir §10.5. |
+| `Modules.jsx` (`useEffect`) | `filters` (objet) + `showToast` absents | Non revu au LOT 3 ; à examiner lors des tests des listes métiers. |
+| `Users.jsx` (`useEffect`) | `availableTabs`, `userTab` absents | Sans impact fonctionnel observé dans les tests LOT 2 (les onglets se synchronisent par un effet dédié) ; à garder en vue. |
 | `FinanceDashboard.jsx` (2 `useMemo`) | valeurs conditionnelles non mémoïsées (`volumesParModule`, `synthese`) | **Performance uniquement** (référence nouvelle à chaque rendu) ; pas de donnée périmée. |
 
 Aucune de ces lignes n'est désactivée : l'avertissement reste un signal pour le
 lot qui les prendra en charge. Les corriger change le comportement (refetch),
 ce qui sort du périmètre du filet de tests.
 
-> Le LOT 1 n'a modifié **aucune logique applicative** : il n'a ajouté que des
-> tests et relevé les seuils. Les 11 avertissements ci-dessus restent donc
-> d'actualité.
+> Les lots 1 à 3 n'ont modifié **aucune logique applicative** : uniquement des
+> tests, le harnais, des fixtures et les seuils. Les bugs/écarts découverts sont
+> tracés (§10.1, §10.4, §10.5), jamais corrigés en silence.
 
 ### 10.3 Variables inutilisées (code mort)
 
@@ -436,6 +456,30 @@ générique. Cas-limite sans impact sécurité, figé par un test `[écart]` dan
 `src/utils/apiErrors.test.js`. Un lot d'hygiène pourra faire retomber ce cas sur
 le fallback.
 
+### 10.5 BUG CONFIRMÉ — `Dashboard` : closure périmée sur la période de présence
+
+**Écran** : `src/pages/Dashboard.jsx` (chargement des « formations en cours »).
+
+`loadDashboardData` est un `useCallback` dont le tableau de dépendances omet
+`presencePeriod` (il ne contient que `selectedSecretariatId`, `referenceDate`,
+`appliedVhPeriod`), alors que l'effet déclencheur, lui, liste `presencePeriod`.
+Conséquence : quand on passe de **« Jour spécifique » avec une date non
+courante** à **Semaine / Mois / Année**, l'effet rappelle une ancienne closure
+encore en mode « jour ». La requête `GET /formations/list/` reste épinglée sur
+la date choisie (`date_mode=date&date=…`) au lieu de revenir à
+`seance_en_cours=true`. La carte « formations en cours » affiche alors les
+séances d'un jour passé au lieu des séances en cours.
+
+- Le cas symétrique (Semaine → Jour avec une date passée) est également faux :
+  on bascule en mode « jour » sans pour autant passer en `date_mode=date`.
+- Le bug est **invisible avec la date du jour** (les deux branches produisent
+  alors `seance_en_cours=true`), d'où sa discrétion.
+- Il est figé par un test `[écart]` dans `src/pages/Dashboard.test.jsx`.
+  **Correctif attendu** (lot dédié, sans surprise car il change une requête) :
+  ajouter `presencePeriod` aux dépendances de `loadDashboardData` (ou déplacer
+  ce calcul dans l'effet) ; le test `[écart]` deviendra alors faux et devra être
+  remplacé par l'assertion correcte (`seance_en_cours=true` après bascule).
+
 ---
 
 ## 11. Couverture des pages — ce qui reste à faire
@@ -454,11 +498,12 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 2 :
+**Aucune page n'est dépourvue de test.** État après le LOT 3 :
 
-- trois écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
-  `DecisionsPedagogiques.jsx` (100 % de lignes) et `Users.jsx` (89 % de lignes,
-  liste serveur complète + CRUD) ;
+- cinq écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
+  `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
+  serveur + CRUD), `Dashboard.jsx` (75 %) et `Statistiques.jsx` (25 %, ciblé sur
+  le contrat d'isolation par secrétariat) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -466,21 +511,20 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **50 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **48 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
 
-1. ~~Moteur de listes + décision pédagogique~~ (LOT 1) et ~~assemblage d'une
-   liste *serveur* typée (recherche debounced, filtres/onglets, pagination,
-   écritures)~~ (LOT 2, page `Users`). Le « tri » par colonne n'existe pas dans
-   les listes actuelles (ordering géré côté API) : aucun besoin à couvrir. Reste
-   la branche `Users` « création d'un secrétariat à la volée » ;
+1. ~~Moteur de listes + décision pédagogique~~ (LOT 1), ~~liste *serveur*
+   typée~~ (LOT 2, `Users`), ~~isolation secrétariat Stats + période Dashboard~~
+   (LOT 3). Restes ponctuels connus : branche `Users` « création d'un secrétariat
+   à la volée », onglets/exports/widgets internes de `Statistiques`, et le
+   **correctif** du bug Dashboard §10.5 (avec bascule du test `[écart]`) ;
 2. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
    jurys, finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
-3. écrans `Statistiques` / `Dashboard` avec fixtures complètes et filtres de
-   période (les points du §10.2 sur `effectiveSecretariatId` seront couverts à
-   cette occasion) ;
+3. corriger les écarts confirmés (§10.5 Dashboard ; §10.1 `must_change_password`)
+   dans des lots dédiés, en transformant les tests `[écart]` correspondants ;
 4. composants partagés (modales, pickers, badges, panneaux de flux) ;
 5. montée progressive du plancher de couverture global (§7) et résorption des
-   points du §10 (dont l'écart `must_change_password` §10.1).
+   derniers points du §10.

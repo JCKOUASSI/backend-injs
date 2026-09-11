@@ -22,27 +22,7 @@ import { renderWithProviders } from '@/test/utils/renderWithProviders'
 import TestErrorBoundary from '@/test/utils/ErrorBoundary'
 import { flushPromises } from '@/test/utils/async'
 import { makeUser } from '@/test/utils/factories'
-
-// Statistiques quotidiennes toutes à zéro (les écrans font des .toFixed sur
-// des nombres ; le mock « vide » générique renvoie des tableaux, d'où cette
-// fixture numérique).
-const dashboardStats = () => {
-  const nombres = [
-    'retard_moyen_minutes', 'auditeurs_attendus_jour', 'auditeurs_presents_jour',
-    'en_salle_now', 'formateurs_attendus_jour', 'formateurs_presents_jour',
-    'modules_en_cours', 'modules_planifies', 'modules_termines',
-    'pointages_aujourd_hui', 'presents_annee', 'presents_aujourd_hui',
-    'presents_mois', 'presents_semaine', 'seances_actives',
-    'seances_planifiees_aujourd_hui', 'taux_presence', 'taux_presence_annee',
-    'taux_presence_mois', 'taux_presence_semaine', 'total_attendus_annee',
-    'total_attendus_jour', 'total_attendus_mois', 'total_attendus_semaine',
-    'total_modules', 'total_participants', 'volume_horaire_effectue_heures',
-    'volume_horaire_effectue_taux', 'volume_horaire_total_heures',
-  ]
-  const stats = { periode: 'jour', derniers_pointages: [], prochaines_seances: [] }
-  for (const k of nombres) stats[k] = 0
-  return stats
-}
+import { dashboardStats } from '@/test/fixtures/dashboard'
 
 // Pages principales
 import AffectationNew from '@/pages/AffectationNew'
