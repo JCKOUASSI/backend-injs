@@ -1,0 +1,7 @@
+# Exclusions racine (fichiers locaux hors Git)
+.DS_Store
+.vscode/
+injslmd2026nouv/
+*.dump
+project_structure.txt
+Save taches app-injs-lmd 2026.txt
