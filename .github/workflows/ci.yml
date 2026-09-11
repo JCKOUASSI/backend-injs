@@ -52,8 +52,17 @@ jobs:
         working-directory: backend
         run: python manage.py check_repo_hygiene
 
+      - name: Collecte des fichiers statiques (manifeste WhiteNoise)
+        working-directory: backend
+        # staticfiles/ n'est plus versionné (P00-02) : le manifeste requis par
+        # ManifestStaticFilesStorage doit être généré avant les tests de templates.
+        run: SECRET_KEY=ci-secret-key-not-for-production DEBUG=True python manage.py collectstatic --noinput
+
       - name: Migrations et tests
         working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
         run: |
           python manage.py migrate --noinput
           python manage.py test --noinput -v 2
