@@ -1,0 +1,53 @@
+================================================================================
+PROMPT P12-05 — RETRAIT DU LEGACY, RECETTE GÉNÉRALE ET DOSSIER DE LIVRAISON
+================================================================================
+P12-05 — RETRAIT DU LEGACY, RECETTE GÉNÉRALE ET DOSSIER DE LIVRAISON
+Lot 12 | 2 séances | Dépendances : tous les lots | Module réf. : tous · DA-12
+Risques couverts : R12, R4 | Type : Clôture
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Tous les lots précédents sont livrés. Il reste à retirer proprement le socle
+legacy isolé (P07-05), à conduire la recette générale sur les 18 modules et à
+produire le dossier de livraison.
+
+MISSION
+Clore la refonte : retrait contrôlé du legacy, recette générale démontrable,
+dossier de livraison complet.
+
+CONSIGNES
+1. RETRAIT DU LEGACY : vérifie la fenêtre d'observation écoulée et l'absence
+   d'usage (journaux + statistiques d'accès). Puis, dans cet ordre et un élément
+   à la fois : désactive définitivement les flags → sauvegarde des templates →
+   suppression de dashboard/views_legacy.py et des templates de badgeage →
+   suppression de backend/static/sw.js « qr-badge-v3 » → suppression du logo
+   résiduel logo-sygepcpfae.png → vérification complète (tests, build,
+   smoke test). Chaque suppression est un commit distinct et réversible.
+2. RECETTE GÉNÉRALE : exécute et documente les 18 scénarios de recette de la
+   PARTIE H, un par module de référence, avec captures d'écran, données
+   utilisées, résultat et signature du validateur.
+3. Mise à jour des manuels : MANUEL_UTILISATEUR.md (par rôle),
+   MANUEL_UTILISATEUR_AUDITEURS.md, manuels spécifiques (scolarité, finance,
+   jurys, EDT, RH, GED), captures d'écran à jour. Vérifie qu'aucun manuel ne
+   décrit une fonctionnalité inexistante.
+4. Documentation finale : README à jour, docs/ARCHITECTURE.md à jour,
+   docs/MODULES_INJS_LMD.md avec la maturité finale de chaque module (0→3),
+   ADR complets, OpenAPI régénéré et vérifié (/api/docs/), baseline finale
+   (docs/audits/BASELINE_2026-09.md section M) avec les chiffres avant/après
+   de toute la refonte.
+5. Vérification finale des 3 feux verts + smoke_test_injs + compare_api_contract
+   + les commandes d'intégrité (P02-05).
+6. Publie le BILAN DE REFONTE : pour chaque risque R1→R12 de l'audit, l'état
+   avant/après et la preuve (test, écran, commande). Pour chaque écart E1→E17,
+   l'état de couverture.
+7. Liste explicite de ce qui RESTE À FAIRE (dettes assumées, évolutions
+   reportées) — une refonte honnête déclare ses restes.
+
+DoD
+[ ] legacy retiré par commits distincts et réversibles, application intacte
+[ ] 18 scénarios de recette exécutés, documentés et signés
+[ ] manuels et documentation à jour, OpenAPI vérifié
+[ ] baseline finale et bilan R1→R12 / E1→E17 publiés
+[ ] liste des restes à faire publiée

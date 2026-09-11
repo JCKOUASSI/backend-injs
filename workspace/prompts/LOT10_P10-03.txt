@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P10-03 — CONGÉS, ABSENCES, MISSIONS ET ÉVALUATIONS DU PERSONNEL
+================================================================================
+P10-03 — CONGÉS, ABSENCES, MISSIONS ET ÉVALUATIONS DU PERSONNEL
+Lot 10 | 2 séances | Dépendances : P10-02, P05-04 | Module réf. : 13, 06
+Risques couverts : E1 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 13 : congés, absences, missions, ordres de mission, formations
+du personnel, évaluations professionnelles, sanctions/récompenses. L'app
+administrations possède déjà Mission. DisponibiliteAgent existe côté RH.
+
+MISSION
+Livrer les workflows RH opérationnels, branchés sur la planification (une
+absence doit être visible du moteur EDT).
+
+CONSIGNES
+1. Congés et absences : demande (type paramétrable, période, motif, pièce),
+   circuit d'approbation paramétrable (supérieur hiérarchique, RH), solde de
+   congés calculé par type, refus motivé.
+2. Impact planification : une absence validée crée une indisponibilité visible
+   du moteur EDT (P05-04 / P06-01) et déclenche la détection de conflit si
+   l'agent a des séances planifiées — avec proposition de remplacement.
+3. Missions et ordres de mission : demande, validation, ordre de mission
+   numéroté (PDF), période, destination, frais prévisionnels (lien avec la
+   chaîne dépense du LOT 9), compte rendu au retour.
+4. Formations du personnel : plan de formation, inscriptions, suivi de
+   réalisation, attestations.
+5. Évaluations professionnelles : campagne annuelle, grille paramétrable,
+   entretien, objectifs, appréciation, validation, confidentialité stricte.
+6. Sanctions et récompenses : actes tracés, rattachés à la carrière.
+7. Tests : solde de congés exact, approbation paramétrée, impact EDT d'une
+   absence, ordre de mission numéroté, confidentialité des évaluations.
+
+DoD
+[ ] congés/absences avec circuit d'approbation et solde calculé
+[ ] absence visible du moteur EDT avec proposition de remplacement
+[ ] missions, ordres numérotés et comptes rendus
+[ ] évaluations confidentielles, sanctions tracées
+[ ] tests verts

@@ -1,0 +1,44 @@
+================================================================================
+PROMPT P04-05 — D3 : PONT Formation ↔ RefFormation ET ALIGNEMENT DES STATISTIQUES
+================================================================================
+P04-05 — D3 : PONT Formation ↔ RefFormation ET ALIGNEMENT DES STATISTIQUES
+Lot 4 | 1 séance | Dépendances : P04-04 | Module réf. : 03, 16 · D3
+Risques couverts : R3 | Type : Données
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Double représentation D3 : formations.Formation n'a pas de clé étrangère vers
+RefFormation, alors que Maquette.ref_formation et Groupe.ref_formation existent
+déjà. Le rapport de mise en œuvre tranche : « Lien clair entre RefFormation
+(Offre LMD) et Formation (Session opérationnelle). Utilisation de la clé
+étrangère nullable Formation.ref_formation. »
+
+MISSION
+Créer le pont et aligner les statistiques LMD dessus, sans fusionner les deux
+objets (une Formation de référence n'est pas une session de formation).
+
+CONSIGNES
+1. Vérifie que Maquette.ref_formation et Groupe.ref_formation existent bien et
+   comment ils sont alimentés. Publie le constat.
+2. Ajoute Formation.ref_formation (nullable) + index. Migration réversible.
+3. Commande backfill_formation_refs (--dry-run / --auto / --interactive) avec
+   rapport de correspondance et écran de rapprochement pour les cas ambigus.
+4. Règle de cohérence : une Maquette et les Formations qui en découlent doivent
+   pointer vers le MÊME RefFormation. Ajoute check_formation_refs qui détecte
+   les incohérences.
+5. Aligne les statistiques : les effectifs, taux de réussite et indicateurs LMD
+   sont agrégés par RefFormation (offre) ET par Formation (session), les deux
+   étant clairement libellés pour éviter toute confusion de lecture.
+6. Documente la distinction dans docs/ADR/ (complément à ADR-001) :
+   RefFormation = offre académique de référence ; Formation = session
+   opérationnelle rattachée à une année académique.
+7. Tests : backfill idempotent, incohérence Maquette/Formation détectée,
+   agrégations statistiques correctes aux deux niveaux.
+
+DoD
+[ ] FK nullable + index + backfill avec rapport
+[ ] check_formation_refs vert
+[ ] statistiques agrégées aux deux niveaux, libellés distincts
+[ ] ADR complété, tests verts

@@ -1,0 +1,55 @@
+================================================================================
+PROMPT P02-04 — MOTEUR DE VALIDATION LMD PARAMÉTRABLE (COMPENSATION, RATTRAPAGE, ECTS)
+================================================================================
+P02-04 — MOTEUR DE VALIDATION LMD PARAMÉTRABLE (COMPENSATION, RATTRAPAGE, ECTS)
+Lot 2 | 1 séance | Dépendances : P02-03 | Module réf. : 09, 10
+Risques couverts : R8, E16 | Type : Moteur métier
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les règles de validation LMD (seuils UE, compensation, crédits, nombre de
+tentatives, rattrapage) doivent être paramétrables. Les jurys de délibération
+dépendent d'un moteur de calcul REPRODUCTIBLE. Règle de référence : « Le
+classement doit être reproductible à partir des notes et règles enregistrées. »
+
+MISSION
+Isoler les règles de validation dans un moteur unique, paramétrable, versionné
+et testable, utilisé par les écrans, les jurys et les exports.
+
+CONSIGNES
+1. Crée un module moteur_validation.py exposant des fonctions pures :
+   moyenne_ecue → moyenne_ue → moyenne_semestre(compensation) →
+   credits_acquis → validation_semestre → validation_annee →
+   decision_passage.
+2. Chaque fonction prend en entrée un OBJET DE RÈGLES (chargé depuis les
+   paramètres académiques) : note_minimale, seuil_validation_ue, compensation
+   semestrielle/annuelle, crédits cibles, nombre de tentatives, règles de
+   rattrapage, prise en compte de la meilleure note.
+3. VERSIONNE les règles utilisées pour un calcul : chaque résultat stocke
+   l'empreinte de l'objet de règles appliqué. Un recalcul postérieur avec des
+   règles différentes est explicitement marqué comme tel.
+4. Rend le moteur REPRODUCTIBLE : deux exécutions avec les mêmes entrées et les
+   mêmes règles produisent exactement le même résultat (test de stabilité,
+   y compris sur l'arrondi — fixe et documente la politique d'arrondi).
+5. Ajoute un simulateur /api/scolarite/simulation-validation/ (N3/N4) : choisir
+   un étudiant ou un groupe, un semestre, un jeu de règles, et voir le résultat
+   détaillé étape par étape (moyennes intermédiaires visibles). C'est l'outil
+   de préparation des jurys.
+6. Ajoute des golden tests : un jeu de notes connu avec des règles connues
+   donne un résultat attendu figé dans le test. Toute évolution du moteur qui
+   change ces résultats est un échec explicite.
+7. Ne branche PAS encore les jurys sur ce moteur : c'est l'objet du prompt
+   P08-04. Ici, le moteur est livré, testé et documenté.
+
+INTERDITS
+- Ne modifie aucun calcul existant en production : le nouveau moteur est livré
+  derrière un flag, en parallèle, avec un rapport de comparaison.
+- Ne code aucune règle en dur.
+
+DoD
+[ ] moteur pur, paramétré, versionné, reproductible (test de stabilité)
+[ ] golden tests verts
+[ ] simulateur fonctionnel pour les jurys
+[ ] rapport de comparaison ancien/nouveau calcul publié

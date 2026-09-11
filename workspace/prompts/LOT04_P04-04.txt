@@ -1,0 +1,55 @@
+================================================================================
+PROMPT P04-04 — D2 : MIGRATION DES CHAMPS TEXTE LEGACY VERS LES RÉFÉRENTIELS Ref*
+================================================================================
+P04-04 — D2 : MIGRATION DES CHAMPS TEXTE LEGACY VERS LES RÉFÉRENTIELS Ref*
+Lot 4 | 2 séances | Dépendances : P04-03 | Module réf. : 03 · D2
+Risques couverts : R3 | Type : Données
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Double représentation D2 : les champs texte legacy de Participant (categorie,
+grade, vague, site, salle, type_concours, libelle_concours) coexistent avec les
+tables de référence RefCategorie / RefGrade / RefVague / RefSite / RefSalle.
+Le rapport de mise en œuvre tranche : « Clés étrangères directes RefCategorie,
+RefGrade, RefVague, RefSite, RefSalle. Migration automatique des champs textes
+legacy vers les FK. »
+
+MISSION
+Rattacher chaque Participant aux référentiels par clé étrangère, avec affichage
+dual et contrôle permanent de divergence.
+
+CONSIGNES
+1. Pour CHACUN des 7 champs texte, mesure la couverture : valeurs distinctes,
+   correspondances exactes avec un référentiel, correspondances approximatives
+   (casse, accents, abréviations), valeurs sans correspondance. Publie le
+   tableau.
+2. Ajoute les clés étrangères nullables (ref_categorie, ref_grade, ref_vague,
+   ref_site, ref_salle, ref_type_concours, ref_concours) + index. Migration
+   réversible.
+3. Commande backfill_participant_refs avec 3 modes :
+   --dry-run (rapport détaillé par champ), --auto (correspondances exactes et
+   normalisées sans ambiguïté), --interactive (validation humaine). Aucune
+   écriture sans rapport.
+4. Règles de normalisation explicites et testées (trim, casse, accents,
+   abréviations connues) — aucune normalisation « magique » non documentée.
+5. Les valeurs sans correspondance sont listées dans un écran de
+   « rapprochement à valider » : l'agent choisit le référentiel correspondant
+   ou crée une nouvelle entrée référentielle (avec droits).
+6. AFFICHAGE DUAL : le référentiel est affiché en priorité, le texte legacy en
+   secondaire jusqu'à la fin de la transition. Indicateur de divergence.
+7. Après atteinte de 100 % de couverture, une étape DISTINCTE (à valider
+   explicitement) rend les champs texte en lecture seule synchronisée, comme
+   pour D1. Ne fais pas cette étape dans ce prompt : prépare-la et documente-la.
+8. Ajoute check_participant_refs et un indicateur de couverture par champ.
+9. Tests : normalisation, refus d'ambiguïté, backfill idempotent, divergence
+   détectée, non-régression des exports/statistiques/imports Excel qui lisent
+   les champs texte.
+
+DoD
+[ ] 7 FK nullables + index, migration réversible
+[ ] rapport de couverture par champ publié
+[ ] backfill dry-run/auto/interactive + écran de rapprochement
+[ ] affichage dual + check_participant_refs + indicateur de couverture
+[ ] aucune régression sur les exports et imports existants

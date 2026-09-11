@@ -1,0 +1,52 @@
+================================================================================
+PROMPT P12-01 — DURCISSEMENT DE L'AUTHENTIFICATION : 2FA, MOTS DE PASSE, SESSIONS
+================================================================================
+P12-01 — DURCISSEMENT DE L'AUTHENTIFICATION : 2FA, MOTS DE PASSE, SESSIONS
+Lot 12 | 2 séances | Dépendances : P01-05 | Module réf. : 18
+Risques couverts : E13 | Type : Sécurité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'audit constate : pas de politique de mots de passe affichée, pas de 2FA (au
+moins pour ADMIN/DIRECTION), must_change_password existant pour les premiers
+comptes, throttling login 20/min, JWT 12 h accès / 7 j refresh en production.
+
+MISSION
+Durcir l'authentification sans casser les accès existants ni le mobile.
+
+CONSIGNES
+1. Politique de mots de passe : configure et AFFICHE les validateurs Django
+   (longueur minimale, complexité, mots de passe courants, similarité avec les
+   informations du compte). Paramétrable. Message d'erreur explicite et
+   pédagogique en français.
+2. 2FA (TOTP) : obligatoire pour ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN,
+   DIRECTION et tout rôle de niveau N4 (liste paramétrable) ; optionnelle pour
+   les autres. Enrôlement guidé (QR + codes de secours), révocation motivée par
+   un autre administrateur, contournement d'urgence tracé.
+3. Sessions : expiration paramétrable, révocation d'une ou de toutes les
+   sessions d'un utilisateur, déconnexion automatique après inactivité
+   (paramétrable), journal des connexions (succès et échecs, adresse, appareil,
+   date) consultable par l'ADMIN et par l'utilisateur lui-même.
+4. Verrouillage de compte après N échecs (paramétrable), avec déblocage par
+   l'ADMIN et notification.
+5. Réinitialisation de mot de passe : jeton à usage unique à durée limitée,
+   aucun indice sur l'existence du compte (réponse uniforme), notification de
+   changement à l'ancienne adresse.
+6. Vérifie que les assouplissements de transport JWT (en-tête X-JWT-Access,
+   paramètre ?access_token=, cookie SameSite=None, auto-login admin de démo)
+   restent INERTES hors DEBUG, et ajoute un test explicite qui le vérifie en
+   configuration de production simulée.
+7. Ajoute ces contrôles à la CHECKLIST DE MISE EN PRODUCTION
+   (docs/PRODUCTION_CHECKLIST.md).
+8. Tests : politique de mots de passe, enrôlement et vérification 2FA, codes de
+   secours, verrouillage, révocation de session, inertie des assouplissements
+   en production simulée.
+
+DoD
+[ ] politique de mots de passe active, paramétrable et affichée
+[ ] 2FA obligatoire pour les rôles N4, optionnelle ailleurs
+[ ] gestion des sessions (expiration, révocation, journal)
+[ ] test d'inertie des assouplissements de démo en production simulée
+[ ] checklist de production mise à jour, tests verts

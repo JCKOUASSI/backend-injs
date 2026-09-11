@@ -1,0 +1,46 @@
+================================================================================
+PROMPT P09-07 — CAISSE, BANQUES, TRÉSORERIE ET PAIEMENTS SORTANTS
+================================================================================
+P09-07 — CAISSE, BANQUES, TRÉSORERIE ET PAIEMENTS SORTANTS
+Lot 9 | 2 séances | Dépendances : P09-06 | Module réf. : 12
+Risques couverts : E3 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 12 : caisse, banques, trésorerie, paiements sortants. Les
+encaissements étudiants (P09-02) doivent remonter ANALYTIQUEMENT dans la
+trésorerie générale, sans fusionner les deux domaines (D5).
+
+MISSION
+Livrer la gestion de trésorerie et les paiements sortants, avec remontée
+analytique des recettes étudiantes.
+
+CONSIGNES
+1. Modèles : CompteCaisse · CompteBancaire (banque, IBAN chiffré, solde,
+   devise) · MouvementTresorerie (compte, date, sens [entrée, sortie], montant,
+   type, pièce justificative, objet lié, statut) · PaiementSortant
+   (ordonnancement, bénéficiaire, mode, montant, date, référence, statut).
+2. Remontée analytique : les encaissements étudiants (finances_etudiantes) et
+   les autres recettes sont consolidés dans la trésorerie par un mécanisme de
+   LIEN (référence croisée), PAS par fusion de modèles. Documente ce choix
+   (complément à ADR-002).
+3. Journal de caisse et de banque : vue chronologique, totaux, clôture
+   quotidienne avec contrôle (écart signalé et motivé).
+4. Prévisions : prévisions d'encaissement (échéanciers étudiants) et de
+   décaissement (factures fournisseurs échues et à échoir), avec horizon
+   paramétrable.
+5. Tableau de bord trésorerie : solde caisse, solde bancaire, total, mouvements
+   récents, prévisions.
+6. Aucun paiement sortant sans ordonnancement validé (contrôle strict), aucune
+   suppression physique de mouvement (contre-passation uniquement).
+7. Tests : clôture de caisse avec écart, remontée analytique sans fusion,
+   prévisions exactes, refus de paiement sans ordonnancement, contre-passation.
+
+DoD
+[ ] 4 modèles et journaux de caisse/banque livrés
+[ ] remontée analytique par lien, sans fusion (ADR complété)
+[ ] clôtures quotidiennes avec contrôle d'écart
+[ ] prévisions d'encaissement et de décaissement
+[ ] tests verts

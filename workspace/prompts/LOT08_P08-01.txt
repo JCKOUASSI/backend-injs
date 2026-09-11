@@ -1,0 +1,45 @@
+================================================================================
+PROMPT P08-01 — ÉVALUATIONS : TYPES, CALENDRIER, CONVOCATIONS ET SURVEILLANCE
+================================================================================
+P08-01 — ÉVALUATIONS : TYPES, CALENDRIER, CONVOCATIONS ET SURVEILLANCE
+Lot 8 | 2 séances | Dépendances : P01-03, P06-08 | Module réf. : 09
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt gère NoteModule, NoteModuleColonne (CC, TP, Examen) et l'app
+suiviEvaluation (8 modèles : questionnaires, questions/choix, réponses,
+paramètres, moyennes, décisions pédagogiques). Le modèle de référence (Module 09)
+exige un sous-module complet : types d'évaluation, évaluations, épreuves,
+calendrier, convocations, listes d'étudiants, surveillance, saisie, import,
+contrôle, rattrapages, historique.
+
+MISSION
+Livrer la gestion complète des évaluations avant la saisie des notes.
+
+CONSIGNES
+1. Écran « Évaluations » : par ECUE, définition des évaluations (type depuis
+   RefTypeEvaluation, coefficient, poids, durée, note_max, date, espace,
+   enseignant responsable, statut).
+2. Calendrier des évaluations : vue par semestre et par groupe, détection des
+   chevauchements pour un même étudiant, intégration à la planification des
+   examens (P06-08).
+3. Convocations aux évaluations : génération numérotée avec QR (réutilise
+   P03-03/P06-08, ne duplique pas), envoi, suivi de présence.
+4. Listes d'étudiants par évaluation : liste d'émargement, export PDF/Excel,
+   pointage de présence à l'épreuve.
+5. Surveillance : affectation des surveillants, ratio paramétrable, contrôle de
+   double affectation.
+6. Rattrapages d'évaluation : session dédiée, éligibilité selon les règles
+   paramétrables (nombre de tentatives, seuil), notes distinctes avec prise en
+   compte de la meilleure note selon le paramètre.
+7. Tests : chevauchement détecté, convocation numérotée, émargement,
+   éligibilité au rattrapage paramétrée.
+
+DoD
+[ ] écran évaluations + calendrier + convocations + émargement
+[ ] surveillance avec ratio paramétrable
+[ ] rattrapages avec éligibilité paramétrable
+[ ] tests verts

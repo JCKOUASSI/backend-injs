@@ -1,0 +1,60 @@
+================================================================================
+PROMPT P02-03 — CÂBLAGE NoteModule → ECUE ET CALCUL ECTS (DOUBLE REPRÉSENTATION D4)
+================================================================================
+P02-03 — CÂBLAGE NoteModule → ECUE ET CALCUL ECTS (DOUBLE REPRÉSENTATION D4)
+Lot 2 | 2 séances | Dépendances : P02-01, P02-02 | Module réf. : 04, 09 · D4
+Risques couverts : R3 | Type : Données — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Double représentation D4 : formations.NoteModule n'est pas rattaché à
+scolarite.ECUE, alors que le calcul des crédits ECTS et les délibérations de
+jury en dépendent. Le rapport de mise en œuvre tranche : « Liaison directe de
+NoteModule à l'ECUE de la maquette académique. Le calcul ECTS s'appuie
+directement sur les crédits de l'ECUE pour la validation semestrielle. »
+
+MISSION
+Créer le pont NoteModule ↔ ECUE sans perte de données, et brancher le calcul
+ECTS dessus, avec un affichage dual pendant la transition.
+
+CONSIGNES
+1. Analyse la cardinalité réelle : pour chaque NoteModule existant, quel ECUE
+   pourrait lui correspondre ? Produis un rapport de correspondance
+   automatique (par module, formation, semestre, libellé) avec taux de
+   correspondance certain / probable / absent. NE DEVINE PAS : ce qui n'est pas
+   certain est marqué À VALIDER.
+2. Ajoute la clé étrangère nullable NoteModule.ecue (pas de NOT NULL immédiat)
+   + un index. Migration réversible.
+3. Écris une commande backfill_notes_ecue avec 3 modes : --dry-run (rapport),
+   --auto (correspondances certaines uniquement), --interactive (validation
+   humaine des probables). Aucune écriture sans rapport préalable.
+4. Affichage DUAL pendant la transition : les écrans de notes affichent à la
+   fois l'ancienne référence (Module legacy) et l'ECUE, avec un indicateur
+   visuel de rattachement (rattaché / non rattaché / à valider).
+5. Branche le calcul ECTS sur les crédits de l'ECUE : moyenne d'ECUE →
+   moyenne d'UE (pondérée par crédits) → crédits acquis → validation
+   semestrielle (30 crédits) → validation annuelle (60 crédits). Utilise les
+   PARAMÈTRES ACADÉMIQUES (P01-03), jamais de constantes en dur.
+6. Ajoute une commande check_ects_integrity : note sans ECUE, ECUE sans
+   crédits, crédits d'un semestre ≠ 30, UE dont la somme des crédits d'ECUE
+   diffère du crédit d'UE, étudiant inscrit à une IP sans ECUE correspondant.
+7. Ajoute un indicateur de couverture ECTS (pourcentage de notes rattachées)
+   sur le tableau de bord scolarité, avec la liste des non-rattachées.
+8. Tests : correspondance automatique, backfill dry-run idempotent, calcul
+   ECTS paramétré (couvrant compensation semestrielle et annuelle), non-
+   régression des notes existantes non rattachées (elles continuent de
+   s'afficher et de se calculer comme avant).
+
+INTERDITS
+- Ne rends pas la FK obligatoire tant que la couverture n'est pas à 100 %.
+- Ne recalcule aucune note existante sans rapport préalable validé.
+- Ne supprime aucune note.
+
+DoD
+[ ] FK nullable + index, migration réversible
+[ ] backfill dry-run + rapport + application partielle documentée
+[ ] calcul ECTS branché sur les crédits ECUE et paramétré
+[ ] check_ects_integrity vert, indicateur de couverture affiché
+[ ] affichage dual, aucune régression sur les notes non rattachées

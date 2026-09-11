@@ -1,0 +1,68 @@
+================================================================================
+PROMPT P02-01 — VERROU DES MAQUETTES ACTIVES ET VERSIONNAGE IMMUABLE
+================================================================================
+P02-01 — VERROU DES MAQUETTES ACTIVES ET VERSIONNAGE IMMUABLE
+Lot 2 | 2 séances | Dépendances : LOT 1 | Module réf. : 04, 18 · DA-03
+Risques couverts : R8 | Type : Intégrité — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+scolarite gère des maquettes versionnées (Maquette / UE / ECUE) avec statuts
+BROUILLON / ACTIVE / ARCHIVEE, clone et journal (MaquetteJournal). Constat de
+l'audit (R8) : une maquette ACTIVE est modifiable sans verrou. C'est un risque
+pédagogique et juridique : la structure sur laquelle les étudiants sont
+inscrits et évalués peut changer après coup.
+
+MISSION
+Rendre une maquette ACTIVE immuable : toute évolution passe par une nouvelle
+version, toute tentative de modification directe est refusée et journalisée.
+
+CONSIGNES
+1. Inventorie exactement ce qui est modifiable aujourd'hui sur une maquette
+   ACTIVE : champs de la Maquette, UE rattachées, ECUE rattachées, crédits,
+   coefficients, volumes horaires CM/TD/TP, affectations. Liste chaque chemin
+   d'écriture (admin Django, API, écran React, commande de management).
+2. Implémente le verrou UNE SEULE FOIS, au plus bas niveau possible
+   (validation au niveau du modèle + garde au niveau de l'API + garde au
+   niveau de l'admin), pour qu'aucun chemin ne le contourne :
+   - Maquette ACTIVE : modification de structure interdite ;
+   - UE / ECUE rattachées à une Maquette ACTIVE : modification interdite ;
+   - suppression : interdite (soft delete uniquement, et seulement sur
+     BROUILLON) ;
+   - exception explicite et tracée : correction d'une coquille non pédagogique
+     (libellé, description) autorisée pour N4 avec motif obligatoire et entrée
+     d'audit.
+3. Ajoute l'opération CLONER VERS NOUVELLE VERSION : depuis une maquette
+   ACTIVE, création d'une version n+1 en BROUILLON, copie intégrale, lien de
+   filiation, journal. La version n reste ACTIVE jusqu'à la bascule.
+4. Ajoute l'opération ACTIVER UNE NOUVELLE VERSION : atomique
+   (transaction.atomic) — la nouvelle version passe ACTIVE, l'ancienne passe
+   ARCHIVEE, les inscriptions pédagogiques en cours ne sont PAS cassées (elles
+   restent rattachées à leur version d'origine). Vérifie explicitement ce
+   point : c'est le principal risque de régression.
+5. Ajoute des messages d'erreur explicites côté API (« Maquette ACTIVE : créez
+   une nouvelle version pour modifier la structure ») et côté UI (bouton
+   désactivé + infobulle explicative + lien vers le clonage).
+6. Ajoute une commande check_maquettes_integrity : maquette ACTIVE sans UE,
+   UE sans ECUE, crédits incohérents avec le paramètre (30/semestre, 60/an),
+   volumes horaires incohérents, maquette ACTIVE rattachée à un parcours
+   inexistant.
+7. Tests — obligatoires : test_anti_modification_maquette_active (paramétré sur
+   chaque champ et chaque chemin d'écriture), test de clonage, test
+   d'activation atomique, test de non-régression des inscriptions pédagogiques
+   existantes, test de contournement par l'admin Django, test de contournement
+   par commande de management.
+
+INTERDITS
+- Ne modifie aucune maquette existante en base pour « la rendre conforme ».
+- N'archive pas automatiquement de maquette : la bascule est une action
+  humaine validée.
+
+DoD
+[ ] verrou effectif sur TOUS les chemins d'écriture (preuve par tests)
+[ ] clonage vers nouvelle version + activation atomique
+[ ] inscriptions pédagogiques existantes intactes (test explicite)
+[ ] check_maquettes_integrity vert
+[ ] messages UI explicites, identité visuelle conservée

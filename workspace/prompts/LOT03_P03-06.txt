@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P03-06 — RECOURS, RÉCLAMATIONS ET DOCUMENTS DE CAMPAGNE
+================================================================================
+P03-06 — RECOURS, RÉCLAMATIONS ET DOCUMENTS DE CAMPAGNE
+Lot 3 | 1 séance | Dépendances : P03-05 | Module réf. : 02, 14
+Risques couverts : E8 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 02 §25) prévoit des recours et réclamations sur
+les décisions d'admission. Ce flux n'existe pas dans le dépôt.
+
+MISSION
+Ajouter un circuit de recours traçable, sans affaiblir l'immuabilité des
+décisions publiées.
+
+CONSIGNES
+1. Crée le modèle RecoursAdmission (candidature, décision contestée, motif,
+   pièces jointes, date de dépôt, statut [REÇU, EN_EXAMEN, ACCEPTE, REJETE,
+   CLOS], examinateur, décision motivée, date de décision) avec délai de dépôt
+   paramétrable.
+2. Un recours ACCEPTÉ ne modifie JAMAIS la décision d'origine : il crée une
+   NOUVELLE décision qui remplace la précédente, les deux restant visibles et
+   liées. L'historique est immuable.
+3. Écran « Recours » : liste filtrable par campagne/statut, fiche détail avec
+   fil de discussion, pièces jointes, décision motivée obligatoire,
+   notification au candidat.
+4. Documents de campagne : génère les documents officiels (avis d'ouverture,
+   liste des admis, liste d'attente, PV de la commission) numérotés, avec QR de
+   vérification.
+5. Statistiques : nombre de recours par campagne, taux d'acceptation, délai
+   moyen de traitement.
+6. Tests : dépôt hors délai refusé, décision d'origine inchangée après recours
+   accepté, immuabilité de l'historique.
+
+DoD
+[ ] circuit de recours complet et traçable
+[ ] décision d'origine jamais altérée (test explicite)
+[ ] documents de campagne numérotés avec QR
+[ ] statistiques de recours

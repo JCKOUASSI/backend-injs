@@ -1,0 +1,52 @@
+================================================================================
+PROMPT P08-06 — DIPLÔMES, REGISTRE, RÉÉDITIONS ET ÉQUIVALENCES
+================================================================================
+P08-06 — DIPLÔMES, REGISTRE, RÉÉDITIONS ET ÉQUIVALENCES
+Lot 8 | 2 séances | Dépendances : P08-04, P04-07 | Module réf. : 10
+Risques couverts : R1, R8 | Type : Documents + workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app graduation (4 modèles : Diplome, Reedition, RegistreDiplomes,
+ModeleDocument) existe avec un workflow brouillon → validation → révocation
+avec motif. L'écran Graduation.jsx existe (maturité 2, peu de tests). L'app
+equivalences (3 modèles) gère les demandes d'équivalence/dispense.
+
+MISSION
+Fiabiliser la diplômation de bout en bout : contrôle de fin de cycle, édition,
+registre, réédition, vérification, et articulation avec les équivalences.
+
+CONSIGNES
+1. Contrôle de fin de cycle automatique : vérifie avant toute édition que
+   l'étudiant a validé tous les semestres requis, acquis les crédits
+   (paramètres : 180 licence / 120 master), satisfait aux obligations de stage
+   et aux équivalences. Produis une liste explicite des manques — jamais un
+   simple refus.
+2. Édition en masse : sélection d'une promotion, génération des diplômes
+   (modèle paramétrable via ModeleDocument), numérotation unique, QR de
+   vérification, empreinte.
+3. Registre des diplômes : registre officiel par année et par type, recherche,
+   export, consultation restreinte par droits.
+4. Rééditions : perte, détérioration, changement d'état civil — procédure
+   motivée, nouveau numéro de réédition, lien vers l'original, suivi.
+5. Révocation : motivée, N4, tracée ; un diplôme révoqué reste au registre avec
+   son statut (jamais de suppression physique).
+6. Équivalences : écran complet (demande, pièces, instruction, décision
+   motivée, impact sur les crédits et sur le contrôle de fin de cycle).
+   Branche les équivalences validées sur le contrôle de fin de cycle.
+7. Vérification publique d'un diplôme (numéro/QR) sans exposition de données
+   sensibles.
+8. Attestation de solde financier comme condition d'édition (paramétrable,
+   branchée sur le LOT 9).
+9. Tests : contrôle de fin de cycle avec liste de manques, édition en masse,
+   numérotation unique, réédition, révocation tracée, équivalence impactant les
+   crédits, condition financière paramétrable.
+
+DoD
+[ ] contrôle de fin de cycle avec liste explicite des manques
+[ ] édition en masse numérotée avec QR et empreinte
+[ ] registre, rééditions et révocations tracées (aucune suppression)
+[ ] équivalences branchées sur le contrôle
+[ ] tests verts

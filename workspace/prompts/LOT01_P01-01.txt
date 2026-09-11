@@ -1,0 +1,65 @@
+================================================================================
+PROMPT P01-01 — SOCLE TRANSVERSAL : AUDIT UNIFIÉ, SOFT DELETE, CODES MÉTIER
+================================================================================
+P01-01 — SOCLE TRANSVERSAL : AUDIT UNIFIÉ, SOFT DELETE, CODES MÉTIER
+Lot 1 | 2 séances | Dépendances : LOT 0 | Module réf. : 01, 18 · DA-02, DA-03
+Risques couverts : R3, R8 | Type : Socle
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt contient déjà plusieurs journaux spécialisés (presences.AuditLog,
+scolarite.JournalScolarite, scolarite.MaquetteJournal,
+parametres.ParametreHistorique, referentiels.ReferentielJournal) et un
+workflow de correction (CorrectionNoteModule). Il manque un socle TRANSVERSAL
+garantissant partout les mêmes propriétés : soft delete, historisation
+uniforme, codes métier uniques. Le modèle de référence impose : R2 soft
+delete, R3 historisation, R6 identifiants internes invisibles, R7 code métier
+unique.
+
+MISSION
+Créer une app Django transversale qui fournit ces briques et les applique
+progressivement, SANS casser les journaux spécialisés existants.
+
+CONSIGNES
+1. Crée l'app backend/core/ (nouvelle app, nomenclature du dépôt) contenant :
+   - TimeStampedModel (created_at, updated_at, created_by, updated_by) ;
+   - SoftDeleteManager + mixin SoftDeleteModel (is_active, deleted_at,
+     deleted_by, deleted_reason) avec queryset par défaut filtré et
+     all_objects pour l'administration ;
+   - AuditTrailMixin + modèle AuditEntry générique (utilisateur, date, action,
+     modèle, object_id, ancienne valeur, nouvelle valeur, justification,
+     résultat, request_id) en JSON ;
+   - BusinessCodeMixin : génération de codes métier uniques et lisibles
+     (préfixe + année + séquence, ex. CAND-2026-000154, MAT-2026-00125,
+     DIP-2026-000042), séquences par préfixe et par année académique,
+     réutilisation interdite après suppression, atomicité garantie ;
+   - un signal/mixin alimentant automatiquement AuditEntry sur create, update
+     (avec diff des champs surveillés) et soft delete.
+2. Ne duplique PAS les journaux existants : AuditEntry est le journal
+   TRANSVERSAL des objets qui n'en ont pas. Les journaux spécialisés restent
+   en place et sont documentés comme tels.
+3. Ajoute une vue d'administration /api/core/audit/ (ADMIN, DIRECTION) :
+   recherche par utilisateur, objet, période, action, pagination serveur.
+4. Ajoute une commande audit_integrity_check qui détecte : objets sans code
+   métier, suppressions physiques suspectes, entrées d'audit orphelines.
+5. Applique le socle à 3 apps pilotes à fort enjeu juridique (jurys,
+   graduation, finances_etudiantes). Les autres apps suivront dans leurs lots.
+6. Ajoute une migration réversible pour chaque changement, et un test de
+   rollback (migrate → migrate précédent → migrate).
+7. Tests : soft delete (queryset, restauration), diff d'audit (avant/après
+   exact), unicité et atomicité des codes métier sous concurrence, non-
+   régression des journaux existants.
+
+INTERDITS
+- Ne supprime ni ne fusionne aucun journal existant.
+- N'applique aucune suppression physique.
+- Ne renomme aucune app ni aucun modèle existant.
+
+DoD
+[ ] app core en place, migrations réversibles testées
+[ ] 3 apps pilotes branchées, journaux existants intacts
+[ ] codes métier uniques et atomiques (test de concurrence vert)
+[ ] /api/core/audit/ fonctionnel et filtré par droits
+[ ] audit_integrity_check vert

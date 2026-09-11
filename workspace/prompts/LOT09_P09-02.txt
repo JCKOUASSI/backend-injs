@@ -1,0 +1,49 @@
+================================================================================
+PROMPT P09-02 — PAIEMENTS, QUITTANCES ET REMBOURSEMENTS
+================================================================================
+P09-02 — PAIEMENTS, QUITTANCES ET REMBOURSEMENTS
+Lot 9 | 2 séances | Dépendances : P09-01 | Module réf. : 11 · DA-07
+Risques couverts : E2 | Type : UI + intégrité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les paiements et leur confirmation sont partiellement câblés côté UI. Les
+quittances et remboursements n'ont pas d'écran. Le modèle de référence exige :
+« Une opération financière validée ne doit jamais être supprimée
+physiquement. Utiliser annulation, régularisation ou remboursement. »
+
+MISSION
+Livrer l'encaissement complet avec quittances numérotées et remboursements
+tracés.
+
+CONSIGNES
+1. Écran « Paiements » : saisie d'un encaissement (étudiant, montant, mode
+   [espèces, chèque, virement, mobile money, carte], référence externe, date,
+   imputation automatique ou manuelle sur les échéances/factures), validation
+   en deux temps (saisie N2, validation N3) paramétrable.
+2. Imputation : règle d'imputation paramétrable (plus ancienne échéance
+   d'abord, ou imputation manuelle), avec gestion du trop-perçu (avance) et du
+   paiement partiel.
+3. Quittances : génération automatique à la validation du paiement,
+   numérotation séquentielle unique, PDF avec QR de vérification, immuable une
+   fois émise, registre des quittances.
+4. Remboursements : procédure motivée (trop-perçu, annulation d'inscription,
+   décision administrative), validation N3/N4, génération d'un avoir ou d'un
+   remboursement bancaire, traçabilité complète, aucun remboursement sans
+   paiement d'origine identifiable.
+5. Annulation d'un paiement : impossible physiquement — uniquement par
+   contre-passation motivée et validée, avec journal immuable.
+6. Journal de caisse : vue chronologique des encaissements et remboursements
+   par journée et par agent, avec totaux et clôture de caisse.
+7. Tests : imputation automatique et manuelle, trop-perçu, paiement partiel,
+   quittance numérotée et immuable, remboursement tracé, refus de suppression
+   physique, clôture de caisse exacte.
+
+DoD
+[ ] encaissement avec imputation paramétrable et validation en 2 temps
+[ ] quittances numérotées, immuables, registre
+[ ] remboursements et contre-passations motivés et tracés
+[ ] journal et clôture de caisse
+[ ] tests verts, dont refus de suppression physique

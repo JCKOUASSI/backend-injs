@@ -1,0 +1,54 @@
+================================================================================
+PROMPT P09-08 — COMPTABILITÉ : PLAN COMPTABLE, JOURNAUX, ÉCRITURES ET PIÈCES
+================================================================================
+P09-08 — COMPTABILITÉ : PLAN COMPTABLE, JOURNAUX, ÉCRITURES ET PIÈCES
+Lot 9 | 3 séances | Dépendances : P09-06, P09-07 | Module réf. : 12
+Risques couverts : E3 | Type : Nouveau domaine — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 12 : comptabilité (plan comptable, journaux, écritures, pièces
+justificatives). Le modèle de référence insiste : « Il ne faut pas coder en dur
+des règles réglementaires qui pourraient évoluer. »
+
+MISSION
+Livrer une comptabilité à partie double, paramétrable, équilibrée et auditable.
+
+CONSIGNES
+1. Modèles : PlanComptable (exercice, numero, libellé, classe, type [actif,
+   passif, charge, produit], parent, solde) · JournalComptable (code, libellé,
+   type) · EcritureComptable (journal, date, pièce, libellé, statut
+   [BROUILLON, VALIDEE, LETTREE, ANNULEE], empreinte) · LigneEcriture
+   (écriture, compte, sens [debit, credit], montant, analytique) ·
+   PieceJustificative (écriture, type de document, fichier, référence).
+2. PARTIE DOUBLE obligatoire : une écriture est refusée si la somme des débits
+   ≠ somme des crédits (contrainte au niveau du modèle ET de la base).
+3. Plan comptable paramétrable : import depuis un fichier (dry-run + rapport),
+   aucune nomenclature codée en dur.
+4. Automatisation : les opérations des autres domaines génèrent des écritures
+   par RÈGLES DE COMPTABILISATION paramétrables (événement → compte débit →
+   compte crédit), jamais par codage en dur. Fournis l'écran d'administration
+   de ces règles.
+5. Immuabilité : une écriture VALIDEE n'est jamais modifiée ni supprimée ;
+   toute correction passe par une écriture d'extourne référencée. Empreinte
+   chaînée des écritures validées (comme les notes en P02-02) et commande
+   verify_compta_chain.
+6. Grand livre, balance, journal : vues par compte, par période, par journal,
+   avec exports (balance générale, balance âgée, grand livre).
+7. Lettrage et rapprochement des comptes tiers (fournisseurs, étudiants).
+8. Tests : partie double (refus d'une écriture déséquilibrée), règles de
+   comptabilisation paramétrées, immuabilité et extourne, verify_compta_chain,
+   balance équilibrée sur un jeu de référence.
+
+INTERDITS
+- Ne code en dur aucune nomenclature comptable ni aucune règle réglementaire.
+- Ne permets jamais la modification d'une écriture validée.
+
+DoD
+[ ] partie double garantie (contrainte modèle + base)
+[ ] plan comptable et règles de comptabilisation paramétrables
+[ ] écritures validées immuables, extournes référencées, chaîne vérifiable
+[ ] grand livre, balance, journal + exports
+[ ] tests verts, dont équilibre de la balance

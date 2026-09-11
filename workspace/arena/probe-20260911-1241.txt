@@ -1,0 +1,38 @@
+======================================================================
+ PROBE — 2026-09-11 12:41
+======================================================================
+
+Colonnes : RELEVE  |  AUDIT [S1]  |  ECART
+
+---------------------------------------------------------------------
+ PISTE BACKEND
+---------------------------------------------------------------------
+  AUCUN backend trouvé dans le workspace.
+
+---------------------------------------------------------------------
+ PISTE FRONTEND
+---------------------------------------------------------------------
+  AUCUN frontend trouvé dans le workspace.
+
+---------------------------------------------------------------------
+ PISTE MOBILE
+---------------------------------------------------------------------
+  AUCUN projet Flutter trouvé.
+  flutter : ABSENT du sandbox -> le 3e feu vert ne peut PAS être levé ici.
+
+---------------------------------------------------------------------
+ CAPACITÉS DU SANDBOX (conditionnent les gates)
+---------------------------------------------------------------------
+  PostgreSQL (client) : ABSENT
+  Docker : ABSENT
+  Node v20.20.2 : présent
+  Git 2.47.3 : présent
+  SQLite : 3.46.1 (base de secours)
+  Réseau : 200 vers pypi.org
+
+---------------------------------------------------------------------
+ VERDICT POUR P00-01 (baseline de non-régression)
+---------------------------------------------------------------------
+  BLOQUANT : amenez d'abord le code dans le workspace (mode opératoire, étape 0).
+
+Rapport écrit dans : /home/user/arena/probe-20260911-1241.txt

@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P08-03 — MOYENNES, ECTS, VALIDATION ET RELEVÉS DE NOTES
+================================================================================
+P08-03 — MOYENNES, ECTS, VALIDATION ET RELEVÉS DE NOTES
+Lot 8 | 1 séance | Dépendances : P08-02, P02-03, P02-04 | Module réf. : 09
+Risques couverts : R8 | Type : Calcul + documents
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le moteur de validation (P02-04) et le pont ECTS (P02-03) sont en place. Il
+faut les exploiter dans les écrans et produire les relevés officiels.
+
+MISSION
+Afficher et publier les résultats calculés, et produire les relevés de notes
+officiels.
+
+CONSIGNES
+1. Écran « Résultats » : par étudiant (moyennes ECUE, UE, semestre, année,
+   crédits acquis, UE validées/non validées, décision), par groupe, par
+   promotion. Détail du calcul accessible (comment chaque moyenne est obtenue).
+2. Branchement sur le moteur de validation : tous les calculs passent par le
+   moteur paramétré et versionné (P02-04). Aucun calcul parallèle dans les
+   écrans.
+3. Publication des résultats : passage à l'état PUBLIÉ par semestre après
+   décision de jury (P08-04), avec date et auteur.
+4. Relevé de notes officiel : génération PDF numérotée avec QR de vérification,
+   contenu paramétrable (mentions, échelle, crédits), immuable une fois émis
+   (réutilise DocumentEtudiant de P04-07).
+5. Attestation de réussite : générée uniquement si la validation est actée par
+   décision de jury (contrôle explicite, jamais sur la seule moyenne calculée).
+6. Tests : exactitude des moyennes sur un jeu de référence (comparaison au
+   golden test du moteur), publication conditionnée, relevé immuable,
+   attestation conditionnée.
+
+DoD
+[ ] écran résultats avec détail du calcul
+[ ] tous les calculs via le moteur paramétré (aucun calcul parallèle)
+[ ] relevés numérotés avec QR, immuables
+[ ] attestation conditionnée à la décision de jury
+[ ] tests verts

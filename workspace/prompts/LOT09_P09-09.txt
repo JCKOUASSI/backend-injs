@@ -1,0 +1,46 @@
+================================================================================
+PROMPT P09-09 — IMMOBILISATIONS, AMORTISSEMENTS ET RAPPROCHEMENT BANCAIRE
+================================================================================
+P09-09 — IMMOBILISATIONS, AMORTISSEMENTS ET RAPPROCHEMENT BANCAIRE
+Lot 9 | 2 séances | Dépendances : P09-08, P06-07 | Module réf. : 12, 07
+Risques couverts : E3 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 12 : immobilisations, amortissements, rapprochement bancaire.
+Le domaine patrimoine (P06-07) gère les biens physiques ; la comptabilité gère
+leur valeur. Les deux doivent être reliés sans se confondre.
+
+MISSION
+Livrer le suivi de la valeur des immobilisations, le calcul des amortissements
+et le rapprochement bancaire.
+
+CONSIGNES
+1. Modèles : Immobilisation (code, libellé, catégorie, date d'acquisition,
+   valeur d'acquisition, durée d'amortissement, méthode [linéaire, dégressif],
+   valeur nette comptable CALCULÉE, statut, lien nullable vers
+   patrimoine.Equipement ou Vehicule) · Amortissement (immobilisation,
+   exercice, montant, date, écriture comptable générée) ·
+   RapprochementBancaire (compte, période, statut) · LigneRapprochement
+   (mouvement, écriture, statut [RAPPROCHE, EN_ATTENTE, ECART], écart).
+2. Calcul automatique du plan d'amortissement selon la méthode et la durée
+   (paramétrables), avec génération des écritures comptables via les règles de
+   comptabilisation (P09-08).
+3. Rapprochement bancaire : rapprochement automatique par montant/date/
+   référence, écarts identifiés, régularisations motivées, état de
+   rapprochement exportable.
+4. Lien patrimoine ↔ comptabilité : un équipement peut avoir une
+   immobilisation ; la valeur comptable et l'état physique restent deux
+   informations distinctes, reliées. Documente le choix (complément ADR-002).
+5. Cession et mise au rebut : tracées, avec écriture de sortie.
+6. Tests : plan d'amortissement exact (linéaire et dégressif), génération
+   d'écritures, rapprochement automatique et écart, cession tracée.
+
+DoD
+[ ] immobilisations avec plan d'amortissement paramétrable
+[ ] écritures d'amortissement générées par règles
+[ ] rapprochement bancaire automatique + écarts
+[ ] lien patrimoine/comptabilité sans confusion (ADR)
+[ ] tests verts

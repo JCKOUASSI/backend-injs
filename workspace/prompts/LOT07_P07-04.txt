@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P07-04 — EXPÉRIENCE MOBILE DU POINTAGE ET HORS-LIGNE
+================================================================================
+P07-04 — EXPÉRIENCE MOBILE DU POINTAGE ET HORS-LIGNE
+Lot 7 | 2 séances | Dépendances : P07-02 | Module réf. : 08, 17
+Risques couverts : R6 | Type : Mobile
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'application Flutter (40 fichiers Dart, 7 818 lignes, 3 fichiers de tests)
+gère connexion, scan QR (mobile_scanner 7.x), historique, questionnaires,
+profil, télémétrie et keepalive. Le heartbeat en avant-plan n'est pas supporté
+hors onglet actif sur la PWA (documenté).
+
+MISSION
+Fiabiliser l'expérience mobile du pointage et augmenter la couverture de tests.
+
+CONSIGNES
+1. Inventorie lib/ et les 3 fichiers de tests existants. Publie la couverture
+   réelle et la liste des parcours non testés.
+2. Améliore la robustesse du scan : gestion du QR expiré, du QR d'une autre
+   séance, du double scan, du scan hors périmètre, du réseau indisponible —
+   chacun avec un message utilisateur clair en français.
+3. Mode dégradé : si le réseau est indisponible, le scan est mis en file
+   d'attente locale chiftrée et rejoué à la reconnexion, avec horodatage réel
+   du scan (pas de l'envoi) et signalisation explicite « pointage différé »
+   côté serveur. Le différé est journalisé.
+4. États de session visibles : séance en cours, temps écoulé, statut du
+   pointage, historique.
+5. Ajoute des tests Flutter : file d'attente hors-ligne, rejou idempotent,
+   gestion des erreurs de scan, garde-fous de déconnexion, reprise de session.
+6. Vérifie la stratégie de publication (Play Store / App Store) et mets à jour
+   les fiches (les documents existent déjà dans le dépôt).
+7. Ne change PAS le choix mobile_scanner sans Google ML Kit.
+
+DoD
+[ ] couverture de tests Flutter augmentée (chiffres publiés)
+[ ] 5 cas d'erreur de scan gérés avec messages clairs
+[ ] mode dégradé hors-ligne chiffré, idempotent, signalé
+[ ] documentation de publication à jour

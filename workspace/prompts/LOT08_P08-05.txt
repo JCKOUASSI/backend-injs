@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P08-05 — PROCÈS-VERBAUX IMMUABLES ET ARCHIVAGE
+================================================================================
+P08-05 — PROCÈS-VERBAUX IMMUABLES ET ARCHIVAGE
+Lot 8 | 1 séance | Dépendances : P08-04 | Module réf. : 10, 14
+Risques couverts : R8 | Type : Documents
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle PVJury existe. Le modèle de référence exige des « Procès-Verbaux de
+jurys inaltérables au format PDF » et l'immuabilité des documents
+validés/signés.
+
+MISSION
+Rendre le PV de jury inaltérable, numéroté, vérifiable et archivé.
+
+CONSIGNES
+1. Génération du PV : contenu paramétrable (composition du jury, périmètre,
+   règles appliquées avec leur empreinte, résultats par étudiant, décisions
+   motivées, mentions obligatoires), numérotation unique séquentielle par année
+   et par type.
+2. Immuabilité : empreinte cryptographique du PDF, stockage en lecture seule,
+   aucune régénération silencieuse. Toute correction passe par un PV
+   RECTIFICATIF qui référence le PV d'origine ; l'original reste disponible.
+3. Vérification publique : contrôle du PV par son numéro et son QR, ne révélant
+   que l'existence, le type, la période et l'empreinte (aucune donnée
+   nominative).
+4. Signature/visa : circuit de signature (président, membres) avec suivi ;
+   après signature, le PV passe à l'état SIGNÉ puis ARCHIVÉ.
+5. Archivage : rattachement à la GED (P10-05) quand elle sera livrée ; en
+   attendant, archivage local avec index et recherche.
+6. Registre des PV : liste par année, recherche, export, statut.
+7. Tests : numérotation unique, empreinte stable, PV rectificatif référencé,
+   vérification publique sans fuite, refus de régénération après signature.
+
+DoD
+[ ] PV numéroté, à empreinte, immuable
+[ ] PV rectificatif référencé, original conservé
+[ ] vérification publique sans donnée nominative
+[ ] circuit de signature et registre des PV
+[ ] tests verts

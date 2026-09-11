@@ -1,0 +1,50 @@
+================================================================================
+PROMPT P12-04 — ENVIRONNEMENT DE RECETTE, CD ET MIGRATIONS ZÉRO TEMPS D'ARRÊT
+================================================================================
+P12-04 — ENVIRONNEMENT DE RECETTE, CD ET MIGRATIONS ZÉRO TEMPS D'ARRÊT
+Lot 12 | 2 séances | Dépendances : P12-03 | Module réf. : 18
+Risques couverts : R10 | Type : Industrialisation
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+La CI (ci.yml) couvre backend, frontend et mobile. L'audit constate : « pas de
+déploiement automatisé (CD) configuré dans le dépôt, pas d'environnement de
+recette/staging décrit, pas de gestion de secrets documentée pour la prod ».
+
+MISSION
+Mettre en place un environnement de recette, un déploiement automatisé sûr et
+une procédure de migration sans interruption de service.
+
+CONSIGNES
+1. Environnement de RECETTE (staging) : compose dédié (compose.staging.yml),
+   base distincte, jeu de données de démonstration NON nominatif, secrets gérés
+   hors dépôt, mêmes versions que la production. Documente l'usage.
+2. Jeu de données de recette : commande seed_recette qui construit un jeu
+   complet couvrant les 18 modules (une campagne, des candidats, des étudiants,
+   des maquettes, des séances, des notes, un jury, des diplômes, des finances,
+   du patrimoine, des courriers) — données fictives uniquement.
+3. CD : pipeline de déploiement (construction de l'image, publication,
+   déploiement sur staging automatique à chaque fusion, déploiement en
+   production sur validation manuelle). Aucune donnée sensible dans le pipeline.
+4. Migrations ZÉRO TEMPS D'ARRÊT : règle écrite et vérifiée — toute migration
+   est additive et réversible ; les migrations en deux temps (ajouter nullable →
+   backfill → contrainte) sont la norme ; aucune migration ne verrouille une
+   table longue en production. Ajoute un test/lint qui détecte les migrations à
+   risque (ajout de NOT NULL sans défaut, suppression de colonne, renommage).
+5. Stratégie de retour arrière : procédure documentée et testée (image
+   précédente + rollback de migration), avec condition de déclenchement claire.
+6. Surveillance post-déploiement : smoke_test_injs exécuté sur l'environnement
+   déployé, alerte en cas d'échec, journal de déploiement.
+7. Documente la gestion des secrets (quoi, où, qui, rotation) dans
+   docs/SECRETS.md — sans jamais révéler de valeur.
+8. Tests : seed_recette complet, détection des migrations à risque, smoke test
+   post-déploiement, retour arrière exercé.
+
+DoD
+[ ] environnement de recette opérationnel avec jeu de données non nominatif
+[ ] CD avec validation manuelle pour la production
+[ ] règle de migration zéro temps d'arrêt + détection des migrations à risque
+[ ] procédure de retour arrière testée, smoke test post-déploiement
+[ ] docs/SECRETS.md écrit, tests verts

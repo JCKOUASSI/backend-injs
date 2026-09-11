@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P05-04 — CHARGES HORAIRES ENSEIGNANTS, CONTRÔLES ET CONFLITS
+================================================================================
+P05-04 — CHARGES HORAIRES ENSEIGNANTS, CONTRÔLES ET CONFLITS
+Lot 5 | 2 séances | Dépendances : P05-03, P01-02 | Module réf. : 05, 06
+Risques couverts : R1 | Type : Calcul + UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'écran ChargesEnseignants.jsx existe (maturité 2 dans l'audit). Le modèle de
+référence (Module 05 §9-15, §25) exige : charge horaire par enseignant, par
+formation, par module, décomposition CM/TD/TP, disponibilités,
+indisponibilités, conflits enseignants, et des « contrôles automatiques
+indispensables ».
+
+MISSION
+Faire de la charge horaire un indicateur calculé, fiable et exploitable AVANT
+la planification de l'EDT.
+
+CONSIGNES
+1. Calcule la charge horaire à partir des sources réelles : affectations
+   pédagogiques × volumes horaires de la maquette (CM/TD/TP) × nombre de
+   groupes. Distingue charge PRÉVUE (maquette) et charge RÉELLEMENT DISPENSÉE
+   (séances réalisées / pointages), l'écart étant un indicateur clé.
+2. Vues : charge par enseignant, par formation, par module, par semestre ;
+   décomposition CM/TD/TP ; top des surcharges ; enseignants sans affectation.
+3. Seuils paramétrables : charge minimale, charge maximale statutaire, seuil
+   d'alerte. Dépassement → alerte visible et bloquante pour l'affectation
+   supplémentaire (sauf dérogation motivée N4).
+4. Indisponibilités : modèle et écran de déclaration (période, motif,
+   récurrence hebdomadaire ou ponctuelle), visibles du moteur EDT (LOT 6) et
+   du contrat EDT externe (/api/scolarite/edt/indisponibilites/).
+5. Détection de conflits : même enseignant affecté à deux enseignements sur le
+   même créneau, affectation pendant une indisponibilité, affectation au-delà
+   de la charge maximale. Chaque conflit est expliqué explicitement.
+6. Export de la charge (PDF/Excel) pour les actes administratifs et la
+   préparation des vacations (lien avec la finance formateurs, LOT 9).
+7. Tests : calcul de charge sur un jeu de référence, seuils et alertes,
+   détection des 3 types de conflits, cohérence prévue/réelle.
+
+DoD
+[ ] charge calculée (prévue vs réalisée) avec décomposition CM/TD/TP
+[ ] seuils paramétrables, alertes et dérogation motivée
+[ ] indisponibilités exposées au moteur EDT et au contrat externe
+[ ] 3 types de conflits détectés et expliqués
+[ ] export + tests verts

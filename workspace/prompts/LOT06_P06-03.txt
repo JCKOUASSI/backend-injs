@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P06-03 — WORKFLOW EDT, MODIFICATION MANUELLE CONTRÔLÉE ET PUBLICATION
+================================================================================
+P06-03 — WORKFLOW EDT, MODIFICATION MANUELLE CONTRÔLÉE ET PUBLICATION
+Lot 6 | 2 séances | Dépendances : P06-02 | Module réf. : 06 §20-23
+Risques couverts : E4 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence impose le workflow : BROUILLON → GÉNÉRÉ → À CONTRÔLER →
+VALIDÉ → PUBLIÉ → ACTIF, et stipule : « Après publication, les modifications
+doivent être tracées » ; une modification après publication « doit générer un
+événement » avec ancienne et nouvelle séance.
+
+MISSION
+Livrer le cycle de vie de l'EDT, la modification manuelle contrôlée et la
+traçabilité post-publication.
+
+CONSIGNES
+1. Implémente le cycle de vie BROUILLON → GÉNÉRÉ → À CONTRÔLER → VALIDÉ →
+   PUBLIÉ → ACTIF avec transitions, droits (validation N3, publication N4) et
+   audit. Une régression d'état exige un motif.
+2. Modification manuelle : déplacement d'une séance (jour, heure, espace,
+   enseignant) avec VÉRIFICATION IMMÉDIATE via verifie_contraintes :
+   enseignant, groupe, espace, capacité, calendrier. Refus explicite et motivé
+   si une contrainte dure est violée ; avertissement si une contrainte souple
+   l'est (avec possibilité de forcer, motivée et tracée).
+3. Modification APRÈS publication : génère un événement de modification
+   (ancienne séance, nouvelle séance, auteur, date, motif), notifie les
+   populations concernées (étudiants du groupe, enseignant), et alimente le
+   journal de l'EDT.
+4. Annulation d'une séance : motivée, tracée, avec notification ; une séance
+   annulée n'est pas supprimée (soft delete).
+5. Rattrapage et remplacement d'enseignant : procédures dédiées, tracées, avec
+   contrôle de disponibilité du remplaçant et de l'espace.
+6. Journal de l'EDT visible à l'écran : historique complet des modifications.
+7. Tests : chaque transition, refus de violation dure, forçage motivé de
+   contrainte souple, événement de modification post-publication, annulation
+   tracée, remplacement contrôlé.
+
+DoD
+[ ] cycle de vie complet avec droits et audit
+[ ] modification manuelle contrôlée en temps réel
+[ ] événements de modification post-publication + notifications
+[ ] annulation, rattrapage et remplacement tracés
+[ ] tests verts

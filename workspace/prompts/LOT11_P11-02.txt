@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P11-02 — CAMPAGNES DE COMMUNICATION ET ALERTES AUTOMATIQUES
+================================================================================
+P11-02 — CAMPAGNES DE COMMUNICATION ET ALERTES AUTOMATIQUES
+Lot 11 | 1 séance | Dépendances : P11-01 | Module réf. : 15, 16
+Risques couverts : E6, R11 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 15 : campagnes, destinataires, groupes de diffusion,
+programmation, alertes automatiques, notifications par domaine (académiques,
+administratives, financières, RH, documentaires).
+
+MISSION
+Livrer les campagnes ciblées et le catalogue d'alertes automatiques.
+
+CONSIGNES
+1. Campagnes : sélection de destinataires par critères (formation, niveau,
+   groupe, statut, situation, solde financier, rôle), aperçu, test sur un
+   échantillon, programmation, envoi, suivi des accusés de réception,
+   statistiques de délivrance.
+2. Catalogue d'alertes automatiques paramétrables (réutilise
+   statistiques.ConfigAlerteSeuil) : échéance de paiement, impayé critique,
+   absence répétée, seuil de présence, note manquante avant jury, contrat
+   expiré, maintenance échue, réservation en attente, courrier en retard,
+   campagne fermant bientôt, groupe saturé, charge enseignant dépassée.
+   Chaque alerte : déclencheur, seuil, destinataires, canal, fréquence,
+   anti-répétition (ne pas renvoyer la même alerte chaque jour).
+3. Anti-spam : regroupement des notifications similaires (digest quotidien
+   paramétrable), limitation par destinataire, respect des plages horaires
+   d'envoi.
+4. Statistiques : volume par type et canal, taux de délivrance, taux de
+   lecture, alertes non traitées.
+5. Tests : sélection de destinataires exacte, programmation, anti-répétition,
+   digest, seuils déclenchés.
+
+DoD
+[ ] campagnes avec ciblage, test, programmation et suivi
+[ ] catalogue de 12 alertes paramétrables avec anti-répétition
+[ ] digest et limitation anti-spam
+[ ] statistiques de délivrance + tests verts

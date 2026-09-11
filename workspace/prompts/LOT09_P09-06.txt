@@ -1,0 +1,53 @@
+================================================================================
+PROMPT P09-06 — ENGAGEMENTS, ACHATS, FOURNISSEURS ET FACTURES
+================================================================================
+P09-06 — ENGAGEMENTS, ACHATS, FOURNISSEURS ET FACTURES
+Lot 9 | 3 séances | Dépendances : P09-05 | Module réf. : 12
+Risques couverts : E3 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 12 : la chaîne dépense ENGAGEMENT → COMMANDE → FOURNISSEUR →
+FACTURE → LIQUIDATION → ORDONNANCEMENT → PAIEMENT.
+
+MISSION
+Livrer la chaîne de la dépense, de la demande d'achat au paiement, avec
+contrôle budgétaire à chaque étape.
+
+CONSIGNES
+1. Modèles : DemandeAchat (demandeur, service, objet, lignes, montant estimé,
+   statut, workflow de validation) · BonCommande (demande, fournisseur, lignes,
+   montant, numéro séquentiel, statut) · Fournisseur (identité, contacts,
+   références bancaires chiffrées, statut, pièces) · ContratFournisseur
+   (objet, période, montant, échéancier, pièces) · FactureFournisseur
+   (fournisseur, bon de commande, numéro, date, montant HT/TVA/TTC, échéance,
+   statut [REÇUE, EN_ATTENTE, VALIDEE, REJETEE, PAYEE, LITIGE]) · Depense ·
+   Liquidation · Ordonnancement.
+2. Workflow de validation à plusieurs niveaux PARAMÉTRABLE (seuils de montant →
+   niveaux d'approbation), chaque niveau tracé avec motif en cas de rejet.
+3. CONTRÔLE BUDGÉTAIRE à chaque étape : une demande d'achat vérifie la
+   disponibilité de la ligne ; un engagement RÉSERVE le montant (disponible
+   diminue) ; une liquidation consomme ; un paiement solde. Toute opération est
+   atomique et rejouable sans double effet (idempotence).
+4. Les montants dérivés de P09-05 (engagé, liquidé, ordonnancé, payé) sont mis
+   à jour par cette chaîne — jamais saisis.
+5. Références bancaires des fournisseurs : chiffrées au repos, jamais exposées
+   en clair dans les listes ni dans les exports, accessibles uniquement aux
+   rôles habilités et journalisées à chaque consultation.
+6. Écrans via gabarit : Demandes d'achat · Bons de commande · Fournisseurs ·
+   Contrats · Factures fournisseurs · Dépenses · Liquidations ·
+   Ordonnancements.
+7. Exports et documents : bon de commande PDF numéroté, ordre de paiement,
+   état des factures.
+8. Tests : workflow de validation par seuil, réservation budgétaire atomique,
+   idempotence, refus de dépassement, chiffrement et contrôle d'accès aux
+   références bancaires, numérotation séquentielle.
+
+DoD
+[ ] 8 modèles et la chaîne complète livrés
+[ ] workflow d'approbation paramétrable par seuil
+[ ] contrôle budgétaire atomique et idempotent à chaque étape
+[ ] références bancaires chiffrées, accès journalisé
+[ ] écrans + exports + tests verts

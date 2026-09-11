@@ -1,0 +1,46 @@
+================================================================================
+PROMPT P06-07 — DOMAINES CAMPUS ET PATRIMOINE : ÉCRANS COMPLETS
+================================================================================
+P06-07 — DOMAINES CAMPUS ET PATRIMOINE : ÉCRANS COMPLETS
+Lot 6 | 2 séances | Dépendances : P06-06, P01-02 | Module réf. : 07
+Risques couverts : R1, E1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app patrimoine (7 modèles : Equipement, Vehicule, Inventaire/Ligne,
+Maintenance, ReservationEspace, MouvementPatrimonial) a une API complète et
+ZÉRO appel écran. Les référentiels campus viennent d'être complétés (P01-02).
+Le modèle de référence (Module 07) exige la gestion des états d'espace, des
+équipements comme objets indépendants, de la maintenance et des réservations.
+
+MISSION
+Livrer l'interface complète du domaine campus/patrimoine via le gabarit.
+
+CONSIGNES
+1. Écrans via descripteurs : Équipements · Véhicules · Inventaires et lignes ·
+   Maintenances · Réservations d'espaces · Mouvements patrimoniaux.
+2. Maintenances : workflow (planifiée → en cours → terminée → close),
+   périodicité paramétrable, coût, prestataire, pièces jointes, alerte
+   d'échéance, impact sur la disponibilité de l'espace (un espace en
+   maintenance est automatiquement indisponible pour l'EDT — branché sur le
+   validateur P06-01).
+3. Réservations d'espaces : demande, validation, période, motif, contrôle de
+   collision avec l'EDT et avec les autres réservations, annulation motivée.
+   Une réservation validée occupe l'espace dans la vue « EDT des espaces ».
+4. Inventaires : campagnes d'inventaire, lignes, écarts constatés,
+   régularisations tracées (aucune suppression physique).
+5. Mouvements patrimoniaux : entrée, sortie, transfert, réforme — chaque
+   mouvement journalisé avec auteur et motif.
+6. Indicateurs : taux de disponibilité des espaces, coût de maintenance par
+   espace et par famille, équipements hors service, réservations en attente.
+7. Tests : workflows de maintenance et de réservation, collision de
+   réservation refusée, impact EDT d'une maintenance, mouvements journalisés.
+
+DoD
+[ ] 6 écrans livrés via descripteurs
+[ ] maintenance et réservation avec workflow et collisions contrôlées
+[ ] maintenance impacte la disponibilité EDT (test)
+[ ] inventaires et mouvements tracés, sans suppression physique
+[ ] indicateurs + tests verts

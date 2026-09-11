@@ -1,0 +1,69 @@
+================================================================================
+PROMPT P01-05 — RBAC EXÉCUTABLE : NIVEAU × RÔLE × PERMISSION × MODULE × PÉRIMÈTRE × ÉTAT
+================================================================================
+P01-05 — RBAC EXÉCUTABLE : NIVEAU × RÔLE × PERMISSION × MODULE × PÉRIMÈTRE × ÉTAT
+Lot 1 | 2 séances | Dépendances : P00-06, P01-01 | Module réf. : 18 · DA-05
+Risques couverts : R3, E13 | Type : Sécurité — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt a 12 rôles (TextChoices), des permissions.py dans 11 apps, une
+synchronisation automatique des Groupes Django (sync_role_groups) et un
+confinement par secrétariat pour SECRETARIAT/CHEF_SECRETARIAT. Le modèle de
+référence exige que la décision d'autorisation combine NIVEAU (N0–N4) + RÔLE +
+PERMISSION + MODULE + PÉRIMÈTRE + ÉTAT DE L'OBJET, et liste 13 actions
+normalisées et 10 périmètres.
+Exemple de référence : ENSEIGNANT + N2 + NOTES.MODIFIER + SES GROUPES +
+NOTE NON VALIDÉE → autorisé ; ENSEIGNANT + N2 + NOTES.MODIFIER + AUTRE
+FORMATION → refusé.
+
+MISSION
+Rendre la matrice RBAC explicite, exécutable, testée et administrable, en
+CONSERVANT les 12 rôles et le système N0–N4.
+
+CONSIGNES
+1. Formalise les enums : NiveauAcces (N0→N4), ActionAutorisee (CONSULTER,
+   CRÉER, MODIFIER, SOUMETTRE, VALIDER, REJETER, PUBLIER, ANNULER, EXPORTER,
+   IMPRIMER, ARCHIVER, SUPPRIMER, ADMINISTRER), Perimetre (INJS_ENTIER,
+   DIRECTION, SERVICE, FORMATION, PARCOURS, NIVEAU, GROUPE, MODULE, ETUDIANT,
+   PROPRE_COMPTE).
+2. Crée le modèle RegleAutorisation (niveau, rôle, module, action, périmètre,
+   condition d'état optionnelle en JSON, effet AUTORISE/REFUSE, priorité,
+   actif, commentaire) + un moteur unique autorise(user, module, action,
+   objet=None) qui évalue : niveau → rôle → permission → module → périmètre →
+   état, avec priorité explicite et refus par défaut.
+3. NE CASSE PAS l'existant : les classes de permission actuelles deviennent des
+   adaptateurs fins qui délèguent au moteur. Migration progressive : un
+   adaptateur par app, un flag par app, repli sur la logique actuelle si le
+   moteur est désactivé.
+4. Ajoute le mapping des 12 rôles existants vers N0–N4 (table documentée et
+   testée) : propose le mapping, FAIS-LE VALIDER, ne l'invente pas seul.
+5. Ajoute les rôles ADDITIONNELS du modèle de référence sans supprimer les
+   existants : COMPTABILITE, DOCUMENTATION, PATRIMOINE, JURY, CANDIDAT,
+   CONSULTATION. Documente le mapping de chacun et sa compatibilité avec les
+   groupes Django synchronisés.
+6. Ajoute l'admin Django et un écran React (ADMIN/DIRECTION) de consultation de
+   la matrice : qui peut quoi, sur quel périmètre, dans quel état — avec une
+   simulation « si cet utilisateur tente cette action sur cet objet, résultat
+   attendu ».
+7. Étends /api/auth/capabilities/ (P00-06) pour exposer la matrice effective.
+8. Tests — le point le plus important : crée un fichier paramétré
+   test_matrice_rbac.py qui, pour CHAQUE rôle × CHAQUE module × CHAQUE action,
+   vérifie le résultat attendu. Ce fichier devient la matrice exécutable de
+   référence. Complète par des tests d'accès croisés (un utilisateur d'un
+   secrétariat ne voit pas les données d'un autre ; un FORMATEUR n'accède pas
+   au web ; un AUDITEUR n'accède qu'à ses propres données).
+
+INTERDITS
+- Ne supprime ni ne remplace les 12 rôles existants.
+- Ne relâche aucun contrôle existant : un refus actuel doit rester un refus.
+- Ne laisse aucune autorisation reposer sur l'UI.
+
+DoD
+[ ] moteur unique en place, adaptateurs branchés, flags par app
+[ ] matrice des 12 rôles → N0–N4 validée et testée
+[ ] test_matrice_rbac.py paramétré et vert (rôles × modules × actions)
+[ ] écran de consultation + simulation fonctionnel
+[ ] zéro régression d'accès (preuves de test)

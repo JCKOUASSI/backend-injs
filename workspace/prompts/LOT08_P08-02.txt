@@ -1,0 +1,44 @@
+================================================================================
+PROMPT P08-02 — SAISIE DES NOTES SÉCURISÉE, IMPORT ET CONTRÔLE
+================================================================================
+P08-02 — SAISIE DES NOTES SÉCURISÉE, IMPORT ET CONTRÔLE
+Lot 8 | 2 séances | Dépendances : P08-01, P02-02 | Module réf. : 09
+Risques couverts : R8 | Type : Intégrité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'écran NotesModule.jsx existe. Le verrou des notes et le journal immuable des
+corrections ont été livrés en P02-02. Le modèle de référence exige : saisie
+avec double vérification, import des notes, contrôle des notes, historique.
+
+MISSION
+Livrer une saisie de notes fiable, contrôlée et entièrement tracée.
+
+CONSIGNES
+1. Saisie par évaluation : grille étudiants × évaluations, validation par
+   plage, navigation clavier, sauvegarde automatique du brouillon, indicateur
+   de progression (saisi / total).
+2. DOUBLE VÉRIFICATION paramétrable : saisie par l'enseignant → relecture et
+   validation par un second rôle (N3) avant verrouillage. Le paramètre décide
+   si la double vérification est obligatoire.
+3. Import Excel : modèle téléchargeable, dry-run obligatoire avec rapport
+   d'erreurs ligne à ligne (étudiant inconnu, note hors bornes, doublon),
+   application partielle possible avec rapport.
+4. Contrôle automatique des notes à la soumission : note hors bornes, note
+   manquante pour un étudiant inscrit, écart statistique anormal (paramétrable,
+   indicatif et non bloquant), étudiant non inscrit à l'évaluation.
+5. Verrouillage par évaluation puis par ECUE, avec les garde-fous de P02-02 ;
+   toute correction passe par le circuit de correction motivée.
+6. Historique visible par évaluation et par étudiant (réutilise l'écran de
+   P02-02).
+7. Tests : saisie, double vérification obligatoire/optionnelle, import dry-run,
+   contrôles automatiques, verrouillage, correction motivée.
+
+DoD
+[ ] saisie avec brouillon, progression et navigation clavier
+[ ] double vérification paramétrable
+[ ] import dry-run avec rapport ligne à ligne
+[ ] contrôles automatiques + verrouillage + corrections motivées
+[ ] tests verts

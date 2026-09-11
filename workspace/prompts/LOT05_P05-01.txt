@@ -1,0 +1,50 @@
+================================================================================
+PROMPT P05-01 — ÉCRANS DÉDIÉS MAQUETTES / UE / ECUE
+================================================================================
+P05-01 — ÉCRANS DÉDIÉS MAQUETTES / UE / ECUE
+Lot 5 | 2 séances | Dépendances : P02-01 | Module réf. : 04
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les maquettes LMD (Maquette / UE / ECUE versionnées) sont gérées par le backend
+avec clone, journal et statuts. Côté UI, les routes maquettes/pédagogie sont
+imbriquées dans Inscriptions/FicheEtudiant [S1 §4.4]. Le modèle de référence
+(Module 04) exige : UE fondamentales et transversales, ECUE, crédits (30 par
+semestre / 60 par an), coefficients, volumes horaires CM/TD/TP, contrôle de
+cohérence pédagogique.
+
+MISSION
+Livrer des écrans dédiés et autonomes pour construire, contrôler et versionner
+les maquettes.
+
+CONSIGNES
+1. Écran « Maquettes » : liste filtrable (formation, parcours, niveau,
+   semestre, version, statut), création, clonage vers nouvelle version,
+   activation (avec les garde-fous de P02-01), archivage.
+2. Écran « Maquette détail » : arborescence Semestre → UE → ECUE en édition
+   inline, avec pour chaque niveau : code métier, libellé, crédits,
+   coefficient, volume CM/TD/TP, catégorie d'enseignement, type
+   d'enseignement, enseignant responsable.
+3. Panneau de CONTRÔLE DE COHÉRENCE PÉDAGOGIQUE en temps réel : somme des
+   crédits d'ECUE = crédit de l'UE ; somme des crédits d'UE du semestre = 30
+   (paramètre) ; somme annuelle = 60 ; volumes horaires cohérents avec les
+   catégories ; UE sans ECUE ; ECUE sans enseignant responsable. Chaque
+   anomalie est cliquable et mène à la correction.
+4. Journal de la maquette visible (MaquetteJournal) : qui a changé quoi, quand.
+5. Comparaison de versions : vue côte à côte de deux versions avec les
+   différences mises en évidence (UE/ECUE ajoutés, supprimés, crédits
+   modifiés).
+6. Export de la maquette (PDF/Excel) au format officiel, réutilisant le moteur
+   d'exports existant.
+7. Tests frontend : arborescence éditable, contrôles de cohérence déclenchés,
+   clonage, comparaison de versions. Tests backend : contrôles de cohérence.
+
+DoD
+[ ] écrans Maquettes + Maquette détail autonomes
+[ ] contrôles de cohérence en temps réel et cliquables
+[ ] journal + comparaison de versions
+[ ] export PDF/Excel
+[ ] tests verts

@@ -1,0 +1,49 @@
+================================================================================
+PROMPT P05-03 — FICHE ENSEIGNANT, GRADES ET AFFECTATIONS
+================================================================================
+P05-03 — FICHE ENSEIGNANT, GRADES ET AFFECTATIONS
+Lot 5 | 2 séances | Dépendances : P01-03 | Module réf. : 05
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt gère formations.Formateur (avec fiche Formateurs.jsx /
+FicheFormateur.jsx) et ressources_humaines.Agent. Le modèle de référence
+(Module 05) insiste : « Ne pas confondre grade et fonction », et distingue
+l'affectation ADMINISTRATIVE (service, fonction) de l'affectation
+PÉDAGOGIQUE (formation, parcours, module, groupe).
+
+MISSION
+Livrer une fiche enseignant unifiée qui articule le volet RH et le volet
+pédagogique sans dupliquer les données.
+
+CONSIGNES
+1. Inventorie Formateur et Agent : champs communs, champs spécifiques, liens
+   existants. Publie le constat et la règle de non-duplication retenue.
+2. Établis (ou vérifie) le lien Formateur ↔ Agent par clé étrangère nullable,
+   avec écran de rapprochement pour les cas ambigus. Un enseignant interne a
+   un dossier RH ET un dossier enseignant ; un vacataire externe peut n'avoir
+   qu'un dossier enseignant.
+3. Fiche enseignant en onglets : Identité · Grade et spécialités · Affectation
+   administrative (service, fonction) · Affectations pédagogiques (formations,
+   parcours, modules, groupes) · Charge horaire · Disponibilités et
+   indisponibilités · Encadrement (stages, mémoires) · Notes validées ·
+   Documents.
+4. Distingue explicitement GRADE (référentiel RefGrade) et FONCTION
+   (ressources_humaines.Fonction) dans l'affichage et les filtres.
+5. Spécialités : liste paramétrable, utilisée par le moteur EDT pour affecter
+   les enseignements (LOT 6).
+6. Ajoute les vues « Enseignants responsables de module » et « Encadrement ».
+7. Accès aux données sensibles : les coordonnées complètes et données
+   administratives ne sont visibles que par les rôles habilités (l'endpoint
+   dédié « données sensibles / RGPD » existe déjà : réutilise-le).
+8. Tests : rapprochement Formateur/Agent, distinction grade/fonction, contrôle
+   d'accès aux données sensibles par rôle.
+
+DoD
+[ ] lien Formateur ↔ Agent documenté, écran de rapprochement
+[ ] fiche en onglets, grade et fonction distingués
+[ ] spécialités paramétrables exploitables par l'EDT
+[ ] données sensibles protégées (tests par rôle)

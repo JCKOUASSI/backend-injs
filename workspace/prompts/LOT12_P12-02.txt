@@ -1,0 +1,47 @@
+================================================================================
+PROMPT P12-02 — CSP STRICTE, PIÈCES JOINTES ET SURFACE D'ATTAQUE
+================================================================================
+P12-02 — CSP STRICTE, PIÈCES JOINTES ET SURFACE D'ATTAQUE
+Lot 12 | 1 séance | Dépendances : P07-05, P12-01 | Module réf. : 18
+Risques couverts : R12, E13 | Type : Sécurité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'audit demande : vérifier la politique de Content-Security-Policy (les CDN
+tiers du sw.js legacy imposent des sources externes à supprimer), et confirmer
+le filtrage strict des types de fichiers et l'antivirus sur les pièces jointes
+côté admissions/RH.
+
+MISSION
+Réduire la surface d'attaque côté navigateur et côté téléversements.
+
+CONSIGNES
+1. Inventorie toutes les ressources externes chargées par le frontend (scripts,
+   styles, polices, images) et par les templates Django. Publie la liste.
+2. Internalise ce qui peut l'être (bootstrap-icons est déjà une dépendance npm ;
+   vérifie qu'aucun CDN ne subsiste). Supprime toute dépendance à un CDN tiers.
+3. Configure une CSP stricte par étapes : d'abord en mode rapport seul
+   (Content-Security-Policy-Report-Only) pendant une fenêtre d'observation,
+   puis en mode appliqué. Aucune CSP « wildcard » en production. Documente
+   chaque directive et sa justification.
+4. En-têtes de sécurité : X-Content-Type-Options, X-Frame-Options (ou
+   frame-ancestors cohérent avec le besoin d'iframe existant), Referrer-Policy,
+   Permissions-Policy. Vérifie la cohérence avec HSTS déjà configuré.
+5. Pièces jointes : centralise la validation (types MIME + extensions autorisées
+   par RefTypeDocument, taille maximale, nom assaini, détection de double
+   extension), hook d'analyse antivirus configurable, stockage hors accès
+   public, téléchargement avec Content-Disposition et type forcé.
+6. Ajoute un test de garde qui échoue si un CDN tiers ou un « wildcard » CSP
+   réapparaît.
+7. Tests : aucune ressource externe, CSP appliquée sans casser l'application
+   (parcours de fumée complet), rejet des types de fichiers interdits,
+   téléchargement sécurisé.
+
+DoD
+[ ] zéro CDN tiers, liste publiée
+[ ] CSP stricte appliquée après fenêtre d'observation, directives justifiées
+[ ] en-têtes de sécurité cohérents
+[ ] validation centralisée des pièces jointes + hook antivirus
+[ ] tests de garde verts

@@ -1,0 +1,44 @@
+================================================================================
+PROMPT P06-09 — TESTS DU DOMAINE EDT (0 TEST AUJOURD'HUI)
+================================================================================
+P06-09 — TESTS DU DOMAINE EDT (0 TEST AUJOURD'HUI)
+Lot 6 | 2 séances | Dépendances : P06-01 à P06-08 | Module réf. : 06 · E15
+Risques couverts : E15, R2 | Type : Qualité — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'audit constate : « edts 0 test, exports 0, dashboard 0 » [S1 §10.1]. Le
+domaine EDT vient de recevoir un moteur de génération, un workflow de
+publication, une ingestion externe et 5 vues. Sans tests, ce lot est le plus
+fragile de la refonte.
+
+MISSION
+Porter le domaine edts (et les exports EDT) à une couverture de tests
+professionnelle.
+
+CONSIGNES
+1. Tests unitaires : chaque étape du moteur (14 étapes), le validateur de
+   contraintes (7 dures × cas conforme/violé, 6 souples × pénalité), la
+   fonction d'objectif, la reproductibilité.
+2. Tests d'intégration : génération complète sur un jeu réaliste, workflow
+   complet BROUILLON → PUBLIÉ → modification post-publication → annulation →
+   rattrapage → remplacement.
+3. Tests d'ingestion : chaque contrôle d'intégrité, atomicité, idempotence.
+4. Tests de contrat : les 8 routes du contrat /api/scolarite/edt/ (schéma,
+   filtres, pagination, droits d'accès).
+5. Tests de droits : chaque vue EDT ne montre que le périmètre autorisé
+   (étudiant, enseignant, groupe, direction).
+6. Tests de performance : mesure bornée sur le jeu réaliste (moteur < 5 min,
+   vue hebdomadaire < 500 ms), avec échec du test si la borne est dépassée.
+7. Tests frontend : les 5 vues, les filtres, la navigation temporelle, les
+   exports.
+8. Tests des exports EDT (PDF/Excel) : contenu attendu sur un jeu de référence.
+9. Publie la couverture avant/après du domaine edts.
+
+DoD
+[ ] couverture edts ≥ 85 %, exports EDT testés
+[ ] bornes de performance vérifiées par test
+[ ] tests de droits par vue
+[ ] chiffres de couverture avant/après publiés

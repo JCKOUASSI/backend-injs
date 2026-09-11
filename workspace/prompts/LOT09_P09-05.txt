@@ -1,0 +1,55 @@
+================================================================================
+PROMPT P09-05 — DOMAINE COMPTABLE : EXERCICES, BUDGETS ET LIGNES BUDGÉTAIRES
+================================================================================
+P09-05 — DOMAINE COMPTABLE : EXERCICES, BUDGETS ET LIGNES BUDGÉTAIRES
+Lot 9 | 2 séances | Dépendances : P01-01 | Module réf. : 12 · DA-07
+Risques couverts : E3 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le Module 12 (Direction financière & comptable) N'EXISTE PAS dans le dépôt : le
+seul volet financier est la rémunération horaire des formateurs
+(formations.FinanceSettings / FinanceAjustement). Le modèle de référence décrit
+le cycle complet : BUDGET → PROGRAMMATION → ENGAGEMENT → COMMANDE/ACHAT →
+FOURNISSEUR → FACTURE → LIQUIDATION → ORDONNANCEMENT → PAIEMENT →
+BANQUE/CAISSE → COMPTABILISATION → RAPPROCHEMENT → REPORTING → CLÔTURE →
+AUDIT/ARCHIVAGE. Il précise : « les règles comptables et budgétaires exactes
+applicables à l'INJS doivent rester paramétrables dans le logiciel ».
+
+MISSION
+Créer la nouvelle app Django « comptabilite » (nomenclature du dépôt, cf. DA-01)
+et livrer son premier étage : exercices, budgets, lignes.
+
+CONSIGNES
+1. Crée l'app backend/comptabilite/ avec ses modèles, admin, permissions,
+   tests, migrations 0001 propres (comme les apps LMD récentes).
+2. Modèles de ce prompt :
+   - ExerciceBudgetaire (code, libellé, date_debut, date_fin, statut
+     [BROUILLON, OUVERT, EN_EXECUTION, EN_CLOTURE, CLOS, ARCHIVE], dates
+     d'ouverture et de clôture) — un exercice CLOS ne peut plus être modifié ;
+   - Budget (exercice, libellé, type [fonctionnement, investissement,
+     formation, équipements, infrastructures, projets], montant_initial,
+     montant_revise, statut) ;
+   - ProgrammeActivite (budget, code, libellé, montant) ;
+   - LigneBudgetaire (programme, code, libellé, nature [recette, dépense],
+     montant_prevu, montant_engage, montant_liquidé, montant_ordonnance,
+     montant_paye, disponible — les montants dérivés sont CALCULÉS, jamais
+     saisis).
+3. Règles : aucune saisie de montant dérivé ; contrôle de non-dépassement du
+   budget disponible à l'engagement ; tout dépassement exige une dérogation
+   motivée N4 tracée.
+4. Taux d'exécution calculé par ligne, programme et budget.
+5. Écrans (via le gabarit P06-06) : Exercices · Budgets · Programmes · Lignes,
+   avec vue d'exécution budgétaire.
+6. Ajoute le rôle COMPTABILITE (créé en P01-05) au périmètre de droits.
+7. Tests : clôture d'exercice verrouillante, calcul des montants dérivés,
+   non-dépassement, dérogation tracée, taux d'exécution exact.
+
+DoD
+[ ] app comptabilite créée proprement (migrations 0001, tests, admin)
+[ ] 4 modèles avec montants dérivés calculés
+[ ] non-dépassement contrôlé + dérogation tracée
+[ ] écrans via gabarit + vue d'exécution budgétaire
+[ ] tests verts

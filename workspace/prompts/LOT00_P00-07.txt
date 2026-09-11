@@ -1,0 +1,47 @@
+================================================================================
+PROMPT P00-07 — CI MOBILE VERT : ASSET app.env ET MISES À JOUR MINEURES
+================================================================================
+P00-07 — CI MOBILE VERT : ASSET app.env ET MISES À JOUR MINEURES
+Lot 0 | 1 séance | Dépendances : P00-01 | Module réf. : —
+Risques couverts : R6 | Type : CI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le lockfile Flutter a été régénéré sous Flutter 3.41.7 (meta 1.17.0,
+test_api 0.7.10) : --enforce-lockfile retourne EXIT 0. Il reste UN échec
+bloquant de `flutter analyze` : l'asset déclaré assets/app.env n'existe pas car
+il est volontairement ignoré par .gitignore. Par ailleurs 70 paquets ont des
+versions plus récentes incompatibles avec les contraintes actuelles
+(mobile_scanner 7.2 vs 7.4, geolocator 13.0.4 vs 14, permission_handler 11
+vs 13).
+
+MISSION
+Rendre la CI mobile entièrement verte et préparer les mises à jour mineures,
+sans changer le comportement de l'application.
+
+CONSIGNES
+1. Corrige l'échec analyze par la solution la plus robuste : versionne
+   qr_badge_mobile/assets/app.env.example (clés sans valeur réelle) ET génère
+   un assets/app.env vide en étape CI avant analyze. Conserve le chargement
+   défensif existant (lib/main.dart tolère l'absence du fichier).
+2. Vérifie que pubspec.yaml déclare bien app.env.example et app.env, et que
+   .gitignore continue d'ignorer app.env mais pas app.env.example.
+3. Ajoute un test Flutter qui vérifie le comportement en l'absence de app.env
+   (démarrage avec valeurs par défaut + journalisation d'un avertissement).
+4. Établis la liste chiffrée des 70 paquets avec version actuelle / version
+   disponible / risque de rupture, dans docs/MOBILE_DEPENDANCES.md, classée en
+   3 vagues (sans risque / mineure à tester / majeure à planifier).
+5. Applique UNIQUEMENT la vague 1 (sans risque) et relance analyze + tests.
+6. Vérifie que le scan QR fonctionne toujours (mobile_scanner 7.x sans Google
+   ML Kit, choix volontaire pour la compatibilité simulateurs arm64/iOS) :
+   ne change pas ce choix.
+7. Documente dans qr_badge_mobile/README.md la procédure complète : cloner,
+   créer app.env, lancer, builder la PWA, publier sur les stores.
+
+DoD
+[ ] flutter pub get --enforce-lockfile → EXIT 0
+[ ] flutter analyze → 0 erreur, 0 avertissement bloquant
+[ ] tests Flutter verts
+[ ] les 3 jobs CI (backend, frontend, mobile) verts

@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P04-01 — FICHE ÉTUDIANT 360° ET HISTORIQUE ACADÉMIQUE
+================================================================================
+P04-01 — FICHE ÉTUDIANT 360° ET HISTORIQUE ACADÉMIQUE
+Lot 4 | 2 séances | Dépendances : LOT 3 | Module réf. : 03
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'écran FicheEtudiant.jsx existe. Le modèle de référence (Module 03) exige une
+fiche étudiant pivot regroupant : identité, matricule, dossier, inscriptions
+administratives et pédagogiques, groupes, progression académique, situations
+(redoublement, dette, changement de formation, transfert, suspension, abandon,
+radiation), historique académique, carte étudiant, documents et attestations.
+Le Module 03 est décrit comme « le pivot » du système.
+
+MISSION
+Faire de la fiche étudiant le point d'entrée unique et complet de la scolarité,
+sans dupliquer les écrans existants.
+
+CONSIGNES
+1. Restructure FicheEtudiant.jsx en onglets, en RÉUTILISANT les composants
+   existants (ne réécris pas ce qui fonctionne) :
+   Identité · Dossier · Inscriptions (IA/IP) · Groupes · Progression
+   académique · Situations · Notes et résultats · Présences · Finances ·
+   Documents et attestations · Historique · Journal.
+2. En-tête permanent : photo, matricule (code métier, jamais l'ID technique),
+   nom, formation/parcours/niveau, année académique, statut étudiant, badges de
+   situation (impayé, suspension, dette académique).
+3. Historique académique : vue chronologique immuable de tous les événements
+   (inscription, changement, décision de jury, diplôme, sanction), avec
+   filtres et export PDF.
+4. Progression académique : crédits acquis par semestre et par année, UE
+   validées / non validées, dette académique, décision de passage — alimentée
+   par le moteur de validation (P02-04).
+5. Ajoute une recherche globale d'étudiants performante : recherche par
+   matricule, nom, prénom, formation, groupe, année — avec pagination serveur
+   et index adaptés. Vérifie les requêtes (select_related/prefetch_related) et
+   mesure le temps de réponse ; cible < 300 ms sur 10 000 étudiants.
+6. Ajoute un mode impression « fiche de synthèse » PDF.
+7. Tests frontend : chaque onglet monte, la recherche fonctionne, les badges de
+   situation s'affichent, l'historique est immuable à l'affichage.
+
+DoD
+[ ] fiche en onglets, composants existants réutilisés
+[ ] en-tête permanent avec matricule métier et badges
+[ ] historique chronologique immuable + export PDF
+[ ] progression académique alimentée par le moteur
+[ ] recherche < 300 ms sur 10 000 étudiants (mesure fournie)

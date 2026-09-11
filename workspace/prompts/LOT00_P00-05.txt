@@ -1,0 +1,53 @@
+================================================================================
+PROMPT P00-05 — OBSERVABILITÉ : LOGGING STRUCTURÉ, SENTRY ET PURGE DES print()
+================================================================================
+P00-05 — OBSERVABILITÉ : LOGGING STRUCTURÉ, SENTRY ET PURGE DES print()
+Lot 0 | 1 séance | Dépendances : P00-01 | Module réf. : 18
+Risques couverts : R7 | Type : Exploitation
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le backend contient 288 occurrences de print( dans du code d'exécution
+(concentrées dans 18 fichiers runtime), alors que LOGGING est déjà configuré
+dans settings.py. Il n'existe ni Sentry ni APM. Les incidents sont donc
+détectés tard.
+
+MISSION
+Passer d'un débogage par print à une journalisation structurée et à un
+rapport d'erreurs centralisé, sur les trois couches.
+
+CONSIGNES
+1. Backend : crée un module de configuration de loggers nommés par domaine
+   (injs.presences, injs.scolarite, injs.finance, injs.admissions, …) dans
+   l'app la plus adaptée, SANS renommer d'app existante.
+2. Remplace mécaniquement les 288 print() par le logger adapté, en choisissant
+   le niveau correct (debug / info / warning / error / exception). Ne supprime
+   aucune information : un print informatif devient logger.info, un print
+   d'erreur devient logger.exception.
+3. Configure un format de log structuré (JSON en production, lisible en DEBUG)
+   avec contexte : request_id, utilisateur, rôle, endpoint. Ajoute un middleware
+   qui génère et propage un request_id.
+4. Intègre Sentry (sentry-sdk pour Django, @sentry/react pour le frontend,
+   sentry_flutter pour le mobile), activé UNIQUEMENT si SENTRY_DSN est défini.
+   Aucun DSN en dur dans le code ni dans Git.
+5. Ajoute des règles de filtrage : aucune donnée nominative, aucune pièce
+   jointe, aucun token, aucun mot de passe dans les logs et les rapports
+   d'erreurs. Fournis un scrubber testé.
+6. Documente niveaux, rétention, alertes et qui est notifié dans
+   docs/OBSERVABILITE.md.
+7. Ajoute un test qui garantit qu'aucun print() ne réapparaît dans le code
+   runtime (parcours AST, exclusion de management/ et migrations/).
+8. Enrichis /api/health/ : statut, base, cache, version, commit, date de la
+   dernière migration — sans exposer d'information sensible.
+
+INTERDITS
+- Ne modifie aucun comportement métier.
+- N'active jamais Sentry si le DSN est absent (dégradation silencieuse).
+
+DoD
+[ ] 0 print() dans le code runtime (test de garde vert)
+[ ] format JSON en production vérifié
+[ ] Sentry actif sur les 3 couches, conditionné au DSN, scrubber testé
+[ ] /api/health/ enrichi et testé

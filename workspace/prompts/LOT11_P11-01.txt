@@ -1,0 +1,57 @@
+================================================================================
+PROMPT P11-01 — HUB DE NOTIFICATIONS MULTI-CANAL
+================================================================================
+P11-01 — HUB DE NOTIFICATIONS MULTI-CANAL
+Lot 11 | 2 séances | Dépendances : P01-01 | Module réf. : 15
+Risques couverts : E6 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les notifications sont aujourd'hui dispersées : presences.NotificationAbsence,
+notifications de jurys, relances finance. Le modèle de référence (Module 15)
+exige un système central : notifications internes, push mobile, e-mail, SMS,
+messages internes, avec modèles, campagnes, programmation, accusés de réception
+et historique.
+
+MISSION
+Créer le hub de notifications unique et y raccorder progressivement les
+émetteurs existants, sans casser leurs comportements.
+
+CONSIGNES
+1. Crée l'app backend/notifications/ (nomenclature du dépôt) avec :
+   Notification (code, titre, message, type, priorité, canal, destinataire,
+   objet lié générique, dates création/envoi/lecture/expiration, statut) ·
+   ModeleMessage (code, canal, objet, corps avec variables, actif, version) ·
+   GroupeDiffusion · CampagneNotification · AccuseReception ·
+   JournalEnvoi (canal, fournisseur, statut technique, erreur).
+2. Types et priorités conformes à la référence : INFORMATION, ALERTE, RAPPEL,
+   URGENT, VALIDATION, REJET, ÉCHÉANCE, SUCCÈS, ERREUR, ANNULATION,
+   MODIFICATION, PUBLICATION ; priorités BASSE, NORMALE, HAUTE, URGENTE.
+3. Couche d'abstraction de canaux : interne, push, e-mail, SMS — chaque
+   fournisseur est CONFIGURABLE par variable d'environnement. En l'absence de
+   fournisseur, la notification est mise en file avec le statut explicite
+   « non envoyée — fournisseur absent » (jamais de faux succès).
+4. File d'envoi asynchrone (le cron Docker existe déjà) avec nouvelles
+   tentatives paramétrables, limitation de débit, et journalisation technique.
+5. Modèles de messages administrables (variables de fusion, aperçu, versionnage)
+   — aucun texte codé en dur.
+6. Raccordement progressif : remplace les émetteurs dispersés par des appels au
+   hub, UN ÉMETTEUR À LA FOIS, derrière un flag, en conservant le comportement
+   observable. Liste chaque émetteur raccordé.
+7. Écrans : Centre de notifications (utilisateur) · Administration des modèles
+   · Campagnes · Journal des envois.
+8. Respect des préférences : chaque utilisateur peut choisir ses canaux par
+   type de notification, dans les limites réglementaires (une convocation
+   officielle ne peut pas être désactivée).
+9. Tests : chaque canal (dont l'absence de fournisseur), file avec nouvelles
+   tentatives, modèles avec variables, préférences utilisateur, non-régression
+   des émetteurs raccordés.
+
+DoD
+[ ] app notifications créée (modèles, admin, tests, migrations 0001)
+[ ] 4 canaux abstraits, fournisseurs configurables, pas de faux succès
+[ ] file asynchrone avec nouvelles tentatives et journal technique
+[ ] modèles administrables + préférences utilisateur
+[ ] émetteurs raccordés progressivement sous flag (liste publiée)

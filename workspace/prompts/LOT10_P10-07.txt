@@ -1,0 +1,37 @@
+================================================================================
+PROMPT P10-07 — RÉUNIONS, COMMISSIONS, DÉCISIONS ET ACTES ADMINISTRATIFS
+================================================================================
+P10-07 — RÉUNIONS, COMMISSIONS, DÉCISIONS ET ACTES ADMINISTRATIFS
+Lot 10 | 1 séance | Dépendances : P10-05, P10-06 | Module réf. : 13, 14
+Risques couverts : E1 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app administrations possède ReunionCommission. Le modèle de référence prévoit
+réunions, commissions, décisions administratives et actes administratifs.
+
+MISSION
+Livrer le suivi des instances et de leurs actes.
+
+CONSIGNES
+1. Réunions et commissions : convocation (ordre du jour, date, lieu = espace du
+   référentiel campus, participants), feuilles de présence, compte rendu
+   versionné, décisions issues.
+2. Réservation de l'espace de réunion : branchée sur les réservations
+   d'espaces (P06-07), avec contrôle de collision.
+3. Décisions administratives : acte numéroté (décision, arrêté, note),
+   référence de la réunion d'origine, objet lié (agent, étudiant, formation),
+   circuit de validation et de signature, diffusion, archivage GED.
+4. Suivi des décisions : application effective (ex. une décision de
+   nomination doit générer une affectation RH), alerte si une décision n'est
+   pas appliquée dans le délai.
+5. Tests : convocation avec réservation d'espace, compte rendu versionné, acte
+   numéroté, suivi d'application.
+
+DoD
+[ ] réunions/commissions avec convocation, présence, compte rendu
+[ ] actes numérotés avec circuit de validation et archivage GED
+[ ] suivi d'application des décisions avec alerte
+[ ] tests verts

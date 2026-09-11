@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P11-07 — PORTAILS ÉTUDIANT, ENSEIGNANT ET PERSONNEL
+================================================================================
+P11-07 — PORTAILS ÉTUDIANT, ENSEIGNANT ET PERSONNEL
+Lot 11 | 2 séances | Dépendances : P11-04, P11-06 | Module réf. : 17 · DA-11
+Risques couverts : E7 | Type : UI + mobile
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'application mobile (Flutter + PWA) sert déjà les AUDITEURS et FORMATEURS
+(connexion, tableau de bord, scan QR, historique, questionnaires, profil).
+Le modèle de référence exige des portails étudiant, enseignant et personnel
+avec accès aux services selon les droits, et prévoit de porter dans le mobile
+la consultation des décisions, notes et emplois du temps.
+
+MISSION
+Compléter les portails par population, sur le web et sur le mobile.
+
+CONSIGNES
+1. PORTAIL ÉTUDIANT : tableau de bord (P11-04), mon EDT (P06-04), mes
+   présences et absences, mes notes et résultats (après publication), mes
+   crédits et ma progression, mes inscriptions, ma situation financière
+   (échéancier, solde, paiement en ligne si un prestataire est branché), mes
+   documents et attestations, mes stages, mes notifications, mon profil et mes
+   appareils.
+2. PORTAIL ENSEIGNANT : tableau de bord (P05-06), mon EDT, mes séances à venir
+   avec génération du QR de présence, saisie des notes, mes étudiants, mes
+   charges, mes indisponibilités, mes encadrements, évaluations de satisfaction.
+3. PORTAIL PERSONNEL : mon dossier RH, mes congés et leur solde, mes missions,
+   mes formations, mes documents, organigramme, annuaire interne, notifications.
+4. MOBILE : porte dans Flutter la consultation de l'EDT, des notes/décisions
+   publiées, des documents et des notifications. Réutilise les API existantes
+   (aucune API parallèle) et le thème existant.
+5. Hors-ligne mobile : consultation en cache des dernières données (EDT,
+   notes), avec indication explicite de la fraîcheur.
+6. Sécurité : périmètre PROPRE_COMPTE strict pour l'étudiant et l'enseignant ;
+   test croisé systématique (un étudiant n'accède jamais aux données d'un
+   autre).
+7. Tests : périmètre par portail, cache hors-ligne et fraîcheur affichée,
+   disponibilité mobile des 4 services, tests croisés d'isolement.
+
+DoD
+[ ] 3 portails web livrés
+[ ] 4 services portés sur mobile (EDT, notes, documents, notifications)
+[ ] cache hors-ligne avec indicateur de fraîcheur
+[ ] tests croisés d'isolement verts

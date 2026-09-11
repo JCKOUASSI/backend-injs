@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P03-03 — CONVOCATIONS : GÉNÉRATION, DIFFUSION ET PRÉSENCE AU CONCOURS
+================================================================================
+P03-03 — CONVOCATIONS : GÉNÉRATION, DIFFUSION ET PRÉSENCE AU CONCOURS
+Lot 3 | 1 séance | Dépendances : P03-02 | Module réf. : 02
+Risques couverts : R9 | Type : UI + documents
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le backend gère les convocations avec présence. Il n'y a pas d'écran dédié.
+Le modèle de référence impose une numérotation des documents et un QR de
+vérification (Module 14).
+
+MISSION
+Livrer l'écran de gestion des convocations : génération en masse, diffusion,
+suivi de présence le jour J.
+
+CONSIGNES
+1. Écran « Convocations » : liste par campagne/épreuve, statut (à générer,
+   générée, envoyée, reçue, présente, absente), filtre et recherche par
+   candidat.
+2. Génération en masse : sélection d'une épreuve → génération des convocations
+   PDF (modèle de document paramétrable via graduation.ModeleDocument ou
+   équivalent existant), numérotation unique et séquentielle, QR de
+   vérification sur chaque convocation.
+3. Diffusion : envoi par e-mail (mécanisme existant), téléchargement groupé
+   (ZIP), impression par lots.
+4. Le jour J : écran de pointage de présence au concours (scan du QR de la
+   convocation ou saisie du numéro), marquage présent/absent/retard avec
+   horodatage et motif. Ce pointage alimente le classement (un absent est
+   éliminé).
+5. Ajoute un export de la liste de présence par épreuve et par centre.
+6. Tests : génération en masse (nombre exact de convocations), unicité de la
+   numérotation, QR vérifiable, pointage de présence, absence non marquée
+   exclue du classement.
+
+DoD
+[ ] écran convocations + génération en masse + QR de vérification
+[ ] pointage de présence le jour J fonctionnel
+[ ] exports de présence
+[ ] tests verts

@@ -1,0 +1,52 @@
+================================================================================
+PROMPT P07-01 — CYCLE DE VIE COMPLET DU POINTAGE ET CLÔTURE AUTOMATIQUE
+================================================================================
+P07-01 — CYCLE DE VIE COMPLET DU POINTAGE ET CLÔTURE AUTOMATIQUE
+Lot 7 | 2 séances | Dépendances : LOT 6 | Module réf. : 08
+Risques couverts : R1 | Type : Intégrité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dispositif existant : QRToken (UUID unique, validité 24 h), Pointage avec
+timestamp_entree / timestamp_sortie et duree_presence_minutes calculée,
+AuditLog, DeviceBinding, Rattrapage, NotificationAbsence, et les commandes
+auto_close_sessions, auto_close_pointages, process_mobile_heartbeats,
+recalc_durees_pointages. Le modèle de référence décrit le cycle :
+scan entrée (statut EN_COURS) → heartbeat → scan sortie (statut TERMINE) →
+clôture automatique (SORTIE_AUTO ou ABSENT_NON_BADGE).
+
+MISSION
+Formaliser, tester et fiabiliser le cycle de vie complet du pointage.
+
+CONSIGNES
+1. Documente l'état réel du cycle (états existants, transitions, commandes) et
+   publie le schéma vérifié.
+2. Formalise le cycle de vie explicite du pointage :
+   EN_ATTENTE → EN_COURS → TERMINE → CLOTURE, avec les cas de sortie
+   SORTIE_AUTO et ABSENT_NON_BADGE, et les états d'exception (RETARD,
+   ABSENT_JUSTIFIE, ABSENT_NON_JUSTIFIE, RATTRAPAGE).
+3. Vérifie et fiabilise la clôture automatique : délai paramétrable
+   (paramètres académiques, P01-03), règle de décision paramétrable
+   (SORTIE_AUTO si présence ≥ seuil, sinon ABSENT_NON_BADGE), atomicité,
+   journalisation, idempotence (relancer la commande ne change rien).
+4. Vérifie le calcul de duree_presence_minutes : cas limites (scan de sortie
+   avant l'entrée, sortie le lendemain, séance annulée, rattrapage). Chaque
+   cas a une règle explicite et un test.
+5. Ajoute une commande check_pointages_integrity : pointage sans séance, séance
+   close avec pointages ouverts, durée incohérente avec la séance, pointage
+   d'un étudiant non inscrit à la séance, doublons.
+6. Ajoute un écran de supervision temps réel de la séance en cours : nombre de
+   présents, entrées/sorties récentes, étudiants non badgeurs, avec
+   rafraîchissement (réutilise le hook de polling à la visibilité d'onglet
+   existant).
+7. Tests de bout en bout : cycle complet nominal, sortie oubliée, absence
+   totale, retard, séance annulée, clôture automatique idempotente.
+
+DoD
+[ ] cycle de vie formalisé et documenté (schéma vérifié)
+[ ] clôture automatique paramétrable, atomique, idempotente
+[ ] cas limites de durée couverts par tests
+[ ] check_pointages_integrity vert
+[ ] écran de supervision temps réel

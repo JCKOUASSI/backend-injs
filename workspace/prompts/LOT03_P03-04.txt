@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P03-04 — NOTES DE CONCOURS, VERROUILLAGE ET CLASSEMENT REPRODUCTIBLE
+================================================================================
+P03-04 — NOTES DE CONCOURS, VERROUILLAGE ET CLASSEMENT REPRODUCTIBLE
+Lot 3 | 2 séances | Dépendances : P03-03 | Module réf. : 02
+Risques couverts : R8, R9 | Type : Intégrité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le backend gère le verrouillage d'épreuve, la saisie de notes et le classement
+calculé/publié. Le modèle de référence exige : « Une note validée ne peut pas
+être modifiée sans procédure de correction » et « Le classement doit être
+reproductible à partir des notes et règles enregistrées. »
+
+MISSION
+Sécuriser la saisie des notes de concours et rendre le classement reproductible
+et auditable.
+
+CONSIGNES
+1. Écran de saisie des notes par épreuve : saisie par liste de candidats,
+   validation par plage (note_min ≤ note ≤ note_max), double vérification
+   (saisie → relecture → verrouillage), import Excel avec dry-run et rapport
+   d'erreurs ligne à ligne.
+2. Verrouillage d'épreuve : après verrouillage, aucune modification sans
+   procédure de correction motivée (réutilise le mécanisme de correction de
+   P02-02, ne crée pas de doublon).
+3. Classement : calcul à partir des notes ET des règles enregistrées
+   (coefficients par épreuve, règles d'élimination, bonus éventuels). Stocke
+   avec le classement l'empreinte des règles utilisées. Fournis une commande
+   recalculer_classement qui rejoue le calcul et compare au classement publié :
+   toute différence est signalée, jamais appliquée silencieusement.
+4. Gestion des ex æquo : règle paramétrable (départage par épreuve
+   prioritaire, par âge, par ordre alphabétique) et résultat tracé.
+5. Publication : passage du classement en état PUBLIÉ avec date, auteur,
+   périmètre (liste principale / liste d'attente), et génération du PDF
+   officiel numéroté.
+6. Tests : saisie hors bornes refusée, verrouillage effectif, reproductibilité
+   du classement (deux calculs identiques), ex æquo paramétré, détection de
+   divergence par recalculer_classement.
+
+DoD
+[ ] saisie + double vérification + verrouillage + import dry-run
+[ ] classement reproductible avec empreinte de règles
+[ ] ex æquo paramétrable et tracé
+[ ] publication numérotée + PDF officiel
+[ ] tests verts, dont reproductibilité

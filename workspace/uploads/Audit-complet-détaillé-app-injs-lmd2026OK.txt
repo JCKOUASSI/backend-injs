@@ -1,0 +1,862 @@
+========================================================================
+AUDIT COMPLET ET DÉTAILLÉ DE L'APPLICATION
+app-injs-lmd2026demo (INJS Marcory — Abidjan, Côte d'Ivoire)
+================================================================================
+Date de l'audit : 11 septembre 2026
+Branche auditée : arena/01a08d49-app-injslmd2026demo (PR #1 ouverte sur main)
+Commit de référence : 1ec2515
+Méthode : analyse statique du code source, de l'historique Git, de la CI GitHub
+Actions, des fichiers de configuration, des tests et de la documentation ;
+aucune donnée de production n'a été manipulée.
+Auditeur : Agent Arena (session d'audit technique)
+================================================================================
+SOMMAIRE
+================================================================================
+ 0. SYNTHÈSE EXÉCUTIVE
+ 1. PÉRIMÈTRE ET CARTOGRAPHIE GÉNÉRALE
+ 2. ARCHITECTURE GLOBALE
+ 3. BACKEND DJANGO (inventaire détaillé)
+ 4. FRONTEND WEB REACT/VITE
+ 5. APPLICATION MOBILE FLUTTER + PWA
+ 6. INFRASTRUCTURE, DÉPLOIEMENT ET CI/CD
+ 7. SÉCURITÉ ET CONFORMITÉ
+ 8. DONNÉES, MODÉLISATION ET MIGRATIONS
+ 9. COUVERTURE FONCTIONNELLE ET MATURITÉ PAR MODULE
+10. TESTS, QUALITÉ ET DETTE TECHNIQUE
+11. IDENTITÉ VISUELLE ET UX
+12. DOCUMENTATION
+13. MATRICE DES RISQUES
+14. RECOMMANDATIONS PRIORISÉES (FEUILLE DE ROUTE)
+15. CHIFFRES CLÉS EN ANNEXE
+================================================================================
+0. SYNTHÈSE EXÉCUTIVE
+================================================================================
+L'application est une plateforme de gestion globale pour l'INJS Marcory, issue
+d'un produit préexistant de gestion des présences par QR Code (« QR Badge /
+SYGEP-CPFAE » du MEMFPMA) et en voie d'extension vers un Système d'Information
+universitaire LMD complet (admissions/concours, scolarité, pédagogie, jurys,
+diplômes, finances étudiantes, stages, administration, RH, patrimoine, EDT,
+statistiques).
+JUGEMENT D'ENSEMBLE : PRODUIT MATURE SUR LE CŒUR, EN MUTATION INACHEVÉE SUR LE PÉRIMÈTRE LMD.
+Le « cœur historique » (formations, participants, formateurs, modules, séances,
+pointage QR, exports, statistiques) est très complet, éprouvé, bien testé et
+déployable. La couche LMD récemment ajoutée est, côté backend, remarquablement
+avancée et disciplinée (modèles, workflows d'états, permissions dédiées, tests),
+mais l'interface web n'accompagne pas encore toute cette richesse : quatre
+domaines entiers ont une API testée sans aucun écran, et plusieurs modules ne
+sont que partiellement intégrés.
+FORCES (9 points)
+  1. Socle backend solide : Django 5.1.4 + DRF, 20 applications métier,
+     133 modèles, ~88 000 lignes de Python hors migrations.
+  2. Très bonne couverture de tests backend : 943 méthodes de test (13 016
+     lignes), CI exécutant migrations + suite complète + build Docker.
+  3. Architecture de permissions mature et rôles métier fins (12 rôles,
+     classes de permission par domaine, synchronisation Groupes Django).
+  4. Chaîne LMD backend très avancée : admissions/concours, inscriptions
+     administratives et pédagogiques, maquettes versionnées UE/ECUE,
+     jurys, diplômes, équivalences, finances étudiantes, stages.
+  5. Sécurité intégrée dès la conception : JWT + refresh, throttling login/
+     scan, liaison d'appareils (DeviceBinding), piste d'audit, média non
+     servis publiquement, durcissement HSTS en production, variables
+     d'environnement, middlewares de démo strictement gardés par DEBUG.
+  6. Fonctionnement multi-transports robuste (navigateur, iframe, mobile,
+     PWA) avec API documentée (drf-spectacular / Swagger).
+  7. Identité visuelle INJS posée : bleu nuit, bleu clair, effet de verre
+     (glassmorphism), logo INJS — à conserver en refonte.
+  8. Moteur d'exports PDF/Excel réutilisable (reportlab/openpyxl, 39 fichiers
+     concernés) et travail préparatoire d'import Excel.
+  9. État d'esprit « préserver l'existant » formalisé (règles workspace,
+     migrations nombreuses mais cohérentes, pas de suppression de modules).
+FAIBLESSES / RISQUES MAJEURS (synthèse — détail §13-14)
+  R1. ÉCART BACKEND / FRONTEND (criticité HAUTE) : 4 domaines ~100 % backend
+      (Stages, Patrimoine, Ressources Humaines, Administrations/courriers)
+      n'ont AUCUN écran web ; les finances étudiantes ne sont exploitées
+      qu'à 25 % dans l'UI ; les concours sont partiellement écrantés.
+  R2. ABSENCE TOTALE DE TESTS FRONTEND (0 test) alors que l'UI est la couche
+      qui porte les workflows LMD les plus sensibles ; 89 avertissements
+      ESLint dont plusieurs dépendances d'effets React.
+  R3. DOUBLES REPRÉSENTATIONS DE DONNÉES non résolues (groupes, catégorisation
+      des participants, notes/ECUE, deux finances, formations sans lien vers
+      le référentiel) — documentées mais non migrées ; risque de chiffres
+      contradictoires entre modules.
+  R4. GIGANTISME DE CERTAINS FICHIERS (jusqu'à 5 508 lignes côté UI, 4 980
+      côté API) qui fragilise la maintenance et la revue de code.
+  R5. HYGIÈNE DU DÉPÔT perfectible : jeux de données Excel/CSV/.numbers et
+     staticfiles/ collectés versionnés dans Git ; README racine et résumés
+      affichant encore l'ancienne identité « sygepcpfae / MEMFPMA » ;
+     vestiges de service worker « qr-badge-v3 » et CDN tiers.
+  R6. CI Mobile instable pour des raisons d'outillage : le lockfile était
+      désynchronisé (corrigé pendant l'audit : meta 1.17.0 / test_api
+      0.7.10) ; il reste un échec `flutter analyze` dû à un asset
+      `assets/app.env` volontairement ignoré par Git (à traiter hors
+      correctif lockfile).
+  R7. Observabilité quasi absente : pas de Sentry/APM, 288 `print()` de
+      débogage dans le code d'exécution, journalisation applicative à
+      renforcer ; aucun test sur les domaines EDT, exports et dashboard.
+  R8. Maquettes LMD ACTIVES modifiables sans verrou et notes sans piste
+      d'audit immuable (risque pédagogique/juridique connu, prérequis aux
+      jurys de délibération).
+RECOMMANDATION GLOBALE
+La refonte doit être une REFONTE D'ALIGNEMENT et non une réécriture : garder
+le socle backend éprouvé et l'identité visuelle, compléter les chaînes de
+valeur manquantes (UI des domaines orphelins, résorption des doubles
+représentations, verrous pédagogiques), industrialiser la qualité (tests
+frontend, observabilité, hygiène du dépôt) et unifier l'identité INJS-LMD.
+================================================================================
+1. PÉRIMÈTRE ET CARTOGRAPHIE GÉNÉRALE
+================================================================================
+Le dépôt contient TROIS applications et des éléments d'exploitation :
+  backend/            Serveur Django + DRF (API REST, admin Django, exports,
+                      page de badgeage HTML legacy, service worker, PWA)
+  frontend/           Application web React 18 + Vite 7 (portail des rôles
+                      internes : administration, scolarité, finance, encadrement)
+  qr_badge_mobile/    Application mobile Flutter (iOS/Android) + cible PWA
+                      destinée aux auditeurs/étudiants et aux formateurs
+  docs/               Documentation fonctionnelle et technique
+  scripts/            Scripts d'exploitation (sauvegarde PG, démarrage,
+                      transcription, génération de manuels)
+  .github/workflows/  CI unique (ci.yml) : Backend, Frontend, Mobile
+  backend/compose.yml Stack Docker : db (postgres:15), redis, app, cron
+  *.md / *.txt        Manuels, rapports, fiches de travaux, règles workspace
+Éléments d'identité présents dans le dépôt :
+  - frontend/src/assets/logo-injs.svg et logo.png (logo INJS utilisé par la
+    barre latérale et la page de connexion) ;
+  - frontend/public/logo.png ;
+  - backend/static/img/logo-sygepcpfae.png (LOGO HÉRITÉ À NE PLUS EXPOSER).
+Volume versionné : 2 556 fichiers suivis par Git, historique continu ; dépôt
+.git d'environ 23 Mo (dont binaires Excel/images, cf. §10.5).
+================================================================================
+2. ARCHITECTURE GLOBALE
+================================================================================
+Schéma logique :
+                         ┌──────────────────────────────┐
+                         │   Navigateurs web internes    │
+                         │ React/Vite (rôles admin,      │
+                         │ scolarité, finance, direction)│
+                         └──────────────┬───────────────┘
+                                        │ HTTPS, JWT (Authorization
+                                        │ Bearer + X-JWT-Access)
+  ┌──────────────┐        ┌─────────────▼──────────────┐      ┌─────────────┐
+  │ App Flutter  │ HTTPS  │   BACKEND DJANGO / DRF      │ SQL  │ PostgreSQL  │
+  │ iOS/Android  ├───────►│   port 8000 (Gunicorn prod) ├─────►│ (prod) /    │
+  │ + PWA        │  JWT   │   Nginx en amont            │      │ SQLite démo │
+  └──────────────┘        │                             │      └─────────────┘
+                          │ - 20 apps métier (API+admin)│      ┌─────────────┐
+  ┌──────────────┐        │ - exports PDF/Excel         │◄────►│ Redis cache │
+  │ Admin Django │        │ - service worker / SPA      │      └─────────────┘
+  └──────────────┘        └────────────────────────────┘
+        │ /admin/
+   (superusers / démo auto-login gardée par DEBUG)
+Points d'architecture notables :
+  - API unique sous /api/ (30 inclusions d'URLs racines), documentation
+    OpenAPI/Swagger via drf-spectacular (/api/docs/, /api/schema/).
+  - Authentification JWT (djangorestframework-simplejwt 5.4.0) avec transport
+    flexible : en-tête Authorization, en-tête X-JWT-Access, paramètre
+    ?access_token=, cookie HttpOnly SameSite=None; Secure (rafraîchissement
+    multi-navigateurs/iframes), rafraîchissement par body ou localStorage en
+    mode démo. Ces assouplissements sont INERTES hors DEBUG.
+  - Le backend Django sert aussi le build React en SPA pour l'aperçu unique
+    (PREVIEW_SPA) avec fallback de routes ; en production, Nginx/Gunicorn.
+  - Découpage en apps Django métier cohérent avec les grands domaines
+    fonctionnels ; certaines apps ont un fichier de vues monolithe
+    (formations/api_views.py, presences/views.py, exports/views.py,
+    statistiques/views.py), les apps LMD récentes utilisent plutôt des
+    fonctions API explicites (api.py) et des workflows par transitions.
+================================================================================
+3. BACKEND DJANGO
+================================================================================
+3.1 Stack
+  - Python 3.12 en CI / image Docker python:3.12-slim.
+  - Django 5.1.4, djangorestframework 3.15.2, simplejwt 5.4.0,
+    drf-spectacular 0.28.0, django-cors-headers 4.6.0, whitenoise 6.8.2.
+  - PostgreSQL en production (psycopg2-binary), SQLite en démo
+    (USE_SQLITE=1), Redis 5.2.1 pour le cache.
+  - Génération documentaire : reportlab 4.2.5 (PDF), openpyxl 3.1.5
+    (Excel), python-docx, qrcode, Pillow 11.1.0.
+  - Serveur : Gunicorn (autoscaling workers, Docker), utilisateur non-root
+    « appuser », Nginx (backend/nginx/upstream.conf).
+3.2 Applications métier (20) et modèles (133 modèles au total)
+  authentication        Utilisateurs à 12 rôles, JWT, provision de comptes
+                        mobiles, e-mails, throttling, permissions, groupes.
+  formations (27 mod.)  Cœur historique : Secretariat, Ref* (référentiels),
+                        Formation, Participant, Formateur, Module,
+                        SessionModule, QRToken, notes, finances formateurs…
+  presences (5 mod.)    Pointage, AuditLog, DeviceBinding, Rattrapage,
+                        NotificationAbsence.
+  exports               14 routes d'exports PDF/Excel (formations, modules,
+                        séances, formateurs, finance, listes de classe).
+  dashboard             Vues de synthèse / page de badgeage HTML legacy.
+  statistiques (5 mod.) ConfigAlerteSeuil, Rapport, observations, signatures,
+                        notifications ; bilans, point journalier, bilan FAC.
+  suiviEvaluation (8)   Questionnaires, questions/choix, réponses,
+                        paramètres, moyennes, décisions pédagogiques.
+  scolarite (21 mod.)   Socle LMD : AnneeAcademique, TypeFormation, Niveau,
+                        Parcours, Semestre, RegimeEtudes, StatutEtudiant,
+                        Groupe, DossierEtudiant, InscriptionAdministrative,
+                        InscriptionPédagogique, Maquette/UE/ECUE,
+                        AffectationGroupe/Pédagogique, journal, indispos…
+  admissions (15 mod.)  Candidat, Candidature, pièces, admissions,
+                        campagnes de concours, épreuves, surveillances,
+                        convocations, notes et classement de concours.
+  parametres (2 mod.)   Parametre + ParametreHistorique (piste d'audit).
+  referentiels (2)      RefSocle, ReferentielJournal.
+  equivalences (3)      Demandes d'équivalence/dispense, pièces, historique.
+  jurys (6 mod.)        SessionJury, membres, propositions, décisions, PV,
+                        notifications.
+  graduation (4 mod.)   Diplome, Reedition, RegistreDiplomes, ModeleDocument.
+  finances_etudiantes   Tarification, échéanciers/lignes, factures,
+        (9 mod.)         paiements, quittances, remboursements, relances,
+                        rapprochement comptable.
+  stages (4 mod.)       OrganismeAccueil, TuteurExterne, ConventionStage,
+                        EvaluationStage.
+  administrations (5)   Courrier, DocumentOfficiel, VersionDocument,
+                        ReunionCommission, Mission.
+  ressources_humaines   Service, Fonction, Agent, AffectationRH,
+        (6 mod.)         DisponibiliteAgent, DocumentRH.
+  patrimoine (7 mod.)   Equipement, Véhicule, Inventaire/Ligne, Maintenance,
+                        ReservationEspace, MouvementPatrimonial.
+  edts (4 mod.)         Créneau template, EmploiDuTemps, AffectationCréneau,
+                        ConflitCréneau.
+  Migrations : 184 fichiers (91 pour formations, 26 presences, 20
+  authentication, 14 scolarite, 12 suiviEvaluation…). Les apps récentes
+  portent des migrations 0001 propres : les domaines LMD ont été ajoutés de
+  façon disciplinée.
+3.3 Vue API
+  - ~396 déclarations de routes dans les fichiers urls.py.
+  - 336 vues fonctions @api_view, 33 vues classes (19 ViewSet, 12 APIView,
+    quelques génériques ListCreate/RetrieveUpdateDestroy), 5 @action.
+  - 45 classes Serializer explicites ; les apps LMD récentes mélangent
+    sérialisation manuelle et serializers ciblés.
+  - L'API racine /api/ fournit un index ; la santé est exposée sur
+    /api/health/ (statut + base).
+  - Pagination par défaut PageNumberPagination.
+  - 108 enregistrements dans l'admin Django : l'admin reste un poste
+    d'administration fonctionnel (avec templates personnalisés, graphiques,
+    guides, actions de provision des comptes).
+3.4 Permissions et rôles
+  - 12 rôles utilisateur (TextChoices) : ADMIN, CHEF_CPFAE_ADMIN,
+    CPFAE_ADMIN, DIRECTION, CHEF_SECRETARIAT, SECRETARIAT, FINANCE, ARCHIVE,
+    ENCADRANT, SUPERVISEUR, FORMATEUR, AUDITEUR.
+  - Rôles à double accès web+admin : les 3 rôles ADMIN/CPFAE ; accès web
+    élargi ; FORMATEUR et AUDITEUR sont réservés au mobile/PWA (l'API refuse
+    leur connexion web avec un message explicite).
+  - Fichiers permissions.py dans 11 apps, permissions transverses dans
+    authentication/permissions.py ; synchronisation automatique des Groupes
+    Django (sync_role_groups, contexte « bulk » pour éviter les boucles de
+    signaux).
+  - Ciblage par secrétariat : les comptes SECRETARIAT/CHEF_SECRETARIAT sont
+    confinés aux données de leur secrétariat (tableur de rôles côté UI dans
+    frontend/src/utils/roles.js, aligné sur role_groups.py).
+3.5 Workflows et règles métier
+  - Machines à états explicites et généralisées dans les modules récents :
+    candidatures (brouillon → soumission → vérification pièces → étude →
+    admissible/admis), pièces (manquante → fournie → vérifiée → validée/
+    refusée/expirée), admissions, inscriptions administratives et
+    pédagogiques, conventions de stage, sessions de jury (PREPARATION →
+    CONTROLE → CALCUL → DELIBERATION → DECISION → PV → VALIDE → VERROUILLE
+    → PUBLIE), diplômes (brouillon → validation → révocation avec motif),
+    maintenances/réservations/courriers/documents/réunions/missions.
+  - Finance « double socle » assumée : (a) financement des formateurs
+    (FinanceSettings/FinanceAjustement avec workflow valider/rejeter et
+    notifications) ; (b) frais de scolarité étudiante (échéanciers,
+    paiements, quittances, remboursements, relances, rapprochements).
+  - Concours : épreuves, surveillants, convocations avec présence,
+    verrouillage d'épreuve, saisie de notes, classement calculé/publié.
+  - EDT : création d'emplois, affectations de créneaux, détection de
+    conflits, validation, occupation des salles, contrat de données lecture
+    seule /api/scolarite/edt/ pour une application EDT externe.
+3.6 État du backend à la lecture du code
+  - Qualité générale bonne : gestion transactionnelle (73 usages de
+    transaction.atomic hors tests), optimisation N+1 (359
+    select_related/prefetch_related), 102 index/déclarations d'index hors
+    migrations.
+  - Fichiers très volumineux à risque de maintenance :
+      formations/api_views.py ................ 4 980 lignes
+      exports/views.py ....................... 3 455 lignes
+      presences/views.py ..................... 3 368 lignes
+      statistiques/views.py ................. 2 084 lignes
+      dashboard/views_legacy.py ............. 1 951 lignes
+      formations/management/commands/import_excel.py 1 747 lignes
+      formations/models.py .................. 1 366 lignes
+      scolarite/models.py ................... 1 279 lignes
+      statistiques/bilans.py ................ 1 224 lignes
+      formations/admin.py ................... 1 082 lignes
+      formations/audit_recovery.py .......... 1 019 lignes
+  - 288 `print(` dans du code d'exécution hors management/migrations
+    (concentrés dans 18 fichiers runtime) : à faire migrer vers le module
+    logging (LOGGING est configuré dans settings.py).
+================================================================================
+4. FRONTEND WEB REACT/VITE
+================================================================================
+4.1 Stack
+  - React 18.2, Vite 7, react-router-dom 6.22, @tanstack/react-query 5.101
+    (cache/rafraîchissement des données), qrcode 1.5.4 (génération locale
+    de QR), bootstrap-icons 1.11.3.
+  - Pas de framework de composants lourd : UI maison en CSS (index.css
+    921 lignes + styles/finance.css 720 lignes, 1 641 lignes au total) ;
+    Bootstrap 5.3 est encore chargé par CDN dans le service worker legacy
+    mais l'UI React actuelle est principalement en CSS propre.
+  - ESLint 8 + plugins React/hooks ; aucune bibliothèque de tests
+    (Vitest/Jest/Testing Library absente).
+4.2 Volume
+  - 105 fichiers JS/JSX sous src/, ~35 495 lignes (dont 27 950 dans les
+    pages).
+  - 53 routes dans App.jsx.
+  - Contextes : AuthContext (session/JWT multi-transports) et ToastContext
+    (notifications UI).
+  - Hooks réutilisables : pagination client/serveur, debounce, listes
+    persistées, pickers paginés, référentiels, secrétariats, méta-stats,
+    polling à la visibilité d'onglet.
+  - Services : services/api.js (client axios, intercepteurs d'auth et de
+    rafraîchissement, gestion des erreurs) et services/scolarite.js.
+  - Utils : dates, durées, périodes finance, filtres, pagination, rôles.
+4.3 Pages principales (36 fichiers de pages + sous-dossiers)
+  Socle/connexion : Login, Profile, Dashboard, Parametres, Users.
+  Cœur formation continue : Formations, FormationDetail, Modules,
+    ModuleDetail, NotesModule, Participants, FicheAuditeur, Formateurs,
+    FicheFormateur, Sessions via ModuleDetail, ImportExcel, Referentiels,
+    Secretariats, Rattrapages, Edts/EdtNew/AffectationNew.
+  Évaluation : EvaluationDashboard, EvaluationList, EvaluationDetail,
+    EvaluationTake, AnalyseQualitative, DecisionsPedagogiques, Quiz*
+    (quiz en voie de retrait du socle).
+  Statistiques : Statistiques (5 508 lignes — fichier le plus gros du
+    dépôt), AnalyseQualitative.
+  Finance formateurs : FinanceDashboard, FinanceAjustements,
+    FinanceEncadrants, FinanceParametrage (sous-composants dédiés).
+  Scolarité LMD (pages/scolarite/) : ScolariteDashboard, Admissions,
+    Campagnes, CampagneDetail, Candidatures, Inscriptions, FicheEtudiant,
+    Groupes, Maquettes, MaquetteDetail, ChargesEnseignants, Equivalences,
+    Jurys, Graduation, FinancesEtudiantes, MonEspace.
+  Archives pédagogiques : ArchivesDashboard, CahiersAppel, ListesNotes.
+4.4 Couverture effective des API par l'UI (constat principal)
+  L'UI consulte très largement : formations (94 appels), scolarite (54),
+  evaluations (42), admissions (27), statistiques (20), auth (14), edts
+  (9), rattrapages, equivalences (5), enseignants (5), graduation (4),
+  finances-etudiantes (4).
+  En revanche :
+    - stages : 0 appel écran (API complète pourtant : organismes, tuteurs,
+      conventions, transitions, PDF, évaluations) ;
+    - patrimoine : 0 appel (équipements, véhicules, inventaires,
+      maintenances, réservations, mouvements) ;
+    - RH (/rh/) : 0 appel (services, fonctions, agents, affectations,
+      disponibilités, documents) ;
+    - administrations : 0 appel sur courriers/documents/réunions
+      (le mot « missions » apparaît dans d'autres contextes) ;
+    - finances étudiantes : seuls échéanciers, paiements et confirmation
+      sont câblés ; factures, lignes d'échéancier, quittances,
+      remboursements, relances et rapprochements comptables n'ont pas
+      d'écran ;
+    - concours : la chaîne campagnes/épreuves/classement/notes est
+      partiellement écrantée dans Campagnes/CampagneDetail ; les
+      convocations et la surveillance n'ont pas d'écran dédié ;
+    - certaines routes LMD (maquettes, pédagogie, passerelle) sont
+      présentes mais imbriquées dans Inscriptions/FicheEtudiant.
+4.5 Qualité frontend
+  - Build de production OK (Vite) ; lint : 0 erreur, 89 avertissements
+    (principalement react-hooks/exhaustive-deps et variables inutilisées),
+    dont plusieurs méritent un traitement ciblé car ils peuvent masquer
+    des rafraîchissements manquants de données.
+  - Composants très volumineux, reflet d'usages « tout en un fichier » :
+      pages/Statistiques.jsx ........... 5 508 lignes
+      pages/ModuleDetail.jsx ........... 1 937
+      pages/FormationDetail.jsx ....... 1 818
+      pages/Dashboard.jsx ............. 806
+      pages/Modules.jsx ............... 795
+      pages/Formateurs.jsx ............ 754
+      pages/Referentiels.jsx .......... 747
+      pages/AnalyseQualitative.jsx .... 736
+  - Le code porte déjà une logique fine de rôles côté UI (utils/roles.js)
+    qui DOIT rester dupliquée à l'identique côté backend (la sécurité ne
+    repose jamais sur l'UI seule : les permissions API existent).
+  - Cohérence de navigation bonne : menu latéral unique, routes
+    scol/finance/archives regroupées.
+================================================================================
+5. APPLICATION MOBILE FLUTTER + PWA
+================================================================================
+5.1 Périmètre
+  Application destinée aux AUDITEURS (étudiants/stagiaires) et FORMATEURS :
+  connexion, tableau de bord, scan QR de séances (mobile_scanner 7.x,
+  sans Google ML Kit → compatible simulateurs arm64/iOS récents),
+  historique des pointages, questionnaires d'évaluation, fiche profil,
+  changement de mot de passe, télémétrie d'appareil (device_info_plus,
+  geolocator, battery_plus), gestion des permissions
+  (permission_handler), persistance sécurisée (flutter_secure_storage),
+  keepalive en avant-plan (flutter_foreground_task), ouverture de liens
+  (url_launcher), variables d'environnement (flutter_dotenv).
+  - 40 fichiers Dart dans lib/, 7 818 lignes ; 3 fichiers de tests.
+  - Thème dédié (lib/theme/qr_badge_theme.dart), widgets réutilisables
+    (logo, cadre de scan, bannière de statut de session, cartes,
+    empty-states), garde-fous de déconnexion, reprise de session,
+    journalisation.
+  - Permissions iOS décrites dans Info.plist (caméra, localisation,
+    Bluetooth) ; politique de confidentialité mobile embarquée/ouvrable.
+5.2 PWA
+  - La compilation Flutter web est utilisée en PWA ; heartbeat en
+    avant-plan non supporté hors onglet actif (documenté) ; les appareils
+    Web sont préfixés FLUTTER_PWA_ et exclus des sanctions de heartbeat.
+  - Un service worker historique (backend/static/sw.js, « qr-badge-v3 »)
+    pré-cache encore des CDN Bootstrap/html5-qrcode : vestige de la page
+    de badgeage HTML à faire évoluer/supprimer lors de la refonte.
+5.3 CI / dépendances
+  - CI : Flutter 3.41.7 stable, `flutter pub get --enforce-lockfile` puis
+    `flutter analyze`.
+  - CONSTAT TRAITÉ PENDANT L'AUDIT : le pubspec.lock avait été généré avec
+    un Flutter de borne différente (borne flutter >=3.38.4) ; sous
+    3.41.7, le SDK fige deux dépendances à des versions plus basses que
+    celles verrouillées : meta 1.18.0 → 1.17.0 et test_api 0.7.11 →
+    0.7.10, d'où « Unable to satisfy pubspec.yaml using pubspec.lock —
+    Would change 2 dependencies — exit 65 ». Le lock a été régénéré sous
+    Flutter 3.41.7 (via CI, aucune dépendance directe modifiée) :
+    `--enforce-lockfile` retourne maintenant EXIT 0 et le lock n'est plus
+    modifié par un `pub get` simple.
+  - RESTE À TRAITER (hors sujet lockfile) : `flutter analyze` échoue sur
+    UN avertissement considéré bloquant : l'asset déclaré
+    `assets/app.env` n'existe pas car il est volontairement ignoré
+    (.gitignore). Solutions recommandées : versionner un fichier
+    `assets/app.env.example` et le déclarer, ou générer un app.env vide
+    en étape CI, ou transformer l'avertissement en configuration non
+    bloquante tout en conservant le chargement défensif déjà en place
+    (lib/main.dart tolère l'absence du fichier).
+  - 70 paquets ont des versions plus récentes incompatibles avec les
+    contraintes actuelles (ex. mobile_scanner 7.2 vs 7.4, geolocator
+    13.0.4 vs 14, permission_handler 11 vs 13) : mise à jour mineure à
+    planifier, sans urgence.
+================================================================================
+6. INFRASTRUCTURE, DÉPLOIEMENT ET CI/CD
+================================================================================
+6.1 Docker / hébergement
+  - backend/Dockerfile : python:3.12-slim, utilisateur non-root,
+    Gunicorn avec autoscaling (2 à 10 workers), collectstatic, whitenoise ;
+    la CI vérifie même que /app/staticfiles appartient à « appuser ».
+  - compose.yml : 4 services (app, cron, db postgres:15, redis) avec
+    volumes persistants et healthchecks ; fichier compose.scale.yml pour
+    la montée en charge ; entrypoint.sh et build.sh.
+  - Cache : Redis en production, FileBasedCache en relai, LocMemCache en
+    DEBUG ; whitenoise pour les statiques ; Nginx en reverse proxy.
+  - Le cron exécute les commandes planifiées (fermeture automatique de
+    séances/pointages, traitement des heartbeats mobiles, auto-sessions).
+6.2 Commandes de management (31) — signe d'une exploitation outillée
+  Cœur : import_excel, auto_sessions, auto_close_sessions,
+    auto_close_pointages, process_mobile_heartbeats,
+    recalc_durees_pointages, récupération/audit (audit_recovery_diag,
+    recover_from_audit, rectify_sessions_terminee_le),
+    nombreux scripts de diagnostic et de réconciliation des référentiels,
+    nettoyage de données de test.
+  Comptes : create_auditeur_accounts, create_formateur_accounts,
+    repair_auditeur_fiches, sync_role_groups.
+  LMD : init_referentiels_admission, init_referentiels_lmd,
+    import_maquette.
+  Recommandation : plusieurs commandes « diag/fix/merge/backfill » sont
+    des rustines ponctuelles à archiver dans un dossier clairement
+    identifié « maintenance one-shot » pour alléger le code vivant.
+6.3 CI GitHub Actions (ci.yml)
+  - Job Backend : PostgreSQL 16 de service, installation pip, migration,
+    `manage.py test` (943 tests), construction de l'image Docker et
+    contrôles staticfiles/collectstatic.
+  - Job Frontend : Node 22, `npm ci`, `npm run lint`, `npm run build`.
+  - Job Mobile : Flutter 3.41.7, pub get --enforce-lockfile, analyze.
+  - Concurrence annulant les exécutions obsolètes ; pas de déploiement
+    automatisé (CD) configuré dans le dépôt, pas d'environnement de
+    recette/staging décrit, pas de gestion de secrets documentée pour la
+    prod (à compléter).
+  - État fin d'audit : Backend et Frontend passent ; Mobile ne passe
+    plus que sur l'avertissement d'asset app.env (cf. §5.3).
+6.4 Sauvegarde
+  - scripts/backup_injs_lmd.sh : dump PostgreSQL de injs_lmd_current avec
+    horodatage et somme de contrôle SHA-256 dans ~/Backups/INJS-LMD.
+    À compléter par une politique de rétention, un envoi hors site
+    (stockage objet) et des tests de restauration.
+================================================================================
+7. SÉCURITÉ ET CONFORMITÉ
+================================================================================
+7.1 Mesures en place (niveau globalement bon)
+  - SECRET_KEY obligatoire en production (refus explicite sinon ; valeur
+    « dev-only » seulement en DEBUG) ; ALLOWED_HOSTS dérivé de
+    l'environnement, jamais « * » en production.
+  - JWT avec durées réduites en production (12 h accès / 7 j refresh) ;
+    throttling DRF (login 20/min, scan 60/min, offline 60/min) avec
+    tests dédiés (test_throttles).
+  - CSRF configuré pour les origines de confiance ; cookies SameSite
+    paramétrables (Lax par défaut, None+Secure seulement quand exigé) ;
+    CORS restreint, CORS_ALLOW_CREDENTIALS.
+  - En production : HSTS 1 an, includeSubDomains + preload ; la
+    redirection SSL est volontairement laissée à Nginx (documenté).
+  - Média (pièces de candidature, documents RH, etc.) NON servis en
+    public : accès par vues authentifiées.
+  - DeviceBinding / révocation d'appareils, AuditLog des pointages,
+    données sensibles des formateurs exposées uniquement aux rôles
+    habilités (endpoint dédié type « données sensibles / RGPD »).
+  - must_change_password pour les premiers comptes ; déconnexion gardée
+    côté mobile ; mot de passe modifiable.
+  - Middlewares d'assouplissement pour la démo/iframe (auto-login admin,
+    en-têtes frame, transport JWT élargi) doublement gardés par DEBUG ET
+    variables d'environnement, restreints à /admin/ ou au seul mode
+    aperçu : ils sont INERTES en production. Cette porte dérobée de
+    démo doit rester conditionnée et figurer dans la checklist de mise
+    en production.
+  - Conformité RGPD amorcée : documents légaux dans docs/legal
+    (confidentialité badgeage web, plateforme, mobile, droits des
+    personnes, mentions légales, politique cookies).
+7.2 Points à durcir
+  - Pas de politique de mots de passe affichée (validateurs Django à
+    vérifier/renforcer), pas de 2FA (au moins pour ADMIN/DIRECTION).
+  - Pas de centre de notifications d'incidents ni de monitoring
+    applicatif (Sentry/APM absent) ; les logs utilisent encore print().
+  - E-mails via SMTP Gmail par défaut (smtp.gmail.com) : à remplacer par
+    un service transactionnel institutionnel ; les SMS sont modélisés
+    dans les relances mais aucun fournisseur n'est branché.
+  - Chiffrement au repos des sauvegardes et hors-site à confirmer.
+  - Journalisation immuable des notes et des maquettes (prérequis
+    jurys) encore incomplète (cf. R8).
+  - Vérifier la politique de Content-Security-Policy (les CDN tiers du
+    sw.js legacy imposent des sources externes à supprimer).
+  - Filtrage strict des types de fichiers et antivirus sur les pièces
+    jointes à confirmer côté admissions/RH.
+================================================================================
+8. DONNÉES, MODÉLISATION ET MIGRATIONS
+================================================================================
+8.1 Bonnes pratiques observées
+  - Référentiels clairement distingués (Ref* dans formations, réf. LMD
+    dans scolarite) avec journaux (ReferentielJournal,
+    ParametreHistorique, MaquetteJournal, JournalScolarite).
+  - Année académique courante unique (contrainte testée), matricule
+    Participant comme identité étudiante de référence.
+  - Maquettes versionnées avec statuts (BROUILLON/ACTIVE/ARCHIVEE),
+    clone, journal ; cohérence parcours↔formation contrôlée.
+  - Workflows de données avec historiques (notes, corrections, décisions,
+    classements, diplômes, documents avec versions).
+8.2 Doubles représentations connues (à résorber dans la refonte)
+  D1 Groupes : scolarite.Groupe + AffectationGroupe (LMD) versus
+     Participant.groupe et Module.groupe en texte libre (legacy FC).
+  D2 Catégorisation des participants : champs texte legacy (categorie,
+     grade, vague, site, salle, type_concours, libelle_concours)
+     versus les tables de référence RefCategorie/Grade/Vague/Site/Salle.
+  D3 Formation : formations.Formation sans clé étrangère vers
+     RefFormation, alors que Maquette.ref_formation et
+     Groupe.ref_formation existent déjà (pont à créer, nullable).
+  D4 Notes/ECUE : NoteModule (formations) non rattaché à scolarite.ECUE,
+     or le calcul des crédits ECTS et les jurys en dépendent.
+  D5 Deux finances : financement des formateurs (existant) et frais de
+     scolarité étudiante (nouveau) — à garder comme DEUX domaines
+     distincts, jamais fusionnés dans un même modèle.
+  Ces points sont déjà cartographiés dans
+  docs/CARTOGRAPHIE_CIBLE_INJS_LMD.md ; la refonte doit fournir le plan
+  de migration et l'affichage dual pendant la transition.
+8.3 Garde-fous à ajouter (cœur métier LMD)
+  - Verrouillage d'une Maquette ACTIVE (interdire les modifications de
+    structure après activation, créer une nouvelle version pour tout
+    changement) ; test anti-modification à ajouter.
+  - Verrouillage des notes avant délibération ; journal immuable des
+    modifications (corrections avec motif, qui/quand/avant/après).
+  - Règles de validation LMD paramétrables (seuils UE, crédits ECTS),
+    dont les graines existent déjà côté parametres.
+================================================================================
+9. COUVERTURE FONCTIONNELLE ET MATURITÉ PAR MODULE
+================================================================================
+Légende maturité : 3 = complet et intégré · 2 = backend solide, UI partielle
+· 1 = backend/API présents, UI absente · 0 = absent.
+ Domaine                         Modèles  Backend  UI web  Mobile  Tests  Maturité
+ -----------------------------------------------------------------------------------
+ Authentification / rôles            -      3       3      3       3      3
+ Référentiels / paramétrage          4      3       3      -       3      3
+ Formations / modules / sessions    27      3       3      3*      3      3
+ Participants / auditeurs            -      3       3      3*      3      3
+ Formateurs / encadrants             -      3       3      2       3      3
+ Pointage QR / présences             5      3       2      3       3      3
+ Rattrapages / notifications         1      3       3      -       3      3
+ Exports PDF/Excel                   -      3       3      -       -      3 (sans tests)
+ Statistiques / rapports / alertes   5      3       3      1       3      3
+ Suivi-évaluation questionnaires     8      3       3      3       2      3
+ Admissions / candidatures          15      3       3      -       3      3
+ Concours (campagnes/épreuves)       -      3       2      -       3      2
+ Scolarité LMD (inscriptions)       21      3       3      -       3      3
+ Pédagogie (maquettes/UE/ECUE/IP)    -      3       2      -       3      2
+ EDT / affectations / conflits       4      3       3      -       0      2 (0 test)
+ Charges enseignants                 -      3       2      -       -      2
+ Équivalences / dispenses            3      3       3      -       3      3
+ Finances formateurs                 2      3       3      -       3      3
+ Finances étudiantes (scolarité)     9      3       1      -       2      1 (UI 25 %)
+ Jurys / délibérations / PV          6      3       3      -       3      2 (UI légère)
+ Diplômes / registre / rééditions    4      3       3      1       2      2
+ Stages / conventions               4      3       0      -       2      1
+ Administrations (courriers/docs)    5      3       0      -       2      1
+ Ressources humaines                 6      3       0      -       2      1
+ Patrimoine / maintenance / salles   7      3       0      -       2      1
+ Administration technique Django     -      3     n/a     n/a      n/a     3
+ (*) les étudiants/formateurs vivent l'essentiel via le mobile/PWA.
+Conclusion du chapitre : environ 80 % de la VALEUR backend LMD est livrée,
+mais seulement 55-60 % en est exploitable par un agent sans passer par
+l'API ou l'admin Django. La refonte doit prioritairement « écrémer » les
+domaines orphelins en commençant par ceux qui servent la chaîne officielle
+de l'année académique (finances étudiantes, jurys/PV, concours) puis les
+fonctions support (stages, administration, RH, patrimoine).
+================================================================================
+10. TESTS, QUALITÉ ET DETTE TECHNIQUE
+================================================================================
+10.1 Tests
+  - Backend : 76 fichiers de tests, 943 méthodes, ~13 016 lignes,
+    répartition : scolarite 247, formations 238, admissions 80,
+    statistiques 61, presences 43, config 24, referentiels 19,
+    parametres 18, jurys 17, equivalences 10, administrations 10,
+    patrimoine 9, RH 7, suiviEvaluation 6, stages 5, finances 4,
+    graduation 4, authentication 11.
+  - Trous de tests : edts 0 test, exports 0, dashboard 0 ; quelques
+    modules récents ont peu de tests (finances 4, graduation 4, stages 5,
+    RH 7, patrimoine 9) alors qu'ils portent des flux sensibles.
+  - Frontend : AUCUN test (0 framework). Risque élevé vu la quantité de
+    logique de rôles, de workflows et de formulaires dans l'UI.
+  - Mobile : 3 fichiers de tests seulement pour 7 800 lignes.
+10.2 Qualité statique
+  - Frontend lint : 0 erreur, 89 avertissements (avant l'audit une
+    erreur bloquante no-extra-semi était présente : elle a été corrigée).
+  - Backend : 0 marqueur TODO/FIXME formel, mais 288 print() runtime et
+    des modules > 3-5 000 lignes.
+  - La CI détecte bien les régressions backend/frontend mais pas les
+    régressions d'interface ni de rendu.
+10.3 Cohérence et duplication
+  - La matrice de rôles est tenue à deux endroits (role_groups.py et
+    utils/roles.js) : envisager un endpoint de « capacités » (/auth/me
+    expose déjà des role_context) pour que l'UI s'aligne toute seule.
+  - Présence de code legacy « dashboard HTML/badge QR » côte à côte avec
+    l'API/React (views_legacy, templates, sw.js, CDN html5-qrcode) ; à
+    isoler derrière une feature flag puis retirer.
+10.4 Performance
+  - Bon réflexe N+1 (359 prefetch/select_related), index nombreux (102).
+  - Pagination DRF défaut, queries React Query côté client.
+  - À surveiller : les très gros écrans Statistiques (5 508 lignes) et
+    les bilans qui agrègent beaucoup de données ; des vues SQL ou des
+    tables de synthèse incrémentales pourront être nécessaires à
+    montée en charge ; Redis est déjà disponible pour la mise en cache.
+10.5 Hygiène du dépôt
+  - Fichiers de données versionnés à tort ou à raison à clarifier :
+    import_*.xlsx, *.csv, LISTE DES FORMATEURS FAB 2026.numbers,
+    dossier importverif/ avec données nominatives, test_*.xlsx.
+    Les données nominatives (noms de participants/formateurs) ne doivent
+    pas rester dans Git ; les MODÈLES VIDES peuvent y rester dans un
+    dossier docs/modeles/.
+  - staticfiles/ collecté est partiellement suivi : il faut l'ignorer et
+    le générer au build Docker (déjà fait) pour éviter les artefacts
+    périmés (des images Glyphicons/GUID doublonnées apparaissent dans
+    Git).
+  - README racine = « # sygepcpfae » (12 caractères) : à remplacer par
+    la présentation INJS-LMD ; backend/README.md, resumer.md et certains
+    titres parlent encore de QR Badge/MEMFPMA/DFRC et de « Django 6 »
+    (le projet est en Django 5.1.4).
+  - .clinerules et .cursor contiennent des chemins macOS absolus
+    (/Users/jckouassi/Sites/...) à neutraliser.
+  - Dépôt .git de 23 Mo, acceptable, mais qui grossira si les binaires
+    nominatifs ne sont pas sortis de l'historique (un nettoyage
+    d'historique, s'il est fait, devra être planifié avec l'équipe).
+================================================================================
+11. IDENTITÉ VISUELLE ET UX
+================================================================================
+Éléments à CONSERVER OBLIGATOIREMENT en refonte (demande explicite) :
+  - Code couleur de base : bleu foncé (navy #001a33, navy-mid #0a2a4d,
+    navy-soft #16365a, dégradé radial jusqu'à #000d1a) et bleu clair
+    (#2277C1, #1A68AC, #1565C0, #1976D2, #f0f7ff), avec l'accent
+    fonctionnel jaune/ambre #F5B100/#E69700, le rouge d'erreur #C62828.
+  - Logo INJS Marcory (frontend/src/assets/logo-injs.svg) utilisé en
+    barre latérale et sur l'écran de connexion.
+  - Effet de verre (glassmorphism) : plusieurs classes utilisent
+    backdrop-filter: blur(12px à 28px) saturate(160%) avec transparences
+    (cf. index.css lignes ~154, 467, 538) ; cartes et panneaux
+    translucides, fond d'écran clair #d4deec.
+  - Composants, navigation, terminologie LMD et libellés métier
+    existants (règle workspace : ne pas réintroduire l'UI de l'ancien
+    QR Badge/SYGEP-CPFAE ; le logo logo-sygepcpfae.png résiduel doit
+    disparaître des écrans).
+Recommandations UX ciblées :
+  - Système de design unifié (tokens déjà dans :root) à étendre :
+    variantes d'éléments verre, tableaux denses pour la scolarité,
+    steppers de workflow (candidatures, inscriptions, jurys, conventions,
+    maintenances), badges de statut normalisés par machine à états,
+    gabarit « liste + détail + documents » réutilisable pour livrer vite
+    les 4 domaines orphelins.
+  - Accessibilité (contrastes des bleus, focus clavier, ARIA) et
+    réactivité mobile/tablette pour les écrans de scolarité.
+  - Cohérence des icônes (bootstrap-icons) et retrait des CDN externes
+    du service worker legacy.
+  - Tableaux de bord par rôle (direction, scolarité, finance, archive,
+    encadrant) avec indicateurs et alertes de seuil déjà existants
+    côté statistiques.
+================================================================================
+12. DOCUMENTATION
+================================================================================
+Existant :
+  - README.md (racine, minimal et mal nommé), backend/README.md
+    (complet mais orienté QR Badge), frontend/README.md,
+    qr_badge_mobile/README.md (PWA + notes de publication Play Store),
+    MANUEL_UTILISATEUR.md, MANUEL_UTILISATEUR_AUDITEURS.md,
+    docs/API_ENDPOINTS.md, docs/CARTOGRAPHIE_CIBLE_INJS_LMD.md
+    (excellente base de planification), docs/EDT_CONTRAT_DONNEES.md,
+    docs/STATISTIQUES_INDICATEURS.md, docs/CARTE_ACCES_FINANCE.md,
+    notes L3/ETS/Prépa, transcriptions de réunion CPFAE, manuels
+    DOCX et captures d'écran pour les statistiques, guides admin
+    (backend/docs/), fiches Play Store (play_store_listing_fr-FR.txt,
+    notes de revue App Store, checklist de test appareil, vidéo de
+    démonstration localisation arrière-plan).
+À produire/mettre à jour en refonte :
+  - README unique INJS-LMD (objectifs, architecture réelle, lancement,
+    variables d'environnement, déploiement Docker, restauration de
+    sauvegarde) ;
+  - matrice des rôles / permissions tenue à jour ;
+  - documentation OpenAPI exploitée (régénération Swagger, exemples) ;
+  - procédures métier de l'année académique (admissions → inscriptions
+    → pédagogie → jurys → diplômes → finances) ;
+  - ADR (Architecture Decision Records) pour les choix sensibles
+    (doubles représentations, EDT externe, deux finances, démo/iframe).
+================================================================================
+13. MATRICE DES RISQUES
+================================================================================
+Criticité = impact × probabilité pour l'objectif « gérer l'INJS de A à Z ».
+ R1 Domaines backend sans UI (stages, patrimoine, RH, administration,
+    finances étudiantes incomplètes) : HAUT impact / HAUTE prob. →
+    déploiement INJS « de A à Z » impossible sans ressaisie via admin.
+ R2 Aucun test frontend : HAUT / HAUTE → régressions silencieuses sur
+    les écrans sensibles (notes, inscriptions, paiements, jurys).
+ R3 Doubles représentations de données : HAUT / MOYENNE → chiffres
+    contradictoires entre formation continue et LMD.
+ R8 Maquettes actives modifiables / notes sans verrou ni audit :
+    HAUT / MOYENNE → irrégularité de délibérations et de diplômes.
+ R4 Fichiers géants (5 000+ lignes) : MOYEN / HAUTE → erreurs de
+    maintenance, fusion, onboarding lent.
+ R5 Identité et hygiène de dépôt (noms legacy, binaires nominatifs,
+    staticfiles) : MOYEN / HAUTE → confusion, fuite de données,
+    image professionnelle dégradée.
+ R6 CI mobile (analyse app.env, dépendances) : MOYEN / MOYENNE →
+    livraison mobile bloquée par intermittence.
+ R7 Observabilité (pas de Sentry, print, pas d'APM) : MOYEN / MOYENNE →
+    incidents détectés tard en production.
+ R9 Concours/convocations et surveillance partiellement écrantés :
+    MOYEN / HAUTE à l'approche d'une campagne.
+ R10 Pas de CD/staging, restauration de sauvegarde non testée :
+    MOYEN / MOYENNE → reprises d'activité incertaines.
+ R11 SMS non branchés, e-mail Gmail par défaut : MOYEN / MOYENNE →
+    relances et notifications métier limitées.
+ R12 Ancien socle HTML/CDN/PWA legacy (html5-qrcode, Bootstrap CDN,
+    sw.js qr-badge-v3) : FAIBLE / HAUTE → dépendances externes,
+    confusion de cache, surface de sécurité.
+================================================================================
+14. RECOMMANDATIONS PRIORISÉES (FEUILLE DE ROUTE DE REFONTE)
+================================================================================
+PRINCIPE DIRECTEUR : ne jamais figer l'application. Chaque lot est livré
+derrière des feature flags / routes ajoutitives, avec migrations sans
+perte, tests au vert et build de production vérifié ; l'existant reste
+en fonctionnement pendant toute la refonte.
+LOT 0 — STABILISATION ET SOCLE (1 itération)
+  0.1 Corriger `flutter analyze` (asset app.env : exemple versionné ou
+      génération CI) pour rendre la CI entièrement verte.
+  0.2 Sortir les binaires nominatifs et staticfiles/ de Git, ignorer
+      via .gitignore, créer docs/modeles/ pour les seuls modèles vides.
+  0.3 Réécrire le README racine aux couleurs INJS-LMD, corriger les
+      mentions Django 6/QR Badge/MEMFPMA et les chemins absolus macOS.
+  0.4 Mettre en place Vitest + Testing Library et les tests des
+      composants critiques (Login, AuthContext, roles, tables de
+      décisions) ; brancher la couverture dans la CI.
+  0.5 Introduire Sentry (backend + frontend + mobile) et remplacer les
+      print() runtime par logging ; niveaux et rétention documentés.
+  0.6 Ajouter un endpoint de « capacités » dérivé des permissions pour
+      aligner automatiquement utils/roles.js sur le backend.
+LOT 1 — INTÉGRITÉ DU CŒUR ACADÉMIQUE (priorité fonctionnelle haute)
+  1.1 Verrouiller les maquettes ACTIVES (versionnage immuable + tests).
+  1.2 Verrouiller les notes avant délibération, journal immuable des
+      corrections (motif, auteur, avant/après).
+  1.3 Câbler NoteModule → ECUE (D4) pour le calcul ECTS et les jurys.
+  1.4 Compléter l'UI jurys (préparation, contrôle, calcul,
+      délibération, génération et archivage du PV) et sécuriser
+      l'enchaînement concours → jury → diplôme.
+  1.5 Finaliser l'UI finances étudiantes (tarifs, échéanciers complets,
+      factures, paiements/quittances, relances, remboursements,
+      rapprochements) avec blocage d'inscription pour impayés ;
+      tableau de bord FINANCE et attestation de solde pour diplôme.
+LOT 2 — CHAÎNE D'ADMISSION ET CONCOURS DE BOUT EN BOUT
+  2.1 Écrans de gestion des pièces (dépôt/vérification) pour les
+      candidats et le secrétariat ; portail candidat si pertinent.
+  2.2 Écrans concours complets : épreuves, affectation des salles et
+      surveillants, convocations (génération/présence), verrouillage,
+      saisie de notes, calcul/publication des classements, liste
+      d'admission, passage en inscription en un clic.
+LOT 3 — DOMAINES ORPHELINS « ADMINISTRATION GÉNÉRALE »
+  3.1 Stages : écrans organismes/tuteurs, conventions avec workflow et
+      PDF, échéances, évaluations, attestations.
+  3.2 Administrations : courriers, documents officiels versionnés,
+      réunions/commissions, missions.
+  3.3 Ressources humaines : organigramme services/fonctions, agents,
+      affectations, disponibilités, documents.
+  3.4 Patrimoine : équipements, véhicules, inventaires, maintenances,
+      réservations d'espaces (reliées aux salles Référentiels),
+      mouvements patrimoniaux.
+  → Livrer ces 4 domaines avec un GABARIT D'ÉCRANS unique (liste
+    filtrable, détail, timeline de statut, pièces jointes, exports)
+    pour diviser le coût et homogénéiser l'UX.
+LOT 4 — RÉSORPTION DES DOUBLES REPRÉSENTATIONS (D1-D3-D5)
+  4.1 Migration progressive texte → clés étrangères Ref* pour les
+      participants (affichage dual, commande de migration, contrôles).
+  4.2 Groupe LMD comme source de vérité, champs texte en lecture seule.
+  4.3 Pont Formation.ref_formation (nullable) puis alignement des
+      statistiques ; garder deux finances bien séparées.
+LOT 5 — PÉDAGOGIE, EDT ET EXPÉRIENCE MOBILE
+  5.1 Écrans dédiés maquettes/UE/ECUE et inscriptions pédagogiques en
+      masse ; réemploi du contrat EDT externe et des écrans EDT
+      existants ; ajouter des TESTS sur le domaine edts (0 aujourd'hui).
+  5.2 Renforcer le mobile : tests, montées de versions mineures des
+      plugins, stratégie de livraison stores, notifications push pour
+      les étudiants/formateurs si le besoin est validé ; porter dans le
+      mobile la consultation des décisions/notes/emplois du temps.
+  5.3 Étendre les statistiques aux indicateurs LMD (réussite par UE,
+      effectifs par niveau/parcours, suivi des impayés, capacité des
+      salles, charges enseignants) et aux tableaux de bord par rôle.
+LOT 6 — INDUSTRIALISATION
+  6.1 Environnement de recette (staging) + CD Docker, migrations
+      automatiques sûres (zéro temps d'arrêt), bascule Redis.
+  6.2 Sauvegardes hors site chiffrées + exercice de restauration ;
+      plan de continuité ; politique de rétention.
+  6.3 Notifications : service e-mail transactionnel institutionnel et
+      passerelle SMS pour les relances/convocations.
+  6.4 Sécurité : 2FA pour les administrateurs, CSP stricte après
+      suppression des CDN legacy, antivirus/typage des pièces jointes,
+      revue des politiques de mot de passe ; tests d'accès croisés
+      systématiques par rôle pour chaque nouveau domaine.
+  6.5 Retrait du socle HTML badge/CDN legacy (sw.js qr-badge-v3,
+      html5-qrcode, views_legacy) une fois les fonctions basculées.
+Chaque lot doit être accompagné de : migrations + tests backend, tests
+frontend des écrans, mise à jour des manuels, captures pour les manuels,
+et contrôle de la matrice rôles/permissions. L'application doit être
+livrable et démontrable à la fin de CHAQUE lot (jamais de big-bang).
+================================================================================
+15. CHIFFRES CLÉS EN ANNEXE
+================================================================================
+BACKEND
+  Django 5.1.4 / DRF 3.15.2 / Python 3.12 / SimpleJWT / drf-spectacular
+  20 applications métier ; 133 modèles ; 184 fichiers de migrations
+  ~88 068 lignes Python (hors migrations et environnement virtuel)
+  336 vues fonctions @api_view ; 33 vues classes ; 45 serializers
+  ~396 routes ; 108 enregistrements admin Django ; 14 routes d'exports
+  76 fichiers de tests ; 943 méthodes de test ; ~13 016 lignes de tests
+  73 transactions atomiques ; 359 select_related/prefetch_related
+  102 index explicites ; 31 commandes de management
+  Cache Redis (prod) / fichier / LocMem ; throttling login 20/min
+FRONTEND
+  React 18.2 / Vite 7 / React Query 5 / react-router 6 / qrcode
+  105 fichiers JS/JSX ; ~35 495 lignes ; 53 routes ; 36 pages
+  1 641 lignes CSS ; 9 pages de plus de 650 lignes (max 5 508)
+  Lint : 0 erreur, 89 avertissements ; 0 test automatisé
+MOBILE/PWA
+  Flutter (CI 3.41.7) ; 40 fichiers Dart ; 7 818 lignes ; 3 fichiers tests
+  Scan QR, télémétrie, keepalive avant-plan, stockage sécurisé, PWA
+  Lockfile réparé (meta 1.17.0, test_api 0.7.10) ; analyze à finaliser
+  sur assets/app.env ; 70 paquets avec mises à jour mineures disponibles
+INFRA
+  Docker : app + cron + postgres:15 + redis ; Gunicorn autoscaling
+  CI GitHub Actions : 3 jobs (backend avec Postgres+Docker, frontend,
+  mobile) ; pas de CD/staging ; script de sauvegarde PostgreSQL+SHA256
+IDENTITÉ
+  Bleus : #001a33 / #0a2a4d / #16365a (foncé) et #2277C1 / #1A68AC /
+  #1565C0 / #1976D2 (clair), accent #F5B100 ; logo logo-injs.svg ;
+  effet de verre backdrop-filter blur(12-28px) saturate(160%).
+================================================================================
+FIN DE L'AUDIT — les constats de ce document doivent être croisés avec le
+rapport de mise en œuvre et le modèle fonctionnel de référence fournis par
+le commanditaire pour produire le fichier « Génération de prompts de
+refontes de app-injs-lmd2026.txt ».
+================================================================================

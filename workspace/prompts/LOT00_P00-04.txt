@@ -1,0 +1,81 @@
+================================================================================
+PROMPT P00-04 — FILET DE SÉCURITÉ FRONTEND : VITEST + TESTING LIBRARY + CI
+================================================================================
+P00-04 — FILET DE SÉCURITÉ FRONTEND : VITEST + TESTING LIBRARY + CI
+Lot 0 | 2 séances | Dépendances : P00-01 | Module réf. : 18
+Risques couverts : R2 | Type : Qualité — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le frontend React 18 / Vite 7 comporte 105 fichiers JS/JSX (~35 495 lignes),
+53 routes, une logique de rôles fine (frontend/src/utils/roles.js), un client
+API avec intercepteurs et rafraîchissement de token
+(frontend/src/services/api.js) et deux contextes (AuthContext, ToastContext).
+Il n'existe AUCUN test frontend : aucun framework de test n'est installé.
+C'est le risque R2 de l'audit : régressions silencieuses possibles sur les
+écrans les plus sensibles (notes, inscriptions, paiements, jurys).
+
+MISSION
+Installer un harnais de tests frontend complet et couvrir en priorité les
+briques qui portent la sécurité et les données sensibles.
+
+CONSIGNES
+1. Installe Vitest + @testing-library/react + @testing-library/user-event +
+   @testing-library/jest-dom + jsdom + @vitest/coverage-v8, en versions
+   compatibles avec Vite 7 et React 18.2. N'upgrade PAS React ni Vite.
+2. Configure : vitest.config.js, setup de tests (jest-dom), alias @/ identique
+   à celui de Vite, environnement jsdom, scripts package.json :
+   "test", "test:run", "test:coverage".
+3. Crée frontend/src/test/utils/ :
+   - renderWithProviders (QueryClientProvider + AuthContext + ToastContext +
+     MemoryRouter) ;
+   - mockAxios / mockApi (msw ou mock manuel) avec fixtures réalistes ;
+   - factory de faux utilisateurs par rôle (les 12 rôles) ;
+   - helpers d'attente asynchrone.
+4. Écris les tests prioritaires, dans cet ordre :
+   a) utils/roles.js — couverture EXHAUSTIVE de la matrice de rôles : pour
+      chaque rôle × chaque capacité, le résultat attendu. Ces tests deviennent
+      le contrat de sécurité côté UI.
+   b) AuthContext — connexion, stockage du JWT multi-transports, expiration,
+      rafraîchissement, déconnexion, redirection.
+   c) services/api.js — intercepteur d'authentification, rafraîchissement sur
+      401, file d'attente des requêtes pendant le refresh, propagation des
+      erreurs, absence de fuite de token dans les logs.
+   d) Login.jsx — soumission, erreurs, must_change_password, rôles refusés sur
+      le web (FORMATEUR / AUDITEUR).
+   e) Un composant de tableau générique + un formulaire de décision (ex.
+      validation d'inscription) : rendu, pagination, filtres, soumission,
+      gestion d'erreur, état vide, état chargement.
+5. Vise un premier palier de couverture mesuré et documenté : 100 % sur
+   utils/roles.js, ≥ 80 % sur services/ et contexts/, et au moins 1 test de
+   rendu par page existante (test « smoke » : la page monte sans crash avec des
+   données mockées). Génère la liste des pages non couvertes.
+6. Branche la couverture dans la CI (job Frontend) : npm run test:run avec
+   seuils de couverture (statements/branches/functions/lines) calés sur le
+   palier atteint — le seuil ne peut que monter.
+7. Ajoute un job CI distinct « Frontend tests » pour que l'échec de test ne
+   soit pas noyé dans le build.
+8. Traite au passage les avertissements ESLint react-hooks/exhaustive-deps qui
+   masquent un rafraîchissement manquant de données (pas de désactivation
+   aveugle : corrige la dépendance ou justifie par un commentaire).
+
+INTERDITS
+- Ne réécris aucune page pour la rendre testable. Adapte par l'extérieur
+  (providers, mocks, data-testid).
+- N'ajoute aucune dépendance lourde de composants UI.
+- Ne modifie pas la logique métier existante : si un test révèle un bug,
+  SIGNALE-LE, ne le corrige pas en silence.
+
+LIVRABLES
+vitest.config.js · frontend/src/test/ (utils + fixtures) · dossiers de tests ·
+package.json (scripts) · .github/workflows/ci.yml (job + seuils) ·
+docs/TESTS_FRONTEND.md (stratégie, paliers, liste des pages non couvertes).
+
+DoD
+[ ] npm run test:run vert
+[ ] couverture roles.js = 100 %, services/ et contexts/ ≥ 80 %
+[ ] au moins 1 test smoke par page existante, liste des non-couvertes publiée
+[ ] CI verte avec seuils de couverture
+[ ] nombre d'avertissements ESLint réduit, aucun désactivé sans justification

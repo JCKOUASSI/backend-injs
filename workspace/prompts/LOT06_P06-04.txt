@@ -1,0 +1,46 @@
+================================================================================
+PROMPT P06-04 — VUES EDT : HEBDOMADAIRE, PAR PROFIL ET PAR ESPACE
+================================================================================
+P06-04 — VUES EDT : HEBDOMADAIRE, PAR PROFIL ET PAR ESPACE
+Lot 6 | 2 séances | Dépendances : P06-03 | Module réf. : 06 §26-31
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les écrans Edts.jsx, EdtNew.jsx et AffectationNew.jsx existent (9 appels API
+côté UI). Le modèle de référence exige 5 vues distinctes : EDT étudiant, EDT
+enseignant, EDT par formation/groupe, EDT des espaces, et une vue hebdomadaire
+publiable, y compris sur mobile.
+
+MISSION
+Livrer les 5 vues EDT cohérentes, performantes et imprimables.
+
+CONSIGNES
+1. Composant de grille hebdomadaire réutilisable (jours × créneaux), alimenté
+   par une seule source de données, avec code couleur par type d'enseignement
+   et par famille d'espace.
+2. Les 5 vues : étudiant (périmètre PROPRE_COMPTE), enseignant (ses
+   affectations), groupe/formation, espace (occupation d'une salle, d'un
+   gymnase, d'une piscine…), et vue consolidée pour la direction.
+3. Filtres : année, semestre, semaine, formation, parcours, niveau, groupe,
+   enseignant, espace, type d'enseignement.
+4. Navigation temporelle : semaine précédente/suivante, date précise, vue
+   semestre, export de la période.
+5. Impressions et exports : EDT PDF par groupe et par enseignant (format
+   officiel, logo INJS), export Excel. Réutilise le moteur d'exports existant.
+6. Performance : une semaine d'EDT pour un groupe doit s'afficher en moins de
+   500 ms. Utilise la pagination ou le fenêtrage si nécessaire, et le cache
+   Redis côté serveur. Mesure et publie les temps.
+7. Mobile : la vue EDT étudiant et enseignant est portée dans l'application
+   Flutter/PWA (réutilise le contrat de données, pas une nouvelle API).
+8. Tests : exactitude des 5 vues sur un jeu de référence, périmètre de droits
+   par vue, performance mesurée.
+
+DoD
+[ ] composant grille réutilisable + 5 vues livrées
+[ ] filtres complets, navigation temporelle
+[ ] exports PDF/Excel au format officiel
+[ ] temps d'affichage < 500 ms (mesure publiée)
+[ ] vues mobiles (étudiant, enseignant) fonctionnelles

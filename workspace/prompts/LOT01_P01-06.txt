@@ -1,0 +1,54 @@
+================================================================================
+PROMPT P01-06 — ADMINISTRATION DES RÉFÉRENTIELS : ÉCRAN UNIFIÉ, IMPORT/EXPORT, JOURNAL
+================================================================================
+P01-06 — ADMINISTRATION DES RÉFÉRENTIELS : ÉCRAN UNIFIÉ, IMPORT/EXPORT, JOURNAL
+Lot 1 | 1 séance | Dépendances : P01-02, P01-03 | Module réf. : 01, 17
+Risques couverts : R5 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt possède déjà un écran Referentiels.jsx (747 lignes) et des commandes
+init_referentiels_lmd / init_referentiels_admission / import_maquette. Les
+référentiels campus et métier viennent d'être étendus (P01-02, P01-03). Il
+faut un point d'entrée d'administration unique, cohérent, avec import/export
+et journal.
+
+MISSION
+Unifier l'administration des référentiels dans un seul écran extensible, sans
+dupliquer ce qui existe.
+
+CONSIGNES
+1. Refactore Referentiels.jsx en un conteneur + un registre de référentiels
+   (chaque référentiel décrit par : clé, libellé, endpoint, colonnes, champs de
+   formulaire, droits, icône). Ajoute les référentiels campus (zone, étage,
+   type d'espace) et métier (type d'enseignement, type d'évaluation, type de
+   document, catégorie d'enseignement) au registre. Ne réécris pas l'écran de
+   zéro : extrais, ne remplace pas.
+2. Ajoute pour chaque référentiel : recherche, filtres, tri, pagination
+   serveur, création/édition/désactivation (soft delete), et journal des
+   modifications visible (qui, quand, avant/après).
+3. Ajoute un import Excel générique (réutilise le moteur openpyxl existant de
+   formations/import_excel.py sans le dupliquer) : téléversement, validation
+   avec rapport d'erreurs ligne à ligne, mode DRY-RUN obligatoire avant
+   application, puis application.
+4. Ajoute un export Excel/PDF générique (réutilise le moteur d'exports
+   existant, 14 routes déjà en place).
+5. Ajoute un contrôle d'intégrité global /api/referentiels/integrite/ qui
+   signale orphelins, doublons de libellé, codes manquants, référentiel vide.
+6. Contrôles d'accès : écriture réservée aux rôles habilités (N3/N4 selon
+   référentiel) ; consultation plus large. Refus explicite et journalisé.
+7. Tests frontend (Vitest) : le registre rend chaque référentiel, l'import
+   dry-run affiche ses erreurs, le soft delete désactive sans supprimer.
+
+INTERDITS
+- Ne duplique ni import_excel.py ni le moteur d'exports.
+- Ne crée pas un deuxième écran de référentiels.
+
+DoD
+[ ] écran unifié avec registre, 100 % des référentiels accessibles
+[ ] import dry-run + application + rapport d'erreurs
+[ ] export Excel/PDF par référentiel
+[ ] /api/referentiels/integrite/ vert
+[ ] tests frontend et backend verts

@@ -1,0 +1,47 @@
+================================================================================
+PROMPT P07-03 — RETARDS, ABSENCES, JUSTIFICATIONS ET RATTRAPAGES
+================================================================================
+P07-03 — RETARDS, ABSENCES, JUSTIFICATIONS ET RATTRAPAGES
+Lot 7 | 1 séance | Dépendances : P07-01 | Module réf. : 08
+Risques couverts : R1 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt gère Rattrapage et NotificationAbsence, et l'écran Rattrapages.jsx
+existe. Le modèle de référence (Module 08) ajoute : retards, absences,
+justifications, saisie manuelle par l'encadrant, et statistiques.
+
+MISSION
+Compléter le traitement des exceptions de présence avec un circuit de
+justification tracé.
+
+CONSIGNES
+1. Formalise les qualifications : PRÉSENT, RETARD (seuil paramétrable),
+   ABSENT_JUSTIFIE, ABSENT_NON_JUSTIFIE, EXCUSE, RATTRAPAGE_ACCEPTE,
+   RATTRAPAGE_REFUSE.
+2. Circuit de justification : l'étudiant dépose une demande avec pièce
+   justificative dans un délai paramétrable ; l'encadrant ou le secrétariat
+   statue (accepté/refusé) avec motif obligatoire ; la décision modifie la
+   qualification du pointage et est tracée.
+3. Saisie manuelle par l'encadrant : possible uniquement sur une séance dont il
+   est responsable, avec motif obligatoire, et systématiquement journalisée
+   dans AuditLog (immuable).
+4. Rattrapages : écran existant complété (statuts, motifs, pièces, décisions en
+   masse avec rapport), alerte sur les demandes en attente depuis trop
+   longtemps.
+5. Notifications : absence détectée, demande de justification, décision.
+6. Statistiques : taux de présence par étudiant, par groupe, par ECUE, par
+   période ; étudiants en dessous du seuil de présence paramétrable (rappel :
+   ce seuil peut conditionner la présentation aux examens — paramétrable, pas
+   en dur).
+7. Tests : chaque qualification, circuit de justification complet, saisie
+   manuelle hors périmètre refusée, délai de dépôt dépassé refusé.
+
+DoD
+[ ] 7 qualifications avec seuils paramétrables
+[ ] circuit de justification tracé avec pièces
+[ ] saisie manuelle limitée au périmètre et journalisée
+[ ] statistiques de présence + alerte de seuil
+[ ] tests verts
