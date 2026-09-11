@@ -1541,6 +1541,7 @@ export default function Statistiques() {
   useEffect(() => {
     const visibleIds = new Set(facGroupesVisibles.map(g => g.id))
     setFacGroupesSelected(prev => prev.filter(id => visibleIds.has(id)))
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [facGradesSelected.join(','), facPerimetre.groupes.length])
 
   const fetchBilanFac = useCallback(async () => {

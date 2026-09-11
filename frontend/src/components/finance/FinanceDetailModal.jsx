@@ -48,6 +48,7 @@ export default function FinanceDetailModal({
         numero_compte_bancaire: financeDetail.numero_compte_bancaire || '',
       })
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [
     financeDetail?.id,
     financeDetail?.numero_piece_identite,

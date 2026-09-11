@@ -1,5 +1,9 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+// Alias partagé entre l'application et les tests (vitest.config.js doit rester aligné).
+const alias = { '@': fileURLToPath(new URL('./src', import.meta.url)) }
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -31,6 +35,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: { alias },
     server: {
       port: 3000,
       host: true,

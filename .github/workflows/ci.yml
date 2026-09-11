@@ -96,6 +96,37 @@ jobs:
           npm run lint
           npm run build
 
+  frontend-tests:
+    name: Frontend tests (Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installer les dépendances
+        working-directory: frontend
+        run: npm ci
+
+      - name: Tests unitaires, composants et smoke (avec seuils de couverture)
+        working-directory: frontend
+        # Le code de sortie de Vitest est non nul si un test échoue OU si un
+        # seuil de couverture (vitest.config.js) n'est pas atteint.
+        run: npm run test:coverage
+
+      - name: Archiver le rapport de couverture HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
   mobile:
     name: Mobile (Flutter)
     runs-on: ubuntu-latest

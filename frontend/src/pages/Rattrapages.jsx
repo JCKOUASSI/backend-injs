@@ -51,6 +51,7 @@ function SearchSelect({ placeholder, icon, value, onSelect, fetcher, renderItem,
       }
     }, 250)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [query, open])
 
   useEffect(() => {
@@ -144,6 +145,7 @@ function SeanceMultiSelect({ selected, onAdd, onAddMany, onRemove, fetchSeances,
       }
     }, 250)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [query, open, disabled, mode])
 
   useEffect(() => {
@@ -299,10 +301,12 @@ export default function Rattrapages() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { load() }, [])
   useEffect(() => {
     const t = setTimeout(load, 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [filterStatut, search])
 
   const searchParticipants = async (q) => {

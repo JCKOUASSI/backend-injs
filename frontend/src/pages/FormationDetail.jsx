@@ -104,6 +104,7 @@ export default function FormationDetail() {
   const [importSeancesMsg, setImportSeancesMsg] = useState(null)
   const importFileRef = useRef()
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { loadFormationData() }, [id])
 
   const loadFormationData = async () => {
@@ -137,6 +138,7 @@ export default function FormationDetail() {
 
   useEffect(() => {
     if (activeTab === 'formateurs') loadFormateurs()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [activeTab])
 
   const loadAllFormateurs = async () => {
@@ -163,12 +165,14 @@ export default function FormationDetail() {
 
   useEffect(() => {
     if (showAddFormateur) formateurPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [formateurSearch])
 
   useEffect(() => {
     if (!showAddFormateur) return
     const t = setTimeout(() => loadAllFormateurs(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [formateurSearch, showAddFormateur, formateurPicker.page])
 
   const handleAddFormateur = async (formateurId) => {
@@ -220,6 +224,7 @@ export default function FormationDetail() {
 
   useEffect(() => {
     if (activeTab === 'presences') loadDashboard(dashboardDate, dashboardSession)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [activeTab, dashboardDate, dashboardSession])
 
   const isJourPasse = (dateStr) => {
@@ -326,12 +331,14 @@ export default function FormationDetail() {
 
   useEffect(() => {
     if (showAssignModal) encadrantPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [encadrantSearch])
 
   useEffect(() => {
     if (!showAssignModal) return
     const t = setTimeout(() => loadSuperviseurs(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [encadrantSearch, showAssignModal, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {
@@ -369,12 +376,14 @@ export default function FormationDetail() {
 
   useEffect(() => {
     if (showAddParticipant) participantPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [addSearch])
 
   useEffect(() => {
     if (!showAddParticipant) return
     const t = setTimeout(() => loadAllParticipants(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [addSearch, showAddParticipant, participantPicker.page])
 
   const handleAddParticipant = async (participantId) => {

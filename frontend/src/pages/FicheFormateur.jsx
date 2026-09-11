@@ -20,7 +20,8 @@ export default function FicheFormateur() {
       } finally { setLoading(false) }
     }
     fetch()
-  }, [formateurId, moduleId])
+    // showToast est stable (useCallback du ToastProvider).
+  }, [formateurId, moduleId, showToast])
 
   const download = async (type) => {
     const path = type === 'pdf'

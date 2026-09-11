@@ -130,7 +130,8 @@ export default function EvaluationTake() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+    // navigate et showToast sont des références stables.
+  }, [id, navigate, showToast])
 
   useEffect(() => { fetchQuestionnaire() }, [fetchQuestionnaire])
 

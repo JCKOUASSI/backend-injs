@@ -18,7 +18,7 @@ module.exports = {
   settings: {
     react: { version: 'detect' },
   },
-  ignorePatterns: ['dist', 'node_modules', 'build'],
+  ignorePatterns: ['dist', 'node_modules', 'build', 'coverage'],
   rules: {
     'react/react-in-jsx-scope': 'off',
     'react/prop-types': 'off',
@@ -31,4 +31,25 @@ module.exports = {
     'no-empty': ['error', { allowEmptyCatch: true }],
     'no-irregular-whitespace': 'warn',
   },
-};
+  overrides: [
+    {
+      // Fichiers de tests et harnais Vitest/Testing Library.
+      files: ['src/test/**/*.{js,jsx}', 'src/**/*.test.{js,jsx}', 'src/**/*.spec.{js,jsx}'],
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        vi: 'readonly',
+      },
+      rules: {
+        // Les tests utilisent volontairement des assertions et du JSX.
+        'react/display-name': 'off',
+      },
+    },
+  ],
+}

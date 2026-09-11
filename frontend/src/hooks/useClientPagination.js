@@ -11,7 +11,10 @@ export const PICKER_PAGE_SIZE = 50
  */
 export function useClientPagination(items, pageSize = TABLE_PAGE_SIZE, resetDeps = []) {
   const [page, setPage] = useState(1)
-  const list = items ?? []
+  // Mémoïsé pour garder une référence stable quand `items` est null/undefined
+  // (sinon le `?? []` créerait un tableau neuf à chaque rendu et casserait les
+  // dépendances du useMemo de pagination).
+  const list = useMemo(() => items ?? [], [items])
   const totalItems = list.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize) || 1)
   const pageSafe = Math.min(Math.max(1, page), totalPages)

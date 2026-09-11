@@ -20,7 +20,8 @@ export default function FicheAuditeur() {
       } finally { setLoading(false) }
     }
     fetch()
-  }, [participantId, formationId])
+    // showToast est stable (useCallback du ToastProvider).
+  }, [participantId, formationId, showToast])
 
   const download = async (type) => {
     const path = type === 'pdf'

@@ -535,7 +535,8 @@ export default function QuizTake() {
       showToast(err?.response?.data?.detail || 'Erreur chargement quiz', 'error')
       navigate('/quiz')
     } finally { setLoading(false) }
-  }, [id, isÉtudiant])
+    // navigate et showToast sont des références stables.
+  }, [id, isÉtudiant, navigate, showToast])
 
   useEffect(() => { fetchQuiz() }, [fetchQuiz])
 

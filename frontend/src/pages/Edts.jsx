@@ -70,7 +70,9 @@ export default function Edts() {
     } catch (err) { showToast(err.response?.data?.detail || 'Erreur suppression', 'error') }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { fetchEdts() }, [anneeId, populationId, typePop])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { if (selectedEdt) fetchAffectations() }, [selectedEdt])
 
   const badge = (s) => {

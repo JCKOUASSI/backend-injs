@@ -150,6 +150,7 @@ export default function Modules() {
     ],
   )
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { loadModules() }, [page, filters.statut, filters.secretariat_type, filters.vague, filters.grade, filters.groupe, filters.date_mode, filters.date, debouncedSearch])
 
   const loadModules = async () => {

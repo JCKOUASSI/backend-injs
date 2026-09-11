@@ -32,6 +32,7 @@ export default function QRCodeModal({
       setToken(null)
       setQrMeta(null)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [isOpen, formationId, sessionId, moduleId])
 
   useEffect(() => {

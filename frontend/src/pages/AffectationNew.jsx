@@ -31,7 +31,8 @@ export default function AffectationNew() {
       } catch (err) { showToast(err.response?.data?.detail || 'Erreur chargement', 'error') }
     }
     fetchCreneaux()
-  }, [])
+    // showToast est une fonction stable (useCallback du ToastProvider).
+  }, [showToast])
 
   const handleChange = (e) => {
     const { name, value } = e.target

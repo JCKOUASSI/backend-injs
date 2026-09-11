@@ -109,6 +109,7 @@ export default function ModuleDetail() {
   const canManageModule = canMutateFormations(user?.role)
   const canArchive = canArchiveModuleFromUser(user)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { loadModule() }, [formationId, moduleId])
   useEffect(() => {
     setSelectedSessionId(null)
@@ -238,12 +239,14 @@ export default function ModuleDetail() {
 
   useEffect(() => {
     if (showAddParticipant) participantPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [participantSearch])
 
   useEffect(() => {
     if (!showAddParticipant) return
     const t = setTimeout(() => loadAvailableParticipants(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [participantSearch, showAddParticipant, participantPicker.page])
 
   const handleAddParticipant = async (pid) => {
@@ -293,12 +296,14 @@ export default function ModuleDetail() {
 
   useEffect(() => {
     if (showAddFormateur) formateurPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [formateurSearch])
 
   useEffect(() => {
     if (!showAddFormateur) return
     const t = setTimeout(() => loadAvailableFormateurs(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [formateurSearch, showAddFormateur, formateurPicker.page])
 
   const handleAddFormateur = async (fid) => {
@@ -488,12 +493,14 @@ export default function ModuleDetail() {
 
   useEffect(() => {
     if (showAssignSup) encadrantPicker.resetPage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [encadrantSearch])
 
   useEffect(() => {
     if (!showAssignSup) return
     const t = setTimeout(() => loadEncadrants(), 300)
     return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   }, [encadrantSearch, showAssignSup, encadrantPicker.page])
 
   const handleAssignSuperviseur = async () => {

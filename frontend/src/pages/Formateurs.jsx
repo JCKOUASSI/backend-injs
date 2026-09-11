@@ -95,6 +95,7 @@ export default function Formateurs() {
     [page, debouncedSearch, appliedFinancePeriod, canViewFinanceData],
   )
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.
   useEffect(() => { loadFormateurs() }, [page, debouncedSearch, appliedFinancePeriod])
 
   useEffect(() => {
