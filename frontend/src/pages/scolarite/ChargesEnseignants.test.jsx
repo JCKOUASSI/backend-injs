@@ -20,7 +20,6 @@ import { renderWithProviders } from '@/test/utils/renderWithProviders'
 import { flushPromises } from '@/test/utils/async'
 import { makeUser } from '@/test/utils/factories'
 import ChargesEnseignants from '@/pages/scolarite/ChargesEnseignants'
-import TestErrorBoundary from '@/test/utils/ErrorBoundary'
 
 const ANNEE_PATH = '/scolarite/annee-courante/'
 const OCCUPATION_PATH = '/enseignants/occupation/'
@@ -88,7 +87,6 @@ const mount = (role = 'ADMIN', {
     const params = appels.length ? appels[appels.length - 1][1]?.params : {}
     return Number(params.enseignant_id) === 4 ? affectations4 : affectations5
   },
-  boundary = false,
 } = {}) => {
   const me = makeUser(role, { username: role.toLowerCase() })
   apiController.setMe(me)
@@ -106,16 +104,11 @@ const mount = (role = 'ADMIN', {
     apiController.setRoute(SEMESTRES_REF_PATH, () => referentiels.semestres)
     apiController.setRoute(FORMATEURS_PATH, () => referentiels.formateurs)
   }
-  return renderWithProviders(
-    boundary
-      ? <TestErrorBoundary><ChargesEnseignants /></TestErrorBoundary>
-      : <ChargesEnseignants />,
-    {
-      authUser: me,
-      routePattern: '/scolarite/charges',
-      initialEntries: ['/scolarite/charges'],
-    },
-  )
+  return renderWithProviders(<ChargesEnseignants />, {
+    authUser: me,
+    routePattern: '/scolarite/charges',
+    initialEntries: ['/scolarite/charges'],
+  })
 }
 
 // Implémentation par défaut du mock (les restoreMocks entre tests peuvent
@@ -350,30 +343,37 @@ describe('pages/scolarite/ChargesEnseignants.jsx — référentiels et habilitat
     expect(screen.getByText('ECUE Alpha')).toBeInTheDocument()
   })
 
-  // NOTE (écart constaté §10.13, P00-04) : l'état initial `options` ne déclare
-  // ni `formateurs` ni `annees`. Si les référentiels échouent (catch → toast,
-  // setOptions jamais appelé), la carte de création rendue juste après
-  // appelle `options.formateurs.map(...)` sur `undefined` : la page CRASH
-  // au lieu d'afficher des sélecteurs vides. Comportement ACTUEL figé ci-
-  // dessous avec la TestErrorBoundary ; correction attendue dans un lot
-  // correctif sur feu vert (état initial complet de `formateurs: []`).
-  it("[écart §10.13] l'échec des référentiels affiche le toast PUIS fait crasher la carte de création", async () => {
+  // Régression §10.13 (LOT 34) : l'état initial `options` déclare désormais
+  // toutes les clés (`formateurs`, `annees` comprises). Un échec du
+  // chargement des référentiels affiche le toast MAIS la page reste stable
+  // avec des sélecteurs vides, au lieu de crasher sur `.map()`.
+  it('§10.13 (LOT 34) un échec des référentiels affiche le toast sans crasher, sélecteurs vides', async () => {
     apiController.setRoute(FORMATEURS_PATH, () => { throw new Error('500') })
-    mount('ADMIN', { boundary: true })
+    mount()
     expect(await screen.findByText('Chargement des référentiels impossible.')).toBeInTheDocument()
-    const crash = await screen.findByTestId('render-crash')
-    expect(crash.textContent).toMatch(/reading 'map'/)
+    // L'écran (occupation) reste rendu.
+    expect(await screen.findByRole('heading', { name: /charges pédagogiques des enseignants/i })).toBeInTheDocument()
+    expect(screen.getByText('Jean Dupont')).toBeInTheDocument()
+    // La carte de création est là, avec les seules options fantômes.
+    const combos = within(creationCard()).getAllByRole('combobox')
+    expect(within(combos[0]).queryAllByRole('option')).toHaveLength(1)
+    expect(within(combos[1]).queryAllByRole('option')).toHaveLength(1)
+    expect(screen.queryByTestId('render-crash')).toBeNull()
   })
 
-  it('[écart §10.13] des référentiels lents (occupation servie avant eux) font aussi crasher la page', async () => {
+  it('§10.13 (LOT 34) des référentiels lents (occupation servie avant eux) ne font pas crasher la page', async () => {
     // Le GET des formateurs ne répond jamais ; l’occupation, elle, se résout
-    // tout de suite → la carte s’affiche tant que setOptions est en attente.
+    // tout de suite → la carte s’affiche alors que les référentiels sont
+    // encore en vol : elle doit rester stable avec des sélecteurs vides.
     apiMock.get.mockImplementation((chemin, ...reste) => (
       chemin === FORMATEURS_PATH ? new Promise(() => {}) : getInitialImpl(chemin, ...reste)
     ))
-    mount('ADMIN', { boundary: true })
-    const crash = await screen.findByTestId('render-crash')
-    expect(crash.textContent).toMatch(/reading 'map'/)
+    mount()
+    expect(await screen.findByRole('heading', { name: /charges pédagogiques des enseignants/i })).toBeInTheDocument()
+    expect(screen.getByText('Jean Dupont')).toBeInTheDocument()
+    const combos = within(creationCard()).getAllByRole('combobox')
+    expect(within(combos[0]).queryAllByRole('option')).toHaveLength(1)
+    expect(screen.queryByTestId('render-crash')).toBeNull()
   })
 })
 

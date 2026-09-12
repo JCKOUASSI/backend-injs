@@ -160,15 +160,16 @@
 > `problemes` de cohérence, clonage versionné avec redirection, ajout d'UE et
 > d'ECUE typés, archivage d'ECUE et habilitations), puis au **[LOT 33]**
 > (l'écran **charges pédagogiques des enseignants** `ChargesEnseignants` est
-> verrouillé à **100 % de lignes / 100 % de fonctions / 96,8 % de branches /
+> verrouillé à **100 % de lignes / 100 % de fonctions / 96,9 % de branches (après le correctif du LOT 34) /
 > 23 tests** : année courante au montage puis occupation et anomalies en
 > parallèle, détail d'enseignant (charge + affectations), création
 > d'affectation typée, cinq référentiels et carte de création sous
 > habilitation ; deux tests `[écart]` y signalent le **crash §10.13** de la
 > carte quand les référentiels échouent ou répondent trop lentement — état
-> initial `options` incomplet). Ce lot **solde les cinq écrans Scolarité
-> réparés au §10.8**.
-> Les LOT 4 à 7, 13, 17 et 19 sont les lots qui touchent la logique
+> initial `options` incomplet — crash alors corrigé dès le **[LOT 34]** par
+> un état initial complet, les deux tests `[écart]` devenant des régressions).
+> Ce lot **solde les cinq écrans Scolarité réparés au §10.8**.
+> Les LOT 4 à 7, 13, 17, 19 et 34 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
 > 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32 et 33 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
@@ -437,7 +438,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
 | `src/pages/scolarite/Equivalences.test.jsx` | page | **27 tests (LOT 31), équivalences/dispenses — 100 % lignes/fonctions/branches/instructions**. `GET /equivalences/demandes/` au montage : spinner, tableau (neuf statuts dont un inconnu en repli, crédits `?? '—'` y compris `0`), message « Aucune demande. », erreur détaillée puis « Chargement impossible. ». **Habilitations** : pour un rôle acteur (`canActScolarite`), les quatre référentiels sont chargés en `Promise.all` (`/scolarite/ref/annees/?actif=true`, `…/formations/`, `…/niveaux/?actif=true`, `…/etudiants/`) ; la liste des rôles non acteurs (DIRECTION, ENCADRANT, FINANCE) ne les requête pas et ne montre ni carte de création ni boutons d'action ; l'échec des référentiels toasté (« Chargement des référentiels impossible. ») sans masquer la liste. **Badges de statut** : les neuf apparences (`BADGE_STATUT`) dont APPLIQUÉE en `dark` et le repli `secondary`. **Création** `POST /equivalences/demandes/` : payload exact avec IDs `Number(x) || undefined` (soumission sans sélection exercée via `fireEvent.submit`), toast « Demande créée en brouillon. » et rechargement, bouton « + » désactivé pendant l'envoi (promesse différée), erreur `JSON.stringify` du détail serveur puis « Création impossible. ». **Transitions** `POST …/:id/transition/` `{statut}` : les cinq boutons du workflow (Soumettre, Instruire, Avis pédagogique, Décider), absence de bouton sur REJETÉE/APPLIQUÉE/statut inconnu, désactivation globale pendant une action, toasts `Demande {statut}.` (rechargement) et « Transition impossible. ». **Décision** : ouverture de la carte inline (titre `Décision — demande #N`, Annuler/Enregistrer), payload `POST …/:id/decision/` avec défauts `FAVORABLE` / « Direction des études INJS », champs crédits/note vides → `undefined`, fermeture après succès, rechargement, cas d'erreur qui laisse la carte ouverte. **Application** `POST …/:id/appliquer/` `{}` après `window.confirm(/effet académique/i)` : annulation sans appel, succès (« Dispense/équivalence appliquée. », rechargement), échec (« Application impossible. »). Aucune alerte `act` (mûrissement du rechargement après chaque écriture). |
 | `src/pages/scolarite/MaquetteDetail.test.jsx` | page | **35 tests (LOT 32), détail de maquette pédagogique — 100 % lignes/fonctions/branches/instructions**. Chargement en parallèle `GET /scolarite/maquettes/:id/` + `…/journal/` : spinner puis en-tête (titre `libelle` avec repli `ref_formation`, niveau · année · version · badge statut · crédits et volume, lien Retour), regroupement des **UE par semestre** (deux UE d'un même semestre dans une seule carte), rendu UE (code/intitulé/crédits/caractère) et ECUE (crédits, coefficient, volume), badge « archivée » sans action pour une ECUE archivée, alerte des **problèmes de cohérence** (absente sinon), journal des validations (action, utilisateur avec tiret de repli, date `fr-FR`, état « Aucune entrée. »), erreur de chargement détaillée puis « Chargement impossible. » avec écran en spinner. **Habilitations** : contrôles de rédaction (groupe workflow, formulaires UE/ECUE, archivage) et `GET /scolarite/ref/semestres/` réservés aux rôles `canActScolarite` (SECRETARIAT inclus ; ENCADRANT/DIRECTION en lecture stricte) et au statut BROUILLON ; le référentiel des semestres n'est plus demandé en VALIDEE/ACTIVE/ARCHIVEE et son échec est avalé en silence (select avec la seule option fantôme). **Boutons par statut** : Valider (BROUILLON), Activer (VALIDEE), Archiver (ACTIVE), Cloner (tout sauf brouillon). **Workflow** : confirmations exactes (« contenu gelé », « immuable », « Archiver cette maquette ? ») — annulation sans appel puis acceptation, `POST …/{valider|activer|archiver}/` `{}`, toast « Opération effectuée. », maquette rechargée avec nouveaux boutons et formulaires retirés, groupe désactivé pendant l'appel (promesse différée), trois niveaux d'erreur (`problemes` concaténés, détail `error`, « Action impossible. ») sans rechargement. **Clonage** `POST …/cloner/` : annulation sans navigation, toast versionné `Version v{n} créée en brouillon.`, redirection `window.location.href` vers la nouvelle maquette, échecs détaillé/générique (« Clonage impossible. »). **Ajout d'UE** `POST …/ues/` : select alimenté par les semestres, payload typé `{semestre_id: Number, code, intitule, credits: Number||0}` (crédits non numériques → 0 par soumission directe), bouton Ajouter désactivé pendant l'envoi, réinitialisation du formulaire et rechargement, échecs détaillé/générique avec formulaire conservé. **Ajout d'ECUE** `POST …/ues/:id/ecues/` : formulaire propre à chaque UE (le `focus` fixe l'UE rattachée, la saisie reste invisible dans le formulaire de l'autre UE), payload `{code, intitule, credits typés, coefficient: 1}` sans `ue_id` dans le corps, réinitialisation, crédits invalides → 0, deux niveaux d'erreur. **Archivage d'ECUE** `DELETE /scolarite/ecues/:id/?mode=archive` : confirmation exacte, annulation sans appel, succès (« ECUE archivée. », rechargement), échecs détaillé/générique (« Suppression impossible. »). |
-| `src/pages/scolarite/ChargesEnseignants.test.jsx` | page | **23 tests (LOT 33), charges pédagogiques des enseignants — 100 % lignes/fonctions, 96,8 % branches** (les 2 branches résiduelles sont des filets défensifs inatteignables par l'UI : la carte n'est rendue qu'une fois l'année résolue et le clic de ligne fournit toujours un identifiant réel). **Année courante** `GET /scolarite/annee-courante/` au montage (§10.8), puis **occupation + anomalies en `Promise.all`** avec `{params:{annee_id}}` : spinner puis titre et libellé d'année, les six colonnes d'occupation avec badges OK (`text-bg-success`) / Surcharge (`text-bg-danger`), état vide « Aucune affectation. », alerte d'anomalies (compteur `N anomalie(s) détectée(s)`, détails `a.detail`, **tronquée aux 8 premières**), absence d'alerte sinon, réponses sans clés `occupation`/`anomalies` repliées sur `[]`. **Absence d'année** : toast « Aucune année académique courante. », aucun chargement d'occupation (écran en attente — comportement figé) ; **échec occupation ou anomalies** : toast « Chargement des charges impossible. » mais `finally` qui rend la page et son état vide. **Détail enseignant** (clic de ligne, ligne mise en `table-active`) : `GET /enseignants/charges/:id/` puis `…/affectations/?enseignant_id=&annee_academique_id=`, carte « Détail — {enseignant} » (heures prévue/affectée/planifiée/réalisée, table ECUE/type/volume/statut, ECUE absente → tiret), changement d'enseignant, échec « Chargement de la charge impossible. » sans carte ; le détail reste ouvert aux rôles non acteurs. **Référentiels** : cinq GET pour un rôle acteur (`annees` et `niveaux` avec `actif:'true'`, `formations`, `semestres`, `formateurs/list/`) alimentant les sélecteurs (nom/prénom, intitulé, code), **semestres filtrés par niveau** (`niveau_id`, option fantôme seule avant choix du niveau), aucun GET pour un rôle non acteur (ENCADRANT) dont la carte de création est absente. **Deux tests `[écart §10.13]`** (via `TestErrorBoundary`) : l'échec des référentiels affiche le toast PUIS fait crasher la carte (`options.formateurs.map` sur `undefined`), et des référentiels lents (occupation servie avant eux) produisent le même crash. **Création** `POST /enseignants/affectations/` : payload typé complet (`type_enseignement:'CM'` par défaut, `ecue_id`/`groupe_id` chaînes vides, IDs `Number(x) || undefined`, `volume_horaire: Number||0`, `annee_academique_id` repris de l'année courante), libellé du bouton portant l'année, soumission directe sans sélection (IDs `undefined`, volume invalide → 0), bouton verrouillé pendant l'envoi (promesse différée), **réinitialisation partielle** (enseignant et volume vidés, formation/niveau/semestre conservés), rechargement global (occupation + anomalies) ET du détail si un enseignant était sélectionné, erreur `JSON.stringify` du détail puis « Création impossible. ». |
+| `src/pages/scolarite/ChargesEnseignants.test.jsx` | page | **23 tests (LOT 33), charges pédagogiques des enseignants — 100 % lignes/fonctions, 96,9 % branches** (les 2 branches résiduelles sont des filets défensifs inatteignables par l'UI : la carte n'est rendue qu'une fois l'année résolue et le clic de ligne fournit toujours un identifiant réel). **Année courante** `GET /scolarite/annee-courante/` au montage (§10.8), puis **occupation + anomalies en `Promise.all`** avec `{params:{annee_id}}` : spinner puis titre et libellé d'année, les six colonnes d'occupation avec badges OK (`text-bg-success`) / Surcharge (`text-bg-danger`), état vide « Aucune affectation. », alerte d'anomalies (compteur `N anomalie(s) détectée(s)`, détails `a.detail`, **tronquée aux 8 premières**), absence d'alerte sinon, réponses sans clés `occupation`/`anomalies` repliées sur `[]`. **Absence d'année** : toast « Aucune année académique courante. », aucun chargement d'occupation (écran en attente — comportement figé) ; **échec occupation ou anomalies** : toast « Chargement des charges impossible. » mais `finally` qui rend la page et son état vide. **Détail enseignant** (clic de ligne, ligne mise en `table-active`) : `GET /enseignants/charges/:id/` puis `…/affectations/?enseignant_id=&annee_academique_id=`, carte « Détail — {enseignant} » (heures prévue/affectée/planifiée/réalisée, table ECUE/type/volume/statut, ECUE absente → tiret), changement d'enseignant, échec « Chargement de la charge impossible. » sans carte ; le détail reste ouvert aux rôles non acteurs. **Référentiels** : cinq GET pour un rôle acteur (`annees` et `niveaux` avec `actif:'true'`, `formations`, `semestres`, `formateurs/list/`) alimentant les sélecteurs (nom/prénom, intitulé, code), **semestres filtrés par niveau** (`niveau_id`, option fantôme seule avant choix du niveau), aucun GET pour un rôle non acteur (ENCADRANT) dont la carte de création est absente. **Deux régressions §10.13 (corrigé au LOT 34)** : l'échec des référentiels affiche le toast SANS crasher (occupation conservée, sélecteurs réduits à leur option fantôme) et des référentiels lents servis après l'occupation laissent l'écran stable ; ces deux tests figuraient `[écart]` au LOT 33 (la carte crashait sur `options.formateurs.map` avec un état `options` incomplet). **Création** `POST /enseignants/affectations/` : payload typé complet (`type_enseignement:'CM'` par défaut, `ecue_id`/`groupe_id` chaînes vides, IDs `Number(x) || undefined`, `volume_horaire: Number||0`, `annee_academique_id` repris de l'année courante), libellé du bouton portant l'année, soumission directe sans sélection (IDs `undefined`, volume invalide → 0), bouton verrouillé pendant l'envoi (promesse différée), **réinitialisation partielle** (enseignant et volume vidés, formation/niveau/semestre conservés), rechargement global (occupation + anomalies) ET du détail si un enseignant était sélectionné, erreur `JSON.stringify` du détail puis « Création impossible. ». |
 | `src/pages/scolarite/FinancesEtudiantes.test.jsx` | page | **25 tests (LOT 26), finance étudiante — 100 % de lignes / 100 % de fonctions / 97 % de branches**. Chargement parallèle `GET /finances-etudiantes/echeanciers/` et `…/paiements/` (normalisation `results || data` sur les deux formes), titre/onglets/bouton Actualiser (qui recharge les deux ressources), spinner initial puis lignes. **Onglet Échéanciers** : étudiant/année/`lignes_count`, badges de statut global (`IMPAYE` danger, `PARTIELLEMENT_PAYE` warning, `COMPLETE` success, statut inconnu → repli secondaire), état vide, navigation entre onglets et retour. **Onglet Paiements** : neuf colonnes (dont Action sous habilitation), identité Étudiant/Candidat/tiret, montant + devise, mode, référence ou tiret, table de badges complète (`INITIE`…`RAPPROCHE`), bouton **Confirmer uniquement pour INITIE/EN_ATTENTE**, état vide et spinner d'onglet. **Création** `POST …/paiements/` : payload exact `{etudiant_id, nature, montant, devise (texte libre), mode, transaction_externe}` (nature/mode sur les listes fermées), message d'idempotence, réinitialisation du formulaire (les `<input type=number>` vides valent `null` en jest-dom), rechargement, erreur serveur détaillée puis message générique. **Confirmation** `POST …/paiements/:id/confirmer/` : `window.confirm` (libellé contenant id/montant/devise, annulation = aucun appel), succès avec toast de quittance et rechargement, échec détaillé (preuve manquante) puis générique. **Habilitations** : FINANCE/DIRECTION/CHEF_CPFAE_ADMIN/CPFAE_ADMIN (saisie + colonne Action), SECRETARIAT/CHEF_SECRETARIAT (saisie mais pas de confirmation), ENCADRANT (lecture stricte, données consultables). |
 | `src/pages/FinanceEncadrants.test.jsx` | page | **19 tests (LOT 27), rapport finance des encadrants — 100 % lignes/fonctions/branches**. Rendu via `FinancePageShell` (titre/sous-titre, liens de navigation dont l'onglet courant accentué, panneau de période). **Chargement** `GET /formations/finance/encadrants/?preset=mois&mois=…` : spinner puis trois KPI (`encadrants_count`, planifié/réalisé formatés par `fmtDuration`, ex. 720 min → `12h`, 450 → `7h 30min`, valeur nulle → `0h`), sections par encadrant (libellé puis repli sur le nom d'utilisateur, badge de sous-total, sept colonnes, sessions en badge, lignes sans grade/module/formation en tirets, pied de tableau), encadrant sans lignes, état vide (`{encadrants:[]}` comme `data:null`) avec KPI à zéro, erreur de chargement détaillée puis générique. **Période** (filtre partagé) : « Cette année » ne recharge qu'après **Appliquer** (nouvelle variante de données, persistance `sessionStorage`), trimestre T1 → `trimestre=YYYY-Q1`, personnalisé avec dates (`date_debut/date_fin`), Appliquer désactivé tant qu'une date manque. **Exports** `getBlob /exports/finance/encadrants/pdf|excel/` reportant la query de période, toasts `(PDF)`/`(XLSX)`, clic d'ancre/révocation, nom par défaut `liste_encadrants.pdf` quand le serveur n'en donne pas, deux niveaux d'erreur. **Filets défensifs** : période persistée sans `preset` → requêtes et export sur les chemins de base sans query, lignes et `sessions_count` absents (repli `[]`/`0`). |
 | `src/pages/FinanceDashboard.test.jsx` | page | **29 tests (LOT 30), tableau de bord finance — 99,8 % lignes, 100 % fonctions, 97,2 % branches** (5 aiguillages de formatage défensifs, figés par les configs KPI statiques, sont inatteignables par l'UI). Rendu via `FinancePageShell` avec la période et le badge de période servie, onglet Tableau de bord accentué, recherche `GET /formations/finance/dashboard/?preset=mois&mois=…` (chemin sans query pour une période dégradée sans preset). **Chargement/erreurs** : spinner, détail serveur puis message générique, `data:null` sans crash. **Cinq KPI héro cliquables** : valeurs durée/argent/pourcentage (2h, 1h 30min, 75 %, 200 000/150 000 FCFA), sous-textes (séances, heures planifiées arrondies, actifs, période précédente ou repli, nombre de tarifs appliqués > 1 puis singulier), badges `EvolutionBadge` hausse/baisse/plat en durée/argent/`pts` avec infobulle du pourcentage. **KPI d'effectifs** (6 cartes, moy. en heures arrondies, replis à 0) ; **alerte de tolérance** active (compteurs avec `?? 0` quand absents, masquée inactive) et **info tarifs** (liste entre parenthèses). **Coût prévisionnel de repli** : somme des `montant_prevu` des modules quand la clé KPI est null/vide/absente (`|| 0` sur les modules sans montant). **Activité mensuelle** : barres proportionnelles à l'activité max (100/50/0 %), durée et montant par mois, section masquée sans données. **Spécialités** : table, forage par le compteur vers une modale (formateurs avec matricule/tiret, liste `|| []`, message vide, fermeture croix/« Fermer »/voile avec `stopPropagation` dans le contenu). **Classement enseignants** : trois mesures (réalisé/planifié/montants avec en-tête et formats changeants), médailles d'or/argent/bronze puis numéro grisé au-delà du top 3, replis matricule/spécialité/séances, état vide, onglet initial lu sur `?rank_tab=` (inconnu → repli réalisé), persistance `rank_tab` dans la query partagée. **Synthèse de paie** : pagination 25/page (26 lignes → 2 pages, suivante/numéros/précédente, badge « N formateur(s) — page x/y »), 13 colonnes, taux avec jauge, `FinanceToleranceBadge` ok/alerte/anomalie/écart/inconnu/absent, ligne lacunaire (tirets/zéros), état vide, réinitialisation de la pagination après Appliquer. **Ventilation par module** (`FinanceModuleBreakdownModal`, ouverte par les cinq KPI) : titres par mesure, tri décroissant, totaux de pied (8h, 6h, 75 %, 150 000/180 000 FCFA), colonne et ligne tarif, secrétariat, libellés et séances en tirets, recherche instantanée avec « N affiché(s) », total filtré + rappel global, absence de correspondance, période sans module, singulier « 1 module », fermetures croix/pied/voile. **Période** : « Cette année » ne recharge qu'après Appliquer (99 séances/100h, variante de données), persistance `sessionStorage finance_period`, sous-texte de taux par défaut sans comparaison, horodatage `generated_at` présent/absent. |
@@ -482,7 +483,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 33 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -522,7 +523,7 @@ Mesure après le LOT 33 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/Equivalences.jsx` (LOT 31) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
-| `pages/scolarite/ChargesEnseignants.jsx` (LOT 33) | **100 %** | **100 %** | **100 %** | **96,8 %** |
+| `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
 | **Global `src/` (toutes zones)** | **60,8 %** | **60,8 %** | **57,1 %** | **79,6 %** |
 
@@ -657,15 +658,16 @@ Mesure après le LOT 33 (V8, `npm run test:coverage`), sur les zones ciblées :
 > ajout typé d'UE et d'ECUE (formulaires isolés par UE), archivage d'ECUE et
 > contrôles réservés aux brouillons des rôles acteurs. Le **LOT 33 verrouille
 > les charges pédagogiques des enseignants** (`ChargesEnseignants`,
-> **23 tests, 100 % lignes/fonctions, 96,8 % branches**) : année courante au
+> **23 tests, 100 % lignes/fonctions, 96,9 % branches**) : année courante au
 > montage, occupation/anomalies, détail et affectations d'un enseignant,
-> création typée avec rechargements ciblés, référentiels sous habilitation —
-> et signale le **crash §10.13** de la carte de création (état `options`
-> incomplet) par deux tests `[écart]`. Avec ce lot, **les cinq écrans
-> Scolarité réparés au §10.8 sont tous couverts en profondeur** et le dossier
-> `pages/scolarite/` monte à **94,1 % de lignes / 90,1 % de fonctions /
-> 88,5 % de branches** (le service `services/scolarite.js` reste à
-> **100 % de lignes**).
+> > création typée avec rechargements ciblés, référentiels sous habilitation ;
+> le **crash §10.13** alors révélé (état `options` incomplet) est **corrigé
+> au LOT 34** par un état initial complet, avec les deux tests `[écart]`
+> transformés en régressions (toast sans crash, course de résolution
+> stable). Avec ces lots, **les cinq écrans Scolarité réparés au §10.8 sont
+> tous couverts en profondeur** et le dossier `pages/scolarite/` atteint
+> **94,1 % de lignes / 90,1 % de fonctions / 88,5 % de branches** (le
+> service `services/scolarite.js` reste à **100 % de lignes**).
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -771,11 +773,8 @@ Conformément aux contraintes, les lots 0 à 3 n'ont **jamais** modifié la
 logique applicative : les écarts y étaient seulement constatés et tracés. Les
 **LOT 4 et 5**, sur feu vert explicite, sont des lots correctifs (§10.4, §10.5,
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
-**LOT 17 (§10.11)** et le **LOT 19 (§10.12)**. Le LOT 33 (tests purs)
-signale un nouvel écart ouvert, le **§10.13** (crash de la carte de
-création de `ChargesEnseignants` si les référentiels échouent ou
-répondent trop lentement), non corrigé sans feu vert. Les points encore
-ouverts sont ci-dessous (§10.1, §10.9 et §10.13).
+**LOT 17 (§10.11)**, le **LOT 19 (§10.12)** et le **LOT 34 (§10.13)**. Les
+points encore ouverts sont ci-dessous (§10.1 et §10.9).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -1142,12 +1141,12 @@ unitaire (prop `formateur`, **100 %**) restent inchangés.
 La page `ModuleDetail.jsx` passe de 88,3 à **89,3 % de lignes** et
 l'assignation d'enseignant est désormais défendue de bout en bout.
 
-### 10.13 Écart constaté au LOT 33 — `ChargesEnseignants` : crash de la carte de création si les référentiels échouent (ou répondent trop lentement)
+### 10.13 BUG corrigé au LOT 34 — `ChargesEnseignants` : crash de la carte de création si les référentiels échouent (ou répondent trop lentement)
 
-En testant l'écran des charges pédagogiques (`ChargesEnseignants.jsx`),
-les tests `[écart §10.13]` (figés dans
-`src/pages/scolarite/ChargesEnseignants.test.jsx`, assertés via la
-`TestErrorBoundary`) mettent en évidence un **crash d'écran blanc** :
+Révélé au LOT 33 en testant l'écran des charges pédagogiques
+(`ChargesEnseignants.jsx`), d'abord figé par deux tests `[écart §10.13]`
+(assertés via la `TestErrorBoundary`), il s'agissait d'un **crash
+d'écran blanc** :
 
 - l'état initial `options` est
   `{ formations: [], niveaux: [], semestres: [], ecues: [], groupes: [] }`
@@ -1166,17 +1165,26 @@ les tests `[écart §10.13]` (figés dans
   (référentiel lent) ; la carte s'affique alors que `options.formateurs`
   n'existe pas encore.
 
-Comportement ACTUEL figé par deux tests : après un échec des référentiels,
-le toast s'affiche **puis** l'arbre de la carte crashe ; avec des
-référentiels lents (formateurs en promesse non résolue) et une occupation
-immédiatement servie, l'écran crashe également.
+**Comportement fautif constaté au LOT 33** : après un échec des
+référentiels, le toast s'affichait **puis** l'arbre de la carte crashait ;
+avec des référentiels lents (formateurs en promesse non résolue) et une
+occupation immédiatement servie, l'écran crashait également (course de
+résolution).
 
-**Correctif minimal attendu** (lot correctif sur feu vert, non appliqué au
-LOT 33 qui est un lot de tests purs) : déclarer l'état initial complet —
-`{ annees: [], formateurs: [], formations: [], niveaux: [], semestres: [],
-ecues: [], groupes: [] }` — ce qui rend la carte résiliente aux deux cas ;
-les deux tests `[écart]` deviendront alors des régressions affirmant le
-toast + les sélecteurs vides (échec) et l'affichage stable (course).
+**Correctif (LOT 34, feu vert explicite), uniquement l'état initial de
+`ChargesEnseignants.jsx`** : celui-ci déclare désormais toutes les clés lues
+au rendu — `{ annees: [], formateurs: [], formations: [], niveaux: [],
+semestres: [], ecues: [], groupes: [] }` — ce qui rend la carte
+résiliente aux deux cas.
+
+**Régressions (dans `ChargesEnseignants.test.jsx`, en remplacement des deux
+tests `[écart]` du LOT 33)** : un échec des référentiels affiche le toast
+« Chargement des référentiels impossible. » **sans crasher** (l'occupation
+reste affichée, les sélecteurs ne contiennent que leur option fantôme), et
+des référentiels lents servis après l'occupation laissent l'écran stable
+avec les sélecteurs vides. Les deux tests échouent sur l'ancien état
+initial (preuve de mutation par aller-retour du correctif). La page reste à
+**100 % de lignes/fonctions, 96,9 % de branches**.
 
 ---
 
@@ -1196,7 +1204,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 33 :
+**Aucune page n'est dépourvue de test.** État après le LOT 34 :
 
 - seize écrans disposent d'un test **fonctionnel dédié** hors module Scolarité
   (les quatre écrans du module Finance transverse — `FinanceEncadrants`,
@@ -1247,8 +1255,8 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   **`MaquetteDetail` au LOT 32** (`MaquetteDetail.test.jsx`, **35 tests,
   100 % lignes/fonctions/branches**) et **`ChargesEnseignants` au LOT 33**
   (`ChargesEnseignants.test.jsx`, **23 tests, 100 % lignes/fonctions,
-  96,8 % branches**) : **les cinq écrans réparés au §10.8 sont désormais
-  tous couverts en profondeur** ;
+  96,9 % branches après le correctif §10.13 du LOT 34**) : **les cinq
+  écrans réparés au §10.8 sont désormais tous couverts en profondeur** ;
 - tout le **parcours administratif de l'étudiant** est couvert par des tests
   fonctionnels dédiés : `Candidatures.jsx` (97,5 % ln, LOT 9), `Admissions.jsx`
   (98 % ln, LOT 10), puis `Inscriptions.jsx` (99,4 % ln / 100 % fonctions,
@@ -1450,7 +1458,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   comportement figé au titre du §10.9 sur cet écran ;
 - au LOT 33, l'écran **`ChargesEnseignants`** (charges pédagogiques des
   enseignants) reçoit un **test dédié de 23 tests à 100 % de lignes /
-  100 % de fonctions / 96,8 % de branches** : résolution de l'année
+  100 % de fonctions / 96,9 % de branches après le LOT 34** : résolution de l'année
   académique courante au montage puis chargement parallèle de l'occupation
   et des anomalies (avec leurs paramètres, leurs états vides, l'alerte
   tronquée à 8 anomalies et les deux niveaux d'erreur), tableau
@@ -1463,11 +1471,19 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   « CM » par défaut, coercitions `Number(...) || undefined/0`, bouton
   verrouillé pendant l'envoi, réinitialisation partielle, rechargement
   global et du détail sélectionné, erreurs JSON/génériques) ; deux tests
-  **`[écart §10.13]`** figent en complément le crash de la carte de
-  création quand les référentiels échouent ou répondent après
+  d'abord écrits en **`[écart §10.13]`** ont révélé le crash de la carte
+  de création quand les référentiels échouent ou répondent après
   l'occupation ; **ce lot solde les cinq écrans Scolarité réparés au
   §10.8** (les deux seules branches non couvertes sont des filets
   défensifs inatteignables par l'UI) ;
+- le **LOT 34, sur feu vert explicite, corrige le crash §10.13** par une
+  seule modification de `ChargesEnseignants.jsx` (l'état initial `options`
+  déclare désormais aussi `annees` et `formateurs`, soit toutes les clés
+  lues au rendu) : les deux tests `[écart]` deviennent des **régressions**
+  qui affirment le toast sans crash (occupation conservée, sélecteurs
+  réduits à leur option fantôme) et la stabilité en cas de course de
+  résolution ; les deux échouent sur l'ancien état initial (preuve de
+  mutation par aller-retour) ;
 - le LOT 16 **achevait aussi la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1519,9 +1535,8 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    `MaquetteDetail` **au LOT 32**, et les charges pédagogiques
    (occupation, détail enseignant, création d'affectation) de
    `ChargesEnseignants` **au LOT 33** : **ce point est soldé**, les cinq
-   écrans réparés au §10.8 ont tous leur test dédié en profondeur (reste
-   seulement l'écart §10.13 à corriger dans un lot correctif sur
-   feu vert) ;
+   écrans réparés au §10.8 ont tous leur test dédié en profondeur, et le
+   crash §10.13 révélé au passage est **corrigé au LOT 34** ;
 3. flux critiques par rôle : ~~candidatures~~ (LOT 9), ~~admissions/décisions~~
    (LOT 10), ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)**,
    ~~jurys / diplômation / vérification publique~~ **(LOT 12)** et ~~saisie des
@@ -1580,11 +1595,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
      les autres actions destructrices) — comportement figé par un test, en
      attente d'un choix produit ;
-   - §10.13 crash de la carte de création de `ChargesEnseignants` quand les
-     référentiels échouent ou répondent après l'occupation (état initial
-     `options` sans clé `formateurs`) — deux tests `[écart]` figent le
-     comportement au LOT 33 ; correctif minimal identifié (état initial
-     complet), en attente de feu vert pour un lot correctif ;
+   - ~~§10.13 crash de la carte de création de `ChargesEnseignants` quand
+     les référentiels échouent ou répondent après l'occupation (état
+     initial `options` sans clé `formateurs`)~~ **corrigé au LOT 34** (état
+     initial complet ; les deux tests `[écart]` du LOT 33 sont devenus des
+     régressions) ;
    - ~~§10.10 boucle de rechargement sur échec de chargement (valeur de contexte
      Toast non mémoïsée)~~ **corrigé au LOT 13** (mémoïsation de la valeur du
      `ToastContext.Provider`, 4 régressions) — ne reste ouvert qu'au titre d'un

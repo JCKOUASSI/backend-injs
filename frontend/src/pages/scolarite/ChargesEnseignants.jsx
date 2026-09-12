@@ -21,7 +21,14 @@ export default function ChargesEnseignants() {
     ref_formation_id: '', niveau_id: '', semestre_id: '', ecue_id: '',
     groupe_id: '', enseignant_id: '', type_enseignement: 'CM', volume_horaire: '',
   })
-  const [options, setOptions] = useState({ formations: [], niveaux: [], semestres: [], ecues: [], groupes: [] })
+  // §10.13 (LOT 34) : l'état initial doit déclarer TOUTES les clés lues au
+  // rendu (dont `formateurs` et `annees`, peuplées après coup) ; sinon, si le
+  // chargement des référentiels échoue (ou répond après l'occupation), la
+  // carte de création appelle `.map()` sur `undefined` et toute la page
+  // crashe au lieu d'afficher des sélecteurs vides.
+  const [options, setOptions] = useState({
+    annees: [], formateurs: [], formations: [], niveaux: [], semestres: [], ecues: [], groupes: [],
+  })
 
   // §10.8 (LOT 7) : ce chargement de l'année courante existait mais n'était
   // jamais appelé : `annee` restait à null et toute la page (occupation,
