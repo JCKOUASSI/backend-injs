@@ -68,12 +68,14 @@ function makeApiMock() {
     return { data: raw, status: route.status ?? 200 }
   }
 
-  const resolve = (path) => {
+  const resolve = async (path) => {
     if (path.split('?')[0] === '/auth/me/' && meUser) return ok(meUser)
     const route = matchRoute(path)
     if (route) {
       const { data, status } = produce(route, path)
-      return ok(data, status)
+      // Les fonctions de route peuvent renvoyer une promesse (utile pour
+      // figer un état de chargement via un « deferred » dans les tests).
+      return ok(await data, await status)
     }
     return ok(safeData())
   }
