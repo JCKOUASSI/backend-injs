@@ -53,9 +53,14 @@
 > §10.11 sont traités — champs **quota** à la création de campagne (valeurs
 > numérisées dans le payload), et **masquage de la saisie de notes et des
 > actions de classement sur campagne fermée** ; les tests `[écart]` deviennent
-> des tests de régression).
+> des tests de régression), puis au **[LOT 18]** (approfondissement du gros
+> écran `ModuleDetail` : inscription/retrait des étudiants, assignation/retrait
+> des enseignants, édition du module, assignation du superviseur, exports
+> PDF/Excel de séance et du module ; un **bug bloquant §10.12** est révélé — la
+> modale d'assignation d'un enseignant plante dès qu'une ligne s'affiche —
+> et laissé non corrigé en attente de feu vert).
 > Les LOT 4 à 7, 13 et 17 sont les lots qui touchent la logique applicative,
-> sur feu vert explicite ; les LOT 8 à 12 et 14 à 16 sont des lots de tests
+> sur feu vert explicite ; les LOT 8 à 12, 14, 16 et 18 sont des lots de tests
 > purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
@@ -274,7 +279,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (36 fichiers, 622 tests)
+### 6.2 Fichiers de test colocalisés (37 fichiers, 641 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -324,7 +329,8 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/NotesModule.test.jsx` | page | **20 tests (LOT 14), saisie des notes** (chaînon pédagogie → jury) : chargement module + grille (colonnes, barèmes, notes pré-remplies, critères seuil/présence, mention/moyenne/admission calculés, « saisi par »), recherche/filtre, état vide ; **saisie en direct** (mention normalisée /20, moyenne, bandeau « modifications non sauvegardées », note hors plage **0–20**, observations, navigation clavier **Entrée → champ suivant**) ; **enregistrement en bloc** `POST …/notes/bulk/` avec le payload `{notes, synthèses}` (mention calculée, cellules vides exclues), réponse partiellement en erreur (toast d'avertissement), échec (la saisie est conservée) ; **colonnes dynamiques** (ajout `POST …/notes/colonnes/`, libellé vide refusé, suppression `DELETE` avec confirmation et impossible à 1 colonne) ; **fiches PDF** module/individuelle (`getBlob`), confirmation si saisie non enregistrée, erreur de génération ; liens Décisions/Retour ; une régression §10.10 (une seule requête sur échec de chargement). Couvre **97,6 % des lignes / 92 % des fonctions**. |
 | `src/pages/Rattrapages.test.jsx` | page | **18 tests (LOT 15), rattrapages de présence** : liste avec badges de statut/cohorte et **filtres débordancés** (`statut`, `q` vérifiés en query) ; états erreur/vide ; **lecture seule** pour un rôle hors `PRESENCE_ACTION_ROLES` (DIRECTION) ; **création** via recherche d'étudiant puis **sélection multiple de séances** (recherche ciblée `participant=`, séance « déjà inscrit » verrouillée, pastille ajout/retrait), mode **module entier** (ajout de toutes ses séances, module déjà fait verrouillé), motif, case « forcer la présence », validation sans étudiant/séance, **payload** `{participant_id, seance_rattrapage_ids, motif, generer_presence}` vérifié, toast créés/réactivés/ignorés, erreur serveur gardée dans la modale ; **génération de pointage** (`POST …/generer-presence/`) et **annulation** via `ConfirmModal` (avec/sans pointage → `supprimer_pointage`, refus = aucun appel), actions absentes sur un rattrapage annulé, cas d'erreur des deux écritures. Couvre **97,3 % des lignes / 86 % de branches** (le résidu est du filtrage défensif inatteignable via l'UI). |
 | `src/pages/FicheAuditeur.test.jsx` | page | **8 tests (LOT 15), fiche de suivi d'un auditeur** : synthèse (formation, moyenne, classement, décision finale), suivi par module (heures présence/prevues, taux, moyenne, épreuves), état « aucun module », tirets des champs absents, erreur de chargement → « fiche introuvable », **exports PDF et Excel** (`getBlob`), nom de fichier par défaut, erreur d'export. Couvre **100 % des lignes / 100 % des fonctions**. |
-| `src/pages/ModuleDetail.test.jsx` | page | **15 tests (LOT 16), émargement — onglets Séances et Présences de `ModuleDetail`**. Séances : badges de statut lus sur `en_cours`/`terminee`, compteurs d'onglets ; **démarrage** (`POST …/sessions/:id/start/` via `ConfirmModal`, toast + rechargement) et **annulation sans appel** ; **fin** (`stop/`), **suppression** (`DELETE …/delete/`, annulation puis confirmation), erreur backend (toast du `detail`), **création** (`POST …/sessions/new/` avec les 4 champs). **Habilitations** : un ENCADRANT peut démarrer mais pas créer/supprimer, la DIRECTION est strictement en lecture (pas de forçage). Présences : les **5 cartes de stats** (attendus = étudiants+enseignants+encadrants, en salle, présents, absents, taux), date sans pointage = tout le monde absent et message explicite ; **forçage unitaire** d'un étudiant absent (`POST …/force-pointage/` avec `{personne_id, type_personne, action:'ENTREE', motif, module_id, date_journee}`, bouton désactivé sans motif, toast du détail, fermeture) ; **badgeage en masse** toutes séances (motif obligatoire, `POST …/force-badgeage-étudiants-bulk/`, agrégat `sessions` en toast, fermeture), sur une séance précise (`session_id` transmis), erreur gardée dans la modale. Couvre **51,8 % des lignes / 62,9 % de branches** de la page (les onglets info/étudiants/enseignants, les éditions, la modale QR et les exports feuille restent au backlog). |
+| `src/pages/ModuleDetail.test.jsx` | page | **15 tests (LOT 16), émargement — onglets Séances et Présences de `ModuleDetail`**. Séances : badges de statut lus sur `en_cours`/`terminee`, compteurs d'onglets ; **démarrage** (`POST …/sessions/:id/start/` via `ConfirmModal`, toast + rechargement) et **annulation sans appel** ; **fin** (`stop/`), **suppression** (`DELETE …/delete/`, annulation puis confirmation), erreur backend (toast du `detail`), **création** (`POST …/sessions/new/` avec les 4 champs). **Habilitations** : un ENCADRANT peut démarrer mais pas créer/supprimer, la DIRECTION est strictement en lecture (pas de forçage). Présences : les **5 cartes de stats** (attendus = étudiants+enseignants+encadrants, en salle, présents, absents, taux), date sans pointage = tout le monde absent et message explicite ; **forçage unitaire** d'un étudiant absent (`POST …/force-pointage/` avec `{personne_id, type_personne, action:'ENTREE', motif, module_id, date_journee}`, bouton désactivé sans motif, toast du détail, fermeture) ; **badgeage en masse** toutes séances (motif obligatoire, `POST …/force-badgeage-étudiants-bulk/`, agrégat `sessions` en toast, fermeture), sur une séance précise (`session_id` transmis), erreur gardée dans la modale. **Complété au LOT 18 (31 tests au total)** : onglet Étudiants (liste + recherche débordancée 400 ms, **inscription via picker** avec exclusion des déjà inscrits, message d'erreur en modale, **retrait via ConfirmModal**, lecture seule DIRECTION), onglet Enseignants (liste, **retrait confirmé**, et deux tests autour du picker — dont le test `[écart §10.12]` qui fige la panne), onglet Informations (**édition du module PATCH**, erreur backend, **assignation/retrait du superviseur** encadrant, absence des boutons en DIRECTION), et **exports PDF/Excel** (`getBlob` module et séance avec nom de fichier dérivé, erreur notifiée). Porte la page à **88,3 % de lignes / 66,1 % de branches / 56,3 % de fonctions** (restent la modale QR, l'archivage `TripleConfirmModal`, la pagination serveur des pickers). |
+| `src/components/formateurs/FormateurAssignPickerItem.test.jsx` | composant | **3 tests (LOT 18)** : rendu nom/prénom/spécialité, clic → `onAssign(id)` exact, gating conflit d'emploi du temps (le message remplace le bouton, ligne grisée), spécialité absente. Teste le contrat déclaré par le composant (prop `formateur`) — le défaut de câblage §10.12 est documenté à part. **100 % de lignes / branches / fonctions**. |
 | `src/pages/scolarite/campagnesCompletion.test.jsx` | page | **19 tests (LOT 16, complétés au LOT 17 §10.11), campagnes d'admission**. `Campagnes` : **création en brouillon** (formulaire — sélecteurs année/formation requis, dates, **champs quota d'admissibles/d'admis transmis en nombres**, quotas vides → `undefined`, réinitialisation + rechargement), échec serveur (formulaire conservé), **les 4 transitions restantes** du workflow (Suspendre sans confirmation, Clôturer avec confirmation, Réouvrir, Archiver ; annulation = aucun appel), lecture seule DIRECTION (référentiels non chargés). `CampagneDetail` : rendu (compteurs, quota, lignes d'épreuves verrouillées, tableau du classement et ses badges, épreuve verrouillée exclue du sélecteur de note, candidatures des autres campagnes filtrées), **ajout d'épreuve** (POST typé avec/sans salle, valeurs par défaut, reset, erreur JSON conservée), **génération des convocations** (confirm annulée puis acceptée), **verrouillage** (confirm d'irréversibilité, échec notifié), boutons absents sur épreuve verrouillée, **calcul du classement sans confirmation** puis **publication avec confirmation**, campagne clôturée (formulaire d'épreuve masqué) et les **régressions §10.11 (LOT 17)** : la carte de saisie de notes et les boutons de calcul/publication sont masqués sur campagne **clôturée comme annulée** (le classement reste consultable), DIRECTION en lecture seule. Porte `Campagnes.jsx` à **99,4 % de lignes / 100 % de fonctions** et `CampagneDetail.jsx` à **98,8 % / 100 %**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
@@ -356,7 +362,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 17 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 18 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -372,7 +378,8 @@ Mesure après le LOT 17 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/NotesModule.jsx` (LOT 14) | **98 %** | 98 % | **92 %** | **84 %** |
 | `pages/Rattrapages.jsx` (LOT 15) | **97 %** | 97 % | **77 %** | **86 %** |
 | `pages/FicheAuditeur.jsx` (LOT 15) | **100 %** | **100 %** | **100 %** | **83 %** |
-| `pages/ModuleDetail.jsx` (LOT 16) | **52 %** | 52 % | **33 %** | **63 %** |
+| `pages/ModuleDetail.jsx` (LOT 16/18) | **88 %** | 88 % | **56 %** | **66 %** |
+| `components/formateurs/FormateurAssignPickerItem.jsx` (LOT 18) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/Campagnes.jsx` (LOT 16/17) | **99 %** | 99 % | **100 %** | **89 %** |
 | `pages/scolarite/CampagneDetail.jsx` (LOT 16/17) | **99 %** | 99 % | **100 %** | **89 %** |
 | `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
@@ -384,7 +391,7 @@ Mesure après le LOT 17 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier) | **82 %** | 82 % | **56 %** | **77 %** |
-| **Global `src/` (toutes zones)** | **45,3 %** | **45,3 %** | **37,8 %** | **69,7 %** |
+| **Global `src/` (toutes zones)** | **47,4 %** | **47,4 %** | **40,0 %** | **70,0 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -392,11 +399,12 @@ Mesure après le LOT 17 (V8, `npm run test:coverage`), sur les zones ciblées :
 > de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
 > (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → 510 (LOT 11) →
 > 539 (LOT 12) → 542 (LOT 13) → 562 (LOT 14) → 588 (LOT 15) →
-> 620 (LOT 16) → **622 (LOT 17)** ; lignes couvertes globalement 35,3 %
-> (LOT 5) → … → 41,6 % (LOT 14) → 43,1 % (LOT 15) → 45,3 % (LOT 16) →
-> **45,3 % (LOT 17)** (fonctions **37,8 %**, branches **69,7 %** ; le LOT 17
-> corrige la logique et transforme des tests `[écart]` en régressions, sans
-> nouveau fichier).
+> 620 (LOT 16) → 622 (LOT 17) → **641 (LOT 18)** ; lignes couvertes
+> globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) → 43,1 % (LOT 15) →
+> 45,3 % (LOT 16/17) → **47,4 % (LOT 18)** (fonctions **40,0 %**, branches
+> **70,0 %**). Le LOT 17 corrige la logique (transformation de tests
+> `[écart]` en régressions, sans nouveau fichier) ; le LOT 18 est un lot de
+> tests purs qui révèle le bug bloquant §10.12 (non corrigé à ce lot).
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
 > **invisibles car en panne** (§10.8) ; le LOT 8 y exécutait les actions au
@@ -422,11 +430,17 @@ Mesure après le LOT 17 (V8, `npm run test:coverage`), sur les zones ciblées :
 > calcul et publication du classement) ; le LOT 17, sur feu vert explicite,
 > **corrige les deux constats §10.11** relevés au passage (champs quota à la
 > création, et saisie de notes/actions de classement interdites sur campagne
-> fermée) avec des régressions dédiées. Les autres onglets de `ModuleDetail`
-> et son miroir `FormationDetail` restent au backlog. Le service
-> `services/scolarite.js` reste à **100 % de lignes** et le dossier
-> `pages/scolarite/` se maintient à **84 % de lignes / 67 % de fonctions /
-> 79 % de branches**.
+> fermée) avec des régressions dédiées. Le LOT 18 approfondit ensuite le gros
+> écran d'émargement `ModuleDetail` (**51,8 → 88,3 % de lignes** :
+> inscriptions/retraits d'étudiants, assignations d'enseignants, édition du
+> module et du superviseur, exports de feuille) et porte le composant
+> `FormateurAssignPickerItem` à **100 %**, tout en révélant le bug bloquant
+> §10.12 (modale d'assignation d'un enseignant en panne) laissé non corrigé.
+> Les zones restantes de cet écran sont la modale QR, l'archivage
+> `TripleConfirmModal` et la pagination serveur des pickers ; son miroir
+> `FormationDetail` reste au backlog. Le service `services/scolarite.js`
+> reste à **100 % de lignes** et le dossier `pages/scolarite/` se maintient à
+> **84 % de lignes / 67 % de fonctions / 79 % de branches**.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -532,8 +546,8 @@ Conformément aux contraintes, les lots 0 à 3 n'ont **jamais** modifié la
 logique applicative : les écarts y étaient seulement constatés et tracés. Les
 **LOT 4 et 5**, sur feu vert explicite, sont des lots correctifs (§10.4, §10.5,
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10) et
-le **LOT 17 (§10.11)**. Les points encore ouverts sont ci-dessous (§10.1 et
-§10.9).
+le **LOT 17 (§10.11)**. Les points encore ouverts sont ci-dessous (§10.1,
+§10.9 et le bug bloquant §10.12).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -856,6 +870,46 @@ Le test `[écart]` du LOT 16 a été remplacé par ces régressions ; le lint
 reste vierge et les deux écrans se maintiennent à **99 % de lignes / 100 % de
 fonctions**.
 
+### 10.12 BUG signalé au LOT 18 — la modale « Assigner un enseignant » de ModuleDetail plante
+
+En testant l'assignation d'un enseignant à un module (onglet *Enseignants* →
+bouton *Assigner*), les tests ont révélé un **bug bloquant de câblage de
+propriété** :
+
+- la page `ModuleDetail.jsx` rend
+  `<FormateurAssignPickerItem enseignant={f} onAssign={…} />` (prop
+  **`enseignant`**) ;
+- or le composant `components/formateurs/FormateurAssignPickerItem.jsx`
+  déstructure **`formateur`** : `export default function FormateurAssignPickerItem({ formateur, onAssign })`.
+
+`formateur` vaut donc `undefined`, et la première ligne rendue
+(`const { nom } = formateur`) lève
+`TypeError: Cannot destructure property 'nom' of 'formateur' as it is
+undefined`. La modale s'ouvre (le chargement débouncé de 300 ms renvoie les
+enseignants disponibles), puis **la page entière bascule sur l'erreur React**
+dès qu'une ligne est renvoyée — avec une liste vide, la modale affiche
+simplement « Aucun enseignant trouvé » et le bug est invisible. Le smoke ne
+l'ouvrait jamais, d'où la discrétion du défaut.
+
+**Conséquence fonctionnelle** : il est impossible d'assigner un enseignant à
+un module depuis l'interface web (le retrait, lui, fonctionne). Le backend
+n'est pas en cause (l'endpoint `…/formateurs/add/` est prêt et le handler
+`handleAddFormateur` correct).
+
+Le comportement est figé par un **test `[écart §10.12]`** dans
+`ModuleDetail.test.jsx` (ouverture de la modale avec une ligne → la
+`TestErrorBoundary` capture l'erreur mentionnant `formateur`, aucune
+écriture émise), et le contrat voulu du composant est testé à part dans
+`FormateurAssignPickerItem.test.jsx` (**100 %**) en lui passant la prop
+`formateur`.
+
+**Correctif minimal proposé (une ligne, non appliqué en l'absence de feu
+vert)** : renommer la prop côté composant (`enseignant`) pour l'aligner sur
+l'unique appelant, ou passer `formateur={f}` dans `ModuleDetail.jsx` ;
+transformer alors le test `[écart]` en test d'assignation bout-en-bout
+(happy path POST `…/formateurs/add/`, message de conflit d'emploi du temps
+dans la modale, gating du bouton déjà couverts au niveau composant).
+
 ---
 
 ## 11. Couverture des pages — ce qui reste à faire
@@ -874,7 +928,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 17 :
+**Aucune page n'est dépourvue de test.** État après le LOT 18 :
 
 - dix écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
@@ -885,8 +939,10 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   colonnes, fiches PDF), `Rattrapages.jsx` (**97,3 % de lignes**, LOT 15 —
   création inter-cohortes, génération de pointage, annulation),
   `FicheAuditeur.jsx` (**100 % de lignes/fonctions**, LOT 15 — fiche de suivi
-  et exports) et `ModuleDetail.jsx` (**51,8 % de lignes / 62,9 % de branches**,
-  LOT 16 — émargement : onglets Séances et Présences) ;
+  et exports) et `ModuleDetail.jsx` (**88,3 % de lignes / 66,1 % de branches /
+  56,3 % de fonctions**, LOTs 16 et 18 — émargement : séances/présences,
+  étudiants, enseignants, édition, superviseur, exports ; reste la modale QR
+  et l'archivage) ;
 - cinq écrans Scolarité (`Campagnes`, `CampagneDetail`, `Equivalences`,
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
@@ -918,13 +974,20 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   pointage, habilitations) et la fiche de suivi d'un auditeur
   (`FicheAuditeur.jsx`, 8 tests, exports PDF/Excel) ;
 - au LOT 16, l'**émargement en temps réel** du gros écran `ModuleDetail.jsx`
-  (15 tests) est couvert sur ses deux onglets cœur, **Séances** (démarrer /
+  est couvert sur ses deux onglets cœur, **Séances** (démarrer /
   terminer / supprimer / créer, chaque écriture destructrice passant par la
   `ConfirmModal` globale, toasts et rechargement) et **Présences** (les cinq
   cartes de statistiques calculées à partir des pointages du jour et de la
   liste des attendus, forçage de pointage **unitaire** et **badgeage en masse**
   80–95 % avec motif obligatoire, filtres date/séance, trois niveaux
   d'habilitation ENCADRANT / secrétariat / DIRECTION) ;
+- au LOT 18, le même écran est **approfondi à 88,3 % de lignes** (31 tests) :
+  onglet Étudiants (recherche débordancée, inscription via picker, retrait
+  confirmé), onglet Enseignants (retrait, picker — avec le bug §10.12
+  signalé), onglet Informations (édition du module PATCH, assignation et
+  retrait du superviseur encadrant), exports PDF/Excel du module et d'une
+  séance (`getBlob`, nom de fichier dérivé) ; le composant
+  `FormateurAssignPickerItem` est testé unitairement à **100 %** ;
 - le même lot **achève la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -939,7 +1002,8 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
   et les hooks associés (`useClientPagination`, `usePickerPagination`,
   `useListReturn`, `usePersistedListQuery`) ;
-- composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
+- composants réutilisables testés : `Pagination`, `ConfirmModal` et
+  `formateurs/FormateurAssignPickerItem` (**100 %**, LOT 18) ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
 - les **31 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
@@ -980,16 +1044,23 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    `reinscrire` / `createEvenement` du service existent et sont déjà couvertes
    à 100 % dans `services/scolarite.test.js`) ; elles ne relèvent donc pas
    encore d'un test de page. Dans le domaine présence qui écrit,
-   **l'émargement de `ModuleDetail` est couvert au LOT 16** sur ses onglets
-   Séances et Présences (démarrage/fin de séance, `force-pointage`, badgeage
-   en masse) ; **restent** ses autres onglets et écritures (modales
-   pickers d'inscription/assignation, édition du module et du superviseur,
-   archivage, exports de feuille, la **modale QR**), l'écran miroir
-   **`FormationDetail`**, et le **CRUD des participants** (`Participants`),
-   puis les **finances étudiantes**, les **référentiels**, et les gros
-   volumes internes `Statistiques` et `Users` (création de secrétariat à la
-   volée) ;
+   **l'émargement de `ModuleDetail` est couvert aux LOTs 16 et 18 à
+   88,3 % de lignes** (cycle de vie des séances, `force-pointage`, badgeage
+   en masse, inscriptions/retraits d'étudiants, édition, superviseur,
+   exports) ; **restent** la **modale QR** (`QRCodeModal`, lib `qrcode`),
+   l'**archivage** (`TripleConfirmModal`), la pagination serveur des pickers
+   et — bloquée par le bug §10.12 — l'**assignation d'un enseignant au clic**
+   (test `[écart]` en place), puis l'écran miroir **`FormationDetail`**, le
+   **CRUD des participants** (`Participants`), les **finances étudiantes**,
+   les **référentiels**, et les gros volumes internes `Statistiques` et
+   `Users` (création de secrétariat à la volée) ;
 4. écarts encore ouverts, dans des lots dédiés :
+   - §10.12 **bug bloquant** révélé au LOT 18 : la modale d'**assignation d'un
+     enseignant** dans `ModuleDetail` plante dès qu'une ligne est renvoyée
+     (prop `enseignant` passée par la page, `formateur` attendue par le
+     composant) — correctif d'une ligne proposé en §10.12, en attente de feu
+     vert, puis transformation du test `[écart]` en parcours d'assignation
+     bout-en-bout ;
    - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
      route protégée, gestion au login et après `refreshUser`) — en attente d'un
      choix produit (blocage total ou lecture seule) ;
