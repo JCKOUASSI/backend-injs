@@ -20,7 +20,6 @@ import {
   saveFinanceExportMontants,
   saveFinancePeriod,
 } from '../utils/financePeriod'
-import { useSecretariats } from '../hooks/useSecretariats'
 import {
   buildFormateursListSearchParams,
   LIST_STORAGE_KEYS,
@@ -67,14 +66,12 @@ export default function Formateurs() {
   const [exportingFiche, setExportingFiche] = useState('')
   const { showToast } = useToast()
 
-  const { data: secretariats = [] } = useSecretariats()
   const [refModules, setRefModules] = useState([])
   const [financeDetail, setFinanceDetail] = useState(null)
   const [financeDetailLoading, setFinanceDetailLoading] = useState(false)
   const [financeDetailTab, setFinanceDetailTab] = useState('statistiques')
   const [exportAfficherMontants, setExportAfficherMontants] = useState(() => loadFinanceExportMontants(true))
   const [exportingSynthese, setExportingSynthese] = useState(false)
-  const [exportingEncadrants, setExportingEncadrants] = useState(false)
   const [financePeriod, setFinancePeriod] = useState(() => resolveFinancePeriod())
   const [financePeriodeInfo, setFinancePeriodeInfo] = useState(null)
 
@@ -255,25 +252,6 @@ export default function Formateurs() {
       showToast(err.response?.data?.detail || 'Erreur lors de l\'export de la fiche', 'error')
     } finally {
       setExportingFiche('')
-    }
-  }
-
-  const exportFinanceEncadrants = async (format) => {
-    const ext = format === 'pdf' ? 'pdf' : 'xlsx'
-    const qs = buildFinanceQuery(appliedFinancePeriod).toString()
-    const base = format === 'pdf'
-      ? '/exports/finance/encadrants/pdf/'
-      : '/exports/finance/encadrants/excel/'
-    const path = qs ? `${base}?${qs}` : base
-    setExportingEncadrants(true)
-    try {
-      const { blob, fileName } = await api.getBlob(path)
-      downloadBlob(blob, fileName || `liste_encadrants.${ext}`)
-      showToast(`Liste encadrants exportée (${ext.toUpperCase()})`)
-    } catch (err) {
-      showToast(err.response?.data?.detail || 'Erreur export encadrants', 'error')
-    } finally {
-      setExportingEncadrants(false)
     }
   }
 

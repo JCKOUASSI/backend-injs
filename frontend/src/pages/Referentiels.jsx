@@ -430,7 +430,6 @@ export default function Referentiels() {
 
   const renderForm = () => {
     const f = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }))
-    const check = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.checked }))
 
     if (tab === 'formations') return (
       <div className="form-group">

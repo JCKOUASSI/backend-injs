@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import api from '../../services/api'
-import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
 /** Lot L1/L3 — espace étudiant minimal : fiche, notes, attestations (L4). */
 export default function MonEspace() {
-  const { user } = useAuth()
   const toast = useToast()
   const [fiche, setFiche] = useState(null)
   const [chargement, setChargement] = useState(true)

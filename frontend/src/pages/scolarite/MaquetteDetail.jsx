@@ -119,6 +119,7 @@ export default function MaquetteDetail() {
     } catch (err) {
       toast.showToast(err.response?.data?.error || 'Suppression impossible.', 'error')
     }
+  }
 
   if (!maquette) {
     return <div className="container-fluid py-4"><div className="spinner-border" /></div>
@@ -284,5 +285,3 @@ export default function MaquetteDetail() {
     </div>
   )
 }
-
-  }

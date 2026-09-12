@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
-import { useAuth } from '../context/AuthContext'
 import { useReferentiels } from '../hooks/useReferentiels'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import Pagination from '../components/Pagination'
@@ -39,7 +38,7 @@ function StatutBar({ brouillon, publie, ferme }) {
         { label: 'Brouillon', val: brouillon, color: '#e69700', bg: '#fff8e0' },
         { label: 'Publié',    val: publie,    color: '#125a99', bg: '#e8eff5' },
         { label: 'Fermé',     val: ferme,     color: '#616161', bg: '#f5f5f5' },
-      ].map(({ label, val, color, bg }) => (
+      ].map(({ label, val, color }) => (
         <div key={label}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '3px' }}>
             <span style={{ fontWeight: 600, color }}>{label}</span>
@@ -56,7 +55,6 @@ function StatutBar({ brouillon, publie, ferme }) {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function EvaluationDashboard() {
-  const { user } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()

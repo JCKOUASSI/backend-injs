@@ -986,34 +986,6 @@ function StackedPresenceChart({ data, height = 160 }) {
   )
 }
 
-function Line({ data, labelKey, valueKey, color='#2277C1', height=130 }) {
-  if (!data?.length) return <Empty />
-  const max = Math.max(...data.map(d=>d[valueKey]),1)
-  const w = Math.max(320, data.length*50+60)
-  const pts = data.map((d,i) => {
-    const x = 30+i*((w-60)/(Math.max(data.length-1,1)))
-    const y = height-4 - Math.round((d[valueKey]/max)*(height-24))
-    return {x,y,...d}
-  })
-  const path = pts.map((p,i)=>`${i===0?'M':'L'}${p.x} ${p.y}`).join(' ')
-  return (
-    <div style={{overflowX:'auto'}}>
-      <svg width={w} height={height+32} style={{display:'block'}}>
-        <polyline points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round"/>
-        {pts.map((p,i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r={4} fill={color}/>
-            <text x={p.x} y={p.y-8} textAnchor="middle" fontSize={9} fill="#1e293b">{p[valueKey]}</text>
-            <text x={p.x} y={height+14} textAnchor="middle" fontSize={8.5} fill="#64748b">
-              {String(p[labelKey]).slice(0,7)}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  )
-}
-
 function TauxBar({ value, small }) {
   const col = value>=70 ? '#2277C1' : value>=40 ? '#F5B100' : '#C62828'
   return (
@@ -1884,7 +1856,7 @@ export default function Statistiques() {
     </div>
   )
 
-  const { kpis, pedagogiques, admin_operationnel: adm, historique, alertes, alertes_overview, formations_liste, secretariats_liste, filtre_actif } = data || {}
+  const { kpis, pedagogiques, admin_operationnel: adm, historique, alertes, alertes_overview, formations_liste, secretariats_liste } = data || {}
   const secretariatScopeLabel = (secretariats_liste || []).find(
     s => String(s.id) === String(effectiveSecretariatId),
   )?.nom || user?.secretariat_nom || 'Mon secrétariat'
@@ -3698,12 +3670,6 @@ const FAC_SOUS_ONGLETS = [
   { id: 'modules',         label: 'État des modules',   icon: 'bi-check2-square' },
 ]
 
-function fmtPct4(n) {
-  if (n == null) return '—'
-  const v = Number(n)
-  return `${(v * 100).toFixed(2).replace('.', ',')} %`
-}
-
 function fmtVH(n) {
   if (n == null) return '—'
   const v = Number(n)
@@ -4121,7 +4087,6 @@ function BilanFACModulesTable({ modules }) {
     <div>
       {grades.map(grade => {
         const mods = modules.filter(m => m.grade === grade)
-        const groupes = [...new Set(mods.map(m => m.groupe).filter(Boolean))].sort()
         return (
           <div key={grade} style={{ marginBottom: '2rem' }}>
             <div style={{
@@ -4660,7 +4625,7 @@ function PedagogiqueEnsemblePanel({ pedagogiques, pedEntries, onSelect, auditeur
                     </tr>
                   </thead>
                   <tbody>
-                    {ped.taux_par_formation.map((r, i) => {
+                    {ped.taux_par_formation.map((r) => {
                       const entryId = `formation-${r.formation_id}`
                       return (
                         <tr

@@ -105,6 +105,7 @@ export default function CampagneDetail() {
     } finally {
       setEnCours(false)
     }
+  }
 
   const campagneFermee = ['CLOTUREE', 'ANNULEE', 'ARCHIVEE'].includes(campagne.statut)
 
@@ -260,4 +261,3 @@ export default function CampagneDetail() {
     </div>
   )
 }
-  }

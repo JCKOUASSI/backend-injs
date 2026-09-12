@@ -121,6 +121,7 @@ export default function Equivalences() {
     } finally {
       setEnCours(false)
     }
+  }
 
   return (
     <div className="container-fluid py-4">
@@ -272,4 +273,3 @@ export default function Equivalences() {
     </div>
   )
 }
-  }

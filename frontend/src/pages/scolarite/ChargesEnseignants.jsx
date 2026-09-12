@@ -4,23 +4,12 @@ import { canActScolarite } from '../../utils/roles'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
-const COULEURS = {
-  MODULE_SANS_ENSEIGNANT: 'danger',
-  VOLUME_NON_COUVERT: 'warning',
-  DOUBLE_AFFECTATION: 'warning',
-  CONFLIT_DISPONIBILITE: 'danger',
-  MAQUETTE_INCOMPATIBLE: 'danger',
-  SURCHARGE: 'danger',
-}
-
 export default function ChargesEnseignants() {
   const { user } = useAuth()
   const toast = useToast()
   const peutAgir = canActScolarite(user)
 
   const [annee, setAnnee] = useState(null)
-  const [annees, setAnnees] = useState([])
-  const [enseignants, setEnseignants] = useState([])
   const [enseignantChoisi, setEnseignantChoisi] = useState('')
   const [charge, setCharge] = useState(null)
   const [occupation, setOccupation] = useState([])
@@ -34,6 +23,9 @@ export default function ChargesEnseignants() {
   })
   const [options, setOptions] = useState({ formations: [], niveaux: [], semestres: [], ecues: [], groupes: [] })
 
+  // §10.8 (LOT 7) : ce chargement de l'année courante existait mais n'était
+  // jamais appelé : `annee` restait à null et toute la page (occupation,
+  // anomalies, création) restait inactive. Câblé sur un effet de montage.
   const chargerAnnee = useCallback(async () => {
     try {
       const res = await api.get('/scolarite/annee-courante/')
@@ -76,6 +68,12 @@ export default function ChargesEnseignants() {
       }))
       .catch(() => toast.showToast('Chargement des référentiels impossible.', 'error'))
   }, [peutAgir, toast])
+
+  // Au montage, résoudre l'année académique courante ; l'effet suivant
+  // ([annee, chargerTout]) charge alors l'occupation et les anomalies.
+  useEffect(() => {
+    chargerAnnee()
+  }, [chargerAnnee])
 
   useEffect(() => {
     if (!annee) return

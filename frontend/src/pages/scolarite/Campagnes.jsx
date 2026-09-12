@@ -5,7 +5,6 @@ import { canActScolarite } from '../../utils/roles'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
-const STATUTS = ['', 'BROUILLON', 'PLANIFIEE', 'OUVERTE', 'SUSPENDUE', 'CLOTUREE', 'ANNULEE', 'ARCHIVEE']
 const BADGE_STATUT = {
   BROUILLON: 'secondary', PLANIFIEE: 'info', OUVERTE: 'success',
   SUSPENDUE: 'warning', CLOTUREE: 'dark', ANNULEE: 'danger', ARCHIVEE: 'dark',
@@ -82,6 +81,7 @@ export default function Campagnes() {
     } finally {
       setEnCours(false)
     }
+  }
 
   return (
     <div className="container-fluid py-4">
@@ -189,4 +189,3 @@ export default function Campagnes() {
     </div>
   )
 }
-  }

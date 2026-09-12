@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import TripleConfirmModal from '../components/TripleConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { formatDate } from '../utils/dates'
-import { fmtHeuresLabel, sommeSeancesHeures, sessionNumeroLabel, nextSessionNumeroForDate } from '../utils/duree'
+import { fmtHeuresLabel, sommeSeancesHeures, sessionNumeroLabel } from '../utils/duree'
 import { LIST_STORAGE_KEYS } from '../utils/listFilters'
 import { useListNavigationState, useListReturn } from '../hooks/useListReturn'
 import { useClientPagination, TABLE_PAGE_SIZE, PICKER_PAGE_SIZE } from '../hooks/useClientPagination'
@@ -423,8 +423,6 @@ export default function FormationDetail() {
     document.body.removeChild(a)
   }
 
-  const hasSeanceTerminee = sessions.some(s => s.terminee)
-
   const handleExport = async (type) => {
     try {
       const { blob } = await api.getBlob(`/exports/formation/${id}/${type}/`)
@@ -467,7 +465,7 @@ export default function FormationDetail() {
   }
   const handleStopSession = (sid, label) => {
     setConfirmDialog({
-      message: `Terminer la séance « ${label} » ?`,
+      message: `Terminer la séance «\u00A0${label}\u00A0» ?`,
       detail: 'Cette action est irréversible.',
       onConfirm: async () => {
         setStoppingSession(sid)

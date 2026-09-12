@@ -13,7 +13,7 @@ const TYPE_LABELS = { QCM: 'QCM', VRAI_FAUX: 'Vrai/Faux', OUVERTE: 'Ouverte' }
 const EMPTY_Q = { question: '', type_question: 'QCM', reponse_correcte: '', options: ['', '', '', ''], points: '1', ordre: '' }
 
 // ─── Vue auditeur ────────────────────────────────────────────
-function QuizPassage({ quiz, onDone }) {
+function QuizPassage({ quiz }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [answers, setAnswers] = useState({})
@@ -84,9 +84,8 @@ function QuizPassage({ quiz, onDone }) {
 }
 
 // ─── Vue staff : édition quiz + questions ───────────────────
-function QuizEdit({ quiz: initialQuiz, onRefresh }) {
+function QuizEdit({ quiz: initialQuiz }) {
   const { showToast } = useToast()
-  const navigate = useNavigate()
   const [quiz, setQuiz] = useState(initialQuiz)
   const [questions, setQuestions] = useState(initialQuiz.questions || [])
   const [showAdd, setShowAdd] = useState(false)

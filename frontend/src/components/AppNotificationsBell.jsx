@@ -112,7 +112,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
       await Promise.all(
         Object.entries(bySource)
           .filter(([, ids]) => ids.length > 0)
-          .map(([source, ids]) => api.patch(patchEndpoint(source), { tout: true })),
+          .map(([source]) => api.patch(patchEndpoint(source), { tout: true })),
       )
       setItems(prev => prev.map(n => ({ ...n, lu: true })))
       setNonLues(0)

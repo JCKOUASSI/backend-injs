@@ -3,14 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
-import { hasAppRole, canFilterDashboardBySecretariat, isSecretariatScopedRole } from '../utils/roles'
+import { canFilterDashboardBySecretariat, isSecretariatScopedRole } from '../utils/roles'
 import { formatDate } from '../utils/dates'
 import {
   appendPeriodToSearchParams,
   resolveFinancePeriod,
   saveFinancePeriod,
   isPeriodWhollyFuture,
-  currentTrimestreParts,
   financePeriodKey,
 } from '../utils/financePeriod'
 import {

@@ -38,7 +38,7 @@ function StarRating({ questionId, value, onChange }) {
 }
 
 function QuestionBlock({ question, answer, onChange }) {
-  const { type_question, intitule, choix, obligatoire } = question
+  const { type_question, choix } = question
 
   if (type_question === 'NOTE') {
     return (

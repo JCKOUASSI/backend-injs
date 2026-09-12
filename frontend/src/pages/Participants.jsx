@@ -6,7 +6,6 @@ import ConfirmModal from '../components/ConfirmModal'
 import { useReferentiels } from '../hooks/useReferentiels'
 import { useToast } from '../context/ToastContext'
 import { useDebounce } from '../hooks/useDebounce'
-import { formatDate } from '../utils/dates'
 import {
   buildParticipantsSearchParams,
   LIST_STORAGE_KEYS,
