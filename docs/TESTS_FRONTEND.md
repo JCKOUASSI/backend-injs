@@ -201,9 +201,31 @@
 > états vides et rendus minimaux des 8 onglets, le cycle des seuils d'alertes
 > (POST/PUT avec garde de rôle et échecs traités) et les exports Point
 > Journalier / Bilans. Aucun écart produit n'a été révélé par ce lot.
+> Le **[LOT 38b]** poursuit `Statistiques.jsx` par des **tests purs** sur la
+> vue « Bilans INJS » de l'onglet Rapports (**45 nouveaux tests**, fichier
+> porté de 52 à **97 tests** et de 64 % à **87 % de lignes**) : les **4
+> dimensions** (module / matière / catégorie / formation), l'ensemble des
+> filtres (année, mois, catégorie, module, matière via clé `r:`/`i:`,
+> formation, période, calendrier), la navigation liste ↔ détail (cache
+> `tableaux_complets` prioritaire sur `?detail=1`, bouton « Plein écran » /
+> « Voir tous les tableaux »), les garde-fous des bilans mal identifiés, les
+> 4 types de tableaux (`effectifs_module/matiere/categorie`,
+> `bilan_periode_formation` avec textarea justificatifs), les exports
+> `/bilans-export/` des 3 formats avec justificatifs, puis le **Bilan FAC**
+> complet : accordéon, périmètre `/bilan-fac/perimetre/` (tout coché,
+> chips grades/groupes, tout cocher/décocher, retrait des groupes d'un grade
+> décoché, héritage de la formation du filtre global), génération
+> `/bilan-fac/` (sous-ensembles `grades`/`groupes`, réinitialisation), les 4
+> sous-onglets (point global, volume horaire avec agrégation des groupes en
+> doublon et récapitulatif global, absents notoires, état des modules) et les
+> exports `/bilan-fac-export/` avec `meta` JSON des justificatifs/difficultés
+> par grade. **Un écart a été révélé et laissé non corrigé (§10.15)** : lors
+> de la fusion de deux lignes Point global d'un même grade, la clé erronée
+> `effectif_étudiants` (au lieu de `effectif_auditeurs`) empêche la sommation
+> des effectifs ; deux tests `[écart]` documentent le comportement actuel.
 > Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36 et 38a sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a et 38b sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -421,7 +443,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (49 fichiers, 1159 tests)
+### 6.2 Fichiers de test colocalisés (49 fichiers, 1204 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -486,7 +508,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/components/ParticipantDetailModal.test.jsx` | composant | **50 tests (LOTs 24 et 25), fenêtre de fiche participant — 98,8 % de lignes / 100 % de fonctions / 84 % de branches**. Rendu direct avec les props (modules/pointages/stats/`initialNotesFiche`) plutôt que par la page, le câblage parent étant déjà couvert par `Participants.test.jsx`. **LOT 24, lecture** : en-tête (pastilles Modules/Présences/Temps total/En cours/À vérifier, matricule optionnel, spinner et boutons désactivés pendant `loading`, fermeture Fermer/X/voile, clic interne sans fermeture), 4 cartes de statistiques et état « Aucune donnée disponible », 19 champs d'identité formatés (`formatDate`, badge sexe, tirets de repli), onglet Modules (méta grade/groupe/vague/site, dates et statut, heures effectuées/prévues et taux coloré, présence vs séances planifiées vs « Aucune séance », heures fractionnaires 1,5 h, volume contractuel, date d'inscription, **déploiement des séances** `GET /formations/:f/modules/:m/full/` avec association par `seance_numero` — Présent/En cours/Non badgé, cache : un seul GET, clic interne sans repli, échec silencieux → « Aucune séance planifiée »), onglet Notes (moyenne/mention/taux depuis `initialNotesFiche` sans GET redondant, lecture seule sans `canManageNotes`, module dont la moyenne est introuvable, **moteur de décision** ADMIS/AJOURNÉ 72,73 %/EXCLUSION/EN_ATTENTE, priorité à la décision backend avec totaux horaires et « Validée manuellement », titres multi-formations, **chargement paresseux** `GET /participant/:id/notes-fiche/` avec grand spinner puis données, toast d'échec, état vide), onglet Séances (groupes **triés par formation**, résumé heures/terminées/en cours, lignes avec horaires, entrée/sortie, durée, appareil tronqué, géolocalisation `±12m`, batterie, heartbeat, sorties géofence). **LOT 25, écritures** : activation du bouton Enregistrer après saisie, POST `…/modules/:m/notes/bulk/` avec le payload `{notes:[{participant_id,colonne_id,note}],syntheses:[{participant_id,mention,observations}]}` suivi du recalcul `POST /evaluations/formations/:f/decisions/recalculer/` puis du rechargement de la fiche et du toast, garde 0–20 (y compris négatif), tableau vide quand la moyenne est effacée, bouton désactivé sans modification ou sans `colonne_id`, réponse partielle (`0 enregistrement(s), 2 erreur(s)`), erreur de sauvegarde détaillée puis générique, échec de recalcul avalé sans masquer le succès, module sans formation (chemin `…/formations/null/…`, pas de recalcul) ; **recalcul manuel** (POST, rechargement, toast de succès, détail d'erreur, erreur générique, masqué en lecture seule) ; **exports relevé** PDF et Excel (`getBlob /participant/:id/notes-fiche/export/:fmt/`, clic d'ancre et révocation d'URL, détail d'erreur puis message générique). Les quelques lignes non couvertes sont du code défensif inatteignable par l'UI (objet de stats de repli, squelette par carte rendu impossible par le spinner englobant, rappel de seuil sans heures que les valeurs calculées à 0 rendent inaccessible). |
 | `src/components/formateurs/FormateurAssignPickerItem.test.jsx` | composant | **3 tests (LOT 18)** : rendu nom/prénom/spécialité, clic → `onAssign(id)` exact, gating conflit d'emploi du temps (le message remplace le bouton, ligne grisée), spécialité absente. Teste le contrat déclaré par le composant (prop `formateur`) ; le câblage de `ModuleDetail` aligné sur ce contrat au LOT 19 (§10.12) est testé dans `ModuleDetail.test.jsx`. **100 % de lignes / branches / fonctions**. |
 | `src/pages/scolarite/campagnesCompletion.test.jsx` | page | **19 tests (LOT 16, complétés au LOT 17 §10.11), campagnes d'admission**. `Campagnes` : **création en brouillon** (formulaire — sélecteurs année/formation requis, dates, **champs quota d'admissibles/d'admis transmis en nombres**, quotas vides → `undefined`, réinitialisation + rechargement), échec serveur (formulaire conservé), **les 4 transitions restantes** du workflow (Suspendre sans confirmation, Clôturer avec confirmation, Réouvrir, Archiver ; annulation = aucun appel), lecture seule DIRECTION (référentiels non chargés). `CampagneDetail` : rendu (compteurs, quota, lignes d'épreuves verrouillées, tableau du classement et ses badges, épreuve verrouillée exclue du sélecteur de note, candidatures des autres campagnes filtrées), **ajout d'épreuve** (POST typé avec/sans salle, valeurs par défaut, reset, erreur JSON conservée), **génération des convocations** (confirm annulée puis acceptée), **verrouillage** (confirm d'irréversibilité, échec notifié), boutons absents sur épreuve verrouillée, **calcul du classement sans confirmation** puis **publication avec confirmation**, campagne clôturée (formulaire d'épreuve masqué) et les **régressions §10.11 (LOT 17)** : la carte de saisie de notes et les boutons de calcul/publication sont masqués sur campagne **clôturée comme annulée** (le classement reste consultable), DIRECTION en lecture seule. Porte `Campagnes.jsx` à **99,4 % de lignes / 100 % de fonctions** et `CampagneDetail.jsx` à **98,8 % / 100 %**. |
-| `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. **LOT 38a (socle, +44 tests)** : les 8 onglets rendus et les **sections API par onglet** (`TAB_SECTIONS`), endpoint dédié `/statistiques/secretariats/`, ouverture directe `?rbView=workflow`, présence/absence du panneau de période par onglet ; **états de chargement et d'erreur** (spinner initial figé par promesse, écran d'erreur plein avec détail backend / message générique / bouton Réessayer qui répare, bandeau d'erreur non bloquant après chargement, indicateur « Actualisation… », erreur PJ dans l'état vide) ; **filtres d'en-tête** (peuplement formation via la méta et propagation `formation_id`, effacement des filtres, horodatage de mise à jour, sélecteur secrétariat activé/désactivé pour un encadrant selon le nombre de secrétariats) ; **filtre de période** (auto-apply d'un preset, période entièrement future + retour au trimestre courant, badge de période, message « aucune séance comptabilisable » et sa non-présence en preset « Tout ») ; **états vides et rendus minimaux** des onglets PJ, bilans/workflow, historique vide et avec données (navigation mensuelle), vue d'ensemble (KPI + navigation de section), administratif, pédagogique, comparatif secrétariats avec chargement du détail ; **alertes/seuils** (invite d'initialisation INJS, boutons masqués pour rôle non validant, POST d'init puis re-fetch, alerte déclenchée et compteurs de synthèse, édition + PUT du corps des seuils, échecs POST/PUT en `window.alert`) ; **exports** Point Journalier et Bilans (boutons désactivés à vide, blob XLSX annuel et PDF du tableau sélectionné avec `jour`/`formation_id`/`categorie`, échecs en alerte sans planter, état d'export puis réactivation). Le mock d'API de test accepte désormais des fonctions de route **asynchrones** (await de la réponse), ce qui permet de figer les états de chargement. Aucun écart produit révélé par ce lot de tests purs. |
+| `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. **LOT 38a (socle, +44 tests)** : les 8 onglets rendus et les **sections API par onglet** (`TAB_SECTIONS`), endpoint dédié `/statistiques/secretariats/`, ouverture directe `?rbView=workflow`, présence/absence du panneau de période par onglet ; **états de chargement et d'erreur** (spinner initial figé par promesse, écran d'erreur plein avec détail backend / message générique / bouton Réessayer qui répare, bandeau d'erreur non bloquant après chargement, indicateur « Actualisation… », erreur PJ dans l'état vide) ; **filtres d'en-tête** (peuplement formation via la méta et propagation `formation_id`, effacement des filtres, horodatage de mise à jour, sélecteur secrétariat activé/désactivé pour un encadrant selon le nombre de secrétariats) ; **filtre de période** (auto-apply d'un preset, période entièrement future + retour au trimestre courant, badge de période, message « aucune séance comptabilisable » et sa non-présence en preset « Tout ») ; **états vides et rendus minimaux** des onglets PJ, bilans/workflow, historique vide et avec données (navigation mensuelle), vue d'ensemble (KPI + navigation de section), administratif, pédagogique, comparatif secrétariats avec chargement du détail ; **alertes/seuils** (invite d'initialisation INJS, boutons masqués pour rôle non validant, POST d'init puis re-fetch, alerte déclenchée et compteurs de synthèse, édition + PUT du corps des seuils, échecs POST/PUT en `window.alert`) ; **exports** Point Journalier et Bilans (boutons désactivés à vide, blob XLSX annuel et PDF du tableau sélectionné avec `jour`/`formation_id`/`categorie`, échecs en alerte sans planter, état d'export puis réactivation). Le mock d'API de test accepte désormais des fonctions de route **asynchrones** (await de la réponse), ce qui permet de figer les états de chargement. Aucun écart produit révélé par ce lot de tests purs. **LOT 38b (vue « Bilans INJS », +45 tests, toujours sans toucher à la page)** : les **4 dimensions** (bascule module / matière / catégorie / formation avec requête `dimension=` adaptée et remplacement du sélecteur module par celui des matières), la portée de **tous les filtres** (`mois`, `categorie`, `module_id`, `ref_module_id`/`matiere_intitule` via les clés `r:id`/`i:intitule`, `formation_id`, `periode`, `calendrier`, `annee`), le listage (`tous_tableaux=1`, en-tête « N bilans · Par … », bouton « Tous les tableaux (N) », badges MOD/MAT/CAT, chips grade/groupe, compteurs inscrits/groupes/pointages), le filtrage des options matière selon la formation, la réinitialisation de la sélection à chaque changement de filtre et le bouton Actualiser ; **navigation liste ↔ détail** : vue d'ensemble (`BilansEnsemblePanel`, « N tableaux — … », chapô « Vue d'ensemble (année · période) », boutons « Plein écran » sans appel `detail=1` quand le tableau est en cache, message « Aucun tableau à afficher »), détails servis par le cache ou par `?detail=1` avec les bonnes clés selon la dimension, tableaux d'effectifs (en-têtes fusionnés par `<br/>`, formatage français milliers/virgule, « X H / Y F inscrits », pourcentages), bandeau « Agrégation de N groupes — étudiants uniques » en dimension matière, tableau `bilan_periode_formation` avec textarea justificatifs synchronisé, garde-fous (module sans `module_id`, matière sans `formation_id`, catégorie vide/`—`, formation sans `formation_id`, dimension inconnue : aucun appel `detail=1`, message « Aucune séance comptabilisable… » ou carte de secours « Zone tableau bilan » avec grille de contexte et `BILAN — <DIMENSION>`), type de tableau non modélisé ; **exports bilans** des 3 formats (PDF d'un module avec `module_id`/`formation_id`/`categorie`, Excel d'une matière clé `i:` sans `module_id`, Word d'un bilan formation avec `justificatifs`, nom par défaut `BILANS_<année>.<ext>`, échec en alerte sans blocage). **Bilan FAC** : panneau replié sans requête puis placeholder « Sélectionnez une formation… » et bouton « Générer le bilan » désactivé, chargement du périmètre dès la formation choisie (tout coché par défaut, chips grades/groupes, boutons tout cocher/décocher, retrait des groupes d'un grade décoché, recoche du grade sans recocher ses groupes → paramètre `groupes` en sous-ensemble, périmètre vide et échec de chargement, héritage de la formation du filtre global d'en-tête, catégorie/année FAC répercutées, réinitialisation du bilan après changement de formation, échec de génération sans planter), génération complète sans `grades`/`groupes` (en-tête grades/absents/date, 4 boutons de sous-onglets), **Point global** (lignes triées par grade, ligne TOTAL issue du backend, 2 textareas par grade, fusions des doublons pour les clés sommées — et test `[écart] §10.15` pour l'effectif auditeurs non sommé), **Volume horaire** (un tableau par grade, agrégation des colonnes de groupes en doublon avec VH sommées, récapitulatif global uniquement si plusieurs grades, totaux VH cycle), **Absents notoires** (message vide dédié puis tableau détaillé après régénération, compteur et pied de tableau), **État des modules** (regroupement par grade, 4 statuts Terminé/En cours/Planifié/Suspendu), **exports FAC** (`meta=JSON({justificatifs,difficultes})` par grade, absence de meta sans saisie, nom par défaut `BILAN_FAC_<année>.<ext>`, échec en alerte). |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
@@ -516,7 +538,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 38a (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 38b (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -547,7 +569,7 @@ Mesure après le LOT 38a (V8, `npm run test:coverage`), sur les zones ciblées :
 | `components/formateurs/FormateurAssignPickerItem.jsx` (LOT 18) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/Campagnes.jsx` (LOT 16/17) | **99 %** | 99 % | **100 %** | **89 %** |
 | `pages/scolarite/CampagneDetail.jsx` (LOT 16/17) | **99 %** | 99 % | **100 %** | **89 %** |
-| `pages/Statistiques.jsx` (LOT 38a, socle) | **64 %** | **64 %** | **52 %** | **59 %** |
+| `pages/Statistiques.jsx` (LOT 38a socle + 38b Bilans INJS / FAC) | **87 %** | **87 %** | **73 %** | **67 %** |
 | `pages/scolarite/Candidatures.jsx` | **97 %** | 97 % | 74 % | **79 %** |
 | `pages/scolarite/Admissions.jsx` | **98 %** | 98 % | 90 % | **85 %** |
 | `pages/scolarite/Inscriptions.jsx` | **99 %** | 99 % | **100 %** | **87 %** |
@@ -559,7 +581,7 @@ Mesure après le LOT 38a (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
-| **Global `src/` (toutes zones)** | **68,9 %** | **68,9 %** | **62,8 %** | **79,5 %** |
+| **Global `src/` (toutes zones)** | **72,4 %** | **72,4 %** | **64,9 %** | **79,8 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -571,20 +593,20 @@ Mesure après le LOT 38a (V8, `npm run test:coverage`), sur les zones ciblées :
 > 656 (LOT 20) → 681 (LOT 21) → 719 (LOT 22) → 754 (LOT 23) →
 > 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → 847 (LOT 27) →
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
-> → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → **1159 (LOT 38a)** ;
+> → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
+> **1204 (LOT 38b)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
 > 55,9 % (LOT 24) → 56,3 % (LOT 25) → 56,7 % (LOT 26) → 57,3 % (LOT 27) →
 > 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → 60,4 % (LOT 31) →
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
-> **68,9 % (LOT 38a)** — le seuil des 60 % de lignes reste largement
-> franchi, **les fonctions montent à 62,8 % (plancher CI 23 %)**, les
-> branches à 79,5 % (plancher CI 60 %) ; le léger recul du pourcentage de
-> branches s'explique par la mise en exercice, via le seul `Statistiques`,
-> de très gros composants satellites riches en branches (`RapportsWorkflowPanel`,
-> `PointJournalierCPFAE`, `AuditeursNotoiresPanel`) dont les panneaux complets
-> seront approfondis aux sous-lots LOT 38 suivants. Les LOT 17 et 19 corrigent
+> 68,9 % (LOT 38a) → **72,4 % (LOT 38b)** — le seuil des 60 % de lignes reste
+> largement franchi, **les fonctions montent à 64,9 % (plancher CI 23 %)**,
+> les branches à 79,8 % (plancher CI 60 %). Le LOT 38b fait passer le seul
+> `Statistiques.jsx` de 64 % à 87 % de lignes ; les branches des gros
+> composants satellites (`RapportsWorkflowPanel`, `PointJournalierCPFAE`,
+> `AuditeursNotoiresPanel`) restent l'objectif des sous-lots LOT 38 suivants. Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
 > bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève la couverture
@@ -739,10 +761,19 @@ Mesure après le LOT 38a (V8, `npm run test:coverage`), sur les zones ciblées :
 > seuils d'alertes (POST d'init et PUT de sauvegarde avec garde de rôle et
 > échecs traités), et les exports Point Journalier / Bilans (garde
 > d'activation, paramètres du blob, état d'export, échecs en `window.alert`).
-> Les sous-lots suivants (38b+) approfondiront les familles volumineuses
-> encore peu couvertes : bilan FAC, panneaux de détail bilans/module &
-> matière/catégorie, workflow des rapports périodiques, et le maillage fin
-> des panneaux pédagogie/historique/secrétariats.
+> Le **LOT 38b enchaîne sur la vue « Bilans INJS » (4 dimensions, détails et
+> exports avec justificatifs) et le Bilan FAC complet (périmètre
+> grades/groupes, génération, 4 sous-onglets, exports avec meta)** :
+> **+45 tests purs**, sans modifier la page, qui font passer
+> `Statistiques.jsx` de **64 % à 87 % de lignes** (fonctions 52 → 73 %,
+> branches 59 → 67 %). Il révèle un unique écart applicatif, laissé ouvert
+> en attente de feu vert : la fusion des lignes Point global d'un même grade
+> ne somme pas les effectifs auditeurs à cause d'une clé erronée
+> (`effectif_étudiants` au lieu de `effectif_auditeurs`, **§10.15**).
+> Les sous-lots suivants (38c+) approfondiront les familles restantes :
+> workflow des rapports périodiques (`RapportsWorkflowPanel`), maillage fin
+> des panneaux pédagogie/historique/secrétariats, et les composants
+> `PointJournalierCPFAE` / `AuditeursNotoiresPanel`.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -849,8 +880,8 @@ logique applicative : les écarts y étaient seulement constatés et tracés. Le
 **LOT 4 et 5**, sur feu vert explicite, sont des lots correctifs (§10.4, §10.5,
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
 **LOT 17 (§10.11)**, le **LOT 19 (§10.12)**, le **LOT 34 (§10.13)** et le
-**LOT 37 (§10.14)**. Les points encore ouverts sont ci-dessous (§10.1 et
-§10.9).
+**LOT 37 (§10.14)**. Les points encore ouverts sont ci-dessous (§10.1,
+§10.9 et §10.15).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -1302,6 +1333,59 @@ protégé ») et passe avec le correctif. La page reste à **99,8 % de
 lignes / 100 % de fonctions / 98,1 % de branches** (54 tests, aucun test
 ajouté ni retiré : seul le test `[écart]` est devenu une régression).
 
+### 10.15 Écart constaté au LOT 38b — `Statistiques` / Bilan FAC : la fusion des lignes Point global ne somme pas les effectifs auditeurs (clé erronée `effectif_étudiants`)
+
+Révélé par les tests LOT 38b du **Bilan FAC** (sous-onglet « Point global »
+de `BilanFACPointGlobalTable`, `Statistiques.jsx` ~L3746). Lorsque le backend
+renvoie plusieurs lignes `point_global.lignes` pour un **même grade**, le
+composant les fusionne dans une `Map` indexée par grade en sommant les clés
+numériques listées dans `sumKeys` :
+
+```js
+const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes',
+  'effectif_étudiants',   // ← clé erronée (accent) : la vraie clé est 'effectif_auditeurs'
+  'absents_notoires', 'groupes_termines', 'vh_total', 'vh_epuise']
+```
+
+La clé `'effectif_étudiants'` n'existe dans aucune ligne (le modèle s'appelle
+`effectif_auditeurs`, comme en témoignent la colonne « EFFECTIF TOTAL DES
+AUDITEURS » et la pondération des moyennes juste en dessous qui lit bien
+`l.effectif_auditeurs`). Conséquences observables quand un grade est
+dupliqué (deux groupes renvoyés en lignes séparées, par exemple) :
+
+- les colonnes secrétariat / encadreurs / nombre de groupes / absents
+  notoires / groupes terminés / VH totale / VH épuisée sont **correctement
+  sommées** ;
+- en revanche l'**effectif total des auditeurs reste figé à la première
+  ligne du grade** (20 affichés au lieu de 45 dans le scénario de test),
+  alors même que la ligne **TOTAL** (fournie par le backend) affiche bien 45 :
+  les deux totaux deviennent incohérents ;
+- les moyennes pondérées des taux (participation, absents, présence/absence
+  aux cours, exécution VH) utilisent pour leur part les bonnes valeurs
+  `effectif_auditeurs` des deux lignes lors de la 2ᵉ itération, mais ne
+  réécrivent pas non plus l'effectif de la ligne fusionnée.
+
+**Sévérité moyenne, périmètre limité** : l'écart ne se manifeste que si
+`point_global.lignes` contient des doublons de grade (ce que le backend
+peut faire aujourd'hui ou demanderait à confirmer avec lui) ; si une seule
+ligne par grade est renvoyée, l'affichage est exact. Aucune donnée n'est
+modifiée (le bug est purement côté restitution / export) ; l'export
+`/bilan-fac-export/` étant généré côté backend, il n'est pas affecté par
+cette erreur d'agrégation front.
+
+**Correctif proposé (non appliqué, en attente de feu vert utilisateur)** :
+remplacer la chaîne `'effectif_étudiants'` par `'effectif_auditeurs'` dans
+`sumKeys` (une ligne). En cas de feu vert, les deux tests
+`Point global : fusionne les lignes en doublon…` et
+`[écart] Point global : l'effectif auditeurs d'un grade en doublon n'est pas
+sommé…` seront adaptés : le test `[écart]` deviendra une régression
+exigeant `45` sur la ligne grade, cohérente avec le TOTAL.
+
+Deux tests figent aujourd'hui le comportement RÉEL : le test positif vérifie
+les sommes qui fonctionnent déjà (groupes, absents, VH, TOTAL backend) et le
+test nommé **`[écart]`** constate explicitement l'effectif figé à 20 face au
+TOTAL 45.
+
 
 ---
 
@@ -1321,7 +1405,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 38a :
+**Aucune page n'est dépourvue de test.** État après le LOT 38b :
 
 - dix-sept écrans disposent d'un test **fonctionnel dédié** hors module
   Scolarité (les quatre écrans du module Finance transverse —
@@ -1331,9 +1415,12 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
   (**99,8 % de lignes / 100 % de fonctions**, LOTs 2 et 36 — liste serveur,
   CRUD complet, secrétariat à la volée), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %,
-  nettoyage des filtres obsolètes), `Statistiques.jsx` (**64 % de lignes au
-  LOT 38a — socle des 8 onglets, états, filtres, seuils d'alertes et exports** ;
-  contrat d'isolation par secrétariat + synchro des justificatifs §10.7),
+  nettoyage des filtres obsolètes), `Statistiques.jsx` (**87 % de lignes au
+  LOT 38b — socle des 8 onglets (LOT 38a), puis vue Bilans INJS : 4
+  dimensions, navigation liste/détail et exports, et Bilan FAC complet :
+  périmètre grades/groupes, génération, 4 sous-onglets et exports avec
+  meta** ; contrat d'isolation par secrétariat + synchro des justificatifs
+  §10.7 ; écart §10.15 sur la fusion des effectifs Point global),
   `NotesModule.jsx` (**97,6 % de lignes**, LOT 14 — grille de saisie, bulk,
   colonnes, fiches PDF), `Rattrapages.jsx` (**97,3 % de lignes**, LOT 15 —
   création inter-cohortes, génération de pointage, annulation),
@@ -1782,13 +1869,17 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    verrouillés au LOT 35** (56 tests, 99,7 % de lignes) et la **gestion des
    comptes `Users.jsx` est achevée au LOT 36** (54 tests, 99,8 % de
    lignes, secrétariat à la volée compris). Le gros volume
-   `Statistiques.jsx` (5 491 lignes) est **ouvert au LOT 38a** (socle des
-   8 onglets, états, filtres, seuils d'alertes et exports, 52 tests,
-   **64 % de lignes**) ; restent les sous-lots 38b+ par famille : bilan
-   FAC (périmètre grades/groupes, 4 sous-tableaux, exports avec meta
-   justificatifs/difficultés), panneaux de détail des bilans (module /
-   matière / catégorie / formation), workflow des rapports périodiques,
-   et maillage fin des panneaux pédagogie / historique / secrétariats.
+   `Statistiques.jsx` (5 491 lignes) est **couvert à 87 % de lignes au
+   LOT 38b** (97 tests) : socle des 8 onglets au LOT 38a, puis vue « Bilans
+   INJS » (4 dimensions, détails module/matière/catégorie/formation, exports
+   avec justificatifs) et **Bilan FAC complet** (périmètre grades/groupes,
+   génération, 4 sous-tableaux dont fusions doublons et récap VH, exports
+   avec meta justificatifs/difficultés) au LOT 38b ; restent les sous-lots
+   38c+ par famille : workflow des rapports périodiques
+   (`RapportsWorkflowPanel`), maillage fin des panneaux pédagogie /
+   historique / secrétariats, et les composants `PointJournalierCPFAE`
+   (KPI strip) et `AuditeursNotoiresPanel`, avec l'écart §10.15 à corriger
+   sur feu vert (clé `effectif_auditeurs` dans la fusion Point global).
    Restent aussi les montées en profondeur des écrans encore en
    couverture partielle (`Dashboard`, `Modules`, `Maquettes`,
    `MonEspace`) ;
@@ -1802,6 +1893,10 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
      les autres actions destructrices) — comportement figé par un test, en
      attente d'un choix produit ;
+   - §10.15 Bilan FAC (Point global) : effectifs auditeurs non sommés lors de
+     la fusion de lignes en doublon d'un même grade (clé erronée
+     `effectif_étudiants`) — test `[écart]` au LOT 38b, correctif d'une ligne
+     en attente de feu vert ;
    - ~~§10.14 écart cosmétique **`Users`** : le toast d'erreur de suppression
      ne réécrivait pas CPFAE en INJS contrairement aux badges et aux alertes
      des modales~~ **corrigé au LOT 37** (toast normalisé comme les autres
