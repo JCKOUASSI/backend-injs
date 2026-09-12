@@ -168,10 +168,19 @@
 > carte quand les référentiels échouent ou répondent trop lentement — état
 > initial `options` incomplet — crash alors corrigé dès le **[LOT 34]** par
 > un état initial complet, les deux tests `[écart]` devenant des régressions).
-> Ce lot **solde les cinq écrans Scolarité réparés au §10.8**.
+> Ce lot **solde les cinq écrans Scolarité réparés au §10.8**, puis le
+> **[LOT 35]** ouvre l'administration transverse : l'écran **référentiels de
+> formation** `Referentiels` (neuf onglets chargés en un seul GET) est
+> verrouillé à **99,7 % de lignes / 100 % de fonctions / 95,2 % de branches /
+> 56 tests** : CRUD des neuf collections (dont les modules multi-formations
+> avec grille de volumes horaires formation × catégorie et les salles/bâtiments
+> hiérarchiques), activation/désactivation, suppression confirmée avec 404
+> dédoublonné, import/export Excel, pagination client et persistance de
+> l'onglet dans l'URL ; les branches résiduelles sont des filets défensifs
+> bornés par la lecture d'onglet.
 > Les LOT 4 à 7, 13, 17, 19 et 34 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32 et 33 sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33 et 35 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -389,7 +398,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (48 fichiers, 1022 tests)
+### 6.2 Fichiers de test colocalisés (49 fichiers, 1078 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -426,6 +435,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | --- | --- | --- |
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
 | `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (17 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **repli sur le seul onglet autorisé** quand l'URL réclame un onglet interdit (§10.2 LOT 6), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
+| `src/pages/Referentiels.test.jsx` | page | **56 tests (LOT 35), référentiels de formation — 99,7 % lignes/instructions, 100 % fonctions, 95,2 % branches** (les branches résiduelles sont des filets défensifs inatteignables : onglet borné par `readReferentielsTab`, états `data`/`formation_ids` toujours initialisés). Les **neuf onglets** (formations, modules, catégories, grades, vagues, sites, bâtiments, salles, types secrétariat) sont chargés en un seul `GET /formations/referentiels/gestion/` : spinner, compteurs par onglet, colonnes spécifiques avec résolution des liens (catégorie de grade, site/bâtiment des salles et bâtiments, replis « — » dont les clés mortes), résumé des volumes de modules groupé par formation (`F (CM: 5h, TD: 4h)`, repli `Formation #id`, total simple `12 h`, vide « — »), état vide « Aucune entrée — cliquez sur Ajouter », réponse sparse (clés absentes → tableaux vides sans crash), erreur « Erreur de chargement », **pagination client 25/page** et **onglet lu dans `?tab=`** (inconnu → Formations), changement d'onglet qui referme la modale. **CRUD** : création par onglet (POST, payloads et valeurs par défaut — formations/catégories/sites/types/vagues/grades), édition (PUT, pré-remplissage, toasts « Ajouté/Modifié avec succès », rechargement + invalidation du cache React Query), bouton « Enregistrement… » pendant l'envoi, erreurs de validation formatées puis message générique, fermetures croix/Annuler/voile sans appel ; **bascule actif/inactif** (PUT du corps complet, toasts Activé/Désactivé, échec « Erreur »). **Suppressions** via `ConfirmModal` (annulation sans DELETE, succès « Supprimé », **404 → « Entrée déjà supprimée — liste actualisée »**, autre erreur générique). **Clés typées** : grades/bâtiments/salles (identifiants `Number()` ou `null`, capacité non numérique neutralisée — y compris une valeur véreuse servie par le backend en édition, bâtiments filtrés par site, changement de site qui réinitialise le bâtiment, défauts `type_lieu:'SALLE'`/`equipements:''`). **Modules** : cases des formations actives seules, garde « au moins une formation » puis « au moins un volume horaire », grille de volumes par formation × catégorie active (valeurs vides/`NaN` écartées, décochage, cases/grille réinitialisées), payload `volumes_horaires` reconstruit (clés de grille et `formations` retirées), POST **201 → ajout** vs **200 → « Module déjà au référentiel — formations rattachées »**, édition avec grille pré-remplie (volume sans formation écarté, ancien format `volumes_par_categorie`, formation morte en `Formation #id`). **Excel** : export `getBlob /formations/ref/excel/{onglet}/` (ancre cliquée, nom serveur ou nom par défaut `referentiel_{onglet}.xlsx`, révocation d'URL, échec notifié), import via l'input caché (clic programmé, extension non `.xlsx` refusée, sélection annulée sans effet, POST `FormData` avec bilan `N ligne(s)…`, réponse sans données → zéros, deux niveaux d'erreur). |
 | `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). |
 | `src/pages/scolarite/scolariteRendu.test.jsx` | page | **5 régressions (LOT 7, §10.8)** sur des écrans qui rendaient une page blanche sans planter : rendu effectif du titre de `Campagnes`, du libellé de `CampagneDetail`, du titre d'`Équivalences`, du libellé de `MaquetteDetail`, et — pour `ChargesEnseignants` — requête de l'année courante **au montage** puis enchaînement sur l'occupation des enseignants. Chaque test échouait avant la correction (preuve de mutation). |
 | `src/pages/scolarite/scolariteActions.test.jsx` | page | **6 tests d'écriture au clic (LOT 8, §10.8)** sur les gestionnaires rétablis : `Campagnes` (Planifier sans confirmation puis Ouvrir **avec** `window.confirm`, bon `POST …/transition/` + rechargement ; cas d'erreur serveur avec toast), `CampagneDetail` (enregistrement d'une note `POST /epreuves/:id/notes/` avec les bons identifiants), `Equivalences` (`POST …/appliquer/` après confirmation), `MaquetteDetail` (`DELETE /ecues/:id/?mode=archive`), `ChargesEnseignants` (création d'affectation `POST /enseignants/affectations/` avec l'année courante et les champs typés). |
@@ -483,7 +493,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 35 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -493,6 +503,7 @@ Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `src/context/**` | **99 %** | **99 %** | 89 % | **91 %** |
 | `src/hooks/**` | **94 %** | **94 %** | 84 % | **94 %** |
 | `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
+| `pages/Referentiels.jsx` (LOT 35) | **99,7 %** | **99,7 %** | **100 %** | **95,2 %** |
 | `pages/Users.jsx` | **89 %** | 89 % | 49 % | **69 %** |
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
 | `pages/Modules.jsx` | **37 %** | 37 % | 6 % | **59 %** |
@@ -525,7 +536,7 @@ Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
-| **Global `src/` (toutes zones)** | **60,8 %** | **60,8 %** | **57,1 %** | **79,6 %** |
+| **Global `src/` (toutes zones)** | **62,3 %** | **62,3 %** | **59,2 %** | **80,6 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -537,14 +548,16 @@ Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 656 (LOT 20) → 681 (LOT 21) → 719 (LOT 22) → 754 (LOT 23) →
 > 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → 847 (LOT 27) →
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
-> → **1022 (LOT 33)** ; lignes
+> → 1022 (LOT 33) → **1078 (LOT 35)** ; lignes
 > couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) → 43,1 %
 > (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
 > 55,9 % (LOT 24) → 56,3 % (LOT 25) → 56,7 % (LOT 26) → 57,3 % (LOT 27) →
 > 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → 60,4 % (LOT 31) →
-> 60,6 % (LOT 32) → **60,8 % (LOT 33)** — le seuil des 60 % de lignes reste
-> franchi (fonctions **57,1 %**, branches **79,6 %**). Les LOT 17 et 19 corrigent
+> 60,6 % (LOT 32) → 60,8 % (LOT 33) → **62,3 % (LOT 35)** — le seuil des
+> 60 % de lignes reste franchi, les fonctions approchent les 60 %
+> (**59,2 %**, pour un plancher CI de 23 %) et les branches dépassent
+> **80 %**. Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
 > bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève la couverture
@@ -668,6 +681,15 @@ Mesure après le LOT 34 (V8, `npm run test:coverage`), sur les zones ciblées :
 > tous couverts en profondeur** et le dossier `pages/scolarite/` atteint
 > **94,1 % de lignes / 90,1 % de fonctions / 88,5 % de branches** (le
 > service `services/scolarite.js` reste à **100 % de lignes**).
+> Le **LOT 35 ouvre l'administration transverse avec les référentiels de
+> formation** (`Referentiels`, **56 tests, 99,7 % de lignes, 100 % de
+> fonctions, 95,2 % de branches**) : les neuf collections sont chargées en
+> un GET, paginées et gérées en CRUD (modules multi-formations avec grille de
+> volumes, hiérarchie site/bâtiment/salle, coercitions d'identifiants),
+> activation, suppression confirmée avec le cas 404 dédoublonné, import/export
+> Excel et persistance de l'onglet dans l'URL ; les seules branches non
+> couvertes sont les replis défensifs d'un onglet déjà borné par
+> `readReferentielsTab` et d'états que le composant initialise toujours.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -1204,11 +1226,12 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 34 :
+**Aucune page n'est dépourvue de test.** État après le LOT 35 :
 
-- seize écrans disposent d'un test **fonctionnel dédié** hors module Scolarité
-  (les quatre écrans du module Finance transverse — `FinanceEncadrants`,
-  `FinanceParametrage`, `FinanceAjustements`, `FinanceDashboard` — s'ajoutent
+- dix-sept écrans disposent d'un test **fonctionnel dédié** hors module
+  Scolarité (les quatre écrans du module Finance transverse —
+  `FinanceEncadrants`, `FinanceParametrage`, `FinanceAjustements`,
+  `FinanceDashboard` — et l'écran d'administration `Referentiels` s'ajoutent
   aux douze initiaux) :
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
   (89 %, liste serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %,
@@ -1241,7 +1264,15 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   priorité à la décision backend, déploiement et tri des séances, saisie de
   moyenne `bulk` avec recalcul en cascade, recalcul manuel et exports
   relevé PDF/Excel ; seul du code défensif inatteignable par l'UI reste non
-  couvert) ;
+  couvert), et
+  `Referentiels.jsx` (**99,7 % de lignes / 100 % de fonctions / 95,2 % de
+  branches**, LOT 35 — **administration des neuf référentiels de formation** :
+  un seul GET pour les neuf collections, pagination client, CRUD typé par
+  onglet, modules multi-formations avec grille de volumes, hiérarchie
+  site/bâtiment/salle, activation, suppression confirmée avec cas 404
+  dédoublonné, import/export Excel et onglet persistant dans l'URL ; les
+  branches résiduelles sont des replis défensifs d'un onglet borné par
+  `readReferentielsTab`) ;
 - cinq écrans Scolarité (`Campagnes`, `CampagneDetail`, `Equivalences`,
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
@@ -1484,6 +1515,20 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   réduits à leur option fantôme) et la stabilité en cas de course de
   résolution ; les deux échouent sur l'ancien état initial (preuve de
   mutation par aller-retour) ;
+- le **LOT 35 ouvre l'administration transverse avec `Referentiels.jsx`**
+  (**56 tests, 99,7 % de lignes / 100 % de fonctions / 95,2 % de branches**,
+  lot de tests purs, fichier produit non modifié, **aucun écart produit**) :
+  les neuf onglets et leur chargement unique (spinner, erreur, réponse
+  sparse, compteurs, état vide), la pagination 25/page et la lecture de
+  `?tab=`, le CRUD des neuf collections avec payloads typés et valeurs par
+  défaut, la bascule d'activation, la suppression via `ConfirmModal` avec
+  le message 404 « déjà supprimée », la création de modules multi-formations
+  (cases des formations actives, grille formation × catégorie, gardes,
+  statut 200 vs 201, ancien format de volumes), les coercitions numériques
+  (y compris des valeurs non numériques servies par le backend en édition)
+  et l'import/export Excel (extension, ancre de téléchargement, bilan,
+  erreurs) ; les quelques branches non couvertes sont des filets défensifs
+  bornés par la whitelist des onglets ;
 - le LOT 16 **achevait aussi la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1505,10 +1550,11 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `ParticipantDetailModal` est **achevé à 98,8 % de lignes / 100 % de
   fonctions** (50 tests, lecture puis écritures) ; les autres composants ne
   sont exercés qu'indirectement via le smoke ;
-- les **22 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **21 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout (les quatre écrans du module Finance
   transverse en sont sortis aux LOTs 27 à 30, puis `Equivalences` au LOT 31,
-  `MaquetteDetail` au LOT 32 et `ChargesEnseignants` au LOT 33).
+  `MaquetteDetail` au LOT 32, `ChargesEnseignants` au LOT 33 et
+  `Referentiels` au LOT 35).
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
 
@@ -1582,9 +1628,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    **les quatre écrans Finance transverse ont désormais leur test dédié**,
    et les trois derniers écrans Scolarité réparés (`Equivalences`,
    `MaquetteDetail`, `ChargesEnseignants`) sont **verrouillés aux LOTs 31 à
-   33**. Suivent les **référentiels** (`Referentiels.jsx`), puis les gros
-   volumes internes `Statistiques` et `Users` (création de secrétariat à la
-   volée) ;
+   33, et les **référentiels de formation `Referentiels.jsx` sont
+   verrouillés au LOT 35** (56 tests, 99,7 % de lignes). Restent les gros
+   volumes internes `Users` (reste connu : branche « création d'un
+   secrétariat à la volée ») et `Statistiques` (onglets, exports et widgets
+   internes) ;
 4. écarts encore ouverts, dans des lots dédiés :
    - ~~§10.12 bug bloquant de la modale d'**assignation d'un enseignant**
      (prop `enseignant`/`formateur`)~~ **corrigé au LOT 19** (alignement du
