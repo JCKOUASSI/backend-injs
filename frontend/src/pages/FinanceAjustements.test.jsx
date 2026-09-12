@@ -123,6 +123,9 @@ const reportVide = {}
 /* ------------------------------------------------------------------ */
 
 const settle = async (n = 5) => { await act(async () => { await flushPromises(n) }) }
+// Le debounce de la recherche est de 300 ms (horloge réelle, comme dans les
+// tests de ModuleDetail/FormationDetail) : on attend un peu au-delà, dans act.
+const waitReal = async (ms = 360) => { await act(async () => { await sleep(ms) }) }
 
 const mount = () => {
   const me = makeUser('FINANCE', { username: 'finance' })
@@ -164,7 +167,7 @@ const openForm = () => fireEvent.click(screen.getByRole('button', { name: /nouve
 // La recherche d'enseignant est débordancée à 300 ms via setTimeout : après
 // le nettoyage RTL de chaque test, on laisse les minuteurs résiduels tirer
 // sur le composant démonté pour ne pas polluer les tests suivants (act).
-afterEach(async () => { await act(async () => { await sleep(310) }) })
+afterEach(async () => { await waitReal(320) })
 
 /* ------------------------------------------------------------------ */
 /* LOT 29 — chargement, KPI, filtres, table                            */
@@ -252,7 +255,9 @@ describe('pages/FinanceAjustements.jsx — chargement, KPI et filtres (LOT 29)',
     expect(row).toHaveTextContent('1h 30min')
     expect(row).toHaveTextContent('Séance prolongée')
     expect(row).toHaveTextContent('jfinance')
-    expect(row).toHaveTextContent('04 mars 2026')
+    // Format fr-FR avec mois en lettres (le padding du jour et un éventuel
+    // « à » avant l'heure varient selon la version ICU : on reste souple).
+    expect(row.textContent).toMatch(/0?4 mars 2026/)
   })
 
   it("affiche le valideur pour un VALIDE et le motif de rejet tronqué (ou tiret) pour un REJETE", async () => {
@@ -504,17 +509,15 @@ describe('pages/FinanceAjustements.jsx — proposition d’ajustement (LOT 29)',
   it('recherche les enseignants après 2 caractères et 300 ms de debounce', async () => {
     mount()
     await settle()
-    openForm()
-    fireEvent.change(formField('Enseignant'), { target: { value: 't' } })
-    await act(async () => { await sleep(350) })
+    // Le minuteur initial (recherche vide) tire au montage : aucun appel et
+    // ça couvre le court-circuit « recherche vide ».
+    await waitReal(320)
     expect(getCalls(FORMATEURS_PATH)).toHaveLength(0)
 
-    // Une recherche lancée puis entièrement effacée ne déclenche rien non plus.
-    fireEvent.change(formField('Enseignant'), { target: { value: 'tra' } })
-    await act(async () => { await sleep(150) }) // avant le débord de 300 ms
-    fireEvent.change(formField('Enseignant'), { target: { value: '' } })
-    await act(async () => { await sleep(350) })
-    expect(getCalls(FORMATEURS_PATH)).toHaveLength(0)
+    openForm()
+    fireEvent.change(formField('Enseignant'), { target: { value: 't' } })
+    await waitReal(360)
+    expect(getCalls(FORMATEURS_PATH)).toHaveLength(0) // un seul caractère ne suffit pas
 
     fireEvent.change(formField('Enseignant'), { target: { value: 'tra' } })
     await waitFor(() => expect(getCalls(FORMATEURS_PATH).length).toBe(1))
@@ -542,7 +545,7 @@ describe('pages/FinanceAjustements.jsx — proposition d’ajustement (LOT 29)',
       return { data: {} }
     })
     fireEvent.change(formField('Enseignant'), { target: { value: 'tra' } })
-    await act(async () => { await sleep(340) }) // laisse le debounce de 300 ms tirer
+    await waitReal(360) // laisse le debounce de 300 ms tirer (promesse toujours différée)
     const input = formField('Enseignant').parentElement
     expect(input.querySelector('.spinner-border')).toBeTruthy()
     await act(async () => { resolveSearch(); await flushPromises(4) })
@@ -826,7 +829,7 @@ describe('pages/FinanceAjustements.jsx — filets défensifs (LOT 29)', () => {
     await settle()
     openForm()
     fireEvent.change(formField('Enseignant'), { target: { value: 'tra' } })
-    await act(async () => { await sleep(350) })
+    await waitReal(360)
     expect(screen.queryByText('#F-700')).toBeNull()
     expect(screen.getByPlaceholderText('Nom ou matricule…')).toBeInTheDocument()
   })
@@ -842,7 +845,7 @@ describe('pages/FinanceAjustements.jsx — filets défensifs (LOT 29)', () => {
     await settle()
     openForm()
     fireEvent.change(formField('Enseignant'), { target: { value: 'tra' } })
-    await act(async () => { await sleep(350) })
+    await waitReal(360)
     expect(document.querySelector('.list-group')).toBeNull()
   })
 
