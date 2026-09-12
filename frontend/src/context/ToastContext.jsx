@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 
 const ToastContext = createContext(null)
 
@@ -11,11 +11,18 @@ export function ToastProvider({ children }) {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 6000)
   }, [])
 
+  // La valeur exposée doit rester une référence stable : `showToast` est mémoïsé,
+  // on l'enveloppe donc dans useMemo. Sinon un nouvel objet { showToast } serait
+  // créé à chaque rendu du provider (donc à chaque toast), ce qui change la
+  // dépendance `toast` des écrans et fait rejouer leurs effets de chargement —
+  // jusqu'à une boucle de requêtes sur un échec initial (§10.10).
+  const value = useMemo(() => ({ showToast }), [showToast])
+
   const iconMap = { success: 'check-circle-fill', error: 'exclamation-triangle-fill', info: 'info-circle-fill' }
   const bgMap = { success: '#125a99', error: '#c62828', info: '#1565C0' }
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '0.5rem', pointerEvents: 'none' }}>
         {toasts.map(t => (

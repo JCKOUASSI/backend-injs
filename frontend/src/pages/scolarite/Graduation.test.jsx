@@ -129,20 +129,19 @@ describe('pages/scolarite/Graduation — liste et filtres', () => {
     expect(listCalls().at(-1)).toEqual({ statut: 'VALIDATED', annee_id: '3', formation_id: '10' })
   })
 
-  // [écart §10.10] Comme Jurys, la page dépend de l'objet `toast` instable :
-  // un échec du chargement initial émet un toast qui fait re-rendre le
-  // ToastProvider, recrée `charger` et relance la requête sans action de
-  // l'agent (boucle infinie si l'échec persiste). On fige la relance parasite
-  // avec deux échecs puis un succès qui stabilise la page.
-  it('[écart §10.10] un échec de chargement relance la liste automatiquement sans action de l’agent', async () => {
+  // Régression §10.10 (corrigé au LOT 13) : comme Jurys, un échec du
+  // chargement initial ne doit produire qu'une seule requête et un seul toast,
+  // puis l'état vide. Deux échecs puis un succès sont programmés : une page
+  // saine ne consomme que le premier appel.
+  it('échec de chargement : une seule requête, un seul toast et état vide (régression §10.10)', async () => {
     failListTimes(2)
     mount()
 
-    expect(await screen.findByText('MAT-001')).toBeInTheDocument()
-    expect(listCalls().length).toBeGreaterThanOrEqual(3)
-    // Un toast par échec/relance : la boucle parasite en empile plusieurs (une
-    // page saine n'afficherait qu'une seule alerte, après un unique appel).
-    expect(screen.getAllByText('Service de diplômation indisponible.').length).toBeGreaterThanOrEqual(2)
+    expect(await screen.findByText('Service de diplômation indisponible.')).toBeInTheDocument()
+    await settle()
+    expect(listCalls()).toHaveLength(1)
+    expect(screen.getAllByText('Service de diplômation indisponible.')).toHaveLength(1)
+    expect(screen.getByText('Aucun diplôme.')).toBeInTheDocument()
   })
 })
 

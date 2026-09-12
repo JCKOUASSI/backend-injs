@@ -130,25 +130,21 @@ describe('pages/scolarite/Jurys — liste et filtres', () => {
     expect(listCalls().at(-1)).toEqual({ statut: 'PREPARATION', annee_id: '1', formation_id: '10' })
   })
 
-  // [écart §10.10] La page mémorise `charger` avec l'objet `toast` pour
-  // dépendance ; cet objet change de référence à chaque rendu du ToastProvider.
-  // Un échec de chargement émet un toast qui fait re-rendre le provider, donc
-  // `charger` est recréé et l'effet relance la requête SANS action de l'agent.
-  // Avec un échec permanent ce serait la boucle infinie (« Maximum update
-  // depth ») ; on fige ici la relance parasite en faisant échouer les deux
-  // premières requêtes puis réussir la suivante, qui stabilise la page.
-  it('[écart §10.10] un échec de chargement relance la liste automatiquement sans action de l’agent', async () => {
+  // Régression §10.10 (corrigé au LOT 13) : un échec du chargement initial ne
+  // doit déclencher QU'UNE SEULE requête et QU'UN SEUL toast, puis l'écran doit
+  // montrer l'état vide — pas de relance automatique. La valeur du
+  // ToastContext étant désormais stable, l'échec ne recrée plus `charger`.
+  // On programme deux échecs puis un succès : une page saine ne consomme que
+  // la première réponse (l'échec) et ne requête jamais à nouveau.
+  it('échec de chargement : une seule requête, un seul toast et état vide (régression §10.10)', async () => {
     failListTimes(2)
     mount()
 
-    // La 3e requête réussit et la page affiche enfin les sessions.
-    expect(await screen.findByText('Jury normal L1 2025-2026')).toBeInTheDocument()
-    // Une page saine ne requêterait qu'une seule fois (aucun mécanisme de
-    // retry) ; ici au moins trois appels : 2 échecs relancés + 1 succès.
-    expect(listCalls().length).toBeGreaterThanOrEqual(3)
-    // Un toast d'erreur par échec/relance : la boucle parasite en empile plusieurs
-    // (une page saine n'afficherait qu'une seule alerte, après un unique appel).
-    expect(screen.getAllByText('Serveur de jurys indisponible.').length).toBeGreaterThanOrEqual(2)
+    expect(await screen.findByText('Serveur de jurys indisponible.')).toBeInTheDocument()
+    await settle()
+    expect(listCalls()).toHaveLength(1)
+    expect(screen.getAllByText('Serveur de jurys indisponible.')).toHaveLength(1)
+    expect(screen.getByText('Aucune session de jury.')).toBeInTheDocument()
   })
 })
 
@@ -184,7 +180,7 @@ describe('pages/scolarite/Jurys — actions de transition', () => {
       { path: '/juries/sessions/2/action/', body: { action: 'publier' } },
     ])
 
-    // Une session déjà PUBLIEE n'offre plus aucun bouton (workflow terminé).
+    // Une session déjà PUBLIÉE n'offre plus aucun bouton (workflow terminé).
     expect(
       within(rowOf('Jury publié L2')).queryByRole('button'),
     ).not.toBeInTheDocument()

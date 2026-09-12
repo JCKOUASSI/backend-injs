@@ -29,9 +29,11 @@
 > **sessions de jury** LMD — workflow de transition contrôler → … → publier
 > exercé pour chaque statut — et **diplômation** : validation/gel du PDF,
 > révocation motivée et **portail public de vérification** ; ce lot a révélé
-> une boucle de rechargement parasite sur échec de chargement, §10.10).
-> Les LOT 4 à 7 sont les seuls à toucher la logique applicative, sur feu vert
-> explicite ; les LOT 8 à 12 sont des lots de tests purs.
+> une boucle de rechargement parasite sur échec de chargement, §10.10), puis au
+> **[LOT 13]** (**correctif** de cet écart transverse : stabilisation de la
+> valeur du `ToastContext.Provider`, avec régressions dédiées — §10.10).
+> Les LOT 4 à 7 et le LOT 13 sont les lots qui touchent la logique applicative,
+> sur feu vert explicite ; les LOT 8 à 12 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -249,7 +251,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (30 fichiers, 539 tests)
+### 6.2 Fichiers de test colocalisés (31 fichiers, 542 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -262,7 +264,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/services/api.test.js` | unitaire | Client API : construction d'URL, en-têtes, gestion 401 → refresh JWT, **partage mono-flight** d'un refresh concurrent, refresh depuis cookie ou corps, erreurs réseau/serveur, gestion des noms de fichiers UTF-8 dans `Content-Disposition`. |
 | `src/services/scolarite.test.js` | unitaire | Services scolarité/admissions : chemins d'endpoint exacts (slash final Django), paramètres de requête, passages à blanc. |
 | `src/context/AuthContext.test.jsx` | intégration | Connexion, persistance, `refreshUser`, **purge de session** en cas de jeton illisible ou de rôle interdit (`FORMATEUR`), absence de stockage quand l'API ne renvoie pas de jeton refresh. |
-| `src/context/ToastContext.test.jsx` | intégration | Affichage, types, disparition automatique (fausses horloges), fermeture manuelle. |
+| `src/context/ToastContext.test.jsx` | intégration | Affichage, types, disparition automatique (fausses horloges), fermeture manuelle, et **stabilité de la valeur de contexte à l'apparition/disparition d'un toast (régression §10.10, LOT 13)**. |
 | `src/pages/Login.test.jsx` | composant/page | Marque INJS, soumission → création de session, erreurs serveur/génériques, **refus des rôles FORMATEUR/AUDITEUR**, bascule « voir le mot de passe », redirection si déjà authentifié. Contient aussi le test `[écart]` du §10.1. |
 | `src/components/Pagination.test.jsx` | composant | Navigation bornée, libellés, gestion des bornes. |
 | `src/components/ConfirmModal.test.jsx` | composant | Confirmation/annulation, action en cours, contenu. |
@@ -293,8 +295,9 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Admissions.test.jsx` | page | **8 tests (LOT 10), boucle admission** : liste/filtre par décision, état du bouton *Inscrire* selon `permet_inscription` ; panneau **profil administratif** (catégorie→grade liés, `PATCH /admissions/:id/`), **prononcé de décision** (`POST …/decision/`, panneau fermé, cas d'erreur) ; **inscription d'un admis** après modale (`POST /scolarite/inscriptions/depuis-admission/` `{admission_id, valider:true}` → matricule + navigation) ; **annulation** après confirmation (`POST …/annuler/`, rechargement) et annulation de la modale sans écriture. Couvre **98 % des lignes** de la page. |
 | `src/pages/scolarite/Inscriptions.test.jsx` | page | **4 tests (LOT 11)** : liste et 4 filtres transmis au service (recherche `q`, statut, formation, niveau — les valeurs vides étant éliminées) ; **validation en cascade** (un brouillon enchaîne `EN_ATTENTE → A_VALIDER → VALIDEE` par 3 `POST …/transition/` dans l'ordre, puis toast + rechargement ; une inscription déjà validée n'a pas de bouton) ; cascade **interrompue** dès qu'une transition échoue (toast de l'erreur, les étapes suivantes ne sont pas émises). Couvre **99,4 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/FicheEtudiant.test.jsx` | page | **6 tests (LOT 11)** : fiche avec inscription validée — rendu identité/programme/groupe/passerelle ; **génération de pédagogie** (`POST …/pedagogie/generer/`, nombre d'ajouts en toast), **retrait d'ECUE** (`DELETE /pedagogie/:id`, constats §10.9) ; **affectation à un groupe** (`POST …/affectations/`, bouton désactivé sans choix, option d'un groupe complet désactivée) ; **passerelle** prévisualisation puis synchronisation (`POST …/passerelle/`) ; fiche sans inscription validée = alerte et sections pédagogie/groupe absentes. Couvre **89,8 % des lignes / 100 % des fonctions**. |
-| `src/pages/scolarite/Jurys.test.jsx` | page | **14 tests (LOT 12), fin du parcours académique** : sessions avec badges et **3 filtres** transmis tels quels (statut/année/formation, clés toujours présentes) ; **workflow de transition complet** exercé pour chaque statut par test paramétré (Contrôler/Calculer/Délibérer/Décider/Générer PV/Valider/Verrouiller/Publier → le bon `POST …/action/` `{action}`, session PUBLIÉE sans bouton) ; confirmation `window.confirm` acceptée/annulée ; action rejetée (toast du détail backend) ; **lecture seule** (DIRECTION : pas d'actions, référentiels non chargés) ; un test **[écart §10.10]** fige la relance parasite sur échec de chargement. Couvre **100 % des lignes / 100 % des fonctions**. |
-| `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; un test **[écart §10.10]**. Couvre **100 % des lignes / 100 % des fonctions**. |
+| `src/pages/scolarite/Jurys.test.jsx` | page | **14 tests (LOT 12), fin du parcours académique** : sessions avec badges et **3 filtres** transmis tels quels (statut/année/formation, clés toujours présentes) ; **workflow de transition complet** exercé pour chaque statut par test paramétré (Contrôler/Calculer/Délibérer/Décider/Générer PV/Valider/Verrouiller/Publier → le bon `POST …/action/` `{action}`, session PUBLIÉE sans bouton) ; confirmation `window.confirm` acceptée/annulée ; action rejetée (toast du détail backend) ; **lecture seule** (DIRECTION : pas d'actions, référentiels non chargés) ; une **régression §10.10** (un échec de chargement = une seule requête, un seul toast, état vide). Couvre **100 % des lignes / 100 % des fonctions**. |
+| `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
+| `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
@@ -325,7 +328,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 12 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 13 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -345,16 +348,17 @@ Mesure après le LOT 12 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/FicheEtudiant.jsx` | **90 %** | 90 % | **100 %** | **74 %** |
 | `pages/scolarite/Jurys.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **88 %** |
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
+| `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier) | **82 %** | 82 % | **56 %** | **77 %** |
 | **Global `src/` (toutes zones)** | **40 %** | **40 %** | **30 %** | **67 %** |
 
-> Les LOT 4 à 7 sont des correctifs ciblés ; les LOT 8 à 12 n'ajoutent que des
-> tests.
+> Les LOT 4 à 7 et le LOT 13 sont des correctifs ciblés ; les LOT 8 à 12
+> n'ajoutent que des tests.
 > Les seuils du LOT 3 restent inchangés (aucun seuil n’a été baissé). Le nombre
 > de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
 > (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → 510 (LOT 11) →
-> **539 (LOT 12)** ; lignes couvertes globalement 35,3 % (LOT 5) → … →
-> 39,9 % (LOT 11) → **40,3 % (LOT 12)** (fonctions **30,4 %**, branches
+> 539 (LOT 12) → **542 (LOT 13)** ; lignes couvertes globalement 35,3 %
+> (LOT 5) → … → **40,3 % (LOT 12/13)** (fonctions **30,4 %**, branches
 > **66,7 %**).
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
@@ -363,10 +367,12 @@ Mesure après le LOT 12 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 97,5 %, `Admissions` 98 %) ; le LOT 11 y ajoutait les **inscriptions et la
 > fiche étudiant** ; le LOT 12 clôt le **parcours académique jusqu'au diplôme**
 > avec `Jurys` et `Graduation`, tous deux à **100 % de lignes / 100 % de
-> fonctions**. Le service `services/scolarite.js` reste à **100 % de lignes**
-> et le dossier `pages/scolarite/` atteint **82 % de lignes / 56 % de
-> fonctions / 77 % de branches**. Ce lot a aussi révélé un écart transverse de
-> rechargement (§10.10), signalé et non corrigé.
+> fonctions** ; le LOT 13 **corrige** l'écart transverse de rechargement qu'il
+> avait révélé (§10.10, stabilisation du `ToastContext`) avec 4 régressions,
+> et ajoute la première couverture de `MonEspace` (73,6 % de lignes). Le
+> service `services/scolarite.js` reste à **100 % de lignes** et le dossier
+> `pages/scolarite/` se maintient à **82 % de lignes / 56 % de fonctions /
+> 77 % de branches**.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -690,9 +696,10 @@ ajouter une `ConfirmModal` de cohérence avec les autres suppressions, ou
 assumer un retrait rapide (l'ECUE peut être régénérée depuis la maquette).
 À traiter, le cas échéant, dans un lot correctif dédié.
 
-### 10.10 Constat au LOT 12 — boucle de rechargement sur échec de chargement (valeur de contexte Toast instable)
+### 10.10 BUG corrigé au LOT 13 — boucle de rechargement sur échec de chargement (valeur de contexte Toast instable)
 
-Les pages `Jurys.jsx` et `Graduation.jsx` mémoïsent leur chargeur ainsi :
+Constaté au LOT 12 sur `Jurys.jsx` et `Graduation.jsx`, qui mémoïsaient leur
+chargeur ainsi :
 
 ```js
 const toast = useToast()                       // un OBJET { showToast }
@@ -702,43 +709,58 @@ const charger = useCallback(async () => {
 useEffect(() => { charger() }, [charger])
 ```
 
-Or `ToastContext.Provider` fournit `value={{ showToast }}` : la fonction
-`showToast` est stable (`useCallback` de deps vide), **mais l'objet `toast` est
-recréé à chaque rendu du fournisseur.** Lorsque le chargement initial échoue,
-`showToast` fait évoluer l'état du fournisseur (nouveau toast) → il se
-re-rend → les consommateurs reçoivent un nouvel objet `toast` → `charger` est
-recréé → l'effet `[charger]` **relance la requête sans action de
-l'utilisateur** ; si l'échec persiste, chaque tentative réémet un toast et la
-chaîne s'**auto-entretient jusqu'à la limite React** (« Maximum update depth
-exceeded ») : spam de toasts et rafale de requêtes, écran inutilisable quand le
-backend répond mal. En cas de succès il n'y a pas de toast, donc pas de boucle
-(un toast émis après une *action* ne provoque qu'un unique rechargement
-supplémentaire indolore) — c'est pourquoi le smoke (données vides qui réussissent)
-restait vert.
+Or `ToastContext.Provider` fournissait `value={{ showToast }}` : la fonction
+`showToast` était stable (`useCallback` de deps vide), **mais l'objet `toast`
+était recréé à chaque rendu du fournisseur.** Lorsque le chargement initial
+échouait, `showToast` faisait évoluer l'état du fournisseur (nouveau toast) →
+il se re-rendait → les consommateurs recevaient un nouvel objet `toast` →
+`charger` était recréé → l'effet `[charger]` **relançait la requête sans action
+de l'utilisateur** ; si l'échec persistait, chaque tentative réémettait un toast
+et la chaîne s'**auto-entretenait jusqu'à la limite React** (« Maximum update
+depth exceeded ») : spam de toasts et rafale de requêtes, écran inutilisable
+quand le backend répondait mal. En cas de succès il n'y avait pas de toast, donc
+pas de boucle — c'est pourquoi le smoke (données qui réussissent) restait vert.
 
 Le même patron (`[toast, …]` / `[toast]` sur un chargeur lancé par un effet)
-existe dans **cinq autres écrans** : `Campagnes`, `ChargesEnseignants`,
-`Equivalences`, `FinancesEtudiantes`, `MonEspace` — non reproduits au clic, mais
-exposés au même risque sur un échec de chargement initial. Les écrans déjà
-couverts (`Inscriptions`, `Admissions`, etc.) échappent au problème en dépendant
-de la fonction stable : `useCallback(…, [filtres, showToast])`.
+existait dans **cinq autres écrans** : `Campagnes`, `ChargesEnseignants`,
+`Equivalences`, `FinancesEtudiantes`, `MonEspace`. Les écrans déjà couverts
+(`Inscriptions`, `Admissions`, etc.) échappaient au problème en dépendant de la
+fonction stable (`useCallback(…, [filtres, showToast])`).
 
-Le comportement est **figé, sans la rendre infinie**, par un test `[écart
-§10.10]` dans `Jurys.test.jsx` et `Graduation.test.jsx` : les deux premières
-requêtes de liste échouent puis la troisième réussit ; l'écran se stabilise en
-affichant les données, mais le test constate **au moins trois requêtes et
-plusieurs toasts d'erreur sans aucune action** (une page saine, sans mécanisme de
-réessai, n'émettrait qu'une seule requête et un seul toast). Il n'est **pas
-corrigé** dans ce lot de tests.
+**Correctif (LOT 13, feu vert explicite), une seule ligne de logique partagée
+au niveau du fournisseur.** Dans `src/context/ToastContext.jsx`, la valeur est
+désormais mémoïsée :
 
-Correctif recommandé pour un lot dédié (à valider, comme §10.9) : la correction
-la plus centrale et la plus sûre est de mémoïser la valeur du fournisseur
-(`const value = useMemo(() => ({ showToast }), [showToast])` dans
-`ToastContext.jsx`), ce qui stabilise `toast` pour **les sept écrans** sans
-changer leur code ; à défaut, aligner chaque écran sur la dépendance stable
-`showToast` (et, le cas échéant, un état d'erreur unique plutôt qu'un toast en
-guise de retour d'échec de chargement). Une régression « une seule requête après
-un échec de chargement » accompagnera alors la correction.
+```js
+const value = useMemo(() => ({ showToast }), [showToast])
+// …
+<ToastContext.Provider value={value}>
+```
+
+La référence de l'objet de contexte ne change donc plus quand un toast apparaît
+ou disparaît (l'état interne `toasts` change, mais pas la valeur exposée) : tous
+les écrans qui dépendaient de `toast` — les sept cités — sont stabilisés
+**sans modification de leur code**, et l'API publique du contexte est
+inchangée.
+
+**Régressions (toutes en échec avant le correctif — preuve de mutation
+constatée)** :
+
+- un test de **stabilité de référence du contexte** dans
+  `context/ToastContext.test.jsx` : la valeur reçue par un consommateur reste
+  identique à l'apparition *et* à la disparition d'un toast ;
+- `Jurys.test.jsx` et `Graduation.test.jsx` : un échec du chargement initial
+  (deux échecs programmés puis un succès) ne produit **qu'une seule requête et
+  qu'un seul toast**, puis l'état vide — au lieu de ≥3 requêtes et de plusieurs
+  toasts ;
+- `MonEspace.test.jsx` (nouveau, 2 tests) : couvre le **second patron** (chargeur
+  lancé par un `useEffect([toast])` direct, sans `useCallback`) — rendu nominal de
+  la fiche, puis une seule requête/un seul toast quand `/scan/me/fiche/`
+  échoue.
+
+Les quatre autres écrans au même patron bénéficient du correctif central ; la
+régression de référence au niveau du contexte garantit qu'aucun consommateur ne
+peut plus rejouer un effet du fait d'un toast.
 
 ---
 
@@ -758,7 +780,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 12 :
+**Aucune page n'est dépourvue de test.** État après le LOT 13 :
 
 - six écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
   `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
@@ -780,6 +802,9 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `Jurys.jsx` (100 % ln / 100 % fonctions — workflow de délibération exercé
   pour chaque statut) et `Graduation.jsx` (100 % ln / 100 % fonctions —
   validation/gel du PDF, révocation motivée, portail public de vérification) ;
+- au LOT 13, `MonEspace.jsx` (espace étudiant) gagne un **test dédié** qui
+  couvre aussi le second patron du bug §10.10 (chargeur direct dans un
+  `useEffect([toast])`) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -787,7 +812,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **36 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **35 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -830,11 +855,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
      les autres actions destructrices) — comportement figé par un test, en
      attente d'un choix produit ;
-   - §10.10 boucle de rechargement sur échec de chargement (valeur de contexte
-     Toast non mémoïsée) touchant `Jurys`/`Graduation` et 5 autres écrans —
-     comportement figé par deux tests `[écart]`, correctif central recommandé
-     (mémoïser la valeur du `ToastContext.Provider`), **en attente de feu vert**
-     pour un lot correctif ;
+   - ~~§10.10 boucle de rechargement sur échec de chargement (valeur de contexte
+     Toast non mémoïsée)~~ **corrigé au LOT 13** (mémoïsation de la valeur du
+     `ToastContext.Provider`, 4 régressions) — ne reste ouvert qu'au titre d'un
+     choix produit éventuel sur la *forme* du retour d'erreur de chargement
+     (toast transversale vs état d'erreur dédié dans la page) ;
 5. composants partagés (modales, pickers, badges, panneaux de flux) ;
 6. montée progressive du plancher de couverture global (§7) et extension aux
    pages encore couvertes seulement en smoke ; option : durcir le smoke
