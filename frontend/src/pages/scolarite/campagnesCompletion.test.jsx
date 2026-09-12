@@ -1,5 +1,5 @@
 /**
- * LOT 13 — complétion des écritures des campagnes d'admission.
+ * LOT 16 — complétion des écritures des campagnes d'admission.
  *
  * Le LOT 8 (scolariteActions.test.jsx) couvrait la transition Planifier/Ouvrir
  * et l'enregistrement d'une note. Ce fichier couvre le reste du domaine :
@@ -12,9 +12,11 @@
  *    calcul/publication du classement, épreuve verrouillée exclue de la saisie
  *    de note, campagne fermée, lecture seule.
  *
- * Deux constats produit sont signalés en §10.11 (quotas non saisissables à la
- * création ; saisie de notes/actions de classement encore actives sur une
- * campagne fermée). Les tests figent le comportement observé sans corriger.
+ * Le LOT 17 (feu vert explicite, §10.11) corrige les deux constats relevés en
+ * LOT 16 : les quotas sont désormais saisissables à la création (et transmis
+ * en nombres), et la carte de saisie de notes / calcul-publication du
+ * classement est masquée sur une campagne fermée. Les tests correspondants
+ * sont des tests de régression.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { screen, act, within, fireEvent } from '@testing-library/react'
@@ -83,6 +85,10 @@ describe('Campagnes — création en brouillon', () => {
     const [dateOuverture, dateFermeture] = card.querySelectorAll('input[type="date"]')
     fireEvent.change(dateOuverture, { target: { value: '2026-03-01' } })
     fireEvent.change(dateFermeture, { target: { value: '2026-04-30' } })
+    // Quotas (régression §10.11 : ils étaient absents du formulaire au LOT 16).
+    const [quotaAdmissibles, quotaAdmis] = card.querySelectorAll('input[type="number"]')
+    fireEvent.change(quotaAdmissibles, { target: { value: '30' } })
+    fireEvent.change(quotaAdmis, { target: { value: '25' } })
     fireEvent.click(within(card).getByRole('button', { name: 'Créer' }))
     await settle(8)
 
@@ -94,17 +100,38 @@ describe('Campagnes — création en brouillon', () => {
       ref_formation_id: 10,
       date_ouverture: '2026-03-01',
       date_fermeture: '2026-04-30',
+      // Les quotas sont numérisés comme les identifiants.
+      quota_admissibles: 30,
+      quota_admis: 25,
     })
-    // Pas de champ quota dans le formulaire : ils partent en undefined.
-    expect(posts[0].body.quota_admissibles).toBeUndefined()
-    expect(posts[0].body.quota_admis).toBeUndefined()
 
     expect(await screen.findByText('Campagne créée en brouillon.')).toBeInTheDocument()
-    // Formulaire réinitialisé.
+    // Formulaire réinitialisé, quotas compris.
     expect(within(card).getByPlaceholderText('Libellé')).toHaveValue('')
+    expect(quotaAdmissibles).toHaveValue(null)
+    expect(quotaAdmis).toHaveValue(null)
     // Liste rechargée après création.
     const listGets = apiMock.get.mock.calls.filter(([p]) => p === '/admissions/campagnes/')
     expect(listGets.length).toBeGreaterThan(1)
+  })
+
+  it('laisse les quotas optionnels : non saisis, ils ne sont pas transmis (undefined)', async () => {
+    setupCampagnesRoutes(() => [])
+    mountCampagnes()
+    await settle()
+
+    const card = nouvelleCampagneCard()
+    fireEvent.change(within(card).getByPlaceholderText('Libellé'), { target: { value: 'Sans quotas' } })
+    const [comboAnnee, comboFormation] = within(card).getAllByRole('combobox')
+    fireEvent.change(comboAnnee, { target: { value: '1' } })
+    fireEvent.change(comboFormation, { target: { value: '10' } })
+    // Aucune valeur dans les deux champs quota.
+    fireEvent.click(within(card).getByRole('button', { name: 'Créer' }))
+    await settle(8)
+
+    const body = writes('post').find(w => w.path === '/admissions/campagnes/').body
+    expect(body.quota_admissibles).toBeUndefined()
+    expect(body.quota_admis).toBeUndefined()
   })
 
   it("sur erreur serveur, notifie et conserve le libellé saisi", async () => {
@@ -417,7 +444,7 @@ describe('CampagneDetail — actions sur épreuves et classement', () => {
   })
 })
 
-describe('CampagneDetail — états fermés et habilitations [écart §10.11]', () => {
+describe('CampagneDetail — états fermés et habilitations', () => {
   it('campagne clôturée : plus d’ajout d’épreuve ni d’actions d’épreuve', async () => {
     const campFermee = { ...CAMP, statut: 'CLOTUREE' }
     mountDetail('ADMIN', campFermee)
@@ -431,15 +458,27 @@ describe('CampagneDetail — états fermés et habilitations [écart §10.11]', 
     expect(within(epreuveRow).queryByRole('button', { name: 'Verrouiller' })).not.toBeInTheDocument()
   })
 
-  it('[écart] la saisie de notes et les actions de classement restent actives sur campagne clôturée', async () => {
+  it('régression §10.11 : la saisie de notes et les actions de classement sont masquées sur campagne clôturée', async () => {
     const campFermee = { ...CAMP, statut: 'CLOTUREE' }
     mountDetail('ADMIN', campFermee)
     await screen.findByText('Concours L1 2026')
-    // Comportement observé figé : la carte de notes et les deux actions de
-    // classement ne sont pas conditionnées par campagneFermee.
-    expect(screen.getByText('Saisie des notes')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /calculer le classement/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /publier les listes/i })).toBeInTheDocument()
+    // Au LOT 16 cette carte et ces boutons restaient actifs (constat §10.11) ;
+    // le LOT 17 les masque sur campagne CLOTUREE/ANNULEE/ARCHIVEE, comme le
+    // formulaire d'épreuve et les boutons Convocations/Verrouiller.
+    expect(screen.queryByText('Saisie des notes')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /calculer le classement/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /publier les listes/i })).not.toBeInTheDocument()
+  })
+
+  it('régression §10.11 : même chose pour une campagne annulée, le classement reste consultable', async () => {
+    const campAnnulee = { ...CAMP, statut: 'ANNULEE' }
+    mountDetail('ADMIN', campAnnulee)
+    await screen.findByText('Concours L1 2026')
+    expect(screen.queryByText('Saisie des notes')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /calculer le classement/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /publier les listes/i })).not.toBeInTheDocument()
+    // Le tableau de classement en lecture reste affiché.
+    expect(screen.getByText('Awa Koné')).toBeInTheDocument()
   })
 
   it('direction : aucune carte d’action (épreuves, notes), le classement reste lisible', async () => {

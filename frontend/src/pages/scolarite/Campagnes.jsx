@@ -56,8 +56,8 @@ export default function Campagnes() {
         ...form,
         annee_academique_id: Number(form.annee_academique_id) || undefined,
         ref_formation_id: Number(form.ref_formation_id) || undefined,
-        quota_admissibles: form.quota_admissibles || undefined,
-        quota_admis: form.quota_admis || undefined,
+        quota_admissibles: Number(form.quota_admissibles) || undefined,
+        quota_admis: Number(form.quota_admis) || undefined,
       })
       toast.showToast('Campagne créée en brouillon.')
       setForm({ libelle: '', annee_academique_id: '', ref_formation_id: '', date_ouverture: '', date_fermeture: '', quota_admissibles: '', quota_admis: '' })
@@ -117,6 +117,16 @@ export default function Campagnes() {
               <div className="col-md-2">
                 <input type="date" className="form-control" value={form.date_fermeture}
                        onChange={(e) => setForm({ ...form, date_fermeture: e.target.value })} />
+              </div>
+              <div className="col-md-1">
+                <input type="number" min="0" className="form-control" placeholder="Quota admiss."
+                       title="Quota d'admissibles (optionnel)" value={form.quota_admissibles}
+                       onChange={(e) => setForm({ ...form, quota_admissibles: e.target.value })} />
+              </div>
+              <div className="col-md-1">
+                <input type="number" min="0" className="form-control" placeholder="Quota admis"
+                       title="Quota d'admis (optionnel)" value={form.quota_admis}
+                       onChange={(e) => setForm({ ...form, quota_admis: e.target.value })} />
               </div>
               <div className="col-md-1">
                 <button className="btn btn-primary w-100" disabled={enCours}>Créer</button>

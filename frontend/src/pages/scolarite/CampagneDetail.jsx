@@ -187,7 +187,7 @@ export default function CampagneDetail() {
       )}
 
 
-      {peutAgir && (
+      {peutAgir && !campagneFermee && (
         <div className="card mb-3">
           <div className="card-body">
             <h2 className="h6 card-title">Saisie des notes</h2>
