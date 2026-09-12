@@ -67,10 +67,14 @@
 > garde-fou inter-module, erreurs), l'**archivage à trois confirmations**
 > `TripleConfirmModal` est couvert de bout en bout (POST, annulation,
 > erreur, habilitations), ainsi que la **pagination serveur** des pickers
-> enseignants/étudiants).
+> enseignants/étudiants), puis au **[LOT 21]** (écran miroir
+> `FormationDetail`, niveau formation : chargement/en-tête/onglets,
+> regroupement des séances par module et tout le cycle de vie des séances,
+> étudiants et enseignants avec pickers, assignation de l'encadrant,
+> habilitations — 25 tests, 63 % de lignes ; le global `src/` franchit 50 %).
 > Les LOT 4 à 7, 13, 17 et 19 sont les lots qui touchent la logique
-> applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18 et 20 sont
-> des lots de tests purs.
+> applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20 et 21
+> sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -288,7 +292,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (37 fichiers, 656 tests)
+### 6.2 Fichiers de test colocalisés (38 fichiers, 681 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -339,6 +343,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/Rattrapages.test.jsx` | page | **18 tests (LOT 15), rattrapages de présence** : liste avec badges de statut/cohorte et **filtres débordancés** (`statut`, `q` vérifiés en query) ; états erreur/vide ; **lecture seule** pour un rôle hors `PRESENCE_ACTION_ROLES` (DIRECTION) ; **création** via recherche d'étudiant puis **sélection multiple de séances** (recherche ciblée `participant=`, séance « déjà inscrit » verrouillée, pastille ajout/retrait), mode **module entier** (ajout de toutes ses séances, module déjà fait verrouillé), motif, case « forcer la présence », validation sans étudiant/séance, **payload** `{participant_id, seance_rattrapage_ids, motif, generer_presence}` vérifié, toast créés/réactivés/ignorés, erreur serveur gardée dans la modale ; **génération de pointage** (`POST …/generer-presence/`) et **annulation** via `ConfirmModal` (avec/sans pointage → `supprimer_pointage`, refus = aucun appel), actions absentes sur un rattrapage annulé, cas d'erreur des deux écritures. Couvre **97,3 % des lignes / 86 % de branches** (le résidu est du filtrage défensif inatteignable via l'UI). |
 | `src/pages/FicheAuditeur.test.jsx` | page | **8 tests (LOT 15), fiche de suivi d'un auditeur** : synthèse (formation, moyenne, classement, décision finale), suivi par module (heures présence/prevues, taux, moyenne, épreuves), état « aucun module », tirets des champs absents, erreur de chargement → « fiche introuvable », **exports PDF et Excel** (`getBlob`), nom de fichier par défaut, erreur d'export. Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/ModuleDetail.test.jsx` | page | **15 tests (LOT 16), émargement — onglets Séances et Présences de `ModuleDetail`**. Séances : badges de statut lus sur `en_cours`/`terminee`, compteurs d'onglets ; **démarrage** (`POST …/sessions/:id/start/` via `ConfirmModal`, toast + rechargement) et **annulation sans appel** ; **fin** (`stop/`), **suppression** (`DELETE …/delete/`, annulation puis confirmation), erreur backend (toast du `detail`), **création** (`POST …/sessions/new/` avec les 4 champs). **Habilitations** : un ENCADRANT peut démarrer mais pas créer/supprimer, la DIRECTION est strictement en lecture (pas de forçage). Présences : les **5 cartes de stats** (attendus = étudiants+enseignants+encadrants, en salle, présents, absents, taux), date sans pointage = tout le monde absent et message explicite ; **forçage unitaire** d'un étudiant absent (`POST …/force-pointage/` avec `{personne_id, type_personne, action:'ENTREE', motif, module_id, date_journee}`, bouton désactivé sans motif, toast du détail, fermeture) ; **badgeage en masse** toutes séances (motif obligatoire, `POST …/force-badgeage-étudiants-bulk/`, agrégat `sessions` en toast, fermeture), sur une séance précise (`session_id` transmis), erreur gardée dans la modale. **Complété aux LOTs 18 et 19 (33 tests au total)** : onglet Étudiants (liste + recherche débordancée 400 ms, **inscription via picker** avec exclusion des déjà inscrits, message d'erreur en modale, **retrait via ConfirmModal**, lecture seule DIRECTION), onglet Enseignants (liste, **assignation au clic via le picker** — happy path POST `formateurs/add/`, refus pour conflit d'emploi du temps affiché dans la modale, gating du bouton, liste vide avec `module_id`, **retrait confirmé** ; ces parcours sont les **régressions §10.12 du LOT 19**), onglet Informations (**édition du module PATCH**, erreur backend, **assignation/retrait du superviseur** encadrant, absence des boutons en DIRECTION), et **exports PDF/Excel** (`getBlob` module et séance avec nom de fichier dérivé, erreur notifiée). **Le LOT 20 porte le fichier à 46 tests et achève la page** : **modale QR des séances** (`QRCodeModal` — GET `superviseur/:id/qr/` avec `session_id`/`module_id`, état 404 « aucun QR actif », **génération** POST `sessions/:id/generate-qr/`, **régénération** derrière `ConfirmModal`, téléchargement PNG (`qr_seance_F_S.png`), refus d'un QR appartenant à un autre module, détail backend en échec, pas de QR sur séance terminée), **archivage** (`TripleConfirmModal` — les 3 étapes puis POST `…/archive/` et toast, annulation sans écriture, erreur backend, bouton masqué si `archived` ou pour un ENCADRANT), et **pagination serveur des pickers** (enseignant et étudiant : `page=2` après « Suivant », libellé `1–50 sur 80`, réinitialisation page 1 à la réouverture). Porte la page à **90,2 % de lignes / 67,9 % de branches / 61,7 % de fonctions** ; `QRCodeModal` atteint **95,8 % de lignes** et `TripleConfirmModal` **100 %** au travers de ces parcours. |
+| `src/pages/FormationDetail.test.jsx` | page | **25 tests (LOT 21), fiche formation — miroir de `ModuleDetail`**. Chargement `GET /formations/:id/detail/` : titre, badges statut, lien module, cartes de résumé, **erreur de chargement** (carte d'erreur + bouton Retour), **onglet Présences masqué** pour un rôle non habilité (SUPERVISEUR). **Onglet Séances regroupées par module** : compteurs de présence/statuts, **démarrage** et **fin** via `ConfirmModal` (`POST sessions/:id/start|stop/`, annulation sans appel), **suppression** (`DELETE …/delete/`, annulation puis confirmation), **création inline** (`POST sessions/new/` avec `numero = sessions.length + 1` et intitulé calculé), **modification** (`PATCH …/update/`, titre de modale résolu par rôle *heading*), détail backend en échec, séance terminée sans action de vie. **Habilitations** : ENCADRANT peut démarrer mais pas créer/supprimer/modifier ; DIRECTION strictement lecture (séances comme étudiants). **Onglet Étudiants** : coordonnées, **ajout via picker** (`POST participants/add/`, exclusion des inscrits, debounce 300 ms), erreur backend (toast), **retrait confirmé** (`DELETE`). **Onglet Enseignants** : chargement paresseux `GET /formations/:id/formateurs/` à l'activation, **ajout au niveau formation** (`POST formateurs/add/` depuis une liste **sans `module_id`**, exclusion des assignés), **retrait confirmé**. **Onglet Informations** : assignation de l'encadrant (picker `GET /auth/users/?role=ENCADRANT`, clic ligne, `POST assign-superviseur/` en `superviseur_id` chaîne), validation refusée sans sélection, crayon masqué en DIRECTION. Porte la page à **63,0 % de lignes / 51,0 % de fonctions / 72,5 % de branches** ; reste l'onglet Présences (dashboard + forçage de pointage), les exports, le QR, l'archivage depuis l'en-tête de groupe, l'import Excel et la pagination serveur des pickers. |
 | `src/components/formateurs/FormateurAssignPickerItem.test.jsx` | composant | **3 tests (LOT 18)** : rendu nom/prénom/spécialité, clic → `onAssign(id)` exact, gating conflit d'emploi du temps (le message remplace le bouton, ligne grisée), spécialité absente. Teste le contrat déclaré par le composant (prop `formateur`) ; le câblage de `ModuleDetail` aligné sur ce contrat au LOT 19 (§10.12) est testé dans `ModuleDetail.test.jsx`. **100 % de lignes / branches / fonctions**. |
 | `src/pages/scolarite/campagnesCompletion.test.jsx` | page | **19 tests (LOT 16, complétés au LOT 17 §10.11), campagnes d'admission**. `Campagnes` : **création en brouillon** (formulaire — sélecteurs année/formation requis, dates, **champs quota d'admissibles/d'admis transmis en nombres**, quotas vides → `undefined`, réinitialisation + rechargement), échec serveur (formulaire conservé), **les 4 transitions restantes** du workflow (Suspendre sans confirmation, Clôturer avec confirmation, Réouvrir, Archiver ; annulation = aucun appel), lecture seule DIRECTION (référentiels non chargés). `CampagneDetail` : rendu (compteurs, quota, lignes d'épreuves verrouillées, tableau du classement et ses badges, épreuve verrouillée exclue du sélecteur de note, candidatures des autres campagnes filtrées), **ajout d'épreuve** (POST typé avec/sans salle, valeurs par défaut, reset, erreur JSON conservée), **génération des convocations** (confirm annulée puis acceptée), **verrouillage** (confirm d'irréversibilité, échec notifié), boutons absents sur épreuve verrouillée, **calcul du classement sans confirmation** puis **publication avec confirmation**, campagne clôturée (formulaire d'épreuve masqué) et les **régressions §10.11 (LOT 17)** : la carte de saisie de notes et les boutons de calcul/publication sont masqués sur campagne **clôturée comme annulée** (le classement reste consultable), DIRECTION en lecture seule. Porte `Campagnes.jsx` à **99,4 % de lignes / 100 % de fonctions** et `CampagneDetail.jsx` à **98,8 % / 100 %**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
@@ -371,7 +376,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 20 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 21 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -388,6 +393,7 @@ Mesure après le LOT 20 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Rattrapages.jsx` (LOT 15) | **97 %** | 97 % | **77 %** | **86 %** |
 | `pages/FicheAuditeur.jsx` (LOT 15) | **100 %** | **100 %** | **100 %** | **83 %** |
 | `pages/ModuleDetail.jsx` (LOT 16/18/19/20) | **90 %** | 90 % | **62 %** | **68 %** |
+| `pages/FormationDetail.jsx` (LOT 21) | **63 %** | 63 % | **51 %** | **72 %** |
 | `components/QRCodeModal.jsx` (via ModuleDetail, LOT 20) | **96 %** | 96 % | 90 % | **82 %** |
 | `components/TripleConfirmModal.jsx` (via ModuleDetail, LOT 20) | **100 %** | **100 %** | **100 %** | **89 %** |
 | `components/formateurs/FormateurAssignPickerItem.jsx` (LOT 18) | **100 %** | **100 %** | **100 %** | **100 %** |
@@ -402,7 +408,7 @@ Mesure après le LOT 20 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier) | **82 %** | 82 % | **56 %** | **77 %** |
-| **Global `src/` (toutes zones)** | **48,1 %** | **48,1 %** | **41,1 %** | **70,9 %** |
+| **Global `src/` (toutes zones)** | **50,3 %** | **50,3 %** | **43,7 %** | **71,4 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -411,14 +417,16 @@ Mesure après le LOT 20 (V8, `npm run test:coverage`), sur les zones ciblées :
 > (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → 510 (LOT 11) →
 > 539 (LOT 12) → 542 (LOT 13) → 562 (LOT 14) → 588 (LOT 15) →
 > 620 (LOT 16) → 622 (LOT 17) → 641 (LOT 18) → 643 (LOT 19) →
-> **656 (LOT 20)** ; lignes couvertes globalement 35,3 % (LOT 5) → … →
-> 41,6 % (LOT 14) → 43,1 % (LOT 15) → 45,3 % (LOT 16/17) →
-> 47,4 % (LOT 18) → 47,5 % (LOT 19) → **48,1 % (LOT 20)**
-> (fonctions **41,1 %**, branches **70,9 %**). Les LOT 17 et 19 corrigent la
-> logique (transformation de tests `[écart]` en régressions, sans nouveau
-> fichier) ; le LOT 18 était un lot de tests purs qui a révélé le bug
-> bloquant §10.12, corrigé au LOT 19 ; le LOT 20 est un lot de tests purs
-> qui achève la couverture fonctionnelle de `ModuleDetail`.
+> 656 (LOT 20) → **681 (LOT 21)** ; lignes couvertes globalement 35,3 %
+> (LOT 5) → … → 41,6 % (LOT 14) → 43,1 % (LOT 15) → 45,3 % (LOT 16/17) →
+> 47,4 % (LOT 18) → 47,5 % (LOT 19) → 48,1 % (LOT 20) →
+> **50,3 % (LOT 21)** (fonctions **43,7 %**, branches **71,4 %**). Les
+> LOT 17 et 19 corrigent la logique (transformation de tests `[écart]` en
+> régressions, sans nouveau fichier) ; le LOT 18 était un lot de tests purs
+> qui a révélé le bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève
+> la couverture fonctionnelle de `ModuleDetail` et le LOT 21 ouvre l'écran
+> miroir `FormationDetail` (63 % de lignes), faisant passer le global **au-delà
+> de 50 % de lignes couvertes**.
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
 > **invisibles car en panne** (§10.8) ; le LOT 8 y exécutait les actions au
@@ -456,8 +464,14 @@ Mesure après le LOT 20 (V8, `npm run test:coverage`), sur les zones ciblées :
 > l'écran** à **90,2 % de lignes / 61,7 % de fonctions** en exerçant la
 > modale QR (95,8 %), l'archivage à trois confirmations (`TripleConfirmModal`
 > à 100 %) et la pagination serveur des pickers.
-> Le seul reliquat de cet écran est son miroir `FormationDetail` (au
-> backlog). Le service `services/scolarite.js`
+> Le **LOT 21 ouvre ensuite l'écran miroir `FormationDetail`** (niveau
+> formation, **63,0 % de lignes** dès ses 25 premiers tests) : onglets et
+> regroupement des séances par module, cycle de vie complet des séances,
+> étudiants/enseignants avec pickers et encadrant ; restent l'onglet
+> Présences (dashboard et forçage de pointage), les exports, le QR,
+> l'archivage depuis l'en-tête de groupe, l'import Excel et la pagination
+> serveur des pickers.
+> Le service `services/scolarite.js`
 > reste à **100 % de lignes** et le dossier `pages/scolarite/` se maintient à
 > **84 % de lignes / 67 % de fonctions / 79 % de branches**.
 
@@ -951,9 +965,9 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 20 :
+**Aucune page n'est dépourvue de test.** État après le LOT 21 :
 
-- dix écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
+- onze écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
   (89 %, liste serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %,
   nettoyage des filtres obsolètes), `Statistiques.jsx` (28 %, contrat
@@ -966,7 +980,12 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   61,7 % de fonctions**, LOTs 16, 18, 19 et 20 — émargement : séances/présences,
   étudiants, enseignants dont l'assignation réparée §10.12, édition,
   superviseur, exports, QR des séances, archivage et pagination des pickers ;
-  l'écran est désormais couvert fonctionnellement de bout en bout) ;
+  l'écran est désormais couvert fonctionnellement de bout en bout), et
+  `FormationDetail.jsx` (**63,0 % de lignes / 72,5 % de branches / 51,0 % de
+  fonctions**, LOT 21 — fiche de niveau formation : séances regroupées par
+  module et leur cycle de vie, étudiants/enseignants avec pickers, encadrant,
+  habilitations ; reste l'onglet Présences, les exports, le QR, l'archivage
+  depuis l'en-tête de groupe et l'import Excel) ;
 - cinq écrans Scolarité (`Campagnes`, `CampagneDetail`, `Equivalences`,
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
@@ -1023,6 +1042,13 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   ou pour un ENCADRANT — `TripleConfirmModal` à 100 %) et la **pagination
   serveur des pickers** enseignants/étudiants (`page=2`, libellé d'intervalle,
   retour page 1 à la réouverture) ;
+- au LOT 21, l'écran miroir **`FormationDetail`** gagne son **test dédié (25
+  tests, 63,0 % de lignes)** : chargement et erreur, masquage de l'onglet
+  Présences selon le rôle, séances **regroupées par module** avec démarrage/
+  fin/suppression/création inline/modification, étudiants (ajout picker,
+  retrait), enseignants (chargement paresseux de l'onglet, ajout **niveau
+  formation sans `module_id`**, retrait) et assignation de l'encadrant, avec
+  les habilitations ENCADRANT/DIRECTION ;
 - le même lot **achève la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1042,7 +1068,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `QRCodeModal` (95,8 %) et `TripleConfirmModal` (100 %) sont exercés en
   profondeur via les parcours de `ModuleDetail` ; les autres composants ne
   sont exercés qu'indirectement via le smoke ;
-- les **31 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **30 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -1086,8 +1112,14 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    `force-pointage`, badgeage en masse, inscriptions/retraits d'étudiants,
    **assignation d'enseignants réparée §10.12**, édition, superviseur,
    exports, **QR des séances au LOT 20**, **archivage à trois
-   confirmations** et pagination serveur des pickers) ; **reste** l'écran
-   miroir **`FormationDetail`**, puis le **CRUD des participants**
+   confirmations** et pagination serveur des pickers) ; l'écran miroir
+   **`FormationDetail` est entamé au LOT 21 à 63,0 % de lignes** (séances
+   regroupées par module et leur cycle de vie, étudiants/enseignants,
+   encadrant) ; **restent sur cet écran** l'onglet **Présences** (dashboard
+   et forçage de pointage unitaire, jour passé), les **exports** PDF/Excel,
+   le **QR de séance**, l'**archivage** depuis l'en-tête de groupe,
+   l'**import Excel** des séances (SECRETARIAT) et la pagination serveur des
+   pickers ; puis le **CRUD des participants**
    (`Participants`), les **finances étudiantes**, les **référentiels**, et
    les gros volumes internes `Statistiques` et `Users` (création de
    secrétariat à la volée) ;
