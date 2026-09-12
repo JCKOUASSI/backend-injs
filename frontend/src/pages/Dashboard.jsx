@@ -73,10 +73,11 @@ export default function Dashboard() {
       listParams.set('seance_en_cours', 'true')
     }
     const listQuery = listParams.toString()
-    const [statsRes, enCoursRes] = await Promise.allSettled([
+    const settled = await Promise.allSettled([
       api.get(`/formations/stats/${statsQuery ? `?${statsQuery}` : ''}`),
       api.get(`/formations/list/?${listQuery}`),
     ])
+    const [statsRes, enCoursRes] = settled
 
     const unwrap = (res, fallback) => {
       if (res.status !== 'fulfilled') return fallback
@@ -87,9 +88,11 @@ export default function Dashboard() {
     if (statsRes.status === 'fulfilled') setStats(statsRes.value.data)
     setFormationsEnCours(unwrap(enCoursRes, []))
 
-    const failures = [statsRes, enCoursRes].filter(r => r.status === 'rejected')
+    // Échec total = toutes les requêtes ont échoué (et non un nombre « 3 »
+    // codé en dur, inatteignable avec 2 requêtes — écart §10.6 corrigé).
+    const failures = settled.filter(r => r.status === 'rejected')
     if (!silent) {
-      if (failures.length === 3) {
+      if (failures.length === settled.length) {
         setError('Erreur lors du chargement des données')
       } else if (failures.length > 0) {
         setError('Certaines données n\'ont pas pu être chargées')

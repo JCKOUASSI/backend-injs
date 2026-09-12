@@ -119,3 +119,33 @@ describe('pages/Dashboard.jsx — chargement et période de présence', () => {
     expect(q.has('seance_en_cours')).toBe(false)
   })
 })
+
+describe('pages/Dashboard.jsx — gestion des erreurs de chargement (§10.6)', () => {
+  beforeEach(() => {
+    apiController.reset()
+    window.localStorage.clear()
+    apiController.setRoute('/formations/secretariats/', () => [])
+  })
+
+  const boom = () => {
+    throw Object.assign(new Error('réseau'), { response: { data: { detail: 'indisponible' } } })
+  }
+
+  it('échec des DEUX requêtes → message d’erreur totale', async () => {
+    apiController.setRoute('/formations/stats/', boom)
+    apiController.setRoute('/formations/list/', boom)
+
+    mountDashboard(adminMe())
+    expect(await screen.findByText('Erreur lors du chargement des données')).toBeInTheDocument()
+    expect(screen.queryByText(/certaines données/i)).not.toBeInTheDocument()
+  })
+
+  it('une seule requête échoue → message d’erreur partielle', async () => {
+    apiController.setRoute('/formations/stats/', () => dashboardStatsWithPeriods())
+    apiController.setRoute('/formations/list/', boom)
+
+    mountDashboard(adminMe())
+    expect(await screen.findByText(/certaines données/i)).toBeInTheDocument()
+    expect(screen.queryByText('Erreur lors du chargement des données')).not.toBeInTheDocument()
+  })
+})

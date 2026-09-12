@@ -33,11 +33,22 @@ describe('utils/apiErrors — formatApiErrors', () => {
     expect(formatApiErrors({ error: 'Quelque chose cloche' })).toBe('Quelque chose cloche')
   })
 
-  it('[écart] traite un error uniquement composé d’espaces comme un champ normal', () => {
-    // Comportement constaté (non corrigé au LOT 1) : un `error` blanc n’est pas
-    // retenu comme message, mais l’objet n’est pas vide pour autant → la clé
-    // « error » est formatée comme une erreur de champ.
-    expect(formatApiErrors({ error: '   ' })).toBe('error :    ')
+  it('un error vide ou composé d’espaces retombe sur le message générique', () => {
+    // Écart §10.4 corrigé : une clé `error` blanche ne doit pas s'afficher
+    // comme un champ (« error :    ») mais faire retomber sur le fallback.
+    expect(formatApiErrors({ error: '   ' })).toBe('Une erreur est survenue.')
+    expect(formatApiErrors({ error: '' })).toBe('Une erreur est survenue.')
+  })
+
+  it('ignore les champs sans message mais conserve les champs renseignés', () => {
+    const out = formatApiErrors({
+      error: '   ',
+      empty: '',
+      missing: null,
+      nothing: [],
+      username: ['Champ requis.'],
+    })
+    expect(out).toBe('Identifiant : Champ requis.')
   })
 
   it('formate les erreurs de champ avec les libellés FR par défaut', () => {
