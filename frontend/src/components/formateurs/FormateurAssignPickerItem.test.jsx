@@ -4,10 +4,9 @@
  * Composant pur : nom/spécialité, bouton d'assignation et gating en cas de
  * conflit d'emploi du temps (le message remplace le bouton).
  *
- * NB : le composant attend la prop `formateur` ; or ModuleDetail le câble avec
- * `enseignant` — c'est l'écart §10.12 (la modale plante tant que ce nom de
- * prop n'est pas aligné). Le présent teste le contrat déclaré par le
- * composant ; le test page [écart §10.12] documente la panne de câblage.
+ * Le câblage côté ModuleDetail a été corrigé au LOT 19 (§10.12 : la page
+ * passait la prop `enseignant` au lieu de `formateur`, faisant planter la
+ * modale) ; les parcours d'assignation sont testés dans ModuleDetail.test.jsx.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'

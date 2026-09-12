@@ -20,7 +20,6 @@ vi.mock('@/services/api', async (importOriginal) => {
 
 import apiMock, { apiController } from '@/test/utils/mockApi'
 import { renderWithProviders } from '@/test/utils/renderWithProviders'
-import TestErrorBoundary from '@/test/utils/ErrorBoundary'
 import { flushPromises } from '@/test/utils/async'
 import { makeUser } from '@/test/utils/factories'
 import ModuleDetail from '@/pages/ModuleDetail'
@@ -462,36 +461,75 @@ describe('ModuleDetail — onglet Étudiants (inscriptions)', () => {
 })
 
 describe('ModuleDetail — onglet Enseignants (assignations)', () => {
-  // [écart §10.12] Le picker d'enseignants passe la prop `enseignant` alors
-  // que FormateurAssignPickerItem la lit sous le nom `formateur` : dès qu'une
-  // ligne est rendue, la modale plante (Cannot destructure property 'nom' of
-  // 'formateur'). Le comportement attendu du composant est testé dans
-  // FormateurAssignPickerItem.test.jsx ; le câblage sera corrigé sur feu vert.
-  it('[écart §10.12] plante dès qu’un enseignant disponible est affiché dans le picker', async () => {
-    apiController.setRoute('/formations/formateurs/list/', () => [
-      { id: 202, nom: 'Koffi', prenom: 'Ado', specialite: 'LSF' },
-    ])
-    const me = makeUser('ADMIN', { username: 'admin' })
-    apiController.setMe(me)
-    renderWithProviders(<TestErrorBoundary><ModuleDetail /></TestErrorBoundary>, {
-      authUser: me,
-      routePattern: '/formations/:formationId/modules/:moduleId',
-      initialEntries: [`/formations/${F}/modules/${M}`],
+  // §10.12 (corrigé au LOT 19) : la page passait la prop `enseignant` alors
+  // que le composant lit `formateur` ; la modale plantait dès qu'une ligne
+  // était renvoyée. Les parcours ci-dessous sont les tests de régression.
+  it('assigne un enseignant disponible via le picker (POST add), en excluant les déjà assignés', async () => {
+    apiController.setRoute('/formations/formateurs/list/', (path) => {
+      expect(path).toContain(`module_id=${M}`) // préfiltrage par module
+      return [
+        { id: 201, nom: 'Nguessan', prenom: 'Yao' }, // déjà assigné → filtré
+        { id: 202, nom: 'Koffi', prenom: 'Ado', specialite: 'LSF' },
+      ]
     })
+    mount()
+    await screen.findByText('Séance du matin')
+    await goTab(/enseignants \(1\)/i)
+    expect(screen.getByText('Enseignants assignés')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /assigner/i }))
+    await waitReal()
+    const box = modal()
+    expect(within(box).queryByText(/Nguessan Yao/)).not.toBeInTheDocument()
+    expect(within(box).getByText(/Koffi Ado/)).toBeInTheDocument()
+
+    fireEvent.click(within(box).getByTitle('Assigner cet enseignant'))
+    await settle(8)
+    expect(posts((p) => p.includes('/formateurs/add/'))).toEqual([
+      { path: `/formations/${F}/modules/${M}/formateurs/add/`, body: { formateur_id: 202 } },
+    ])
+    expect(await screen.findByText('Enseignant assigné')).toBeInTheDocument()
+    // La modale reste ouverte pour permettre une deuxième assignation.
+    expect(within(box).getByText(/Assigner un enseignant/i)).toBeInTheDocument()
+  })
+
+  it("en cas de refus backend (conflit d'emploi du temps), le détail reste affiché dans la modale", async () => {
+    apiController.setRoute('/formations/formateurs/list/', () => [
+      { id: 203, nom: 'Dosso', prenom: 'Awa' },
+    ])
+    apiController.setRoute(/\/formateurs\/add\//, () => {
+      // eslint-disable-next-line no-throw-literal
+      throw { response: { data: { detail: "Conflit d'emploi du temps sur ce créneau." } } }
+    })
+    mount()
     await screen.findByText('Séance du matin')
     await goTab(/enseignants \(1\)/i)
     fireEvent.click(screen.getByRole('button', { name: /assigner/i }))
     await waitReal()
-    // Le chargement débouncé (300 ms) fait planter la modale.
-    const crash = screen.getByTestId('render-crash')
-    expect(crash.textContent).toMatch(/formateur/i)
-    // Aucune écriture n'a eu le temps de partir.
-    expect(posts((p) => p.includes('/formateurs/add/'))).toHaveLength(0)
+    const box = modal()
+    fireEvent.click(within(box).getByTitle('Assigner cet enseignant'))
+    // Le message d'erreur structuré est rendu dans la fenêtre (pas seulement un toast).
+    expect(await within(box).findByText(/conflit d'emploi du temps/i)).toBeInTheDocument()
+    expect(within(box).getByText(/Dosso Awa/)).toBeInTheDocument()
+    // Aucune assignation n'a été enregistrée.
+    expect(posts((p) => p.includes('/formateurs/add/'))).toHaveLength(1)
   })
 
-  it("ne plantera pas après correctif : le module_id est bien envoyé au chargement de la liste", async () => {
-    // État « liste vide » : sans ligne rendue, la modale s'ouvre et le
-    // GET porte bien le module_id (prérequis qui restera valide après fix).
+  it('masque le bouton d’assignation d’un enseignant signalé en conflit (gating §10.12)', async () => {
+    apiController.setRoute('/formations/formateurs/list/', () => [
+      { id: 204, nom: 'Bile', prenom: 'Eric', conflit_assignation: 'Déjà en salle B2 à 8h.' },
+    ])
+    mount()
+    await screen.findByText('Séance du matin')
+    await goTab(/enseignants \(1\)/i)
+    fireEvent.click(screen.getByRole('button', { name: /assigner/i }))
+    await waitReal()
+    const box = modal()
+    expect(within(box).getByText(/déjà en salle b2 à 8h/i)).toBeInTheDocument()
+    expect(within(box).queryByTitle('Assigner cet enseignant')).not.toBeInTheDocument()
+  })
+
+  it('gère une liste vide et transmet le module_id au chargement', async () => {
     apiController.setRoute('/formations/formateurs/list/', (path) => {
       expect(path).toContain(`module_id=${M}`)
       return []

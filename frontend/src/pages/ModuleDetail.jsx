@@ -1611,7 +1611,7 @@ export default function ModuleDetail() {
                   {allFormateurs.map(f => (
                     <FormateurAssignPickerItem
                       key={f.id}
-                      enseignant={f}
+                      formateur={f}
                       onAssign={handleAddFormateur}
                     />
                   ))}
