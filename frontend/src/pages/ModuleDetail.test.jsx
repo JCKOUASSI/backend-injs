@@ -5,9 +5,12 @@
  * Le LOT 18 complète l'écran : inscription/retrait des étudiants,
  * assignation/retrait des enseignants, édition du module, assignation du
  * superviseur (encadrant) et exports PDF/Excel des feuilles.
+ * Le LOT 19 répare l'assignation d'enseignant (prop formateur, §10.12) et le
+ * LOT 20 couvre la modale QR des séances (génération/régénération/téléchargement),
+ * l'archivage TripleConfirmModal (3 confirmations) et la pagination serveur
+ * des pickers.
  *
- * Restent hors périmètre (lots suivants) : la modale QR (QRCodeModal),
- * l'archivage TripleConfirmModal et l'écran miroir FormationDetail.
+ * Reste hors périmètre (lots suivants) : l'écran miroir FormationDetail.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, act, within, fireEvent } from '@testing-library/react'
@@ -700,5 +703,263 @@ describe('ModuleDetail — exports PDF / Excel', () => {
       await flushPromises(6)
     })
     expect(await screen.findByText('Rapport en cours de génération.')).toBeInTheDocument()
+  })
+})
+
+describe('ModuleDetail — QR code, archivage, pagination serveur (LOT 20)', () => {
+  describe('QR code des séances (QRCodeModal)', () => {
+    // QRCode.toCanvas tente de dessiner sur un <canvas> que jsdom ne prend
+    // pas en charge (pas de contexte 2D) ; la promesse est volontairement
+    // capturee par la modale. On coupe le bruit console.error attendu.
+    let consoleSpy
+    beforeEach(() => { consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) })
+    afterEach(() => consoleSpy.mockRestore())
+
+    const qrPath = `/formations/superviseur/${F}/qr/`
+    const openQr = async (sessionLabel) => {
+      fireEvent.click(within(sessionRow(sessionLabel)).getByTitle('QR Code'))
+      await screen.findByText('QR Code — Séance')
+      return modal()
+    }
+
+    it('charge le QR actif de la séance (GET qr avec session_id/module_id) et permet le téléchargement PNG', async () => {
+      apiController.setRoute(qrPath, () => ({
+        token: 'TOK-ACTIF', session: 1, module_id: M,
+        module_intitule: 'LSF Niveau 1 — A1', module_groupe: 'G1',
+        session_intitule: 'Séance du matin',
+      }))
+      const downloaded = []
+      vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,AAA')
+      stubBlobDownload()
+      HTMLAnchorElement.prototype.click.mockImplementation(function () { downloaded.push(this.download) })
+
+      mount()
+      await screen.findByText('Séance du matin')
+      const box = await openQr('Séance du matin')
+
+      // Les paramètres axios (et non l'URL) portent la séance et le module.
+      const qrCall = apiMock.get.mock.calls.find(([p]) => p === qrPath)
+      expect(qrCall[1].params).toEqual({ session_id: 1, module_id: String(M) })
+      expect(await within(box).findByRole('button', { name: /télécharger/i })).toBeInTheDocument()
+      expect(within(box).getByRole('button', { name: /régénérer/i })).toBeInTheDocument()
+      expect(within(box).queryByRole('button', { name: /générer le qr code/i })).not.toBeInTheDocument()
+
+      fireEvent.click(within(box).getByRole('button', { name: /télécharger/i }))
+      expect(downloaded).toEqual(['qr_seance_10_1.png'])
+    })
+
+    it("sans QR actif (404), affiche l'état vide puis génère le QR (POST generate-qr)", async () => {
+      apiController.setRoute(qrPath, () => {
+        // eslint-disable-next-line no-throw-literal
+        throw { response: { status: 404 } }
+      })
+      apiController.setRoute(/\/generate-qr\/$/, () => ({ token: 'TOK-NEW', session: 2 }))
+
+      mount()
+      await screen.findByText('Séance du matin')
+      const box = await openQr('Séance planifiée')
+
+      expect(await within(box).findByText(/aucun qr code actif/i)).toBeInTheDocument()
+      fireEvent.click(within(box).getByRole('button', { name: /générer le qr code/i }))
+      await settle(8)
+
+      expect(await within(box).findByRole('button', { name: /télécharger/i })).toBeInTheDocument()
+      expect(posts((p) => p.includes('/generate-qr/'))).toEqual([
+        { path: `/formations/${F}/sessions/2/generate-qr/`, body: { module_id: String(M) } },
+      ])
+    })
+
+    it('demande confirmation avant de régénérer (le QR précédent est invalidé)', async () => {
+      apiController.setRoute(qrPath, () => ({ token: 'TOK-OLD', session: 1 }))
+      apiController.setRoute(/\/generate-qr\/$/, () => ({ token: 'TOK-NEW', session: 1 }))
+
+      mount()
+      await screen.findByText('Séance du matin')
+      const box = await openQr('Séance du matin')
+      fireEvent.click(await within(box).findByRole('button', { name: /régénérer/i }))
+
+      // La ConfirmModal s'empile au-dessus de la modale QR (deuxième .modal-content).
+      await screen.findByText(/régénérer le qr code \?/i)
+      const boxes = document.querySelectorAll('.modal-content')
+      const confirmBox = boxes[boxes.length - 1]
+      fireEvent.click(within(confirmBox).getByRole('button', { name: 'Régénérer' }))
+      await settle(8)
+
+      const calls = posts((p) => p.includes('/generate-qr/'))
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toEqual({ path: `/formations/${F}/sessions/1/generate-qr/`, body: { module_id: String(M) } })
+    })
+
+    it("refuse d'afficher un QR appartenant à un autre module (garde-fou anti-course)", async () => {
+      apiController.setRoute(qrPath, () => ({
+        token: 'TOK-AUTRE', session: 1, module_id: 999,
+        module_intitule: 'Grammaire avancée', module_groupe: 'G9',
+      }))
+      mount()
+      await screen.findByText('Séance du matin')
+      const box = await openQr('Séance du matin')
+      expect(await within(box).findByText(/QR refusé/i)).toHaveTextContent(/Grammaire avancée/)
+      expect(within(box).queryByRole('button', { name: /télécharger/i })).not.toBeInTheDocument()
+    })
+
+    it("affiche le détail backend si la génération échoue (aucune fausse réussite)", async () => {
+      apiController.setRoute(qrPath, () => {
+        // eslint-disable-next-line no-throw-literal
+        throw { response: { status: 404 } }
+      })
+      apiController.setRoute(/\/generate-qr\/$/, () => {
+        // eslint-disable-next-line no-throw-literal
+        throw { response: { status: 400, data: { detail: 'Séance déjà terminée.' } } }
+      })
+      mount()
+      await screen.findByText('Séance du matin')
+      const box = await openQr('Séance planifiée')
+      fireEvent.click(await within(box).findByRole('button', { name: /générer le qr code/i }))
+      expect(await within(box).findByText('Séance déjà terminée.')).toBeInTheDocument()
+      expect(within(box).queryByRole('button', { name: /télécharger/i })).not.toBeInTheDocument()
+    })
+
+    it('ne propose pas de QR pour une séance terminée', async () => {
+      mount()
+      await screen.findByText('Séance du matin')
+      expect(within(sessionRow('Séance ancienne')).queryByTitle('QR Code')).not.toBeInTheDocument()
+      expect(within(sessionRow('Séance ancienne')).getByText('Terminé')).toBeInTheDocument()
+    })
+  })
+
+  describe('Archivage du module (TripleConfirmModal)', () => {
+    const archivePath = `/formations/${F}/modules/${M}/archive/`
+    const goThroughConfirm = async () => {
+      await screen.findByText(/étape 1\/3/i)
+      fireEvent.click(within(modal()).getByRole('button', { name: 'Continuer' }))
+      await screen.findByText(/étape 2\/3/i)
+      fireEvent.click(within(modal()).getByRole('button', { name: 'Je comprends' }))
+      await screen.findByText(/étape 3\/3/i)
+      fireEvent.click(within(modal()).getByRole('button', { name: 'Archiver définitivement' }))
+      await settle(8)
+    }
+
+    it('archive le module au terme des 3 confirmations (POST archive) et notifie', async () => {
+      mount()
+      await screen.findByText('Séance du matin')
+      fireEvent.click(screen.getByTitle('Archiver ce module (3 confirmations)'))
+      await goThroughConfirm()
+      const calls = posts((p) => p.endsWith('/archive/'))
+      expect(calls).toHaveLength(1)
+      expect(calls[0].path).toBe(archivePath)
+      expect(await screen.findByText(/module archivé/i)).toBeInTheDocument()
+      expect(document.querySelector('.modal-overlay')).toBeNull()
+    })
+
+    it("l'annulation à la première étape ferme la modale sans rien poster", async () => {
+      mount()
+      await screen.findByText('Séance du matin')
+      fireEvent.click(screen.getByTitle('Archiver ce module (3 confirmations)'))
+      await screen.findByText(/étape 1\/3/i)
+      fireEvent.click(within(modal()).getByRole('button', { name: 'Annuler' }))
+      await settle()
+      expect(posts((p) => p.endsWith('/archive/'))).toHaveLength(0)
+      expect(document.querySelector('.modal-overlay')).toBeNull()
+    })
+
+    it("affiche le détail backend si l'archivage échoue (sans écran de réussite)", async () => {
+      apiController.setRoute(/\/archive\/$/, () => {
+        // eslint-disable-next-line no-throw-literal
+        throw { response: { data: { detail: 'Module non soldé : des décisions sont en attente.' } } }
+      })
+      mount()
+      await screen.findByText('Séance du matin')
+      fireEvent.click(screen.getByTitle('Archiver ce module (3 confirmations)'))
+      await goThroughConfirm()
+      expect(await screen.findByText(/module non soldé/i)).toBeInTheDocument()
+      expect(posts((p) => p.endsWith('/archive/'))).toHaveLength(1)
+    })
+
+    it("masque le bouton si le module est déjà archivé", async () => {
+      apiController.reset()
+      apiController.setRoute(fullPath, () => ({ ...buildModule(), archived: true }))
+      apiController.setRoute(presencesPath, () => ({ presences: [] }))
+      const me = makeUser('ADMIN', { username: 'admin' })
+      apiController.setMe(me)
+      renderWithProviders(<ModuleDetail />, {
+        authUser: me,
+        routePattern: '/formations/:formationId/modules/:moduleId',
+        initialEntries: [`/formations/${F}/modules/${M}`],
+      })
+      await screen.findByText('Séance du matin')
+      expect(screen.queryByTitle('Archiver ce module (3 confirmations)')).not.toBeInTheDocument()
+    })
+
+    it("réserve l'archivage aux rôles habilités (un ENCADRANT ne voit pas le bouton)", async () => {
+      mount('ENCADRANT')
+      await screen.findByText('Séance du matin')
+      expect(screen.queryByTitle('Archiver ce module (3 confirmations)')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Pagination serveur des pickers', () => {
+    it("pagine la liste des enseignants disponibles : la page suivante porte page=2, la réouverture revient page 1", async () => {
+      const pagesRequested = []
+      apiController.setRoute('/formations/formateurs/list/', (path) => {
+        const query = new URLSearchParams(path.split('?')[1])
+        pagesRequested.push(query.get('page'))
+        if (query.get('page') === '2') {
+          return { count: 60, total_pages: 2, results: [{ id: 230, nom: 'Page', prenom: 'Deux' }] }
+        }
+        return { count: 60, total_pages: 2, results: [{ id: 202, nom: 'Koffi', prenom: 'Ado' }] }
+      })
+      mount()
+      await screen.findByText('Séance du matin')
+      await goTab(/enseignants \(1\)/i)
+      fireEvent.click(screen.getByRole('button', { name: /assigner/i }))
+      await waitReal()
+      const box = modal()
+      expect(await within(box).findByText(/Koffi Ado/)).toBeInTheDocument()
+
+      fireEvent.click(within(box).getByLabelText('Page suivante'))
+      await waitReal()
+      expect(within(box).getByText(/Page Deux/)).toBeInTheDocument()
+      expect(within(box).queryByText(/Koffi Ado/)).not.toBeInTheDocument()
+      expect(pagesRequested).toContain('2')
+
+      // Réouverture : le compteur de page est réinitialisé.
+      fireEvent.click(within(box).getByRole('button', { name: 'Fermer' }))
+      await settle()
+      fireEvent.click(screen.getByRole('button', { name: /assigner/i }))
+      await waitReal()
+      expect(await within(modal()).findByText(/Koffi Ado/)).toBeInTheDocument()
+      expect(within(modal()).queryByText(/Page Deux/)).not.toBeInTheDocument()
+    })
+
+    it('pagine la liste des étudiants disponibles du picker (page=2 portée dans la requête)', async () => {
+      apiController.setRoute('/formations/participants/list/', (path) => {
+        const query = new URLSearchParams(path.split('?')[1])
+        if (query.get('page') === '2') {
+          return { count: 80, total_pages: 2, results: [{ id: 180, nom: 'PageDeux', prenom: 'Etud' }] }
+        }
+        return {
+          count: 80, total_pages: 2,
+          results: [{ id: 103, nom: 'Bamba', prenom: 'Issa', numero_matricule: 'MAT-003' }],
+        }
+      })
+      mount()
+      await screen.findByText('Séance du matin')
+      await goTab(/étudiants \(2\)/i)
+      fireEvent.click(screen.getByRole('button', { name: /inscrire/i }))
+      await waitReal()
+      const box = modal()
+      expect(await within(box).findByText('Bamba')).toBeInTheDocument()
+      expect(within(box).getByText(/1–50 sur 80/)).toBeInTheDocument()
+
+      fireEvent.click(within(box).getByLabelText('Page suivante'))
+      await waitReal()
+      expect(within(box).getByText('PageDeux')).toBeInTheDocument()
+      expect(within(box).queryByText('Bamba')).not.toBeInTheDocument()
+
+      const lastCall = apiMock.get.mock.calls
+        .filter(([p]) => p.startsWith('/formations/participants/list/'))
+        .pop()
+      expect(lastCall[0]).toContain('page=2')
+    })
   })
 })
