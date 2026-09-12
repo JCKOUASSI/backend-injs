@@ -186,9 +186,12 @@
 > (POST structure + PATCH de rattachement + mise à jour du cache),
 > rattachement à une structure existante, gardes d'unicité (Chef INJS Admin,
 > chef de secrétariat), édition complète et suppressions en erreur ; un
-> **écart d'affichage mineur (§10.14)** est signalé (CPFAE non remplacé dans
-> le toast d'erreur de suppression), sans correction.
-> Les LOT 4 à 7, 13, 17, 19 et 34 sont les lots qui touchent la logique
+> **écart d'affichage mineur (§10.14)** y était signalé (CPFAE non remplacé
+> dans le toast d'erreur de suppression), et **corrigé dès le [LOT 37]** (une
+> ligne : le toast applique désormais le même rebranding CPFAE→INJS que les
+> badges et les alertes des modales ; le test `[écart]` est devenu une
+> régression qui échoue sur l'ancien code).
+> Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
 > 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35 et 36 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
@@ -444,7 +447,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | Fichier | Niveau | Ce qui est vérifié |
 | --- | --- | --- |
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
-| `src/pages/Users.test.jsx` | page | **Gestion des comptes utilisateurs (54 tests dont 37 ajoutés au LOT 36), 99,8 % lignes / 100 % fonctions / 98,1 % branches.** **Liste serveur (LOT 2)** : chargement initial (`exclude_role`, page 1), pagination serveur 50/page, recherche avec debounce 400 ms, filtre par rôle, onglets personnel / étudiants / enseignants (reset page, `role=AUDITEUR/FORMATEUR`), persistance sessionStorage/URL, état vide, erreur de chargement formatée, permissions (contrôles masqués sans `can_mutate_users`, repli sur le seul onglet autorisé, §10.2 LOT 6). **LOT 36** : présentation (replis « - », nom/username et initiales de secours, nom du secrétariat rattaché, badge actif/inactif, classes de badges par rôle avec repli `badge-info`, remplacement CPFAE→INJS des libellés), lignes non gérables sans action, `role_context` vide (repli `personnel`, `exclude_role` par défaut), gestionnaire sans `manageable_roles`/sans `staff_filter_roles`, conservation/reset du filtre selon l'onglet, repli sur un onglet non personnel quand c'est le seul disponible ; **création** tous champs (payload exact, clé `secretariat` vide omise), compte enseignant (libellé/badge/placeholder/note), rattachement à un secrétariat existant (aucune structure créée, pas de PATCH), **création de secrétariat à la volée** (POST user → POST `/formations/secretariats/` avec `responsable` → PATCH de rattachement dans le bon ordre, type vide autorisé, cache React Query mis à jour visible à la réouverture, pas de structure sans nom, réinitialisation nom/type au changement de rôle, bloc masqué pour un gestionnaire lui-même secrétariat), gardes d'unicité Chef INJS Admin et chef de secrétariat, erreurs JSON (CPFAE→INJS) et génériques, bouton « Création... », fermetures croix/Annuler/voile sans appel et réinitialisation du formulaire ; **édition** : pré-remplissage complet (secrétariat, statut inactif), utilisateur aux champs absents (replis `|| ''`, username vide), PATCH complet avec nouveau mot de passe et changement de rattachement, erreurs à deux niveaux, fermetures sans PATCH, gardes d'unicité en édition (excluant l'utilisateur édité), bouton « Enregistrement... » ; **suppression** : annulation sans DELETE (message + détail), erreur formatée (**[écart §10.14]** : CPFAE non retranscrit dans le toast) et message générique. Les 4 branches résiduelles sont des filets défensifs inatteignables par l'UI (onglet borné aux clés de `TAB_CONFIG`, bloc « rôle protégé » et `role || ''` inaccessibles par le filtre des boutons d'édition, repli `old || []` d'un cache toujours alimenté par le hook inconditionnel). |
+| `src/pages/Users.test.jsx` | page | **Gestion des comptes utilisateurs (54 tests dont 37 ajoutés au LOT 36), 99,8 % lignes / 100 % fonctions / 98,1 % branches.** **Liste serveur (LOT 2)** : chargement initial (`exclude_role`, page 1), pagination serveur 50/page, recherche avec debounce 400 ms, filtre par rôle, onglets personnel / étudiants / enseignants (reset page, `role=AUDITEUR/FORMATEUR`), persistance sessionStorage/URL, état vide, erreur de chargement formatée, permissions (contrôles masqués sans `can_mutate_users`, repli sur le seul onglet autorisé, §10.2 LOT 6). **LOT 36** : présentation (replis « - », nom/username et initiales de secours, nom du secrétariat rattaché, badge actif/inactif, classes de badges par rôle avec repli `badge-info`, remplacement CPFAE→INJS des libellés), lignes non gérables sans action, `role_context` vide (repli `personnel`, `exclude_role` par défaut), gestionnaire sans `manageable_roles`/sans `staff_filter_roles`, conservation/reset du filtre selon l'onglet, repli sur un onglet non personnel quand c'est le seul disponible ; **création** tous champs (payload exact, clé `secretariat` vide omise), compte enseignant (libellé/badge/placeholder/note), rattachement à un secrétariat existant (aucune structure créée, pas de PATCH), **création de secrétariat à la volée** (POST user → POST `/formations/secretariats/` avec `responsable` → PATCH de rattachement dans le bon ordre, type vide autorisé, cache React Query mis à jour visible à la réouverture, pas de structure sans nom, réinitialisation nom/type au changement de rôle, bloc masqué pour un gestionnaire lui-même secrétariat), gardes d'unicité Chef INJS Admin et chef de secrétariat, erreurs JSON (CPFAE→INJS) et génériques, bouton « Création... », fermetures croix/Annuler/voile sans appel et réinitialisation du formulaire ; **édition** : pré-remplissage complet (secrétariat, statut inactif), utilisateur aux champs absents (replis `|| ''`, username vide), PATCH complet avec nouveau mot de passe et changement de rattachement, erreurs à deux niveaux, fermetures sans PATCH, gardes d'unicité en édition (excluant l'utilisateur édité), bouton « Enregistrement... » ; **suppression** : annulation sans DELETE (message + détail), erreur formatée (**régression §10.14, corrigée au LOT 37** : le toast réécrit désormais CPFAE en INJS comme les autres zones d'erreur ; le test échoue sur l'ancien code) et message générique. Les 4 branches résiduelles sont des filets défensifs inatteignables par l'UI (onglet borné aux clés de `TAB_CONFIG`, bloc « rôle protégé » et `role || ''` inaccessibles par le filtre des boutons d'édition, repli `old || []` d'un cache toujours alimenté par le hook inconditionnel). |
 | `src/pages/Referentiels.test.jsx` | page | **56 tests (LOT 35), référentiels de formation — 99,7 % lignes/instructions, 100 % fonctions, 95,2 % branches** (les branches résiduelles sont des filets défensifs inatteignables : onglet borné par `readReferentielsTab`, états `data`/`formation_ids` toujours initialisés). Les **neuf onglets** (formations, modules, catégories, grades, vagues, sites, bâtiments, salles, types secrétariat) sont chargés en un seul `GET /formations/referentiels/gestion/` : spinner, compteurs par onglet, colonnes spécifiques avec résolution des liens (catégorie de grade, site/bâtiment des salles et bâtiments, replis « — » dont les clés mortes), résumé des volumes de modules groupé par formation (`F (CM: 5h, TD: 4h)`, repli `Formation #id`, total simple `12 h`, vide « — »), état vide « Aucune entrée — cliquez sur Ajouter », réponse sparse (clés absentes → tableaux vides sans crash), erreur « Erreur de chargement », **pagination client 25/page** et **onglet lu dans `?tab=`** (inconnu → Formations), changement d'onglet qui referme la modale. **CRUD** : création par onglet (POST, payloads et valeurs par défaut — formations/catégories/sites/types/vagues/grades), édition (PUT, pré-remplissage, toasts « Ajouté/Modifié avec succès », rechargement + invalidation du cache React Query), bouton « Enregistrement… » pendant l'envoi, erreurs de validation formatées puis message générique, fermetures croix/Annuler/voile sans appel ; **bascule actif/inactif** (PUT du corps complet, toasts Activé/Désactivé, échec « Erreur »). **Suppressions** via `ConfirmModal` (annulation sans DELETE, succès « Supprimé », **404 → « Entrée déjà supprimée — liste actualisée »**, autre erreur générique). **Clés typées** : grades/bâtiments/salles (identifiants `Number()` ou `null`, capacité non numérique neutralisée — y compris une valeur véreuse servie par le backend en édition, bâtiments filtrés par site, changement de site qui réinitialise le bâtiment, défauts `type_lieu:'SALLE'`/`equipements:''`). **Modules** : cases des formations actives seules, garde « au moins une formation » puis « au moins un volume horaire », grille de volumes par formation × catégorie active (valeurs vides/`NaN` écartées, décochage, cases/grille réinitialisées), payload `volumes_horaires` reconstruit (clés de grille et `formations` retirées), POST **201 → ajout** vs **200 → « Module déjà au référentiel — formations rattachées »**, édition avec grille pré-remplie (volume sans formation écarté, ancien format `volumes_par_categorie`, formation morte en `Formation #id`). **Excel** : export `getBlob /formations/ref/excel/{onglet}/` (ancre cliquée, nom serveur ou nom par défaut `referentiel_{onglet}.xlsx`, révocation d'URL, échec notifié), import via l'input caché (clic programmé, extension non `.xlsx` refusée, sélection annulée sans effet, POST `FormData` avec bilan `N ligne(s)…`, réponse sans données → zéros, deux niveaux d'erreur). |
 | `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). |
 | `src/pages/scolarite/scolariteRendu.test.jsx` | page | **5 régressions (LOT 7, §10.8)** sur des écrans qui rendaient une page blanche sans planter : rendu effectif du titre de `Campagnes`, du libellé de `CampagneDetail`, du titre d'`Équivalences`, du libellé de `MaquetteDetail`, et — pour `ChargesEnseignants` — requête de l'année courante **au montage** puis enchaînement sur l'occupation des enseignants. Chaque test échouait avant la correction (preuve de mutation). |
@@ -503,7 +506,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 36 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 37 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -707,8 +710,9 @@ Mesure après le LOT 36 (V8, `npm run test:coverage`), sur les zones ciblées :
 > `responsable`, PATCH de rattachement, cache React Query mis à jour), ainsi
 > que les rattachements à une structure existante, les gardes d'unicité
 > (Chef INJS Admin, chef de secrétariat), les éditions complètes et les deux
-> niveaux d'erreur de chaque action ; un unique écart cosmétique mineur est
-> signalé au §10.14, les quelques branches restantes étant des filets
+> niveaux d'erreur de chaque action ; l'écart cosmétique mineur alors
+> révélé (toast de suppression sans rebranding CPFAE→INJS, §10.14) est
+> **corrigé au LOT 37**, les quelques branches restantes étant des filets
 > défensifs inatteignables par l'UI.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
@@ -815,8 +819,9 @@ Conformément aux contraintes, les lots 0 à 3 n'ont **jamais** modifié la
 logique applicative : les écarts y étaient seulement constatés et tracés. Les
 **LOT 4 et 5**, sur feu vert explicite, sont des lots correctifs (§10.4, §10.5,
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
-**LOT 17 (§10.11)**, le **LOT 19 (§10.12)** et le **LOT 34 (§10.13)**. Les
-points encore ouverts sont ci-dessous (§10.1, §10.9 et §10.14).
+**LOT 17 (§10.11)**, le **LOT 19 (§10.12)**, le **LOT 34 (§10.13)** et le
+**LOT 37 (§10.14)**. Les points encore ouverts sont ci-dessous (§10.1 et
+§10.9).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -1228,10 +1233,10 @@ avec les sélecteurs vides. Les deux tests échouent sur l'ancien état
 initial (preuve de mutation par aller-retour du correctif). La page reste à
 **100 % de lignes/fonctions, 96,9 % de branches**.
 
-### 10.14 Écart cosmétique signalé au LOT 36 — `Users` : le toast d'erreur de suppression ne remplace pas CPFAE par INJS
+### 10.14 Corrigé au LOT 37 — `Users` : le toast d'erreur de suppression ne remplaçait pas CPFAE par INJS
 
 Révélé au LOT 36 en testant les erreurs de suppression de compte
-(`Users.jsx`), ce n'est **pas un bug fonctionnel** mais une incohérence
+(`Users.jsx`), ce n'était **pas un bug fonctionnel** mais une incohérence
 d'affichage du rebranding CPFAE → INJS :
 
 - trois endroits de `Users.jsx` appliquent systématiquement
@@ -1240,23 +1245,33 @@ d'affichage du rebranding CPFAE → INJS :
   sélecteurs) et les **alertes d'erreur des modales** de création
   (`formError`) et d'édition (`editError`) ;
 - en revanche, en cas d'**échec de la suppression**, le message renvoyé
-  par le serveur est passé tel quel à `showToast(...)` sans
-  remplacement : si le backend retournait par exemple
-  `{ "detail": "Compte CPFAE protégé" }`, le toast afficherait
+  par le serveur était passé tel quel à `showToast(...)` sans
+  remplacement : si le backend avait retourné par exemple
+  `{ "detail": "Compte CPFAE protégé" }`, le toast aurait affiché
   « Compte **CPFAE** protégé » là où toutes les autres zones d'erreur de
-  l'écran afficheraient « INJS ».
+  l'écran affichaient « INJS ».
 
-**Sévérité très faible** : le cas ne se réalise que si le backend émet un
-message d'erreur contenant la chaîne « CPFAE » sur un `DELETE
-/auth/users/<id>/`, ce qu'aucun message standard ne fait aujourd'hui.
-Aucune donnée ni action n'est affectée.
+**Sévérité très faible** : le cas ne se réalisait que si le backend émettait
+un message d'erreur contenant la chaîne « CPFAE » sur un `DELETE
+/auth/users/<id>/`, ce qu'aucun message standard ne fait. Aucune donnée ni
+action n'était affectée. Le comportement fautif avait d'abord été figé au
+LOT 36 par un test **`[écart §10.14]`** (toast en l'état, en attente d'un
+choix produit).
 
-**Comportement figé par un test `[écart §10.14]`** dans
-`Users.test.jsx` (le toast affiche le message serveur brut, et
-« Compte INJS protégé » n'est pas présent). Un éventuel correctif
-uniformiserait en appliquant le même remplacement avant `showToast` dans
-`handleDelete` (une ligne), sur feu vert explicite ; il n'a pas été
-appliqué au LOT 36, qui reste un lot de tests purs.
+**Correctif (LOT 37, feu vert par délégation de choix explicite),
+uniquement `handleDelete` dans `Users.jsx`** : le message d'erreur est désormais
+normalisé par `String(...).replaceAll('CPFAE', 'INJS')` avant `showToast`,
+exactement comme pour les alertes des modales. C'est la seule modification de
+code du lot (deux lignes de commentaire explicatif en plus).
+
+**Régression (dans `Users.test.jsx`, en remplacement du test `[écart]` du
+LOT 36)** : sur un `DELETE` rejeté avec `{ detail: "Compte CPFAE protégé" }`,
+le toast affiche désormais **« Compte INJS protégé »** et la chaîne
+« Compte CPFAE protégé » est absente. Le test a été vérifié en
+aller-retour : il **échoue sur l'ancien code** (toast brut « Compte CPFAE
+protégé ») et passe avec le correctif. La page reste à **99,8 % de
+lignes / 100 % de fonctions / 98,1 % de branches** (54 tests, aucun test
+ajouté ni retiré : seul le test `[écart]` est devenu une régression).
 
 
 ---
@@ -1277,7 +1292,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 36 :
+**Aucune page n'est dépourvue de test.** État après le LOT 37 :
 
 - dix-sept écrans disposent d'un test **fonctionnel dédié** hors module
   Scolarité (les quatre écrans du module Finance transverse —
@@ -1597,10 +1612,17 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   gestionnaire lui-même secrétariat), gardes d'unicité Chef INJS Admin et
   chef de secrétariat en création comme en édition, éditions complètes avec
   nouveau mot de passe et changement de rattachement, boutons d'envoi en
-  cours, fermetures sans appel, suppressions annulées ou en échec ; un
-  **écart cosmétique mineur est signalé au §10.14** (CPFAE non remplacé
-  dans le toast d'erreur de suppression), et les 4 branches résiduelles
-  sont des filets défensifs inatteignables par l'UI ;
+  cours, fermetures sans appel, suppressions annulées ou en échec ; l'écart
+  cosmétique §10.14 alors révélé est **corrigé au LOT 37**, et les 4
+  branches résiduelles sont des filets défensifs inatteignables par l'UI ;
+- le **LOT 37, sur feu vert (délégation de choix explicite), corrige
+  l'écart §10.14** par une seule modification de `Users.jsx` (`handleDelete`) :
+  le message d'erreur du toast de suppression est désormais normalisé par
+  `String(...).replaceAll('CPFAE', 'INJS')`, comme les badges et les
+  alertes des modales ; le test `[écart §10.14]` du LOT 36 devient une
+  **régression** (toast « Compte INJS protégé »), vérifiée en aller-retour
+  (elle échoue sur l'ancien code). Aucun test ajouté ni retiré (54 tests
+  inchangés), couverture identique (99,8 % de lignes / 100 % de fonctions) ;
 - le LOT 16 **achevait aussi la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1719,10 +1741,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
      les autres actions destructrices) — comportement figé par un test, en
      attente d'un choix produit ;
-   - §10.14 écart cosmétique **`Users`** : le toast d'erreur de suppression
-     ne réécrit pas CPFAE en INJS contrairement aux badges et aux alertes des
-     modales — comportement figé par un test `[écart]` au LOT 36, correctif
-     d'une ligne sur feu vert ;
+   - ~~§10.14 écart cosmétique **`Users`** : le toast d'erreur de suppression
+     ne réécrivait pas CPFAE en INJS contrairement aux badges et aux alertes
+     des modales~~ **corrigé au LOT 37** (toast normalisé comme les autres
+     zones d'erreur ; le test `[écart]` du LOT 36 est devenu une régression
+     vérifiée en aller-retour) ;
    - ~~§10.13 crash de la carte de création de `ChargesEnseignants` quand
      les référentiels échouent ou répondent après l'occupation (état
      initial `options` sans clé `formateurs`)~~ **corrigé au LOT 34** (état

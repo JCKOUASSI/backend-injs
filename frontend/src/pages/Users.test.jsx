@@ -1176,10 +1176,10 @@ describe('pages/Users.jsx — suppression confirmée (LOT 36)', () => {
     expect(apiMock.delete).not.toHaveBeenCalled()
   })
 
-  it("[écart §10.14] affiche le message d'erreur serveur tel quel dans le toast de suppression (CPFAE n'y est pas remplacé par INJS)", async () => {
-    // Les alertes des modales création/édition et les libellés de rôle remplacent
-    // CPFAE par INJS ; le toast d'erreur de suppression (showToast brut) ne le
-    // fait pas. Comportement actuel figé en attendant un choix produit (§10.14).
+  it("régression §10.14 (LOT 37) : réécrit CPFAE en INJS dans le toast d'erreur de suppression comme partout ailleurs", async () => {
+    // Avant le LOT 37, le toast d'erreur de suppression affichait le message
+    // serveur brut ; il applique désormais le même rebranding CPFAE -> INJS que
+    // les libellés de rôle et les alertes des modales création/édition.
     setup(adminMe(), { rows: [cu(51, { first_name: 'Sup', last_name: 'Prime' })] })
     await waitForResults(1)
     apiMock.delete.mockRejectedValueOnce(
@@ -1188,8 +1188,8 @@ describe('pages/Users.jsx — suppression confirmée (LOT 36)', () => {
 
     const boite = await askDelete('Sup Prime')
     fireEvent.click(within(boite).getByRole('button', { name: 'Confirmer' }))
-    expect(await screen.findByText('Compte CPFAE protégé')).toBeInTheDocument()
-    expect(screen.queryByText('Compte INJS protégé')).not.toBeInTheDocument()
+    expect(await screen.findByText('Compte INJS protégé')).toBeInTheDocument()
+    expect(screen.queryByText('Compte CPFAE protégé')).not.toBeInTheDocument()
   })
 
   it('notifie le message générique quand la suppression échoue sans réponse serveur', async () => {

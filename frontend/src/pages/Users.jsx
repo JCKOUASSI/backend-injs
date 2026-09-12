@@ -174,7 +174,9 @@ export default function Users() {
           showToast('Utilisateur supprimé')
         } catch (err) {
           console.error('Suppression utilisateur:', err)
-          showToast(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' }), 'error')
+          // §10.14 (corrigé au LOT 37) : le toast d'erreur applique le même
+          // rebranding CPFAE -> INJS que les badges et les alertes des modales.
+          showToast(String(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' })).replaceAll('CPFAE', 'INJS'), 'error')
         }
       }
     })
