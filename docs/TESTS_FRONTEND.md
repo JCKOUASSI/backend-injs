@@ -144,10 +144,18 @@
 > période partagée et `rank_tab` persistant ; les 5 branches non
 > couvertes sont des aiguillages de formatage défensifs figés par les
 > tables de configuration statiques, donc inatteignables par l'UI — le
-> **module Finance transverse est ainsi entièrement couvert**).
+> **module Finance transverse est ainsi entièrement couvert**), puis au
+> **[LOT 31]** (l'écran **équivalences/dispenses** `Equivalences` est
+> verrouillé à **100 % de lignes / 100 % de fonctions / 100 % de branches /
+> 27 tests** : chargement et `Promise.all` des quatre référentiels sous
+> habilitation, table des badges de statut et des crédits, création en
+> brouillon avec identifiants typés (`Number(x) || undefined`), tout le
+> workflow des transitions par statut, la modale de décision pédagogique et
+> l'application après confirmation `window.confirm`, avec chaque chemin
+> d'erreur et la lecture seule des rôles non acteurs).
 > Les LOT 4 à 7, 13, 17 et 19 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29 et 30 sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30 et 31 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -365,7 +373,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (45 fichiers, 937 tests)
+### 6.2 Fichiers de test colocalisés (46 fichiers, 964 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -412,6 +420,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Jurys.test.jsx` | page | **14 tests (LOT 12), fin du parcours académique** : sessions avec badges et **3 filtres** transmis tels quels (statut/année/formation, clés toujours présentes) ; **workflow de transition complet** exercé pour chaque statut par test paramétré (Contrôler/Calculer/Délibérer/Décider/Générer PV/Valider/Verrouiller/Publier → le bon `POST …/action/` `{action}`, session PUBLIÉE sans bouton) ; confirmation `window.confirm` acceptée/annulée ; action rejetée (toast du détail backend) ; **lecture seule** (DIRECTION : pas d'actions, référentiels non chargés) ; une **régression §10.10** (un échec de chargement = une seule requête, un seul toast, état vide). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
+| `src/pages/scolarite/Equivalences.test.jsx` | page | **27 tests (LOT 31), équivalences/dispenses — 100 % lignes/fonctions/branches/instructions**. `GET /equivalences/demandes/` au montage : spinner, tableau (neuf statuts dont un inconnu en repli, crédits `?? '—'` y compris `0`), message « Aucune demande. », erreur détaillée puis « Chargement impossible. ». **Habilitations** : pour un rôle acteur (`canActScolarite`), les quatre référentiels sont chargés en `Promise.all` (`/scolarite/ref/annees/?actif=true`, `…/formations/`, `…/niveaux/?actif=true`, `…/etudiants/`) ; la liste des rôles non acteurs (DIRECTION, ENCADRANT, FINANCE) ne les requête pas et ne montre ni carte de création ni boutons d'action ; l'échec des référentiels toasté (« Chargement des référentiels impossible. ») sans masquer la liste. **Badges de statut** : les neuf apparences (`BADGE_STATUT`) dont APPLIQUÉE en `dark` et le repli `secondary`. **Création** `POST /equivalences/demandes/` : payload exact avec IDs `Number(x) || undefined` (soumission sans sélection exercée via `fireEvent.submit`), toast « Demande créée en brouillon. » et rechargement, bouton « + » désactivé pendant l'envoi (promesse différée), erreur `JSON.stringify` du détail serveur puis « Création impossible. ». **Transitions** `POST …/:id/transition/` `{statut}` : les cinq boutons du workflow (Soumettre, Instruire, Avis pédagogique, Décider), absence de bouton sur REJETÉE/APPLIQUÉE/statut inconnu, désactivation globale pendant une action, toasts `Demande {statut}.` (rechargement) et « Transition impossible. ». **Décision** : ouverture de la carte inline (titre `Décision — demande #N`, Annuler/Enregistrer), payload `POST …/:id/decision/` avec défauts `FAVORABLE` / « Direction des études INJS », champs crédits/note vides → `undefined`, fermeture après succès, rechargement, cas d'erreur qui laisse la carte ouverte. **Application** `POST …/:id/appliquer/` `{}` après `window.confirm(/effet académique/i)` : annulation sans appel, succès (« Dispense/équivalence appliquée. », rechargement), échec (« Application impossible. »). Aucune alerte `act` (mûrissement du rechargement après chaque écriture). |
 | `src/pages/scolarite/FinancesEtudiantes.test.jsx` | page | **25 tests (LOT 26), finance étudiante — 100 % de lignes / 100 % de fonctions / 97 % de branches**. Chargement parallèle `GET /finances-etudiantes/echeanciers/` et `…/paiements/` (normalisation `results || data` sur les deux formes), titre/onglets/bouton Actualiser (qui recharge les deux ressources), spinner initial puis lignes. **Onglet Échéanciers** : étudiant/année/`lignes_count`, badges de statut global (`IMPAYE` danger, `PARTIELLEMENT_PAYE` warning, `COMPLETE` success, statut inconnu → repli secondaire), état vide, navigation entre onglets et retour. **Onglet Paiements** : neuf colonnes (dont Action sous habilitation), identité Étudiant/Candidat/tiret, montant + devise, mode, référence ou tiret, table de badges complète (`INITIE`…`RAPPROCHE`), bouton **Confirmer uniquement pour INITIE/EN_ATTENTE**, état vide et spinner d'onglet. **Création** `POST …/paiements/` : payload exact `{etudiant_id, nature, montant, devise (texte libre), mode, transaction_externe}` (nature/mode sur les listes fermées), message d'idempotence, réinitialisation du formulaire (les `<input type=number>` vides valent `null` en jest-dom), rechargement, erreur serveur détaillée puis message générique. **Confirmation** `POST …/paiements/:id/confirmer/` : `window.confirm` (libellé contenant id/montant/devise, annulation = aucun appel), succès avec toast de quittance et rechargement, échec détaillé (preuve manquante) puis générique. **Habilitations** : FINANCE/DIRECTION/CHEF_CPFAE_ADMIN/CPFAE_ADMIN (saisie + colonne Action), SECRETARIAT/CHEF_SECRETARIAT (saisie mais pas de confirmation), ENCADRANT (lecture stricte, données consultables). |
 | `src/pages/FinanceEncadrants.test.jsx` | page | **19 tests (LOT 27), rapport finance des encadrants — 100 % lignes/fonctions/branches**. Rendu via `FinancePageShell` (titre/sous-titre, liens de navigation dont l'onglet courant accentué, panneau de période). **Chargement** `GET /formations/finance/encadrants/?preset=mois&mois=…` : spinner puis trois KPI (`encadrants_count`, planifié/réalisé formatés par `fmtDuration`, ex. 720 min → `12h`, 450 → `7h 30min`, valeur nulle → `0h`), sections par encadrant (libellé puis repli sur le nom d'utilisateur, badge de sous-total, sept colonnes, sessions en badge, lignes sans grade/module/formation en tirets, pied de tableau), encadrant sans lignes, état vide (`{encadrants:[]}` comme `data:null`) avec KPI à zéro, erreur de chargement détaillée puis générique. **Période** (filtre partagé) : « Cette année » ne recharge qu'après **Appliquer** (nouvelle variante de données, persistance `sessionStorage`), trimestre T1 → `trimestre=YYYY-Q1`, personnalisé avec dates (`date_debut/date_fin`), Appliquer désactivé tant qu'une date manque. **Exports** `getBlob /exports/finance/encadrants/pdf|excel/` reportant la query de période, toasts `(PDF)`/`(XLSX)`, clic d'ancre/révocation, nom par défaut `liste_encadrants.pdf` quand le serveur n'en donne pas, deux niveaux d'erreur. **Filets défensifs** : période persistée sans `preset` → requêtes et export sur les chemins de base sans query, lignes et `sessions_count` absents (repli `[]`/`0`). |
 | `src/pages/FinanceDashboard.test.jsx` | page | **29 tests (LOT 30), tableau de bord finance — 99,8 % lignes, 100 % fonctions, 97,2 % branches** (5 aiguillages de formatage défensifs, figés par les configs KPI statiques, sont inatteignables par l'UI). Rendu via `FinancePageShell` avec la période et le badge de période servie, onglet Tableau de bord accentué, recherche `GET /formations/finance/dashboard/?preset=mois&mois=…` (chemin sans query pour une période dégradée sans preset). **Chargement/erreurs** : spinner, détail serveur puis message générique, `data:null` sans crash. **Cinq KPI héro cliquables** : valeurs durée/argent/pourcentage (2h, 1h 30min, 75 %, 200 000/150 000 FCFA), sous-textes (séances, heures planifiées arrondies, actifs, période précédente ou repli, nombre de tarifs appliqués > 1 puis singulier), badges `EvolutionBadge` hausse/baisse/plat en durée/argent/`pts` avec infobulle du pourcentage. **KPI d'effectifs** (6 cartes, moy. en heures arrondies, replis à 0) ; **alerte de tolérance** active (compteurs avec `?? 0` quand absents, masquée inactive) et **info tarifs** (liste entre parenthèses). **Coût prévisionnel de repli** : somme des `montant_prevu` des modules quand la clé KPI est null/vide/absente (`|| 0` sur les modules sans montant). **Activité mensuelle** : barres proportionnelles à l'activité max (100/50/0 %), durée et montant par mois, section masquée sans données. **Spécialités** : table, forage par le compteur vers une modale (formateurs avec matricule/tiret, liste `|| []`, message vide, fermeture croix/« Fermer »/voile avec `stopPropagation` dans le contenu). **Classement enseignants** : trois mesures (réalisé/planifié/montants avec en-tête et formats changeants), médailles d'or/argent/bronze puis numéro grisé au-delà du top 3, replis matricule/spécialité/séances, état vide, onglet initial lu sur `?rank_tab=` (inconnu → repli réalisé), persistance `rank_tab` dans la query partagée. **Synthèse de paie** : pagination 25/page (26 lignes → 2 pages, suivante/numéros/précédente, badge « N formateur(s) — page x/y »), 13 colonnes, taux avec jauge, `FinanceToleranceBadge` ok/alerte/anomalie/écart/inconnu/absent, ligne lacunaire (tirets/zéros), état vide, réinitialisation de la pagination après Appliquer. **Ventilation par module** (`FinanceModuleBreakdownModal`, ouverte par les cinq KPI) : titres par mesure, tri décroissant, totaux de pied (8h, 6h, 75 %, 150 000/180 000 FCFA), colonne et ligne tarif, secrétariat, libellés et séances en tirets, recherche instantanée avec « N affiché(s) », total filtré + rappel global, absence de correspondance, période sans module, singulier « 1 module », fermetures croix/pied/voile. **Période** : « Cette année » ne recharge qu'après Appliquer (99 séances/100h, variante de données), persistance `sessionStorage finance_period`, sous-texte de taux par défaut sans comparaison, horodatage `generated_at` présent/absent. |
@@ -456,7 +465,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 30 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 31 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -494,8 +503,9 @@ Mesure après le LOT 30 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Jurys.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **88 %** |
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
-| `pages/scolarite/**` (dossier, 16 écrans) | **88 %** | 88 % | **72 %** | **81 %** |
-| **Global `src/` (toutes zones)** | **60,1 %** | **60,1 %** | **54,7 %** | **78,5 %** |
+| `pages/scolarite/Equivalences.jsx` (LOT 31) | **100 %** | **100 %** | **100 %** | **100 %** |
+| `pages/scolarite/**` (dossier, 16 écrans) | **90,0 %** | **90,0 %** | **81,2 %** | **83,9 %** |
+| **Global `src/` (toutes zones)** | **60,4 %** | **60,4 %** | **55,9 %** | **78,9 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -506,14 +516,14 @@ Mesure après le LOT 30 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 620 (LOT 16) → 622 (LOT 17) → 641 (LOT 18) → 643 (LOT 19) →
 > 656 (LOT 20) → 681 (LOT 21) → 719 (LOT 22) → 754 (LOT 23) →
 > 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → 847 (LOT 27) →
-> 873 (LOT 28) → 908 (LOT 29) → **937 (LOT 30)** ; lignes
+> 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → **964 (LOT 31)** ; lignes
 > couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) → 43,1 %
 > (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
 > 55,9 % (LOT 24) → 56,3 % (LOT 25) → 56,7 % (LOT 26) → 57,3 % (LOT 27) →
-> 57,8 % (LOT 28) → 59,0 % (LOT 29) → **60,1 % (LOT 30)** — le seuil des
-> 60 % de lignes est franchi
-> (fonctions **54,7 %**, branches **78,5 %**). Les LOT 17 et 19 corrigent
+> 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → **60,4 % (LOT 31)**
+> — le seuil des 60 % de lignes reste franchi
+> (fonctions **55,9 %**, branches **78,9 %**). Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
 > bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève la couverture
@@ -615,9 +625,13 @@ Mesure après le LOT 30 (V8, `npm run test:coverage`), sur les zones ciblées :
 > paginée avec badges de tolérance, période partagée et `rank_tab`
 > persistant ; les 5 branches résiduelles sont des aiguillages de
 > formatage figés par les tables de configuration statiques des KPI.
-> Le service `services/scolarite.js`
+> Le **LOT 31 verrouille l'écran équivalences/dispenses** (`Equivalences`,
+> **27 tests, 100 % lignes/fonctions/branches**) : référentiels chargés sous
+> habilitation seulement, création typée, transitions selon le statut,
+> décision pédagogique et application confirmée, tous les chemins d'erreur et
+> la lecture seule des rôles non acteurs. Le service `services/scolarite.js`
 > reste à **100 % de lignes** et le dossier `pages/scolarite/` monte à
-> **87,5 % de lignes / 72 % de fonctions / 81 % de branches**.
+> **90,0 % de lignes / 81,2 % de fonctions / 83,9 % de branches**.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -1109,7 +1123,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 30 :
+**Aucune page n'est dépourvue de test.** État après le LOT 31 :
 
 - seize écrans disposent d'un test **fonctionnel dédié** hors module Scolarité
   (les quatre écrans du module Finance transverse — `FinanceEncadrants`,
@@ -1152,9 +1166,13 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
   le chargement effectif — allant au-delà du smoke qui n'exclut pas les pages
   blanches ; leurs **actions d'écriture sont en outre exercées au clic** au
-  LOT 8 (`scolariteActions.test.jsx`, §10.8), et les deux écrans *Campagnes*
+  LOT 8 (`scolariteActions.test.jsx`, §10.8), les deux écrans *Campagnes*
   sont **quasi exhaustivement couverts au LOT 16**
-  (`campagnesCompletion.test.jsx`, **99 % de lignes / 100 % de fonctions**) ;
+  (`campagnesCompletion.test.jsx`, **99 % de lignes / 100 % de fonctions**),
+  et **`Equivalences` est verrouillé de bout en bout au LOT 31**
+  (`Equivalences.test.jsx`, **27 tests, 100 % lignes/fonctions/branches**) ;
+  `MaquetteDetail` et `ChargesEnseignants` restent couverts par le rendu
+  dédié et l'action au clic du LOT 8 ;
 - tout le **parcours administratif de l'étudiant** est couvert par des tests
   fonctionnels dédiés : `Candidatures.jsx` (97,5 % ln, LOT 9), `Admissions.jsx`
   (98 % ln, LOT 10), puis `Inscriptions.jsx` (99,4 % ln / 100 % fonctions,
@@ -1320,6 +1338,21 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   preset) ; les cinq branches résiduelles sont les aiguillages de
   formatage des helpers KPI figés par des tables de configuration
   statiques (format jamais sélectionnable par les données) ;
+- au LOT 31, l'écran **`Equivalences`** (workflow des demandes
+  d'équivalence/dispense) reçoit un **test dédié de 27 tests à 100 % de
+  lignes / 100 % de fonctions / 100 % de branches** : chargement de la
+  liste et des neuf badges de statut (crédits `null`/`0`/valeur avec tiret
+  de repli), chargement parallèle des quatre référentiels **seulement pour
+  les rôles acteurs** (`canActScolarite`) et son échec toasté, création en
+  brouillon (payload typé `Number(x) || undefined`, y compris par soumission
+  directe du formulaire, bouton verrouillé pendant l'envoi, erreur JSON puis
+  message générique), les cinq transitions du workflow et l'absence de
+  bouton sur les statuts terminaux/inconnus, la carte de **décision
+  pédagogique** (valeurs par défaut FAVORABLE / autorité, champs vides
+  omis, fermeture après succès, ouverte sur erreur), et **l'application**
+  après `window.confirm` (annulation sans appel, succès/échec) ; les
+  régressions §10.8 existantes (rendu puis application au clic) restent en
+  place, le dossier `pages/scolarite/` passe à 90,0 % de lignes ;
 - le LOT 16 **achevait aussi la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1363,11 +1396,12 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    (`campagnesCompletion.test.jsx`) : création de campagne, toutes les
    transitions, ajout d'épreuve, convocations, verrouillage, calcul et
    publication du classement, **parachevés au LOT 17 par les correctifs
-   §10.11** (quotas, campagne fermée). Restent les actions secondaires de ces
-   écrans : la modale « Décider » et les autres transitions (`Equivalences`),
-   le workflow maquette (valider/activer/archiver/cloner) et l'ajout d'ECUE
-   (`MaquetteDetail`), le détail enseignant et la sélection dans
-   `ChargesEnseignants` ;
+   §10.11** (quotas, campagne fermée), et la modale « Décider », les
+   transitions, la création et l'application de `Equivalences` sont
+   **couverts à 100 % au LOT 31**. Restent les actions secondaires des deux
+   derniers écrans réparés : le workflow maquette
+   (valider/activer/archiver/cloner) et l'ajout d'ECUE (`MaquetteDetail`),
+   le détail enseignant et la sélection dans `ChargesEnseignants` ;
 3. flux critiques par rôle : ~~candidatures~~ (LOT 9), ~~admissions/décisions~~
    (LOT 10), ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)**,
    ~~jurys / diplômation / vérification publique~~ **(LOT 12)** et ~~saisie des
@@ -1410,10 +1444,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    `FinanceDashboard` achève le module Finance transverse au LOT 30**
    (99,8 % lignes / 100 % fonctions : KPI évolutifs, forages, classements,
    synthèse paginée, ventilation modale, période et `rank_tab` partagés) —
-   **les quatre écrans Finance transverse ont désormais leur test dédié**.
-   Suivent les **référentiels**, les actions secondaires des écrans
-   Scolarité (`Equivalences`, `MaquetteDetail`, `ChargesEnseignants`), et
-   les gros volumes internes `Statistiques` et `Users` (création de
+   **les quatre écrans Finance transverse ont désormais leur test dédié**,
+   puis **`Equivalences` est verrouillé à 100 % au LOT 31**. Suivent les
+   **référentiels**, les actions secondaires des deux derniers écrans
+   Scolarité réparés (`MaquetteDetail`, `ChargesEnseignants`), et les gros
+   volumes internes `Statistiques` et `Users` (création de
    secrétariat à la volée) ;
 4. écarts encore ouverts, dans des lots dédiés :
    - ~~§10.12 bug bloquant de la modale d'**assignation d'un enseignant**
