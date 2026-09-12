@@ -31,12 +31,15 @@ import ChargesEnseignants from '@/pages/scolarite/ChargesEnseignants'
 const callsTo = (pathOnly) =>
   apiMock.get.mock.calls.filter(([p]) => p.split('?')[0] === pathOnly)
 
-const mount = (Component, { pattern, url }) =>
-  renderWithProviders(<Component />, {
-    authUser: makeUser('ADMIN', { username: 'admin' }),
+const mount = (Component, { pattern, url }) => {
+  const me = makeUser('ADMIN', { username: 'admin' })
+  apiController.setMe(me)
+  return renderWithProviders(<Component />, {
+    authUser: me,
     routePattern: pattern,
     initialEntries: [url],
   })
+}
 
 const settle = async () => {
   await act(async () => {

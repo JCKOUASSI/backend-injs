@@ -13,9 +13,12 @@
 > défauts de mémoïsation et trou de synchronisation §10.7, avec régressions), puis
 > au **[LOT 7]** (lint **vierge** : suppression du code mort réel, et — découverte
 > majeure — réparation de **5 écrans Scolarité en panne** dont les « variables
-> mortes » n'étaient que le symptôme, §10.8, avec régressions dédiées).
+> mortes » n'étaient que le symptôme, §10.8, avec régressions dédiées), puis au
+> **[LOT 8]** (les actions rétablies au LOT 7 sont désormais exercées **au clic** :
+> transitions de campagne, note, application d'équivalence, archivage d'ECUE,
+> création d'affectation — écritures POST/DELETE vérifiées).
 > Les LOT 4 à 7 sont les seuls à toucher la logique applicative, sur feu vert
-> explicite.
+> explicite ; le LOT 8 est un lot de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -233,7 +236,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (23 fichiers, 477 tests)
+### 6.2 Fichiers de test colocalisés (24 fichiers, 483 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -272,6 +275,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (17 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **repli sur le seul onglet autorisé** quand l'URL réclame un onglet interdit (§10.2 LOT 6), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
 | `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). |
 | `src/pages/scolarite/scolariteRendu.test.jsx` | page | **5 régressions (LOT 7, §10.8)** sur des écrans qui rendaient une page blanche sans planter : rendu effectif du titre de `Campagnes`, du libellé de `CampagneDetail`, du titre d'`Équivalences`, du libellé de `MaquetteDetail`, et — pour `ChargesEnseignants` — requête de l'année courante **au montage** puis enchaînement sur l'occupation des enseignants. Chaque test échouait avant la correction (preuve de mutation). |
+| `src/pages/scolarite/scolariteActions.test.jsx` | page | **6 tests d'écriture au clic (LOT 8, §10.8)** sur les gestionnaires rétablis : `Campagnes` (Planifier sans confirmation puis Ouvrir **avec** `window.confirm`, bon `POST …/transition/` + rechargement ; cas d'erreur serveur avec toast), `CampagneDetail` (enregistrement d'une note `POST /epreuves/:id/notes/` avec les bons identifiants), `Equivalences` (`POST …/appliquer/` après confirmation), `MaquetteDetail` (`DELETE /ecues/:id/?mode=archive`), `ChargesEnseignants` (création d'affectation `POST /enseignants/affectations/` avec l'année courante et les champs typés). |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
@@ -302,7 +306,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 7 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 8 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -316,24 +320,22 @@ Mesure après le LOT 7 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
 | `pages/Modules.jsx` | **37 %** | 37 % | 6 % | **59 %** |
 | `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
-| `pages/scolarite/**` (dossier) | **54 %** | 54 % | 17 % | **65 %** |
-| **Global `src/` (toutes zones)** | **37 %** | **37 %** | **25 %** | **64 %** |
+| `pages/scolarite/**` (dossier) | **61 %** | 61 % | 26 % | **66 %** |
+| **Global `src/` (toutes zones)** | **38 %** | **38 %** | **26 %** | **64 %** |
 
-> Les LOT 4 à 7 sont des correctifs ciblés : les seuils du LOT 3 restent
-> inchangés (aucun seuil n’a été baissé). Les régressions ajoutées font
-> progressivement monter le nombre de tests : 464 (LOT 4) → 467 (LOT 5) →
-> 472 (LOT 6) → **477 (LOT 7)**, et les lignes couvertes globalement de
-> 35,3 % (LOT 5) → 35,9 % (LOT 6) → **37,0 % (LOT 7)**.
+> Les LOT 4 à 7 sont des correctifs ciblés ; le LOT 8 n'ajoute que des tests.
+> Les seuils du LOT 3 restent inchangés (aucun seuil n’a été baissé). Le nombre
+> de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
+> (LOT 7) → **483 (LOT 8)**, et les lignes couvertes globalement 35,3 %
+> (LOT 5) → 35,9 % (LOT 6) → 37,0 % (LOT 7) → **37,7 % (LOT 8)**.
 >
-> Le LOT 7 fait apparaître de la couverture là où les pages étaient
-> **invisibles car en panne** (§10.8) : `Campagnes` 61 % ln / 85 % br,
-> `CampagneDetail` 68 % / 88 %, `ChargesEnseignants` 63 % / 65 %,
-> `Equivalences` 51 % / 79 %, `MaquetteDetail` 31 % / 52 %. Le taux global de
-> **fonctions** recule très légèrement (25,5 % → 24,9 %) : réparer les pages
-> rend désormais leurs gestionnaires câblés (boutons/forms) *définis* dans le
-> rapport, alors qu’avant ils n’étaient pas rendus ; ils ne sont pas encore
-> *exécutés* par les tests (les clics restent à couvrir). Conséquence attendue,
-> très au-dessus du seuil de 23 %.
+> Le LOT 7 faisait apparaître de la couverture là où les pages étaient
+> **invisibles car en panne** (§10.8) ; le LOT 8 y **exécute les actions au
+> clic** : `Campagnes` 61 → **83 %** ln, `CampagneDetail` 68 → **82 %**,
+> `ChargesEnseignants` 63 → **73 %** (fonctions 12,5 → **87,5 %**),
+> `Equivalences` 51 → **64 %**, `MaquetteDetail` 31 → **68 %**. Le léger creux
+> de couverture de **fonctions** constaté au LOT 7 (gestionnaires définis mais
+> non exécutés : 24,9 %) se résorbe à **25,8 %**, au-dessus du seuil de 23 %.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -631,6 +633,18 @@ constatées pour le câblage du chargeur comme pour les pages blanches).
 > contenu caractéristique (titre, tableau, action), et non seulement l'absence
 > d'erreur (voir §6.3 et §9).
 
+**Les actions rétablies sont couvertes au clic au LOT 8**
+(`scolariteActions.test.jsx`, 6 tests). Le LOT 7 vérifiait que les pages
+*s'affichent* et *chargent* ; le LOT 8 exerce les écritures et confirme chemin,
+charge utile, confirmation et message de succès : transitions de campagne
+(Planifier sans confirmation, Ouvrir avec `window.confirm`), enregistrement
+d'une note, application d'une dispense/équivalence, archivage d'ECUE
+(`DELETE ?mode=archive`) et création d'affectation (avec l'année courante). Un
+cas de transition **rejetée** couvre aussi la branche d'erreur (toast du
+message serveur, sans crash). Couverture des pages : `Campagnes` 61 → **83 %**,
+`CampagneDetail` 68 → **82 %**, `ChargesEnseignants` 63 → **73 %** (fonctions
+12,5 → 87,5 %), `Equivalences` 51 → **64 %**, `MaquetteDetail` 31 → **68 %**.
+
 ---
 
 ## 11. Couverture des pages — ce qui reste à faire
@@ -649,7 +663,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 7 :
+**Aucune page n'est dépourvue de test.** État après le LOT 8 :
 
 - six écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
   `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
@@ -660,7 +674,8 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
   le chargement effectif — allant au-delà du smoke qui n'exclut pas les pages
-  blanches ;
+  blanches ; leurs **actions d'écriture sont en outre exercées au clic** au
+  LOT 8 (`scolariteActions.test.jsx`, §10.8) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -682,11 +697,15 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    avec un test dédié `Modules` et deux régressions supplémentaires ; le
    **LOT 7** a rendu le lint **vierge** (§10.3) et réparé **5 écrans Scolarité
    en panne** (§10.8) ;
-2. **[prioritaire] compléter les écrans Scolarité réparés (§10.8)** : les tests
-   actuels affirment le rendu/chargement, mais les actions rétablies
-   (transition de campagne, enregistrement de note, application d'équivalence,
-   archivage d'ECUE, création d'affectation) restent à couvrir **au clic**
-   (requêtes POST/PATCH/PATCH + toasts + rechargement) ;
+2. ~~Compléter les écrans Scolarité réparés (§10.8) par des tests au clic~~
+   **fait au LOT 8** (`scolariteActions.test.jsx`) : transition de campagne
+   (avec/sans confirmation + erreur), note, application d'équivalence,
+   archivage d'ECUE, création d'affectation. Restent les actions secondaires de
+   ces écrans : création de campagne et ajout d'épreuve (`Campagnes` /
+   `CampagneDetail`), la modale « Décider » et les autres transitions
+   (`Equivalences`), le workflow maquette (valider/activer/archiver/cloner) et
+   l'ajout d'ECUE (`MaquetteDetail`), le détail enseignant et la sélection dans
+   `ChargesEnseignants` ;
 3. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
    jurys, finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
 4. écart encore ouvert, dans un lot dédié :
