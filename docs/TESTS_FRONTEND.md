@@ -234,9 +234,20 @@
 > (avec champ motif réservé aux validateurs) et la suppression. Le composant
 > passe à **99,2 % de lignes / 91 % fonctions / 91 % branches** ; aucun
 > écart produit n'a été révélé.
+> Le **[LOT 38d]** verrouille les deux composants satellites de l'onglet
+> Point Journalier par des tests unitaires directs (composants de
+> présentation rendus sans provider) : **35 nouveaux tests purs** dans deux
+> fichiers colocalisés, qui portent `AuditeursNotoiresPanel.jsx` (fonction
+> pure de filtrage secrétariat/grade/groupe, bandeau KPI singulier/pluriel,
+> tableau complet à 12 colonnes vs compact à 7, replis et pied de tableau)
+> et `PointJournalierCPFAE.jsx` (formatage `pjPct`, modèle Excel FAC :
+> titre/ligne DATE/sidebar de vague, créneaux matin/soir avec groupes,
+> salles, 5 lignes de données, totaux, cellules de padding quand les
+> créneaux ont des nombres de groupes différents, taux du jour) à
+> **100 % de lignes et de fonctions** pour les deux. Aucun écart révélé.
 > Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b et 38c sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c et 38d sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -454,7 +465,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (50 fichiers, 1250 tests)
+### 6.2 Fichiers de test colocalisés (52 fichiers, 1285 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -521,6 +532,8 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/campagnesCompletion.test.jsx` | page | **19 tests (LOT 16, complétés au LOT 17 §10.11), campagnes d'admission**. `Campagnes` : **création en brouillon** (formulaire — sélecteurs année/formation requis, dates, **champs quota d'admissibles/d'admis transmis en nombres**, quotas vides → `undefined`, réinitialisation + rechargement), échec serveur (formulaire conservé), **les 4 transitions restantes** du workflow (Suspendre sans confirmation, Clôturer avec confirmation, Réouvrir, Archiver ; annulation = aucun appel), lecture seule DIRECTION (référentiels non chargés). `CampagneDetail` : rendu (compteurs, quota, lignes d'épreuves verrouillées, tableau du classement et ses badges, épreuve verrouillée exclue du sélecteur de note, candidatures des autres campagnes filtrées), **ajout d'épreuve** (POST typé avec/sans salle, valeurs par défaut, reset, erreur JSON conservée), **génération des convocations** (confirm annulée puis acceptée), **verrouillage** (confirm d'irréversibilité, échec notifié), boutons absents sur épreuve verrouillée, **calcul du classement sans confirmation** puis **publication avec confirmation**, campagne clôturée (formulaire d'épreuve masqué) et les **régressions §10.11 (LOT 17)** : la carte de saisie de notes et les boutons de calcul/publication sont masqués sur campagne **clôturée comme annulée** (le classement reste consultable), DIRECTION en lecture seule. Porte `Campagnes.jsx` à **99,4 % de lignes / 100 % de fonctions** et `CampagneDetail.jsx` à **98,8 % / 100 %**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. **LOT 38a (socle, +44 tests)** : les 8 onglets rendus et les **sections API par onglet** (`TAB_SECTIONS`), endpoint dédié `/statistiques/secretariats/`, ouverture directe `?rbView=workflow`, présence/absence du panneau de période par onglet ; **états de chargement et d'erreur** (spinner initial figé par promesse, écran d'erreur plein avec détail backend / message générique / bouton Réessayer qui répare, bandeau d'erreur non bloquant après chargement, indicateur « Actualisation… », erreur PJ dans l'état vide) ; **filtres d'en-tête** (peuplement formation via la méta et propagation `formation_id`, effacement des filtres, horodatage de mise à jour, sélecteur secrétariat activé/désactivé pour un encadrant selon le nombre de secrétariats) ; **filtre de période** (auto-apply d'un preset, période entièrement future + retour au trimestre courant, badge de période, message « aucune séance comptabilisable » et sa non-présence en preset « Tout ») ; **états vides et rendus minimaux** des onglets PJ, bilans/workflow, historique vide et avec données (navigation mensuelle), vue d'ensemble (KPI + navigation de section), administratif, pédagogique, comparatif secrétariats avec chargement du détail ; **alertes/seuils** (invite d'initialisation INJS, boutons masqués pour rôle non validant, POST d'init puis re-fetch, alerte déclenchée et compteurs de synthèse, édition + PUT du corps des seuils, échecs POST/PUT en `window.alert`) ; **exports** Point Journalier et Bilans (boutons désactivés à vide, blob XLSX annuel et PDF du tableau sélectionné avec `jour`/`formation_id`/`categorie`, échecs en alerte sans planter, état d'export puis réactivation). Le mock d'API de test accepte désormais des fonctions de route **asynchrones** (await de la réponse), ce qui permet de figer les états de chargement. Aucun écart produit révélé par ce lot de tests purs. **LOT 38b (vue « Bilans INJS », +45 tests, toujours sans toucher à la page)** : les **4 dimensions** (bascule module / matière / catégorie / formation avec requête `dimension=` adaptée et remplacement du sélecteur module par celui des matières), la portée de **tous les filtres** (`mois`, `categorie`, `module_id`, `ref_module_id`/`matiere_intitule` via les clés `r:id`/`i:intitule`, `formation_id`, `periode`, `calendrier`, `annee`), le listage (`tous_tableaux=1`, en-tête « N bilans · Par … », bouton « Tous les tableaux (N) », badges MOD/MAT/CAT, chips grade/groupe, compteurs inscrits/groupes/pointages), le filtrage des options matière selon la formation, la réinitialisation de la sélection à chaque changement de filtre et le bouton Actualiser ; **navigation liste ↔ détail** : vue d'ensemble (`BilansEnsemblePanel`, « N tableaux — … », chapô « Vue d'ensemble (année · période) », boutons « Plein écran » sans appel `detail=1` quand le tableau est en cache, message « Aucun tableau à afficher »), détails servis par le cache ou par `?detail=1` avec les bonnes clés selon la dimension, tableaux d'effectifs (en-têtes fusionnés par `<br/>`, formatage français milliers/virgule, « X H / Y F inscrits », pourcentages), bandeau « Agrégation de N groupes — étudiants uniques » en dimension matière, tableau `bilan_periode_formation` avec textarea justificatifs synchronisé, garde-fous (module sans `module_id`, matière sans `formation_id`, catégorie vide/`—`, formation sans `formation_id`, dimension inconnue : aucun appel `detail=1`, message « Aucune séance comptabilisable… » ou carte de secours « Zone tableau bilan » avec grille de contexte et `BILAN — <DIMENSION>`), type de tableau non modélisé ; **exports bilans** des 3 formats (PDF d'un module avec `module_id`/`formation_id`/`categorie`, Excel d'une matière clé `i:` sans `module_id`, Word d'un bilan formation avec `justificatifs`, nom par défaut `BILANS_<année>.<ext>`, échec en alerte sans blocage). **Bilan FAC** : panneau replié sans requête puis placeholder « Sélectionnez une formation… » et bouton « Générer le bilan » désactivé, chargement du périmètre dès la formation choisie (tout coché par défaut, chips grades/groupes, boutons tout cocher/décocher, retrait des groupes d'un grade décoché, recoche du grade sans recocher ses groupes → paramètre `groupes` en sous-ensemble, périmètre vide et échec de chargement, héritage de la formation du filtre global d'en-tête, catégorie/année FAC répercutées, réinitialisation du bilan après changement de formation, échec de génération sans planter), génération complète sans `grades`/`groupes` (en-tête grades/absents/date, 4 boutons de sous-onglets), **Point global** (lignes triées par grade, ligne TOTAL issue du backend, 2 textareas par grade, fusions des doublons pour les clés sommées — et test `[écart] §10.15` pour l'effectif auditeurs non sommé), **Volume horaire** (un tableau par grade, agrégation des colonnes de groupes en doublon avec VH sommées, récapitulatif global uniquement si plusieurs grades, totaux VH cycle), **Absents notoires** (message vide dédié puis tableau détaillé après régénération, compteur et pied de tableau), **État des modules** (regroupement par grade, 4 statuts Terminé/En cours/Planifié/Suspendu), **exports FAC** (`meta=JSON({justificatifs,difficultes})` par grade, absence de meta sans saisie, nom par défaut `BILAN_FAC_<année>.<ext>`, échec en alerte). |
 | `src/components/RapportsWorkflowPanel.test.jsx` | composant | **46 tests (LOT 38c), workflow des rapports périodiques de l'onglet Rapports — 99,2 % de lignes / 91 % fonctions / 91 % branches**, rendu direct du composant (props `user`/`formationId`/`secretariatId`/`appliedVhPeriod`). **Chargement/périmètre/droits** : liste au montage (`GET /statistiques/rapports/`), titre/compteur singulier-pluriel, 5 badges de statut, périodes formatées FR avec flèche, état « Chargement… » figé par promesse et Actualiser désactivé, liste vide, erreurs backend/génériques en toast, Actualiser, portée `formation_id`/`secretariat_id`/période (`preset=mois&mois=`, custom `date_debut/date_fin`), rechargement sur changement de props, habillage des rôles (auditeur : aucune action ; SECRETARIAT/CHEF_SECRETARIAT : générer/soumettre/modifier un brouillon mais pas valider/supprimer ; ADMIN : tout), badge de statut inconnu en repli. **Détail** : `GET /rapports/<id>/`, type libellé, période en cadratin, générateur/validateur/date `toLocaleString`, commentaire conditionnel, spinner de chargement, 4 cartes KPI (taux bruts « X % », entiers, replis `—`), absence de grille KPI, erreur détail avec repli sur les données de la liste, changement de sélection. **Workflow (admin)** : soumission immédiate depuis BROUILLON (`POST …/workflow/ {action:'soumettre'}` + toast + rafraîchissement), modales Valider/Publier avec commentaire (vide par défaut), Rejeter avec **garde motif obligatoire** (pas de POST sans saisie, `commentaire`+`motif` avec), Annulation/croix sans appel, **parcours complet brouillon → en validation → validé → publié** via un backend simulé mutable, erreur backend (modale conservée). **Création** : modale avec les 10 types, valeurs par défaut (MENSUEL), Annuler sans POST, POST du formulaire sur le périmètre filtré avec toast, fermeture, réinitialisation et **sélection automatique du rapport créé** (GET détail de son id), titre vide autorisé, erreur gardant la modale ouverte. **Modification** : pré-remplissage depuis le détail (y compris sur un PUBLIÉ pour l'admin, champ `motif` réservé aux validateurs), PATCH sans clé `motif` si vide puis avec motif trimé, secrétariat bloqué sur VALIDE/PUBLIÉ, erreur et annulation. **Suppression** : modale à commentaire optionnel, `DELETE …/ {data:{motif}}`, déselection et rechargement, motif vide, erreur conservant la sélection, annulation sans appel, bouton absent pour un secrétariat. Aucun écart produit révélé (les 9 % de branches restants sont les `catch` de `fmtDate/fmtDateTime`, quasi-inatteignables en jsdom). |
+| `src/components/AuditeursNotoiresPanel.test.jsx` | composant | **19 tests (LOT 38d), absents notoires — 100 % lignes / 100 % fonctions / 93 % branches**, rendu direct sans provider. **`filterAuditeursNotoires` (pur)** : donnée nulle, total/pct arrondi au dixième, repli inscrits (`opts.inscrits` > `data.inscrits` > 0), filtre secrétariat avec coercition chaîne, filtre grade/groupe y compris le repli `—`, cumul des filtres. **`AuditeursNotoiresKpiStrip`** : rendu nul sans données, bandeau vert à total 0, singulier/pluriel, pourcentage en virgule, inscription entre parenthèses, mention « Module démarré ». **`AuditeursNotoiresPanel`** : messages « Données non disponibles. » / « Aucun absent notoire sur ce périmètre. », 12 colonnes complètes vs 7 en mode `compact`, numérotation, grade/groupe combinés ou en repli, contacts joints par « · » / seul / aucun, motif en rouge ou `—`, valeurs manquantes en `—`, `maxHeight`/overflow du conteneur défilant, pied de tableau avec/sans part des inscrits, lignes sans `id`. |
+| `src/components/PointJournalierCPFAE.test.jsx` | composant | **16 tests (LOT 38d), modèle Excel du point journalier FAC — 100 % lignes / 100 % fonctions / 90 % branches**, rendu direct. **`pjPct`** : fractions formatées en français à 2 décimales, chaîne numérique acceptée, repli `—` (null/undefined/NaN/non numérique). **`PointJournalierTableauCPFAE`** : rendu nul sans `tb`, titre/ligne DATE (jour, mois, année, organisme), sidebar de vague par défaut « SECONDE VAGUE » / personnalisée et trimée, taux du jour présence/absence et leur repli `—` ; **créneaux** : en-tête horaire avec repli `—`, lignes GROUPES (avec salles et `—`), 5 lignes de données dans l'ordre du modèle (ÉFFECTIF, PRÉSENTS, ABSENTS, TAUX DE PRÉSENCE, TAUX D'ABSENCE), valeurs brutes mises à 0 et taux en `—` quand elles manquent, totaux de dernière colonne, **cellules de padding** quand un créneau a moins de groupes que le maximum des deux créneaux, créneau absent non rendu sans planter, minimum `nGroups = 1`. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
@@ -550,7 +563,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 38c (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 38d (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -583,6 +596,8 @@ Mesure après le LOT 38c (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/CampagneDetail.jsx` (LOT 16/17) | **99 %** | 99 % | **100 %** | **89 %** |
 | `pages/Statistiques.jsx` (LOT 38a socle + 38b Bilans INJS / FAC) | **87 %** | **87 %** | **73 %** | **67 %** |
 | `components/RapportsWorkflowPanel.jsx` (LOT 38c) | **99 %** | **99 %** | **91 %** | **91 %** |
+| `components/AuditeursNotoiresPanel.jsx` (LOT 38d) | **100 %** | **100 %** | **100 %** | **93 %** |
+| `components/PointJournalierCPFAE.jsx` (LOT 38d) | **100 %** | **100 %** | **100 %** | **90 %** |
 | `pages/scolarite/Candidatures.jsx` | **97 %** | 97 % | 74 % | **79 %** |
 | `pages/scolarite/Admissions.jsx` | **98 %** | 98 % | 90 % | **85 %** |
 | `pages/scolarite/Inscriptions.jsx` | **99 %** | 99 % | **100 %** | **87 %** |
@@ -594,7 +609,7 @@ Mesure après le LOT 38c (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
-| **Global `src/` (toutes zones)** | **73,4 %** | **73,4 %** | **66,6 %** | **80,2 %** |
+| **Global `src/` (toutes zones)** | **73,9 %** | **73,9 %** | **66,8 %** | **80,7 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -607,22 +622,22 @@ Mesure après le LOT 38c (V8, `npm run test:coverage`), sur les zones ciblées :
 > 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → 847 (LOT 27) →
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
-> 1204 (LOT 38b) → **1250 (LOT 38c)** ;
+> 1204 (LOT 38b) → 1250 (LOT 38c) → **1285 (LOT 38d)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
 > 55,9 % (LOT 24) → 56,3 % (LOT 25) → 56,7 % (LOT 26) → 57,3 % (LOT 27) →
 > 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → 60,4 % (LOT 31) →
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
-> 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → **73,4 % (LOT 38c)** — le seuil des
-> 60 % de lignes reste largement franchi, **les fonctions montent à
-> 66,6 % (plancher CI 23 %)**, les branches à 80,2 % (plancher CI 60 %).
-> Le LOT 38b fait passer le seul `Statistiques.jsx` de 64 % à 87 % de
-> lignes, et le LOT 38c porte le composant satellite
-> `RapportsWorkflowPanel` à 99,2 % de lignes ; restent les gros composants
-> `PointJournalierCPFAE` et `AuditeursNotoiresPanel`, ainsi que le maillage
-> fin des panneaux pédagogie / historique / secrétariats, pour les
-> sous-lots LOT 38 suivants. Les LOT 17 et 19 corrigent
+> 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → 73,4 % (LOT 38c) →
+> **73,9 % (LOT 38d)** — le seuil des 60 % de lignes reste largement
+> franchi, **les fonctions montent à 66,8 % (plancher CI 23 %)**, les
+> branches à 80,7 % (plancher CI 60 %). Le LOT 38b porte `Statistiques.jsx`
+> de 64 % à 87 % de lignes, le LOT 38c verrouille `RapportsWorkflowPanel`
+> à 99,2 %, et le LOT 38d les deux composants de présentation du point
+> journalier (`AuditeursNotoiresPanel`, `PointJournalierCPFAE`) à 100 % de
+> lignes et de fonctions ; reste le maillage fin des panneaux pédagogie /
+> historique / secrétariats pour les sous-lots LOT 38 suivants. Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
 > bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève la couverture
@@ -786,14 +801,16 @@ Mesure après le LOT 38c (V8, `npm run test:coverage`), sur les zones ciblées :
 > en attente de feu vert : la fusion des lignes Point global d'un même grade
 > ne somme pas les effectifs auditeurs à cause d'une clé erronée
 > (`effectif_étudiants` au lieu de `effectif_auditeurs`, **§10.15**).
-> Le **[LOT 38c]** verrouille ensuite le workflow des rapports périodiques
+> Le **[LOT 38c]** verrouille le workflow des rapports périodiques
 > (`RapportsWorkflowPanel`) avec **46 tests dédiés** qui portent le composant
 > à **99,2 % de lignes / 91 % fonctions / 91 % branches**, sans révéler
 > d'écart (droits par rôle, 4 transitions de validation, création,
-> modification, suppression, KPI et périmètre). Les sous-lots suivants
-> (38d+) approfondiront le maillage fin des panneaux pédagogie /
-> historique / secrétariats et les composants `PointJournalierCPFAE` /
-> `AuditeursNotoiresPanel`.
+> modification, suppression, KPI et périmètre). Le **[LOT 38d]** porte les
+> deux composants de présentation du point journalier
+> (`AuditeursNotoiresPanel`, `PointJournalierCPFAE`) à **100 % de lignes et
+> de fonctions** avec **35 tests directs**. Les sous-lots suivants (38e+)
+> approfondiront le maillage fin des panneaux pédagogie / historique /
+> secrétariats de `Statistiques.jsx`.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -1425,7 +1442,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 38c :
+**Aucune page n'est dépourvue de test.** État après le LOT 38d :
 
 - dix-sept écrans disposent d'un test **fonctionnel dédié** hors module
   Scolarité (les quatre écrans du module Finance transverse —
@@ -1891,15 +1908,15 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    lignes, secrétariat à la volée compris). Le gros volume
    `Statistiques.jsx` (5 491 lignes) est **couvert à 87 % de lignes**
    (97 tests, LOT 38a socle des 8 onglets, LOT 38b vue « Bilans INJS » et
-   Bilan FAC complet) ; son composant satellite
-   `RapportsWorkflowPanel.jsx` est **verrouillé à 99,2 % de lignes au
-   LOT 38c** (46 tests dédiés : droits par rôle, transitions soumettre /
-   valider / rejeter / publier, génération, modification, suppression) ;
-   restent les sous-lots 38d+ : maillage fin des panneaux pédagogie /
-   historique / secrétariats, et les composants `PointJournalierCPFAE`
-   (KPI strip) et `AuditeursNotoiresPanel`, avec l'écart §10.15 à corriger
-   sur feu vert (clé `effectif_auditeurs` dans la fusion Point global).
-   Restent aussi les montées en profondeur des écrans encore en
+   Bilan FAC complet) ; ses composants satellites sont verrouillés :
+   `RapportsWorkflowPanel.jsx` à **99,2 % de lignes au LOT 38c** (46 tests :
+   droits par rôle, transitions soumettre / valider / rejeter / publier,
+   génération, modification, suppression), `AuditeursNotoiresPanel.jsx` et
+   `PointJournalierCPFAE.jsx` à **100 % de lignes au LOT 38d** (35 tests) ;
+   reste le sous-lot 38e : maillage fin des panneaux pédagogie /
+   historique / secrétariats de `Statistiques.jsx`, avec l'écart §10.15 à
+   corriger sur feu vert (clé `effectif_auditeurs` dans la fusion Point
+   global). Restent aussi les montées en profondeur des écrans encore en
    couverture partielle (`Dashboard`, `Modules`, `Maquettes`,
    `MonEspace`) ;
 4. écarts encore ouverts, dans des lots dédiés :
