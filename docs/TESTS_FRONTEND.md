@@ -31,9 +31,14 @@
 > révocation motivée et **portail public de vérification** ; ce lot a révélé
 > une boucle de rechargement parasite sur échec de chargement, §10.10), puis au
 > **[LOT 13]** (**correctif** de cet écart transverse : stabilisation de la
-> valeur du `ToastContext.Provider`, avec régressions dédiées — §10.10).
+> valeur du `ToastContext.Provider`, avec régressions dédiées — §10.10), puis au
+> **[LOT 14]** (la **saisie des notes d'un module** — chaînon entre la
+> pédagogie et le jury : grille, calcul en direct mention/moyenne/admission,
+> enregistrement en bloc `{notes, synthèses}`, colonnes dynamiques, fiches PDF ;
+> lot de tests purs).
 > Les LOT 4 à 7 et le LOT 13 sont les lots qui touchent la logique applicative,
-> sur feu vert explicite ; les LOT 8 à 12 sont des lots de tests purs.
+> sur feu vert explicite ; les LOT 8 à 12 et le LOT 14 sont des lots de tests
+> purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -251,7 +256,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (31 fichiers, 542 tests)
+### 6.2 Fichiers de test colocalisés (32 fichiers, 562 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -298,6 +303,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Jurys.test.jsx` | page | **14 tests (LOT 12), fin du parcours académique** : sessions avec badges et **3 filtres** transmis tels quels (statut/année/formation, clés toujours présentes) ; **workflow de transition complet** exercé pour chaque statut par test paramétré (Contrôler/Calculer/Délibérer/Décider/Générer PV/Valider/Verrouiller/Publier → le bon `POST …/action/` `{action}`, session PUBLIÉE sans bouton) ; confirmation `window.confirm` acceptée/annulée ; action rejetée (toast du détail backend) ; **lecture seule** (DIRECTION : pas d'actions, référentiels non chargés) ; une **régression §10.10** (un échec de chargement = une seule requête, un seul toast, état vide). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
+| `src/pages/NotesModule.test.jsx` | page | **20 tests (LOT 14), saisie des notes** (chaînon pédagogie → jury) : chargement module + grille (colonnes, barèmes, notes pré-remplies, critères seuil/présence, mention/moyenne/admission calculés, « saisi par »), recherche/filtre, état vide ; **saisie en direct** (mention normalisée /20, moyenne, bandeau « modifications non sauvegardées », note hors plage **0–20**, observations, navigation clavier **Entrée → champ suivant**) ; **enregistrement en bloc** `POST …/notes/bulk/` avec le payload `{notes, synthèses}` (mention calculée, cellules vides exclues), réponse partiellement en erreur (toast d'avertissement), échec (la saisie est conservée) ; **colonnes dynamiques** (ajout `POST …/notes/colonnes/`, libellé vide refusé, suppression `DELETE` avec confirmation et impossible à 1 colonne) ; **fiches PDF** module/individuelle (`getBlob`), confirmation si saisie non enregistrée, erreur de génération ; liens Décisions/Retour ; une régression §10.10 (une seule requête sur échec de chargement). Couvre **97,6 % des lignes / 92 % des fonctions**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
@@ -328,7 +334,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 13 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 14 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -341,6 +347,7 @@ Mesure après le LOT 13 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Users.jsx` | **89 %** | 89 % | 49 % | **69 %** |
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
 | `pages/Modules.jsx` | **37 %** | 37 % | 6 % | **59 %** |
+| `pages/NotesModule.jsx` (LOT 14) | **98 %** | 98 % | **92 %** | **84 %** |
 | `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
 | `pages/scolarite/Candidatures.jsx` | **97 %** | 97 % | 74 % | **79 %** |
 | `pages/scolarite/Admissions.jsx` | **98 %** | 98 % | 90 % | **85 %** |
@@ -350,16 +357,16 @@ Mesure après le LOT 13 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier) | **82 %** | 82 % | **56 %** | **77 %** |
-| **Global `src/` (toutes zones)** | **40 %** | **40 %** | **30 %** | **67 %** |
+| **Global `src/` (toutes zones)** | **42 %** | **42 %** | **32 %** | **68 %** |
 
 > Les LOT 4 à 7 et le LOT 13 sont des correctifs ciblés ; les LOT 8 à 12
 > n'ajoutent que des tests.
 > Les seuils du LOT 3 restent inchangés (aucun seuil n’a été baissé). Le nombre
 > de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
 > (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → 510 (LOT 11) →
-> 539 (LOT 12) → **542 (LOT 13)** ; lignes couvertes globalement 35,3 %
-> (LOT 5) → … → **40,3 % (LOT 12/13)** (fonctions **30,4 %**, branches
-> **66,7 %**).
+> 539 (LOT 12) → 542 (LOT 13) → **562 (LOT 14)** ; lignes couvertes
+> globalement 35,3 % (LOT 5) → … → 40,3 % (LOT 12/13) →
+> **41,6 % (LOT 14)** (fonctions **31,8 %**, branches **68,2 %**).
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
 > **invisibles car en panne** (§10.8) ; le LOT 8 y exécutait les actions au
@@ -369,7 +376,9 @@ Mesure après le LOT 13 (V8, `npm run test:coverage`), sur les zones ciblées :
 > avec `Jurys` et `Graduation`, tous deux à **100 % de lignes / 100 % de
 > fonctions** ; le LOT 13 **corrige** l'écart transverse de rechargement qu'il
 > avait révélé (§10.10, stabilisation du `ToastContext`) avec 4 régressions,
-> et ajoute la première couverture de `MonEspace` (73,6 % de lignes). Le
+> et ajoute la première couverture de `MonEspace` (73,6 % de lignes) ; le
+> LOT 14 couvre la **saisie des notes d'un module** (`NotesModule`, **97,6 % de
+> lignes / 92 % de fonctions**), référencée par les décisions puis le jury. Le
 > service `services/scolarite.js` reste à **100 % de lignes** et le dossier
 > `pages/scolarite/` se maintient à **82 % de lignes / 56 % de fonctions /
 > 77 % de branches**.
@@ -780,13 +789,15 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 13 :
+**Aucune page n'est dépourvue de test.** État après le LOT 14 :
 
-- six écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
-  `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
-  serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %, nettoyage des
-  filtres obsolètes) et `Statistiques.jsx` (28 %, contrat d'isolation par
-  secrétariat + synchro des justificatifs §10.7) ;
+- sept écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
+  `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
+  (89 %, liste serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %,
+  nettoyage des filtres obsolètes), `Statistiques.jsx` (28 %, contrat
+  d'isolation par secrétariat + synchro des justificatifs §10.7) et
+  `NotesModule.jsx` (**97,6 % de lignes**, LOT 14 — grille de saisie, bulk,
+  colonnes, fiches PDF) ;
 - cinq écrans Scolarité (`Campagnes`, `CampagneDetail`, `Equivalences`,
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
@@ -805,6 +816,10 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 - au LOT 13, `MonEspace.jsx` (espace étudiant) gagne un **test dédié** qui
   couvre aussi le second patron du bug §10.10 (chargeur direct dans un
   `useEffect([toast])`) ;
+- au LOT 14, la **saisie des notes** (`NotesModule.jsx`, 20 tests) est couverte
+  en profondeur : c'est le chaînon qui alimente les décisions pédagogiques puis
+  la délibération du jury (calcul normalisé /20, mentions, moyennes, seuils
+  d'admission, enregistrement en bloc, colonnes dynamiques, fiches PDF) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -812,7 +827,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **35 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **34 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -836,17 +851,20 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    l'ajout d'ECUE (`MaquetteDetail`), le détail enseignant et la sélection dans
    `ChargesEnseignants` ;
 3. flux critiques par rôle : ~~candidatures~~ (LOT 9), ~~admissions/décisions~~
-   (LOT 10), ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)** et
-   ~~jurys / diplômation / vérification publique~~ **(LOT 12)** couverts : le
-   parcours étudiant de la candidature jusqu'à la **délivrance du diplôme et sa
-   vérification par un tiers** est défendu de bout en bout. La **réinscription**
-   et la **création d'événements** n'ont à ce jour **pas d'écran dédié** (les
-   fonctions `reinscrire` / `createEvenement` du service existent et sont déjà
-   couvertes à 100 % dans `services/scolarite.test.js`) ; elles ne relèvent
-   donc pas encore d'un test de page. Restent les écrans hors scolarité qui
-   écrivent : **présences/QR** (`Participants`, `FicheAuditeur`), **saisie de
-   notes / rattrapages** (`NotesModule`, `Rattrapages`), **finances étudiantes**,
-   **référentiels** (priorité aux écrans qui écrivent), puis les gros volumes
+   (LOT 10), ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)**,
+   ~~jurys / diplômation / vérification publique~~ **(LOT 12)** et ~~saisie des
+   notes d'un module~~ **(LOT 14, `NotesModule`)** couverts : le parcours
+   étudiant, de la candidature à la délibération du jury (alimentée par les
+   notes) jusqu'à la **délivrance du diplôme et sa vérification par un tiers**,
+   est défendu de bout en bout. La **réinscription** et la **création
+   d'événements** n'ont à ce jour **pas d'écran dédié** (les fonctions
+   `reinscrire` / `createEvenement` du service existent et sont déjà couvertes
+   à 100 % dans `services/scolarite.test.js`) ; elles ne relèvent donc pas
+   encore d'un test de page. Restent les écrans qui écrivent, hors scolarité :
+   **présences/QR et rattrapages** (`Participants`, `FicheAuditeur`,
+   `Rattrapages` — ce dernier relève en réalité du domaine *présence* :
+   déplacement vers une séance d'une autre cohorte et génération de pointage),
+   **finances étudiantes**, **référentiels**, puis les gros volumes
    `Statistiques` internes et `Users` (création de secrétariat à la volée) ;
 4. écarts encore ouverts, dans des lots dédiés :
    - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
