@@ -39,9 +39,18 @@
 > **rattrapages** inter-cohortes avec recherches débordancées, sélection
 > multiple de séances/modules, génération de pointage et annulation confirmée ;
 > et fiche de suivi d'un **auditeur** avec exports PDF/Excel — deux lots de
-> tests purs).
+> tests purs), puis au **[LOT 16]** (deux volets de tests purs : d'une part
+> l'**émargement en temps réel**, au cœur du gros écran `ModuleDetail` —
+> onglet Séances (démarrage/fin/suppression/création via `ConfirmModal`) et
+> onglet Présences (cinq cartes de statistiques, forçage de pointage
+> unitaire, badgeage en masse, habilitations ENCADRANT / secrétariat /
+> DIRECTION) ; d'autre part la **complétion des campagnes d'admission** —
+> création d'une campagne en brouillon, toutes les transitions de statut
+> restantes, ajout d'épreuve, convocations, verrouillage, calcul et
+> publication du classement, campagne fermée et lecture seule ; deux
+> constats produit en §10.11).
 > Les LOT 4 à 7 et le LOT 13 sont les lots qui touchent la logique applicative,
-> sur feu vert explicite ; les LOT 8 à 12, 14 et 15 sont des lots de tests
+> sur feu vert explicite ; les LOT 8 à 12 et 14 à 16 sont des lots de tests
 > purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
@@ -260,7 +269,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (34 fichiers, 588 tests)
+### 6.2 Fichiers de test colocalisés (36 fichiers, 620 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -310,6 +319,8 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/NotesModule.test.jsx` | page | **20 tests (LOT 14), saisie des notes** (chaînon pédagogie → jury) : chargement module + grille (colonnes, barèmes, notes pré-remplies, critères seuil/présence, mention/moyenne/admission calculés, « saisi par »), recherche/filtre, état vide ; **saisie en direct** (mention normalisée /20, moyenne, bandeau « modifications non sauvegardées », note hors plage **0–20**, observations, navigation clavier **Entrée → champ suivant**) ; **enregistrement en bloc** `POST …/notes/bulk/` avec le payload `{notes, synthèses}` (mention calculée, cellules vides exclues), réponse partiellement en erreur (toast d'avertissement), échec (la saisie est conservée) ; **colonnes dynamiques** (ajout `POST …/notes/colonnes/`, libellé vide refusé, suppression `DELETE` avec confirmation et impossible à 1 colonne) ; **fiches PDF** module/individuelle (`getBlob`), confirmation si saisie non enregistrée, erreur de génération ; liens Décisions/Retour ; une régression §10.10 (une seule requête sur échec de chargement). Couvre **97,6 % des lignes / 92 % des fonctions**. |
 | `src/pages/Rattrapages.test.jsx` | page | **18 tests (LOT 15), rattrapages de présence** : liste avec badges de statut/cohorte et **filtres débordancés** (`statut`, `q` vérifiés en query) ; états erreur/vide ; **lecture seule** pour un rôle hors `PRESENCE_ACTION_ROLES` (DIRECTION) ; **création** via recherche d'étudiant puis **sélection multiple de séances** (recherche ciblée `participant=`, séance « déjà inscrit » verrouillée, pastille ajout/retrait), mode **module entier** (ajout de toutes ses séances, module déjà fait verrouillé), motif, case « forcer la présence », validation sans étudiant/séance, **payload** `{participant_id, seance_rattrapage_ids, motif, generer_presence}` vérifié, toast créés/réactivés/ignorés, erreur serveur gardée dans la modale ; **génération de pointage** (`POST …/generer-presence/`) et **annulation** via `ConfirmModal` (avec/sans pointage → `supprimer_pointage`, refus = aucun appel), actions absentes sur un rattrapage annulé, cas d'erreur des deux écritures. Couvre **97,3 % des lignes / 86 % de branches** (le résidu est du filtrage défensif inatteignable via l'UI). |
 | `src/pages/FicheAuditeur.test.jsx` | page | **8 tests (LOT 15), fiche de suivi d'un auditeur** : synthèse (formation, moyenne, classement, décision finale), suivi par module (heures présence/prevues, taux, moyenne, épreuves), état « aucun module », tirets des champs absents, erreur de chargement → « fiche introuvable », **exports PDF et Excel** (`getBlob`), nom de fichier par défaut, erreur d'export. Couvre **100 % des lignes / 100 % des fonctions**. |
+| `src/pages/ModuleDetail.test.jsx` | page | **15 tests (LOT 16), émargement — onglets Séances et Présences de `ModuleDetail`**. Séances : badges de statut lus sur `en_cours`/`terminee`, compteurs d'onglets ; **démarrage** (`POST …/sessions/:id/start/` via `ConfirmModal`, toast + rechargement) et **annulation sans appel** ; **fin** (`stop/`), **suppression** (`DELETE …/delete/`, annulation puis confirmation), erreur backend (toast du `detail`), **création** (`POST …/sessions/new/` avec les 4 champs). **Habilitations** : un ENCADRANT peut démarrer mais pas créer/supprimer, la DIRECTION est strictement en lecture (pas de forçage). Présences : les **5 cartes de stats** (attendus = étudiants+enseignants+encadrants, en salle, présents, absents, taux), date sans pointage = tout le monde absent et message explicite ; **forçage unitaire** d'un étudiant absent (`POST …/force-pointage/` avec `{personne_id, type_personne, action:'ENTREE', motif, module_id, date_journee}`, bouton désactivé sans motif, toast du détail, fermeture) ; **badgeage en masse** toutes séances (motif obligatoire, `POST …/force-badgeage-étudiants-bulk/`, agrégat `sessions` en toast, fermeture), sur une séance précise (`session_id` transmis), erreur gardée dans la modale. Couvre **51,8 % des lignes / 62,9 % de branches** de la page (les onglets info/étudiants/enseignants, les éditions, la modale QR et les exports feuille restent au backlog). |
+| `src/pages/scolarite/campagnesCompletion.test.jsx` | page | **17 tests (LOT 16), complétion des campagnes d'admission**. `Campagnes` : **création en brouillon** (formulaire — sélecteurs année/formation requis, dates, payload avec identifiants numérisés, quotas non exposés → `undefined`, réinitialisation + rechargement), échec serveur (formulaire conservé), **les 4 transitions restantes** du workflow (Suspendre sans confirmation, Clôturer avec confirmation, Réouvrir, Archiver ; annulation = aucun appel), lecture seule DIRECTION (référentiels non chargés). `CampagneDetail` : rendu (compteurs, quota, lignes d'épreuves verrouillées, tableau du classement et ses badges, épreuve verrouillée exclue du sélecteur de note, candidatures des autres campagnes filtrées), **ajout d'épreuve** (POST typé avec/sans salle, valeurs par défaut, reset, erreur JSON conservée), **génération des convocations** (confirm annulée puis acceptée), **verrouillage** (confirm d'irréversibilité, échec notifié), boutons absents sur épreuve verrouillée, **calcul du classement sans confirmation** puis **publication avec confirmation**, campagne clôturée (formulaire d'épreuve masqué) et les deux tests `[écart §10.11]` (saisie de notes/classement encore actifs à clôture ; DIRECTION en lecture seule). Porte `Campagnes.jsx` à **99,4 % de lignes / 100 % de fonctions** et `CampagneDetail.jsx` à **98,8 % / 100 %**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
@@ -340,7 +351,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 15 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 16 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -356,6 +367,9 @@ Mesure après le LOT 15 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/NotesModule.jsx` (LOT 14) | **98 %** | 98 % | **92 %** | **84 %** |
 | `pages/Rattrapages.jsx` (LOT 15) | **97 %** | 97 % | **77 %** | **86 %** |
 | `pages/FicheAuditeur.jsx` (LOT 15) | **100 %** | **100 %** | **100 %** | **83 %** |
+| `pages/ModuleDetail.jsx` (LOT 16) | **52 %** | 52 % | **33 %** | **63 %** |
+| `pages/scolarite/Campagnes.jsx` (LOT 16) | **99 %** | 99 % | **100 %** | **88 %** |
+| `pages/scolarite/CampagneDetail.jsx` (LOT 16) | **99 %** | 99 % | **100 %** | **89 %** |
 | `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
 | `pages/scolarite/Candidatures.jsx` | **97 %** | 97 % | 74 % | **79 %** |
 | `pages/scolarite/Admissions.jsx` | **98 %** | 98 % | 90 % | **85 %** |
@@ -365,16 +379,17 @@ Mesure après le LOT 15 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier) | **82 %** | 82 % | **56 %** | **77 %** |
-| **Global `src/` (toutes zones)** | **43 %** | **43 %** | **34 %** | **69 %** |
+| **Global `src/` (toutes zones)** | **45,3 %** | **45,3 %** | **37,7 %** | **69,7 %** |
 
 > Les LOT 4 à 7 et le LOT 13 sont des correctifs ciblés ; les LOT 8 à 12
 > n'ajoutent que des tests.
 > Les seuils du LOT 3 restent inchangés (aucun seuil n’a été baissé). Le nombre
 > de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
 > (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → 510 (LOT 11) →
-> 539 (LOT 12) → 542 (LOT 13) → 562 (LOT 14) → **588 (LOT 15)** ; lignes
-> couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
-> **43,1 % (LOT 15)** (fonctions **34,1 %**, branches **69,4 %**).
+> 539 (LOT 12) → 542 (LOT 13) → 562 (LOT 14) → 588 (LOT 15) →
+> **620 (LOT 16)** ; lignes couvertes globalement 35,3 % (LOT 5) → … →
+> 41,6 % (LOT 14) → 43,1 % (LOT 15) → **45,3 % (LOT 16)** (fonctions
+> **37,7 %**, branches **69,7 %**).
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
 > **invisibles car en panne** (§10.8) ; le LOT 8 y exécutait les actions au
@@ -389,10 +404,19 @@ Mesure après le LOT 15 (V8, `npm run test:coverage`), sur les zones ciblées :
 > lignes / 92 % de fonctions**), référencée par les décisions puis le jury ; le
 > LOT 15 ouvre le domaine **présence** avec les `Rattrapages` inter-cohortes
 > (**97,3 % de lignes** : création, pointage, annulation) et la fiche de suivi
-> d'un auditeur `FicheAuditeur` (**100 % de lignes / fonctions**). Le
-> service `services/scolarite.js` reste à **100 % de lignes** et le dossier
-> `pages/scolarite/` se maintient à **82 % de lignes / 56 % de fonctions /
-> 77 % de branches**.
+> d'un auditeur `FicheAuditeur` (**100 % de lignes / fonctions**) ; le LOT 16
+> attaque l'**émargement en temps réel** au cœur du gros écran `ModuleDetail`
+> (onglets Séances + Présences, **51,8 % de lignes / 62,9 % de branches** :
+> cycle de vie des séances sous confirmation, pointage forcé unitaire,
+> badgeage en masse, cartes de statistiques et habilitations), puis **achève
+> la couverture des campagnes d'admission** (`Campagnes` **99,4 %** et
+> `CampagneDetail` **98,8 % de lignes, 100 % de fonctions** : création,
+> tout le workflow de transitions, épreuves, convocations, verrouillage,
+> calcul et publication du classement) ; deux constats produit sont signalés
+> en §10.11. Les autres onglets de `ModuleDetail` et son miroir
+> `FormationDetail` restent au backlog. Le service `services/scolarite.js`
+> reste à **100 % de lignes** et le dossier `pages/scolarite/` progresse à
+> **84 % de lignes / 67 % de fonctions / 79 % de branches**.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -782,6 +806,32 @@ Les quatre autres écrans au même patron bénéficient du correctif central ; l
 régression de référence au niveau du contexte garantit qu'aucun consommateur ne
 peut plus rejouer un effet du fait d'un toast.
 
+### 10.11 Constats du LOT 16 — campagnes d'admission (deux incohérences mineures, figées par des tests)
+
+Les tests de complétion du flux admission (`campagnesCompletion.test.jsx`)
+ont mis en évidence deux écarts de cohérence, non corrigés dans ce lot de
+tests purs :
+
+1. **Quotas non saisissables à la création.** Le formulaire *Nouvelle campagne*
+   de `Campagnes.jsx` ne comporte aucun champ `quota_admissibles` /
+   `quota_admis`, alors que le gestionnaire `creer` les transmet au backend
+   (ils partent donc toujours en `undefined`) et que `CampagneDetail.jsx`
+   affiche le « quota admissibles » d'une campagne. Selon les besoins produit,
+   il faudrait soit ajouter deux champs au formulaire, soit retirer ces clés
+   du payload. Le test fige l'état observé (`quota_admissibles` et
+   `quota_admis` `undefined`).
+2. **Saisie de notes et actions de classement encore actives sur campagne
+   fermée.** Dans `CampagneDetail.jsx`, une campagne `CLOTUREE` / `ANNULEE` /
+   `ARCHIVEE` masque bien le formulaire d'ajout d'épreuve ainsi que les
+   boutons *Convocations* / *Verrouiller* des épreuves, mais la carte
+   *Saisie des notes* et les boutons *Calculer le classement* / *Publier les
+   listes* restent rendus et actionnables. Un test `[écart]` fige ce
+   comportement. Décision produit : désactiver ces actions sur campagne
+   fermée (cohérence avec les autres garde-fous), ou les assumer (correction
+   d'une note après clôture).
+
+À traiter, le cas échéant, dans un lot correctif dédié, sur feu vert.
+
 ---
 
 ## 11. Couverture des pages — ce qui reste à faire
@@ -800,24 +850,27 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 15 :
+**Aucune page n'est dépourvue de test.** État après le LOT 16 :
 
-- neuf écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
+- dix écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
   (89 %, liste serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %,
   nettoyage des filtres obsolètes), `Statistiques.jsx` (28 %, contrat
   d'isolation par secrétariat + synchro des justificatifs §10.7),
   `NotesModule.jsx` (**97,6 % de lignes**, LOT 14 — grille de saisie, bulk,
   colonnes, fiches PDF), `Rattrapages.jsx` (**97,3 % de lignes**, LOT 15 —
-  création inter-cohortes, génération de pointage, annulation) et
+  création inter-cohortes, génération de pointage, annulation),
   `FicheAuditeur.jsx` (**100 % de lignes/fonctions**, LOT 15 — fiche de suivi
-  et exports) ;
+  et exports) et `ModuleDetail.jsx` (**51,8 % de lignes / 62,9 % de branches**,
+  LOT 16 — émargement : onglets Séances et Présences) ;
 - cinq écrans Scolarité (`Campagnes`, `CampagneDetail`, `Equivalences`,
   `MaquetteDetail`, `ChargesEnseignants`) ont un **test de rendu dédié**
   (`scolariteRendu.test.jsx`, §10.8) qui affirme un contenu caractéristique et
   le chargement effectif — allant au-delà du smoke qui n'exclut pas les pages
   blanches ; leurs **actions d'écriture sont en outre exercées au clic** au
-  LOT 8 (`scolariteActions.test.jsx`, §10.8) ;
+  LOT 8 (`scolariteActions.test.jsx`, §10.8), et les deux écrans *Campagnes*
+  sont **quasi exhaustivement couverts au LOT 16**
+  (`campagnesCompletion.test.jsx`, **99 % de lignes / 100 % de fonctions**) ;
 - tout le **parcours administratif de l'étudiant** est couvert par des tests
   fonctionnels dédiés : `Candidatures.jsx` (97,5 % ln, LOT 9), `Admissions.jsx`
   (98 % ln, LOT 10), puis `Inscriptions.jsx` (99,4 % ln / 100 % fonctions,
@@ -840,6 +893,21 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   inscriptions déjà faites, génération de pointage, annulation avec/sans
   pointage, habilitations) et la fiche de suivi d'un auditeur
   (`FicheAuditeur.jsx`, 8 tests, exports PDF/Excel) ;
+- au LOT 16, l'**émargement en temps réel** du gros écran `ModuleDetail.jsx`
+  (15 tests) est couvert sur ses deux onglets cœur, **Séances** (démarrer /
+  terminer / supprimer / créer, chaque écriture destructrice passant par la
+  `ConfirmModal` globale, toasts et rechargement) et **Présences** (les cinq
+  cartes de statistiques calculées à partir des pointages du jour et de la
+  liste des attendus, forçage de pointage **unitaire** et **badgeage en masse**
+  80–95 % avec motif obligatoire, filtres date/séance, trois niveaux
+  d'habilitation ENCADRANT / secrétariat / DIRECTION) ;
+- le même lot **achève la couverture fonctionnelle des campagnes
+  d'admission** (`campagnesCompletion.test.jsx`, 17 tests) : création en
+  brouillon, les quatre transitions de statut non couvertes par le LOT 8
+  (suspendre/clôturer/réouvrir/archiver, avec et sans confirmation), ajout
+  d'épreuve (typage, salles, échec JSON), convocations, verrouillage, calcul
+  et publication du classement, états « campagne fermée » et lecture seule ;
+  deux constats de cohérence sont figés en §10.11 ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -847,7 +915,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **32 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **31 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -864,11 +932,13 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
 2. ~~Compléter les écrans Scolarité réparés (§10.8) par des tests au clic~~
    **fait au LOT 8** (`scolariteActions.test.jsx`) : transition de campagne
    (avec/sans confirmation + erreur), note, application d'équivalence,
-   archivage d'ECUE, création d'affectation. Restent les actions secondaires de
-   ces écrans : création de campagne et ajout d'épreuve (`Campagnes` /
-   `CampagneDetail`), la modale « Décider » et les autres transitions
-   (`Equivalences`), le workflow maquette (valider/activer/archiver/cloner) et
-   l'ajout d'ECUE (`MaquetteDetail`), le détail enseignant et la sélection dans
+   archivage d'ECUE, création d'affectation ; **puis au LOT 16**
+   (`campagnesCompletion.test.jsx`) : création de campagne, toutes les
+   transitions, ajout d'épreuve, convocations, verrouillage, calcul et
+   publication du classement. Restent les actions secondaires de ces écrans :
+   la modale « Décider » et les autres transitions (`Equivalences`), le
+   workflow maquette (valider/activer/archiver/cloner) et l'ajout d'ECUE
+   (`MaquetteDetail`), le détail enseignant et la sélection dans
    `ChargesEnseignants` ;
 3. flux critiques par rôle : ~~candidatures~~ (LOT 9), ~~admissions/décisions~~
    (LOT 10), ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)**,
@@ -901,6 +971,11 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
      `ToastContext.Provider`, 4 régressions) — ne reste ouvert qu'au titre d'un
      choix produit éventuel sur la *forme* du retour d'erreur de chargement
      (toast transversale vs état d'erreur dédié dans la page) ;
+   - §10.11 deux constats mineurs sur les campagnes (LOT 16) : quotas
+     `quota_admissibles`/`quota_admis` non saisissables à la création alors
+     qu'affichés au détail, et saisie de notes / calcul-publication du
+     classement encore actives sur une campagne clôturée/annulée/archivée —
+     les deux sont figés par des tests, en attente d'un choix produit ;
 5. composants partagés (modales, pickers, badges, panneaux de flux) ;
 6. montée progressive du plancher de couverture global (§7) et extension aux
    pages encore couvertes seulement en smoke ; option : durcir le smoke
