@@ -59,6 +59,14 @@ const pointages = [
     timestamp_entree: '2026-02-03T08:02:00',
     temps_cours: { heure_debut_prevue: '08:00:00', heure_fin_prevue: '10:00:00' },
   },
+  // Second groupe de formation (exerce le tri alphabétique des séances).
+  {
+    id: 9004, formation_id: 502, formation_titre: 'AAA Atelier précoce',
+    module_id: 401, module_intitule: 'Atelier', statut: 'TERMINE',
+    duree_presence_minutes: 60, date_journee: '2026-01-15',
+    seance_intitule: 'Séance 1', seance_numero: 1,
+    timestamp_entree: '2026-01-15T08:10:00', timestamp_sortie: '2026-01-15T09:10:00',
+  },
 ]
 
 const stats = {
@@ -338,6 +346,23 @@ describe('components/ParticipantDetailModal.jsx — onglet Modules (LOT 24)', ()
     ).toHaveLength(1)
   })
 
+  it('un clic dans la zone déployée des séances ne replie pas la carte', async () => {
+    renderModal()
+    await goTab('Modules')
+    fireEvent.click(screen.getByText('LSF Niveau 1'))
+    await waitFor(() =>
+      expect(apiMock.get).toHaveBeenCalledWith('/formations/501/modules/101/full/'),
+    )
+    // Le conteneur déployé arrête la propagation : la carte reste ouverte.
+    fireEvent.click(within(screen.getByText('LSF Niveau 1').closest('.card')).getByText(/^Séances$/))
+    await settle()
+    const card = screen.getByText('LSF Niveau 1').closest('.card')
+    expect(within(card).getByText('Présent')).toBeInTheDocument()
+    expect(
+      apiMock.get.mock.calls.filter(([p]) => p === '/formations/501/modules/101/full/'),
+    ).toHaveLength(1)
+  })
+
   it("reste fonctionnel si le détail complet du module échoue au déploiement", async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     apiController.reset()
@@ -470,6 +495,7 @@ describe('components/ParticipantDetailModal.jsx — onglet Notes et décision (L
     expect(within(s).getByText('Admis')).toBeInTheDocument()
     expect(within(s).getByText('Très bien')).toBeInTheDocument()
     expect(within(s).getByText('Validée manuellement')).toBeInTheDocument()
+    expect(within(s).getByText(/47\.5h \/ 50h/)).toBeInTheDocument()
   })
 
   it('regroupe et titre la synthèse par formation (plusieurs formations)', async () => {
@@ -513,6 +539,32 @@ describe('components/ParticipantDetailModal.jsx — onglet Notes et décision (L
     expect(await within(box()).findByDisplayValue('11')).toBeInTheDocument()
   })
 
+  it('affiche le spinner de l’onglet pendant le chargement paresseux, puis les données', async () => {
+    // NB: le squelette « par module » est du code mort — tant que notesLoading
+    // est vrai, l'onglet affiche le grand spinner et n'exécute pas le map ;
+    // c'est ce spinner réel que l'on vérifie ici.
+    let resolveLoad
+    apiMock.get.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveLoad = resolve }),
+    )
+    renderModal({ initialNotesFiche: null })
+    await goTab('Notes')
+    expect(box().querySelector('.loading.py-4 .spinner')).toBeTruthy()
+    const lazyFiche = {
+      modules: [{
+        module_id: 101, colonne_id: 701, moyenne: 11, heures_presence: 30,
+        heures_prevues: 50, taux_presence: 60, admissible: false, mention: 'PASSABLE',
+      }],
+      formations: [{ formation_id: 501, decision: null }],
+    }
+    await act(async () => {
+      resolveLoad({ data: lazyFiche })
+      await flushPromises(4)
+    })
+    expect(within(box()).getByDisplayValue('11')).toBeInTheDocument()
+    expect(box().querySelector('.loading.py-4')).toBeNull()
+  })
+
   it('notifie l’échec du chargement paresseux des notes', async () => {
     apiController.setRoute('/participant/1/notes-fiche/', () => {
       throw { response: { status: 500, data: {} } }
@@ -542,9 +594,20 @@ describe('components/ParticipantDetailModal.jsx — onglet Séances (LOT 24)', (
     renderModal()
     await goTab('Séances')
 
-    // Résumé : 120 min terminées = 2h, 1 terminée, 1 en cours.
+    // Résumé : 120 min terminées = 2h, 1 terminée, 1 en cours ; le second
+    // groupe (60 min) affiche 1h.
     expect(screen.getByText('2h')).toBeInTheDocument()
+    expect(screen.getByText('1h')).toBeInTheDocument()
     expect(screen.getAllByText(/Formation LSF 2026/).length).toBeGreaterThan(0)
+
+    // Les groupes sont triés par titre de formation : « AAA Atelier précoce »
+    // avant « Formation LSF 2026 ».
+    const groupHeadings = [...box().querySelectorAll('h6')].map((h) => h.textContent)
+    const idxAaa = groupHeadings.findIndex((t) => /AAA Atelier précoce/.test(t))
+    const idxLsf = groupHeadings.findIndex((t) => /Formation LSF 2026/.test(t))
+    expect(idxAaa).toBeGreaterThanOrEqual(0)
+    expect(idxLsf).toBeGreaterThan(idxAaa)
+    expect(screen.getByText('2026-01-15')).toBeInTheDocument()
 
     // Ligne du badgeage terminé (les deux pointages ont la même plage horaire).
     expect(screen.getByText('2026-02-02')).toBeInTheDocument()
@@ -562,5 +625,264 @@ describe('components/ParticipantDetailModal.jsx — onglet Séances (LOT 24)', (
     // Ligne en cours : pas de sortie, statut EN_COURS brut (sans libellé).
     expect(screen.getByText('2026-02-03')).toBeInTheDocument()
     expect(screen.getAllByText('EN_COURS').length).toBeGreaterThan(0)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* LOT 25 — écritures : saisie de moyenne, recalcul, exports relevé    */
+/* ------------------------------------------------------------------ */
+
+const stubBlobDownload = () => {
+  URL.createObjectURL = vi.fn(() => 'blob:test')
+  URL.revokeObjectURL = vi.fn()
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+}
+
+describe('components/ParticipantDetailModal.jsx — saisie d’une moyenne (LOT 25)', () => {
+  beforeEach(() => {
+    apiController.reset()
+    window.localStorage.clear()
+    // Après toute écriture, le composant recharge la fiche de notes.
+    apiController.setRoute('/participant/1/notes-fiche/', () => notesFiche)
+  })
+
+  const openNotes = async () => {
+    renderModal()
+    await goTab('Notes')
+    return screen.getByText('LSF Niveau 1').closest('.card')
+  }
+
+  it('active Enregistrer après modification puis poste la note et la synthèse', async () => {
+    const card = await openNotes()
+    const button = within(card).getByRole('button', { name: 'Enregistrer' })
+    expect(button).toBeDisabled()
+
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '15' } })
+    expect(button).toBeEnabled()
+
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        '/formations/501/modules/101/notes/bulk/',
+        {
+          notes: [{ participant_id: 1, colonne_id: 701, note: 15 }],
+          syntheses: [{ participant_id: 1, mention: 'BIEN', observations: '' }],
+        },
+      ),
+    )
+    // La sauvegarde enchaîne le recalcul de la décision de formation…
+    expect(apiMock.post).toHaveBeenCalledWith(
+      '/evaluations/formations/501/decisions/recalculer/',
+    )
+    // …puis le rechargement de la fiche, avec un toast de succès.
+    expect(apiMock.get).toHaveBeenCalledWith('/participant/1/notes-fiche/')
+    expect(await screen.findByText('Moyenne enregistrée')).toBeInTheDocument()
+  })
+
+  it("refuse une moyenne négative ou supérieure à 20 sans aucun appel", async () => {
+    const card = await openNotes()
+    const input = within(card).getByDisplayValue('15.5')
+    fireEvent.change(input, { target: { value: '22' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('La moyenne doit être comprise entre 0 et 20')).toBeInTheDocument()
+    expect(apiMock.post).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: '-1' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findAllByText('La moyenne doit être comprise entre 0 et 20')).toHaveLength(2)
+    expect(apiMock.post).not.toHaveBeenCalled()
+  })
+
+  // NB: la branche NaN de la garde est inaccessible par l'UI (le navigateur
+  // comme jsdom vident un <input type="number"> dont la saisie n'est pas un
+  // nombre) : elle n'est pas testable « par l'extérieur ».
+
+  it("garde le bouton désactivé tant que la fiche n'est pas modifiée", async () => {
+    const card = await openNotes()
+    fireEvent.click(within(card).getByDisplayValue('15.5'))
+    expect(within(card).getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  })
+
+  it("n'active pas Enregistrer pour un module sans colonne de notes", async () => {
+    renderModal()
+    await goTab('Notes')
+    // Carte LSF Niveau 2 (colonne_id null dans la fiche).
+    const card2 = screen.getByText('LSF Niveau 2').closest('.card')
+    const input = within(card2).getByRole('spinbutton')
+    fireEvent.change(input, { target: { value: '12' } })
+    expect(within(card2).getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
+  })
+
+  it('poste des tableaux vides quand la moyenne est effacée', async () => {
+    const card = await openNotes()
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        '/formations/501/modules/101/notes/bulk/',
+        { notes: [], syntheses: [] },
+      ),
+    )
+    expect(await screen.findByText('Moyenne enregistrée')).toBeInTheDocument()
+  })
+
+  it('avertit quand le serveur renvoie des erreurs partielles', async () => {
+    apiController.setRoute('/formations/501/modules/101/notes/bulk/', () => ({
+      saved: 0, errors: [{ ligne: 1 }, { ligne: 2 }],
+    }))
+    const card = await openNotes()
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '9' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('0 enregistrement(s), 2 erreur(s)')).toBeInTheDocument()
+  })
+
+  it("notifie l'erreur du serveur de sauvegarde", async () => {
+    apiMock.post.mockRejectedValueOnce({ response: { data: { detail: 'Verrou de saisie' } } })
+    const card = await openNotes()
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '9' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('Verrou de saisie')).toBeInTheDocument()
+  })
+
+  it("notifie une erreur générique sans détail serveur", async () => {
+    apiMock.post.mockRejectedValueOnce(new Error('réseau'))
+    const card = await openNotes()
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '9' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    expect(await screen.findByText('Erreur lors de la sauvegarde')).toBeInTheDocument()
+  })
+
+  it("avale un échec de recalcul post-sauvegarde sans masquer le succès", async () => {
+    // Le bulk (sans route explicite) réussit ; seul le recalcul échoue.
+    apiController.setRoute('/evaluations/formations/501/decisions/recalculer/', () => {
+      // eslint-disable-next-line no-throw-literal
+      throw { response: { data: { detail: 'Calcul indisponible' } } }
+    })
+    const card = await openNotes()
+    fireEvent.change(within(card).getByDisplayValue('15.5'), { target: { value: '14' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    // La moyenne est bien enregistrée et la fiche rechargée malgré le recalcul KO.
+    expect(await screen.findByText('Moyenne enregistrée')).toBeInTheDocument()
+    expect(apiMock.get).toHaveBeenCalledWith('/participant/1/notes-fiche/')
+  })
+
+  it("ne recalcule pas de décision pour un module sans formation rattachée", async () => {
+    const mod = [{
+      id: 301, module: 'Module hors formation', formation: '', formation_id: null,
+      statut: 'EN_COURS', duree_prevue_heures: 4,
+    }]
+    const fiche = {
+      modules: [{
+        module_id: 301, colonne_id: 901, moyenne: 11, heures_presence: 20,
+        heures_prevues: 20, taux_presence: 100, admissible: true, mention: 'PASSABLE',
+      }],
+      formations: [],
+    }
+    renderModal({ modules: mod, pointages: [], initialNotesFiche: fiche })
+    await goTab('Notes')
+    const card = screen.getByText('Module hors formation').closest('.card')
+    fireEvent.change(within(card).getByDisplayValue('11'), { target: { value: '13' } })
+    fireEvent.click(within(card).getByRole('button', { name: 'Enregistrer' }))
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        '/formations/null/modules/301/notes/bulk/',
+        expect.objectContaining({ notes: [{ participant_id: 1, colonne_id: 901, note: 13 }] }),
+      ),
+    )
+    expect(
+      apiMock.post.mock.calls.some(([p]) => typeof p === 'string' && p.includes('decisions/recalculer')),
+    ).toBe(false)
+    expect(await screen.findByText('Moyenne enregistrée')).toBeInTheDocument()
+  })
+})
+
+describe('components/ParticipantDetailModal.jsx — recalcul manuel de décision (LOT 25)', () => {
+  beforeEach(() => {
+    apiController.reset()
+    window.localStorage.clear()
+    apiController.setRoute('/participant/1/notes-fiche/', () => notesFiche)
+  })
+
+  it('recalcule la décision, recharge la fiche et notifie', async () => {
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(within(synthesisCard()).getByRole('button', { name: /recalculer la décision/i }))
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith(
+        '/evaluations/formations/501/decisions/recalculer/',
+      ),
+    )
+    expect(apiMock.get).toHaveBeenCalledWith('/participant/1/notes-fiche/')
+    expect(await screen.findByText('Décision recalculée')).toBeInTheDocument()
+  })
+
+  it("notifie le détail d'un échec de recalcul", async () => {
+    apiMock.post.mockRejectedValueOnce({ response: { data: { detail: 'Période verrouillée' } } })
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(within(synthesisCard()).getByRole('button', { name: /recalculer la décision/i }))
+    expect(await screen.findByText('Période verrouillée')).toBeInTheDocument()
+  })
+
+  it("notifie une erreur générique de recalcul", async () => {
+    apiMock.post.mockRejectedValueOnce(new Error('boom'))
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(within(synthesisCard()).getByRole('button', { name: /recalculer la décision/i }))
+    expect(await screen.findByText('Erreur recalcul décision')).toBeInTheDocument()
+  })
+
+  it('masque le recalcul (et la sauvegarde) en lecture seule', async () => {
+    renderModal({ canManageNotes: false })
+    await goTab('Notes')
+    expect(screen.queryByRole('button', { name: /recalculer la décision/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('components/ParticipantDetailModal.jsx — exports relevé de notes (LOT 25)', () => {
+  beforeEach(() => {
+    apiController.reset()
+    window.localStorage.clear()
+    stubBlobDownload()
+  })
+
+  it('exporte le relevé PDF avec le nom de fichier par défaut', async () => {
+    apiMock.getBlob.mockResolvedValueOnce({
+      blob: new Blob(['pdf'], { type: 'application/pdf' }), fileName: '',
+    })
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(screen.getByRole('button', { name: /export PDF/i }))
+    await waitFor(() =>
+      expect(apiMock.getBlob).toHaveBeenCalledWith('/participant/1/notes-fiche/export/pdf/'),
+    )
+    expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1)
+    expect(URL.createObjectURL).toHaveBeenCalled()
+    expect(URL.revokeObjectURL).toHaveBeenCalled()
+  })
+
+  it('exporte le relevé Excel', async () => {
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(screen.getByRole('button', { name: /export Excel/i }))
+    await waitFor(() =>
+      expect(apiMock.getBlob).toHaveBeenCalledWith('/participant/1/notes-fiche/export/xlsx/'),
+    )
+  })
+
+  it("notifie le détail d'un échec d'export", async () => {
+    apiMock.getBlob.mockRejectedValueOnce({ response: { data: { detail: 'Génération KO' } } })
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(screen.getByRole('button', { name: /export PDF/i }))
+    expect(await screen.findByText('Génération KO')).toBeInTheDocument()
+  })
+
+  it("notifie une erreur générique d'export", async () => {
+    apiMock.getBlob.mockRejectedValueOnce(new Error('réseau'))
+    renderModal()
+    await goTab('Notes')
+    fireEvent.click(screen.getByRole('button', { name: /export PDF/i }))
+    expect(await screen.findByText('Erreur export')).toBeInTheDocument()
   })
 })
