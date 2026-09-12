@@ -107,10 +107,16 @@
 > exigée, navigation par onglets, badges de statut et leurs replis, états
 > de chargement/vide/erreur, bouton Actualiser et la matrice d'habilitation
 > FINANCE/DIRECTION/admin (écriture + confirmation), SECRÉTARIAT (saisie
-> seule) et lecture stricte).
+> seule) et lecture stricte), puis au **[LOT 27]** (le **rapport des
+> encadrants** `FinanceEncadrants` est couvert à **100 % de lignes /
+> 100 % de fonctions / 100 % de branches / 19 tests** : KPI et tableaux par
+> encadrant/groupe avec les replis défensifs, période partagée mois/
+> trimestre/année/personnalisé appliquée via le shell commun, exports PDF/
+> Excel reportant la période, période dégradée sans preset, nom de fichier
+> par défaut et filets d'erreur).
 > Les LOT 4 à 7, 13, 17 et 19 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25 et 26 sont des lots de tests purs.
+> 22, 23, 24, 25, 26 et 27 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -328,7 +334,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (41 fichiers, 828 tests)
+### 6.2 Fichiers de test colocalisés (42 fichiers, 847 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -376,6 +382,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
 | `src/pages/scolarite/FinancesEtudiantes.test.jsx` | page | **25 tests (LOT 26), finance étudiante — 100 % de lignes / 100 % de fonctions / 97 % de branches**. Chargement parallèle `GET /finances-etudiantes/echeanciers/` et `…/paiements/` (normalisation `results || data` sur les deux formes), titre/onglets/bouton Actualiser (qui recharge les deux ressources), spinner initial puis lignes. **Onglet Échéanciers** : étudiant/année/`lignes_count`, badges de statut global (`IMPAYE` danger, `PARTIELLEMENT_PAYE` warning, `COMPLETE` success, statut inconnu → repli secondaire), état vide, navigation entre onglets et retour. **Onglet Paiements** : neuf colonnes (dont Action sous habilitation), identité Étudiant/Candidat/tiret, montant + devise, mode, référence ou tiret, table de badges complète (`INITIE`…`RAPPROCHE`), bouton **Confirmer uniquement pour INITIE/EN_ATTENTE**, état vide et spinner d'onglet. **Création** `POST …/paiements/` : payload exact `{etudiant_id, nature, montant, devise (texte libre), mode, transaction_externe}` (nature/mode sur les listes fermées), message d'idempotence, réinitialisation du formulaire (les `<input type=number>` vides valent `null` en jest-dom), rechargement, erreur serveur détaillée puis message générique. **Confirmation** `POST …/paiements/:id/confirmer/` : `window.confirm` (libellé contenant id/montant/devise, annulation = aucun appel), succès avec toast de quittance et rechargement, échec détaillé (preuve manquante) puis générique. **Habilitations** : FINANCE/DIRECTION/CHEF_CPFAE_ADMIN/CPFAE_ADMIN (saisie + colonne Action), SECRETARIAT/CHEF_SECRETARIAT (saisie mais pas de confirmation), ENCADRANT (lecture stricte, données consultables). |
+| `src/pages/FinanceEncadrants.test.jsx` | page | **19 tests (LOT 27), rapport finance des encadrants — 100 % lignes/fonctions/branches**. Rendu via `FinancePageShell` (titre/sous-titre, liens de navigation dont l'onglet courant accentué, panneau de période). **Chargement** `GET /formations/finance/encadrants/?preset=mois&mois=…` : spinner puis trois KPI (`encadrants_count`, planifié/réalisé formatés par `fmtDuration`, ex. 720 min → `12h`, 450 → `7h 30min`, valeur nulle → `0h`), sections par encadrant (libellé puis repli sur le nom d'utilisateur, badge de sous-total, sept colonnes, sessions en badge, lignes sans grade/module/formation en tirets, pied de tableau), encadrant sans lignes, état vide (`{encadrants:[]}` comme `data:null`) avec KPI à zéro, erreur de chargement détaillée puis générique. **Période** (filtre partagé) : « Cette année » ne recharge qu'après **Appliquer** (nouvelle variante de données, persistance `sessionStorage`), trimestre T1 → `trimestre=YYYY-Q1`, personnalisé avec dates (`date_debut/date_fin`), Appliquer désactivé tant qu'une date manque. **Exports** `getBlob /exports/finance/encadrants/pdf|excel/` reportant la query de période, toasts `(PDF)`/`(XLSX)`, clic d'ancre/révocation, nom par défaut `liste_encadrants.pdf` quand le serveur n'en donne pas, deux niveaux d'erreur. **Filets défensifs** : période persistée sans `preset` → requêtes et export sur les chemins de base sans query, lignes et `sessions_count` absents (repli `[]`/`0`). |
 | `src/pages/NotesModule.test.jsx` | page | **20 tests (LOT 14), saisie des notes** (chaînon pédagogie → jury) : chargement module + grille (colonnes, barèmes, notes pré-remplies, critères seuil/présence, mention/moyenne/admission calculés, « saisi par »), recherche/filtre, état vide ; **saisie en direct** (mention normalisée /20, moyenne, bandeau « modifications non sauvegardées », note hors plage **0–20**, observations, navigation clavier **Entrée → champ suivant**) ; **enregistrement en bloc** `POST …/notes/bulk/` avec le payload `{notes, synthèses}` (mention calculée, cellules vides exclues), réponse partiellement en erreur (toast d'avertissement), échec (la saisie est conservée) ; **colonnes dynamiques** (ajout `POST …/notes/colonnes/`, libellé vide refusé, suppression `DELETE` avec confirmation et impossible à 1 colonne) ; **fiches PDF** module/individuelle (`getBlob`), confirmation si saisie non enregistrée, erreur de génération ; liens Décisions/Retour ; une régression §10.10 (une seule requête sur échec de chargement). Couvre **97,6 % des lignes / 92 % des fonctions**. |
 | `src/pages/Rattrapages.test.jsx` | page | **18 tests (LOT 15), rattrapages de présence** : liste avec badges de statut/cohorte et **filtres débordancés** (`statut`, `q` vérifiés en query) ; états erreur/vide ; **lecture seule** pour un rôle hors `PRESENCE_ACTION_ROLES` (DIRECTION) ; **création** via recherche d'étudiant puis **sélection multiple de séances** (recherche ciblée `participant=`, séance « déjà inscrit » verrouillée, pastille ajout/retrait), mode **module entier** (ajout de toutes ses séances, module déjà fait verrouillé), motif, case « forcer la présence », validation sans étudiant/séance, **payload** `{participant_id, seance_rattrapage_ids, motif, generer_presence}` vérifié, toast créés/réactivés/ignorés, erreur serveur gardée dans la modale ; **génération de pointage** (`POST …/generer-presence/`) et **annulation** via `ConfirmModal` (avec/sans pointage → `supprimer_pointage`, refus = aucun appel), actions absentes sur un rattrapage annulé, cas d'erreur des deux écritures. Couvre **97,3 % des lignes / 86 % de branches** (le résidu est du filtrage défensif inatteignable via l'UI). |
 | `src/pages/FicheAuditeur.test.jsx` | page | **8 tests (LOT 15), fiche de suivi d'un auditeur** : synthèse (formation, moyenne, classement, décision finale), suivi par module (heures présence/prevues, taux, moyenne, épreuves), état « aucun module », tirets des champs absents, erreur de chargement → « fiche introuvable », **exports PDF et Excel** (`getBlob`), nom de fichier par défaut, erreur d'export. Couvre **100 % des lignes / 100 % des fonctions**. |
@@ -415,7 +422,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 26 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 27 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -436,6 +443,7 @@ Mesure après le LOT 26 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Participants.jsx` (LOT 23) | **100 %** | **100 %** | **100 %** | **93 %** |
 | `components/ParticipantDetailModal.jsx` (LOT 24/25) | **99 %** | **99 %** | **100 %** | **84 %** |
 | `pages/scolarite/FinancesEtudiantes.jsx` (LOT 26) | **100 %** | **100 %** | **100 %** | **97 %** |
+| `pages/FinanceEncadrants.jsx` (LOT 27) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `components/QRCodeModal.jsx` (via ModuleDetail, LOT 20) | **96 %** | 96 % | 90 % | **82 %** |
 | `components/TripleConfirmModal.jsx` (via ModuleDetail, LOT 20) | **100 %** | **100 %** | **100 %** | **89 %** |
 | `components/formateurs/FormateurAssignPickerItem.jsx` (LOT 18) | **100 %** | **100 %** | **100 %** | **100 %** |
@@ -450,7 +458,7 @@ Mesure après le LOT 26 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/Graduation.jsx` (LOT 12) | **100 %** | **100 %** | **100 %** | **85 %** |
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **88 %** | 88 % | **72 %** | **81 %** |
-| **Global `src/` (toutes zones)** | **56,7 %** | **56,7 %** | **49,7 %** | **75,0 %** |
+| **Global `src/` (toutes zones)** | **57,3 %** | **57,3 %** | **50,6 %** | **75,4 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -460,12 +468,13 @@ Mesure après le LOT 26 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 539 (LOT 12) → 542 (LOT 13) → 562 (LOT 14) → 588 (LOT 15) →
 > 620 (LOT 16) → 622 (LOT 17) → 641 (LOT 18) → 643 (LOT 19) →
 > 656 (LOT 20) → 681 (LOT 21) → 719 (LOT 22) → 754 (LOT 23) →
-> 783 (LOT 24) → 803 (LOT 25) → **828 (LOT 26)** ; lignes couvertes
-> globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) → 43,1 % (LOT 15) →
-> 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) → 48,1 % (LOT 20) →
-> 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) → 55,9 % (LOT 24) →
-> 56,3 % (LOT 25) → **56,7 % (LOT 26)** (fonctions **49,7 %**, branches
-> **75,0 %**). Les LOT 17 et 19 corrigent
+> 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → **847 (LOT 27)** ; lignes
+> couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) → 43,1 %
+> (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
+> 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
+> 55,9 % (LOT 24) → 56,3 % (LOT 25) → 56,7 % (LOT 26) → **57,3 % (LOT 27)**
+> (fonctions **50,6 %** — le seuil de 50 % de fonctions est franchi —,
+> branches **75,4 %**). Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
 > bug bloquant §10.12, corrigé au LOT 19 ; le LOT 20 achève la couverture
@@ -543,7 +552,12 @@ Mesure après le LOT 26 (V8, `npm run test:coverage`), sur les zones ciblées :
 > la finance étudiante** (`scolarite/FinancesEtudiantes`, **25 tests,
 > 100 % de lignes / 100 % de fonctions**) : échéanciers, paiements
 > idempotents et confirmation sous preuve, avec toute la matrice
-> d'habilitation.
+> d'habilitation. Le **LOT 27 ouvre le module Finance transverse** avec le
+> **rapport des encadrants** (`FinanceEncadrants`, **19 tests,
+> 100 % lignes/fonctions/branches**) : KPI et tableaux de volumes horaires,
+> période partagée mois/trimestre/année/personnalisé via le shell commun,
+> exports PDF/Excel et filets défensifs (période sans preset, données
+> lacunaires).
 > Le service `services/scolarite.js`
 > reste à **100 % de lignes** et le dossier `pages/scolarite/` monte à
 > **87,5 % de lignes / 72 % de fonctions / 81 % de branches**.
@@ -1038,7 +1052,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 26 :
+**Aucune page n'est dépourvue de test.** État après le LOT 27 :
 
 - douze écrans disposent d'un test **fonctionnel dédié** hors module Scolarité :
   `Login.jsx`, `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx`
@@ -1187,6 +1201,16 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   exigée, annulation sans appel, quittance, deux niveaux d'erreur), et la
   matrice d'habilitation FINANCE/DIRECTION/admin (saisie + confirmation),
   SECRÉTARIAT (saisie seule), ENCADRANT (lecture stricte) ;
+- au LOT 27, l'écran **`FinanceEncadrants`** (premier rapport du module
+  Finance transverse, basé sur le shell et la période partagés) reçoit un
+  **test dédié de 19 tests à 100 % de lignes / fonctions / branches** :
+  KPI de synthèse formatés (`fmtDuration`), sections par encadrant et
+  tableaux par groupe avec tous les replis (libellé/nom d'utilisateur,
+  tirets, lignes absentes, compteurs nuls), navigation du shell, périodes
+  mois/trimestre/année/personnalisé appliquées après « Appliquer » et
+  persistées, exports PDF/Excel reportant la période (nom de fichier par
+  défaut, deux niveaux d'erreur), période dégradée sans preset et erreurs
+  de chargement ;
 - le LOT 16 **achevait aussi la couverture fonctionnelle des campagnes
   d'admission** (`campagnesCompletion.test.jsx`, 19 tests après le LOT 17) :
   création en brouillon **avec quotas**, les quatre transitions de statut
@@ -1266,12 +1290,15 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    décision, saisie de moyenne `bulk`, recalcul, exports relevé), et la
    **finance étudiante `FinancesEtudiantes` est verrouillée à 100 % au
    LOT 26** (échéanciers, paiements idempotents, confirmation sous
-   preuve, habilitations). Restent ensuite les **autres écrans du module
-   Finance** (`FinanceDashboard`, `FinanceAjustements`, `FinanceParametrage`,
-   `FinanceEncadrants`), les **référentiels**, les actions secondaires des
-   écrans Scolarité (`Equivalences`, `MaquetteDetail`, `ChargesEnseignants`),
-   et les gros volumes internes `Statistiques` et `Users` (création de
-   secrétariat à la volée) ;
+   preuve, habilitations), et le **rapport `FinanceEncadrants` est
+   couvert à 100 % au LOT 27** (volumes horaires, période partagée,
+   exports). Restent ensuite les **autres écrans du module Finance**
+   (`FinanceDashboard`, `FinanceAjustements`, `FinanceParametrage`, et
+   `FinanceEncadrants` a ouvert la voie du shell/période communs), les
+   **référentiels**, les actions secondaires des écrans Scolarité
+   (`Equivalences`, `MaquetteDetail`, `ChargesEnseignants`), et les gros
+   volumes internes `Statistiques` et `Users` (création de secrétariat à la
+   volée) ;
 4. écarts encore ouverts, dans des lots dédiés :
    - ~~§10.12 bug bloquant de la modale d'**assignation d'un enseignant**
      (prop `enseignant`/`formateur`)~~ **corrigé au LOT 19** (alignement du
