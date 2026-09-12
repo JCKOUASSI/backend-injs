@@ -84,28 +84,35 @@ describe('pages/Dashboard.jsx — chargement et période de présence', () => {
     await waitFor(() => expect(screen.getByText(/présences de l.année/i)).toBeInTheDocument())
   })
 
-  // [écart] BUG CONFIRMÉ — closure périmée sur la période de présence.
-  // Contexte : loadDashboardData (useCallback, Dashboard.jsx ~L55) omet
-  // `presencePeriod` de ses dépendances, alors que l'effet déclencheur (L103)
-  // l'inclut. Quand on passe de « Jour spécifique » (avec une date passée) à
-  // « Semaine », l'effet rappelle une ANCIENNE closure encore en mode `jour` :
-  // la liste /formations/list/ reste épinglée sur la date (date_mode=date)
-  // au lieu de revenir à « séance en cours » (seance_en_cours=true).
-  // Comportement ATTENDU (à rétablir lors d'un lot correctif) :
-  //   la requête après bascule ne doit plus contenir ni date_mode ni date,
-  //   et doit porter seance_en_cours=true.
-  // On fige ici le comportement OBSERVÉ pour ne pas corriger la logique en
-  // silence ; voir docs/TESTS_FRONTEND.md §10.5.
-  it('[écart] garde le mode date après Jour(date passée) → Semaine (closure périmée)', async () => {
+  // Régression pour le bug de closure périmée (docs §10.5), corrigé au LOT 4 :
+  // loadDashboardData listait presencePeriod dans l'effet déclencheur mais pas
+  // dans ses propres dépendances de useCallback. Les bascules de période
+  // rappelaient une closure figée sur l'ancienne valeur.
+  it('Jour(date passée) → Semaine : la liste revient aux séances en cours', async () => {
     mountDashboard(adminMe(), '/?reference_date=2026-01-15&presence_period=jour')
     await waitFor(() => expect(callsTo('/formations/list/').length).toBeGreaterThan(0))
     expect(callsTo('/formations/list/').at(-1).get('date_mode')).toBe('date')
 
     const nBefore = callsTo('/formations/list/').length
     clickPeriod('Semaine')
-    // Une nouvelle requête est bien émise après la bascule…
     await waitFor(() => expect(callsTo('/formations/list/').length).toBeGreaterThan(nBefore))
-    // …mais elle porte ENCORE l'ancien mode date (bug de closure constaté).
+
+    const q = callsTo('/formations/list/').at(-1)
+    expect(q.has('date_mode')).toBe(false)
+    expect(q.has('date')).toBe(false)
+    expect(q.get('seance_en_cours')).toBe('true')
+  })
+
+  it('Semaine(date passée) → Jour : la liste passe en mode date épinglé', async () => {
+    mountDashboard(adminMe(), '/?reference_date=2026-01-15&presence_period=semaine')
+    await waitFor(() => expect(callsTo('/formations/list/').length).toBeGreaterThan(0))
+    // En « Semaine », même avec une date passée, on reste sur le temps réel.
+    expect(callsTo('/formations/list/').at(-1).get('seance_en_cours')).toBe('true')
+
+    const nBefore = callsTo('/formations/list/').length
+    clickPeriod('Jour spécifique')
+    await waitFor(() => expect(callsTo('/formations/list/').length).toBeGreaterThan(nBefore))
+
     const q = callsTo('/formations/list/').at(-1)
     expect(q.get('date_mode')).toBe('date')
     expect(q.get('date')).toBe('2026-01-15')

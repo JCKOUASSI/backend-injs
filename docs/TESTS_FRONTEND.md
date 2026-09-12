@@ -4,16 +4,18 @@
 > Introduit par le lot **P00-04 [LOT 0]** (filet de sécurité de tests automatisés), puis
 > étendu au **[LOT 1]** (moteur de tableaux/listes génériques et formulaire de décision
 > pédagogique), au **[LOT 2]** (page de liste *serveur* typée `Users` : recherche
-> debounced, onglets/rôles, pagination et écritures CRUD) et au **[LOT 3]** (contrat
+> debounced, onglets/rôles, pagination et écritures CRUD), au **[LOT 3]** (contrat
 > d'**isolation des données par secrétariat** dans `Statistiques`, et période de présence
-> du `Dashboard` — ce dernier a révélé un bug réel, voir §10.5).
+> du `Dashboard` — ce dernier a révélé un bug réel) et au **[LOT 4]** (**correctif** de ce
+> bug de closure, voir §10.5). Le LOT 4 est le seul à modifier une ligne de logique
+> applicative, sur feu vert explicite.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
 > Voir aussi : [ARCHITECTURE.md](ARCHITECTURE.md), [sécurité des données](SECURITE_DONNEES.md),
 > [README racine](../README.md).
 
-Date de référence : 11 septembre 2026.
+Date de référence : 12 septembre 2026.
 
 ---
 
@@ -224,7 +226,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (21 fichiers, 463 tests)
+### 6.2 Fichiers de test colocalisés (21 fichiers, 464 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -262,7 +264,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
 | `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (16 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. |
-| `src/pages/Dashboard.test.jsx` | page | **Chargement et période de présence (4 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, et un test **`[écart]`** qui fige le bug de closure confirmé (§10.5). |
+| `src/pages/Dashboard.test.jsx` | page | **Chargement et période de présence (5 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, et **deux tests de régression** (Jour(date passée)→Semaine et l'inverse) qui garantissent le bon mode de requête après chaque bascule (bug de closure corrigé au LOT 4, §10.5). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
@@ -284,7 +286,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 3 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 4 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -298,6 +300,10 @@ Mesure après le LOT 3 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **79 %** |
 | `pages/Statistiques.jsx` | **25 %** | 25 % | 11 % | **58 %** |
 | **Global `src/` (toutes zones)** | **35 %** | 35 % | 25 % | **63 %** |
+
+> Le LOT 4 est un correctif ciblé : il n'a pas vocation à augmenter la couverture
+> (les seuils du LOT 3 restent donc inchangés). Il a transformé un test `[écart]`
+> en deux tests de régression (463 → **464 tests**).
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`,
@@ -390,10 +396,12 @@ et de l'emploi mobile (Flutter).
 
 ---
 
-## 10. Écarts et anomalies SIGNALÉS par les tests (non corrigés aux lots 0 à 3)
+## 10. Écarts et anomalies SIGNALÉS par les tests
 
-Conformément aux contraintes, ces points sont **constatés et tracés**, pas
-corrigés en silence. Ils attendent un lot dédié (ils touchent au comportement).
+Conformément aux contraintes, les lots 0 à 3 n'ont **jamais** modifié la
+logique applicative : les écarts y étaient seulement constatés et tracés. Le
+**LOT 4**, sur feu vert explicite, est le premier lot correctif (§10.5). Les
+points encore ouverts sont ci-dessous.
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -407,7 +415,7 @@ Ce comportement est figé par un test `[écart]` dans `src/pages/Login.test.jsx`
 **À traiter** dans un lot de durcissement de l'authentification (parcours forcé,
 route protégée, détection au login et après `refreshUser`).
 
-### 10.2 Avertissements `react-hooks/exhaustive-deps` restants (11)
+### 10.2 Avertissements `react-hooks/exhaustive-deps` (10 restants après LOT 4)
 
 Le lot a fait reculer le nombre total d'avertissements ESLint de **89 à 51**, et
 les `exhaustive-deps` de **49 à 11**. Les 31 avertissements de type « fonction de
@@ -425,7 +433,7 @@ dédiés. Résultat :
 | `Statistiques.jsx` (5 `useCallback`) | dépendance `effectiveSecretariatId` absente | ✅ **FAUX POSITIF confirmé par le test.** `effectiveSecretariatId = lockedSecretariatId(user) || secretariatId` : pour un compte verrouillé l'id est **constant de la session** (et un effet synchronise d'ailleurs `secretariatId` dessus) ; pour un compte qui peut filtrer, `secretariatId` — qui varie — **est bien** dans les dépendances, et les effets déclencheurs listent `secretariatId`. Aucune requête à secrétariat périmé (vérifié sur Point Journalier, Rapports, Alertes et sur le compte Chef Secrétariat). Le warning reste ouvert pour lisibilité, mais le risque de fuite de données est écarté. |
 | `Statistiques.jsx` (`useEffect`) | `data?.justificatifs` non listé | Composant présentuel `BilanPeriodeFormationTable` : la synchronisation se fait sur les clés d'identité de ligne (`titre`, `formation_id`, `annee`) ; un justificatif changeant à clés identiques est un cas très improbable. Risque **mineur**, non corrigé. |
 | `Statistiques.jsx` (`useEffect`) | expression complexe + `facGroupesVisibles` | Lisibilité uniquement (expression à extraire) ; non testé spécifiquement. |
-| `Dashboard.jsx` (`useCallback`) | `presencePeriod` absent | ❌ **VRAI BUG CONFIRMÉ** — voir §10.5. |
+| ~~`Dashboard.jsx` (`useCallback`)~~ | ~~`presencePeriod` absent~~ | ✅ **CORRIGÉ au LOT 4** (§10.5) : `presencePeriod` ajouté aux dépendances ; warning disparu, tests de régression en place. |
 | `Modules.jsx` (`useEffect`) | `filters` (objet) + `showToast` absents | Non revu au LOT 3 ; à examiner lors des tests des listes métiers. |
 | `Users.jsx` (`useEffect`) | `availableTabs`, `userTab` absents | Sans impact fonctionnel observé dans les tests LOT 2 (les onglets se synchronisent par un effet dédié) ; à garder en vue. |
 | `FinanceDashboard.jsx` (2 `useMemo`) | valeurs conditionnelles non mémoïsées (`volumesParModule`, `synthese`) | **Performance uniquement** (référence nouvelle à chaque rendu) ; pas de donnée périmée. |
@@ -434,9 +442,10 @@ Aucune de ces lignes n'est désactivée : l'avertissement reste un signal pour l
 lot qui les prendra en charge. Les corriger change le comportement (refetch),
 ce qui sort du périmètre du filet de tests.
 
-> Les lots 1 à 3 n'ont modifié **aucune logique applicative** : uniquement des
-> tests, le harnais, des fixtures et les seuils. Les bugs/écarts découverts sont
-> tracés (§10.1, §10.4, §10.5), jamais corrigés en silence.
+> Les lots 0 à 3 n'ont modifié **aucune logique applicative** : uniquement des
+> tests, le harnais, des fixtures et les seuils. Le LOT 4 est le premier lot
+> correctif (§10.5). Les écarts encore ouverts sont tracés (§10.1, §10.4,
+> §10.6), jamais corrigés en silence.
 
 ### 10.3 Variables inutilisées (code mort)
 
@@ -456,29 +465,44 @@ générique. Cas-limite sans impact sécurité, figé par un test `[écart]` dan
 `src/utils/apiErrors.test.js`. Un lot d'hygiène pourra faire retomber ce cas sur
 le fallback.
 
-### 10.5 BUG CONFIRMÉ — `Dashboard` : closure périmée sur la période de présence
+### 10.5 BUG corrigé au LOT 4 — `Dashboard` : closure périmée sur la période de présence
 
 **Écran** : `src/pages/Dashboard.jsx` (chargement des « formations en cours »).
 
-`loadDashboardData` est un `useCallback` dont le tableau de dépendances omet
-`presencePeriod` (il ne contient que `selectedSecretariatId`, `referenceDate`,
-`appliedVhPeriod`), alors que l'effet déclencheur, lui, liste `presencePeriod`.
-Conséquence : quand on passe de **« Jour spécifique » avec une date non
-courante** à **Semaine / Mois / Année**, l'effet rappelle une ancienne closure
-encore en mode « jour ». La requête `GET /formations/list/` reste épinglée sur
-la date choisie (`date_mode=date&date=…`) au lieu de revenir à
-`seance_en_cours=true`. La carte « formations en cours » affiche alors les
-séances d'un jour passé au lieu des séances en cours.
+`loadDashboardData` est un `useCallback` dont le tableau de dépendances omettait
+`presencePeriod` (il ne contenait que `selectedSecretariatId`, `referenceDate`,
+`appliedVhPeriod`), alors que l'effet déclencheur, lui, listait `presencePeriod`.
+Conséquence : après **« Jour spécifique » avec une date non courante →
+Semaine / Mois / Année**, l'effet rappelait une ancienne closure encore en mode
+« jour » ; la requête `GET /formations/list/` restait épinglée sur la date
+(`date_mode=date&date=…`) au lieu de revenir à `seance_en_cours=true` (et
+symétriquement, Semaine → Jour ne passait pas en mode date). Le bug était
+invisible avec la date du jour.
 
-- Le cas symétrique (Semaine → Jour avec une date passée) est également faux :
-  on bascule en mode « jour » sans pour autant passer en `date_mode=date`.
-- Le bug est **invisible avec la date du jour** (les deux branches produisent
-  alors `seance_en_cours=true`), d'où sa discrétion.
-- Il est figé par un test `[écart]` dans `src/pages/Dashboard.test.jsx`.
-  **Correctif attendu** (lot dédié, sans surprise car il change une requête) :
-  ajouter `presencePeriod` aux dépendances de `loadDashboardData` (ou déplacer
-  ce calcul dans l'effet) ; le test `[écart]` deviendra alors faux et devra être
-  remplacé par l'assertion correcte (`seance_en_cours=true` après bascule).
+**Correctif (LOT 4, feu vert explicite)** : ajout de `presencePeriod` aux
+dépendances du `useCallback` (une seule ligne de logique applicative modifiée
+dans tout le lot) :
+
+```js
+}, [selectedSecretariatId, referenceDate, presencePeriod, appliedVhPeriod])
+```
+
+Le polling (`useVisibilityPolling`) transite par un `ref` : changer l'identité
+du callback ne crée pas de boucle de minuteur. Le test `[écart]` du LOT 3 a été
+remplacé par **deux tests de régression** (les deux sens de bascule) dans
+`src/pages/Dashboard.test.jsx`. L'avertissement ESLint correspondant a disparu
+(51 → 50 warnings ; `exhaustive-deps` 11 → 10).
+
+### 10.6 Écrat mineur constaté au LOT 4 — branche d'erreur « 3 » inatteignable dans `Dashboard`
+
+Toujours dans `loadDashboardData`, le code compte les promesses en échec via
+`Promise.allSettled([statsRes, enCoursRes])` (**2** requêtes), mais teste
+`failures.length === 3` pour le message « Erreur lors du chargement des
+données ». Cette branche n'est donc jamais atteinte : un échec complet (les 2
+requêtes) affiche « Certaines données n'ont pas pu être chargées » au lieu du
+message d'erreur totale. **Non corrigé au LOT 4** (hors périmètre du bug §10.5) ;
+à corriger en remplaçant `=== 3` par `=== 2` (ou par le nombre de promesses)
+dans un lot d'hygiène, avec un test dédié.
 
 ---
 
@@ -498,7 +522,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 3 :
+**Aucune page n'est dépourvue de test.** État après le LOT 4 :
 
 - cinq écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
   `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
@@ -519,12 +543,16 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
 1. ~~Moteur de listes + décision pédagogique~~ (LOT 1), ~~liste *serveur*
    typée~~ (LOT 2, `Users`), ~~isolation secrétariat Stats + période Dashboard~~
    (LOT 3). Restes ponctuels connus : branche `Users` « création d'un secrétariat
-   à la volée », onglets/exports/widgets internes de `Statistiques`, et le
-   **correctif** du bug Dashboard §10.5 (avec bascule du test `[écart]`) ;
+   à la volée », onglets/exports/widgets internes de `Statistiques`. Le bug de
+   closure Dashboard §10.5 a été **corrigé au LOT 4** (deux tests de régression) ;
 2. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
    jurys, finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
-3. corriger les écarts confirmés (§10.5 Dashboard ; §10.1 `must_change_password`)
-   dans des lots dédiés, en transformant les tests `[écart]` correspondants ;
+3. corriger les écarts encore ouverts dans des lots dédiés :
+   - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
+     route protégée, gestion au login et après `refreshUser`) ;
+   - §10.4 `formatApiErrors` (cas `error` composé d'espaces) ;
+   - §10.6 branche d'erreur `failures.length === 3` inatteignable dans `Dashboard` ;
+   chaque correctif transforme le test `[écart]` ou ajoute la régression ;
 4. composants partagés (modales, pickers, badges, panneaux de flux) ;
 5. montée progressive du plancher de couverture global (§7) et résorption des
    derniers points du §10.

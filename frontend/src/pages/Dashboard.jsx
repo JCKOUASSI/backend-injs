@@ -98,7 +98,10 @@ export default function Dashboard() {
       }
       setLoading(false)
     }
-  }, [selectedSecretariatId, referenceDate, appliedVhPeriod])
+    // presencePeriod doit figurer ici : sa valeur pilote la construction de
+    // listQuery (date_mode/date vs seance_en_cours). Sans elle, un changement
+    // de période rappelait une closure périmée (bug §10.5, corrigé au LOT 4).
+  }, [selectedSecretariatId, referenceDate, presencePeriod, appliedVhPeriod])
 
   useEffect(() => {
     loadDashboardData()
