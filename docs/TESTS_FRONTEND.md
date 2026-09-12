@@ -21,9 +21,13 @@
 > d'admission** — liste/filtres, transitions, vérification et dépôt de pièces,
 > ouverture d'admission, création candidat + candidature, cas d'erreur), puis au
 > **[LOT 10]** (boucle de la chaîne : **décision et annulation d'admission**,
-> profil administratif, **inscription d'un admis** via modale de confirmation).
+> profil administratif, **inscription d'un admis** via modale de confirmation),
+> puis au **[LOT 11]** (termine le parcours étudiant : **inscriptions
+> administratives** avec validation en cascade, et fiche étudiant — génération/
+> retrait de **pédagogie**, affectation de **groupe**, **passerelle** vers les
+> modules opérationnels).
 > Les LOT 4 à 7 sont les seuls à toucher la logique applicative, sur feu vert
-> explicite ; les LOT 8 à 10 sont des lots de tests purs.
+> explicite ; les LOT 8 à 11 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -241,7 +245,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (26 fichiers, 500 tests)
+### 6.2 Fichiers de test colocalisés (28 fichiers, 510 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -283,6 +287,8 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/scolariteActions.test.jsx` | page | **6 tests d'écriture au clic (LOT 8, §10.8)** sur les gestionnaires rétablis : `Campagnes` (Planifier sans confirmation puis Ouvrir **avec** `window.confirm`, bon `POST …/transition/` + rechargement ; cas d'erreur serveur avec toast), `CampagneDetail` (enregistrement d'une note `POST /epreuves/:id/notes/` avec les bons identifiants), `Equivalences` (`POST …/appliquer/` après confirmation), `MaquetteDetail` (`DELETE /ecues/:id/?mode=archive`), `ChargesEnseignants` (création d'affectation `POST /enseignants/affectations/` avec l'année courante et les champs typés). |
 | `src/pages/scolarite/Candidatures.test.jsx` | page | **9 tests (LOT 9), parcours candidatures qui écrit** : liste + année courante, recherche `q` et filtre `statut` transmis en paramètres au service ; panneau « Dossier » : **transition de statut** (`POST …/transition/` + toast + rechargement), **validation/refus d'une pièce** (`POST …/pieces/:id/verifier/`, boutons désactivés sans fichier), **dépôt de fichier** multipart (`POST …/deposer/`, `FormData`), **ouverture d'admission** (`POST /admissions/admissions/`) ; **création** candidat puis candidature avec l'année courante (`POST /candidats/` puis `/candidatures/`) ; cas d'erreur serveur (transition refusée, création avec message champ). Couvre **97,5 % des lignes** de la page et porte le service `services/scolarite.js` à **100 % de lignes**. |
 | `src/pages/scolarite/Admissions.test.jsx` | page | **8 tests (LOT 10), boucle admission** : liste/filtre par décision, état du bouton *Inscrire* selon `permet_inscription` ; panneau **profil administratif** (catégorie→grade liés, `PATCH /admissions/:id/`), **prononcé de décision** (`POST …/decision/`, panneau fermé, cas d'erreur) ; **inscription d'un admis** après modale (`POST /scolarite/inscriptions/depuis-admission/` `{admission_id, valider:true}` → matricule + navigation) ; **annulation** après confirmation (`POST …/annuler/`, rechargement) et annulation de la modale sans écriture. Couvre **98 % des lignes** de la page. |
+| `src/pages/scolarite/Inscriptions.test.jsx` | page | **4 tests (LOT 11)** : liste et 4 filtres transmis au service (recherche `q`, statut, formation, niveau — les valeurs vides étant éliminées) ; **validation en cascade** (un brouillon enchaîne `EN_ATTENTE → A_VALIDER → VALIDEE` par 3 `POST …/transition/` dans l'ordre, puis toast + rechargement ; une inscription déjà validée n'a pas de bouton) ; cascade **interrompue** dès qu'une transition échoue (toast de l'erreur, les étapes suivantes ne sont pas émises). Couvre **99,4 % des lignes / 100 % des fonctions**. |
+| `src/pages/scolarite/FicheEtudiant.test.jsx` | page | **6 tests (LOT 11)** : fiche avec inscription validée — rendu identité/programme/groupe/passerelle ; **génération de pédagogie** (`POST …/pedagogie/generer/`, nombre d'ajouts en toast), **retrait d'ECUE** (`DELETE /pedagogie/:id`, constats §10.9) ; **affectation à un groupe** (`POST …/affectations/`, bouton désactivé sans choix, option d'un groupe complet désactivée) ; **passerelle** prévisualisation puis synchronisation (`POST …/passerelle/`) ; fiche sans inscription validée = alerte et sections pédagogie/groupe absentes. Couvre **89,8 % des lignes / 100 % des fonctions**. |
 | `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
@@ -313,7 +319,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 10 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 11 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -329,22 +335,27 @@ Mesure après le LOT 10 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
 | `pages/scolarite/Candidatures.jsx` | **97 %** | 97 % | 74 % | **79 %** |
 | `pages/scolarite/Admissions.jsx` | **98 %** | 98 % | 90 % | **85 %** |
-| `pages/scolarite/**` (dossier) | **75 %** | 75 % | 41 % | **71 %** |
-| **Global `src/` (toutes zones)** | **39 %** | **39 %** | **28 %** | **65 %** |
+| `pages/scolarite/Inscriptions.jsx` | **99 %** | 99 % | **100 %** | **87 %** |
+| `pages/scolarite/FicheEtudiant.jsx` | **90 %** | 90 % | **100 %** | **74 %** |
+| `pages/scolarite/**` (dossier) | **79 %** | 79 % | **48 %** | **74 %** |
+| **Global `src/` (toutes zones)** | **40 %** | **40 %** | **29 %** | **66 %** |
 
 > Les LOT 4 à 7 sont des correctifs ciblés ; le LOT 8 n'ajoute que des tests.
 > Les seuils du LOT 3 restent inchangés (aucun seuil n’a été baissé). Le nombre
 > de tests progresse : 464 (LOT 4) → 467 (LOT 5) → 472 (LOT 6) → 477
-> (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → **500 (LOT 10)** ; lignes couvertes
-> globalement 35,3 % (LOT 5) → … → 38,8 % (LOT 9) → **39,4 % (LOT 10)**
-> (fonctions **28,1 %**, branches **65,2 %**).
+> (LOT 7) → 483 (LOT 8) → 492 (LOT 9) → 500 (LOT 10) → **510 (LOT 11)** ;
+> lignes couvertes globalement 35,3 % (LOT 5) → … → 39,4 % (LOT 10) →
+> **39,9 % (LOT 11)** (fonctions **29,0 %**, branches **65,8 %**).
 >
 > Le LOT 7 faisait apparaître de la couverture là où les pages étaient
 > **invisibles car en panne** (§10.8) ; le LOT 8 y exécutait les actions au
-> clic ; les LOT 9 et 10 couvrent la **chaîne admission** : `Candidatures`
-> **97,5 %** ln puis `Admissions` **98 % ln / 90 % fonctions / 85 % branches**.
-> Le service `services/scolarite.js` est à **100 % de lignes** et le dossier
-> `pages/scolarite/` passe de 61 % (LOT 8) à **75 % de lignes (LOT 10)**.
+> clic ; les LOT 9 et 10 couvraient la **chaîne admission** (`Candidatures`
+> 97,5 %, `Admissions` 98 %) ; le LOT 11 la termine avec les **inscriptions et
+> la fiche étudiant** : `Inscriptions` **99,4 % ln / 100 % fonctions** et
+> `FicheEtudiant` **89,8 % ln / 100 % fonctions**. Le service
+> `services/scolarite.js` reste à **100 % de lignes / 98,6 % de branches** et
+> le dossier `pages/scolarite/` atteint **79 % de lignes / 48 % de
+> fonctions**.
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -654,6 +665,20 @@ message serveur, sans crash). Couverture des pages : `Campagnes` 61 → **83 %**
 `CampagneDetail` 68 → **82 %**, `ChargesEnseignants` 63 → **73 %** (fonctions
 12,5 → 87,5 %), `Equivalences` 51 → **64 %**, `MaquetteDetail` 31 → **68 %**.
 
+### 10.9 Constat au LOT 11 — retrait d'une ECUE pédagogique sans confirmation
+
+Dans `FicheEtudiant.jsx` (section `Pedagogie`), le bouton **Retirer** d'une
+ligne pédagogique appelle immédiatement `retirerEcue(ligne.id)`
+(`DELETE /scolarite/pedagogie/:id/`) **sans `ConfirmModal`**, alors que les
+autres actions destructrices du domaine (archiver une ECUE de *maquette* dans
+`MaquetteDetail`, annuler une admission, inscrire un admis) font l'objet d'une
+confirmation explicite. Le comportement actuel est figé par un test
+(`FicheEtudiant.test.jsx` : clic → DELETE immédiat, aucun `.modal-overlay`) ;
+il n'est **pas corrigé** dans ce lot de tests. Décision produit à prendre :
+ajouter une `ConfirmModal` de cohérence avec les autres suppressions, ou
+assumer un retrait rapide (l'ECUE peut être régénérée depuis la maquette).
+À traiter, le cas échéant, dans un lot correctif dédié.
+
 ---
 
 ## 11. Couverture des pages — ce qui reste à faire
@@ -672,7 +697,7 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 10 :
+**Aucune page n'est dépourvue de test.** État après le LOT 11 :
 
 - six écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
   `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
@@ -685,10 +710,11 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   le chargement effectif — allant au-delà du smoke qui n'exclut pas les pages
   blanches ; leurs **actions d'écriture sont en outre exercées au clic** au
   LOT 8 (`scolariteActions.test.jsx`, §10.8) ;
-- la **chaîne admission** est couverte par des tests fonctionnels dédiés :
-  `Candidatures.jsx` (97,5 % de lignes, LOT 9 — liste/filtres, transitions,
-  pièces, ouverture d'admission, création) et `Admissions.jsx` (98 % de lignes,
-  LOT 10 — profil administratif, décision, annulation, inscription d'un admis) ;
+- tout le **parcours administratif de l'étudiant** est couvert par des tests
+  fonctionnels dédiés : `Candidatures.jsx` (97,5 % ln, LOT 9), `Admissions.jsx`
+  (98 % ln, LOT 10), puis `Inscriptions.jsx` (99,4 % ln / 100 % fonctions,
+  LOT 11 — validation en cascade) et `FicheEtudiant.jsx` (89,8 % ln / 100 %
+  fonctions, LOT 11 — pédagogie, groupes, passerelle) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -696,7 +722,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **40 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **38 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -719,16 +745,19 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    (`Equivalences`), le workflow maquette (valider/activer/archiver/cloner) et
    l'ajout d'ECUE (`MaquetteDetail`), le détail enseignant et la sélection dans
    `ChargesEnseignants` ;
-3. flux critiques par rôle : ~~candidatures~~ (LOT 9) et
-   ~~admissions/décisions~~ **(LOT 10)** couverts ; reste la continuité après
-   admission : **inscriptions pédagogiques** (`scolarite/Inscriptions`,
-   inscrire depuis admission, génération de pédagogie, ajout/retrait d'ECUE,
-   affectation de groupes, réinscription), puis présences/QR, notes et jurys,
+3. flux critiques par rôle : ~~candidatures~~ (LOT 9), ~~admissions/décisions~~
+   (LOT 10) et ~~inscriptions / pédagogie / groupes / passerelle~~ **(LOT 11)**
+   couverts : le parcours étudiant de la candidature au rattachement aux cours
+   est défendu de bout en bout. Restent la **réinscription**, la **création
+   d'événements** et les écrans hors scolarité : présences/QR, notes et jurys,
    finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
-4. écart encore ouvert, dans un lot dédié :
+4. écarts encore ouverts, dans des lots dédiés :
    - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
      route protégée, gestion au login et après `refreshUser`) — en attente d'un
      choix produit (blocage total ou lecture seule) ;
+   - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
+     les autres actions destructrices) — comportement figé par un test, en
+     attente d'un choix produit ;
 5. composants partagés (modales, pickers, badges, panneaux de flux) ;
 6. montée progressive du plancher de couverture global (§7) et extension aux
    pages encore couvertes seulement en smoke ; option : durcir le smoke
