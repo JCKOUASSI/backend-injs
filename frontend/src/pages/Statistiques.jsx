@@ -1356,7 +1356,9 @@ export default function Statistiques() {
         seuils_vides: payload.seuils_vides ?? !(payload.seuils || []).length,
       })
     } catch {}
-  }, [formationId, secretariatId])
+    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
+    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
+  }, [formationId, effectiveSecretariatId])
 
   const initSeuilsDefaut = async () => {
     setInitSeuilsLoading(true)
@@ -1402,7 +1404,9 @@ export default function Statistiques() {
     } finally {
       setLoadingPj(false)
     }
-  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId])
+    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
+    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
+  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, effectiveSecretariatId])
 
   const fetchPjDetail = useCallback(async (tb) => {
     if (!tb) {
@@ -1427,7 +1431,9 @@ export default function Statistiques() {
     } finally {
       setLoadingPjDetail(false)
     }
-  }, [pjAnnee, secretariatId])
+    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
+    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
+  }, [pjAnnee, effectiveSecretariatId])
 
   const downloadPointJournalier = async (format) => {
     setExportingPj(format)
@@ -1499,7 +1505,9 @@ export default function Statistiques() {
     } finally {
       setLoadingRb(false)
     }
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId])
+    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
+    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
+  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, effectiveSecretariatId])
 
   const fetchFacPerimetre = useCallback(async () => {
     const effFormation = facFormationId || formationId
@@ -1629,7 +1637,9 @@ export default function Statistiques() {
     } finally {
       setLoadingRbDetail(false)
     }
-  }, [rbAnnee, rbMois, rbCategorie, rbFormationId, rbPeriode, rbCalendrier, formationId, secretariatId])
+    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
+    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
+  }, [rbAnnee, rbMois, rbCategorie, rbFormationId, rbPeriode, rbCalendrier, formationId, effectiveSecretariatId])
 
   const downloadBilanExport = async (format) => {
     setExportingRb(format)
@@ -3474,7 +3484,9 @@ function normalizeJustificatifs(value) {
   return ''
 }
 
-function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificatifsChange }) {
+// Exporté pour les tests unitaires de la synchro des justificatifs (§10.7) ;
+// le rendu applicatif passe par BilanDetailPanel ci-dessous.
+export function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificatifsChange }) {
   const th = {
     padding: '0.4rem 0.35rem',
     border: '1px solid #000',
@@ -3503,8 +3515,13 @@ function BilanPeriodeFormationTable({ data, justificatifsText = '', onJustificat
   ))
 
   useEffect(() => {
+    // `data?.justificatifs` est bien une dépendance voulue (écart §10.7 tranché
+    // LOT 6) : un justificatif serveur reçu pour une ligne DÉJÀ affichée (mêmes
+    // titre/formation/année, ex. rafraîchissement) doit synchroniser le champ.
+    // La saisie reste prioritaire : quand le parent porte déjà un texte, le
+    // `justificatifsText ||` court-circule la valeur serveur et n'écrase rien.
     setJustifText(justificatifsText || normalizeJustificatifs(data?.justificatifs))
-  }, [data?.titre, data?.formation_id, data?.annee, justificatifsText])
+  }, [data?.titre, data?.formation_id, data?.annee, data?.justificatifs, justificatifsText])
 
   const handleJustifChange = (e) => {
     const next = e.target.value

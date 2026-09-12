@@ -200,7 +200,13 @@ export default function FinanceDashboard() {
     setSynthesePage(1)
   }
 
-  const volumesParModule = Array.isArray(data?.volumes_par_module) ? data.volumes_par_module : []
+  // Mémoïsé : sans cela, le fallback `[]` est un tableau neuf à chaque rendu
+  // et le useMemo des KPI ci-dessous perdait toute mémoïsation (warning
+  // exhaustive-deps LOT 6). Référence stable tant que `data` ne change pas.
+  const volumesParModule = useMemo(
+    () => (Array.isArray(data?.volumes_par_module) ? data.volumes_par_module : []),
+    [data?.volumes_par_module],
+  )
   const kpis = useMemo(() => {
     const raw = data?.kpis || {}
     if (raw.total_montant_prevu != null && raw.total_montant_prevu !== '') {
@@ -220,7 +226,12 @@ export default function FinanceDashboard() {
   const topRealise = Array.isArray(data?.top_temps_realise) ? data.top_temps_realise : []
   const topMontants = Array.isArray(data?.top_montants) ? data.top_montants : []
   const specialites = Array.isArray(data?.repartition_specialites) ? data.repartition_specialites : []
-  const synthese = Array.isArray(data?.synthese_formateurs) ? data.synthese_formateurs : []
+  // Idem ci-dessus : le fallback `[]` recyclé à chaque rendu rendait le
+  // useMemo de la page de synthèse inopérant (warning LOT 6).
+  const synthese = useMemo(
+    () => (Array.isArray(data?.synthese_formateurs) ? data.synthese_formateurs : []),
+    [data?.synthese_formateurs],
+  )
   const syntheseTotalPages = Math.max(1, Math.ceil(synthese.length / SYNTHESE_PAGE_SIZE))
   const synthesePageSafe = Math.min(synthesePage, syntheseTotalPages)
   const synthesePageRows = useMemo(() => {

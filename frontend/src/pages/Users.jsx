@@ -78,10 +78,17 @@ export default function Users() {
   const { showToast } = useToast()
 
   const debouncedSearch = useDebounce(search)
+  // Faux positif exhaustive-deps (tranché au LOT 6, cf. TESTS_FRONTEND §10.2) :
+  // le repli d'onglet ne dépend que des trois DISPONIBILITÉS dérivées des
+  // permissions. `availableTabs` est un tableau neuf à chaque rendu : l'ajouter
+  // ferait boucler l'effet (setUserTab → rendu → effet…). `userTab` est lu dans
+  // sa version courante au moment où une disponibilité change, sans désuétude.
+  // Régressions : Users.test.jsx « replie sur un onglet disponible ».
   useEffect(() => {
     if (!availableTabs.some(t => t.id === userTab)) {
       setUserTab(availableTabs[0]?.id || 'personnel')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showStaffSection, showAuditeursSection, showFormateursSection])
 
   usePersistedListQuery(

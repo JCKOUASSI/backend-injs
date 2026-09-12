@@ -7,9 +7,12 @@
 > debounced, onglets/rôles, pagination et écritures CRUD), au **[LOT 3]** (contrat
 > d'**isolation des données par secrétariat** dans `Statistiques`, et période de présence
 > du `Dashboard` — ce dernier a révélé un bug réel), au **[LOT 4]** (**correctif** de ce
-> bug de closure, voir §10.5) et au **[LOT 5]** (lot d'hygiène corrective : ferme les
-> écarts mineurs §10.4 et §10.6). Les LOT 4 et 5 sont les seuls à toucher la logique
-> applicative, sur feu vert explicite.
+> bug de closure, voir §10.5), au **[LOT 5]** (hygiène corrective : ferme les
+> écarts mineurs §10.4 et §10.6) et au **[LOT 6]** (soldage de **tous** les
+> avertissements `react-hooks/exhaustive-deps` : faux positifs dûment tranchés,
+> défauts de mémoïsation et trou de synchronisation §10.7, avec régressions).
+> Les LOT 4 à 6 sont les seuls à toucher la logique applicative, sur feu vert
+> explicite.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -227,7 +230,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (21 fichiers, 467 tests)
+### 6.2 Fichiers de test colocalisés (22 fichiers, 472 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -263,8 +266,9 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | Fichier | Niveau | Ce qui est vérifié |
 | --- | --- | --- |
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
-| `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (16 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
-| `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. |
+| `src/pages/Users.test.jsx` | page | **Liste *serveur* typée, assemblage bout-en-bout (17 tests)** : chargement initial (`exclude_role`, page 1), **pagination serveur** (page 2 / précédent, plage « x–y sur n »), **recherche avec debounce 400 ms**, **filtre par rôle**, **onglets personnel / étudiants / enseignants** (reset page, `role=AUDITEUR/FORMATEUR`), persistance `sessionStorage`/URL, état vide, **erreur de chargement formatée**, permissions (les contrôles de gestion sont masqués sans `can_mutate_users`), **repli sur le seul onglet autorisé** quand l'URL réclame un onglet interdit (§10.2 LOT 6), **création** personnel et étudiant (POST + toast adapté), **erreur de validation** serveur, **édition** (PATCH, statut, mot de passe vide non transmis) et **suppression** avec confirmation. Couvre **89 % des lignes** de la page (reste surtout la branche « création d'un secrétariat à la volée »). Le mock reproduit un backend paginé (50/page) via une route dynamique. |
+| `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). |
+| `src/pages/Statistiques.test.jsx` | page | **Contrat d'isolation multi-secrétariat (6 tests)** : admin sans périmètre forcé, application du filtre global, et pour les onglets **Point Journalier, Rapports & Bilans, Alertes** vérification que chaque requête porte le secrétariat **courant** (les 5 `useCallback` signalés par ESLint sont ainsi testés : pas de secrétariat périmé, voir §10.2) ; pour un **Chef Secrétariat**, TOUTES les requêtes (dès la première, méta comprise) sont verrouillées sur son id, le sélecteur est masqué et les onglets non autorisés absents. Rendu fidèle via la garde `WaitForAuth`. **+ 2 tests (LOT 6, §10.7)** sur le sous-composant exporté `BilanPeriodeFormationTable` : reprise d'un justificatif serveur reçu à clés de ligne identiques, et non-écrasement d'une saisie utilisateur. |
 | `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
@@ -287,7 +291,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 5 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 6 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -295,17 +299,21 @@ Mesure après le LOT 5 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `src/utils/**` (rôles inclus) | 77 % | 77 % | 79 % | 86 % |
 | `src/services/**` | **97 %** | 97 % | 97 % | **91 %** |
 | `src/context/**` | **99 %** | 99 % | 89 % | **91 %** |
-| `src/hooks/**` | **94 %** | 94 % | 84 % | **91 %** |
+| `src/hooks/**` | **94 %** | 94 % | 84 % | **94 %** |
 | `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
 | `pages/Users.jsx` | **89 %** | 89 % | 49 % | **69 %** |
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
-| `pages/Statistiques.jsx` | **25 %** | 25 % | 11 % | **58 %** |
-| **Global `src/` (toutes zones)** | **35 %** | 35 % | 25 % | **64 %** |
+| `pages/Modules.jsx` | **37 %** | 37 % | 6 % | **59 %** |
+| `pages/Statistiques.jsx` | **28 %** | 28 % | 17 % | **58 %** |
+| **Global `src/` (toutes zones)** | **36 %** | 36 % | **26 %** | **64 %** |
 
-> Les LOT 4 et 5 sont des correctifs ciblés : ils n'ont pas pour but de monter la
-> couverture (les seuils du LOT 3 restent donc inchangés), mais les régressions
-> ajoutées font légèrement progresser `Dashboard` et `apiErrors`
-> (464 → **467 tests**, branches globales 63 % → **64 %**).
+> Les LOT 4 à 6 sont des correctifs ciblés : les seuils du LOT 3 restent
+> inchangés (aucun seuil n'a été baissé), mais les régressions ajoutées font
+> progressivement monter la couverture : 464 (LOT 4) → 467 (LOT 5) →
+> **472 tests (LOT 6)** ; global 35,3 % de lignes / 24,9 % de fonctions au
+> LOT 5 → **35,9 % / 25,5 %** au LOT 6. Le LOT 6 apporte notamment un test
+> dédié à `Modules.jsx` (était couvert seulement par le smoke) et deux tests
+> sur le tableau des justificatifs de `Statistiques.jsx` (§10.7).
 
 Fichiers du moteur de listes quasi exhaustivement couverts : `listFilters.js`
 97,5 % lignes / 97,3 % branches ; `paginationPages.js`, `paginatedResponse.js`
@@ -418,46 +426,53 @@ Ce comportement est figé par un test `[écart]` dans `src/pages/Login.test.jsx`
 **À traiter** dans un lot de durcissement de l'authentification (parcours forcé,
 route protégée, détection au login et après `refreshUser`).
 
-### 10.2 Avertissements `react-hooks/exhaustive-deps` (10 restants après LOT 4)
+### 10.2 Avertissements `react-hooks/exhaustive-deps` — TOUT SOLDÉ au LOT 6
 
-Le lot a fait reculer le nombre total d'avertissements ESLint de **89 à 51**, et
-les `exhaustive-deps` de **49 à 11**. Les 31 avertissements de type « fonction de
-chargement au montage » ont été réglés par une **désactivation inline justifiée**
-(`-- rechargement intentionnel…`), car ajouter une fonction de chargement non
-mémoïsée au tableau de dépendances provoquerait une boucle ; les dépendances de
-données présentes pilotent déjà le (re)chargement. Quelques dépendances
-**stables** (`showToast` issu d'un `useCallback`, `navigate`) ont été ajoutées.
+Le lot 0 avait fait reculer les `exhaustive-deps` de **49 à 11** (les
+avertissements « fonction de chargement au montage » étant réglés par une
+**désactivation inline justifiée** : une fonction non mémoïsée dans les deps
+provoquerait une boucle). Le LOT 4 en a soldé un vrai bug (§10.5). Le **LOT 6 a
+tranché et soldé les 10 derniers** ; le lint ne remonte désormais **aucun**
+avertissement `exhaustive-deps` (il ne reste que des `no-unused-vars`, §10.3) :
 
-Les 11 avertissements conservés ont été **expertisés au LOT 3** par des tests
-dédiés. Résultat :
-
-| Écran | Hook / sujet | Conclusion au LOT 3 |
+| Écran | Hook / sujet | Verdict et traitement LOT 6 |
 | --- | --- | --- |
-| `Statistiques.jsx` (5 `useCallback`) | dépendance `effectiveSecretariatId` absente | ✅ **FAUX POSITIF confirmé par le test.** `effectiveSecretariatId = lockedSecretariatId(user) || secretariatId` : pour un compte verrouillé l'id est **constant de la session** (et un effet synchronise d'ailleurs `secretariatId` dessus) ; pour un compte qui peut filtrer, `secretariatId` — qui varie — **est bien** dans les dépendances, et les effets déclencheurs listent `secretariatId`. Aucune requête à secrétariat périmé (vérifié sur Point Journalier, Rapports, Alertes et sur le compte Chef Secrétariat). Le warning reste ouvert pour lisibilité, mais le risque de fuite de données est écarté. |
-| `Statistiques.jsx` (`useEffect`) | `data?.justificatifs` non listé | Composant présentuel `BilanPeriodeFormationTable` : la synchronisation se fait sur les clés d'identité de ligne (`titre`, `formation_id`, `annee`) ; un justificatif changeant à clés identiques est un cas très improbable. Risque **mineur**, non corrigé. |
-| `Statistiques.jsx` (`useEffect`) | expression complexe + `facGroupesVisibles` | Lisibilité uniquement (expression à extraire) ; non testé spécifiquement. |
-| ~~`Dashboard.jsx` (`useCallback`)~~ | ~~`presencePeriod` absent~~ | ✅ **CORRIGÉ au LOT 4** (§10.5) : `presencePeriod` ajouté aux dépendances ; warning disparu, tests de régression en place. |
-| `Modules.jsx` (`useEffect`) | `filters` (objet) + `showToast` absents | Non revu au LOT 3 ; à examiner lors des tests des listes métiers. |
-| `Users.jsx` (`useEffect`) | `availableTabs`, `userTab` absents | Sans impact fonctionnel observé dans les tests LOT 2 (les onglets se synchronisent par un effet dédié) ; à garder en vue. |
-| `FinanceDashboard.jsx` (2 `useMemo`) | valeurs conditionnelles non mémoïsées (`volumesParModule`, `synthese`) | **Performance uniquement** (référence nouvelle à chaque rendu) ; pas de donnée périmée. |
+| `Statistiques.jsx` (5 `useCallback`) | `effectiveSecretariatId` absent | ✅ **FAUX POSITIF** prouvé au LOT 3 (6 tests d'isolation). `effectiveSecretariatId = lockedSecretariatId(user) || secretariatId` est une **string** : les 5 callbacks listent maintenant cette valeur **à la place de** `secretariatId` (qu'ils ne lisent pas directement — ESLint le signalait alors comme dépendance superflue). Aucun risque de boucle (primitive), requêtes identiques vérifiées. |
+| `Statistiques.jsx` (`useEffect` justificatifs) | `data?.justificatifs` non listé | ⚠️ **TROU RÉEL CORRIGÉ** → §10.7 : la dépendance est ajoutée ; la saisie reste prioritaire via `justificatifsText \|\| …`. Deux régressions (synchronisation serveur, non-écrasement de la saisie), dont une preuve de mutation (échec sans le correctif). |
+| ~~`Dashboard.jsx` (`useCallback`)~~ | ~~`presencePeriod` absent~~ | ✅ **CORRIGÉ au LOT 4** (§10.5). |
+| `Modules.jsx` (`useEffect`) | `filters` + `showToast` absents | ✅ **FAUX POSITIF.** L'effet ne doit se déclencher qu'**à l'arrivée des référentiels** pour y confronter les filtres persistés ; il lit le `filters` du rendu courant (jamais périmé : React exécute la dernière version de l'effet). Ajouter `filters` ferait revalider après chaque saisie. Désactivation inline justifiée ; fonction de nettoyage désormais couverte par 2 tests (`Modules.test.jsx`). |
+| `Users.jsx` (`useEffect`) | `availableTabs`, `userTab` absents | ✅ **FAUX POSITIF, dangereux à corriger naïvement.** Le repli d'onglet ne dépend que des trois booléens de permission : `availableTabs` est un tableau **neuf à chaque rendu** (son ajout ferait boucler l'effet), `userTab` est lu à jour. Désactivation inline justifiée ; régression « repli sur onglet autorisé » ajoutée. |
+| `FinanceDashboard.jsx` (2 `useMemo`) | `volumesParModule`, `synthese` conditionnels | ⚠️ **DÉFAUT DE PERF RÉEL (sans donnée périmée).** Le fallback `[]` était un tableau neuf à chaque rendu, ce qui rendait les `useMemo` qui en dépendaient inopérants. Les deux valeurs sont désormais elles-mêmes mémoïsées (`useMemo` sur `data?.…`) ; comportement identique, rendu allégé, smoke validé. |
 
-Aucune de ces lignes n'est désactivée : l'avertissement reste un signal pour le
-lot qui les prendra en charge. Les corriger change le comportement (refetch),
-ce qui sort du périmètre du filet de tests.
+Les quelques avertissements « fonction de chargement au montage » (déjà traités
+au lot 0) et les deux faux positifs ci-dessus portent une désactivation
+**nominative et commentée** : c'est le résultat d'un tranchage, pas une mise
+sous silence. Les tests associés (régressions LOT 4/6 + isolements LOT 3)
+garantissent que toute régression future sera capturée.
 
 > Les lots 0 à 3 n'ont modifié **aucune logique applicative** : uniquement des
-> tests, le harnais, des fixtures et les seuils. Les LOT 4 et 5 sont les lots
-> correctifs (§10.4, §10.5, §10.6). Le seul écart encore ouvert de cette
-> section est §10.1 (fonctionnalité `must_change_password`, non tranchée).
+> tests, le harnais, des fixtures et les seuils. Les LOT 4, 5 et 6 sont les lots
+> correctifs (§10.4, §10.5, §10.6, §10.7 et §10.2). Le seul écart encore ouvert
+> de cette section est §10.1 (fonctionnalité `must_change_password`, non
+> tranchée).
 
-### 10.3 Variables inutilisées (code mort)
+### 10.3 Variables inutilisées (code mort) — 38 warnings, lot d'hygiène suivant
 
-Il reste **38 avertissements `no-unused-vars`** préexistants (variables,
-imports ou états jamais lus, ex. `currentTrimestreParts`, `exportingEncadrants`,
-`nextSessionNumeroForDate`, `formatDate`, `navigate`, etc.). Ils sont antérieurs
-au lot et n'ont pas été nettoyés pour limiter le périmètre. Ils peuvent être
-supprimés sans risque dans un lot d'hygiène dédié, après vérification qu'il ne
-s'agit pas d'API publiques.
+Les **10 `exhaustive-deps` étant soldés au LOT 6** (§10.2), les **40
+avertissements ESLint restants** se réduisent à du **code mort / cosmétique**,
+sans aucun effet sur le comportement :
+
+- **38 `no-unused-vars`** préexistants (variables, imports ou états jamais lus,
+  ex. `currentTrimestreParts`, `exportingEncadrants`, `nextSessionNumeroForDate`,
+  `formatDate`, `navigate`, `Line`, `filtre_actif`, `fmtPct4`, `groupes`…) ;
+- **2 `no-irregular-whitespace`** dans `FormationDetail.jsx:470` (espaces
+  insécables dans un libellé de confirmation « Terminer la séance … ? »).
+
+Ils sont antérieurs aux lots et ont été laissés hors périmètre pour garder des
+commits focaux. Les `no-unused-vars` peuvent être supprimés dans un lot dédié
+après vérification qu'il ne s'agit pas d'API publiques ; les espaces insolites
+sont à remplacer par des espaces ordinaires (le sens du libellé est conservé).
+**C'est le candidat naturel du LOT 7.**
 
 ### 10.4 Corrigé au LOT 5 — `formatApiErrors` : champ `error` blanc / valeurs vides
 
@@ -495,7 +510,9 @@ Le polling (`useVisibilityPolling`) transite par un `ref` : changer l'identité
 du callback ne crée pas de boucle de minuteur. Le test `[écart]` du LOT 3 a été
 remplacé par **deux tests de régression** (les deux sens de bascule) dans
 `src/pages/Dashboard.test.jsx`. L'avertissement ESLint correspondant a disparu
-(51 → 50 warnings ; `exhaustive-deps` 11 → 10).
+(51 → 50 warnings ; `exhaustive-deps` 11 → 10), et les 10 derniers warnings de
+cette règle ont été soldés au **LOT 6** (§10.2) : le lint n'en affiche plus
+aucun aujourd'hui.
 
 ### 10.6 Corrigé au LOT 5 — branche d'erreur « 3 » inatteignable dans `Dashboard`
 
@@ -508,6 +525,24 @@ comparant au nombre de promesses réellement attendues
 `src/pages/Dashboard.test.jsx` distinguent désormais l'échec total (les 2
 requêtes en échec → message total) de l'échec partiel (une seule → message
 partiel).
+
+### 10.7 Corrigé au LOT 6 — `Statistiques` : justificatifs non synchronisés à clés de ligne identiques
+
+Le sous-composant `BilanPeriodeFormationTable` (tableau *Bilan période
+formation*, volet Rapports & Bilans) synchronise la zone libre « justificatifs »
+par un `useEffect` qui ne dépendait que des clés d'identité de ligne
+(`data.titre`, `formation_id`, `annee`) et de la prop `justificatifsText`. Si
+des justificatifs serveur arrivaient **pour une ligne déjà affichée** (mêmes clés
+— rafraîchissement du tableau, réponse enrichie), la zone restait vide alors que
+les données existaient. **Corrigé au LOT 6** en ajoutant `data?.justificatifs`
+aux dépendances. La correction est **sans risque pour la saisie** : l'effet
+écrit `justificatifsText || normalize(…)`, donc dès que l'utilisateur a saisi
+quelque chose (prop parent non vide), la valeur serveur ne peut rien écraser.
+
+Le sous-composant quasi pur est exporté pour les tests et couvert par deux
+régressions dans `src/pages/Statistiques.test.jsx` : reprise d'un justificatif
+serveur à clés identiques (en échec sans le correctif — preuve de mutation
+constatée), et non-écrasement d'une saisie utilisateur.
 
 ---
 
@@ -527,12 +562,13 @@ Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace
 NotesModule, Parametres, Participants, Profile, QuizList, QuizTake, Rattrapages,
 Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
 
-**Aucune page n'est dépourvue de test.** État après le LOT 5 :
+**Aucune page n'est dépourvue de test.** État après le LOT 6 :
 
-- cinq écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
+- six écrans disposent d'un test **fonctionnel dédié** : `Login.jsx`,
   `DecisionsPedagogiques.jsx` (100 % de lignes), `Users.jsx` (89 %, liste
-  serveur + CRUD), `Dashboard.jsx` (75 %) et `Statistiques.jsx` (25 %, ciblé sur
-  le contrat d'isolation par secrétariat) ;
+  serveur + CRUD), `Dashboard.jsx` (75 %), `Modules.jsx` (37 %, nettoyage des
+  filtres obsolètes) et `Statistiques.jsx` (28 %, contrat d'isolation par
+  secrétariat + synchro des justificatifs §10.7) ;
 - le **moteur de tableaux/listes génériques** est couvert indépendamment des
   écrans : construction des requêtes/filtres (`listFilters`), pagination
   (`paginationPages`, `paginatedResponse`), formatage des erreurs (`apiErrors`),
@@ -540,7 +576,7 @@ Referentiels, ScolariteDashboard, Secretariats, Statistiques, Users`.
   `useListReturn`, `usePersistedListQuery`) ;
 - composants réutilisables testés : `Pagination`, `ConfirmModal` ; les autres
   composants ne sont exercés qu'indirectement via le smoke ;
-- les **48 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
+- les **47 autres pages** sont couvertes en *smoke* (rendu) mais pas encore en
   *comportement métier* bout-en-bout.
 
 Backlog proposé pour les lots suivants (ordre de valeur) :
@@ -550,13 +586,19 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    (LOT 3). Restes ponctuels connus : branche `Users` « création d'un secrétariat
    à la volée », onglets/exports/widgets internes de `Statistiques`. Les bugs
    §10.4, §10.5 et §10.6 ont été **corrigés aux LOT 4 et 5**, avec régressions ;
+   le **LOT 6** a soldé tous les `exhaustive-deps` (§10.2) et corrigé §10.7,
+   avec un test dédié `Modules` et deux régressions supplémentaires ;
 2. flux critiques par rôle : admissions/candidatures, présences/QR, notes et
    jurys, finances étudiantes, référentiels (priorité aux écrans qui écrivent) ;
-3. écarts encore ouverts, dans des lots dédiés :
+3. **[candidat LOT 7] hygiène résiduelle sans risque comportemental** :
+   - 38 `no-unused-vars` (§10.3) : suppression du code mort, fichier par
+     fichier, en vérifiant qu'aucune API publique n'est concernée ;
+   - 2 `no-irregular-whitespace` dans `FormationDetail.jsx:470` ;
+   après ce lot, le lint frontend devrait être **vierge de warnings** ;
+4. écart encore ouvert, dans un lot dédié :
    - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
      route protégée, gestion au login et après `refreshUser`) — en attente d'un
      choix produit (blocage total ou lecture seule) ;
-   chaque correctif transforme le test `[écart]` ou ajoute la régression ;
-4. composants partagés (modales, pickers, badges, panneaux de flux) ;
-5. montée progressive du plancher de couverture global (§7) et résorption des
-   derniers points du §10.
+5. composants partagés (modales, pickers, badges, panneaux de flux) ;
+6. montée progressive du plancher de couverture global (§7) et extension aux
+   pages encore couvertes seulement en smoke.

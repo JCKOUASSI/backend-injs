@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const actual = await importOriginal()
@@ -11,7 +11,7 @@ import apiMock, { apiController } from '@/test/utils/mockApi'
 import { renderWithProviders } from '@/test/utils/renderWithProviders'
 import { makeUser } from '@/test/utils/factories'
 import { useAuth } from '@/context/AuthContext'
-import Statistiques from '@/pages/Statistiques'
+import Statistiques, { BilanPeriodeFormationTable } from '@/pages/Statistiques'
 
 // Reproduit la garde ProtectedRoute de production : la page ne se monte
 // qu'une fois l'utilisateur courant résolu (GET /auth/me), comme en vrai.
@@ -205,5 +205,69 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
     expect(screen.queryByRole('button', { name: /vue d'ensemble/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pédagogique' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Alertes' })).not.toBeInTheDocument()
+  })
+})
+
+/* Sous-composant pur : pas de provider, rendu direct. */
+const jStats = {
+  nb_groupes: 1, nb_encadrants: 2, effectif_secretariat: 3,
+  inscrits_actifs: 10, inscrits_reference: 12, pct_inscrits: 83,
+  masculin_inscrits: 6, feminin_inscrits: 6, auditeurs_listes: 9,
+  effectifs_presents: 8, pct_presents_total: 80,
+  masculin: 4, pct_masculins_presents: 50, feminin: 4, pct_feminins_presents: 50,
+  absents: 1, pct_absents_total: 10,
+}
+const makeJTableau = (overrides = {}) => ({
+  type: 'bilan_periode_formation',
+  titre: 'Bilan L1 — 2025',
+  formation_id: 42,
+  annee: 2025,
+  date_inscrits: '01/01/2026',
+  justificatifs: '',
+  lignes: [{ categorie: 'Grade A', totaux: jStats }],
+  total: jStats,
+  ...overrides,
+})
+const justifBox = () => screen.getByPlaceholderText(/saisir les justificatifs/i)
+
+describe('BilanPeriodeFormationTable — synchronisation des justificatifs (§10.7 LOT 6)', () => {
+  it('reprend les justificatifs serveur reçus pour une ligne DÉJÀ affichée (clés identiques)', async () => {
+    const { rerender } = render(
+      <BilanPeriodeFormationTable data={makeJTableau()} justificatifsText="" />,
+    )
+    expect(justifBox().value).toBe('')
+
+    // Rafraîchissement : mêmes titre/formation_id/année, mais le serveur fournit
+    // maintenant les justificatifs (tableau → liste à puces). Avant le LOT 6,
+    // l'effet ne se redéclenchait pas et la zone restait vide.
+    rerender(
+      <BilanPeriodeFormationTable
+        data={makeJTableau({ justificatifs: ['Report de formation', 'Maladie'] })}
+        justificatifsText=""
+      />,
+    )
+    await waitFor(() => expect(justifBox().value).toContain('Report de formation'))
+    expect(justifBox().value).toBe('• Report de formation\n• Maladie')
+  })
+
+  it('ne remplace jamais une saisie utilisateur par la valeur renvoyée par le serveur', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <BilanPeriodeFormationTable data={makeJTableau()} justificatifsText="" onJustificatifsChange={onChange} />,
+    )
+
+    fireEvent.change(justifBox(), { target: { value: 'Mon texte saisi' } })
+    expect(onChange).toHaveBeenCalledWith('Mon texte saisi')
+
+    // Une mise à jour serveur pour la même ligne ne doit pas écraser la saisie :
+    // dès que le parent porte un texte, il reste prioritaire.
+    rerender(
+      <BilanPeriodeFormationTable
+        data={makeJTableau({ justificatifs: ['Valeur serveur'] })}
+        justificatifsText="Mon texte saisi"
+        onJustificatifsChange={onChange}
+      />,
+    )
+    expect(justifBox().value).toBe('Mon texte saisi')
   })
 })

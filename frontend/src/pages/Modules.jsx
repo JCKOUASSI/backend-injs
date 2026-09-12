@@ -133,6 +133,14 @@ export default function Modules() {
         'info',
       )
     }
+    // Faux positif exhaustive-deps (tranché au LOT 6, cf. TESTS_FRONTEND §10.2) :
+    // cet effet ne doit se déclencher QU'À L'ARRIVÉE des référentiels pour y
+    // confronter les filtres persistés. Il lit volontairement le `filters` du
+    // rendu courant (React exécute la dernière version de l'effet, donc jamais
+    // de valeur périmée) ; ajouter `filters` le ferait revalider après chaque
+    // saisie, et `showToast` est une fonction stable du ToastProvider.
+    // Régressions : Modules.test.jsx « nettoie les filtres obsolètes ».
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [referentielsData])
   usePersistedListQuery(
     LIST_STORAGE_KEYS.modules,

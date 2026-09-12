@@ -228,6 +228,33 @@ describe('pages/Users.jsx — liste serveur (recherche, filtres, onglets, pagina
     )
   })
 
+  it('replie sur le seul onglet disponible quand l’URL demande un onglet interdit (§10.2 LOT 6)', async () => {
+    // Utilisateur SANS gestion de comptes étudiants/enseignants mais avec un
+    // filtre personnel : seule l'onglet « personnel » existe. Un lien obsolète
+    // ?tab=auditeurs doit être ignoré (effet de repli sur les permissions).
+    const personnelOnly = () =>
+      makeUser('SECRETARIAT', {
+        username: 'sec-limit',
+        role_context: {
+          labels: LABELS,
+          badge_account_roles: ['AUDITEUR', 'FORMATEUR'],
+          staff_filter_roles: ['FINANCE'],
+        },
+      })
+
+    mountUsers(personnelOnly(), '/users?tab=auditeurs')
+    await waitForTable()
+
+    // La requête finale est bien celle du personnel : pas de `tab`, avec
+    // l'exclusion des comptes à badge, et jamais role=AUDITEUR.
+    expect(lastUsersParams().get('tab')).toBe(null)
+    expect(lastUsersParams().get('role')).toBe(null)
+    expect(lastUsersParams().get('exclude_role')).toContain('AUDITEUR')
+    // La barre d'onglets (Comptes étudiants/enseignants) n'est pas rendue.
+    expect(screen.queryByRole('tab', { name: /étudiants/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /enseignants/i })).not.toBeInTheDocument()
+  })
+
   it('affiche un état vide quand aucun utilisateur ne correspond', async () => {
     mountUsers()
     await waitForTable()
