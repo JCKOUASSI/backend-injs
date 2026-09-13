@@ -4,11 +4,12 @@ API Views pour le module Paramètres.
 Endpoints REST pour consulter et modifier les paramètres.
 """
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter, OrderingFilter
+from drf_spectacular.utils import extend_schema, inline_serializer
 
 from .models import Parametre, ParametreHistorique
 from .serializers import (
@@ -144,6 +145,37 @@ class ParametreViewSet(viewsets.ModelViewSet):
             context={'request': request}
         )
         return Response(serializer.data)
+
+    @extend_schema(
+        tags=['Paramètres'],
+        summary='Feature flags évalués pour l’utilisateur courant (P00-08)',
+        responses=inline_serializer(
+            name='FeatureFlagsResponse',
+            fields={
+                'flags': serializers.DictField(
+                    child=serializers.BooleanField(),
+                    help_text='Carte {clé du flag: état effectif pour l’utilisateur}',
+                ),
+            },
+        ),
+    )
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[IsAuthenticated],
+    )
+    def flags(self, request):
+        """
+        Feature flags effectifs pour l'utilisateur connecté (lecture seule).
+
+        GET /api/parametres/flags/ → ``{"flags": {"flag.xxx": true, …}}``
+
+        Seules les valeurs booléennes sont exposées (jamais la liste interne
+        des rôles habilités). Les flags sont livrés DÉSACTIVÉS et ne pilotent
+        aucun comportement métier tant qu'un lot ne les consomme pas.
+        """
+        from .flags import flags_for_user
+        return Response({'flags': flags_for_user(request.user)})
 
     @action(
         detail=False,

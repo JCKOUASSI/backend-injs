@@ -8,6 +8,7 @@ duplication, ce qui protège des réessais mobile-money.
 from decimal import Decimal
 from datetime import date, timedelta
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -82,7 +83,12 @@ def enregistrer_paiement_idempotent(
     if paiement_existant:
         return paiement_existant, False
 
+    source = etudiant or candidat
     paiement = Paiement.objects.create(
+        # La clé générique (GenericForeignKey « source ») est NOT NULL :
+        # on la renseigne systématiquement à partir de l'étudiant ou du candidat.
+        content_type=ContentType.objects.get_for_model(source),
+        object_id=source.pk,
         etudiant=etudiant, candidat=candidat, nature=nature,
         montant=montant, devise=devise, mode=mode,
         statut=statut_initie, utilisateur=utilisateur,
@@ -91,11 +97,12 @@ def enregistrer_paiement_idempotent(
     return paiement, True
 
 
-def confirmer_paiement(paiement, utilisateur):
+def confirmer_paiement(paiement, utilisateur, date_echeance=None):
     """Confirme un paiement (create Quittance, exige une preuve).
 
     Préconditions : paiement.statut ∈ {INITIE, EN_ATTENTE}, ET preuve fournie.
-    La transition vers CONFIRME crée une Quittance unique.
+    La transition vers CONFIRME crée une Quittance unique. ``date_echeance``
+    est horodatée au jour de la confirmation lorsqu'elle n'est pas fournie.
     """
     if paiement.statut == 'CONFIRME':
         return paiement
@@ -108,7 +115,10 @@ def confirmer_paiement(paiement, utilisateur):
     paiement.statut = 'CONFIRME'
     paiement.date_rapprochement = timezone.now()
     paiement.save(update_fields=['statut', 'date_rapprochement'])
-    Quittance.objects.get_or_create(paiement=paiement)
+    Quittance.objects.get_or_create(
+        paiement=paiement,
+        defaults={'date_echeance': date_echeance or timezone.localdate()},
+    )
     return paiement
 
 

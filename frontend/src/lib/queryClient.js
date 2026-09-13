@@ -16,3 +16,6 @@ export const SECRETARIATS_QUERY_KEY = ['secretariats']
 // Capacités effectives dérivées du backend (P00-06) : invalidées à la
 // connexion, la déconnexion et tout rafraîchissement de profil.
 export const CAPABILITIES_QUERY_KEY = ['auth', 'capabilities']
+// Feature flags (P00-08) : carte {cle: bool} évaluée serveur ; invalidée à
+// la connexion/déconnexion et après toute bascule depuis l'écran d'admin.
+export const FLAGS_QUERY_KEY = ['parametres', 'flags']

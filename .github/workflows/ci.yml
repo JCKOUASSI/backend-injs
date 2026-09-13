@@ -67,6 +67,24 @@ jobs:
           python manage.py migrate --noinput
           python manage.py test --noinput -v 2
 
+      - name: Contrat d'API figé (snapshot drf-spectacular, P00-08)
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+        # Échoue si une route / clé requise / code HTTP a été retiré ou renommé
+        # sans mise à jour justifiée du snapshot (docs/api/contract.snapshot.json).
+        run: python manage.py export_api_contract --check
+
+      - name: Parcours de fumée bout-en-bout (smoke INJS-LMD, P00-08)
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+        # Base neuve : la commande s'auto-ensemence et annule sa transaction
+        # en fin (idempotente) ; tout échec d'une étape rend le build rouge.
+        run: python manage.py smoke_test_injs
+
       - name: Vérifier l'image Docker backend (collectstatic / permissions)
         run: |
           docker build -t sygep-backend-ci ./backend

@@ -45,6 +45,8 @@ class Parametre(models.Model):
         ('securite', 'Sécurité'),
         ('interface', 'Interface'),
         ('finance', 'Finance'),
+        # P00-08 : feature flags (interrupteurs de fonctionnalités, livrés éteints).
+        ('flags', 'Fonctionnalités (feature flags)'),
     ]
 
     # Types de paramètres

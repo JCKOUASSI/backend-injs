@@ -21,6 +21,7 @@ import ImportExcel from './pages/ImportExcel'
 import Secretariats from './pages/Secretariats'
 import Referentiels from './pages/Referentiels'
 import Parametres from './pages/Parametres'
+import FeatureFlags from './pages/FeatureFlags'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
@@ -313,6 +314,11 @@ function Layout({ children, breadcrumb }) {
           {canViewReferentiels && (
             <Link to="/parametres" className={`nav-item ${path === '/parametres' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-gear"></i> <span className="nav-label">Paramètres</span></span>
+            </Link>
+          )}
+          {canViewReferentiels && (
+            <Link to="/parametres/flags" className={`nav-item ${path === '/parametres/flags' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+              <span><i className="bi bi-toggles"></i> <span className="nav-label">Fonctionnalités</span></span>
             </Link>
           )}
         </nav>
@@ -726,6 +732,13 @@ function App() {
             <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Paramètres</li></>}>
                 <Parametres />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/parametres/flags" element={
+            <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/parametres">Paramètres</Link></li><li className="separator">/</li><li>Fonctionnalités</li></>}>
+                <FeatureFlags />
               </Layout>
             </ProtectedRoute>
           } />

@@ -51,6 +51,7 @@ import ModuleDetail from '@/pages/ModuleDetail'
 import Modules from '@/pages/Modules'
 import NotesModule from '@/pages/NotesModule'
 import Parametres from '@/pages/Parametres'
+import FeatureFlags from '@/pages/FeatureFlags'
 import Participants from '@/pages/Participants'
 import Profile from '@/pages/Profile'
 import QuizList from '@/pages/QuizList'
@@ -112,6 +113,7 @@ const PAGES = [
   ['Modules', Modules, '/modules', '/modules'],
   ['NotesModule', NotesModule, '/formations/:formationId/modules/:moduleId/notes', '/formations/1/modules/1/notes'],
   ['Parametres', Parametres, '/parametres', '/parametres'],
+  ['FeatureFlags', FeatureFlags, '/parametres/flags', '/parametres/flags'],
   ['Participants', Participants, '/participants', '/participants'],
   ['Profile', Profile, '/profile', '/profile'],
   ['QuizList', QuizList, '*', '/quiz'],

@@ -8,5 +8,6 @@ class ParametresConfig(AppConfig):
 
     def ready(self):
         """Enregistre les signaux lors du chargement de l'app."""
-        # Historique géré directement dans le serializer de mise à jour.
-        pass
+        # Historique géré directement dans le serializer de mise à jour ;
+        # les signaux ne font qu'invalider le cache des feature flags (P00-08).
+        from . import signals  # noqa: F401

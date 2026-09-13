@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useQueryClient } from '@tanstack/react-query'
 import api, { setSessionExpiredCallback } from '../services/api'
 import { hasAppRole, webLoginForbiddenMessage, ALLOWED_WEB_ROLES } from '../utils/roles'
-import { CAPABILITIES_QUERY_KEY } from '../lib/queryClient'
+import { CAPABILITIES_QUERY_KEY, FLAGS_QUERY_KEY } from '../lib/queryClient'
 
 const AuthContext = createContext(null)
 
@@ -41,6 +41,10 @@ export function AuthProvider({ children }) {
     // on écrase donc aussi explicitement les données (défense en profondeur).
     queryClient.removeQueries({ queryKey: CAPABILITIES_QUERY_KEY })
     queryClient.setQueryData(CAPABILITIES_QUERY_KEY, undefined)
+    // P00-08 : purge des feature flags de la session (même exigence de
+    // non-traversée des sessions que pour les capacités).
+    queryClient.removeQueries({ queryKey: FLAGS_QUERY_KEY })
+    queryClient.setQueryData(FLAGS_QUERY_KEY, undefined)
     setCapabilities(null)
   }, [queryClient])
 
@@ -97,8 +101,9 @@ export function AuthProvider({ children }) {
       ...userData,
       role_context: response.data.role_context || userData.role_context || {},
     }))
-    // Les capacités de la nouvelle session doivent être (re)chargées.
+    // Les capacités et flags de la nouvelle session doivent être (re)chargés.
     queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: FLAGS_QUERY_KEY })
 
     return response.data
   }
@@ -116,8 +121,9 @@ export function AuthProvider({ children }) {
       return
     }
     setUser(normalizeUser(res.data))
-    // Un changement de rôle éventuel change les capacités : on les rafraîchit.
+    // Un changement de rôle éventuel change capacités et flags : on rafraîchit.
     queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: FLAGS_QUERY_KEY })
   }, [_clearSession, queryClient])
 
   const isAuthenticated = !!user

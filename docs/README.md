@@ -9,6 +9,8 @@ dans le [README racine](../README.md) ; l'architecture réelle et les décisions
 | Document | Contenu |
 |---------|---------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture réelle, table modules ↔ applications, décisions DA-01 → DA-12 |
+| [GARDE_FOUS.md](GARDE_FOUS.md) | Garde-fous du chantier (feature flags, contrat d'API figé, parcours de fumée) — P00-08 |
+| [api/](api/) | Contrat d'API figé (`contract.snapshot.json`) et journal des évolutions (`CHANGELOG_CONTRAT.md`) |
 | [ADR/](ADR/README.md) | Registre des décisions d'architecture (ADR-001 à ADR-006) |
 | [CARTOGRAPHIE_CIBLE_INJS_LMD.md](CARTOGRAPHIE_CIBLE_INJS_LMD.md) | Cartographie détaillée par module (existants / à créer / doubles représentations) |
 | [API_ENDPOINTS.md](API_ENDPOINTS.md) | Référence des endpoints REST du backend INJS-LMD |
