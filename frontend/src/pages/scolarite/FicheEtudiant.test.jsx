@@ -105,13 +105,38 @@ describe('FicheEtudiant avec inscription validée — pédagogie', () => {
     expect(await screen.findByText('4 enseignement(s) ajouté(s)')).toBeInTheDocument()
   })
 
-  it('retire une ECUE (DELETE) et notifie — action immédiate, sans modale (constat §10.9)', async () => {
+  // Régression §10.9 (corrigé au LOT 45) : le retrait d'une ECUE est une
+  // action destructrice qui passe désormais par une ConfirmModal, comme
+  // l'archivage d'une ECUE de maquette ou l'annulation d'une admission.
+  it('demande confirmation avant de retirer une ECUE ; annuler ne supprime rien (§10.9)', async () => {
     mount()
     await screen.findByText('ECUE1 — Fondements LSF')
 
-    // Aucune modale de confirmation n'est présente avant l'action.
+    // Aucune modale avant le clic.
     expect(document.querySelector('.modal-overlay')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retirer' }))
+
+    // La modale s'ouvre et mentionne l'ECUE ; aucun DELETE n'est encore parti.
+    expect(document.querySelector('.modal-overlay')).not.toBeNull()
+    expect(document.querySelector('.modal-overlay').textContent).toMatch(/Retirer/)
+    expect(apiMock.delete).not.toHaveBeenCalled()
+
+    // Annulation : la modale se ferme et aucun DELETE n'est émis.
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }))
+    await settle()
+    expect(document.querySelector('.modal-overlay')).toBeNull()
+    expect(apiMock.delete).not.toHaveBeenCalled()
+  })
+
+  it('confirme le retrait d’une ECUE (DELETE) après validation de la modale et notifie (§10.9)', async () => {
+    mount()
+    await screen.findByText('ECUE1 — Fondements LSF')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }))
+    expect(await screen.findByText(/du programme pédagogique/)).toBeInTheDocument()
+    expect(apiMock.delete).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retirer' }).pop())
     await settle()
 
     expect(apiMock.delete).toHaveBeenCalledWith('/scolarite/pedagogie/70/')

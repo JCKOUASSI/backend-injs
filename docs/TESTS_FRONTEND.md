@@ -349,8 +349,18 @@
 > taux distincts). Le test `[écart]` devient une régression (effectif 45
 > cohérent avec TOTAL, taux pondéré 91,11 %) et le test positif de fusion
 > vérifie aussi l'effectif ; le nombre total de tests reste 1408.
-> Les LOT 4 à 7, 13, 17, 19, 34, 37, 43 et 44 sont les lots qui touchent la
-> logique applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18,
+> Le **[LOT 45]**, sur feu vert explicite (décision d'expert déléguée),
+> corrige l'écart **§10.9** dans la fiche étudiant : le bouton « Retirer »
+> d'une ECUE pédagogique ouvre désormais une `ConfirmModal` (message + détail
+> « régénérable depuis la maquette », bouton Retirer/Annuler, fermeture par
+> la croix ou le voile) et le `DELETE /scolarite/pedagogie/:id/` n'est émis
+> qu'après confirmation, par cohérence avec les autres actions destructrices
+> (archivage d'ECUE de maquette, annulation d'admission, inscription d'un
+> admis). Le test qui figurait l'action immédiate devient deux régressions
+> (annulation sans aucun DELETE, confirmation avec DELETE et toast) ; le
+> total passe de 1408 à 1409 tests.
+> Les LOT 4 à 7, 13, 17, 19, 34, 37, 43, 44 et 45 sont les lots qui touchent
+> la logique applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18,
 > 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b,
 > 38c, 38d, 38e, 39, 40, 41 et 42 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
@@ -614,7 +624,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Candidatures.test.jsx` | page | **9 tests (LOT 9), parcours candidatures qui écrit** : liste + année courante, recherche `q` et filtre `statut` transmis en paramètres au service ; panneau « Dossier » : **transition de statut** (`POST …/transition/` + toast + rechargement), **validation/refus d'une pièce** (`POST …/pieces/:id/verifier/`, boutons désactivés sans fichier), **dépôt de fichier** multipart (`POST …/deposer/`, `FormData`), **ouverture d'admission** (`POST /admissions/admissions/`) ; **création** candidat puis candidature avec l'année courante (`POST /candidats/` puis `/candidatures/`) ; cas d'erreur serveur (transition refusée, création avec message champ). Couvre **97,5 % des lignes** de la page et porte le service `services/scolarite.js` à **100 % de lignes**. |
 | `src/pages/scolarite/Admissions.test.jsx` | page | **8 tests (LOT 10), boucle admission** : liste/filtre par décision, état du bouton *Inscrire* selon `permet_inscription` ; panneau **profil administratif** (catégorie→grade liés, `PATCH /admissions/:id/`), **prononcé de décision** (`POST …/decision/`, panneau fermé, cas d'erreur) ; **inscription d'un admis** après modale (`POST /scolarite/inscriptions/depuis-admission/` `{admission_id, valider:true}` → matricule + navigation) ; **annulation** après confirmation (`POST …/annuler/`, rechargement) et annulation de la modale sans écriture. Couvre **98 % des lignes** de la page. |
 | `src/pages/scolarite/Inscriptions.test.jsx` | page | **4 tests (LOT 11)** : liste et 4 filtres transmis au service (recherche `q`, statut, formation, niveau — les valeurs vides étant éliminées) ; **validation en cascade** (un brouillon enchaîne `EN_ATTENTE → A_VALIDER → VALIDEE` par 3 `POST …/transition/` dans l'ordre, puis toast + rechargement ; une inscription déjà validée n'a pas de bouton) ; cascade **interrompue** dès qu'une transition échoue (toast de l'erreur, les étapes suivantes ne sont pas émises). Couvre **99,4 % des lignes / 100 % des fonctions**. |
-| `src/pages/scolarite/FicheEtudiant.test.jsx` | page | **6 tests (LOT 11)** : fiche avec inscription validée — rendu identité/programme/groupe/passerelle ; **génération de pédagogie** (`POST …/pedagogie/generer/`, nombre d'ajouts en toast), **retrait d'ECUE** (`DELETE /pedagogie/:id`, constats §10.9) ; **affectation à un groupe** (`POST …/affectations/`, bouton désactivé sans choix, option d'un groupe complet désactivée) ; **passerelle** prévisualisation puis synchronisation (`POST …/passerelle/`) ; fiche sans inscription validée = alerte et sections pédagogie/groupe absentes. Couvre **89,8 % des lignes / 100 % des fonctions**. |
+| `src/pages/scolarite/FicheEtudiant.test.jsx` | page | **7 tests (LOT 11, complétés au LOT 45)** : fiche avec inscription validée — rendu identité/programme/groupe/passerelle ; **génération de pédagogie** (`POST …/pedagogie/generer/`, nombre d'ajouts en toast), **retrait d'ECUE** (`DELETE /pedagogie/:id`, **confirmé par une `ConfirmModal` depuis le LOT 45 / §10.9** : annulation sans aucun DELETE puis confirmation avec DELETE et toast) ; **affectation à un groupe** (`POST …/affectations/`, bouton désactivé sans choix, option d'un groupe complet désactivée) ; **passerelle** prévisualisation puis synchronisation (`POST …/passerelle/`) ; fiche sans inscription validée = alerte et sections pédagogie/groupe absentes. Couvre **89,8 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/Jurys.test.jsx` | page | **14 tests (LOT 12), fin du parcours académique** : sessions avec badges et **3 filtres** transmis tels quels (statut/année/formation, clés toujours présentes) ; **workflow de transition complet** exercé pour chaque statut par test paramétré (Contrôler/Calculer/Délibérer/Décider/Générer PV/Valider/Verrouiller/Publier → le bon `POST …/action/` `{action}`, session PUBLIÉE sans bouton) ; confirmation `window.confirm` acceptée/annulée ; action rejetée (toast du détail backend) ; **lecture seule** (DIRECTION : pas d'actions, référentiels non chargés) ; une **régression §10.10** (un échec de chargement = une seule requête, un seul toast, état vide). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **7 tests (LOT 13, complétés au LOT 41), espace étudiant — 100 % lignes / 100 % fonctions / 100 % branches**. Socle LOT 13 : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. **LOT 41 (+5 tests purs)** : compteurs d'affichage par défaut avec une fiche vide (`0 module(s) inscrit(s)`, taux `—%`, zone attestations L4 présente), **téléchargement du relevé de notes PDF** (`getBlob /presences/participant/<id>/notes-fiche/export/pdf/`, ancre cliquée, `URL.createObjectURL`/`revokeObjectURL`, nom de fichier `releve-notes-<matricule>.pdf` puis **repli `releve-notes-<id>.pdf`** sans matricule, mention « matricule » absente), refus notifié **« Aucun dossier étudiant rattaché à ce compte. »** sans aucun appel de blob quand `fiche.profil.id` est absent, et toast **« Téléchargement du relevé de notes impossible. »** quand le service échoue (pas de révocation d'URL). |
@@ -669,9 +679,9 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 44 (V8, `npm run test:coverage`), sur les zones ciblées
-(le LOT 44 est un correctif sans test supplémentaire : il transforme un test
-`[écart]` en régression, le total reste 1408) :
+Mesure après le LOT 45 (V8, `npm run test:coverage`), sur les zones ciblées
+(le LOT 44 transformait un test `[écart]` en régression sans ajouter de test,
+le LOT 45 découpe un test en deux régressions : 1408 → 1409) :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -733,7 +743,7 @@ Mesure après le LOT 44 (V8, `npm run test:coverage`), sur les zones ciblées
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
 > 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → 1314 (LOT 38e) →
 > 1354 (LOT 39) → 1374 (LOT 40) → 1379 (LOT 41) → 1406 (LOT 42) →
-> **1408 (LOT 43, inchangé au LOT 44 correctif)** ;
+> **1408 (LOT 43, inchangé au LOT 44 correctif) → 1409 (LOT 45)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
@@ -1045,9 +1055,9 @@ logique applicative : les écarts y étaient seulement constatés et tracés. Le
 **LOT 4 et 5**, sur feu vert explicite, sont des lots correctifs (§10.4, §10.5,
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
 **LOT 17 (§10.11)**, le **LOT 19 (§10.12)**, le **LOT 34 (§10.13)** et le
-**LOT 37 (§10.14)**, le **LOT 43 (§10.16, §10.17)** et le
-**LOT 44 (§10.15)**. Les points encore ouverts sont ci-dessous (§10.1 et
-§10.9).
+**LOT 37 (§10.14)**, le **LOT 43 (§10.16, §10.17)**, le
+**LOT 44 (§10.15)** et le **LOT 45 (§10.9)**. Le point encore ouvert est
+ci-dessous (§10.1).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -1252,7 +1262,15 @@ message serveur, sans crash). Couverture des pages : `Campagnes` 61 → **83 %**
 `CampagneDetail` 68 → **82 %**, `ChargesEnseignants` 63 → **73 %** (fonctions
 12,5 → 87,5 %), `Equivalences` 51 → **64 %**, `MaquetteDetail` 31 → **68 %**.
 
-### 10.9 Constat au LOT 11 — retrait d'une ECUE pédagogique sans confirmation
+### 10.9 ~~Corrigé au LOT 45~~ — retrait d'une ECUE pédagogique sans confirmation
+
+> **Corrigé au LOT 45 (feu vert explicite / décision d'expert déléguée).**
+> Le bouton « Retirer » ouvre désormais une `ConfirmModal` et le
+> `DELETE /scolarite/pedagogie/:id/` n'est émis qu'après confirmation (le
+> détail précise que l'ECUE reste régénérable depuis la maquette) ; annuler,
+> fermer la croix ou cliquer le voile ne supprime rien. Le test qui figurait
+> l'action immédiate est devenu deux régressions (annulation sans DELETE,
+> confirmation avec DELETE et toast). Analyse initiale conservée ci-dessous.
 
 Dans `FicheEtudiant.jsx` (section `Pedagogie`), le bouton **Retirer** d'une
 ligne pédagogique appelle immédiatement `retirerEcue(ligne.id)`
@@ -2194,9 +2212,10 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
      route protégée, gestion au login et après `refreshUser`) — en attente d'un
      choix produit (blocage total ou lecture seule) ;
-   - §10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX avec
-     les autres actions destructrices) — comportement figé par un test, en
-     attente d'un choix produit ;
+   - ~~§10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX
+     avec les autres actions destructrices)~~ **corrigé au LOT 45**
+     (`ConfirmModal` ajoutée ; annulation sans DELETE, confirmation avec
+     DELETE, deux régressions) ;
    - ~~§10.15 Bilan FAC (Point global) : effectifs auditeurs non sommés lors
      de la fusion de lignes en doublon d'un même grade (clé erronée
      `effectif_étudiants`)~~ **corrigé au LOT 44** (cumul explicite de

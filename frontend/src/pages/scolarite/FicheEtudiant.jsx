@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import StatutBadge from '../../components/scolarite/StatutBadge'
+import ConfirmModal from '../../components/ConfirmModal'
 import {
   affecterGroupe,
   analyserPasserelle,
@@ -58,6 +59,9 @@ function Pedagogie({ inscription, onChange }) {
   const [donnees, setDonnees] = useState(null)
   const [chargement, setChargement] = useState(true)
   const [action, setAction] = useState(false)
+  // ECUE dont le retrait est en attente de confirmation (§10.9, corrigé au
+  // LOT 45 : cohérence avec les autres actions destructrices confirmées).
+  const [aRetirer, setARetirer] = useState(null)
 
   const charger = useCallback(async () => {
     setChargement(true)
@@ -101,6 +105,7 @@ function Pedagogie({ inscription, onChange }) {
   const lignes = donnees?.lignes || []
 
   return (
+    <>
     <Section
       titre="Programme pédagogique"
       action={
@@ -151,7 +156,7 @@ function Pedagogie({ inscription, onChange }) {
                       </span>
                     </td>
                     <td className="text-end">
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => retirer(ligne)}>
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => setARetirer(ligne)}>
                         Retirer
                       </button>
                     </td>
@@ -170,6 +175,20 @@ function Pedagogie({ inscription, onChange }) {
         </>
       )}
     </Section>
+    {aRetirer && (
+      <ConfirmModal
+        message={`Retirer « ${aRetirer.ecue_code} — ${aRetirer.ecue_intitule} » du programme pédagogique ?`}
+        detail="L'enseignement sera dissocié de cette fiche ; il pourra être régénéré depuis la maquette."
+        confirmLabel="Retirer"
+        onConfirm={async () => {
+          const ligne = aRetirer
+          setARetirer(null)
+          await retirer(ligne)
+        }}
+        onCancel={() => setARetirer(null)}
+      />
+    )}
+    </>
   )
 }
 
