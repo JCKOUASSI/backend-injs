@@ -3742,16 +3742,23 @@ function BilanFACPointGlobalTable({ data, onMetaChange }) {
       lignesMap.set(grade, { ...l, grade })
     } else {
       const existing = lignesMap.get(grade)
-      // Sommer les valeurs numériques
-      const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes', 'effectif_étudiants',
+      // Sommer les valeurs numériques. L'effectif auditeurs est cumulé à part
+      // (ci-dessous) : sa valeur courante sert de poids aux moyennes, donc le
+      // sommer ici (via une clé) fausserait les poids en comptant la nouvelle
+      // ligne deux fois.
+      const sumKeys = ['effectif_secretariat', 'nb_encadrants', 'nb_groupes',
         'absents_notoires', 'groupes_termines', 'vh_total', 'vh_epuise']
       for (const k of sumKeys) {
         existing[k] = (existing[k] || 0) + (l[k] || 0)
       }
-      // Moyenne pondérée pour les taux
+      // Moyenne pondérée pour les taux ; n1 = effectif déjà cumulé, n2 =
+      // effectif de la ligne fusionnée. Le cumul de l'effectif est posé APRÈS
+      // lecture des poids (§10.15, corrigé au LOT 44 : la clé erronée
+      // 'effectif_étudiants' laissait l'effectif figé à la première ligne).
       const n1 = existing.effectif_auditeurs || 0
       const n2 = l.effectif_auditeurs || 0
       const total = n1 + n2
+      existing.effectif_auditeurs = total
       if (total > 0) {
         const w1 = n1 / total
         const w2 = n2 / total

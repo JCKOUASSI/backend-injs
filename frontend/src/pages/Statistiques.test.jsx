@@ -2238,29 +2238,29 @@ describe('Statistiques (LOT 38b) — Bilan FAC : génération, sous-onglets et e
     // Sommes correctes pour les clés listées dans sumKeys (absents, VH,
     // secrétariat/encadreurs/groupes).
     expect(a1[0].cells[3].textContent.trim()).toBe('2') // nombre de groupes
+    expect(a1[0].cells[4].textContent.trim()).toBe('45') // effectif auditeurs sommé (§10.15, LOT 44)
     expect(a1[0].cells[5].textContent.trim()).toBe('3') // absents notoires
     expect(a1[0].cells[10].textContent.trim()).toBe('150') // VH total
     expect(a1[0].cells[11].textContent.trim()).toBe('60') // VH épuisé
-    // Le TOTAL fourni par le backend est affiché tel quel.
+    // Le TOTAL fourni par le backend est affiché tel quel, cohérent avec la ligne grade.
     const totalRow = rows.find((r) => r.cells[0].textContent === 'TOTAL')
     expect(totalRow.cells[4].textContent.trim()).toBe('45')
   })
 
-  // NOTE (écart constaté, P00-04, §10.15) : dans BilanFACPointGlobalTable,
-  // la liste `sumKeys` de la fusion des lignes par grade contient la clé
-  // erronée 'effectif_étudiants' (accent) au lieu de 'effectif_auditeurs'.
-  // Conséquence : en cas de doublon de grade, l'effectif auditeurs de la
-  // ligne fusionnée reste figé à la première ligne (20), alors que la ligne
-  // TOTAL affiche bien 45 — les deux totaux sont incohérents. Comportement
-  // ACTUEL documenté ci-dessous ; correction (clé 'effectif_auditeurs')
-  // réservée à un lot correctif soumis au feu vert utilisateur.
-  it('[écart] Point global : l’effectif auditeurs d’un grade en doublon n’est pas sommé (clé erronée effectif_étudiants)', async () => {
+  // Régression §10.15 (corrigé au LOT 44) : lors d'une fusion de lignes en
+  // doublon d'un même grade, l'effectif auditeurs doit être sommé (la clé
+  // erronée 'effectif_étudiants' le laissait figé à la première ligne) et la
+  // moyenne pondérée des taux doit rester exacte (l'effectif cumulé sert de
+  // poids : il ne faut pas compter la ligne fusionnée deux fois).
+  it('Point global : l’effectif auditeurs d’un grade en doublon est sommé et les taux restent pondérés (§10.15)', async () => {
     const facDoublon = {
       ...FAC_DATA,
       point_global: {
         lignes: [
-          facLigne('A1', { effectif_auditeurs: 20, absents_notoires: 2 }),
-          facLigne('A1', { effectif_auditeurs: 25, absents_notoires: 1 }),
+          // Taux de participation distincts pour détecter une mauvaise pondération :
+          // attendu = 80*20/45 + 100*25/45 = 91,11 %.
+          facLigne('A1', { effectif_auditeurs: 20, absents_notoires: 2, taux_participation: 80 }),
+          facLigne('A1', { effectif_auditeurs: 25, absents_notoires: 1, taux_participation: 100 }),
         ],
         totaux: {
           effectif_auditeurs: 45, absents_notoires: 3, vh_total: 150, vh_epuise: 60,
@@ -2276,9 +2276,14 @@ describe('Statistiques (LOT 38b) — Bilan FAC : génération, sous-onglets et e
     const a1 = rows.filter((r) => r.cells[0].textContent === 'A1')[0]
     const totalRow = rows.find((r) => r.cells[0].textContent === 'TOTAL')
 
-    // Comportement ACTUEL (incorrect) : 20 au lieu de 45 attendus.
-    expect(a1.cells[4].textContent.trim()).toBe('20')
+    // L'effectif de la ligne grade est désormais sommé (45), cohérent avec TOTAL.
+    expect(a1.cells[4].textContent.trim()).toBe('45')
     expect(totalRow.cells[4].textContent.trim()).toBe('45')
+    // Les autres sommes fonctionnent toujours.
+    expect(a1.cells[5].textContent.trim()).toBe('3') // absents notoires
+    // Moyenne pondérée exacte : 91,11 % (et non une valeur biaisée par un
+    // double comptage de l'effectif dans les poids).
+    expect(a1.cells[8].textContent.trim()).toBe('91,11 %')
   })
 
   it('sous-onglet Volume horaire : tableaux par grade, agrégation des groupes doublons et récap global', async () => {
