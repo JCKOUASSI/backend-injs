@@ -1,0 +1,1059 @@
+====================================================================================================
+PROMPT DE MISE EN ŒUVRE
+MODULE « COMPTES UTILISATEURS — RÔLES & PERMISSIONS » (CURP-INJS)
+Création et modification des comptes des acteurs du processus, gestion des rôles,
+des permissions, des niveaux N0–N4 et des périmètres
+À intégrer dans l'application app-injs-lmd2026demo
+====================================================================================================
+Institution        : Institut National de la Jeunesse et des Sports (INJS) — Marcory, Abidjan, Côte d'Ivoire
+Unité              : UFR STAPS-JL
+Application cible  : app-injs-lmd2026demo (Django 5.1.4 + DRF / React 18 + Vite 7 / Flutter + PWA)
+Module à livrer    : CURP-INJS — Comptes Utilisateurs, Rôles & Permissions
+Date               : 13 septembre 2026
+Documents sources  : Audit-complet-détaillé-app-injs-lmd2026OK.txt
+                     Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt (MODULE 18 notamment)
+                     RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL-DE-RÉFÉRENCE...txt
+Nature             : Recueil de prompts — 1 prompt principal autoportant + 6 prompts
+                     complémentaires séquencés, destinés à un agent de codage
+                     (Arena Agent Mode / Cline / Ollama / Copilot Workspace) travaillant
+                     directement sur le dépôt app-injs-lmd2026demo.
+Fichier            : Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt
+Règle cardinale    : ZÉRO RÉGRESSION sur l'authentification existante. Aucun compte en service
+                     ne doit perdre l'accès, à aucun moment, pour aucune raison.
+
+MODE D'EMPLOI DU RECUEIL
+  1. Les prompts s'exécutent DANS L'ORDRE : prompt principal (Partie II), puis C1 à C6 (Partie III).
+  2. Chaque prompt se copie-colle tel quel à l'agent de codage, dans une session dédiée.
+  3. Les annexes de la Partie IV constituent le référentiel de travail : elles se consultent
+     pendant l'exécution et se font valider par l'expert fonctionnel et le référent scolarité.
+  4. À la fin de chaque prompt, l'application doit démarrer, les migrations passer, la suite de
+     tests backend rester 100 % verte, et AUCUN compte existant ne doit avoir perdu d'accès.
+  5. Une branche et une pull request par prompt : feature/curp-injs-principal, feature/curp-injs-C1
+     … feature/curp-injs-C6. Revue obligatoire, CI verte avant fusion.
+  6. Ce recueil s'articule avec les documents déjà produits pour le module EDT-INJS : il en
+     reprend les conventions de qualité, de non-régression et de traçabilité.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+PARTIE I    — AVERTISSEMENT DE CRITICITÉ ET RÈGLES DE SÛRETÉ
+PARTIE II   — PROMPT PRINCIPAL « CURP-INJS » (à soumettre en premier)
+PARTIE III  — PROMPTS COMPLÉMENTAIRES C1 À C6
+              C1 Référentiel des rôles métier et matrice de permissions
+              C2 Écrans web d'administration des comptes
+              C3 Cycle de vie des comptes, provisionnement en masse et délégation
+              C4 Sécurité renforcée : MFA, sessions, appareils, mots de passe
+              C5 Audit, conformité, protection des données et revue des habilitations
+              C6 Migration des comptes existants, bascule et documentation
+PARTIE IV   — ANNEXES DE RÉFÉRENCE
+              A1 Les 33 rôles métier demandés et leur codification
+              A2 Matrice rôles × modules × niveaux N0–N4
+              A3 Catalogue des permissions atomiques par module
+              A4 Périmètres et règles de cloisonnement
+              A5 Machine à états du compte utilisateur
+              A6 Correspondance avec les 12 rôles existants
+              A7 Critères d'acceptation (Definition of Done)
+====================================================================================================
+
+
+====================================================================================================
+PARTIE I — AVERTISSEMENT DE CRITICITÉ ET RÈGLES DE SÛRETÉ
+====================================================================================================
+
+Ce module est le plus sensible de toute l'application. Une erreur sur les comptes ou les
+permissions ne produit pas un désagrément : elle produit soit un blocage total de l'institut,
+soit une fuite de données personnelles et de notes. Les règles suivantes priment sur toute
+autre considération, y compris sur le calendrier.
+
+  S1. INTERDICTION DE PERTE D'ACCÈS
+      Aucun compte actuellement en service ne doit, à aucun moment de la mise en œuvre, perdre
+      un accès dont il dispose aujourd'hui. Toute restriction nouvelle est introduite en mode
+      « observation » (journalisée mais non bloquante) pendant au moins deux semaines avant
+      d'être rendue effective.
+
+  S2. INTERDICTION D'ÉLARGISSEMENT SILENCIEUX
+      Aucun compte ne doit gagner un accès qu'il n'avait pas, sauf décision explicite, tracée
+      et validée. Un élargissement accidentel est aussi grave qu'une perte d'accès.
+
+  S3. LE BACKEND EST LA SEULE SOURCE DE VÉRITÉ
+      L'interface masque et désactive, mais ne protège jamais. Toute règle d'autorisation
+      existe côté serveur, est testée côté serveur, et le test de refus est aussi obligatoire
+      que le test d'autorisation.
+
+  S4. DOUBLE COMMANDE SUR LES ACTIONS IRRÉVERSIBLES
+      Attribution d'un rôle d'administration, désactivation d'un compte de direction,
+      suppression logique d'un compte, réinitialisation massive : ces actions exigent une
+      confirmation explicite, un motif, et sont notifiées à un second administrateur.
+
+  S5. AUCUNE SUPPRESSION PHYSIQUE
+      Un compte ne se supprime pas : il se désactive, s'anonymise si la réglementation
+      l'exige, mais son identifiant et son historique d'actions restent exploitables pour
+      l'audit. La suppression physique est interdite par conception.
+
+  S6. PAS D'AUTO-ÉLÉVATION
+      Un administrateur ne peut pas s'attribuer à lui-même un rôle supérieur, ni modifier ses
+      propres permissions. Toute modification de ses propres droits passe par un autre
+      administrateur. Le système refuse l'opération et la journalise comme tentative.
+
+  S7. TOUJOURS AU MOINS DEUX ADMINISTRATEURS
+      Le système refuse toute opération qui aurait pour effet de laisser moins de deux comptes
+      administrateurs actifs. Cette règle prévient le verrouillage total de l'institut.
+
+  S8. PROCÉDURE DE SECOURS DOCUMENTÉE
+      Une procédure de récupération d'accès administrateur, exécutable en ligne de commande sur
+      le serveur, existe, est testée et est conservée hors de l'application.
+
+====================================================================================================
+PARTIE II — PROMPT PRINCIPAL « CURP-INJS »
+====================================================================================================
+
+--- DÉBUT DU PROMPT PRINCIPAL — À SOUMETTRE À L'AGENT DE CODAGE ---
+
+RÔLE QUE TU ENDOSSES
+Tu es un ingénieur logiciel senior spécialiste de la sécurité applicative et des systèmes
+d'information universitaires, intervenant sur le dépôt « app-injs-lmd2026demo » de l'Institut
+National de la Jeunesse et des Sports de Marcory, Abidjan, Côte d'Ivoire. Tu travailles avec un
+expert fonctionnel scolarité LMD et un responsable de la sécurité des systèmes d'information.
+Tu produis du code de production, testé, documenté en français, sans aucune régression.
+
+----------------------------------------------------------------------------------------------------
+1. CONTEXTE TECHNIQUE DE L'EXISTANT — À RESPECTER SCRUPULEUSEMENT
+----------------------------------------------------------------------------------------------------
+Pile : Django 5.1.4, DRF 3.15.2, Python 3.12, SimpleJWT 5.4.0, drf-spectacular 0.28.0,
+PostgreSQL 15/16, Redis, Docker, Gunicorn, Nginx. Frontend React 18.2 + Vite 7, 53 routes,
+AuthContext, ToastContext, @tanstack/react-query, services/api.js, utils/roles.js.
+Mobile Flutter 3.41.7 + PWA. CI GitHub Actions (jobs Backend, Frontend, Mobile).
+Volumétrie : 20 applications métier, 133 modèles, ~396 routes, 943 tests backend verts.
+
+APPLICATION `authentication` — LE CŒUR À ÉTENDRE, JAMAIS À REMPLACER
+  • Modèle utilisateur personnalisé avec 12 rôles en TextChoices :
+        ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN, DIRECTION, CHEF_SECRETARIAT, SECRETARIAT,
+        FINANCE, ARCHIVE, ENCADRANT, SUPERVISEUR, FORMATEUR, AUDITEUR
+  • Fichier role_groups.py : synchronisation automatique des Groupes Django à partir des rôles,
+    avec un contexte « bulk » destiné à éviter les boucles de signaux (sync_role_groups).
+  • authentication/permissions.py : permissions transverses ; 11 autres applications possèdent
+    leur propre permissions.py.
+  • Cloisonnement par secrétariat : les comptes SECRETARIAT et CHEF_SECRETARIAT sont confinés
+    aux données de leur secrétariat.
+  • Règle de transport : FORMATEUR et AUDITEUR sont réservés au mobile et à la PWA ; l'API
+    refuse leur connexion web avec un message explicite. CE COMPORTEMENT DOIT ÊTRE PRÉSERVÉ.
+  • JWT multi-transports : en-tête Authorization Bearer, en-tête X-JWT-Access, paramètre
+    ?access_token=, cookie HttpOnly SameSite configurable. Durées de production : 12 h pour
+    l'accès, 7 jours pour le rafraîchissement.
+  • Throttling DRF : login 20/min, scan 60/min, offline 60/min, avec tests dédiés
+    (test_throttles).
+  • must_change_password sur les premiers comptes ; provision de comptes mobiles ;
+    commandes create_auditeur_accounts, create_formateur_accounts, repair_auditeur_fiches,
+    sync_role_groups.
+  • presences.DeviceBinding : liaison d'un compte à un device_id, avec révocation.
+  • Piste d'audit existante (AuditLog) sur les pointages.
+  • Middlewares de démonstration et d'auto-connexion administrateur : doublement gardés par
+    DEBUG ET par variables d'environnement, restreints à /admin/ ou au mode aperçu, INERTES en
+    production. Ils ne doivent en aucun cas être élargis.
+
+CE QUE DIT LE MODÈLE FONCTIONNEL DE RÉFÉRENCE (Module 18)
+  • Chaîne conceptuelle obligatoire :
+        PERSONNE → COMPTE UTILISATEUR → RÔLE → PERMISSIONS → PÉRIMÈTRE → ACTIONS AUTORISÉES
+    Ne jamais confondre identité, compte, rôle, permission et fonction administrative.
+  • Statuts de compte : INVITÉ, ACTIF, SUSPENDU, DÉSACTIVÉ, VERROUILLÉ, EXPIRÉ.
+  • Une permission se définit par : MODULE + RESSOURCE + ACTION + PÉRIMÈTRE.
+  • Actions possibles : CONSULTER, CRÉER, MODIFIER, SOUMETTRE, VALIDER, REJETER, PUBLIER,
+    ANNULER, EXPORTER, IMPRIMER, ARCHIVER, SUPPRIMER, ADMINISTRER. La suppression physique
+    doit être extrêmement limitée.
+  • Niveaux N0 à N4 : N0 consultation très limitée, N1 consultation, N2 saisie et traitement,
+    N3 validation, N4 administration et décision. Mais « il faut éviter de faire dépendre
+    toute la sécurité d'un simple nombre » : la décision d'autorisation combine
+        NIVEAU + RÔLE + PERMISSION + MODULE + PÉRIMÈTRE + ÉTAT DE L'OBJET.
+  • Périmètres : INJS_ENTIER, DIRECTION, SERVICE, FORMATION, PARCOURS, NIVEAU, GROUPE,
+    MODULE, ETUDIANT, PROPRE_COMPTE.
+  • Protection contre l'accès horizontal : connaître une URL ou un identifiant ne doit jamais
+    suffire à accéder à une ressource.
+  • Les identifiants techniques ne sont jamais exposés comme données métier : on expose
+    MAT-2026-00125, FORMATION-EM, MODULE-EM101, jamais id = 1547.
+  • Séparation des tâches en finance : une même personne ne doit pas pouvoir valider, payer et
+    comptabiliser la même opération.
+  • Un même personnel peut porter plusieurs rôles fonctionnels, mais une seule fiche
+    administrative principale.
+  • MFA à prévoir pour les comptes sensibles : administrateurs, direction, finance, RH, et
+    tout accès à des données sensibles.
+
+FAIBLESSES DE L'AUDIT À TRAITER OU NE PAS AGGRAVER
+  • La matrice de rôles est tenue à deux endroits : role_groups.py côté serveur et
+    utils/roles.js côté interface. L'audit recommande un endpoint de « capacités » pour que
+    l'interface s'aligne automatiquement. C'EST UN LIVRABLE DE CE PROMPT.
+  • Quatre domaines (stages, patrimoine, ressources humaines, administrations) ont une API
+    complète mais aucun écran : leurs rôles doivent néanmoins exister et être correctement
+    habilités dès maintenant.
+  • Aucun test frontend n'existe ; 89 avertissements ESLint.
+  • Pas de MFA, pas de politique de revue des habilitations.
+  • Fichiers volumineux à ne pas reproduire : aucun nouveau fichier au-delà de 600 lignes
+    côté serveur, 400 lignes côté interface.
+
+----------------------------------------------------------------------------------------------------
+2. OBJECTIF DU MODULE CURP-INJS
+----------------------------------------------------------------------------------------------------
+Livrer un module complet et industriel de création et de modification des comptes utilisateurs
+correspondant à TOUS les acteurs du processus de gestion de l'INJS, doté d'un système de rôles
+et de permissions fin, traçable, paramétrable sans redéploiement, et parfaitement rétrocompatible
+avec les 12 rôles existants.
+
+Les acteurs à couvrir, groupés par domaine, sont les suivants. Chacun devient un RÔLE MÉTIER
+dans le référentiel, avec sa codification, ses permissions et ses périmètres par défaut.
+
+  ADMINISTRATION
+    • Administrateur système
+    • Direction
+    • Scolarité
+    • Responsable pédagogique
+  CANDIDATURES
+    • Agent de candidature
+    • Agent de contrôle des dossiers
+    • Responsable concours et sélection
+  SCOLARITÉ
+    • Agent admissions
+    • Agent inscriptions
+    • Gestionnaire étudiants
+  PÉDAGOGIE
+    • Responsable formation
+    • Responsable pédagogique
+    • Gestionnaire groupes
+    • Gestionnaire cours
+  ENSEIGNANTS
+    • Enseignant
+    • Responsable UE / ECUE
+  ÉVALUATIONS
+    • Gestionnaire notes
+    • Membre de jury
+    • Responsable jury
+  DIPLÔMATION
+    • Responsable graduation
+    • Responsable diplômation
+  FINANCE
+    • Gestionnaire finances étudiantes (module finances_etudiantes présent : rôle actif)
+  STAGES
+    • Gestionnaire stages (module stages présent : rôle actif)
+  RESSOURCES HUMAINES
+    • Gestionnaire RH (module ressources_humaines présent : rôle actif)
+  ADMINISTRATION GÉNÉRALE ET PATRIMOINE
+    • Gestionnaire courriers et documents (module administrations présent : rôle actif)
+    • Gestionnaire patrimoine et équipements (module patrimoine présent : rôle actif)
+    • Gestionnaire espaces et réservations (rattaché à patrimoine et à l'EDT)
+
+  RÈGLE D'ACTIVATION CONDITIONNELLE : pour chaque rôle rattaché à un module, le rôle n'est
+  proposé à l'attribution que si l'application correspondante est installée et active. Le
+  système le détecte automatiquement au démarrage (inspection d'INSTALLED_APPS) et marque le
+  rôle comme DISPONIBLE ou INDISPONIBLE, sans jamais échouer. Les cinq modules cités ci-dessus
+  étant présents dans le dépôt, leurs rôles sont actifs dès la livraison.
+
+  S'ajoutent les rôles de destinataires du service, également gérés :
+    • Étudiant / auditeur (accès à son propre dossier uniquement)
+    • Candidat (accès à sa seule candidature, avant admission)
+    • Consultation (lecture restreinte, pour un partenaire ou une tutelle)
+
+----------------------------------------------------------------------------------------------------
+3. TRAVAUX À RÉALISER
+----------------------------------------------------------------------------------------------------
+
+3.1 ARCHITECTURE GÉNÉRALE
+  Créer une application Django `habilitations` (ou un ensemble de modules dans `authentication`
+  si tu juges l'intégration plus sûre — justifie ton choix par écrit avant de coder), organisée
+  ainsi, aucun fichier ne dépassant 600 lignes :
+
+      backend/habilitations/
+        ├── models/          personne.py, compte.py, role.py, permission.py, perimetre.py,
+        │                    attribution.py, delegation.py, journal.py, politique.py
+        ├── services/        autorisation.py, provisionnement.py, cycle_de_vie.py,
+        │                    capacites.py, revue.py, secours.py
+        ├── api/             comptes.py, roles.py, permissions.py, attributions.py,
+        │                    capacites.py, sessions.py, appareils.py, journal.py
+        ├── serializers/
+        ├── permissions.py
+        ├── admin.py
+        ├── management/commands/
+        └── tests/
+
+3.2 MODÈLE DE DONNÉES
+  Respecter strictement la chaîne PERSONNE → COMPTE → RÔLE → PERMISSION → PÉRIMÈTRE.
+
+  a) Personne (identité métier, distincte du compte)
+     Champs : matricule institutionnel unique et lisible (format paramétrable, par exemple
+     PERS-2026-00125), civilité, nom, prénoms, date et lieu de naissance, sexe, nationalité,
+     téléphones, adresse électronique personnelle et institutionnelle, photographie,
+     pièce d'identité (type, numéro, échéance), situation (INTERNE, EXTERNE, VACATAIRE,
+     PARTENAIRE), rattachement (service, direction), statut, dates.
+     Liens NULLABLES et non exclusifs vers les identités métier existantes :
+       ressources_humaines.Agent, formations.Formateur, formations.Participant,
+       scolarite.DossierEtudiant, admissions.Candidat.
+     Une même personne peut ainsi être à la fois agent et enseignant vacataire, sans duplication.
+     Service de rapprochement : détection de doublons par nom, date de naissance, téléphone et
+     adresse électronique, avec proposition de fusion soumise à validation humaine. La fusion
+     conserve l'historique des deux identités et ne supprime rien.
+
+  b) CompteUtilisateur
+     Ne PAS créer un second modèle utilisateur. Étendre le modèle existant par un profil lié
+     en OneToOne, ou par migration additive de champs nullables — le choix est à justifier.
+     Champs à ajouter ou à exposer : lien vers Personne (nullable, car des comptes techniques
+     existent), statut parmi INVITE, ACTIF, SUSPENDU, DESACTIVE, VERROUILLE, EXPIRE,
+     date de création, créé par, date d'activation, date d'expiration (facultative, utile pour
+     les vacataires et les partenaires), dernière connexion, dernière activité, nombre d'échecs
+     consécutifs, date de verrouillage, motif du statut courant, canal d'accès autorisé
+     (WEB, MOBILE, LES_DEUX) avec la valeur MOBILE imposée par défaut pour les rôles
+     enseignant et étudiant afin de préserver le comportement existant, indicateur de MFA,
+     indicateur must_change_password conservé, langue, notes administratives.
+
+  c) RoleMetier
+     Référentiel paramétrable en base, jamais figé dans le code.
+     Champs : code technique stable en majuscules (par exemple AGENT_CANDIDATURE), libellé
+     français, libellé court pour l'affichage, domaine (ADMINISTRATION, CANDIDATURES,
+     SCOLARITE, PEDAGOGIE, ENSEIGNANTS, EVALUATIONS, DIPLOMATION, FINANCE, STAGES, RH,
+     PATRIMOINE, ADMINISTRATION_GENERALE, DESTINATAIRES, TECHNIQUE), description fonctionnelle
+     rédigée pour un non-informaticien, niveau par défaut N0 à N4, périmètre par défaut,
+     module requis (nom d'application Django, nullable), disponible (calculé au démarrage),
+     rôle sensible (booléen imposant le MFA), cumulable avec d'autres rôles (booléen),
+     incompatible avec (relation réflexive, pour la séparation des tâches), canal d'accès
+     imposé, ordre d'affichage, actif, auteur et dates.
+     Les 33 rôles de l'annexe A1 sont pré-chargés par une migration de données idempotente.
+
+  d) PermissionMetier
+     Permission atomique définie par la quadruple MODULE + RESSOURCE + ACTION + PORTEE_MAXIMALE.
+     Code canonique lisible : `<module>.<ressource>.<action>`, par exemple
+     `evaluations.note.modifier`, `scolarite.inscription.valider`, `edt.seance.publier`.
+     Champs : code unique, module, ressource, action parmi les 13 actions du modèle de
+     référence, libellé français, description, criticité (NORMALE, SENSIBLE, CRITIQUE),
+     nécessite un motif (booléen), nécessite une double validation (booléen), journalisée
+     obligatoirement (booléen, vrai par défaut pour tout ce qui n'est pas CONSULTER).
+     Le catalogue initial de l'annexe A3 est pré-chargé par migration de données.
+
+  e) Perimetre
+     Champs : type parmi INJS_ENTIER, DIRECTION, SERVICE, SECRETARIAT, SITE, FORMATION,
+     PARCOURS, NIVEAU, GROUPE, MODULE_ECUE, ETUDIANT, PROPRE_COMPTE ; référence à l'objet
+     concerné (clé générique ou champs dédiés nullables, au choix justifié) ; libellé calculé.
+     Le périmètre SECRETARIAT est OBLIGATOIRE pour préserver le cloisonnement existant.
+
+  f) AttributionRole — le cœur du dispositif
+     Lie un compte à un rôle, avec son niveau effectif et son ou ses périmètres.
+     Champs : compte, rôle, niveau effectif N0 à N4 (peut différer du niveau par défaut du
+     rôle, à la hausse comme à la baisse), périmètres (relation multiple), date de début,
+     date de fin (nullable, pour les attributions temporaires), motif d'attribution obligatoire,
+     attribué par, validé par (pour les rôles sensibles, exigeant une seconde signature),
+     statut (PROPOSEE, ACTIVE, SUSPENDUE, EXPIREE, REVOQUEE), motif de révocation, dates.
+     Contraintes : refus d'une attribution incompatible avec une attribution active existante
+     (séparation des tâches) ; refus si le rôle exige un module absent ; refus d'auto-attribution
+     d'un rôle sensible.
+
+  g) PermissionAttribuee — l'exception maîtrisée
+     Permet d'accorder ou de RETIRER une permission atomique à un compte donné, en dérogation
+     de son rôle. Champs : compte, permission, sens (OCTROI ou RETRAIT), périmètre, motif
+     obligatoire, date de fin obligatoire si OCTROI (une dérogation est toujours temporaire,
+     durée maximale paramétrable, 90 jours par défaut), attribué par, validé par, statut.
+     Toute dérogation apparaît en évidence dans les revues d'habilitation.
+
+  h) DelegationHabilitation
+     Un titulaire peut déléguer tout ou partie de ses attributions à un autre compte, pour une
+     période bornée (congé, mission, intérim). Champs : délégant, délégataire, rôles et
+     permissions délégués, périmètre, date de début, date de fin obligatoire, motif, statut,
+     validé par. La délégation n'est jamais permanente et ne peut pas être re-déléguée.
+     Les actions accomplies par délégation sont journalisées au nom du délégataire AVEC mention
+     du délégant.
+
+  i) PolitiqueSecurite
+     Paramètres modifiables sans redéploiement : longueur et complexité minimales du mot de
+     passe, durée de validité, nombre de mots de passe mémorisés, nombre d'échecs avant
+     verrouillage, durée de verrouillage, durée d'inactivité avant expiration de session,
+     durée d'inactivité avant suspension automatique du compte, obligation de MFA par rôle,
+     durée maximale d'une dérogation, périodicité des revues d'habilitation, canal d'accès
+     par défaut par rôle. Historisation de chaque modification.
+
+  j) JournalHabilitation — append-only
+     Une écriture par événement : création de compte, activation, suspension, désactivation,
+     verrouillage, déverrouillage, réinitialisation de mot de passe, attribution de rôle,
+     révocation, octroi ou retrait de permission, délégation, connexion, échec de connexion,
+     déconnexion, révocation de session, révocation d'appareil, modification de politique,
+     tentative d'accès refusée sur une ressource sensible, tentative d'auto-élévation.
+     Champs : horodatage serveur, acteur, compte concerné, type d'événement, objet, ancienne
+     valeur, nouvelle valeur, motif, adresse IP, agent utilisateur, identifiant de corrélation,
+     empreinte de chaînage avec l'entrée précédente.
+     Aucun UPDATE, aucun DELETE : surcharger save() et delete() pour les refuser, et écrire
+     un test qui tente les deux opérations et vérifie leur échec, y compris via l'admin Django.
+
+3.3 MOTEUR D'AUTORISATION
+  Créer services/autorisation.py exposant une fonction unique et centrale :
+
+      def est_autorise(compte, permission_code, objet=None, contexte=None) -> Decision
+
+  La Decision retourne : autorise (booléen), motif lisible en français, règle appliquée,
+  niveau requis, niveau détenu, périmètre évalué, et la liste ordonnée des contrôles effectués.
+  Cette traçabilité de la décision est indispensable au diagnostic et à la revue d'audit.
+
+  Ordre d'évaluation imposé, chaque étape pouvant refuser :
+      1. Le compte existe et son statut est ACTIF.
+      2. Le canal d'accès utilisé est autorisé pour ce compte (préserve la règle existante
+         réservant FORMATEUR et AUDITEUR au mobile et à la PWA).
+      3. Une dérogation de type RETRAIT sur cette permission refuse immédiatement.
+      4. Une dérogation de type OCTROI en cours de validité autorise, sous réserve du périmètre.
+      5. Le compte possède au moins une attribution active portant cette permission.
+      6. Le niveau effectif détenu est supérieur ou égal au niveau requis par la permission.
+      7. Le périmètre de l'attribution couvre l'objet visé (contrôle anti-accès horizontal).
+      8. L'état de l'objet autorise l'action (on ne modifie pas une note validée, on ne
+         republie pas un emploi du temps verrouillé, on ne force pas un badgeage sur une
+         séance annulée).
+      9. Les règles de séparation des tâches sont respectées pour l'opération en cours.
+     10. Si la permission est CRITIQUE, la double validation et le motif sont exigés.
+
+  Performance : la résolution des habilitations d'un compte est mise en cache dans Redis, avec
+  invalidation immédiate par signal dès qu'une attribution, une dérogation, une délégation ou
+  une politique change. Objectif ferme : une décision d'autorisation en moins de 5 millisecondes
+  hors premier appel, et aucune requête supplémentaire en base dans une boucle.
+
+  Intégration DRF : fournir une classe de permission générique paramétrable, utilisable ainsi
+      permission_classes = [ExigePermission("scolarite.inscription.valider")]
+  ainsi qu'un décorateur pour les vues fonctions, et un mixin de filtrage de queryset par
+  périmètre, afin que les listes ne renvoient jamais d'objet hors périmètre.
+
+  MODE OBSERVATION — exigence de sûreté S1 : un paramètre global et par permission permet
+  d'exécuter tous les contrôles, de journaliser ce qui AURAIT été refusé, mais de laisser
+  passer. Ce mode est activé par défaut à la livraison et désactivé permission par permission
+  après analyse des journaux. Aucun refus nouveau n'est rendu effectif sans ce préalable.
+
+3.4 ENDPOINT DE CAPACITÉS — RÉSORPTION DE LA DOUBLE MATRICE
+  Créer GET /api/auth/capacites/ renvoyant, pour le compte connecté :
+    • ses rôles avec libellés, niveaux et périmètres ;
+    • la liste plate de ses permissions effectives, dérogations comprises ;
+    • ses canaux d'accès autorisés ;
+    • ses indicateurs (MFA activé, changement de mot de passe requis, délégations reçues) ;
+    • une empreinte permettant à l'interface de savoir si ses capacités ont changé.
+  L'interface React consomme cet endpoint et cesse progressivement de dupliquer la matrice
+  dans utils/roles.js. Conserver utils/roles.js en fonctionnement pendant la transition, mais
+  l'alimenter à partir des capacités reçues. Documenter la bascule.
+
+3.5 CRÉATION ET MODIFICATION DES COMPTES — LE CŒUR FONCTIONNEL
+  a) Création unitaire, en assistant guidé :
+     étape 1 identité (recherche d'une personne existante AVANT toute création, pour éviter les
+     doublons) ; étape 2 compte (identifiant proposé automatiquement selon une règle
+     paramétrable, adresse électronique, canal d'accès) ; étape 3 rôles et périmètres, avec
+     contrôle immédiat des incompatibilités ; étape 4 récapitulatif lisible « cette personne
+     pourra faire ceci, ne pourra pas faire cela » ; étape 5 confirmation, motif, création.
+     À la création : mot de passe temporaire à usage unique, must_change_password activé,
+     notification d'activation, journalisation complète.
+  b) Modification : mêmes contrôles, avec affichage systématique du DIFFÉRENTIEL avant
+     validation — ce que le compte gagne, ce qu'il perd — et motif obligatoire.
+  c) Actions de cycle de vie : activer, suspendre (avec motif et durée), réactiver, désactiver,
+     verrouiller, déverrouiller, prolonger, faire expirer, réinitialiser le mot de passe,
+     révoquer les sessions, révoquer un appareil, forcer le MFA.
+  d) Opérations en masse : création depuis un fichier tabulaire avec prévisualisation complète
+     et rapport ligne à ligne avant écriture ; attribution ou révocation d'un rôle à une
+     sélection de comptes ; toutes en transaction unique, toutes réversibles, toutes journalisées
+     ligne par ligne.
+  e) Réutilisation obligatoire des commandes existantes create_auditeur_accounts et
+     create_formateur_accounts : les étendre, ne pas les réécrire, et faire en sorte qu'elles
+     alimentent le nouveau dispositif.
+
+3.6 API REST
+  Sous /api/habilitations/ : comptes (liste filtrable, détail, création, modification,
+  actions de cycle de vie), personnes, rôles, permissions, attributions, dérogations,
+  délégations, périmètres, politiques, journal, sessions, appareils, revues.
+  Sous /api/auth/ : capacites, mon-profil, changer-mot-de-passe, mfa (activation, vérification,
+  codes de secours), mes-sessions, mes-appareils.
+  Chaque route : classe de permission explicite, pagination, filtres, documentation OpenAPI
+  complète, format d'erreur normalisé {code, message_fr, details}, throttling adapté.
+  Les identifiants techniques ne sont jamais exposés : utiliser les codes métier lisibles.
+
+3.7 SÉCURITÉ
+  • Politique de mot de passe appliquée côté serveur, avec messages d'aide explicites en
+    français indiquant ce qui manque.
+  • Verrouillage progressif après échecs répétés, avec déverrouillage automatique temporisé et
+    déverrouillage manuel par un administrateur.
+  • MFA par application d'authentification (TOTP) pour les rôles marqués sensibles :
+    administrateur système, direction, finance, RH, responsable jury, responsable diplômation.
+    Codes de secours à usage unique, régénérables. Activation progressive, jamais brutale.
+  • Gestion des sessions : liste, révocation unitaire, révocation totale, détection d'activité
+    inhabituelle (adresse IP nouvelle, connexion simultanée géographiquement incompatible).
+  • Gestion des appareils : réutiliser et étendre presences.DeviceBinding, ne pas le dupliquer.
+  • Protection anti-accès horizontal systématique : tout accès à un objet identifié vérifie le
+    périmètre, et un test automatisé le prouve pour chaque ressource sensible.
+  • Aucune donnée personnelle inutile dans les journaux techniques.
+
+----------------------------------------------------------------------------------------------------
+4. CE QU'IL NE FAUT SURTOUT PAS FAIRE
+----------------------------------------------------------------------------------------------------
+  • Ne pas créer un second modèle utilisateur ni remplacer le modèle existant.
+  • Ne pas supprimer ni renommer les 12 rôles existants : ils deviennent des rôles métier du
+    nouveau référentiel, avec une correspondance documentée (annexe A6), et continuent de
+    fonctionner à l'identique.
+  • Ne pas casser role_groups.py ni la synchronisation des Groupes Django : l'étendre.
+  • Ne pas retirer la règle réservant FORMATEUR et AUDITEUR au mobile et à la PWA.
+  • Ne pas modifier le comportement du JWT ni ses transports multiples.
+  • Ne pas élargir les middlewares de démonstration, ni assouplir leurs gardes.
+  • Ne pas rendre un contrôle nouveau bloquant sans passer par le mode observation.
+  • Ne pas supprimer physiquement un compte, un rôle ou une entrée de journal.
+  • Ne pas exposer d'identifiant technique dans une réponse d'API destinée à l'affichage.
+  • Ne pas dépasser 600 lignes par fichier serveur, 400 par fichier d'interface.
+  • Ne pas ajouter de print() : utiliser logging.
+  • Ne pas ajouter de dépendance chargée depuis un CDN.
+
+----------------------------------------------------------------------------------------------------
+5. LIVRABLES ATTENDUS
+----------------------------------------------------------------------------------------------------
+  • L'application backend/habilitations/ complète, avec ses migrations réversibles.
+  • Les migrations de données pré-chargeant les 33 rôles, le catalogue de permissions et les
+    politiques de sécurité par défaut.
+  • Le moteur d'autorisation, sa classe DRF, son décorateur, son mixin de filtrage.
+  • L'endpoint /api/auth/capacites/ et l'adaptation de l'interface pour le consommer.
+  • Les commandes de management :
+        init_habilitations_injs [--dry-run]
+        importer_comptes --fichier <chemin> [--dry-run]
+        revue_habilitations --periode <p> [--format pdf|xlsx]
+        habilitations_diag
+        habilitations_secours --creer-admin (procédure de secours, exécutable hors application)
+  • Les tests : au minimum 120 tests couvrant modèles, contraintes, moteur d'autorisation,
+    chaque rôle, chaque refus, cloisonnement par secrétariat, anti-accès horizontal,
+    immuabilité du journal, séparation des tâches, non-régression de l'authentification.
+  • La documentation : docs/CURP_INJS_MODELE.md, docs/CURP_INJS_MATRICE.md (lisible par un
+    fonctionnel), docs/CURP_INJS_PROCEDURES.md, docs/CURP_INJS_SECOURS.md.
+
+----------------------------------------------------------------------------------------------------
+6. VÉRIFICATIONS À EXÉCUTER ET À REPORTER
+----------------------------------------------------------------------------------------------------
+      python manage.py check && python manage.py check --deploy
+      python manage.py makemigrations --check --dry-run
+      python manage.py migrate            (base vide ET copie de base peuplée)
+      python manage.py migrate <app> <precedente> puis retour  (réversibilité)
+      python manage.py test               (943 tests existants + nouveaux, tous verts)
+      python manage.py test authentication presences   (non-régression ciblée)
+      npm run lint && npm run build
+  Contrôles fonctionnels obligatoires à démontrer :
+      • Un compte de chacun des 12 rôles existants conserve exactement ses accès actuels.
+      • Un compte FORMATEUR ne peut toujours pas se connecter à l'interface web.
+      • Un compte SECRETARIAT ne voit rien hors de son secrétariat.
+      • Un administrateur ne peut pas s'attribuer un rôle supérieur.
+      • Le système refuse de descendre sous deux administrateurs actifs.
+      • Une entrée de journal ne peut être ni modifiée ni supprimée, même via l'admin Django.
+      • La procédure de secours permet de recréer un accès administrateur.
+
+----------------------------------------------------------------------------------------------------
+7. AVANT DE PRODUIRE LA MOINDRE LIGNE DE CODE
+----------------------------------------------------------------------------------------------------
+Reformule en dix lignes maximum : ce que tu vas créer, ce que tu vas étendre, ce que tu ne
+toucheras pas, la façon dont tu garantis qu'aucun compte existant ne perdra d'accès, et les
+deux ou trois décisions d'architecture sur lesquelles tu attends mon arbitrage. Attends ma
+confirmation avant de continuer.
+
+--- FIN DU PROMPT PRINCIPAL ---
+
+
+====================================================================================================
+PARTIE III — PROMPTS COMPLÉMENTAIRES C1 À C6
+====================================================================================================
+À exécuter dans l'ordre, après le prompt principal, chacun dans sa propre session, précédé du
+rappel de contexte du prompt principal.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C1 — RÉFÉRENTIEL DES RÔLES MÉTIER ET MATRICE DE PERMISSIONS
+----------------------------------------------------------------------------------------------------
+CONTEXTE
+Le socle technique est livré. Il faut maintenant le peupler de la réalité de l'INJS : les 33 rôles
+métier, leurs permissions, leurs niveaux et leurs périmètres par défaut.
+
+OBJECTIF
+Produire un référentiel complet, cohérent, sans angle mort ni sur-habilitation, validé par
+l'expert fonctionnel.
+
+À FAIRE
+ 1. Charger par migration de données les 33 rôles de l'annexe A1, avec pour chacun : code,
+    libellé, domaine, description fonctionnelle rédigée pour un agent non informaticien, niveau
+    par défaut, périmètre par défaut, module requis, caractère sensible, incompatibilités.
+ 2. Charger le catalogue complet des permissions atomiques de l'annexe A3, module par module,
+    en couvrant TOUTES les applications existantes : authentication, formations, presences,
+    scolarite, admissions, jurys, graduation, finances_etudiantes, stages, administrations,
+    ressources_humaines, patrimoine, edts, exports, dashboard, statistiques, suiviEvaluation,
+    referentiels, parametres, equivalences.
+ 3. Établir la matrice rôle × permission × niveau, en appliquant les principes suivants :
+      • MOINDRE PRIVILÈGE : on n'accorde que ce qui est nécessaire à la mission.
+      • SÉPARATION DES TÂCHES : celui qui saisit ne valide pas ; celui qui valide ne paie pas ;
+        celui qui paie ne comptabilise pas ; celui qui saisit une note ne préside pas le jury.
+      • COHÉRENCE DE CHAÎNE : un rôle doit disposer de toutes les permissions nécessaires à
+        l'accomplissement complet de sa mission, sinon il sera contourné par des partages de
+        compte — le pire des risques.
+ 4. Déclarer explicitement les incompatibilités de la séparation des tâches, au minimum :
+      gestionnaire notes ↔ responsable jury ; agent inscriptions ↔ gestionnaire finances
+      étudiantes ; gestionnaire finances étudiantes ↔ validation comptable ;
+      agent de candidature ↔ agent de contrôle des dossiers ;
+      responsable graduation ↔ gestionnaire notes.
+ 5. Produire docs/CURP_INJS_MATRICE.md : un tableau lisible, imprimable, compréhensible par la
+    Direction, présentant pour chaque rôle ce qu'il peut faire et ce qu'il ne peut pas faire,
+    en langage métier et non en codes techniques.
+ 6. Écrire un test par rôle vérifiant l'intégralité de son périmètre d'autorisation ET un test
+    par rôle vérifiant au moins trois refus caractéristiques.
+ 7. Écrire un test global de cohérence : aucune permission orpheline (non attribuée à aucun
+    rôle), aucun rôle vide, aucune incompatibilité contradictoire, aucun module sans rôle
+    responsable.
+
+VALIDATION
+ La matrice est relue ligne à ligne avec l'expert fonctionnel et le référent scolarité de
+ l'INJS. Toute case contestée est arbitrée et tracée avant la fusion.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C2 — ÉCRANS WEB D'ADMINISTRATION DES COMPTES
+----------------------------------------------------------------------------------------------------
+OBJECTIF
+Livrer l'interface React permettant à un administrateur ou à un responsable habilité de créer et
+de modifier les comptes sans jamais passer par l'admin Django.
+
+À FAIRE
+ 1. Écrans, sous /administration/comptes, aucun fichier au-delà de 400 lignes :
+      • ListeComptes : recherche instantanée, filtres par rôle, statut, domaine, périmètre,
+        canal, dernière connexion ; colonnes essentielles ; actions rapides ; export.
+      • FicheCompte : identité, compte, rôles et périmètres, dérogations, délégations,
+        sessions actives, appareils, chronologie complète des événements du journal.
+      • AssistantCreation : les 5 étapes décrites au §3.5, avec recherche préalable de personne
+        et récapitulatif en langage clair avant confirmation.
+      • ModificationCompte : affichage obligatoire du différentiel de droits avant validation.
+      • GestionRoles : consultation du référentiel, description de chaque rôle, liste des
+        comptes qui le portent.
+      • MatricePermissions : visualisation croisée rôle × permission, filtrable, exportable.
+      • Derogations : demande, instruction, validation, suivi des échéances.
+      • Delegations : création, suivi, fin anticipée.
+      • OperationsMasse : import de fichier avec prévisualisation intégrale et rapport.
+      • RevueHabilitations : campagne de revue, validation ou révocation par responsable.
+      • JournalHabilitations : consultation filtrable, export, vérification du chaînage.
+ 2. Ergonomie de sûreté :
+      • Toute action irréversible passe par une confirmation explicite qui NOMME l'action et
+        ses conséquences, et exige la saisie d'un motif.
+      • Le différentiel de droits est toujours montré avant validation, en vert ce qui est
+        gagné, en rouge ce qui est perdu.
+      • Un bandeau permanent rappelle « toute action sur les habilitations est tracée ».
+      • Les rôles sensibles sont visuellement distingués.
+ 3. Alignement automatique sur /api/auth/capacites/ : l'interface n'affiche que ce que le
+    compte connecté peut réellement faire, et affiche un message explicite en cas de refus 403.
+ 4. Tests Vitest : au minimum 25 tests couvrant l'assistant, le différentiel, les refus, les
+    opérations en masse et les permissions d'affichage.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C3 — CYCLE DE VIE DES COMPTES, PROVISIONNEMENT EN MASSE ET DÉLÉGATION
+----------------------------------------------------------------------------------------------------
+OBJECTIF
+Automatiser ce qui peut l'être dans la vie d'un compte, en gardant l'humain aux points de décision.
+
+À FAIRE
+ 1. Provisionnement automatique déclenché par les événements métier, chacun activable et
+    paramétrable, jamais imposé :
+      • admission d'un candidat validée → proposition de création du compte étudiant ;
+      • inscription administrative validée → activation du compte étudiant et rattachement
+        au périmètre de sa formation, de son niveau et de son groupe ;
+      • recrutement d'un agent enregistré en RH → proposition de création du compte agent ;
+      • affectation pédagogique d'un enseignant → proposition du rôle enseignant avec le
+        périmètre des ECUE concernées ;
+      • fin d'inscription, départ, fin de contrat, fin de vacation → proposition de suspension
+        puis de désactivation, après un délai de grâce paramétrable.
+    Chaque proposition entre dans une file d'attente soumise à validation humaine. Aucune
+    création ni suppression automatique sans validation.
+ 2. Suspension automatique des comptes inactifs au-delà d'une durée paramétrable, avec
+    notification préalable à l'intéressé et à son responsable.
+ 3. Expiration automatique des attributions temporaires, des dérogations et des délégations,
+    avec notification à échéance moins sept jours.
+ 4. Import en masse : fichier tabulaire, validation ligne à ligne, prévisualisation complète,
+    rapport détaillé, écriture en une transaction, possibilité de rejouer l'import corrigé,
+    réversibilité par identifiant d'exécution.
+ 5. Délégation : assistant de création, contrôle de cohérence (on ne délègue que ce que l'on
+    détient), interdiction de re-délégation, fin anticipée, journalisation des actions
+    accomplies par délégation avec mention du délégant.
+ 6. Tests : au minimum 30, couvrant chaque déclencheur, la file de validation, l'expiration,
+    l'import, la réversibilité et la délégation.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C4 — SÉCURITÉ RENFORCÉE : MFA, SESSIONS, APPAREILS, MOTS DE PASSE
+----------------------------------------------------------------------------------------------------
+OBJECTIF
+Élever le niveau de sécurité des accès sans dégrader l'expérience des utilisateurs de terrain.
+
+À FAIRE
+ 1. MFA par TOTP : activation guidée avec code QR, vérification, dix codes de secours à usage
+    unique, régénération, désactivation soumise à un administrateur. Imposé progressivement aux
+    rôles sensibles, avec période de grâce paramétrable et rappels.
+ 2. Politique de mot de passe : longueur, complexité, historique, expiration, interdiction des
+    mots de passe courants et des informations personnelles évidentes. Messages d'aide précis
+    indiquant ce qui manque, jamais un refus opaque.
+ 3. Réinitialisation : par l'utilisateur avec lien à durée limitée, ou par un administrateur
+    avec mot de passe temporaire et changement obligatoire à la première connexion.
+ 4. Sessions : liste des sessions actives avec appareil, adresse IP, date et localisation
+    approximative ; révocation unitaire et totale ; expiration sur inactivité ; détection
+    d'anomalie avec notification à l'utilisateur.
+ 5. Appareils : extension de presences.DeviceBinding ; demande de changement d'appareil soumise
+    à validation administrative tracée ; révocation ; limite paramétrable du nombre d'appareils.
+ 6. Verrouillage progressif, journalisation de chaque échec, notification de l'utilisateur après
+    plusieurs échecs, et alerte à l'administrateur en cas de rafale suspecte.
+ 7. Tests de sécurité : au minimum 30, dont tentative d'auto-élévation, rejeu, accès horizontal,
+    contournement du canal d'accès, force brute, réutilisation de code de secours.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C5 — AUDIT, CONFORMITÉ, PROTECTION DES DONNÉES ET REVUE DES HABILITATIONS
+----------------------------------------------------------------------------------------------------
+OBJECTIF
+Rendre les habilitations vérifiables, défendables et conformes, dans la durée.
+
+À FAIRE
+ 1. Vérification d'intégrité du journal : commande contrôlant le chaînage des empreintes sur une
+    période et signalant toute rupture. Exécution périodique automatique.
+ 2. Campagnes de revue des habilitations : à périodicité paramétrable, chaque responsable reçoit
+    la liste des comptes de son périmètre avec leurs droits, et doit confirmer, réduire ou
+    révoquer chacun. Les non-réponses au-delà de l'échéance déclenchent une alerte et non une
+    révocation automatique. Rapport final signé et archivé.
+ 3. Tableau de bord des habilitations : nombre de comptes par statut et par rôle, comptes
+    inactifs, comptes sans connexion depuis N jours, dérogations en cours et échues,
+    délégations actives, rôles sensibles sans MFA, cumuls de rôles incompatibles détectés,
+    comptes sans personne rattachée, administrateurs actifs.
+ 4. Détection d'anomalies d'habilitation : compte cumulant des rôles incompatibles, compte avec
+    plus de N rôles, dérogation reconduite plus de deux fois, compte actif d'une personne dont
+    la relation avec l'institut est terminée, compte partagé présumé (connexions simultanées
+    depuis des lieux incompatibles).
+ 5. Protection des données : registre des traitements pour ce module, durées de conservation,
+    procédure d'exercice des droits des personnes (accès, rectification, effacement dans les
+    limites légales), export des données d'une personne à sa demande, anonymisation d'un compte
+    désactivé au terme de la durée de conservation, sans destruction des traces d'audit
+    nécessaires à la preuve.
+ 6. Exports et documents : attestation d'habilitation d'un agent, fiche de droits par rôle,
+    extrait du journal pour une personne ou une période, rapport de revue, tous au format PDF
+    et Excel, à l'en-tête institutionnel paramétrable, via le moteur d'exports existant.
+ 7. Tests : au minimum 25, dont l'intégrité du chaînage, la campagne de revue complète, la
+    détection de chaque anomalie, l'export des données d'une personne.
+
+----------------------------------------------------------------------------------------------------
+PROMPT C6 — MIGRATION DES COMPTES EXISTANTS, BASCULE ET DOCUMENTATION
+----------------------------------------------------------------------------------------------------
+OBJECTIF
+Basculer l'existant vers le nouveau dispositif sans qu'aucun utilisateur ne s'en aperçoive
+autrement que par un gain de clarté.
+
+À FAIRE
+ 1. Commande migrer_comptes_vers_curp avec --dry-run obligatoire produisant un rapport complet :
+      • pour chaque compte existant : son rôle actuel, le ou les rôles métier correspondants
+        selon l'annexe A6, le périmètre déduit, les permissions avant et après ;
+      • la liste des comptes dont les droits changeraient, à la hausse comme à la baisse ;
+      • la liste des comptes sans personne rattachée, à traiter manuellement.
+    OBJECTIF DE RÉCONCILIATION : zéro compte perdant un accès. Tout écart est examiné
+    individuellement et tranché avant la bascule.
+ 2. Rattachement des comptes aux Personnes : rapprochement automatique avec les identités
+    métier existantes (Agent, Formateur, Participant, DossierEtudiant, Candidat), proposition
+    de fusion des doublons, validation humaine obligatoire.
+ 3. Drapeaux de bascule, tous inactifs par défaut :
+      CURP_ACTIF, CURP_MOTEUR_AUTORISATION, CURP_MODE_OBSERVATION (actif par défaut),
+      CURP_UI_NOUVELLE, CURP_MFA_OBLIGATOIRE, CURP_PROVISIONNEMENT_AUTO.
+ 4. Bascule en quatre étapes :
+      E1 Observation : le nouveau moteur évalue et journalise, l'ancien décide. Deux semaines
+         minimum. Analyse des écarts journalisés, correction de la matrice.
+      E2 Bascule en lecture : le nouveau moteur décide sur les opérations de consultation.
+      E3 Bascule complète : le nouveau moteur décide sur toutes les opérations.
+      E4 Retrait progressif de la duplication de matrice dans utils/roles.js.
+ 5. Procédure de secours : commande habilitations_secours exécutable sur le serveur, hors
+    application, permettant de recréer un accès administrateur en cas de verrouillage total.
+    Documentée dans docs/CURP_INJS_SECOURS.md, testée, et conservée par l'exploitant hors ligne.
+ 6. Documentation et formation :
+      • docs/CURP_INJS_MANUEL_ADMINISTRATEUR.md — créer, modifier, suspendre, déléguer, réviser ;
+      • docs/CURP_INJS_MANUEL_RESPONSABLE.md — comprendre et valider les droits de son équipe ;
+      • docs/CURP_INJS_MANUEL_UTILISATEUR.md — mon compte, mon mot de passe, mon MFA, mes appareils ;
+      • fiche mémo A4 « que puis-je faire avec mon rôle » par grande famille de rôles ;
+      • mise à jour du manuel utilisateur général et du README.
+ 7. Tests : migration sur copie de la base de production, rapport de réconciliation à zéro
+    écart, essai complet de chaque étape de bascule et de chaque repli.
+
+
+====================================================================================================
+PARTIE IV — ANNEXES DE RÉFÉRENCE
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+A1 — LES 33 RÔLES MÉTIER ET LEUR CODIFICATION
+----------------------------------------------------------------------------------------------------
+ Domaine            Code                          Libellé                              Niv. Périmètre défaut  Sens.
+ -----------------  ----------------------------  -----------------------------------  ---- ----------------  -----
+ ADMINISTRATION     ADMIN_SYSTEME                 Administrateur système                N4  INJS_ENTIER        oui
+                    DIRECTION_GENERALE            Direction                             N4  INJS_ENTIER        oui
+                    DIRECTION_ETUDES              Direction des études                  N4  INJS_ENTIER        oui
+                    SCOLARITE                     Scolarité                             N3  SECRETARIAT        non
+                    RESPONSABLE_PEDAGOGIQUE       Responsable pédagogique               N3  FORMATION          non
+ CANDIDATURES       AGENT_CANDIDATURE             Agent de candidature                  N2  INJS_ENTIER        non
+                    AGENT_CONTROLE_DOSSIERS       Agent de contrôle des dossiers        N2  INJS_ENTIER        non
+                    RESPONSABLE_CONCOURS          Responsable concours et sélection     N3  INJS_ENTIER        oui
+ SCOLARITE          AGENT_ADMISSIONS              Agent admissions                      N2  SECRETARIAT        non
+                    AGENT_INSCRIPTIONS            Agent inscriptions                    N2  SECRETARIAT        non
+                    GESTIONNAIRE_ETUDIANTS        Gestionnaire étudiants                N2  SECRETARIAT        non
+ PEDAGOGIE          RESPONSABLE_FORMATION         Responsable de formation              N3  FORMATION          non
+                    GESTIONNAIRE_GROUPES          Gestionnaire des groupes              N2  FORMATION          non
+                    GESTIONNAIRE_COURS            Gestionnaire des cours                N2  FORMATION          non
+                    GESTIONNAIRE_MAQUETTES        Gestionnaire des maquettes            N3  FORMATION          non
+ ENSEIGNANTS        ENSEIGNANT                    Enseignant                            N2  MODULE_ECUE        non
+                    RESPONSABLE_UE_ECUE           Responsable UE / ECUE                 N3  MODULE_ECUE        non
+                    GESTIONNAIRE_CHARGES          Gestionnaire des charges enseignantes N2  FORMATION          non
+ EVALUATIONS        GESTIONNAIRE_NOTES            Gestionnaire des notes                N2  FORMATION          non
+                    MEMBRE_JURY                   Membre de jury                        N2  FORMATION          non
+                    RESPONSABLE_JURY              Responsable de jury                   N4  FORMATION          oui
+ DIPLOMATION        RESPONSABLE_GRADUATION        Responsable graduation                N3  INJS_ENTIER        oui
+                    RESPONSABLE_DIPLOMATION       Responsable diplômation               N4  INJS_ENTIER        oui
+ FINANCE            GESTIONNAIRE_FINANCES_ETUD    Gestionnaire finances étudiantes      N2  INJS_ENTIER        oui
+                    VALIDATEUR_FINANCIER          Validateur financier                  N3  INJS_ENTIER        oui
+                    GESTIONNAIRE_VACATIONS        Gestionnaire vacations formateurs     N2  INJS_ENTIER        oui
+ STAGES             GESTIONNAIRE_STAGES           Gestionnaire des stages               N2  FORMATION          non
+ RH                 GESTIONNAIRE_RH               Gestionnaire ressources humaines      N3  INJS_ENTIER        oui
+ PATRIMOINE         GESTIONNAIRE_PATRIMOINE       Gestionnaire du patrimoine            N2  SITE               non
+                    GESTIONNAIRE_ESPACES          Gestionnaire des espaces              N2  SITE               non
+ ADMIN. GENERALE    GESTIONNAIRE_COURRIERS        Gestionnaire courriers et documents   N2  SERVICE            non
+                    ARCHIVISTE                    Archiviste                            N2  INJS_ENTIER        non
+ DESTINATAIRES      ETUDIANT                      Étudiant / auditeur                   N1  PROPRE_COMPTE      non
+                    CANDIDAT                      Candidat                              N0  PROPRE_COMPTE      non
+                    CONSULTATION                  Consultation restreinte               N1  INJS_ENTIER        non
+
+ Note : les codes sont stables et ne changent jamais ; les libellés sont modifiables en base
+ sans redéploiement, conformément au Module 18 (« les noms définitifs doivent être configurables »).
+
+----------------------------------------------------------------------------------------------------
+A2 — MATRICE RÔLES × MODULES × NIVEAUX N0–N4 (extrait directeur)
+----------------------------------------------------------------------------------------------------
+ Lecture : le chiffre indique le niveau détenu par le rôle sur ce module ; « — » signifie aucun accès.
+ N0 consultation très limitée · N1 consultation · N2 saisie et traitement · N3 validation ·
+ N4 administration et décision.
+
+ Rôle \ Module               Adm Cand Scol Péda Ens Éval Jury Dipl Fin Stag RH Patr EDT Prés Stat
+ --------------------------  --- ---- ---- ---- --- ---- ---- ---- --- ---- -- ---- --- ---- ----
+ ADMIN_SYSTEME                N4  N4   N4   N4   N4  N4   N4   N4   N4  N4   N4 N4   N4  N4   N4
+ DIRECTION_GENERALE           N1  N1   N1   N1   N1  N1   N1   N3   N1  N1   N1 N1   N1  N1   N4
+ DIRECTION_ETUDES             N1  N1   N3   N3   N1  N3   N3   N3   —   N1   —  —    N3  N1   N3
+ SCOLARITE                    N1  N2   N3   N2   N1  N2   N1   N2   N1  N1   —  —    N2  N2   N1
+ RESPONSABLE_PEDAGOGIQUE      —   N1   N1   N3   N2  N2   N2   N1   —   N2   —  —    N3  N2   N1
+ AGENT_CANDIDATURE            —   N2   N1   —    —   —    —    —    —   —    —  —    —   —    —
+ AGENT_CONTROLE_DOSSIERS      —   N2   N1   —    —   —    —    —    —   —    —  —    —   —    —
+ RESPONSABLE_CONCOURS         —   N4   N2   N1   N1  N2   —    —    —   —    —  —    N1  N1   N1
+ AGENT_ADMISSIONS             —   N2   N2   N1   —   —    —    —    N1  —    —  —    —   —    —
+ AGENT_INSCRIPTIONS           —   N1   N2   N1   —   —    —    —    N1  —    —  —    —   —    —
+ GESTIONNAIRE_ETUDIANTS       —   N1   N2   N1   —   N1   —    N1   N1  N1   —  —    N1  N1   N1
+ RESPONSABLE_FORMATION        —   N1   N1   N3   N2  N2   N2   N1   —   N2   —  —    N2  N1   N1
+ GESTIONNAIRE_GROUPES         —   —    N1   N2   N1  —    —    —    —   —    —  —    N2  N1   —
+ GESTIONNAIRE_COURS           —   —    N1   N2   N1  N1   —    —    —   —    —  N1   N2  N1   —
+ GESTIONNAIRE_MAQUETTES       —   —    N1   N3   N1  N1   —    —    —   —    —  —    N1  —    —
+ ENSEIGNANT                   —   —    —    N1   N1  N2*  —    —    —   N1*  —  —    N1* N2*  —
+ RESPONSABLE_UE_ECUE          —   —    —    N2   N2  N3*  N1   —    —   N1   —  —    N2* N2*  N1
+ GESTIONNAIRE_CHARGES         —   —    —    N2   N2  —    —    —    N1  —    N1 —    N2  N1   N1
+ GESTIONNAIRE_NOTES           —   —    N1   N1   N1  N2   N1   —    —   —    —  —    —   N1   N1
+ MEMBRE_JURY                  —   —    N1   N1   —   N1   N2   N1   —   —    —  —    —   N1   N1
+ RESPONSABLE_JURY             —   —    N1   N1   —   N3   N4   N2   —   —    —  —    —   N1   N1
+ RESPONSABLE_GRADUATION       —   —    N1   N1   —   N1   N1   N3   —   —    —  —    —   —    N1
+ RESPONSABLE_DIPLOMATION      —   —    N1   N1   —   N1   N1   N4   —   —    —  —    —   —    N1
+ GESTIONNAIRE_FINANCES_ETUD   —   N1   N1   —    —   —    —    N1   N2  —    —  —    —   —    N1
+ VALIDATEUR_FINANCIER         —   —    N1   —    —   —    —    N1   N3  —    —  N1   —   —    N1
+ GESTIONNAIRE_VACATIONS       —   —    —    N1   N2  —    —    —    N2  —    N1 —    N1  N1   N1
+ GESTIONNAIRE_STAGES          —   —    N1   N1   N1  N1   —    —    N1  N2   —  —    N1  N1   N1
+ GESTIONNAIRE_RH              —   —    —    —    N1  —    —    —    N1  —    N3 N1   N1  N1   N1
+ GESTIONNAIRE_PATRIMOINE      —   —    —    —    —   —    —    —    N1  —    N1 N2   N1  —    N1
+ GESTIONNAIRE_ESPACES         —   —    —    N1   —   —    —    —    —   —    —  N2   N2  N1   N1
+ GESTIONNAIRE_COURRIERS       N2  —    N1   —    —   —    —    N1   —   —    N1 N1   —   —    —
+ ARCHIVISTE                   N1  N1   N1   N1   N1  N1   N1   N1   N1  N1   N1 N1   N1  N1   N1
+ ETUDIANT                     —   —    N1°  N1°  —   N1°  N0°  N1°  N1° N1°  —  —    N1° N1°  —
+ CANDIDAT                     —   N1°  —    —    —   —    —    —    N0° —    —  —    —   —    —
+ CONSULTATION                 —   N0   N0   N0   N0  N0   —    N0   —   N0   —  N0   N0  N0   N1
+
+ (*) limité à ses propres ECUE, groupes ou séances.
+ (°) limité à son propre dossier, sans aucun accès aux données d'autrui.
+ Cette matrice est un extrait directeur : la matrice détaillée, permission par permission, est
+ produite par le prompt C1 et validée par l'expert fonctionnel avant toute mise en service.
+
+----------------------------------------------------------------------------------------------------
+A3 — CATALOGUE DES PERMISSIONS ATOMIQUES PAR MODULE
+----------------------------------------------------------------------------------------------------
+Convention de code : <module>.<ressource>.<action>
+Actions : consulter, creer, modifier, soumettre, valider, rejeter, publier, annuler, exporter,
+          imprimer, archiver, supprimer, administrer.
+
+ administration   compte.*, personne.*, role.*, permission.*, attribution.*, derogation.*,
+                  delegation.*, politique.*, journal.consulter, journal.exporter, revue.*
+ candidatures     campagne.*, candidat.*, candidature.*, piece.consulter, piece.valider,
+                  piece.rejeter, eligibilite.valider, concours.*, epreuve.*, surveillance.*,
+                  convocation.*, note_concours.*, classement.calculer, classement.publier
+ scolarite        annee.*, dossier_etudiant.*, inscription_administrative.*,
+                  inscription_pedagogique.*, groupe.*, affectation_groupe.*,
+                  transfert.*, reorientation.*, equivalence.*, journal_scolarite.consulter
+ pedagogie        maquette.consulter, maquette.creer, maquette.modifier, maquette.valider,
+                  maquette.verrouiller, ue.*, ecue.*, volume_horaire.*, credit_ects.*,
+                  affectation_pedagogique.*, passerelle.*
+ enseignants      enseignant.*, specialite.*, charge.consulter, charge.modifier,
+                  charge.valider, disponibilite.*, indisponibilite.*
+ evaluations      colonne_note.*, note.consulter, note.saisir, note.modifier, note.valider,
+                  note.verrouiller, correction_note.*, moyenne.calculer, moyenne.publier,
+                  questionnaire.*, decision_pedagogique.*
+ jurys            session_jury.*, membre_jury.*, proposition.*, deliberation.*, decision.*,
+                  pv.generer, pv.signer, pv.publier, resultat.publier
+ diplomation      diplome.consulter, diplome.creer, diplome.valider, diplome.editer,
+                  diplome.revoquer, reedition.*, registre.consulter, registre.administrer,
+                  attestation.*, releve_notes.*, modele_document.*
+ finances_etud    tarification.*, echeancier.*, facture.*, paiement.saisir, paiement.valider,
+                  quittance.editer, remboursement.*, relance.*, rapprochement.*
+ finances_form    parametrage.*, ajustement.saisir, ajustement.valider, ajustement.rejeter,
+                  heures_certifiees.consulter, etat_vacation.editer
+ stages           organisme.*, tuteur.*, convention.creer, convention.valider,
+                  convention.signer, evaluation_stage.*, attestation_stage.editer
+ rh               service.*, fonction.*, agent.*, affectation_rh.*, disponibilite_agent.*,
+                  document_rh.consulter, document_rh.deposer, document_rh.administrer
+ patrimoine       equipement.*, vehicule.*, inventaire.*, maintenance.*, mouvement.*,
+                  espace.consulter, espace.modifier, reservation.creer, reservation.valider
+ edt              calendrier.*, creneau.*, besoin.*, contrainte.*, emploi_du_temps.creer,
+                  emploi_du_temps.generer, emploi_du_temps.valider, emploi_du_temps.publier,
+                  seance.creer, seance.deplacer, seance.annuler, seance.remplacer,
+                  conflit.resoudre, rattrapage.*, examen.*
+ presences        seance_emargement.ouvrir, seance_emargement.cloturer, qr.generer,
+                  emargement.consulter, emargement.saisir, emargement.forcer,
+                  justificatif.deposer, justificatif.instruire, justificatif.decider,
+                  presence_intervenant.*, cahier_texte.*, heures.certifier
+ administrations  courrier.*, document_officiel.*, version_document.*, reunion.*, mission.*
+ statistiques     indicateur.consulter, rapport.generer, rapport.publier, alerte.configurer,
+                  bilan.editer, tableau_bord.consulter
+ exports          export.generer, export.imprimer, export_sensible.generer
+ parametres       parametre.consulter, parametre.modifier, parametre.administrer
+ referentiels     referentiel.consulter, referentiel.creer, referentiel.modifier,
+                  referentiel.archiver
+
+ Permissions marquées CRITIQUES (motif obligatoire, double validation, journalisation renforcée) :
+   administration.role.attribuer sur un rôle sensible, administration.compte.desactiver,
+   evaluations.note.verrouiller, jurys.pv.signer, jurys.resultat.publier,
+   diplomation.diplome.valider, diplomation.diplome.revoquer, finances_etud.paiement.valider,
+   finances_etud.remboursement.valider, presences.emargement.forcer,
+   edt.emploi_du_temps.publier, parametres.parametre.administrer, exports.export_sensible.generer
+
+----------------------------------------------------------------------------------------------------
+A4 — PÉRIMÈTRES ET RÈGLES DE CLOISONNEMENT
+----------------------------------------------------------------------------------------------------
+ INJS_ENTIER ..... toutes les données de l'institut
+ DIRECTION ....... les données rattachées à une direction
+ SERVICE ......... les données d'un service administratif
+ SECRETARIAT ..... les données d'un secrétariat — CLOISONNEMENT EXISTANT À PRÉSERVER
+                   IMPÉRATIVEMENT pour les rôles SCOLARITE, AGENT_*, GESTIONNAIRE_ETUDIANTS
+ SITE ............ les données rattachées à un site physique
+ FORMATION ....... les données d'une offre de formation
+ PARCOURS ........ les données d'un parcours
+ NIVEAU .......... les données d'un niveau (L1, L2, L3, M1, M2)
+ GROUPE .......... les données d'un groupe pédagogique
+ MODULE_ECUE ..... les données d'un module ou d'une ECUE — périmètre naturel de l'enseignant
+ ETUDIANT ........ les données d'un étudiant nommément désigné (tutorat, suivi individuel)
+ PROPRE_COMPTE ... uniquement ses propres données
+
+ Règles de cloisonnement non négociables
+  1. Un compte ne voit jamais un objet hors de son périmètre, y compris s'il en connaît
+     l'identifiant : la vérification est systématique, et un test le prouve pour chaque
+     ressource sensible.
+  2. Les listes sont filtrées par périmètre à la source, jamais côté interface.
+  3. Un étudiant n'accède qu'à son propre dossier ; un candidat qu'à sa propre candidature.
+  4. Un enseignant n'accède qu'aux groupes, séances, ECUE et notes qui le concernent.
+  5. Le périmètre est cumulatif : plusieurs périmètres sur une même attribution s'additionnent.
+  6. Un périmètre plus large ne s'obtient que par une attribution explicite, jamais par déduction.
+
+----------------------------------------------------------------------------------------------------
+A5 — MACHINE À ÉTATS DU COMPTE UTILISATEUR
+----------------------------------------------------------------------------------------------------
+        [création]
+             ↓
+          INVITE ──────(première connexion + changement de mot de passe)────→ ACTIF
+             │                                                                  │
+             │ (invitation expirée)                                             │
+             ↓                                                                  │
+          EXPIRE                                                                │
+                          ┌─────────────────────────────────────────────────────┤
+                          ↓                          ↓                          ↓
+                      SUSPENDU               VERROUILLE                    DESACTIVE
+                   (décision admin,        (échecs répétés,            (départ, fin de
+                    durée bornée)           automatique)                relation, décision)
+                          │                          │                          │
+                          │ (réactivation            │ (déverrouillage          │ (réactivation
+                          │  motivée)                │  auto ou admin)          │  exceptionnelle
+                          ↓                          ↓                          │  motivée)
+                        ACTIF ←─────────────────────ACTIF ←──────────────────────┘
+
+        Depuis ACTIF, une date d'expiration atteinte conduit à EXPIRE.
+        Depuis n'importe quel état, jamais de suppression physique : un compte désactivé est
+        anonymisé au terme de la durée légale de conservation, ses traces d'audit demeurent.
+
+        Chaque transition : permission requise, motif obligatoire, notification de l'intéressé,
+        écriture au journal, révocation des sessions actives le cas échéant.
+
+----------------------------------------------------------------------------------------------------
+A6 — CORRESPONDANCE AVEC LES 12 RÔLES EXISTANTS
+----------------------------------------------------------------------------------------------------
+ Rôle existant        →  Rôle(s) métier CURP attribué(s)              Périmètre repris
+ -------------------  -----------------------------------------  ----------------------------
+ ADMIN                →  ADMIN_SYSTEME                              INJS_ENTIER
+ CHEF_CPFAE_ADMIN     →  ADMIN_SYSTEME + DIRECTION_ETUDES           INJS_ENTIER
+ CPFAE_ADMIN          →  SCOLARITE (N3) + GESTIONNAIRE_COURS        SECRETARIAT d'origine
+ DIRECTION            →  DIRECTION_GENERALE                         INJS_ENTIER
+ CHEF_SECRETARIAT     →  SCOLARITE (N3) + AGENT_INSCRIPTIONS
+                         + AGENT_ADMISSIONS + GESTIONNAIRE_ETUDIANTS SECRETARIAT d'origine
+ SECRETARIAT          →  AGENT_INSCRIPTIONS + AGENT_ADMISSIONS
+                         + GESTIONNAIRE_ETUDIANTS (N2)               SECRETARIAT d'origine
+ FINANCE              →  GESTIONNAIRE_FINANCES_ETUD
+                         + GESTIONNAIRE_VACATIONS                    INJS_ENTIER
+ ARCHIVE              →  ARCHIVISTE                                  INJS_ENTIER
+ ENCADRANT            →  ENSEIGNANT + GESTIONNAIRE_GROUPES (N2)      ses groupes
+ SUPERVISEUR          →  RESPONSABLE_PEDAGOGIQUE (N3)                sa formation
+ FORMATEUR            →  ENSEIGNANT — canal MOBILE imposé            ses ECUE et séances
+ AUDITEUR             →  ETUDIANT — canal MOBILE imposé              PROPRE_COMPTE
+
+ RÈGLE DE MIGRATION : cette correspondance est appliquée automatiquement par la commande de
+ migration, en mode --dry-run d'abord. Le rapport doit démontrer que chaque compte conserve au
+ minimum les accès dont il disposait. Tout compte qui perdrait un accès est traité
+ individuellement, et l'écart est arbitré et tracé avant la bascule. Les anciens codes de rôle
+ restent présents dans le modèle utilisateur et continuent d'être renseignés, afin que tout code
+ existant qui les interroge continue de fonctionner sans modification.
+
+----------------------------------------------------------------------------------------------------
+A7 — CRITÈRES D'ACCEPTATION (DEFINITION OF DONE)
+----------------------------------------------------------------------------------------------------
+ FONCTIONNEL
+  1. Les 33 rôles métier existent, sont documentés en français et attribuables.
+  2. Un administrateur crée un compte complet, de l'identité aux permissions, en moins de trois
+     minutes, sans passer par l'admin Django.
+  3. La modification d'un compte affiche systématiquement le différentiel de droits avant
+     validation.
+  4. Les rôles conditionnés à un module absent sont automatiquement marqués indisponibles, sans
+     erreur ni plantage.
+  5. Les opérations en masse fonctionnent avec prévisualisation, rapport et réversibilité.
+  6. La délégation temporaire fonctionne et s'éteint automatiquement à échéance.
+  7. La revue périodique des habilitations est opérationnelle et produit un rapport signé.
+ SÉCURITÉ
+  8. Aucun compte existant n'a perdu un seul accès : rapport de réconciliation à zéro écart.
+  9. Aucun compte n'a gagné d'accès non décidé.
+ 10. Le cloisonnement par secrétariat est intact et testé.
+ 11. FORMATEUR et AUDITEUR restent réservés au mobile et à la PWA.
+ 12. L'accès horizontal est impossible : testé pour chaque ressource sensible.
+ 13. L'auto-élévation est refusée et journalisée.
+ 14. Le système refuse de descendre sous deux administrateurs actifs.
+ 15. Le journal est immuable, chaîné, et sa vérification d'intégrité est automatisée.
+ 16. Le MFA fonctionne pour les rôles sensibles, avec codes de secours.
+ 17. La procédure de secours administrateur est documentée et testée.
+ TECHNIQUE
+ 18. Suite backend 100 % verte : 943 tests existants plus au moins 120 nouveaux.
+ 19. Tests frontend en place, au minimum 25 sur ce module.
+ 20. Une décision d'autorisation en moins de 5 millisecondes hors premier appel, sans requête
+     supplémentaire en base dans une boucle.
+ 21. Aucun fichier au-delà de 600 lignes côté serveur, 400 côté interface.
+ 22. Aucun print(), aucune dépendance CDN, aucun identifiant technique exposé.
+ 23. Toutes les routes documentées dans OpenAPI, avec test de succès et test de refus par rôle.
+ 24. Migrations réversibles, testées sur base vide et sur copie de base peuplée.
+ ORGANISATIONNEL
+ 25. La matrice de permissions est validée ligne à ligne par l'expert fonctionnel et le référent
+     scolarité de l'INJS.
+ 26. Les trois manuels et la fiche mémo par famille de rôles sont livrés.
+ 27. La bascule en quatre étapes est exécutée, chaque étape étant réversible en moins d'une minute.
+
+====================================================================================================
+RAPPEL FINAL À L'AGENT DE CODAGE
+====================================================================================================
+Ce module décide qui peut faire quoi à l'INJS Marcory. Une permission trop large expose des notes,
+des dossiers médicaux de justification d'absence et des données financières. Une permission trop
+étroite pousse les agents à partager leurs comptes, ce qui détruit toute traçabilité et constitue
+le pire des risques.
+
+La règle de conduite est donc double et constante : le moindre privilège nécessaire, mais la
+totalité du privilège nécessaire. Et en cas de doute sur une règle métier, on ne tranche pas
+seul : on demande à l'expert fonctionnel, on obtient l'arbitrage, et on le consigne.
+
+Zéro perte d'accès, zéro élargissement silencieux, traçabilité intégrale.
+====================================================================================================
+FIN DU FICHIER — Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt
+====================================================================================================
