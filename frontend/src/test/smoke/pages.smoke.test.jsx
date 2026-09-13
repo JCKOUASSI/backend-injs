@@ -38,6 +38,7 @@ import EvaluationList from '@/pages/EvaluationList'
 import EvaluationTake from '@/pages/EvaluationTake'
 import FicheAuditeur from '@/pages/FicheAuditeur'
 import FicheFormateur from '@/pages/FicheFormateur'
+import ForcedPasswordChange from '@/pages/ForcedPasswordChange'
 import FinanceAjustements from '@/pages/FinanceAjustements'
 import FinanceDashboard from '@/pages/FinanceDashboard'
 import FinanceEncadrants from '@/pages/FinanceEncadrants'
@@ -96,6 +97,9 @@ const PAGES = [
   ['EvaluationTake', EvaluationTake, '/evaluations/repondre/:id', '/evaluations/repondre/1'],
   ['FicheAuditeur', FicheAuditeur, '/auditeurs/:participantId/formations/:formationId/fiche', '/auditeurs/1/formations/1/fiche'],
   ['FicheFormateur', FicheFormateur, '/formateurs/:formateurId/modules/:moduleId/fiche', '/formateurs/1/modules/1/fiche'],
+  // Compte admin non flagué : l'écran redirige vers l'accueil via <Navigate>,
+  // sans planter ; le comportement forcé est testé dans ForcedPasswordChange.test.jsx.
+  ['ForcedPasswordChange', ForcedPasswordChange, '/changement-mot-de-passe-obligatoire', '/changement-mot-de-passe-obligatoire'],
   ['FinanceAjustements', FinanceAjustements, '/finance-ajustements', '/finance-ajustements'],
   ['FinanceDashboard', FinanceDashboard, '/finance-dashboard', '/finance-dashboard'],
   ['FinanceEncadrants', FinanceEncadrants, '/finance-encadrants', '/finance-encadrants'],

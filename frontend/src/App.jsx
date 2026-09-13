@@ -5,7 +5,9 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { hasAppRole, getUserRoles } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
 import AppNotificationsBell from './components/AppNotificationsBell'
+import ProtectedRoute, { FORCED_PASSWORD_PATH } from './components/auth/ProtectedRoute'
 import Login from './pages/Login'
+import ForcedPasswordChange from './pages/ForcedPasswordChange'
 import Dashboard from './pages/Dashboard'
 import Formations from './pages/Formations'
 import FormationDetail from './pages/FormationDetail'
@@ -79,14 +81,6 @@ const Jurys = lazy(() => import('./pages/scolarite/Jurys'))
 const Graduation = lazy(() => import('./pages/scolarite/Graduation'))
 const FinancesEtudiantes = lazy(() => import('./pages/scolarite/FinancesEtudiantes'))
 
-
-function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, loading, user } = useAuth()
-  if (loading) return <div className="loading"><div className="spinner"></div></div>
-  if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (allowedRoles && !hasAppRole(user, allowedRoles)) return <Navigate to="/" replace />
-  return children
-}
 
 function Layout({ children, breadcrumb }) {
   const { user } = useAuth()
@@ -403,6 +397,11 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path={FORCED_PASSWORD_PATH} element={
+            <ProtectedRoute>
+              <ForcedPasswordChange />
+            </ProtectedRoute>
+          } />
           <Route path="/" element={
             <ProtectedRoute>
               <HomeRoute />

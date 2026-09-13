@@ -111,20 +111,20 @@ describe('pages/Login.jsx', () => {
     await waitFor(() => expect(screen.queryByLabelText(/nom d'utilisateur/i)).not.toBeInTheDocument())
   })
 
-  // NOTE (écart constaté, P00-04) : le backend expose user.must_change_password
-  // mais le frontend Login.jsx/AuthContext ne gèrent aucune redirection de
-  // changement de mot de passe obligatoire. Comportement ACTUEL documenté :
-  // la connexion réussit sans invite. À traiter dans un lot fonctionnel (à
-  // confirmer avec le commanditaire), sans correction silencieuse ici.
-  it('[écart] must_change_password n’entraîne aujourd’hui aucune redirection', async () => {
-    const user = makeUser('AUDITEUR') // rôle mobile pour garder une assertion stable
-    user.must_change_password = true
-    apiMock.post.mockResolvedValueOnce({ data: makeLoginResponse(user, { refreshInCookie: false }) })
+  // Régression §10.1 (corrigé au LOT 46) : un compte WEB autorisé marqué
+  // must_change_password se connecte normalement ; Login navigue vers
+  // l'accueil, et le garde ProtectedRoute le renvoie alors vers l'écran de
+  // changement obligatoire (cette redirection est testée en bout en bout
+  // dans ProtectedRoute.test.jsx, avec le vrai Login et la vraie page forcée).
+  it('connecte un compte web marqué must_change_password sans erreur (§10.1)', async () => {
+    const user = makeUser('ADMIN', { username: 'badgeadmin', must_change_password: true })
+    apiMock.post.mockResolvedValueOnce({ data: makeLoginResponse(user) })
     renderLogin()
-    await userEvent.type(screen.getByLabelText("Nom d'utilisateur"), 'p001')
-    await userEvent.type(screen.getByLabelText('Mot de passe'), 'p001')
+    await userEvent.type(screen.getByLabelText("Nom d'utilisateur"), 'badgeadmin')
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'admin123')
     await userEvent.click(screen.getByRole('button', { name: /se connecter/i }))
-    // Le compte étudiant est refusé pour cause de rôle, indépendamment du flag.
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
+
+    await waitFor(() => expect(window.localStorage.getItem('access_token')).toBe('access.jwt'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

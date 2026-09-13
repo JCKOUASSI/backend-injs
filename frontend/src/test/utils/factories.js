@@ -71,6 +71,10 @@ export function makeLoginResponse(user, { refreshInCookie = true, refresh = 'ref
     access,
     refresh: refreshInCookie ? undefined : refresh,
     refresh_in_cookie: refreshInCookie,
+    // Présent en tête et dans le profil utilisateur, comme la vue de login
+    // réelle (UserSerializer) ; le garde de changement obligatoire (§10.1)
+    // lit user.must_change_password juste après la connexion.
+    must_change_password: user.must_change_password ?? false,
     user: {
       id: user.id,
       username: user.username,
@@ -79,6 +83,7 @@ export function makeLoginResponse(user, { refreshInCookie = true, refresh = 'ref
       email: user.email,
       role: user.role,
       secretariat: user.secretariat ?? null,
+      must_change_password: user.must_change_password ?? false,
     },
     role_context: user.role_context || {},
   }

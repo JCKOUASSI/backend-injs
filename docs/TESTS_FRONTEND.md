@@ -359,10 +359,31 @@
 > admis). Le test qui figurait l'action immédiate devient deux régressions
 > (annulation sans aucun DELETE, confirmation avec DELETE et toast) ; le
 > total passe de 1408 à 1409 tests.
-> Les LOT 4 à 7, 13, 17, 19, 34, 37, 43, 44 et 45 sont les lots qui touchent
-> la logique applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18,
-> 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b,
-> 38c, 38d, 38e, 39, 40, 41 et 42 sont des lots de tests purs.
+> Le **[LOT 46]**, sur feu vert explicite (décision d'expert déléguée :
+> blocage total recommandé pour la sécurité), implémente le **changement de
+> mot de passe obligatoire** (§10.1) : un nouveau garde `ProtectedRoute`
+> (extrait d'`App.jsx` vers `src/components/auth/ProtectedRoute.jsx`) renvoie
+> un compte marqué `must_change_password` vers un écran dédié
+> (`src/pages/ForcedPasswordChange.jsx`, route nue hors layout) quelle que
+> soit la page demandée, avec mémorisation de la destination ; l'écran
+> réutilise le contrat existant `POST /auth/me/change-password/`
+> (ancien/nouveau/confirmation, minimum 8, erreurs de champ backend), appelle
+> `refreshUser()` après succès (le backend bascule le drapeau à faux) puis
+> reconduit à la cible initiale, et offre la déconnexion. La détection vaut
+> dès le login (Login navigue vers `/`, le garde intercepte) et après tout
+> `refreshUser`. La fabrique de test `makeLoginResponse` reflète désormais le
+> contrat réel (le flag est présent en tête et dans `user`, comme la vue de
+> login backend). 20 nouveaux tests répartis sur deux fichiers (garde
+> `ProtectedRoute.test.jsx` : redirection forcée, absence de boucle,
+> authentification, restriction de rôle, parcours de connexion complet,
+> déverrouillage après changement ; `ForcedPasswordChange.test.jsx` :
+> validations client, succès, trois formes d'erreur serveur, bascule œil,
+> déconnexion), auxquels s'ajoute 1 test smoke pour la nouvelle page ; total
+> 1409 → 1430, 53 → 55 fichiers de tests.
+> Les LOT 4 à 7, 13, 17, 19, 34, 37, 43, 44, 45 et 46 sont les lots qui
+> touchent la logique applicative, sur feu vert explicite ; les LOT 8 à 12,
+> 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36,
+> 38a, 38b, 38c, 38d, 38e, 39, 40, 41 et 42 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -475,7 +496,7 @@ n'est pas respecté (voir §7). Le rapport HTML de couverture est généré dans
 src/test/
 ├── setup.js                  # polyfils jsdom + reset global
 ├── smoke/
-│   └── pages.smoke.test.jsx  # un test de montage par page (53 pages)
+│   └── pages.smoke.test.jsx  # un test de montage par page (54 pages)
 ├── fixtures/
 │   └── dashboard.js          # statistiques 100 % chiffrées (Dashboard/Stats)
 └── utils/
@@ -580,7 +601,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (53 fichiers, 1379 tests)
+### 6.2 Fichiers de test colocalisés (55 fichiers, 1430 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -594,9 +615,11 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/services/scolarite.test.js` | unitaire | Services scolarité/admissions : chemins d'endpoint exacts (slash final Django), paramètres de requête, passages à blanc. |
 | `src/context/AuthContext.test.jsx` | intégration | Connexion, persistance, `refreshUser`, **purge de session** en cas de jeton illisible ou de rôle interdit (`FORMATEUR`), absence de stockage quand l'API ne renvoie pas de jeton refresh. |
 | `src/context/ToastContext.test.jsx` | intégration | Affichage, types, disparition automatique (fausses horloges), fermeture manuelle, et **stabilité de la valeur de contexte à l'apparition/disparition d'un toast (régression §10.10, LOT 13)**. |
-| `src/pages/Login.test.jsx` | composant/page | Marque INJS, soumission → création de session, erreurs serveur/génériques, **refus des rôles FORMATEUR/AUDITEUR**, bascule « voir le mot de passe », redirection si déjà authentifié. Contient aussi le test `[écart]` du §10.1. |
+| `src/pages/Login.test.jsx` | composant/page | Marque INJS, soumission → création de session, erreurs serveur/génériques, **refus des rôles FORMATEUR/AUDITEUR**, bascule « voir le mot de passe », redirection si déjà authentifié. L'ancien test `[écart]` du §10.1 est devenu au LOT 46 une **régression** : un compte web marqué `must_change_password` se connecte sans erreur (le blocage est assuré par `ProtectedRoute`, voir §10.1). |
+| `src/pages/ForcedPasswordChange.test.jsx` | page | **11 tests (LOT 46, §10.1), écran de changement de mot de passe obligatoire — 100 % lignes/fonctions, 96,1 % branches** : rendu du bandeau et des trois champs pour un compte marqué `must_change_password` ; client non valide (champs vides, nouveau < 8, confirmation différente) sans appel ; bascule œil en clair ; succès `POST /auth/me/change-password/` {`old_password`,`new_password`} puis `refreshUser()` et renvoi vers la destination mémorisée ; erreurs backend `old_password` (liste), `new_password` (liste puis chaîne), `detail` en alerte globale, erreur réseau générique ; déconnexion renvoyant à `/login`. |
 | `src/components/Pagination.test.jsx` | composant | Navigation bornée, libellés, gestion des bornes. |
 | `src/components/ConfirmModal.test.jsx` | composant | Confirmation/annulation, action en cours, contenu. |
+| `src/components/auth/ProtectedRoute.test.jsx` | composant | **9 tests (LOT 46, §10.1), garde de route — 100 % lignes/fonctions/branches** : écran d'attente pendant le chargement de `/auth/me/`, visiteur renvoyé vers `/login`, accès autorisé sans flag, redirection forcée d'un compte `must_change_password` vers `/changement-mot-de-passe-obligatoire` (avec `state.from`, sans boucle depuis cette route, redirection `/` quand on visite la route sans flag), restriction de rôle (`allowedRoles` refusée/acceptée), parcours de connexion complet d'un compte marqué et déverrouillage après changement. |
 | `src/hooks/useClientPagination.test.jsx` | hook | Slice, remise à la page 1 selon dépendances, bornes, tailles de page. |
 
 **Moteur de tableaux/listes génériques (LOT 1)**
@@ -651,12 +674,12 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/components/AuditeursNotoiresPanel.test.jsx` | composant | **19 tests (LOT 38d), absents notoires — 100 % lignes / 100 % fonctions / 93 % branches**, rendu direct sans provider. **`filterAuditeursNotoires` (pur)** : donnée nulle, total/pct arrondi au dixième, repli inscrits (`opts.inscrits` > `data.inscrits` > 0), filtre secrétariat avec coercition chaîne, filtre grade/groupe y compris le repli `—`, cumul des filtres. **`AuditeursNotoiresKpiStrip`** : rendu nul sans données, bandeau vert à total 0, singulier/pluriel, pourcentage en virgule, inscription entre parenthèses, mention « Module démarré ». **`AuditeursNotoiresPanel`** : messages « Données non disponibles. » / « Aucun absent notoire sur ce périmètre. », 12 colonnes complètes vs 7 en mode `compact`, numérotation, grade/groupe combinés ou en repli, contacts joints par « · » / seul / aucun, motif en rouge ou `—`, valeurs manquantes en `—`, `maxHeight`/overflow du conteneur défilant, pied de tableau avec/sans part des inscrits, lignes sans `id`. |
 | `src/components/PointJournalierCPFAE.test.jsx` | composant | **16 tests (LOT 38d), modèle Excel du point journalier FAC — 100 % lignes / 100 % fonctions / 90 % branches**, rendu direct. **`pjPct`** : fractions formatées en français à 2 décimales, chaîne numérique acceptée, repli `—` (null/undefined/NaN/non numérique). **`PointJournalierTableauCPFAE`** : rendu nul sans `tb`, titre/ligne DATE (jour, mois, année, organisme), sidebar de vague par défaut « SECONDE VAGUE » / personnalisée et trimée, taux du jour présence/absence et leur repli `—` ; **créneaux** : en-tête horaire avec repli `—`, lignes GROUPES (avec salles et `—`), 5 lignes de données dans l'ordre du modèle (ÉFFECTIF, PRÉSENTS, ABSENTS, TAUX DE PRÉSENCE, TAUX D'ABSENCE), valeurs brutes mises à 0 et taux en `—` quand elles manquent, totaux de dernière colonne, **cellules de padding** quand un créneau a moins de groupes que le maximum des deux créneaux, créneau absent non rendu sans planter, minimum `nGroups = 1`. |
 | `src/pages/Dashboard.test.jsx` | page | **34 tests, 99,7 % lignes / 100 % fonctions / 97,6 % branches (LOT 43).** **Chargement, période de présence et erreurs (7 tests d'origine, durcis au LOT 42)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), **distinction échec total / échec partiel** (§10.6 corrigé). **LOT 42 (+27 tests, sans toucher à la page)** : KPI d'en-tête (modules 341 / sous-totaux démarrés-planifiés-terminés, volume 480h/600h et taux, 1207 auditeurs), cartes **Capacité du jour** (70/90, 5/8, séances planifiées), **Exécution live** (séances actives, pointages du jour, en salle, retard moyen « 4.5 min ») ; **table des modules débutés** avec lignes complètes et tous les replis (intitulé, grade, site composé, « Non assigné », « — », dates en `-`, effectifs et pourcentages d'absence 20/40/50/75 %, seuils de couleur vert/warning/rouge, module sans effectif en 0/0 sans pourcentage, cinq liens œil `/formations/{id}/modules/{module_id}`) ; **prochaines séances** avec/sans heure prévue, date formatée, chevrons (dont module_id null) ; **derniers pointages** avec les trois badges (Enseignant/Encadrant/Étudiant), heures `fmtTime`, sortie absente et cinq replis « — » ; badge de période volume horaire servi par les stats ; bloc présences sur jour/semaine/mois/année (zéros formatés « 0 (0.0 %) », seuils jaune puis rouge, repli `taux || 0`). **Carte Secrétariats** (ADMIN/DIRECTION) : propagation `secretariat=` aux deux ressources puis retour « Tous », état « Chargement... » figé par promesse différée ; **jour de référence** (`date_mode=date&date=…`, plus de `seance_en_cours`, `reference_date` aux stats, sous-titre « Référence: JJ/MM/AAAA ») ; **période volume horaire** (pilule « Cette année » → `preset=annee`, bouton Appliquer, période entièrement future + raccourci « Voir ce mois » → `preset=mois`) ; **rôles** (DIRECTION voit les secrétariats mais pas « Pointages du jour », ENCADRANT sans appel secrétariats avec titre « Mes modules débutés » et sélecteur de période inline semaine 450/500, SECRETARIAT avec mention du secrétariat rattaché) ; **libellés présences** selon date valide/invalide ; **états vides** (trois messages + « aucune personne attendue »), **formes de liste défensives** (tableau brut, objet sans `results`), **replis de configuration** (salut par username sans `first_name`, appel stats sans query string une fois tout filtre vidé). Deux tests `[écart]` figuraient le comportement défectueux (rafraîchissement de visibilité non silencieux **§10.16**, `presence_period` inconnue qui faisait planter la page / date vidée → « Référence: Invalid Date » **§10.17**) ; **les deux écarts sont corrigés au LOT 43**, ces tests sont devenus des régressions et le normalisateur `readDashboardFilters` gagne 2 tests unitaires dans `listFilters.test.js` (33 tests). Les rares branches résiduelles sont inatteignables par l'UI (appel sans argument de `handleApplyVhPeriod`, filets de repli sur la période/la date désormais doublonnés par la validation en amont, utilisateur non authentifié, et un artefact d'instrumentation v8 sur la flèche à corps de bloc du `map` des modules). |
-| `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
+| `src/test/smoke/pages.smoke.test.jsx` | smoke | **54 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
 
 `src/test/smoke/pages.smoke.test.jsx` tient une table `PAGES` de tuples
-`[nom, Composant, motif de route, URL]` couvrant les **53 écrans** : 37 racines,
+`[nom, Composant, motif de route, URL]` couvrant les **54 écrans** : 38 racines,
 3 pages d'archives, 13 écrans du module scolarité/admissions.
 
 Chaque test : rend la page en `ADMIN`, avec `safeData` vide et l'utilisateur
@@ -679,9 +702,9 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 45 (V8, `npm run test:coverage`), sur les zones ciblées
-(le LOT 44 transformait un test `[écart]` en régression sans ajouter de test,
-le LOT 45 découpe un test en deux régressions : 1408 → 1409) :
+Mesure après le LOT 46 (V8, `npm run test:coverage`), sur les zones ciblées
+(le LOT 46 ajoute l'écran et le garde de changement de mot de passe
+obligatoire avec 20 tests : 1409 → 1430, 53 → 55 fichiers) :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -727,8 +750,10 @@ le LOT 45 découpe un test en deux régressions : 1408 → 1409) :
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/Maquettes.jsx` (LOT 40) | **100 %** | **100 %** | **100 %** | **93 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
+| `components/auth/ProtectedRoute.jsx` (LOT 46) | **100 %** | **100 %** | **100 %** | **100 %** |
+| `pages/ForcedPasswordChange.jsx` (LOT 46) | **100 %** | **100 %** | **100 %** | **96,1 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **96,6 %** | **96,6 %** | **94,2 %** | **89,2 %** |
-| **Global `src/` (toutes zones)** | **76,9 %** | **76,9 %** | **72,0 %** | **82,3 %** |
+| **Global `src/` (toutes zones)** | **77,6 %** | **77,6 %** | **72,5 %** | **82,8 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -743,7 +768,8 @@ le LOT 45 découpe un test en deux régressions : 1408 → 1409) :
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
 > 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → 1314 (LOT 38e) →
 > 1354 (LOT 39) → 1374 (LOT 40) → 1379 (LOT 41) → 1406 (LOT 42) →
-> **1408 (LOT 43, inchangé au LOT 44 correctif) → 1409 (LOT 45)** ;
+> **1408 (LOT 43, inchangé au LOT 44 correctif) → 1409 (LOT 45) →
+> 1430 (LOT 46)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
@@ -752,9 +778,10 @@ le LOT 45 découpe un test en deux régressions : 1408 → 1409) :
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
 > 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → 73,4 % (LOT 38c) →
 > 73,9 % (LOT 38d) → 75,2 % (LOT 38e) → 76,6 % (LOT 39) →
-> 76,8 % (LOT 40) → 76,9 % (LOT 41) → 77,5 % (LOT 42) → **77,5 % (LOT 43)**
+> 76,8 % (LOT 40) → 76,9 % (LOT 41) → 77,5 % (LOT 42) → 77,5 % (LOT 43) →
+> **77,6 % (LOT 46)**
 > — le seuil des 60 % de lignes reste largement franchi, **les fonctions
-> montent à 72,4 % (plancher CI 23 %)**, les branches à 82,9 % (plancher
+> montent à 72,5 % (plancher CI 23 %)**, les branches à 82,8 % (plancher
 > CI 60 %). Le très léger tassement de branches à `Dashboard.jsx` (98 % →
 > 97,6 %) au LOT 43 est volontaire : la validation de `readDashboardFilters`
 > rend deux filets de repli (`|| periodStats.jour`, date `NaN`) inatteignables
@@ -1056,10 +1083,29 @@ logique applicative : les écarts y étaient seulement constatés et tracés. Le
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
 **LOT 17 (§10.11)**, le **LOT 19 (§10.12)**, le **LOT 34 (§10.13)** et le
 **LOT 37 (§10.14)**, le **LOT 43 (§10.16, §10.17)**, le
-**LOT 44 (§10.15)** et le **LOT 45 (§10.9)**. Le point encore ouvert est
-ci-dessous (§10.1).
+**LOT 44 (§10.15)**, le **LOT 45 (§10.9)** et le **LOT 46 (§10.1)**.
+**Tous les écarts signalés sont désormais soldés.**
 
-### 10.1 Changement de mot de passe obligatoire ignoré par le web
+### 10.1 ~~Corrigé au LOT 46~~ — changement de mot de passe obligatoire ignoré par le web
+
+> **Corrigé au LOT 46 (feu vert explicite / décision d'expert déléguée,
+> option « blocage total »).** Le garde `ProtectedRoute`, extrait d'`App.jsx`
+> dans `src/components/auth/ProtectedRoute.jsx`, redirige tout compte marqué
+> `must_change_password` vers la route nue
+> `/changement-mot-de-passe-obligatoire` (composant
+> `src/pages/ForcedPasswordChange.jsx`, hors layout applicatif), quelle que
+> soit la page demandée, et mémorise la destination d'origine dans
+> `location.state.from`. L'écran impose ancien/nouveau/confirmation
+> (minimum 8, concordance, erreurs de champ renvoyées par le backend), appelle
+> `POST /auth/me/change-password/` puis `refreshUser()` (la vue backend
+> repasse déjà le drapeau à faux) et reconduit l'utilisateur à sa cible ; la
+> déconnexion reste possible. La contrainte vaut dès la connexion (Login va
+> vers `/`, le garde intercepte) et après chaque rafraîchissement du profil.
+> La fabrique `makeLoginResponse` reflète maintenant le contrat réel
+> (drapeau en tête et dans `user`). Le test `[écart]` de `Login.test.jsx` est
+> devenu une régression de connexion ; le forçage, le parcours complet et le
+> déverrouillage sont couverts par 20 tests dédiés (garde + page). Analyse
+> initiale conservée ci-dessous.
 
 Le backend expose l'attribut **`user.must_change_password`**
 (`backend/authentication/models.py`, sérialiseurs, badges de comptes). Le
@@ -1097,9 +1143,11 @@ garantissent que toute régression future sera capturée.
 
 > Les lots 0 à 3 n'ont modifié **aucune logique applicative** : uniquement des
 > tests, le harnais, des fixtures et les seuils. Les LOT 4 à 7 sont les lots
-> correctifs (§10.2, §10.4, §10.5, §10.6, §10.7, §10.8). Le seul point encore
-> ouvert de cette section est §10.1 (fonctionnalité `must_change_password`, non
-> tranchée).
+> correctifs (§10.2, §10.4, §10.5, §10.6, §10.7, §10.8). **Depuis le LOT 46,
+> plus aucun point de la section §10 n'est ouvert** : le dernier, §10.1
+> (`must_change_password`), y est soldé par le garde de forçage et l'écran
+> dédié ; la campagne P00-04 est donc close (écarts §10.1 à §10.17 tous
+> traités).
 
 ### 10.3 Variables inutilisées (code mort) — soldé au LOT 7, le lint est vierge
 
@@ -1709,14 +1757,15 @@ sous-titre absent ou cohérent).
 
 ## 11. Couverture des pages — ce qui reste à faire
 
-Les **53 pages** existantes bénéficient d'au moins un test smoke (montage sans
+Les **54 pages** existantes bénéficient d'au moins un test smoke (montage sans
 erreur avec données vides) :
 
 `Admissions, AffectationNew, AnalyseQualitative, ArchiveCahiersAppel,
 ArchiveListesNotes, ArchivesDashboard, CampagneDetail, Campagnes, Candidatures,
 ChargesEnseignants, Dashboard, DecisionsPedagogiques, EdtNew, Edts, Equivalences,
 EvaluationAcademique, EvaluationDashboard, EvaluationDetail, EvaluationList,
-EvaluationTake, FicheAuditeur, FicheEtudiant, FicheFormateur, FinanceAjustements,
+EvaluationTake, FicheAuditeur, FicheEtudiant, FicheFormateur,
+ForcedPasswordChange, FinanceAjustements,
 FinanceDashboard, FinanceEncadrants, FinanceParametrage, FinancesEtudiantes,
 Formateurs, FormationDetail, Formations, Graduation, Groupes, ImportExcel,
 Inscriptions, Jurys, MaquetteDetail, Maquettes, ModuleDetail, Modules, MonEspace,
@@ -2205,13 +2254,15 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    100 % de fonctions ; LOT 43 corrige ses deux écarts §10.16 et §10.17)
    sont faites ; **ce panier est désormais vide** — toutes les pages ont au
    moins un test smoke et les écrans fonctionnels majeurs sont verrouillés ;
-4. écarts encore ouverts, dans des lots dédiés :
+4. ~~écarts encore ouverts, dans des lots dédiés~~ **: tous soldés au LOT 46
+   (§10.1 à §10.17) — la campagne P00-04 est close** :
    - ~~§10.12 bug bloquant de la modale d'**assignation d'un enseignant**
      (prop `enseignant`/`formateur`)~~ **corrigé au LOT 19** (alignement du
      nom de prop, parcours d'assignation bout-en-bout en régressions) ;
-   - §10.1 `must_change_password` (**fonctionnalité** : parcours forcé, nouvelle
-     route protégée, gestion au login et après `refreshUser`) — en attente d'un
-     choix produit (blocage total ou lecture seule) ;
+   - ~~§10.1 `must_change_password` (parcours forcé, route protégée, gestion au
+     login et après `refreshUser`)~~ **corrigé au LOT 46** (garde
+     `ProtectedRoute` + écran dédié `ForcedPasswordChange`, blocage total de
+     l'application tant que le mot de passe n'est pas changé, 20 tests) ;
    - ~~§10.9 retrait d'une ECUE pédagogique sans confirmation (cohérence UX
      avec les autres actions destructrices)~~ **corrigé au LOT 45**
      (`ConfirmModal` ajoutée ; annulation sans DELETE, confirmation avec
