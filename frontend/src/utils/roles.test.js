@@ -116,6 +116,21 @@ describe('utils/roles.js — contrat de sécurité UI', () => {
     })
   })
 
+  describe('autorise() — repli statique et formes inattendues', () => {
+    it('cible nulle ou sans rôle → pas d’autorisation', () => {
+      expect(roles.autorise(null, 'modules', 'archiver')).toBe(false)
+      expect(roles.autorise({}, 'modules', 'archiver')).toBe(false)
+    })
+    it('module ou action inconnue du repli → false (aucune exception)', () => {
+      expect(roles.autorise('ADMIN', 'module_inexistant', 'archiver')).toBe(false)
+      expect(roles.autorise('ADMIN', 'modules', 'action_inexistante')).toBe(false)
+    })
+    it('objet utilisateur sans capacités chargées → repli sur ses rôles', () => {
+      expect(roles.autorise({ role: 'DIRECTION' }, 'modules', 'archiver')).toBe(true)
+      expect(roles.autorise({ roles: ['AUDITEUR'] }, 'modules', 'archiver')).toBe(false)
+    })
+  })
+
   describe('canArchiveModuleFromUser', () => {
     it('user null → false', () => {
       expect(roles.canArchiveModuleFromUser(null)).toBe(false)
@@ -127,10 +142,26 @@ describe('utils/roles.js — contrat de sécurité UI', () => {
       expect(roles.canArchiveModuleFromUser({ role: 'DIRECTION' })).toBe(true)
     })
     it('role_context.can_archive_modules=true force true même pour un rôle a priori non habilité', () => {
-      expect(roles.canArchiveModuleFromUser({ role: 'SECRETARIAT', role_context: { can_archive_modules: true } })).toBe(true)
+      // AUDITEUR ne peut pas archiver par le repli statique : seul le
+      // role_context backend peut lever l'interdiction (branche `return true`).
+      expect(roles.canArchiveModuleFromUser({ role: 'AUDITEUR', role_context: { can_archive_modules: true } })).toBe(true)
     })
     it('role_context.can_archive_modules=false ne court-circuite pas', () => {
       expect(roles.canArchiveModuleFromUser({ role: 'SECRETARIAT', role_context: { can_archive_modules: false } })).toBe(true)
+      // Et ne lève pas l'interdiction d'un rôle non habilité.
+      expect(roles.canArchiveModuleFromUser({ role: 'AUDITEUR', role_context: { can_archive_modules: false } })).toBe(false)
+    })
+    it('capacités backend chargées : elles font autorité sur le contexte et le rôle', () => {
+      const habilite = {
+        role: 'AUDITEUR', role_context: { can_archive_modules: false },
+        capabilities: { capacites: { modules: ['archiver'] } },
+      }
+      expect(roles.canArchiveModuleFromUser(habilite)).toBe(true)
+      const nonHabilite = {
+        role: 'DIRECTION', role_context: { can_archive_modules: true },
+        capabilities: { capacites: { modules: [] } },
+      }
+      expect(roles.canArchiveModuleFromUser(nonHabilite)).toBe(false)
     })
   })
 
@@ -203,6 +234,10 @@ describe('utils/roles.js — contrat de sécurité UI', () => {
       expect(roles.niveauAcces(user)).toBe('N2')
       expect(roles.perimetresAcces(user)).toEqual({ niveaux: ['SERVICE'] })
       expect(roles.niveauAcces({ role: 'SECRETARIAT' })).toBeNull()
+      expect(roles.perimetresAcces({ role: 'SECRETARIAT' })).toBeNull()
+      // Aucun utilisateur → null (les capacités ne sont pas chargées).
+      expect(roles.niveauAcces(null)).toBeNull()
+      expect(roles.perimetresAcces(null)).toBeNull()
     })
 
     it('un corps de capacités mal formé n’est pas pris en compte', () => {
