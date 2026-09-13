@@ -154,10 +154,28 @@ export const buildReferentielsSearchParams = (tab) => {
   return p
 }
 
+/**
+ * Périodes de présence acceptées par le tableau de bord. Toute valeur d'URL
+ * hors de cette liste est normalisée à « jour » (§10.17, corrigé au LOT 43 :
+ * une période inconnue faisait planter le rendu sur
+ * `periodLabels[presencePeriod].toUpperCase()`).
+ */
+export const DASHBOARD_PRESENCE_PERIODS = ['jour', 'semaine', 'mois', 'annee']
+
+const isValidDashboardDate = (value) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00`)
+  return !Number.isNaN(parsed.getTime())
+}
+
 export const readDashboardFilters = (searchParams) => ({
   secretariat: searchParams.get('secretariat') || '',
-  presence_period: searchParams.get('presence_period') || 'jour',
-  reference_date: searchParams.get('reference_date') || new Date().toISOString().slice(0, 10),
+  presence_period: DASHBOARD_PRESENCE_PERIODS.includes(searchParams.get('presence_period'))
+    ? searchParams.get('presence_period')
+    : 'jour',
+  reference_date: isValidDashboardDate(searchParams.get('reference_date'))
+    ? searchParams.get('reference_date')
+    : new Date().toISOString().slice(0, 10),
 })
 
 export const buildDashboardSearchParams = (filters, period) => {

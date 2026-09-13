@@ -214,6 +214,25 @@ describe('utils/listFilters — filtres Dashboard / statistiques', () => {
     expect(f.reference_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
+  // Régression §10.17 (corrigé au LOT 43) : une présence_period inconnue est
+  // normalisée vers « jour » au lieu de faire planter le rendu du Dashboard.
+  it('readDashboardFilters normalise une presence_period inconnue vers le jour (§10.17)', () => {
+    expect(readDashboardFilters(sp('?presence_period=bizarre')).presence_period).toBe('jour')
+    expect(readDashboardFilters(sp('?presence_period=JOUR')).presence_period).toBe('jour')
+    for (const period of ['semaine', 'mois', 'annee']) {
+      expect(readDashboardFilters(sp(`?presence_period=${period}`)).presence_period).toBe(period)
+    }
+  })
+
+  // Régression §10.17 : une référence invalide (ou un jour inexistant) est
+  // remplacée par la date du jour plutôt que de produire « Invalid Date ».
+  it('readDashboardFilters remplace une reference_date invalide par aujourd’hui (§10.17)', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    expect(readDashboardFilters(sp('?reference_date=date-invalide')).reference_date).toBe(today)
+    expect(readDashboardFilters(sp('?reference_date=2026-13-40')).reference_date).toBe(today)
+    expect(readDashboardFilters(sp('?reference_date=2026-01-15')).reference_date).toBe('2026-01-15')
+  })
+
   it('buildDashboardSearchParams omet les valeurs par défaut (jour / aujourd’hui)', () => {
     const today = new Date().toISOString().slice(0, 10)
     const p = buildDashboardSearchParams({ secretariat: '', presence_period: 'jour', reference_date: today })

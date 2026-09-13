@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { Component } from 'react'
 import { screen, waitFor, within, fireEvent, act } from '@testing-library/react'
 
 vi.mock('@/services/api', async (importOriginal) => {
@@ -19,30 +18,6 @@ function WaitForAuth({ children }) {
   const { isAuthenticated, loading } = useAuth()
   if (loading || !isAuthenticated) return <div className="loading"><div className="spinner" /></div>
   return children
-}
-
-// Limite de rendu d'appoint (test uniquement) : capture une exception de
-// rendu du Dashboard pour pouvoir la figer sans faire tomber toute la run.
-class CrashProbe extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { error: null }
-  }
-  static getDerivedStateFromError(error) {
-    return { error }
-  }
-  render() {
-    if (this.state.error) return <div data-testid="render-crash">{this.state.error.message}</div>
-    return this.props.children
-  }
-}
-
-const mountDashboardWithProbe = (me, entry = '/') => {
-  apiController.setMe(me)
-  return renderWithProviders(
-    <WaitForAuth><CrashProbe><Dashboard /></CrashProbe></WaitForAuth>,
-    { authUser: me, initialEntries: [entry], routePattern: '/' },
-  )
 }
 
 const BASE = 'http://testserver'
@@ -620,10 +595,20 @@ describe('pages/Dashboard.jsx — libellé du bloc présences selon le jour de r
     expect(await screen.findByText(/présences du 15\/01\/2026/i)).toBeInTheDocument()
   })
 
-  it('avec une date invalide, le titre retombe sur « du jour »', async () => {
+  it('avec une date invalide, normalise vers aujourd’hui : titre daté du jour, sous-titre cohérent (§10.17)', async () => {
     mountDashboard(adminMe(), '/?reference_date=date-invalide&presence_period=jour')
-    expect(await screen.findByText(/présences du jour/i)).toBeInTheDocument()
+    // La date invalide est remplacée par aujourd'hui : le titre est daté du
+    // jour courant (et non plus « du jour » avec un sous-titre « Invalid Date »).
+    const todayLabel = new Date().toLocaleDateString('fr-FR')
+    expect(
+      await screen.findByText(new RegExp(`présences du ${todayLabel.replace(/\//g, '\\/')}`, 'i')),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/date-invalide/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+    // La date invalide n'est transmise à aucune ressource.
+    expect(apiMock.get.mock.calls.some(([p]) => String(p).includes('date-invalide'))).toBe(false)
+    // La liste reste en temps réel (la référence normalisée vaut aujourd'hui).
+    expect(callsTo('/formations/list/').at(-1).get('seance_en_cours')).toBe('true')
   })
 })
 
@@ -704,27 +689,19 @@ describe('pages/Dashboard.jsx — replis de configuration', () => {
     expect(await screen.findByText(/Bonjour, sansprenom/)).toBeInTheDocument()
   })
 
-  // NOTE (écart constaté, P00-04, §10.17) : readDashboardFilters transmet
-  // tel quel `presence_period` sans valider la valeur. Avec une période
-  // inconnue (URL trafiquée ou lien erroné), `periodLabels[presencePeriod]`
-  // vaut undefined et le rendu lève sur `.toUpperCase()` (Dashboard.jsx:390,
-  // puis `.toLowerCase()` ligne 423 et un libellé « Présences undefined » au
-  // niveau du bloc présences) : tout l'écran devient blanc. Le fallback de
-  // données (`periodStats[presencePeriod] || periodStats.jour`) existe mais
-  // aucun équivalent ne protège les libellés. Comportement ACTUEL figé
-  // ci-dessous ; correction (validation/repli sur 'jour') réservée à un lot
-  // correctif soumis au feu vert utilisateur.
-  it('[écart] une presence_period inconnue dans l’URL fait planter le rendu (§10.17)', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const r = mountDashboardWithProbe(adminMe(), '/?presence_period=bizarre')
-      const crash = await r.findByTestId('render-crash')
-      expect(crash.textContent).toMatch(/toUpperCase|toLowerCase/)
-      // Aucune carte du jour ne peut s'afficher : le rendu est cassé.
-      expect(r.queryByText('Nombre Étudiants Présents/Attendus')).not.toBeInTheDocument()
-    } finally {
-      spy.mockRestore()
-    }
+  // Régression §10.17 (corrigé au LOT 43) : readDashboardFilters normalise
+  // désormais une `presence_period` inconnue (URL trafiquée ou lien erroné)
+  // vers « jour ». Avant le correctif, `periodLabels[presencePeriod]` valait
+  // undefined et le rendu levait sur `.toUpperCase()`, rendant l'écran blanc.
+  it('une presence_period inconnue dans l’URL est normalisée vers le jour sans planter (§10.17)', async () => {
+    mountDashboard(adminMe(), '/?presence_period=bizarre')
+    // Les indicateurs du jour s'affichent normalement.
+    expect(await screen.findByText('Nombre Étudiants Présents/Attendus')).toBeInTheDocument()
+    expect(screen.getByText(/présences du /i)).toBeInTheDocument()
+    // La valeur invalide n'est jamais répercutée vers l'API.
+    const anyCallWithBizarre = apiMock.get.mock.calls.some(([p]) => String(p).includes('bizarre'))
+    expect(anyCallWithBizarre).toBe(false)
+    expect(screen.queryByText(/bizarre/i)).not.toBeInTheDocument()
   })
 
   it('sans aucun filtre actif (ni période, ni jour de référence), l’appel stats n’a aucune query string', async () => {
@@ -745,21 +722,21 @@ describe('pages/Dashboard.jsx — replis de configuration', () => {
     })
   })
 
-  // NOTE (écart constaté, P00-04, §10.17) : quand l'utilisateur vide le champ
+  // Régression §10.17 (corrigé au LOT 43) : quand l'utilisateur vide le champ
   // « Jour spécifique », referenceDate devient '' : le bloc présences et la
-  // liste retombent bien sur le jour courant, mais le sous-titre de bienvenue
-  // construit `new Date('T00:00:00')` et affiche « Référence: Invalid Date ».
-  // Comportement ACTUEL figé ci-dessous, correction réservée à un lot
-  // correctif soumis au feu vert utilisateur.
-  it('[écart] vider « Jour spécifique » replace sur le jour mais affiche « Référence: Invalid Date » (§10.17)', async () => {
+  // liste retombent sur le jour courant, et le sous-titre affiche désormais
+  // la date du jour (avant : « Référence: Invalid Date »).
+  it('vider « Jour spécifique » replace sur le jour et affiche la date du jour en référence (§10.17)', async () => {
     mountDashboard(adminMe())
     const input = await screen.findByLabelText('Jour spécifique')
     fireEvent.change(input, { target: { value: '2026-01-15' } })
-    await waitFor(() => expect(callsTo('/formations/list/').at(-1).get('date')).toBe('2026-01-15'))
+    expect(await screen.findByText(/Référence: 15\/01\/2026/)).toBeInTheDocument()
 
     fireEvent.change(input, { target: { value: '' } })
     expect(await screen.findByText(/présences du jour/i)).toBeInTheDocument()
-    expect(screen.getByText(/Référence: Invalid Date/)).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument()
+    const todayLabel = new Date().toLocaleDateString('fr-FR')
+    expect(screen.getByText(new RegExp(`Référence: ${todayLabel.replace(/\//g, '\\/')}`))).toBeInTheDocument()
     const last = callsTo('/formations/list/').at(-1)
     expect(last.has('date_mode')).toBe(false)
     expect(last.get('seance_en_cours')).toBe('true')
@@ -777,16 +754,12 @@ describe('pages/Dashboard.jsx — rafraîchissement au retour d’onglet (§10.1
     apiController.setRoute('/formations/secretariats/', () => [])
   })
 
-  // NOTE (écart constaté, P00-04, §10.16) : useVisibilityPolling invoque la
-  // fonction de rafraîchissement avec un booléen (`callback(true)`, convention
-  // suivie par ModuleDetail.refreshPresences(silent = true)), alors que
-  // Dashboard.loadDashboardData attend un objet ({ silent = false } = {}).
-  // Avec `true` destructuré en objet, `silent` retombe à false : le
-  // rafraîchissement de fond (retour d'onglet) n'est donc jamais silencieux et
-  // peut faire apparaître le bandeau d'erreur lors d'un échec passager.
-  // Comportement ACTUEL figé ci-dessous ; correction (harmonisation du contrat)
-  // réservée à un lot correctif soumis au feu vert utilisateur.
-  it('[écart] le rafraîchissement au retour d’onglet n’est pas silencieux et affiche l’échec de fond (§10.16)', async () => {
+  // Régression §10.16 (corrigé au LOT 43) : useVisibilityPolling appelle le
+  // rafraîchissement avec un booléen (`callback(true)`), convention que
+  // loadDashboardData respecte désormais (signature positionnelle `silent`,
+  // comme ModuleDetail.refreshPresences). Un échec du rechargement de fond au
+  // retour d'onglet ne doit donc PAS faire apparaître le bandeau d'erreur.
+  it('le rafraîchissement au retour d’onglet est silencieux : un échec de fond n’affiche pas le bandeau (§10.16)', async () => {
     let statsAttempts = 0
     apiController.setRoute('/formations/stats/', () => {
       statsAttempts += 1
@@ -800,17 +773,26 @@ describe('pages/Dashboard.jsx — rafraîchissement au retour d’onglet (§10.1
     await waitFor(() => expect(callsTo('/formations/stats/').length).toBe(1))
     expect(screen.queryByText(/n'ont pas pu être chargées/)).not.toBeInTheDocument()
 
-    await act(async () => {
-      Object.defineProperty(document, 'visibilityState', {
-        configurable: true,
-        get: () => 'visible',
-      })
-      document.dispatchEvent(new Event('visibilitychange'))
+    // jsdom expose visibilityState sur Document.prototype : on pose un
+    // descripteur propre (« visible ») qu'on supprimera pour restaurer l'état
+    // initial et éviter toute fuite vers les tests suivants.
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
     })
+    try {
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
 
-    await waitFor(() => expect(callsTo('/formations/stats/').length).toBe(2))
-    // Comportement ACTUEL (incorrect) : un rafraîchissement réellement
-    // silencieux ne toucherait pas au bandeau d'erreur.
-    expect(await screen.findByText(/certaines données n'ont pas pu être chargées/i)).toBeInTheDocument()
+      await waitFor(() => expect(callsTo('/formations/stats/').length).toBe(2))
+      // Le deuxième appel a bien eu lieu (silencieux) et l'écran reste sans
+      // bandeau d'erreur ; une courte attente garantit qu'aucun état n'est posé.
+      await act(async () => {})
+      expect(screen.queryByText(/certaines données n'ont pas pu être chargées/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/erreur lors du chargement/i)).not.toBeInTheDocument()
+    } finally {
+      delete document.visibilityState
+    }
   })
 })

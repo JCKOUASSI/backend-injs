@@ -54,7 +54,11 @@ export default function Dashboard() {
     [selectedSecretariatId, presencePeriod, referenceDate, appliedPeriodKey],
   )
 
-  const loadDashboardData = useCallback(async ({ silent = false } = {}) => {
+  // Le hook useVisibilityPolling invoque cette fonction avec un booléen
+  // positionnel (silent), convention identique à
+  // ModuleDetail.refreshPresences(silent) — un objet { silent } rendait le
+  // rafraîchissement de fond bruyant (§10.16, corrigé au LOT 43).
+  const loadDashboardData = useCallback(async (silent = false) => {
     const statsParams = new URLSearchParams()
     if (selectedSecretariatId) statsParams.set('secretariat', selectedSecretariatId)
     if (referenceDate) statsParams.set('reference_date', referenceDate)
@@ -124,6 +128,13 @@ export default function Dashboard() {
 
   const selectedSecretariat = secretariats.find((s) => String(s.id) === String(selectedSecretariatId))
   const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
+  // Étiquette du jour de référence pour le sous-titre : une référence vide ou
+  // invalide (champ « Jour spécifique » entièrement vidé) retombe sur la date
+  // du jour au lieu d'afficher « Invalid Date » (§10.17, corrigé au LOT 43).
+  const referenceDateParsed = new Date(`${referenceDate || ''}T00:00:00`)
+  const referenceDateLabel = Number.isNaN(referenceDateParsed.getTime())
+    ? new Date().toLocaleDateString('fr-FR')
+    : referenceDateParsed.toLocaleDateString('fr-FR')
   const prochainesSeances = stats?.prochaines_seances || []
   const periodLabels = {
     jour: 'Jour',
@@ -274,7 +285,7 @@ export default function Dashboard() {
             </span>
           )}
           <span style={{ marginLeft: '0.45rem' }}>
-            • Référence: {new Date(`${referenceDate}T00:00:00`).toLocaleDateString('fr-FR')}
+            • Référence: {referenceDateLabel}
           </span>
         </p>
       </div>
