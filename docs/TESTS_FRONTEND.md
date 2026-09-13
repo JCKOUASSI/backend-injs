@@ -283,9 +283,20 @@
 > à triple confirmation, fermeture des modales par la croix, Annuler et le
 > clic sur l'overlay. Le fichier atteint **100 % de lignes et de fonctions**
 > (89 % de branches) ; aucun écart produit révélé.
+> Le **[LOT 40]** verrouille l'écran-liste **`Maquettes.jsx`** (maquettes
+> pédagogiques LMD), qui n'avait aucun test, par **20 nouveaux tests purs** :
+> liste, badges de statut, filtre, référentiels conditionnels aux
+> habilitations, création avec IDs typés, permissions `canActScolarite`,
+> workflow valider / activer / archiver / cloner sous confirmation avec les
+> trois niveaux d'erreur et la désactivation pendant le traitement. Le
+> fichier atteint **100 % de lignes et de fonctions** (93 % de branches) ;
+> aucun écart produit. Ce lot fiabilise aussi un test 38a qui pouvait
+> conclure avant la livraison de la méta (sélecteur de secrétariat encadrant
+> transitoirement désactivé) en attendant explicitement le peuplement de la
+> liste.
 > Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d, 38e et 39 sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d, 38e, 39 et 40 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -503,7 +514,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (52 fichiers, 1354 tests)
+### 6.2 Fichiers de test colocalisés (53 fichiers, 1374 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -552,6 +563,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/scolarite/Graduation.test.jsx` | page | **15 tests (LOT 12), diplômation** : liste (badges, mention/ECTS, tirets de valeur absente, **lien PDF** uniquement pour un diplôme validé, en `target=_blank`), 3 filtres transmis ; **validation** d'un diplôme en attente (`POST …/valider/`, confirmation, toast, rechargement, annulation sans écriture, erreur backend) ; **révocation motivée** (`window.prompt` motif obligatoire : `POST …/revoquer/` `{motif}`, annulation et rejet serveur couverts) ; **portail public de vérification** (`GET …/verifier/{token}/`) : diplôme valide et ses détails, numéro inconnu (`valide:false` + raison), erreur serveur, absence de requête sans numéro ; **lecture seule** qui conserve le portail public ; une **régression §10.10** (échec de chargement sans relance). Couvre **100 % des lignes / 100 % des fonctions**. |
 | `src/pages/scolarite/MonEspace.test.jsx` | page | **2 tests (LOT 13)** : rendu de la fiche étudiante (`/scan/me/fiche/`) et **régression §10.10 sur le second patron** (chargeur lancé par un `useEffect([toast])` direct) : quand la fiche est indisponible, une seule requête et un seul toast, sans boucle de rechargement. |
 | `src/pages/scolarite/Equivalences.test.jsx` | page | **27 tests (LOT 31), équivalences/dispenses — 100 % lignes/fonctions/branches/instructions**. `GET /equivalences/demandes/` au montage : spinner, tableau (neuf statuts dont un inconnu en repli, crédits `?? '—'` y compris `0`), message « Aucune demande. », erreur détaillée puis « Chargement impossible. ». **Habilitations** : pour un rôle acteur (`canActScolarite`), les quatre référentiels sont chargés en `Promise.all` (`/scolarite/ref/annees/?actif=true`, `…/formations/`, `…/niveaux/?actif=true`, `…/etudiants/`) ; la liste des rôles non acteurs (DIRECTION, ENCADRANT, FINANCE) ne les requête pas et ne montre ni carte de création ni boutons d'action ; l'échec des référentiels toasté (« Chargement des référentiels impossible. ») sans masquer la liste. **Badges de statut** : les neuf apparences (`BADGE_STATUT`) dont APPLIQUÉE en `dark` et le repli `secondary`. **Création** `POST /equivalences/demandes/` : payload exact avec IDs `Number(x) || undefined` (soumission sans sélection exercée via `fireEvent.submit`), toast « Demande créée en brouillon. » et rechargement, bouton « + » désactivé pendant l'envoi (promesse différée), erreur `JSON.stringify` du détail serveur puis « Création impossible. ». **Transitions** `POST …/:id/transition/` `{statut}` : les cinq boutons du workflow (Soumettre, Instruire, Avis pédagogique, Décider), absence de bouton sur REJETÉE/APPLIQUÉE/statut inconnu, désactivation globale pendant une action, toasts `Demande {statut}.` (rechargement) et « Transition impossible. ». **Décision** : ouverture de la carte inline (titre `Décision — demande #N`, Annuler/Enregistrer), payload `POST …/:id/decision/` avec défauts `FAVORABLE` / « Direction des études INJS », champs crédits/note vides → `undefined`, fermeture après succès, rechargement, cas d'erreur qui laisse la carte ouverte. **Application** `POST …/:id/appliquer/` `{}` après `window.confirm(/effet académique/i)` : annulation sans appel, succès (« Dispense/équivalence appliquée. », rechargement), échec (« Application impossible. »). Aucune alerte `act` (mûrissement du rechargement après chaque écriture). |
+| `src/pages/scolarite/Maquettes.test.jsx` | page | **20 tests (LOT 40), liste des maquettes LMD — 100 % lignes / 100 % fonctions / 93 % branches**, écran sans aucun test auparavant. **Liste et états** : titre, 9 colonnes, lignes avec liens de détail, versions `vN`, UE/crédits, repli parcours « — », classes de badge des 4 statuts (dont badge générique pour un statut inconnu), spinner figé par promesse, état vide « Aucune maquette. », erreur de chargement détaillée, **filtre par statut** passé en config `axios` (`{ params: { statut } }`, le mock conservant le 2ᵉ argument) et rappel de la liste, retour à « Tous les statuts » sans paramètre. **Permissions** `canActScolarite` : un rôle non habilité (ÉTUDIANT) lit la liste sans la carte « Nouvelle maquette », sans colonne ni boutons d'action, et les 3 référentiels ne sont pas chargés ; un admin charge années/formations/niveaux ; un échec des référentiels notifie « Chargement des référentiels impossible. » sans bloquer la liste. **Création** : POST `…/creer/` avec les 3 IDs convertis en nombres (`Number(x) || undefined`), libellé facultatif (chaîne vide par défaut), toast versionné `Maquette vN créée en brouillon.`, réinitialisation du formulaire et rechargement, erreur détaillée puis message générique « Création impossible. ». **Workflow** : boutons conditionnels (Valider seul en BROUILLON ; Activer + Cloner en VALIDÉE ; Archiver + Cloner en ACTIVE ; Cloner seul sinon), confirmations `window.confirm` exactes avec annulation sans appel, POST `…/<id>/{valider,activer,archiver,cloner}/` avec `{}` et rechargement, toast « Opération effectuée. » sans détail, agrégation de la liste `problemes`, détail `error`, message générique « Action impossible. », et désactivation de tous les boutons pendant le traitement (promesse différée). |
 | `src/pages/scolarite/MaquetteDetail.test.jsx` | page | **35 tests (LOT 32), détail de maquette pédagogique — 100 % lignes/fonctions/branches/instructions**. Chargement en parallèle `GET /scolarite/maquettes/:id/` + `…/journal/` : spinner puis en-tête (titre `libelle` avec repli `ref_formation`, niveau · année · version · badge statut · crédits et volume, lien Retour), regroupement des **UE par semestre** (deux UE d'un même semestre dans une seule carte), rendu UE (code/intitulé/crédits/caractère) et ECUE (crédits, coefficient, volume), badge « archivée » sans action pour une ECUE archivée, alerte des **problèmes de cohérence** (absente sinon), journal des validations (action, utilisateur avec tiret de repli, date `fr-FR`, état « Aucune entrée. »), erreur de chargement détaillée puis « Chargement impossible. » avec écran en spinner. **Habilitations** : contrôles de rédaction (groupe workflow, formulaires UE/ECUE, archivage) et `GET /scolarite/ref/semestres/` réservés aux rôles `canActScolarite` (SECRETARIAT inclus ; ENCADRANT/DIRECTION en lecture stricte) et au statut BROUILLON ; le référentiel des semestres n'est plus demandé en VALIDEE/ACTIVE/ARCHIVEE et son échec est avalé en silence (select avec la seule option fantôme). **Boutons par statut** : Valider (BROUILLON), Activer (VALIDEE), Archiver (ACTIVE), Cloner (tout sauf brouillon). **Workflow** : confirmations exactes (« contenu gelé », « immuable », « Archiver cette maquette ? ») — annulation sans appel puis acceptation, `POST …/{valider|activer|archiver}/` `{}`, toast « Opération effectuée. », maquette rechargée avec nouveaux boutons et formulaires retirés, groupe désactivé pendant l'appel (promesse différée), trois niveaux d'erreur (`problemes` concaténés, détail `error`, « Action impossible. ») sans rechargement. **Clonage** `POST …/cloner/` : annulation sans navigation, toast versionné `Version v{n} créée en brouillon.`, redirection `window.location.href` vers la nouvelle maquette, échecs détaillé/générique (« Clonage impossible. »). **Ajout d'UE** `POST …/ues/` : select alimenté par les semestres, payload typé `{semestre_id: Number, code, intitule, credits: Number||0}` (crédits non numériques → 0 par soumission directe), bouton Ajouter désactivé pendant l'envoi, réinitialisation du formulaire et rechargement, échecs détaillé/générique avec formulaire conservé. **Ajout d'ECUE** `POST …/ues/:id/ecues/` : formulaire propre à chaque UE (le `focus` fixe l'UE rattachée, la saisie reste invisible dans le formulaire de l'autre UE), payload `{code, intitule, credits typés, coefficient: 1}` sans `ue_id` dans le corps, réinitialisation, crédits invalides → 0, deux niveaux d'erreur. **Archivage d'ECUE** `DELETE /scolarite/ecues/:id/?mode=archive` : confirmation exacte, annulation sans appel, succès (« ECUE archivée. », rechargement), échecs détaillé/générique (« Suppression impossible. »). |
 | `src/pages/scolarite/ChargesEnseignants.test.jsx` | page | **23 tests (LOT 33), charges pédagogiques des enseignants — 100 % lignes/fonctions, 96,9 % branches** (les 2 branches résiduelles sont des filets défensifs inatteignables par l'UI : la carte n'est rendue qu'une fois l'année résolue et le clic de ligne fournit toujours un identifiant réel). **Année courante** `GET /scolarite/annee-courante/` au montage (§10.8), puis **occupation + anomalies en `Promise.all`** avec `{params:{annee_id}}` : spinner puis titre et libellé d'année, les six colonnes d'occupation avec badges OK (`text-bg-success`) / Surcharge (`text-bg-danger`), état vide « Aucune affectation. », alerte d'anomalies (compteur `N anomalie(s) détectée(s)`, détails `a.detail`, **tronquée aux 8 premières**), absence d'alerte sinon, réponses sans clés `occupation`/`anomalies` repliées sur `[]`. **Absence d'année** : toast « Aucune année académique courante. », aucun chargement d'occupation (écran en attente — comportement figé) ; **échec occupation ou anomalies** : toast « Chargement des charges impossible. » mais `finally` qui rend la page et son état vide. **Détail enseignant** (clic de ligne, ligne mise en `table-active`) : `GET /enseignants/charges/:id/` puis `…/affectations/?enseignant_id=&annee_academique_id=`, carte « Détail — {enseignant} » (heures prévue/affectée/planifiée/réalisée, table ECUE/type/volume/statut, ECUE absente → tiret), changement d'enseignant, échec « Chargement de la charge impossible. » sans carte ; le détail reste ouvert aux rôles non acteurs. **Référentiels** : cinq GET pour un rôle acteur (`annees` et `niveaux` avec `actif:'true'`, `formations`, `semestres`, `formateurs/list/`) alimentant les sélecteurs (nom/prénom, intitulé, code), **semestres filtrés par niveau** (`niveau_id`, option fantôme seule avant choix du niveau), aucun GET pour un rôle non acteur (ENCADRANT) dont la carte de création est absente. **Deux régressions §10.13 (corrigé au LOT 34)** : l'échec des référentiels affiche le toast SANS crasher (occupation conservée, sélecteurs réduits à leur option fantôme) et des référentiels lents servis après l'occupation laissent l'écran stable ; ces deux tests figuraient `[écart]` au LOT 33 (la carte crashait sur `options.formateurs.map` avec un état `options` incomplet). **Création** `POST /enseignants/affectations/` : payload typé complet (`type_enseignement:'CM'` par défaut, `ecue_id`/`groupe_id` chaînes vides, IDs `Number(x) || undefined`, `volume_horaire: Number||0`, `annee_academique_id` repris de l'année courante), libellé du bouton portant l'année, soumission directe sans sélection (IDs `undefined`, volume invalide → 0), bouton verrouillé pendant l'envoi (promesse différée), **réinitialisation partielle** (enseignant et volume vidés, formation/niveau/semestre conservés), rechargement global (occupation + anomalies) ET du détail si un enseignant était sélectionné, erreur `JSON.stringify` du détail puis « Création impossible. ». |
 | `src/pages/scolarite/FinancesEtudiantes.test.jsx` | page | **25 tests (LOT 26), finance étudiante — 100 % de lignes / 100 % de fonctions / 97 % de branches**. Chargement parallèle `GET /finances-etudiantes/echeanciers/` et `…/paiements/` (normalisation `results || data` sur les deux formes), titre/onglets/bouton Actualiser (qui recharge les deux ressources), spinner initial puis lignes. **Onglet Échéanciers** : étudiant/année/`lignes_count`, badges de statut global (`IMPAYE` danger, `PARTIELLEMENT_PAYE` warning, `COMPLETE` success, statut inconnu → repli secondaire), état vide, navigation entre onglets et retour. **Onglet Paiements** : neuf colonnes (dont Action sous habilitation), identité Étudiant/Candidat/tiret, montant + devise, mode, référence ou tiret, table de badges complète (`INITIE`…`RAPPROCHE`), bouton **Confirmer uniquement pour INITIE/EN_ATTENTE**, état vide et spinner d'onglet. **Création** `POST …/paiements/` : payload exact `{etudiant_id, nature, montant, devise (texte libre), mode, transaction_externe}` (nature/mode sur les listes fermées), message d'idempotence, réinitialisation du formulaire (les `<input type=number>` vides valent `null` en jest-dom), rechargement, erreur serveur détaillée puis message générique. **Confirmation** `POST …/paiements/:id/confirmer/` : `window.confirm` (libellé contenant id/montant/devise, annulation = aucun appel), succès avec toast de quittance et rechargement, échec détaillé (preuve manquante) puis générique. **Habilitations** : FINANCE/DIRECTION/CHEF_CPFAE_ADMIN/CPFAE_ADMIN (saisie + colonne Action), SECRETARIAT/CHEF_SECRETARIAT (saisie mais pas de confirmation), ENCADRANT (lecture stricte, données consultables). |
@@ -601,7 +613,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 39 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 40 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -645,9 +657,10 @@ Mesure après le LOT 39 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MonEspace.jsx` (LOT 13) | **74 %** | 74 % | 50 % | **100 %** |
 | `pages/scolarite/Equivalences.jsx` (LOT 31) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
+| `pages/scolarite/Maquettes.jsx` (LOT 40) | **100 %** | **100 %** | **100 %** | **93 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
-| **Global `src/` (toutes zones)** | **76,6 %** | **76,6 %** | **71,4 %** | **82,2 %** |
+| **Global `src/` (toutes zones)** | **76,8 %** | **76,8 %** | **72,0 %** | **82,3 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -661,7 +674,7 @@ Mesure après le LOT 39 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
 > 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → 1314 (LOT 38e) →
-> **1354 (LOT 39)** ;
+> 1354 (LOT 39) → **1374 (LOT 40)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
@@ -669,19 +682,19 @@ Mesure après le LOT 39 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → 60,4 % (LOT 31) →
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
 > 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → 73,4 % (LOT 38c) →
-> 73,9 % (LOT 38d) → 75,2 % (LOT 38e) → **76,6 % (LOT 39)** — le seuil des
-> 60 % de lignes reste largement franchi, **les fonctions montent à 71,4 %
-> (plancher CI 23 %)**, les branches à 82,2 % (plancher CI 60 %). Le LOT 38b
-> porte `Statistiques.jsx` de 64 % à 87 % de lignes, le LOT 38c verrouille
-> `RapportsWorkflowPanel` à 99,2 %, le LOT 38d les deux composants de
-> présentation du point journalier (`AuditeursNotoiresPanel`,
-> `PointJournalierCPFAE`) à 100 % de lignes et de fonctions, le LOT 38e
-> porte le maillage fin des panneaux internes de `Statistiques.jsx`
-> (sections de la Vue d'ensemble, détails pédagogie / historique /
-> secrétariats) de 87 % à **95,7 % de lignes**, et le LOT 39 porte l'écran
-> CRUD `Modules.jsx` de 37 % à **100 % de lignes et de fonctions** ; les
-> quelques lignes non couvertes ailleurs sont des replis défensifs
-> inatteignables via le parcours réel.
+> 73,9 % (LOT 38d) → 75,2 % (LOT 38e) → 76,6 % (LOT 39) →
+> **76,8 % (LOT 40)** — le seuil des 60 % de lignes reste largement
+> franchi, **les fonctions montent à 72,0 % (plancher CI 23 %)**, les
+> branches à 82,3 % (plancher CI 60 %). Le LOT 38b porte `Statistiques.jsx`
+> de 64 % à 87 % de lignes, le LOT 38c verrouille `RapportsWorkflowPanel` à
+> 99,2 %, le LOT 38d les deux composants de présentation du point
+> journalier (`AuditeursNotoiresPanel`, `PointJournalierCPFAE`) à 100 % de
+> lignes et de fonctions, le LOT 38e porte le maillage fin des panneaux
+> internes de `Statistiques.jsx` de 87 % à 95,7 % de lignes, le LOT 39 porte
+> l'écran CRUD `Modules.jsx` de 37 % à **100 % de lignes et de fonctions**,
+> et le LOT 40 verrouille la liste `Maquettes.jsx` (sans test jusqu'alors) à
+> **100 % de lignes et de fonctions** ; les quelques lignes non couvertes
+> ailleurs sont des replis défensifs inatteignables via le parcours réel.
 > Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le

@@ -640,6 +640,10 @@ describe('Statistiques (LOT 38a) — filtres d’en-tête (formation / secrétar
 
   it('laisse le sélecteur de secrétariat activé pour un encadrant avec plusieurs secrétariats', async () => {
     mountStats(makeUser('ENCADRANT', { username: 'enc1' }))
+    // Le sélecteur est d'abord rendu désactivé tant que la méta n'a pas livré
+    // les secrétariats (liste initiale vide) : on attend qu'elle soit peuplée
+    // avant d'affirmer l'activation (stabilité CI, LOT 40).
+    await screen.findByRole('option', { name: 'INJS Marcory' })
     expect(await secretariatSelect()).not.toBeDisabled()
   })
 
