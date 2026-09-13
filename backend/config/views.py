@@ -3,9 +3,29 @@ import os
 from django.http import HttpResponse, JsonResponse
 
 
+def _frontend_url(request):
+    """URL du frontend canonique (port 3000, figé pour le projet).
+
+    Priorité : variable ``FRONTEND_URL`` si elle est posée (production /
+    Docker). Sinon on dérive l'hôte de la requête (ou de l'en-tête
+    ``X-Forwarded-Host`` posé par le proxy d'aperçu) en remplaçant le port de
+    l'API (8000) par celui du front (3000) — sans aucun identifiant codé en dur.
+    """
+    explicite = os.environ.get('FRONTEND_URL')
+    if explicite:
+        return explicite.rstrip('/')
+    proto = 'https' if request.is_secure() else 'http'
+    host = request.headers.get('X-Forwarded-Host') or request.get_host()
+    if host.startswith('8000-'):
+        host = f'3000-{host[len("8000-"):]}'
+    elif ':' in host:
+        host = f'{host.split(":", 1)[0]}:3000'
+    return f'{proto}://{host}'
+
+
 def _api_links(request):
     base = request.build_absolute_uri('/').rstrip('/')
-    frontend = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+    frontend = _frontend_url(request)
     return {
         'application': 'INJS LMD API',
         'organisation': 'INJS — Institut National de la Jeunesse et des Sports',

@@ -367,19 +367,32 @@ Ne pas considérer une modification comme terminée simplement parce que le fich
 
 ⸻
 
-18. SERVEURS LOCAUX
+18. SERVEURS LOCAUX — PORTS FIGÉS JUSQU'À LA FIN DU PROJET
 
 Backend Django :
 
 http://127.0.0.1:8000
 
-Frontend Vite :
+Frontend Vite (vignette « Site INJS - prévisualisation ») :
 
 http://localhost:3000
 
-Ne pas modifier les ports existants sans nécessité.
+RÈGLE IMPÉRATIVE (validée par le commanditaire le 2026-09-13) :
 
-Ne pas démarrer inutilement plusieurs instances concurrentes du même serveur.
+* le frontend tourne TOUJOURS sur le port 3000 et l'API Django sur le port 8000,
+  quels que soient les travaux, incidents ou changements jusqu'à la fin du projet ;
+* NE JAMAIS lancer Vite sur un autre port (en particulier plus jamais 5173,
+  qui fut un contournement ponctuel d'incident d'aperçu) : aucune option
+  `--port` de contournement ; `frontend/vite.config.js` impose d'ailleurs
+  `port: 3000` + `strictPort: true` (Vite échoue plutôt que de changer de port) ;
+* si un port est occupé, on libère le port, on ne déplace pas le serveur ;
+* utiliser les lanceurs versionnés et idempotents :
+  `bash arena/lancer-api.sh` (API, 8000) et `bash arena/lancer-front.sh` (front, 3000) ;
+* après une réinitialisation du sandbox : `bash arena/bootstrap.sh` puis ces deux lanceurs ;
+  l'overlay `arena/settings_sandbox.py` (et son générateur dans `bootstrap.sh`)
+  porte les réglages iframe/https, et le lien frontal est dérivé de l'hôte
+  apparent par `backend/config/views.py` (`_frontend_url`, port 3000) ;
+* ne pas démarrer inutilement plusieurs instances concurrentes du même serveur.
 
 ⸻
 

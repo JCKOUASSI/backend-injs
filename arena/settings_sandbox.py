@@ -52,3 +52,34 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+
+# Noms de cookies dédiés au projet (anti 403 CSRF par cookie hérité).
+CSRF_COOKIE_NAME = "injs_csrftoken"
+SESSION_COOKIE_NAME = "injs_sessionid"
+# === Aperçu Arena en iframe https cross-site (ports figés : front 3000, API 8000) ===
+# Le proxy Arena termine le TLS : on lui fait confiance pour le protocole apparent.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Cookies de session/CSRF en SameSite=None + Secure pour survivre à l'iframe.
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+# CHIPS : cookies partitionnes. L'admin est affichee dans une iframe tierce
+# (page Arena en *.arena.site integrant le bac a sable en *.e2b.app) : les
+# cookies tiers classiques y sont stockes mais JAMAIS renvoyes. Les cookies
+# Partitioned sont stockes dans la partition de la page integratrice et
+# renvoyes pour les requetes de cette meme partition. Django 5.1 ne gere pas
+# SESSION_COOKIE_PARTITIONED (ajoute en 5.2) : l'attribut est pose par le
+# middleware arena.partitioned_cookies (compatibilite Python 3.11 incluse).
+MIDDLEWARE = ["arena.partitioned_cookies.PartitionedCookieMiddleware"] + list(MIDDLEWARE)
+# L'URL du front (port 3000) est dérivée de l'hôte apparent par config.views
+# (_frontend_url) ; aucun identifiant d'aperçu n'est codé en dur ici.
+
+# === Auto-connexion demo (apercu Arena uniquement, jamais en production) ===
+# La passerelle d'apercu Arena filtre les en-tetes Cookie entre son point
+# d'entree (*.arena.site) et le bac a sable (*.e2b.app) : toute authentification
+# Django par cookie (session/CSRF) y est impossible dans les vignettes. Ce
+# middleware d'APERCU authentifie automatiquement les requetes /admin/ comme
+# compte demo "admin" sans aucun cookie. Il ne vit QUE dans cet overlay.
+PREVIEW_AUTOLOGIN_USERNAME = "admin"
+MIDDLEWARE.append("arena.preview_autologin.AutoLoginApercuMiddleware")

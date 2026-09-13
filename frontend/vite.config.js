@@ -20,7 +20,15 @@ export default defineConfig(({ mode }) => {
   // afin que Django génère les bonnes URL absolues et les bons cookies CSRF.
   const forwardHeaders = (proxyReq, req) => {
     const host = req.headers['x-forwarded-host'] || req.headers.host
-    const proto = req.headers['x-forwarded-proto'] || 'http'
+    // Le proxy de l'aperçu Arena (*.e2b.app) est toujours expose en HTTPS,
+    // meme s'il ne propage pas (ou propage mal) X-Forwarded-Proto : on force
+    // https des que l'hote public transmis est un hote e2b.app. Un override
+    // explicite par variable d'environnement reste possible.
+    const protoRecu = req.headers['x-forwarded-proto']
+    const hotePublic = String(host || '')
+    const forceHttps =
+      process.env.VITE_FORCE_HTTPS === '1' || /\.e2b\.app$/i.test(hotePublic)
+    const proto = forceHttps ? 'https' : protoRecu || 'http'
     proxyReq.setHeader('X-Forwarded-Host', host || '')
     proxyReq.setHeader('X-Forwarded-Proto', proto)
     proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '')
@@ -37,7 +45,12 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: { alias },
     server: {
+      // Ports CANONIQUES et figés du projet (jamais de --port de contournement,
+      // jamais le port par défaut de Vite) : le front reste sur 3000, l'API
+      // Django sur 8000. strictPort : si 3000 est occupé, Vite échoue au lieu
+      // de migrer silencieusement vers un autre port (qui casserait les vignettes).
       port: 3000,
+      strictPort: true,
       host: true,
       allowedHosts: ['.e2b.app', 'localhost', '127.0.0.1'],
       hmr,

@@ -159,8 +159,49 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 PY
+cat <<'PY'
+
+# === Aperçu Arena en iframe https cross-site (ports figés : front 3000, API 8000) ===
+# Noms de cookies dédiés au projet : évite qu'un vieux csrftoken/sessionid hérité
+# du navigateur (mauvaise longueur, essai avant durcissement) provoque des 403 CSRF.
+CSRF_COOKIE_NAME = "injs_csrftoken"
+SESSION_COOKIE_NAME = "injs_sessionid"
+# Le proxy Arena termine le TLS : on lui fait confiance pour le protocole apparent.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Cookies de session/CSRF en SameSite=None + Secure pour survivre à l'iframe.
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+# CHIPS : cookies partitionnés. L'admin s'affiche dans une iframe tierce
+# (page Arena en *.arena.site intégrant le bac en *.e2b.app) : les cookies
+# tiers classiques y sont stockés mais jamais renvoyés. Django 5.1 ne connaît
+# pas SESSION_COOKIE_PARTITIONED (ajouté en 5.2) : l'attribut est posé par le
+# middleware arena.partitioned_cookies (compatible Python 3.11).
+MIDDLEWARE = ["arena.partitioned_cookies.PartitionedCookieMiddleware"] + list(MIDDLEWARE)
+# Auto-connexion démo : la passerelle Arena filtre les en-têtes Cookie entre
+# *.arena.site et *.e2b.app ; toute authentification admin par cookie est donc
+# impossible en vignette. Ce middleware d'APERÇU authentifie /admin/ comme
+# compte démo "admin" sans cookie. JAMAIS chargé hors de cet overlay.
+PREVIEW_AUTOLOGIN_USERNAME = "admin"
+MIDDLEWARE.append("arena.preview_autologin.AutoLoginApercuMiddleware")
+# L'URL du front (port 3000) est dérivée de l'hôte apparent par config.views
+# (_frontend_url) ; aucun identifiant d'aperçu n'est codé en dur ici.
+PY
 } > "$RACINE/arena/settings_sandbox.py"
 ok "arena/settings_sandbox.py écrit (overlay de $SET_MOD)"
+
+# Modules compagnons de l'overlay (middlewares d'aperçu), recopiés du dépôt
+# afin de survivre aux réinitialisations du snapshot.
+_BDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for _module in partitioned_cookies.py preview_autologin.py; do
+  if [ -f "$_BDIR/$_module" ]; then
+    cp "$_BDIR/$_module" "$RACINE/arena/$_module"
+    ok "arena/$_module recopié dans l'overlay"
+  else
+    warn "arena/$_module absent du dépôt — l'overlay en dépend"
+  fi
+done
 
 
 # --- 6. Garde-fous de dépôt --------------------------------------------------

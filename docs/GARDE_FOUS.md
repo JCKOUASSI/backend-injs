@@ -171,6 +171,47 @@ sans prompt dédié et feu vert explicite.
   compteurs incohérents, les répliques dupliquées et les orphelines ; code 1
   sur la moindre anomalie.
 
+## 6. Aperçu Arena : ports figés et admin en iframe (anti-403 CSRF)
+
+- **Ports canoniques, invariables jusqu'à la fin du projet** : frontend Vite
+  sur **3000**, API Django sur **8000**. `frontend/vite.config.js` impose
+  `port: 3000` + **`strictPort: true`** (Vite échoue plutôt que de basculer
+  sur un autre port — notamment plus jamais le port par défaut 5173, qui fut
+  un contournement ponctuel d'incident). Si un port est occupé, on le libère,
+  on ne déplace pas le serveur. Lanceurs idempotents :
+  `arena/lancer-front.sh`, `arena/lancer-api.sh`. Après une réinitialisation :
+  `bash arena/bootstrap.sh` puis les deux lanceurs.
+- **Admin Django en iframe https cross-site** : le proxy Arena termine le
+  TLS. L'overlay `arena/settings_sandbox.py` (et son générateur `bootstrap.sh`,
+  pour survivre aux resets) porte en dur :
+  - `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')` ;
+  - `SESSION_COOKIE_SAMESITE = CSRF_COOKIE_SAMESITE = 'None'` ;
+  - `SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True` ;
+  - **noms de cookies dédiés** `injs_csrftoken` / `injs_sessionid` : un vieux
+    cookie `csrftoken` hérité dans le navigateur (mauvaise longueur, datant
+    d'avant le durcissement) provoquait « Interdit (403) — vérification CSRF »
+    ; le renommage rend cette collision impossible. Le refresh JWT du front
+    utilise son propre cookie `refresh_token` (inchangé).
+- **L'admin s'ouvre via le proxy Vite (port 3000), pas seulement via 8000** :
+  dans l'aperçu, l'URL `https://3000-<sandbox>.e2b.app/admin/…` transite par
+  Vite qui relaie vers Django. Le proxy Arena transmet (ou fait défaut sur)
+  **`X-Forwarded-Proto: http`** alors que la navigation est en HTTPS : Django
+  se croyait en HTTP et émettait des cookies `Secure` que le navigateur
+  refusait en iframe → « CSRF cookie not set » (cause réelle du 403 du
+  2026-09-13, vérifiée par capture d'en-têtes, PAS un blocage de cookies
+  tiers). `frontend/vite.config.js` (`forwardHeaders`) force donc `https`
+  dès que l'hôte public transmis correspond à `*.e2b.app`
+  (override `VITE_FORCE_HTTPS=1` possible). Test gardé :
+  `test_vite_force_https_derriere_proxy_e2b`.
+- Ces réglages ne vivent **que dans l'overlay d'aperçu** (jamais dans
+  `config/settings.py`, qui garde les défauts de production Lax/non sécurisés
+  selon l'environnement). Un test les fige :
+  `config/tests/test_apercu_hardening.py` (overlay + bootstrap + ports +
+  forçage https Vite).
+- Cas résiduel non contournable côté serveur : un navigateur en politique de
+  cookies tiers **stricte** peut refuser tout cookie d'iframe ; ouvrir alors la
+  vignette API dans un onglet dédié (cookie première partie).
+
 ---
 
 ## Bruit de fond connu (ne pas « réparer » hors prompt dédié)
