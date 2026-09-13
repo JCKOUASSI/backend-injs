@@ -34,6 +34,7 @@ urlpatterns = [
 
     # API endpoints
     path('api/', api_root, name='api-root'),
+    path('api/core/', include('core.urls')),  # P01-01 — audit unifié
     path('api/auth/', include('authentication.urls')),
     path('api/formations/', include('formations.urls')),
     path('api/', include('presences.urls')),

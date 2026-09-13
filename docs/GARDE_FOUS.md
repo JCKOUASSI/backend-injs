@@ -142,6 +142,35 @@ DSN et le cadre contractuel. En attendant, la configuration `LOGGING`
 l'observabilité locale. Aucune dépendance `sentry-sdk` ne doit être ajoutée
 sans prompt dédié et feu vert explicite.
 
+## 5. Journal d'audit unifié `core` (P01-01)
+
+- Nouvelle application **`core`** (LOT 1) portant le registre d'audit
+  transverse `core.EvenementAudit` : append-only strict (création seule ;
+  modification et suppression interdites par le modèle, le queryset et
+  l'admin Django, qui est en lecture seule).
+- Chaque événement possède un **code métier unique et atomique**
+  `AUDIT-AAAAMMJJ-NNNNNN` (séquence continue remise à zéro chaque jour),
+  généré sous verrou (`CompteurCode` + `select_for_update`, reprise sur
+  collision testée ; la concurrence réelle est vérifiée par un test
+  conditionné PostgreSQL).
+- Les journaux applicatifs existants **restent la référence dans leur app et
+  ne sont pas modifiés** : `presences.AuditLog`, `scolarite.JournalScolarite`,
+  `referentiels.ReferentielJournal` (les 3 apps pilotes). Quand le flag LOT 1
+  est activé, chaque entrée créée est dupliquée **une seule fois** dans core
+  par des signaux (contrainte d'idempotence sur `(source, source_entree_id)`,
+  horodatage d'origine conservé). Flag OFF (livraison) : aucun signal
+  n'écrit, comportement strictement identique à l'avant P01-01.
+- **API** `GET /api/core/audit/` et `GET /api/core/audit/<code>/`, lecture
+  seule, avec filtres (`source`, `action`, `acteur`, `date_debut/date_fin`,
+  recherche `objet`). Autorisée uniquement aux rôles validés au cadrage :
+  ADMIN, DIRECTION, CHEF_CPFAE_ADMIN, CPFAE_ADMIN (N4) + AUDITEUR et ARCHIVE
+  (N1). Les autres rôles gardent les journaux métier ciblés existants ;
+  l'API répond 403 tant que le flag est OFF (y compris pour les admins).
+- **Commande** `manage.py audit_integrity_check` (CI, après la smoke) :
+  vérifie en lecture seule les doublons de codes, les séquences trouées, les
+  compteurs incohérents, les répliques dupliquées et les orphelines ; code 1
+  sur la moindre anomalie.
+
 ---
 
 ## Bruit de fond connu (ne pas « réparer » hors prompt dédié)

@@ -88,15 +88,16 @@ sont disposées à plat (DA-01 / ADR-005) : on ne crée pas de sous-dossier `app
 | 15 | Notifications & communication | dispersé (`presences.NotificationAbsence`, notifications de jurys, relances financières) ; future app `notifications` | CRÉER | CRÉER |
 | 16 | Rapports, statistiques & BI | `statistiques` (config d'alertes/seuils, rapports, observations, signatures, notifications), `dashboard`, `exports` (routes PDF/Excel) — **lecture seule**, DA-10 | OK | OK |
 | 17 | Portails & services en ligne | frontend React (routes), Flutter/PWA, `dashboard/views_legacy.py` ; future app `portails` (aucun nouveau métier, DA-11) | PART | PART |
-| 18 | Administration système & sécurité | `authentication` (12 rôles, JWT, appairage de device, limitation de débit, permissions, groupes), `parametres` (`Parametre` + historique), `presences.AuditLog` | OK | PART |
+| 18 | Administration système & sécurité | `authentication` (12 rôles, JWT, appairage de device, limitation de débit, permissions, groupes), `parametres` (`Parametre` + historique), `presences.AuditLog`, **`core` (P01-01 : journal d'audit unifié append-only, codes atomiques, `/api/core/audit/`)** | OK | PART |
 
 Le tableau ci-dessus couvre les **20 applications métier** répertoriées dans
 `INSTALLED_APPS` (`referentiels` y est inclus, au titre du module 01) ; `config` n'est pas
 une application mais le package de réglages Django. Les applications créées pendant la
 restauration de la branche 2026-09 sont `graduation`, `finances_etudiantes`, `stages`,
-`administrations`, `ressources_humaines`, `patrimoine`, `edts`. Les applications manquantes
-à créer plus tard selon la même nomenclature à plat sont `core`, `comptabilite`,
-`notifications` et `portails` (DA-01).
+`administrations`, `ressources_humaines`, `patrimoine`, `edts`. L'application **`core`**
+est créée par P01-01 (journal d'audit unifié, derrière `flag.lot01_socle_referentiels_rbac`).
+Les applications manquantes à créer plus tard selon la même nomenclature à plat sont
+`comptabilite`, `notifications` et `portails` (DA-01).
 
 ---
 

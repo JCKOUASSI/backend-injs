@@ -120,6 +120,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     # Local apps
+    'core.apps.CoreConfig',  # P01-01 — noyau transverse, journal d'audit unifié
     'authentication',
     'formations.apps.FormationsConfig',
     'presences',

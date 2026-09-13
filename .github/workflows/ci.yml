@@ -85,6 +85,15 @@ jobs:
         # en fin (idempotente) ; tout échec d'une étape rend le build rouge.
         run: python manage.py smoke_test_injs
 
+      - name: Intégrité du journal d'audit unifié (P01-01)
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+        # Vérifie en lecture seule codes uniques, séquences continues et
+        # répliques non dupliquées/orphelines du registre core.
+        run: python manage.py audit_integrity_check
+
       - name: Vérifier l'image Docker backend (collectstatic / permissions)
         run: |
           docker build -t sygep-backend-ci ./backend

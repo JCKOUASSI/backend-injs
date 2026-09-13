@@ -563,6 +563,67 @@
         }
       }
     },
+    "GET /api/core/audit/": {
+      "parameters": [
+        "acteur",
+        "action",
+        "date_debut",
+        "date_fin",
+        "objet",
+        "page",
+        "source"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "acteur": null,
+              "acteur_label": null,
+              "acteur_nom": null,
+              "action": null,
+              "action_libelle": null,
+              "code": null,
+              "detail": null,
+              "horodatage": null,
+              "ip_address": null,
+              "objet_id": null,
+              "objet_libelle": null,
+              "objet_type": null,
+              "source": null,
+              "source_libelle": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/core/audit/{code}/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "acteur": null,
+          "acteur_label": null,
+          "acteur_nom": null,
+          "action": null,
+          "action_libelle": null,
+          "code": null,
+          "detail": null,
+          "horodatage": null,
+          "ip_address": null,
+          "objet_id": null,
+          "objet_libelle": null,
+          "objet_type": null,
+          "source": null,
+          "source_libelle": null
+        }
+      }
+    },
     "GET /api/devices/": {
       "parameters": [],
       "request_keys": null,
