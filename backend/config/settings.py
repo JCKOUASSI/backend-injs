@@ -143,6 +143,9 @@ INSTALLED_APPS = [
     'patrimoine.apps.PatrimoineConfig',                  # L7 : équipements, véhicules, maintenance, réservations
     # Lot L8 — Emploi du temps
     'edts.apps.EdtsConfig',                              # L8 : créneaux, plannings, affectations, conflits
+    # Refonte CURP-INJS (unité U1) : socle additif de données d'habilitation.
+    # Aucun contrôle d'accès n'est branché depuis cette application en U1.
+    'habilitations.apps.HabilitationsConfig',
 ]
 
 MIDDLEWARE = [
