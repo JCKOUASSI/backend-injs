@@ -272,16 +272,27 @@
 > replis défensifs inatteignables via le parcours réel (section inconnue,
 > spinner doublon que le parent ne rend jamais, périmètre introuvable).
 > Aucun écart produit révélé.
+> Le **[LOT 39]** ouvre le backlog des grands écrans restants par **40
+> nouveaux tests purs** sur `Modules.jsx` (CRUD pédagogique), jusque-là à
+> 37 % de lignes et 6 % de fonctions : liste et badges des 4 statuts,
+> recherche débouncée, filtres et modes de date, pagination, secours de
+> chargement des formations, permissions par rôle (ADMIN, ÉTUDIANT,
+> DIRECTION, flag de rôle), création/édition d'un module (catalogue
+> référentiel, cascade site/bâtiment/salle, champs libres de repli,
+> erreurs de validation), création de formation, suppression et archivage
+> à triple confirmation, fermeture des modales par la croix, Annuler et le
+> clic sur l'overlay. Le fichier atteint **100 % de lignes et de fonctions**
+> (89 % de branches) ; aucun écart produit révélé.
 > Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d et 38e sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d, 38e et 39 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
 > Voir aussi : [ARCHITECTURE.md](ARCHITECTURE.md), [sécurité des données](SECURITE_DONNEES.md),
 > [README racine](../README.md).
 
-Date de référence : 12 septembre 2026.
+Date de référence : 13 septembre 2026.
 
 ---
 
@@ -492,7 +503,7 @@ que celui importé par les pages. Les tests unitaires du client
 3. **Composants/pages** — interactions réalistes Testing Library.
 4. **Smoke de rendu** — chaque page monte sans planter avec des données vides.
 
-### 6.2 Fichiers de test colocalisés (52 fichiers, 1314 tests)
+### 6.2 Fichiers de test colocalisés (52 fichiers, 1354 tests)
 
 Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du code),
 à l'exception du smoke groupé.
@@ -530,7 +541,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/pages/DecisionsPedagogiques.test.jsx` | page | **Tableau + formulaire de décision pédagogique** : en-têtes et critères, moyennes/présence/mentions/état validé, réponse en tableau ou objet, **filtrage par les cartes KPI**, état vide, **recalcul (POST → notification → rechargement)**, **ajustement d'une décision (sélect → PATCH → fermeture)**, annulation, et les trois chemins d'erreur (chargement, recalcul, validation). **100 % des lignes** de la page. |
 | `src/pages/Users.test.jsx` | page | **Gestion des comptes utilisateurs (54 tests dont 37 ajoutés au LOT 36), 99,8 % lignes / 100 % fonctions / 98,1 % branches.** **Liste serveur (LOT 2)** : chargement initial (`exclude_role`, page 1), pagination serveur 50/page, recherche avec debounce 400 ms, filtre par rôle, onglets personnel / étudiants / enseignants (reset page, `role=AUDITEUR/FORMATEUR`), persistance sessionStorage/URL, état vide, erreur de chargement formatée, permissions (contrôles masqués sans `can_mutate_users`, repli sur le seul onglet autorisé, §10.2 LOT 6). **LOT 36** : présentation (replis « - », nom/username et initiales de secours, nom du secrétariat rattaché, badge actif/inactif, classes de badges par rôle avec repli `badge-info`, remplacement CPFAE→INJS des libellés), lignes non gérables sans action, `role_context` vide (repli `personnel`, `exclude_role` par défaut), gestionnaire sans `manageable_roles`/sans `staff_filter_roles`, conservation/reset du filtre selon l'onglet, repli sur un onglet non personnel quand c'est le seul disponible ; **création** tous champs (payload exact, clé `secretariat` vide omise), compte enseignant (libellé/badge/placeholder/note), rattachement à un secrétariat existant (aucune structure créée, pas de PATCH), **création de secrétariat à la volée** (POST user → POST `/formations/secretariats/` avec `responsable` → PATCH de rattachement dans le bon ordre, type vide autorisé, cache React Query mis à jour visible à la réouverture, pas de structure sans nom, réinitialisation nom/type au changement de rôle, bloc masqué pour un gestionnaire lui-même secrétariat), gardes d'unicité Chef INJS Admin et chef de secrétariat, erreurs JSON (CPFAE→INJS) et génériques, bouton « Création... », fermetures croix/Annuler/voile sans appel et réinitialisation du formulaire ; **édition** : pré-remplissage complet (secrétariat, statut inactif), utilisateur aux champs absents (replis `|| ''`, username vide), PATCH complet avec nouveau mot de passe et changement de rattachement, erreurs à deux niveaux, fermetures sans PATCH, gardes d'unicité en édition (excluant l'utilisateur édité), bouton « Enregistrement... » ; **suppression** : annulation sans DELETE (message + détail), erreur formatée (**régression §10.14, corrigée au LOT 37** : le toast réécrit désormais CPFAE en INJS comme les autres zones d'erreur ; le test échoue sur l'ancien code) et message générique. Les 4 branches résiduelles sont des filets défensifs inatteignables par l'UI (onglet borné aux clés de `TAB_CONFIG`, bloc « rôle protégé » et `role || ''` inaccessibles par le filtre des boutons d'édition, repli `old || []` d'un cache toujours alimenté par le hook inconditionnel). |
 | `src/pages/Referentiels.test.jsx` | page | **56 tests (LOT 35), référentiels de formation — 99,7 % lignes/instructions, 100 % fonctions, 95,2 % branches** (les branches résiduelles sont des filets défensifs inatteignables : onglet borné par `readReferentielsTab`, états `data`/`formation_ids` toujours initialisés). Les **neuf onglets** (formations, modules, catégories, grades, vagues, sites, bâtiments, salles, types secrétariat) sont chargés en un seul `GET /formations/referentiels/gestion/` : spinner, compteurs par onglet, colonnes spécifiques avec résolution des liens (catégorie de grade, site/bâtiment des salles et bâtiments, replis « — » dont les clés mortes), résumé des volumes de modules groupé par formation (`F (CM: 5h, TD: 4h)`, repli `Formation #id`, total simple `12 h`, vide « — »), état vide « Aucune entrée — cliquez sur Ajouter », réponse sparse (clés absentes → tableaux vides sans crash), erreur « Erreur de chargement », **pagination client 25/page** et **onglet lu dans `?tab=`** (inconnu → Formations), changement d'onglet qui referme la modale. **CRUD** : création par onglet (POST, payloads et valeurs par défaut — formations/catégories/sites/types/vagues/grades), édition (PUT, pré-remplissage, toasts « Ajouté/Modifié avec succès », rechargement + invalidation du cache React Query), bouton « Enregistrement… » pendant l'envoi, erreurs de validation formatées puis message générique, fermetures croix/Annuler/voile sans appel ; **bascule actif/inactif** (PUT du corps complet, toasts Activé/Désactivé, échec « Erreur »). **Suppressions** via `ConfirmModal` (annulation sans DELETE, succès « Supprimé », **404 → « Entrée déjà supprimée — liste actualisée »**, autre erreur générique). **Clés typées** : grades/bâtiments/salles (identifiants `Number()` ou `null`, capacité non numérique neutralisée — y compris une valeur véreuse servie par le backend en édition, bâtiments filtrés par site, changement de site qui réinitialise le bâtiment, défauts `type_lieu:'SALLE'`/`equipements:''`). **Modules** : cases des formations actives seules, garde « au moins une formation » puis « au moins un volume horaire », grille de volumes par formation × catégorie active (valeurs vides/`NaN` écartées, décochage, cases/grille réinitialisées), payload `volumes_horaires` reconstruit (clés de grille et `formations` retirées), POST **201 → ajout** vs **200 → « Module déjà au référentiel — formations rattachées »**, édition avec grille pré-remplie (volume sans formation écarté, ancien format `volumes_par_categorie`, formation morte en `Formation #id`). **Excel** : export `getBlob /formations/ref/excel/{onglet}/` (ancre cliquée, nom serveur ou nom par défaut `referentiel_{onglet}.xlsx`, révocation d'URL, échec notifié), import via l'input caché (clic programmé, extension non `.xlsx` refusée, sélection annulée sans effet, POST `FormData` avec bilan `N ligne(s)…`, réponse sans données → zéros, deux niveaux d'erreur). |
-| `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). |
+| `src/pages/Modules.test.jsx` | page | **Nettoyage des filtres obsolètes (2 tests, LOT 6)** : à l'arrivée des référentiels, un filtre d'URL absent des options (`grade=999`) est écarté, la liste est rechargée sans lui (un filtre valide comme `statut` est conservé) et un toast « Filtre(s) ignoré(s) » informe l'utilisateur ; cas contraire (filtres tous valides), aucune alerte. Couvre l'effet `referentielsData` dont les dépendances faisaient un faux positif ESLint (§10.2). **LOT 39 (couverture fonctionnelle complète, +40 tests, sans toucher à la page), `Modules.jsx` porté à 100 % de lignes et de fonctions** : rendu de la liste (9 colonnes, les 4 badges de statut `badge-planifiee/en-cours/terminee/suspendue` + badge générique pour un statut inconnu, dates `formatDate` JJ/MM/AAAA, replis `—`/`-` des grade/secrétariat/groupe/dates, compteur « N module(s) », lien Détail), état vide « Aucun module trouvé », spinner figé par promesse pilotée, message d'erreur de chargement ; **recherche** avec debounce 400 ms et retour page 1 après pagination ; **filtres** statut / secrétariat / vague / grade / groupe, modes de date (`today`, `all`, `date` avec apparition du sélecteur et paramètre `date`), sélecteur de secrétariat masqué pour les rôles périmètre, mode de date invalide corrigé silencieusement, **pagination** (51 résultats sur 2 pages), liste de secours `/formations/list/?page_size=500` avec déduplication des doublons d'id quand le référentiel n'a pas de formations réelles ; **permissions par rôle** (ADMIN tout voir, AUDITEur en lecture seule, DIRECTION archivage seul, module déjà archivé sans bouton, flag `role_context.can_archive_modules`) ; **création de module** (POST `/formations/<id>/modules/`, champ formation pré-rempli après création d'une formation, intitulé en liste dérivée du référentiel avec pré-remplissage du volume horaire et filtrage par `formation_ids`, cascade site → bâtiment (reset) → salle (reset), champs texte de repli quand les référentiels sont vides, dates nulles et volume 0 par défaut, erreurs de validation formatées `champ: raison` et erreur générique) ; **édition** (PATCH, pré-remplissage des dates tranchées, formation non modifiable) ; fermetures par Annuler / croix / clic sur l'overlay pour les deux modales ; **création de formation** (POST `/formations/` en select d'intitulés ou saisie libre, nouvelle formation ajoutée et présélectionnée dans la modale module, toast, cas d'erreur) ; **suppression** (`ConfirmModal` avec le nom du module et le caractère définitif, DELETE, toast, rechargement, annulation, échecs avec/sans détail) ; **archivage** (`TripleConfirmModal` : Continuer / Je comprends / Archiver définitivement, POST `…/archive/`, annulation initiale, échecs avec/sans détail). |
 | `src/pages/scolarite/scolariteRendu.test.jsx` | page | **5 régressions (LOT 7, §10.8)** sur des écrans qui rendaient une page blanche sans planter : rendu effectif du titre de `Campagnes`, du libellé de `CampagneDetail`, du titre d'`Équivalences`, du libellé de `MaquetteDetail`, et — pour `ChargesEnseignants` — requête de l'année courante **au montage** puis enchaînement sur l'occupation des enseignants. Chaque test échouait avant la correction (preuve de mutation). |
 | `src/pages/scolarite/scolariteActions.test.jsx` | page | **6 tests d'écriture au clic (LOT 8, §10.8)** sur les gestionnaires rétablis : `Campagnes` (Planifier sans confirmation puis Ouvrir **avec** `window.confirm`, bon `POST …/transition/` + rechargement ; cas d'erreur serveur avec toast), `CampagneDetail` (enregistrement d'une note `POST /epreuves/:id/notes/` avec les bons identifiants), `Equivalences` (`POST …/appliquer/` après confirmation), `MaquetteDetail` (`DELETE /ecues/:id/?mode=archive`), `ChargesEnseignants` (création d'affectation `POST /enseignants/affectations/` avec l'année courante et les champs typés). |
 | `src/pages/scolarite/Candidatures.test.jsx` | page | **9 tests (LOT 9), parcours candidatures qui écrit** : liste + année courante, recherche `q` et filtre `statut` transmis en paramètres au service ; panneau « Dossier » : **transition de statut** (`POST …/transition/` + toast + rechargement), **validation/refus d'une pièce** (`POST …/pieces/:id/verifier/`, boutons désactivés sans fichier), **dépôt de fichier** multipart (`POST …/deposer/`, `FormData`), **ouverture d'admission** (`POST /admissions/admissions/`) ; **création** candidat puis candidature avec l'année courante (`POST /candidats/` puis `/candidatures/`) ; cas d'erreur serveur (transition refusée, création avec message champ). Couvre **97,5 % des lignes** de la page et porte le service `services/scolarite.js` à **100 % de lignes**. |
@@ -590,7 +601,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 38e (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 39 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -603,7 +614,7 @@ Mesure après le LOT 38e (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/Referentiels.jsx` (LOT 35) | **99,7 %** | **99,7 %** | **100 %** | **95,2 %** |
 | `pages/Users.jsx` (LOT 36) | **99,8 %** | **99,8 %** | **100 %** | **98,1 %** |
 | `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
-| `pages/Modules.jsx` | **37 %** | 37 % | 6 % | **59 %** |
+| `pages/Modules.jsx` (LOT 39) | **100 %** | **100 %** | **100 %** | **89 %** |
 | `pages/NotesModule.jsx` (LOT 14) | **98 %** | 98 % | **92 %** | **84 %** |
 | `pages/Rattrapages.jsx` (LOT 15) | **97 %** | 97 % | **77 %** | **86 %** |
 | `pages/FicheAuditeur.jsx` (LOT 15) | **100 %** | **100 %** | **100 %** | **83 %** |
@@ -636,7 +647,7 @@ Mesure après le LOT 38e (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/scolarite/MaquetteDetail.jsx` (LOT 32) | **100 %** | **100 %** | **100 %** | **100 %** |
 | `pages/scolarite/ChargesEnseignants.jsx` (LOT 33/34) | **100 %** | **100 %** | **100 %** | **96,9 %** |
 | `pages/scolarite/**` (dossier, 16 écrans) | **94,1 %** | **94,1 %** | **90,1 %** | **88,5 %** |
-| **Global `src/` (toutes zones)** | **75,2 %** | **75,2 %** | **68,3 %** | **81,8 %** |
+| **Global `src/` (toutes zones)** | **76,6 %** | **76,6 %** | **71,4 %** | **82,2 %** |
 
 > Les LOT 4 à 7, 13 et 17 sont des correctifs ciblés ; les LOT 8 à 12 et 14 à
 > 16 n'ajoutent que des tests.
@@ -649,7 +660,8 @@ Mesure après le LOT 38e (V8, `npm run test:coverage`), sur les zones ciblées :
 > 783 (LOT 24) → 803 (LOT 25) → 828 (LOT 26) → 847 (LOT 27) →
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
-> 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → **1314 (LOT 38e)** ;
+> 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → 1314 (LOT 38e) →
+> **1354 (LOT 39)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
@@ -657,17 +669,19 @@ Mesure après le LOT 38e (V8, `npm run test:coverage`), sur les zones ciblées :
 > 57,8 % (LOT 28) → 59,0 % (LOT 29) → 60,1 % (LOT 30) → 60,4 % (LOT 31) →
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
 > 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → 73,4 % (LOT 38c) →
-> 73,9 % (LOT 38d) → **75,2 % (LOT 38e)** — le seuil des 60 % de lignes
-> reste largement franchi, **les fonctions montent à 68,3 % (plancher CI
-> 23 %)**, les branches à 81,8 % (plancher CI 60 %). Le LOT 38b porte
-> `Statistiques.jsx` de 64 % à 87 % de lignes, le LOT 38c verrouille
+> 73,9 % (LOT 38d) → 75,2 % (LOT 38e) → **76,6 % (LOT 39)** — le seuil des
+> 60 % de lignes reste largement franchi, **les fonctions montent à 71,4 %
+> (plancher CI 23 %)**, les branches à 82,2 % (plancher CI 60 %). Le LOT 38b
+> porte `Statistiques.jsx` de 64 % à 87 % de lignes, le LOT 38c verrouille
 > `RapportsWorkflowPanel` à 99,2 %, le LOT 38d les deux composants de
 > présentation du point journalier (`AuditeursNotoiresPanel`,
-> `PointJournalierCPFAE`) à 100 % de lignes et de fonctions, et le LOT 38e
+> `PointJournalierCPFAE`) à 100 % de lignes et de fonctions, le LOT 38e
 > porte le maillage fin des panneaux internes de `Statistiques.jsx`
 > (sections de la Vue d'ensemble, détails pédagogie / historique /
-> secrétariats) de 87 % à **95,7 % de lignes** ; les quelques lignes
-> restantes sont des replis défensifs inatteignables via le parcours réel.
+> secrétariats) de 87 % à **95,7 % de lignes**, et le LOT 39 porte l'écran
+> CRUD `Modules.jsx` de 37 % à **100 % de lignes et de fonctions** ; les
+> quelques lignes non couvertes ailleurs sont des replis défensifs
+> inatteignables via le parcours réel.
 > Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
