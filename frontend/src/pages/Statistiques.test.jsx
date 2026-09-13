@@ -2395,3 +2395,841 @@ describe('Statistiques (LOT 38b) — Bilan FAC : génération, sous-onglets et e
     expect(alertSpy.mock.calls[0][0]).toMatch(/export fac KO|téléchargement/i)
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// LOT 38e — Maillage fin des panneaux internes de Statistiques.jsx, tels que
+// rendus par la page complète : navigation ensemble ↔ détail de la Vue
+// d'ensemble (sections cliquables), périmètres pédagogiques (formations,
+// grades, secrétariats), détail mensuel de l'historique et tableau comparatif
+// / détail des secrétariats. Tests PURS (aucune modification de source).
+// ════════════════════════════════════════════════════════════════════════════
+
+const AN_LISTE_38E = [
+  {
+    id: 1, matricule: 'MC-101', nom: 'KOUASSI', prenom: 'Jean', sexe: 'M',
+    categorie: 'A', grade: 'A1', groupe: 'G1', vague: 'V2024',
+    secretariat: 'INJS Centre', secretariat_id: 1,
+    libelle_concours: 'Concours 2024', telephone: '0700000001',
+    email: 'jean1@test.ci', motif: 'Maladie longue durée',
+  },
+  {
+    id: 2, matricule: 'MC-102', nom: 'DIALLO', prenom: 'Awa', sexe: 'F',
+    categorie: 'B', grade: 'A2', groupe: 'G2', vague: 'V2023',
+    secretariat: 'INJS Centre', secretariat_id: 1,
+    libelle_concours: 'Concours 2023', telephone: '0700000002',
+    email: 'awa1@test.ci', motif: '',
+  },
+  {
+    id: 3, matricule: 'MC-103', nom: 'TRAORE', prenom: 'Moussa', sexe: 'M',
+    categorie: 'A', grade: 'A1', groupe: 'G3', vague: 'V2023',
+    secretariat: 'INJS Marcory', secretariat_id: 2,
+    libelle_concours: 'Concours 2023', telephone: '0700000003',
+    email: 'moussa2@test.ci', motif: 'Abandon',
+  },
+]
+const AN_DATA_38E = { total: 3, inscrits: 42, pct: 7.1, liste: AN_LISTE_38E }
+
+const PED_RICHE = {
+  ...PED,
+  nb_seances_terminees: 20,
+  taux_par_formation: [
+    { formation_id: 10, formation: 'Licence 1 LSF', inscrits: 20, presents: 16, taux: 80 },
+    { formation_id: 11, formation: 'Licence 2 LSF', inscrits: 22, presents: 14, taux: 63.6 },
+  ],
+  taux_par_grade: [
+    { grade: 'A1', inscrits: 25, presents: 20, taux: 80 },
+    { grade: 'A2', inscrits: 17, presents: 10, taux: 58.8 },
+  ],
+  taux_par_secretariat: [
+    { secretariat_id: 1, numero: 1, secretariat: 'INJS Centre', inscrits: 30, presents: 22, taux: 73.3 },
+    { secretariat_id: 2, numero: 2, secretariat: 'INJS Marcory', inscrits: 12, presents: 8, taux: 66.7 },
+  ],
+  par_type_concours: [
+    { type: 'Professionnel', total: 30 },
+    { type: 'Concours direct', total: 12 },
+  ],
+  auditeurs_notoires: AN_DATA_38E,
+}
+const ADM_RICHE = {
+  ...ADM,
+  participants_par_sexe: [
+    { sexe: 'Hommes', total: 23 },
+    { sexe: 'Femmes', total: 19 },
+  ],
+  participants_par_categorie: [
+    { categorie: 'Externe', total: 25 },
+    { categorie: 'Interne', total: 17 },
+  ],
+  participants_par_grade: [
+    { grade: 'A1', total: 25 },
+    { grade: 'A2', total: 17 },
+  ],
+  participants_par_vague: [
+    { vague: 'Vague 2024', total: 30 },
+    { vague: 'Vague 2025', total: 12 },
+  ],
+  charge_formateurs: [
+    { nom: 'KONAN Yao', nb_sessions: 12 },
+    { nom: 'BAMBA Aminata', nb_sessions: 8 },
+  ],
+  auditeurs_notoires: AN_DATA_38E,
+}
+
+/** Un mois supplémentaire sans aucune donnée (couvre l'opacité/variation). */
+const HIST_ZERO = {
+  ...HIST,
+  pointages_par_mois: [
+    ...HIST.pointages_par_mois,
+    { mois: `${CURRENT_YEAR}-07`, total: 0, presents: 0, absents: 0 },
+  ],
+  taux_presence_par_mois: [
+    ...HIST.taux_presence_par_mois,
+    { mois: `${CURRENT_YEAR}-07`, total: 0 },
+  ],
+  sessions_par_mois: [
+    ...HIST.sessions_par_mois,
+    { mois: `${CURRENT_YEAR}-07`, total: 0 },
+  ],
+  modules_par_mois: [
+    ...HIST.modules_par_mois,
+    { mois: `${CURRENT_YEAR}-07`, total: 0, actifs: 0, cumul: 9 },
+  ],
+}
+
+const SEC_ROWS = [
+  {
+    secretariat_id: 1, numero: 1, secretariat: 'INJS Centre', responsable: 'KONAN Yao',
+    nb_modules: 5, nb_participants: 30, nb_formateurs: 4, nb_sessions: 18,
+    nb_inscrits: 30, nb_presents: 22, taux_presence: 73.3, nb_absences: 8,
+    nb_auditeurs_notoires: 2, pct_auditeurs_notoires: 6.7,
+    vh_prevu: 300, taux_execution_vh: 66,
+    ratio_hf: { hommes: 18, femmes: 12 }, nb_pointages: 220,
+  },
+  {
+    secretariat_id: 2, numero: 2, secretariat: 'INJS Marcory', responsable: '',
+    nb_modules: 4, nb_participants: 12, nb_formateurs: 3, nb_sessions: 12,
+    nb_inscrits: 12, nb_presents: 8, taux_presence: 66.7, nb_absences: 4,
+    nb_auditeurs_notoires: 0, pct_auditeurs_notoires: 0,
+    vh_prevu: 200, taux_execution_vh: 50,
+    ratio_hf: { hommes: 5, femmes: 7 }, nb_pointages: 90,
+  },
+]
+const SEC_STATS_38E = { secretariats: SEC_ROWS, total: 2, auditeurs_notoires: AN_DATA_38E }
+
+const SEC_DETAIL_38E = {
+  kpis: {
+    ...KPIS,
+    modules: 5, participants: 30, formateurs: 4, sessions_total: 18,
+    pointages: 220, vh_prevu_heures: 300, taux_execution_vh: 66,
+  },
+  pedagogiques: {
+    ...PED, taux_presence: 73.3, taux_absence: 26.7,
+    taux_par_formation: [
+      { formation: 'Licence 1 LSF', inscrits: 20, presents: 16, taux: 80 },
+    ],
+    taux_par_grade: [
+      { grade: 'A1', inscrits: 18, presents: 15, taux: 83.3 },
+      { grade: 'A2', inscrits: 12, presents: 7, taux: 58.3 },
+    ],
+  },
+  admin_operationnel: {
+    ...ADM,
+    pointages_par_statut: [
+      { statut: 'TERMINE', total: 200 },
+      { statut: 'EN_COURS', total: 20 },
+    ],
+    participants_par_sexe: [
+      { sexe: 'Hommes', total: 18 },
+      { sexe: 'Femmes', total: 12 },
+    ],
+    participants_par_categorie: [
+      { categorie: 'Externe', total: 18 },
+      { categorie: 'Interne', total: 12 },
+    ],
+    charge_formateurs: [{ nom: 'KONAN Yao', nb_sessions: 12 }],
+    auditeurs_notoires: {
+      ...AN_DATA_38E,
+      total: 2, inscrits: 30, pct: 6.7,
+      liste: AN_LISTE_38E.filter((r) => r.secretariat_id === 1),
+    },
+  },
+  filtre_actif: { scope_locked: false },
+}
+const SEC_DETAIL_VIDE_38E = {
+  kpis: {
+    modules: 0, participants: 0, formateurs: 0, sessions_total: 0,
+    pointages: 0, vh_prevu_heures: 0, taux_execution_vh: 0,
+  },
+  pedagogiques: {
+    taux_presence: 0, taux_absence: 0,
+    taux_par_formation: [], taux_par_grade: [],
+  },
+  admin_operationnel: {
+    pointages_par_statut: [], participants_par_sexe: [],
+    participants_par_categorie: [], charge_formateurs: [],
+    auditeurs_notoires: null,
+  },
+  filtre_actif: { scope_locked: false },
+}
+
+const OV_ALERTES_38E = [
+  {
+    indicateur: 'taux_presence', libelle: 'Assiduité séance', icone: 'bi-people',
+    couleur: '#2277C1', niveau: 'critique', valeur: 42, unite: '%',
+    seuil_avertissement: 70, seuil_critique: 50, inverse: true,
+    configure: true, actif: true, aide: 'Assiduité des places présentes.', echelle_max: 100,
+  },
+  {
+    indicateur: 'saturation_groupe', libelle: 'Saturation des groupes', icone: 'bi-people',
+    couleur: '#C62828', niveau: 'avertissement', valeur: 95, unite: '%',
+    seuil_avertissement: 90, seuil_critique: 100, inverse: false,
+    configure: true, actif: true, aide: 'Taux de remplissage des groupes.', echelle_max: 120,
+  },
+]
+
+/**
+ * Routes 38e : données RICHES (tableaux de répartition remplis, comparatif de
+ * secrétariats peuplé, détail d'un secrétariat). Le détail appelle
+ * `/statistiques/?sections=…,filtre_actif&secretariat_id=…` (fetchSecDetail).
+ */
+function install38eRoutes(opts = {}) {
+  const {
+    ped = PED_RICHE,
+    adm = ADM_RICHE,
+    hist = HIST,
+    kpis = KPIS,
+    periode = undefined,
+    secStats = SEC_STATS_38E,
+    secDetail = SEC_DETAIL_38E,
+    secDetailError = false,
+    alertesOverview = [],
+  } = opts
+  apiController.reset()
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+  apiController.setRoute('/statistiques/secretariats/', (path) => {
+    const q = paramsOf(path)
+    const id = q.get('secretariat_id')
+    if (id) {
+      const rows = secStats.secretariats.filter(
+        (s) => String(s.secretariat_id) === String(id),
+      )
+      return { ...secStats, secretariats: rows, total: rows.length }
+    }
+    return secStats
+  })
+  apiController.setRoute('/statistiques/', (path) => {
+    const q = paramsOf(path)
+    if (isMetaCall(q)) {
+      return {
+        formations_liste: FORMATIONS,
+        secretariats_liste: SECRETARIATS,
+        filtre_actif: { scope_locked: false },
+      }
+    }
+    const sections = q.get('sections') || ''
+    if (sections.includes('filtre_actif') && q.get('secretariat_id')) {
+      if (secDetailError) throw new Error('détail secrétariat KO')
+      return typeof secDetail === 'function' ? secDetail(q) : secDetail
+    }
+    return statsDataFor(q, {
+      kpis, pedagogiques: ped, adm, historique: hist, periode,
+      alertes: alertesOverview, alertes_overview: alertesOverview,
+    })
+  })
+  apiController.setRoute('/statistiques/point-journalier/', () => ({ tableaux: [], tableaux_complets: [] }))
+  apiController.setRoute('/statistiques/bilans/', () => ({ bilans: [], tableaux_complets: [], total_bilans: 0 }))
+  apiController.setRoute('/statistiques/alertes/seuils/', () => ({
+    seuils: [], indicateurs: [], synthese: {}, seuils_vides: true,
+  }))
+}
+
+async function mount38e(opts = {}) {
+  install38eRoutes(opts)
+  mountStats(adminMe())
+  await screen.findByText('4 sections')
+}
+
+/** Récupère la ligne `<tr>` contenant un texte (les sidebars sont de vrais boutons). */
+const tableRowContaining = (text) =>
+  screen.getAllByText(text).map((el) => el.closest('tr')).find(Boolean)
+
+// ── Vue d'ensemble : sections cliquables et panneaux de détail ───────────────
+describe('Statistiques (LOT 38e) — Vue d’ensemble : synthèse riche et navigation par sections', () => {
+  it('rend la synthèse avec graphiques H/F, charge enseignants remplie et badge de période', async () => {
+    await mount38e()
+
+    expect(await screen.findByText("Vue d'ensemble — synthèse")).toBeInTheDocument()
+    expect(screen.getByText('Données filtrées : Septembre 2026')).toBeInTheDocument()
+    // Volumes chiffrés des KPI de tête.
+    expect(screen.getByText('600h')).toBeInTheDocument()
+    expect(screen.getByText('66%')).toBeInTheDocument()
+    // La carte H/F affiche la légende du donut (données ADM_RICHE).
+    expect(screen.getByText('Hommes')).toBeInTheDocument()
+    expect(screen.getByText('Femmes')).toBeInTheDocument()
+    // La charge enseignants est remplie (HBars).
+    expect(screen.getByText('Charge des enseignants (top 8)')).toBeInTheDocument()
+    expect(screen.getByText('KONAN Yao')).toBeInTheDocument()
+    expect(screen.getByText('Taux pédagogiques')).toBeInTheDocument()
+    // La carte des absents notoires est alimentée par l'admin.
+    expect(screen.getByText('KOUASSI')).toBeInTheDocument()
+  })
+
+  it('liste les 4 sections en sidebar avec leurs sous-textes, sans alerte active', async () => {
+    await mount38e()
+
+    expect(screen.getByText('4 sections')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^ALT Surveillance/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^KPI Chiffres clés/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^PED Pédagogique/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^OPE Opérationnel/ })).toBeInTheDocument()
+    expect(screen.getByText('Aucune alerte active')).toBeInTheDocument()
+    expect(screen.getByText('Formations, modules, étudiants, séances…')).toBeInTheDocument()
+    expect(screen.getByText('Assiduité séance, couverture étudiants, absences')).toBeInTheDocument()
+    expect(screen.getByText('Répartition H/F, charge enseignants, absents notoires')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tous les indicateurs' })).toBeInTheDocument()
+  })
+
+  it('avec des alertes : sous-texte agrégé de la section et bandeau de la synthèse', async () => {
+    await mount38e({ alertesOverview: OV_ALERTES_38E })
+
+    // Sous-texte de la section Surveillance (1 critique + 1 avertissement).
+    const btnSurv = screen.getByRole('button', { name: /^ALT Surveillance/ })
+    expect(within(btnSurv).getByText(/2 alertes \(1 crit\. · 1 avert\.\)/)).toBeInTheDocument()
+    // Le bandeau en haut de la synthèse liste les alertes et leurs seuils.
+    expect(screen.getByText('Saturation des groupes')).toBeInTheDocument()
+    expect(screen.getByText('Seuil critique : 50%')).toBeInTheDocument()
+    expect(screen.getByText('Seuil avertissement : 100%')).toBeInTheDocument()
+  })
+
+  it('les 5 zones cliquables de la synthèse ouvrent chacune la bonne section', async () => {
+    await mount38e()
+    await screen.findByText("Vue d'ensemble — synthèse")
+
+    // Ordre DOM : bandeau alertes, grille KPI, carte pédagogie, carte charge, carte H/F.
+    const zones = () => document.querySelectorAll('[role="button"]')
+    expect(zones()).toHaveLength(5)
+
+    fireEvent.click(zones()[1]) // grille KPI
+    expect(await screen.findByRole('heading', { name: 'Chiffres clés' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    await screen.findByText("Vue d'ensemble — synthèse")
+
+    fireEvent.click(zones()[2]) // carte pédagogie
+    expect(await screen.findByRole('heading', { name: 'Pédagogique' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    await screen.findByText("Vue d'ensemble — synthèse")
+
+    fireEvent.click(zones()[3]) // carte charge (opérationnel)
+    expect(await screen.findByRole('heading', { name: 'Opérationnel' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    await screen.findByText("Vue d'ensemble — synthèse")
+
+    fireEvent.click(zones()[4]) // carte H/F (opérationnel également, handler propre)
+    expect(await screen.findByRole('heading', { name: 'Opérationnel' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    await screen.findByText("Vue d'ensemble — synthèse")
+
+    fireEvent.click(zones()[0]) // bandeau surveillance
+    expect(await screen.findByText('Aucune alerte active sur les 3 indicateurs clés.')).toBeInTheDocument()
+  })
+
+  it('section Surveillance vide : message de contrôle et bouton vers l’onglet Alertes', async () => {
+    await mount38e()
+    fireEvent.click(screen.getByRole('button', { name: /^ALT Surveillance/ }))
+
+    expect(await screen.findByText('Aucune alerte active sur les 3 indicateurs clés.')).toBeInTheDocument()
+    const bouton = screen.getByRole('button', { name: /Configurer et voir toutes les alertes/ })
+    fireEvent.click(bouton)
+    // L'onglet Alertes est maintenant affiché.
+    expect(await screen.findByText('Surveillance INJS — seuils et alertes')).toBeInTheDocument()
+    expect(screen.queryByText('4 sections')).not.toBeInTheDocument()
+  })
+
+  it('section Surveillance avec alertes : rend les cartes de suivi des indicateurs', async () => {
+    await mount38e({ alertesOverview: OV_ALERTES_38E })
+    fireEvent.click(screen.getByRole('button', { name: /^ALT Surveillance/ }))
+
+    // Les deux indicateurs de surveillance sont rendus en cartes.
+    expect(await screen.findByText('Saturation des groupes')).toBeInTheDocument()
+    expect(screen.getAllByText('Assiduité séance').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('valeur actuelle')).toHaveLength(2)
+    // Le bouton de bascule reste proposé.
+    expect(screen.getByRole('button', { name: /Configurer et voir toutes les alertes/ })).toBeInTheDocument()
+  })
+
+  it('section Pédagogique : KPI, grilles de taux et bouton d’ouverture de l’onglet dédié', async () => {
+    await mount38e()
+    fireEvent.click(screen.getByRole('button', { name: /^PED Pédagogique/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Pédagogique' })).toBeInTheDocument()
+    expect(screen.getAllByText('Inscrits').length).toBeGreaterThan(0)
+    expect(screen.getByText('Événements')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ouvrir l'onglet Pédagogique/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir l'onglet Pédagogique/ }))
+    expect(await screen.findByText(/Pédagogique — vue d'ensemble/)).toBeInTheDocument()
+  })
+
+  it('affiche le libellé secondaire de période dans le badge de la synthèse quand l’API le fournit', async () => {
+    await mount38e({
+      periode: { label: 'Septembre 2026', periode_label: '3e trimestre 2026', filtre_actif: true },
+    })
+    await screen.findByText("Vue d'ensemble — synthèse")
+    expect(screen.getAllByText(/3e trimestre 2026/).length).toBeGreaterThan(0)
+  })
+
+  it('section Opérationnel : cartes H/F et charge, bouton vers l’onglet Administratif', async () => {
+    await mount38e()
+    fireEvent.click(screen.getByRole('button', { name: /^OPE Opérationnel/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Opérationnel' })).toBeInTheDocument()
+    expect(screen.getByText('Hommes')).toBeInTheDocument()
+    expect(screen.getByText('KONAN Yao')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir l'onglet Administratif/ }))
+    // Onglet Administratif : les KPI opérationnels deviennent visibles.
+    expect(await screen.findByText('Groupes actifs')).toBeInTheDocument()
+  })
+})
+
+// ── Pédagogique : périmètres formation / grade / secrétariat ─────────────────
+describe('Statistiques (LOT 38e) — Pédagogique : ensemble, sidebars et panneaux de détail', () => {
+  it('ensemble : 6 périmètres groupés, tableaux remplis, types de concours et AN', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+
+    expect(await screen.findByText(/Pédagogique — vue d'ensemble/)).toBeInTheDocument()
+    expect(screen.getByText('6 périmètres')).toBeInTheDocument()
+    // En-têtes des groupes de la sidebar.
+    expect(screen.getByText('Formations')).toBeInTheDocument()
+    expect(screen.getByText('Grades')).toBeInTheDocument()
+    // L'en-tête de groupe de la sidebar est un <div> (l'onglet est un <button>).
+    const entetesSec = screen.getAllByText('Secrétariats').filter((el) => el.tagName === 'DIV')
+    expect(entetesSec).toHaveLength(1)
+    // Entrées sidebar avec leurs sous-textes.
+    expect(screen.getByRole('button', { name: /^FOR Licence 1 LSF/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /20 inscrits · 80\.0% prés\./ })).toBeInTheDocument()
+    // Tableau des formations : en-têtes et valeurs.
+    expect(screen.getByText('Assiduité séance par formation')).toBeInTheDocument()
+    expect(screen.getAllByText('Licence 2 LSF').length).toBeGreaterThan(0)
+    expect(screen.getByText('Professionnel')).toBeInTheDocument()
+    expect(screen.getByText('Concours direct')).toBeInTheDocument()
+    // Tableau des secrétariats (rendu uniquement si données).
+    expect(screen.getByText('Assiduité séance par secrétariat')).toBeInTheDocument()
+    expect(screen.getAllByText('INJS Centre').length).toBeGreaterThan(0)
+    // Absents notoires récupérés via ped.auditeurs_notoires (section pédagogiques seule).
+    expect(screen.getByText('TRAORE')).toBeInTheDocument()
+    // Message de fin listant les périmètres cliquables.
+    expect(screen.getByText(/6 périmètres listés à gauche/)).toBeInTheDocument()
+  })
+
+  it('détail formation par clic sur la LIGNE du tableau : KPI, écart, grades liés, survols', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('6 périmètres')).toBeInTheDocument()
+
+    const row = tableRowContaining('Licence 1 LSF')
+    fireEvent.mouseEnter(row) // exerce les handlers de survol
+    fireEvent.mouseLeave(row)
+    fireEvent.click(row)
+
+    const titre = await screen.findByText(/Formation — Licence 1 LSF/)
+    expect(titre).toBeInTheDocument()
+    // Tag FOR dans le titre (en plus des 2 tags FOR de la sidebar).
+    expect(screen.getAllByText('FOR').length).toBe(3)
+    // Assiduité du périmètre (toFixed(1)) et écart vs 71,4 % global : +8,6 pts.
+    expect(screen.getByText('80.0%')).toBeInTheDocument()
+    expect(screen.getByText('+8.6 pt')).toBeInTheDocument()
+    expect(screen.getByText('Moyenne globale : 71.4% (assiduité séance)')).toBeInTheDocument()
+    expect(screen.getByText('Contexte global (filtre actif)')).toBeInTheDocument()
+    expect(screen.getByText('Grades liés (aperçu)')).toBeInTheDocument()
+    expect(screen.getByText('Séances terminées')).toBeInTheDocument()
+    // Une formation n'a ni numéro, ni bouton de bascule vers les secrétariats.
+    expect(screen.queryByText(/^N° /)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ouvrir l'onglet Secrétariats/ })).not.toBeInTheDocument()
+  })
+
+  it('détail grade via la barre cliquable : pas de grades liés ni de navigation secrétariat', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('6 périmètres')).toBeInTheDocument()
+
+    // La carte des grades utilise un conteneur role=button (la sidebar est un <button>).
+    const gradeBox = screen.getAllByText('A1')
+      .map((el) => el.closest('div[role="button"]'))
+      .find(Boolean)
+    fireEvent.click(gradeBox)
+
+    expect(await screen.findByText(/Grade — A1/)).toBeInTheDocument()
+    expect(screen.getAllByText('GRD').length).toBeGreaterThan(0)
+    expect(screen.getByText('+8.6 pt')).toBeInTheDocument()
+    expect(screen.queryByText('Grades liés (aperçu)')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ouvrir l'onglet Secrétariats/ })).not.toBeInTheDocument()
+
+    // Retour au panneau d'ensemble.
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    expect(await screen.findByText(/Pédagogique — vue d'ensemble/)).toBeInTheDocument()
+  })
+
+  it('détail secrétariat : AN filtrés, bouton ouvrant l’onglet Secrétariats filtré puis réinitialisation', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('6 périmètres')).toBeInTheDocument()
+
+    // Ouverture via l'entrée sidebar du secrétariat (tag SEC).
+    fireEvent.click(screen.getByRole('button', { name: /^SEC INJS Centre/ }))
+    expect(await screen.findByText(/Secrétariat — INJS Centre/)).toBeInTheDocument()
+    expect(screen.getByText('N° 1')).toBeInTheDocument()
+    expect(screen.getByText('+1.9 pt')).toBeInTheDocument() // 73,3 − 71,4
+    expect(screen.getByRole('button', { name: /Ouvrir l'onglet Secrétariats/ })).toBeInTheDocument()
+    // Le panneau compact ne liste QUE les absents du secrétariat 1 (KOUASSI, DIALLO).
+    expect(screen.getByText('KOUASSI')).toBeInTheDocument()
+    expect(screen.getByText('DIALLO')).toBeInTheDocument()
+    expect(screen.queryByText('TRAORE')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir l'onglet Secrétariats/ }))
+    // Le filtre global est positionné : le comparatif ne contient que le
+    // secrétariat courant, et un effet l'ouvre AUTOMATIQUEMENT en détail
+    // (sélection déduite de secretariatId) — c'est le comportement attendu.
+    await waitFor(() => {
+      expect(callsTo('/statistiques/secretariats/').at(-1).get('secretariat_id')).toBe('1')
+    })
+    expect(await screen.findByText('Responsable : KONAN Yao')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tous les secrétariats (1)' })).toBeInTheDocument()
+
+    // Le bouton de réinitialisation de la sidebar retire le filtre et revient
+    // au comparatif complet.
+    fireEvent.click(screen.getByRole('button', { name: 'Tous les secrétariats (1)' }))
+    expect(await screen.findByText("2 secrétariats — vue d'ensemble")).toBeInTheDocument()
+    await waitFor(() => {
+      expect(callsTo('/statistiques/secretariats/').at(-1).get('secretariat_id')).toBe(null)
+    })
+  })
+
+  it('la ligne du tableau « par secrétariat » ouvre le détail du secrétariat (avec survols)', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('6 périmètres')).toBeInTheDocument()
+
+    const row = tableRowContaining('INJS Marcory')
+    fireEvent.mouseEnter(row)
+    fireEvent.mouseLeave(row)
+    fireEvent.click(row)
+
+    expect(await screen.findByText(/Secrétariat — INJS Marcory/)).toBeInTheDocument()
+    expect(screen.getByText('N° 2')).toBeInTheDocument()
+  })
+
+  it('l’entrée sidebar d’une formation ouvre le détail puis le bouton de retour ramène à l’ensemble', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('6 périmètres')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^FOR Licence 2 LSF/ }))
+    expect(await screen.findByText(/Formation — Licence 2 LSF/)).toBeInTheDocument()
+    // 63,6 % apparaît dans le KPI et dans la barre de taux.
+    expect(screen.getAllByText('63.6%').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('-7.8 pt')).toBeInTheDocument() // 63,6 − 71,4
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les indicateurs' }))
+    expect(await screen.findByText(/Pédagogique — vue d'ensemble/)).toBeInTheDocument()
+    // Le bouton racine de la sidebar réinitialise aussi la sélection.
+    fireEvent.click(screen.getByRole('button', { name: /^FOR Licence 1 LSF/ }))
+    expect(await screen.findByText(/Formation — Licence 1 LSF/)).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Tous les indicateurs' })[0])
+    expect(await screen.findByText(/Pédagogique — vue d'ensemble/)).toBeInTheDocument()
+  })
+
+  it('détail d’un périmètre sans taux renseigné : la carte d’écart vs global n’est pas rendue', async () => {
+    const pedDegrade = {
+      ...PED_RICHE,
+      // Un seul grade, sans taux : l'écart ne peut pas être calculé.
+      taux_par_grade: [{ grade: 'A3', inscrits: 5, presents: 0, taux: null }],
+    }
+    await mount38e({ ped: pedDegrade })
+    fireEvent.click(tabButton('Pédagogique'))
+    expect(await screen.findByText('5 périmètres')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /^GRD A3/ }))
+    expect(await screen.findByText(/Grade — A3/)).toBeInTheDocument()
+    expect(screen.queryByText('Écart vs global')).not.toBeInTheDocument()
+  })
+
+  it('sans répartition : messages d’absence, 0 périmètre et pas de tableau secrétariat', async () => {
+    await mount38e({ ped: PED, adm: ADM })
+    fireEvent.click(tabButton('Pédagogique'))
+
+    expect(await screen.findByText('0 périmètre')).toBeInTheDocument()
+    expect(screen.getByText('Aucun grade renseigné')).toBeInTheDocument()
+    expect(screen.queryByText('Assiduité séance par secrétariat')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^FOR / })).not.toBeInTheDocument()
+    expect(screen.queryByText(/périmètres listés à gauche/)).not.toBeInTheDocument()
+  })
+})
+
+// ── Historique : synthèse 12 mois et détail mensuel ──────────────────────────
+describe('Statistiques (LOT 38e) — Historique : ensemble, navigation mensuelle et variations', () => {
+  it('ensemble : KPI de résumé (dont la tendance), graphiques, stock cumulé et sidebar ordonnée', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Historique'))
+
+    expect(await screen.findByText('Historique — 12 derniers mois')).toBeInTheDocument()
+    expect(screen.getByText('2 mois')).toBeInTheDocument()
+    // KPI de résumé.
+    expect(screen.getByText('Pointages (12 mois)')).toBeInTheDocument()
+    expect(screen.getByText('Moy. 55/mois actif')).toBeInTheDocument()
+    expect(screen.getByText('16 ce mois')).toBeInTheDocument()
+    expect(screen.getByText('81.5%')).toBeInTheDocument()
+    expect(screen.getByText('Pointages ce mois')).toBeInTheDocument()
+    expect(screen.getByText('▲ 20%')).toBeInTheDocument()
+    // Graphiques et stock cumulé.
+    expect(screen.getByText('Pointages par mois — présents vs absents')).toBeInTheDocument()
+    expect(screen.getByText(/Stock cumulé :/)).toBeInTheDocument()
+    expect(screen.getByText(/Cliquez sur un mois à gauche/)).toBeInTheDocument()
+    // Sidebar : mois le plus récent d'abord, avec les taux en sous-texte.
+    const septBtn = screen.getByRole('button', { name: /Septembre 2026.*60 ptg\./ })
+    const aoutBtn = screen.getByRole('button', { name: /Août 2026.*50 ptg\./ })
+    expect(septBtn.compareDocumentPosition(aoutBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(septBtn.textContent).toContain('83.0% prés.')
+    // Le panneau des absents notoires est alimenté (admin chargé avec l'historique).
+    expect(screen.getByText('KOUASSI')).toBeInTheDocument()
+  })
+
+  it('détail du premier mois (août) : variation +100 %, contexte sur 1 mois et KPI strip AN', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Historique'))
+    await screen.findByText('Historique — 12 derniers mois')
+
+    fireEvent.click(screen.getByRole('button', { name: /Août 2026/ }))
+    expect(await screen.findByRole('heading', { name: 'Août 2026' })).toBeInTheDocument()
+    // Pas de mois précédent → variation conventionnelle +100 %.
+    expect(screen.getByText('▲ 100%')).toBeInTheDocument()
+    expect(screen.getByText('Présents vs absents (ce mois)')).toBeInTheDocument()
+    expect(screen.getByText('Contexte — 1 mois')).toBeInTheDocument()
+    expect(screen.getByText('80.0%')).toBeInTheDocument()
+    expect(screen.getByText('Modules créés')).toBeInTheDocument()
+    expect(screen.getByText('Stock modules')).toBeInTheDocument()
+    // KPI strip des absents notoires du périmètre global (le total et le
+    // libellé sont dans des nœuds séparés, d'où les assertions distinctes).
+    const strip = screen.getByText('absents notoires').closest('div[style*="fef2f2"]')
+    // Le pourcentage et les inscrits sont dans des nœuds séparés (<b>) : on
+    // lit le texte complet du strip plutôt qu'un nœud unique.
+    expect(strip.textContent).toContain('3')
+    expect(strip.textContent).toContain('7,1% des inscrits (42)')
+    expect(strip.textContent).toContain('Module démarré')
+  })
+
+  it('détail de septembre : variation +20 %, contexte glissant sur 2 mois puis retour', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Historique'))
+    await screen.findByText('Historique — 12 derniers mois')
+
+    fireEvent.click(screen.getByRole('button', { name: /Septembre 2026/ }))
+    expect(await screen.findByRole('heading', { name: 'Septembre 2026' })).toBeInTheDocument()
+    // (60 − 50) / 50 = +20 %.
+    expect(screen.getByText('▲ 20%')).toBeInTheDocument()
+    expect(screen.getByText('Contexte — 2 mois')).toBeInTheDocument()
+    expect(screen.getByText('Assiduité séance (contexte)')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les mois' }))
+    expect(await screen.findByText('Historique — 12 derniers mois')).toBeInTheDocument()
+
+    // Le bouton racine de la sidebar (« Tous les mois (12) ») réinitialise aussi.
+    fireEvent.click(screen.getByRole('button', { name: 'Tous les mois (12)' }))
+    expect(screen.getByText('Historique — 12 derniers mois')).toBeInTheDocument()
+  })
+
+  it('mois sans données : mention « sans données », opacité réduite, variation −100 % et fenêtre 3 mois', async () => {
+    await mount38e({ hist: HIST_ZERO })
+    fireEvent.click(tabButton('Historique'))
+
+    expect(await screen.findByText('3 mois')).toBeInTheDocument()
+    const juilBtn = screen.getByRole('button', { name: /Juillet 2026/ })
+    expect(juilBtn.textContent).toContain('0 ptg.')
+    expect(juilBtn.textContent).toContain('sans données')
+
+    fireEvent.click(juilBtn)
+    expect(await screen.findByRole('heading', { name: 'Juillet 2026' })).toBeInTheDocument()
+    // (0 − 60) / 60 = −100 %.
+    expect(screen.getByText('▼ 100%')).toBeInTheDocument()
+    // Fenêtre glissante maximale : juillet + ses 2 prédécesseurs.
+    expect(screen.getByText('Contexte — 3 mois')).toBeInTheDocument()
+  })
+})
+
+// ── Secrétariats : comparatif et détail ──────────────────────────────────────
+describe('Statistiques (LOT 38e) — Secrétariats : comparatif complet, détail et cas limites', () => {
+  it('ensemble : agrégats, tableau à 17 colonnes, valeurs formatées et graphiques', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Secrétariats'))
+
+    expect(await screen.findByText("2 secrétariats — vue d'ensemble")).toBeInTheDocument()
+    // Agrégats des KPI d'en-tête.
+    expect(screen.getByText('Étudiants total')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument() // 30 + 12
+    expect(screen.getByText('9')).toBeInTheDocument() // modules 5 + 4
+    expect(screen.getByText('310')).toBeInTheDocument() // pointages 220 + 90
+    expect(screen.getByText('7,1% des inscrits')).toBeInTheDocument() // AN global
+
+    // Tableau comparatif : 17 colonnes.
+    const table = screen.getByText('Responsable').closest('table')
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(17)
+    for (const h of ['N°', 'Secrétariat', 'Modules', 'Abs. notoires', 'Vol.H. prévu', 'Avancement VH', 'Hommes', 'Femmes']) {
+      expect(within(table).getByText(h)).toBeInTheDocument()
+    }
+    // Valeurs des lignes : VH formatées, responsable manquant replié sur « — »,
+    // infobulle du pourcentage d'absents notoires (virgule des titres en point).
+    expect(within(table).getByText('300h')).toBeInTheDocument()
+    expect(within(table).getByText('200h')).toBeInTheDocument()
+    expect(within(table).getByText('—')).toBeInTheDocument()
+    expect(within(table).getByTitle('6.7% des inscrits')).toBeInTheDocument()
+    // Graphiques d'accompagnement.
+    expect(screen.getByText('Pointages par secrétariat')).toBeInTheDocument()
+    expect(screen.getByText('Absences par secrétariat')).toBeInTheDocument()
+    // Carte des absents notoires du comparatif.
+    expect(screen.getByText('TRAORE')).toBeInTheDocument()
+  })
+
+  it('sidebar : sous-textes des secrétariats avec mention notoires conditionnelle', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+
+    expect(screen.getByRole('button', { name: 'Tous les secrétariats (2)' })).toBeInTheDocument()
+    const centre = screen.getByRole('button', { name: /5 mod\./ })
+    expect(centre.textContent).toContain('INJS Centre')
+    expect(centre.textContent).toMatch(/73\.3% prés\./)
+    expect(centre.textContent).toContain('2 not.')
+    // Le second secrétariat n'a aucun absent notoire : la mention est omise.
+    const marcory = screen.getByRole('button', { name: /4 mod\./ })
+    expect(marcory.textContent).toContain('INJS Marcory')
+    expect(marcory.textContent).not.toContain('not.')
+  })
+
+  it('clic sur une LIGNE du comparatif : détail chargé pour le secrétariat (Marcory, sans responsable)', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+
+    const row = tableRowContaining('INJS Marcory')
+    fireEvent.mouseEnter(row) // exerce les handlers de survol
+    fireEvent.mouseLeave(row)
+    fireEvent.click(row)
+
+    // L'appel de détail porte bien l'id du secrétariat et les sections dédiées.
+    await waitFor(() => {
+      const q = dataCalls().at(-1)
+      expect(q.get('secretariat_id')).toBe('2')
+      expect(q.get('sections')).toContain('filtre_actif')
+    })
+    expect(await screen.findByRole('heading', { name: 'INJS Marcory' })).toBeInTheDocument()
+    expect(screen.queryByText(/^Responsable :/)).not.toBeInTheDocument()
+    // KPI chiffrés du détail (220 apparaît aussi au centre du donut des statuts).
+    expect(screen.getByText('Pointages')).toBeInTheDocument()
+    expect(screen.getAllByText('220').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Taux absence')).toBeInTheDocument()
+    expect(screen.getByText('26.7%')).toBeInTheDocument()
+    // Répartition des pointages par statut (labels français du donut).
+    expect(screen.getByText('Terminé')).toBeInTheDocument()
+    expect(screen.getByText('En cours')).toBeInTheDocument()
+    // Formations rattachées (le libellé est aussi dans le sélecteur global) et
+    // grades renseignés dans le détail.
+    expect(screen.getAllByText('Licence 1 LSF').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Taux par grade')).toBeInTheDocument()
+    expect(screen.getAllByText('83.3%').length).toBeGreaterThan(0)
+    // AN du détail : les 2 absents du secrétariat 1, pas celui du secrétariat 2.
+    expect(screen.getByText('KOUASSI')).toBeInTheDocument()
+    expect(screen.queryByText('TRAORE')).not.toBeInTheDocument()
+  })
+
+  it('clic sidebar sur le Centre : responsable affiché au détail, puis retour au comparatif', async () => {
+    await mount38e()
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+
+    fireEvent.click(screen.getByRole('button', { name: /INJS Centre.*prés\./ }))
+    expect(await screen.findByText('Responsable : KONAN Yao')).toBeInTheDocument()
+    expect(screen.getByText('Pointages par statut')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voir tous les secrétariats' }))
+    expect(await screen.findByText("2 secrétariats — vue d'ensemble")).toBeInTheDocument()
+  })
+
+  it('détail sans ventilations : messages d’absence des formations/grades et données AN indisponibles', async () => {
+    await mount38e({ secDetail: SEC_DETAIL_VIDE_38E })
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+
+    fireEvent.click(screen.getByRole('button', { name: /INJS Centre.*prés\./ }))
+    expect(await screen.findByText('Aucune formation pour ce secrétariat')).toBeInTheDocument()
+    expect(screen.getByText('Aucun grade renseigné')).toBeInTheDocument()
+    expect(screen.getByText('Données non disponibles.')).toBeInTheDocument()
+    // Les donuts/barres vides replient sur le message générique.
+    expect(screen.getAllByText('Aucune donnée').length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('affiche le filtre formation actif dans le chapeau et le transmet au comparatif', async () => {
+    await mount38e()
+    // Sélection d'une formation dans le filtre global d'en-tête.
+    const formationSelect = (await screen.findByRole('option', { name: 'Licence 1 LSF' })).closest('select')
+    fireEvent.change(formationSelect, { target: { value: '10' } })
+
+    fireEvent.click(tabButton('Secrétariats'))
+    expect(await screen.findByText("2 secrétariats — vue d'ensemble")).toBeInTheDocument()
+    expect(screen.getByText(/Filtre formation/)).toBeInTheDocument()
+    expect(screen.getAllByText('Licence 1 LSF').length).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(callsTo('/statistiques/secretariats/').at(-1).get('formation_id')).toBe('10')
+    })
+  })
+
+  it('échec du chargement du détail : message d’impossibilité sans planter la page', async () => {
+    await mount38e({ secDetailError: true })
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+
+    fireEvent.click(screen.getByRole('button', { name: /INJS Centre.*prés\./ }))
+    expect(await screen.findByText('Impossible de charger le détail de ce secrétariat')).toBeInTheDocument()
+  })
+})
+
+describe('Statistiques (LOT 38e) — boutons Actualiser des onglets maillés', () => {
+  it('relance les chargements dédiés pour Pédagogique, Historique et Secrétariats', async () => {
+    await mount38e()
+    // L'en-tête global contient aussi un bouton Actualiser : on prend le
+    // DERNIER du DOM, qui est celui propre à l'onglet affiché.
+    const refreshButton = () => screen.getAllByRole('button', { name: 'Actualiser' }).at(-1)
+
+    // Vue d'ensemble : section groupée de l'onglet par défaut.
+    const countOverview = () => dataCalls().filter(
+      (q) => q.get('sections') === 'kpis,pedagogiques,admin_operationnel,alertes_overview,alertes',
+    ).length
+    const nOv = countOverview()
+    fireEvent.click(refreshButton())
+    await waitFor(() => expect(countOverview()).toBe(nOv + 1))
+
+    // Pédagogique : section « pedagogiques » seule.
+    fireEvent.click(tabButton('Pédagogique'))
+    await screen.findByText(/Pédagogique — vue d'ensemble/)
+    const countPed = () => dataCalls().filter((q) => q.get('sections') === 'pedagogiques').length
+    const nPed = countPed()
+    fireEvent.click(refreshButton())
+    await waitFor(() => expect(countPed()).toBe(nPed + 1))
+
+    // Historique : section groupée historique + pedagogiques + admin.
+    fireEvent.click(tabButton('Historique'))
+    await screen.findByText('Historique — 12 derniers mois')
+    const countHist = () =>
+      dataCalls().filter((q) => q.get('sections') === 'historique,pedagogiques,admin_operationnel').length
+    const nHist = countHist()
+    fireEvent.click(refreshButton())
+    await waitFor(() => expect(countHist()).toBe(nHist + 1))
+
+    // Secrétariats : endpoint dédié.
+    fireEvent.click(tabButton('Secrétariats'))
+    await screen.findByText("2 secrétariats — vue d'ensemble")
+    const nSec = callsTo('/statistiques/secretariats/').length
+    fireEvent.click(refreshButton())
+    await waitFor(() => expect(callsTo('/statistiques/secretariats/').length).toBe(nSec + 1))
+  })
+})
