@@ -85,6 +85,19 @@ jobs:
         # en fin (idempotente) ; tout échec d'une étape rend le build rouge.
         run: python manage.py smoke_test_injs
 
+      - name: Parcours de fumée d'authentification CURP (U0, 14 comptes témoins)
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+          COMPTE_TEMOIN_MOT_DE_PASSE: "Fumee-CI#2026"
+        # Auto-ensemence idempotemment les 14 comptes témoins (12 rôles +
+        # double secrétariat) puis prouve : connexion web des 10 rôles web,
+        # refus web + canal mobile pour FORMATEUR/AUDITEUR, routes de
+        # référence à 200 et cloisonnement croisé entre deux secrétariats.
+        # Une seule ligne rouge rend le build rouge (sortie 1).
+        run: python manage.py fumee_authentification --tous --creer
+
       - name: Intégrité du journal d'audit unifié (P01-01)
         working-directory: backend
         env:
