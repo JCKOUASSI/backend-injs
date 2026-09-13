@@ -71,7 +71,7 @@ export default function Modules() {
   const [formationError, setFormationError] = useState('')
   const [lastCreatedFormationId, setLastCreatedFormationId] = useState('')
 
-  const canManage = canMutateFormations(user?.role)
+  const canManage = canMutateFormations(user)
   const canArchive = canArchiveModuleFromUser(user)
 
   const refFormationIdForSelectedFormation = () => {

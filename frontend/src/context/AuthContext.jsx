@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import api, { setSessionExpiredCallback } from '../services/api'
 import { hasAppRole, webLoginForbiddenMessage, ALLOWED_WEB_ROLES } from '../utils/roles'
+import { CAPABILITIES_QUERY_KEY } from '../lib/queryClient'
 
 const AuthContext = createContext(null)
 
@@ -19,13 +21,31 @@ function normalizeUser(userData) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  // Capacités renvoyées par GET /auth/capabilities/ (P00-06), attachées à
+  // l'utilisateur exposé par le contexte. Tant qu'elles ne sont pas chargées,
+  // les helpers de rôles appliquent le repli statique historique.
+  const [capabilities, setCapabilities] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Client React Query fourni par le provider (singleton applicatif en
+  // production, instance dédiée en tests) : les invalidations de capacités
+  // (P00-06) touchent le même cache que les hooks useCapabilities.
+  const queryClient = useQueryClient()
 
   const _clearSession = useCallback(() => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     setUser(null)
-  }, [])
+    // Purge des droits dérivés du backend (P00-06) : une autre session ne doit
+    // jamais hériter des capacités du compte précédent. removeQueries détruit
+    // les requêtes ; un observateur encore monté peut recréer une entrée vide,
+    // on écrase donc aussi explicitement les données (défense en profondeur).
+    queryClient.removeQueries({ queryKey: CAPABILITIES_QUERY_KEY })
+    queryClient.setQueryData(CAPABILITIES_QUERY_KEY, undefined)
+    setCapabilities(null)
+  }, [queryClient])
+
+  // Callback stable exposée au composant CapabilitiesSync (P00-06).
+  const syncCapabilities = useCallback((c) => setCapabilities(c), [])
 
   useEffect(() => {
     setSessionExpiredCallback(_clearSession)
@@ -77,6 +97,8 @@ export function AuthProvider({ children }) {
       ...userData,
       role_context: response.data.role_context || userData.role_context || {},
     }))
+    // Les capacités de la nouvelle session doivent être (re)chargées.
+    queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
 
     return response.data
   }
@@ -94,12 +116,27 @@ export function AuthProvider({ children }) {
       return
     }
     setUser(normalizeUser(res.data))
-  }, [_clearSession])
+    // Un changement de rôle éventuel change les capacités : on les rafraîchit.
+    queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
+  }, [_clearSession, queryClient])
 
   const isAuthenticated = !!user
 
+  // L'utilisateur exposé embarque les capacités backend dès qu'elles sont
+  // connues : tous les helpers de src/utils/roles.js en dérivent sans avoir à
+  // modifier chaque page.
+  const exposedUser = user && capabilities ? { ...user, capabilities } : user
+
   return (
-    <AuthContext.Provider value={{ user, loading, isAuthenticated, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user: exposedUser,
+      loading,
+      isAuthenticated,
+      login,
+      logout,
+      refreshUser,
+      syncCapabilities,
+    }}>
       {children}
     </AuthContext.Provider>
   )

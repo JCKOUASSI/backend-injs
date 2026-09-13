@@ -403,12 +403,57 @@ existant — `ROLE_HIERARCHY`, ensembles de rôles et classes de permission) :
 
 > **État d'implémentation :** les 12 rôles, les groupes et la hiérarchie existent et sont
 > appliqués par les permissions DRF. Le formalisme **N0–N4 à 5 dimensions** (niveau ×
-> permission × module × périmètre × état), la table des capacités exposée au frontend et
-> l'endpoint de capacités restent à construire et à **faire valider par le commanditaire**
-> (tâche P01-05, point de validation humaine). Le tableau ci-dessus est la cible alignée
-> sur les permissions réelles ; il ne constitue pas une extension de droits déjà codée.
-> Des combinaisons multi-rôles sont autorisées pendant la transition
-> (`ALLOWED_MULTI_ROLE_COMBINATIONS`).
+> permission × module × périmètre × état) et la **validation humaine du mapping
+> rôles → N0–N4** restent à **faire valider par le commanditaire** (tâche P01-05, point de
+> validation humaine) : c'est pourquoi le niveau exposé porte `niveau_provisoire: true`.
+> Le tableau ci-dessus est la cible alignée sur les permissions réelles ; il ne constitue
+> pas une extension de droits déjà codée. Des combinaisons multi-rôles sont autorisées
+> pendant la transition (`ALLOWED_MULTI_ROLE_COMBINATIONS`).
+
+### 8.1 Endpoint de capacités pour l'interface (`GET /api/auth/capabilities/`, P00-06)
+
+Afin qu'il n'existe **qu'une seule source de vérité des droits affichés**, l'endpoint
+authentifié `GET /api/auth/capabilities/` projette pour l'utilisateur courant :
+
+- `capacites` : la liste explicite des actions par module, sous la forme
+  `{ "<module>": ["<action>", …] }` (les modules sans action sont présents avec une
+  liste vide, jamais absents) ;
+- `niveau` (`N0`–`N4`, **provisoire** tant que le gate G2/P01-05 n'est pas levé,
+  signalé par `niveau_provisoire: true`) et `hierarchie` ;
+- `perimetres` : types de périmètre (`niveaux`) et identifiants concrets
+  (`secretariats`, `formations`, `groupes`, `'*'` pour périmètre global) ;
+- `role`, `roles` (combinaisons multi-rôles) et `role_context` (même contenu que
+  `/api/auth/me/`).
+
+Le calcul est réalisé par la fonction unique `authentication.capabilities.compute_capabilities(user)`,
+qui **réutilise les classes de permissions existantes** (constantes de
+`authentication.role_groups` et prédicats des apps, par ex. `formations.access`) : il n'y
+a pas de seconde logique d'autorisation. L'endpoint est documenté dans OpenAPI (tag
+« Authentification ») et figé par un **test de contrat pour les 12 rôles**
+(`authentication/test_capabilities.py`, matrice exécutable), incluant un test croisé
+capacités ↔ permissions Django effectives. Les 12 modules exposés sont :
+`web, utilisateurs, participants, modules, presences, finance, statistiques,
+evaluations, notes, scolarite, exports, dashboard`.
+
+**Côté frontend** (`frontend/`) :
+
+- `src/hooks/useCapabilities.js` charge le contrat via React Query (clé
+  `['auth','capabilities']`, 5 min de fraîcheur, pas de réessai) ; la requête n'est
+  activée que pour une session authentifiée ;
+- `src/components/auth/CapabilitiesSync.jsx` attache le contrat à l'utilisateur du
+  `AuthContext` (`user.capabilities`) ; les helpers de `src/utils/roles.js` (`peut`,
+  ainsi que tous les helpers `can*`, les drapeaux de navigation et les garde-fous
+  `ProtectedRoute` via la prop `capacite`) **dérivent du contrat backend** dès qu'il est
+  chargé ;
+- tant que le contrat n'est pas arrivé (premier rendu, hors-ligne, endpoint en échec),
+  un **repli statique strictement identique à l'historique** (`FALLBACK_CAPACITES`)
+  s'applique ;
+- le cache est **invalidé à la connexion et au changement de rôle**, et **purgé à la
+  déconnexion** (aucune capacité ne peut traverser deux sessions).
+
+> L'interface ne fait jamais foi : les vues DRF conservent l'intégralité de leurs
+> `permission_classes` et restent la seule autorité de sécurité (règle P00-06 : ne jamais
+> affaiblir un contrôle backend).
 
 ---
 

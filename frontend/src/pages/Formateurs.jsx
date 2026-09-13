@@ -196,8 +196,8 @@ export default function Formateurs() {
     })
   }
 
-  const canEdit = !canViewFinanceData && canMutateFormations(user?.role)
-  const canDelete = !canViewFinanceData && canMutateFormations(user?.role)
+  const canEdit = !canViewFinanceData && canMutateFormations(user)
+  const canDelete = !canViewFinanceData && canMutateFormations(user)
 
   const formatDate = (value) => {
     if (!value) return '-'

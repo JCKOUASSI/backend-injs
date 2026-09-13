@@ -2,6 +2,7 @@ import { render } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
+import CapabilitiesSync from '@/components/auth/CapabilitiesSync'
 import { ToastProvider } from '@/context/ToastContext'
 
 /**
@@ -33,6 +34,7 @@ export function AllProviders({ children, queryClient, authUser, initialEntries =
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={initialEntries}>
         <AuthProvider>
+          <CapabilitiesSync />
           <ToastProvider>
             <Routes>
               <Route path={routePattern} element={children} />

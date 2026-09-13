@@ -738,3 +738,82 @@ describe('pages/Participants.jsx — exports liste de classe (LOT 23)', () => {
     expect(q.get('sexe')).toBe('MASCULIN')
   })
 })
+
+/* ------------------------------------------------------------------ */
+/* P00-06 — les capacités renvoyées par le backend font autorité       */
+/* d'affichage : aucune action absente du contrat ne doit s'afficher,  */
+/* y compris en contradiction avec le repli statique.                  */
+/* ------------------------------------------------------------------ */
+
+describe('pages/Participants.jsx — P00-06 (capacités backend)', () => {
+  const mountWithCaps = (role, capacites) => {
+    apiController.reset()
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+    const me = makeUser(role, { username: role.toLowerCase() })
+    apiController.setMe(me)
+    apiController.setRoute('/auth/capabilities/', {
+      version: 1,
+      role,
+      roles: [role],
+      niveau: 'N2',
+      niveau_provisoire: true,
+      capacites: { participants: [], exports: [], notes: [], ...capacites },
+      perimetres: { niveaux: [], secretariats: [], formations: [], groupes: [] },
+      role_context: {},
+    })
+    apiController.setRoute(LIST, listHandler)
+    apiController.setRoute(REFS, referentiels)
+    renderWithProviders(<Participants />, {
+      authUser: me,
+      initialEntries: ['/participants'],
+      routePattern: '/participants',
+    })
+  }
+
+  /** Attend que le contrat de capacités soit chargé ET appliqué au user du contexte. */
+  const waitForCapacites = async () => {
+    await waitFor(() =>
+      expect(apiController.findCall('get', '/auth/capabilities/')).toBeDefined(),
+    )
+    await settle(3)
+  }
+
+  it('un SECRETARIAT limité à « lister » par le backend ne voit aucune action de gestion', async () => {
+    // Le repli statique autorise pourtant gerer (FORMATEUR statique =
+    // FORMATION_MUTATION_ROLES) : le contrat backend, plus restrictif, gagne.
+    mountWithCaps('SECRETARIAT', { participants: ['lister'] })
+    await waitForTable()
+    await waitForCapacites()
+    expect(screen.queryByRole('button', { name: /nouvel étudiant/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /listes de classe pdf/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /listes de classe excel/i })).not.toBeInTheDocument()
+    const row = rowFor('Nom1 Prenom1')
+    expect(within(row).queryByTitle('Modifier')).not.toBeInTheDocument()
+    expect(within(row).queryByTitle('Supprimer')).not.toBeInTheDocument()
+    // La lecture (détail) reste possible : l'action « lister » est bien présente.
+    expect(within(row).getByTitle('Détail')).toBeInTheDocument()
+  })
+
+  it('un SECRETARIAT doté de « creer » par le backend voit le bouton de création (le backend peut accorder plus que le statique)', async () => {
+    mountWithCaps('SECRETARIAT', { participants: ['creer', 'gerer', 'lister'], exports: ['liste_classe'], notes: ['gerer'] })
+    await waitForTable()
+    await waitForCapacites()
+    expect(screen.getByRole('button', { name: /nouvel étudiant/i })).toBeInTheDocument()
+    const row = rowFor('Nom1 Prenom1')
+    expect(within(row).getByTitle('Modifier')).toBeInTheDocument()
+    expect(within(row).getByTitle('Supprimer')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /listes de classe pdf/i })).toBeInTheDocument()
+  })
+
+  it('FINANCE (participants absent du contrat) ne voit ni création ni gestion ni export', async () => {
+    mountWithCaps('FINANCE', { participants: [], exports: [] })
+    await waitForTable()
+    await waitForCapacites()
+    expect(screen.queryByRole('button', { name: /nouvel étudiant/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /listes de classe pdf/i })).not.toBeInTheDocument()
+    const row = rowFor('Nom1 Prenom1')
+    expect(within(row).queryByTitle('Modifier')).not.toBeInTheDocument()
+    expect(within(row).queryByTitle('Supprimer')).not.toBeInTheDocument()
+  })
+})

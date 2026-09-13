@@ -13,3 +13,6 @@ export const queryClient = new QueryClient({
 
 export const REFERENTIELS_QUERY_KEY = ['referentiels']
 export const SECRETARIATS_QUERY_KEY = ['secretariats']
+// Capacités effectives dérivées du backend (P00-06) : invalidées à la
+// connexion, la déconnexion et tout rafraîchissement de profil.
+export const CAPABILITIES_QUERY_KEY = ['auth', 'capabilities']

@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { hasAppRole } from '../../utils/roles'
+import { hasAppRole, peut, capacitesChargees } from '../../utils/roles'
 
 /**
  * Écran de changement de mot de passe obligatoire. Un compte dont
@@ -10,7 +10,16 @@ import { hasAppRole } from '../../utils/roles'
  */
 export const FORCED_PASSWORD_PATH = '/changement-mot-de-passe-obligatoire'
 
-export default function ProtectedRoute({ children, allowedRoles }) {
+/**
+ * Garde de route. Deux modes :
+ * - `allowedRoles` (historique) : contrôle statique par liste de rôles,
+ *   conservé comme repli strictement identique ;
+ * - `capacite={{ module, action }}` (P00-06) : quand les capacités backend
+ *   sont chargées, c'est le contrat GET /auth/capabilities/ qui décide ;
+ *   avant chargement, on retombe sur `allowedRoles` (ou l'accès autorisé si
+ *   aucune liste n'est fournie). L'API reste la seule autorité de sécurité.
+ */
+export default function ProtectedRoute({ children, allowedRoles, capacite }) {
   const { isAuthenticated, loading, user } = useAuth()
   const location = useLocation()
 
@@ -23,6 +32,10 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to={FORCED_PASSWORD_PATH} replace state={{ from: location }} />
   }
 
-  if (allowedRoles && !hasAppRole(user, allowedRoles)) return <Navigate to="/" replace />
+  if (capacite && capacitesChargees(user)) {
+    if (!peut(user, capacite.module, capacite.action)) return <Navigate to="/" replace />
+  } else if (allowedRoles && !hasAppRole(user, allowedRoles)) {
+    return <Navigate to="/" replace />
+  }
   return children
 }

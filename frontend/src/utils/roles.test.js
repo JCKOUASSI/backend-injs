@@ -39,6 +39,7 @@ const EXPECTED_SETS = {
   USER_MUTATION_ROLES: [...A, 'CHEF_SECRETARIAT', 'SECRETARIAT'],
   DASHBOARD_SECRETARIAT_FILTER_ROLES: [...A, 'DIRECTION'],
   SECRETARIAT_SCOPED_ROLES: ['SECRETARIAT', 'CHEF_SECRETARIAT'],
+  GLOBAL_STATS_ROLES: [...A, 'DIRECTION', 'ARCHIVE', 'FINANCE'],
 }
 
 // Matrice rôle → capacité pour chaque prédicat de l'API publique.
@@ -145,6 +146,69 @@ describe('utils/roles.js — contrat de sécurité UI', () => {
     })
     it('rôle scopé avec secrétariat numérique → chaîne de l’id', () => {
       expect(roles.lockedSecretariatId({ role: 'SECRETARIAT', secretariat: 42 })).toBe('42')
+    })
+  })
+
+  describe('peut() — capacités backend (P00-06)', () => {
+    it('sans capacités chargées, retombe sur le référentiel statique (repli identique)', () => {
+      // SECRETARIAT peut gérer les utilisateurs selon le repli statique…
+      expect(roles.peut({ role: 'SECRETARIAT' }, 'utilisateurs', 'gerer')).toBe(true)
+      // …DIRECTION non (lecture seule) — comportement historique.
+      expect(roles.peut({ role: 'DIRECTION' }, 'utilisateurs', 'gerer')).toBe(false)
+      // FINANCE ne voit jamais la liste participants.
+      expect(roles.peut({ role: 'FINANCE' }, 'participants', 'lister')).toBe(false)
+    })
+
+    it('module/action inconnus → false', () => {
+      expect(roles.peut({ role: 'ADMIN' }, 'inexistant', 'voir')).toBe(false)
+    })
+
+    it('user null → false', () => {
+      expect(roles.peut(null, 'web', 'acceder')).toBe(false)
+    })
+
+    it('les capacités backend font autorité, même en contradiction avec le rôle statique', () => {
+      // Le backend accorde valider_decisions à un SECRETARIAT (permission de
+      // groupe), alors que le repli statique (DECISION_ROLES) le refuse :
+      // dès que les capacités sont chargées, c'est le backend qui gagne.
+      const user = {
+        role: 'SECRETARIAT',
+        capabilities: {
+          niveau: 'N2',
+          capacites: { notes: ['gerer', 'valider_decisions'] },
+        },
+      }
+      expect(roles.peut(user, 'notes', 'valider_decisions')).toBe(true)
+
+      // Et une action absente du contrat backend reste masquée même pour un
+      // rôle qui l'aurait eue en statique (ex. secrétariat ne peut pas créer
+      // de participant : le backend ne liste pas « creer »).
+      const user2 = {
+        role: 'SECRETARIAT',
+        capabilities: {
+          niveau: 'N2',
+          capacites: { participants: ['gerer', 'lister'] },
+        },
+      }
+      expect(roles.peut(user2, 'participants', 'creer')).toBe(false)
+    })
+
+    it('capacitesChargees / niveauAcces / perimetresAcces lisent le contrat backend', () => {
+      expect(roles.capacitesChargees({ role: 'SECRETARIAT' })).toBe(false)
+      const user = {
+        role: 'SECRETARIAT',
+        capabilities: { niveau: 'N2', perimetres: { niveaux: ['SERVICE'] }, capacites: {} },
+      }
+      expect(roles.capacitesChargees(user)).toBe(true)
+      expect(roles.niveauAcces(user)).toBe('N2')
+      expect(roles.perimetresAcces(user)).toEqual({ niveaux: ['SERVICE'] })
+      expect(roles.niveauAcces({ role: 'SECRETARIAT' })).toBeNull()
+    })
+
+    it('un corps de capacités mal formé n’est pas pris en compte', () => {
+      const user = { role: 'SECRETARIAT', capabilities: [] }
+      expect(roles.capacitesChargees(user)).toBe(false)
+      expect(roles.peut(user, 'utilisateurs', 'gerer')).toBe(true) // repli statique
     })
   })
 

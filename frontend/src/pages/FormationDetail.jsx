@@ -554,12 +554,12 @@ export default function FormationDetail() {
   const getStatutBadge = (s) => ({ 'PLANIFIEE': 'badge-planifiee', 'EN_COURS': 'badge-en-cours', 'TERMINEE': 'badge-terminee', 'SUSPENDUE': 'badge-suspendue' }[s] || 'badge-info')
   const getStatutLabel = (s) => ({ 'PLANIFIEE': 'Planifié', 'EN_COURS': 'En cours', 'TERMINEE': 'Terminé', 'SUSPENDUE': 'Suspendu' }[s] || s)
 
-  const canEdit = canMutateFormations(user?.role)
-  const canSupervise = canSuperviseSessions(user?.role)
-  const canManageSessions = canMutateFormations(user?.role)
+  const canEdit = canMutateFormations(user)
+  const canSupervise = canSuperviseSessions(user)
+  const canManageSessions = canMutateFormations(user)
   const canArchive = canArchiveModuleFromUser(user)
   const canImport = user?.role === 'SECRETARIAT'
-  const canViewPresencesTab = canViewPresences(user?.role)
+  const canViewPresencesTab = canViewPresences(user)
 
   if (loading) return <div className="loading"><div className="spinner"></div></div>
   if (error || !formation) return (
@@ -849,7 +849,7 @@ export default function FormationDetail() {
           {dashboardLoading && <div className="loading"><div className="spinner"></div></div>}
 
           {dashboard && !dashboardLoading && (() => {
-            const canAction = canPresenceAction(user?.role)
+            const canAction = canPresenceAction(user)
             const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'
             const fmtMin = (m) => m != null ? `${Math.round(m)} min` : '—'
             const matricule = (p) => p.matricule || p.numero_matricule || p.numero || '—'

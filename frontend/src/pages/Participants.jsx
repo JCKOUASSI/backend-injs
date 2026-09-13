@@ -13,7 +13,7 @@ import {
   readParticipantsFilters,
 } from '../utils/listFilters'
 import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
-import { canCreateParticipant, canManageParticipant, PRESENCE_VIEW_ROLES, NOTE_GESTION_ROLES, LISTE_CLASSE_EXPORT_ROLES, hasAppRole } from '../utils/roles'
+import { canCreateParticipant, canManageParticipant, canViewPresences as canViewPresencesRole, peut } from '../utils/roles'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import ParticipantDetailModal from '../components/ParticipantDetailModal'
@@ -111,7 +111,7 @@ export default function Participants() {
     vagueFilter,
   ])
 
-  const canViewPresences = PRESENCE_VIEW_ROLES.includes(user?.role)
+  const canViewPresences = canViewPresencesRole(user)
 
   useEffect(() => {
     if (!showDetail) {
@@ -249,9 +249,9 @@ export default function Participants() {
   const sexeLabel = (s) => ({ MASCULIN: 'Masculin', FEMININ: 'Féminin' }[s] || '-')
   const sexeBadge = (s) => s === 'MASCULIN' ? 'badge-bg-info' : s === 'FEMININ' ? 'badge-bg-warning' : ''
 
-  const canManage = canManageParticipant(user?.role)
-  const canCreate = canCreateParticipant(user?.role)
-  const canExportListeClasse = hasAppRole(user, LISTE_CLASSE_EXPORT_ROLES)
+  const canManage = canManageParticipant(user)
+  const canCreate = canCreateParticipant(user)
+  const canExportListeClasse = peut(user, 'exports', 'liste_classe')
 
   const buildListeClasseQuery = () => {
     const params = new URLSearchParams()
@@ -482,7 +482,7 @@ export default function Participants() {
           initialNotesFiche={detailNotesFiche}
           onClose={() => setShowDetail(null)}
           loading={detailFormationsLoading || detailPointagesLoading}
-          canManageNotes={hasAppRole(user, NOTE_GESTION_ROLES)}
+          canManageNotes={peut(user, 'notes', 'gerer')}
         />
       )}
 

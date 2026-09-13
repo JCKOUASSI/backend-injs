@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const initialDash = readDashboardFilters(searchParams)
   const isDirection = String(user?.role || '').trim().toUpperCase() === 'DIRECTION'
-  const canFilterBySecretariat = canFilterDashboardBySecretariat(user?.role)
+  const canFilterBySecretariat = canFilterDashboardBySecretariat(user)
   const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const [stats, setStats] = useState(null)
   const [formationsEnCours, setFormationsEnCours] = useState([])

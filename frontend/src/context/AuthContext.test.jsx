@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { makeUser, makeLoginResponse } from '@/test/utils/factories'
+import { createTestQueryClient } from '@/test/utils/renderWithProviders'
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
@@ -38,7 +40,12 @@ function Probe() {
   )
 }
 
-const renderProbe = (ui) => render(<AuthProvider>{ui}</AuthProvider>)
+const renderProbe = (ui) =>
+  render(
+    <QueryClientProvider client={createTestQueryClient()}>
+      <AuthProvider>{ui}</AuthProvider>
+    </QueryClientProvider>,
+  )
 
 describe('context/AuthContext', () => {
   beforeEach(() => {

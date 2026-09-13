@@ -104,9 +104,9 @@ export default function ModuleDetail() {
   const [refs, setRefs] = useState({ sites: [], batiments: [], salles: [], vagues: [] })
   const { data: referentielsData } = useReferentiels()
 
-  const canSupervise = canSuperviseSessions(user?.role)
-  const canManageSessions = canMutateFormations(user?.role)
-  const canManageModule = canMutateFormations(user?.role)
+  const canSupervise = canSuperviseSessions(user)
+  const canManageSessions = canMutateFormations(user)
+  const canManageModule = canMutateFormations(user)
   const canArchive = canArchiveModuleFromUser(user)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement intentionnel : la fonction de chargement n’est pas mémoïsée (l’ajouter provoquerait une boucle) ; les dépendances de données présentes pilotent déjà le (re)chargement.

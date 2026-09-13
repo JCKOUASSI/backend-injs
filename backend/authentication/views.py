@@ -37,6 +37,8 @@ from .role_groups import (
 )
 from .throttles import LoginRateThrottle
 from .emails import send_welcome_email
+from .capabilities import CapabilitiesResponseSerializer, compute_capabilities
+from drf_spectacular.utils import extend_schema
 from presences.models import DeviceBinding, AuditLog, _log_audit
 from config.client_ip import get_client_ip
 
@@ -310,6 +312,22 @@ def me_view(request):
 def roles_view(request):
     """Hiérarchie et périmètre de gestion des rôles pour l'utilisateur connecté."""
     return Response(user_role_context(request.user))
+
+
+@extend_schema(
+    tags=['Authentification'],
+    summary="Capacités de l'utilisateur courant pour l'interface (P00-06)",
+    responses=CapabilitiesResponseSerializer,
+)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def capabilities_view(request):
+    """Droits d'affichage effectifs : {module: [actions]}, niveau, périmètres.
+
+    Projection en lecture seule des permissions existantes ; l'API reste
+    l'autorité (les vues conservent leurs permission_classes).
+    """
+    return Response(compute_capabilities(request.user))
 
 
 @api_view(['POST'])
