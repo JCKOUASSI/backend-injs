@@ -11,6 +11,7 @@
 | 1 | **Feature flags** | écran *Fonctionnalités* (`/parametres/flags`) + `GET /api/parametres/flags/` | Activer/désactiver un comportement nouveau sans redéploiement, avec effet immédiat et historique |
 | 2 | **Contrat d'API figé** | `manage.py export_api_contract --check` (CI) | Détecter toute rupture de route / paramètre / clé de réponse |
 | 3 | **Parcours de fumée** | `manage.py smoke_test_injs` (CI) | Rejouer la chaîne académique complète de bout en bout sur données auto-ensemencées |
+| 4 | **Zéro `print()` runtime** (P00-05) | `manage.py check_repo_hygiene` (CI, étendu) | Interdire les sorties `print()` dans le code Django ; logging structuré obligatoire |
 
 ---
 
@@ -99,6 +100,47 @@ désormais par `finances_etudiantes/tests/test_paiements.py`) :
 
 Les deux sont corrigés (source polymorphe renseignée depuis l'étudiant ou le
 candidat ; `date_echeance` = jour de la confirmation, surchargeable).
+
+## 4. Zéro `print()` dans le runtime (P00-05)
+
+- La commande `check_repo_hygiene` (job Backend, avant les tests) détecte par
+  **analyse AST** tout appel au *builtin* `print()` dans le code Python du
+  runtime versionné (`backend/**.py` : apps, `config`, modules racine,
+  **commandes de gestion comprises**). Elle ignore les commentaires,
+  docstrings et chaînes (donc un identifiant comme `…fingerprint(`), ainsi que
+  les redéfinitions locales de `print` (paramètre, import, fonction).
+- Sorties attendues à la place :
+  - code applicatif (vues, services, modèles, signaux…) :
+    `logger = logging.getLogger(__name__)` puis `logger.debug/info/warning/…`,
+    la configuration `LOGGING` de `config/settings.py` émet en console en
+    DEBUG et dans le fichier rotatif `logs/injs_lmd.log` (niveau WARNING) hors
+    DEBUG ;
+  - commandes de gestion : `self.stdout.write(...)` / `self.stderr.write(...)`
+    (jamais `print`, qui contourne la redirection et le style Django).
+- **Périmètre exclu, par construction et de façon explicite** (listé dans la
+  constante `RUNTIME_EXCLUDED_ROOT_SCRIPTS` et les règles de la commande) :
+  - les **scripts manuels d'import / reprise / génération** :
+    `backend/scripts/*.py` et les scripts historiques à la racine de `backend/`
+    (`seed_data.py`, `count_*.py`, `extract_*.py`, `generate_*.py`,
+    `analyze_edt.py`, `analyse_dossier.py`, `verify_import_files.py`,
+    `build_import_from_donnees.py`). Ce sont des CLI opérateur hors runtime
+    serveur, dont la sortie console est la fonction même ; ils portent un
+    en-tête normalisé « Script manuel HORS RUNTIME Django (P00-05) » ;
+  - les tests (les affichages n'y ont de toute façon aucun effet utile) et les
+    migrations (fichiers historiques figés, jamais retouchés).
+- Côté frontend, les `console.log` hors tests sont également proscrits ; ESLint
+  et les revues s'appliquent (aucun résidu au jour du P00-05).
+
+### Observabilité / Sentry
+
+La baseline initiale relevait l'absence de Sentry. Le rattachement d'un
+agrégateur d'erreurs SaaS est un **actif d'infrastructure DSI** (DSN,
+conservation, chiffrement, hébergement des données) au même titre que P00-07 ;
+il n'est pas câblé dans le code applicatif tant que la DSI ne fournit pas le
+DSN et le cadre contractuel. En attendant, la configuration `LOGGING`
+(console + fichier rotatif `logs/injs_lmd.log`, 5 Mo × 5) constitue
+l'observabilité locale. Aucune dépendance `sentry-sdk` ne doit être ajoutée
+sans prompt dédié et feu vert explicite.
 
 ---
 

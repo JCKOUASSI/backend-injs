@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Génère les fichiers d'import réels depuis donnees
 Fichiers sources :
   - FAB 2026 PHASE 1 FICHIER COMPLET.xlsx  → participants (22 feuilles de groupes)

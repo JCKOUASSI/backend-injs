@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Script de génération des fichiers Excel d'import réels.
 Usage : python generate_import_files.py
 """

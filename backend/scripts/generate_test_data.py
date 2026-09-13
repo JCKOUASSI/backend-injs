@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur d'import/reprise.
+# Sorties print() de console volontaires ; exclu du garde-fou check_repo_hygiene.
 """
 Génère un seul fichier Excel de test : import_test.xlsx
 

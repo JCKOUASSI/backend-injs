@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur d'import/reprise.
+# Sorties print() de console volontaires ; exclu du garde-fou check_repo_hygiene.
 """
 Vérifie un fichier Excel d'import Cours avant import en base.
 

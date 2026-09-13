@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Analyse complète du dossier données :
 - Structure de chaque fichier source (feuilles, colonnes, nb lignes)
 - Couverture par grade/groupe

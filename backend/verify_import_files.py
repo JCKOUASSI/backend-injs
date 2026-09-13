@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Vérifie la cohérence des 3 fichiers d'import avant import en base.
 """
 import openpyxl, os, re

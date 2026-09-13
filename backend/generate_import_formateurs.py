@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Script de génération du fichier d'import formateurs.
 
 Source : LISTE DES FORMATEURS FAB 2026_Prod V2.xlsx

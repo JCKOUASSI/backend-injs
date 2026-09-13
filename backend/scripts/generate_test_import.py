@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Génère un fichier Excel de test pour l'import formations + séances.
 Basé sur la structure observée dans les emplois du temps (image) et
 le format attendu par import_excel.py.

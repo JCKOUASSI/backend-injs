@@ -1,4 +1,7 @@
 """
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
+d'import/reprise — sorties print() de console volontaires ;
+exclu du garde-fou check_repo_hygiene.
 Génère l'icône de l'app mobile QR Badge (1024x1024 PNG).
 Usage: source venv/bin/activate && python scripts/generate_app_icon.py
 """

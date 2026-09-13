@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur d'import/reprise.
+# Sorties print() de console volontaires ; exclu du garde-fou check_repo_hygiene.
 """
 Lit l'EDT papier-style (Emploi du Temps A4 GROUPE 8MAJ.xlsx) et génère
 import_formations / import_seances compatibles import_excel.

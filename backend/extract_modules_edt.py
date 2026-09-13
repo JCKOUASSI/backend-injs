@@ -1,4 +1,8 @@
-"""Extrait tous les modules/matières distincts des fichiers EDT."""
+"""Extrait tous les modules/matières distincts des fichiers EDT.
+
+Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur d'import/reprise.
+Sorties print() de console volontaires ; exclu du garde-fou check_repo_hygiene.
+"""
 import openpyxl, os, re
 
 SRC = 'donnees'

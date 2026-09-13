@@ -245,7 +245,7 @@ Les 17 écarts nets E1→E17 de la PARTIE E restent valides dans leur principe ;
 | **Méthodes de test backend (plancher)** | **943** | **943** | **0** | **jamais de baisse** |
 | Tests verts dans le sandbox SQLite | 877 / 902 exécutés (943 détectés) | — | 19 err + 6 éch (voir J) | 100 % après arbitrage J1/J2 |
 | Backend CI PostgreSQL (3.12) | **vert à `1ec2515`** | — | — | rester vert |
-| `print()` runtime | 271 | 288 | −17 | **→ 0 (P00-05)** |
+| `print()` runtime | 271 | 288 | −17 | **0 atteint P00-05 (2026-09-13)** : 0 dans les apps/commandes ; 19 scripts manuels CLI exclus explicitement ; garde-fou AST dans `check_repo_hygiene` |
 | `select_related`/`prefetch_related` | 363 | 359 | +4 | ↑ |
 | Commandes de gestion | 32 | 31 | +1 | information |
 | Fichiers `.js/.jsx` | 106 | 105 | +1 | information |
@@ -265,6 +265,14 @@ Les 17 écarts nets E1→E17 de la PARTIE E restent valides dans leur principe ;
 | CI (jobs verts à `1ec2515`) | 2 / 3 (mobile rouge R6) | 2 / 3 | 0 | 3 / 3 |
 | Feu 3 Flutter dans Arena | **NON LEVABLE** | — | — | obligatoire hors sandbox à chaque gate |
 | `staticfiles/` versionné | 18 Mo | — | — | sortir du dépôt (P00-02) |
+
+### Mises à jour après les lots LOT 0
+
+| Date | Lot | Indicateur / évolution |
+|---|---|---|
+| 2026-09-13 | P00-05 | **`print()` runtime = 0** dans les apps et les commandes ; garde-fou AST bloquant dans `check_repo_hygiene` (CI). Les 19 scripts manuels d'import/reprise (`backend/scripts/`, racine `backend/`) sont des CLI opérateur hors runtime, exclus nommément et marqués en en-tête. Sentry non câblé : actif DSI/DSN (cf. `docs/GARDE_FOUS.md` §4). |
+| 2026-09-13 | P00-08 | Garde-fous ajoutés : 13 feature flags OFF (`/api/parametres/flags/`), contrat d'API figé (`export_api_contract --check`, 529 routes au gel), parcours de fumée `smoke_test_injs` (23 étapes, rollback par défaut) — voir `docs/GARDE_FOUS.md`. |
+| 2026-09-13 | P00-06 | CI « Frontend tests (Vitest) » : seuils de couverture respectés (le job était rouge depuis la mise en place du framework de test front ; 100 % branches sur `utils/roles.js`). |
 
 ---
 
