@@ -305,9 +305,26 @@
 > l'ancre et révocation d'URL blob), refus notifié sans appel quand aucun
 > dossier étudiant n'est rattaché, et échec du service notifié. Aucun écart
 > produit révélé.
+> Le **[LOT 42]** parachève le tableau de bord transverse **`Dashboard.jsx`**
+> (812 lignes), qui était le dernier écran fonctionnel majeur en couverture
+> partielle (75 % de lignes, 43 % de fonctions) : **27 nouveaux tests purs**
+> (fichier porté de 7 à **34 tests**) couvrent les KPI d'en-tête, les cartes
+> Capacité du jour / Exécution live / Qualité, le tableau des modules débutés
+> (replis, seuils de couleur, liens), les prochaines séances et les derniers
+> pointages, la carte Secrétariats (filtrage et état de chargement), le jour
+> de référence, la période volume horaire (preset, période future), les trois
+> variantes de rôles (DIRECTION, ENCADRANT, SECRETARIAT), les états vides et
+> les formes de réponse défensives. L'écran atteint **99,7 % de lignes,
+> 100 % de fonctions et 98 % de branches** ; les quelques branches
+> résiduelles sont inatteignables par l'UI ou liées à deux écarts SIGNALÉS
+> et non corrigés (**§10.16** : rafraîchissement de visibilité non silencieux
+> par incohérence de contrat booléen/objet ; **§10.17** : `presence_period`
+> d'URL non validée qui fait planter l'écran, et « Référence: Invalid Date »
+> quand le champ date est vidé). Ce lot durcit en outre trois attentes de
+> tests préexistants qui pouvaient conclure avant le rendu (fix de flakiness).
 > Les LOT 4 à 7, 13, 17, 19, 34 et 37 sont les lots qui touchent la logique
 > applicative, sur feu vert explicite ; les LOT 8 à 12, 14, 16, 18, 20, 21,
-> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d, 38e, 39, 40 et 41 sont des lots de tests purs.
+> 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 38a, 38b, 38c, 38d, 38e, 39, 40, 41 et 42 sont des lots de tests purs.
 > Il décrit l'état **réel** du dépôt, les conventions à respecter et les anomalies
 > repérées grâce aux tests mais **laissées volontairement non corrigées** à ce lot.
 >
@@ -595,7 +612,7 @@ Les tests sont **colocalisés** avec les sources (`*.test.js(x)` à côté du co
 | `src/components/RapportsWorkflowPanel.test.jsx` | composant | **46 tests (LOT 38c), workflow des rapports périodiques de l'onglet Rapports — 99,2 % de lignes / 91 % fonctions / 91 % branches**, rendu direct du composant (props `user`/`formationId`/`secretariatId`/`appliedVhPeriod`). **Chargement/périmètre/droits** : liste au montage (`GET /statistiques/rapports/`), titre/compteur singulier-pluriel, 5 badges de statut, périodes formatées FR avec flèche, état « Chargement… » figé par promesse et Actualiser désactivé, liste vide, erreurs backend/génériques en toast, Actualiser, portée `formation_id`/`secretariat_id`/période (`preset=mois&mois=`, custom `date_debut/date_fin`), rechargement sur changement de props, habillage des rôles (auditeur : aucune action ; SECRETARIAT/CHEF_SECRETARIAT : générer/soumettre/modifier un brouillon mais pas valider/supprimer ; ADMIN : tout), badge de statut inconnu en repli. **Détail** : `GET /rapports/<id>/`, type libellé, période en cadratin, générateur/validateur/date `toLocaleString`, commentaire conditionnel, spinner de chargement, 4 cartes KPI (taux bruts « X % », entiers, replis `—`), absence de grille KPI, erreur détail avec repli sur les données de la liste, changement de sélection. **Workflow (admin)** : soumission immédiate depuis BROUILLON (`POST …/workflow/ {action:'soumettre'}` + toast + rafraîchissement), modales Valider/Publier avec commentaire (vide par défaut), Rejeter avec **garde motif obligatoire** (pas de POST sans saisie, `commentaire`+`motif` avec), Annulation/croix sans appel, **parcours complet brouillon → en validation → validé → publié** via un backend simulé mutable, erreur backend (modale conservée). **Création** : modale avec les 10 types, valeurs par défaut (MENSUEL), Annuler sans POST, POST du formulaire sur le périmètre filtré avec toast, fermeture, réinitialisation et **sélection automatique du rapport créé** (GET détail de son id), titre vide autorisé, erreur gardant la modale ouverte. **Modification** : pré-remplissage depuis le détail (y compris sur un PUBLIÉ pour l'admin, champ `motif` réservé aux validateurs), PATCH sans clé `motif` si vide puis avec motif trimé, secrétariat bloqué sur VALIDE/PUBLIÉ, erreur et annulation. **Suppression** : modale à commentaire optionnel, `DELETE …/ {data:{motif}}`, déselection et rechargement, motif vide, erreur conservant la sélection, annulation sans appel, bouton absent pour un secrétariat. Aucun écart produit révélé (les 9 % de branches restants sont les `catch` de `fmtDate/fmtDateTime`, quasi-inatteignables en jsdom). |
 | `src/components/AuditeursNotoiresPanel.test.jsx` | composant | **19 tests (LOT 38d), absents notoires — 100 % lignes / 100 % fonctions / 93 % branches**, rendu direct sans provider. **`filterAuditeursNotoires` (pur)** : donnée nulle, total/pct arrondi au dixième, repli inscrits (`opts.inscrits` > `data.inscrits` > 0), filtre secrétariat avec coercition chaîne, filtre grade/groupe y compris le repli `—`, cumul des filtres. **`AuditeursNotoiresKpiStrip`** : rendu nul sans données, bandeau vert à total 0, singulier/pluriel, pourcentage en virgule, inscription entre parenthèses, mention « Module démarré ». **`AuditeursNotoiresPanel`** : messages « Données non disponibles. » / « Aucun absent notoire sur ce périmètre. », 12 colonnes complètes vs 7 en mode `compact`, numérotation, grade/groupe combinés ou en repli, contacts joints par « · » / seul / aucun, motif en rouge ou `—`, valeurs manquantes en `—`, `maxHeight`/overflow du conteneur défilant, pied de tableau avec/sans part des inscrits, lignes sans `id`. |
 | `src/components/PointJournalierCPFAE.test.jsx` | composant | **16 tests (LOT 38d), modèle Excel du point journalier FAC — 100 % lignes / 100 % fonctions / 90 % branches**, rendu direct. **`pjPct`** : fractions formatées en français à 2 décimales, chaîne numérique acceptée, repli `—` (null/undefined/NaN/non numérique). **`PointJournalierTableauCPFAE`** : rendu nul sans `tb`, titre/ligne DATE (jour, mois, année, organisme), sidebar de vague par défaut « SECONDE VAGUE » / personnalisée et trimée, taux du jour présence/absence et leur repli `—` ; **créneaux** : en-tête horaire avec repli `—`, lignes GROUPES (avec salles et `—`), 5 lignes de données dans l'ordre du modèle (ÉFFECTIF, PRÉSENTS, ABSENTS, TAUX DE PRÉSENCE, TAUX D'ABSENCE), valeurs brutes mises à 0 et taux en `—` quand elles manquent, totaux de dernière colonne, **cellules de padding** quand un créneau a moins de groupes que le maximum des deux créneaux, créneau absent non rendu sans planter, minimum `nGroups = 1`. |
-| `src/pages/Dashboard.test.jsx` | page | **Chargement, période de présence et erreurs (7 tests)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), et la **distinction échec total / échec partiel** (§10.6 corrigé). |
+| `src/pages/Dashboard.test.jsx` | page | **34 tests, 99,7 % lignes / 100 % fonctions / 98,4 % branches.** **Chargement, période de présence et erreurs (7 tests d'origine, durcis au LOT 42)** : endpoints stats/formations, liste « séance en cours » par défaut, bascule en **mode date** pour un jour spécifique passé, changement d'indicateurs Jour→Année, **deux tests de régression** de la bascule de période (bug de closure §10.5), **distinction échec total / échec partiel** (§10.6 corrigé). **LOT 42 (+27 tests, sans toucher à la page)** : KPI d'en-tête (modules 341 / sous-totaux démarrés-planifiés-terminés, volume 480h/600h et taux, 1207 auditeurs), cartes **Capacité du jour** (70/90, 5/8, séances planifiées), **Exécution live** (séances actives, pointages du jour, en salle, retard moyen « 4.5 min ») ; **table des modules débutés** avec lignes complètes et tous les replis (intitulé, grade, site composé, « Non assigné », « — », dates en `-`, effectifs et pourcentages d'absence 20/40/50/75 %, seuils de couleur vert/warning/rouge, module sans effectif en 0/0 sans pourcentage, cinq liens œil `/formations/{id}/modules/{module_id}`) ; **prochaines séances** avec/sans heure prévue, date formatée, chevrons (dont module_id null) ; **derniers pointages** avec les trois badges (Enseignant/Encadrant/Étudiant), heures `fmtTime`, sortie absente et cinq replis « — » ; badge de période volume horaire servi par les stats ; bloc présences sur jour/semaine/mois/année (zéros formatés « 0 (0.0 %) », seuils jaune puis rouge, repli `taux || 0`). **Carte Secrétariats** (ADMIN/DIRECTION) : propagation `secretariat=` aux deux ressources puis retour « Tous », état « Chargement... » figé par promesse différée ; **jour de référence** (`date_mode=date&date=…`, plus de `seance_en_cours`, `reference_date` aux stats, sous-titre « Référence: JJ/MM/AAAA ») ; **période volume horaire** (pilule « Cette année » → `preset=annee`, bouton Appliquer, période entièrement future + raccourci « Voir ce mois » → `preset=mois`) ; **rôles** (DIRECTION voit les secrétariats mais pas « Pointages du jour », ENCADRANT sans appel secrétariats avec titre « Mes modules débutés » et sélecteur de période inline semaine 450/500, SECRETARIAT avec mention du secrétariat rattaché) ; **libellés présences** selon date valide/invalide ; **états vides** (trois messages + « aucune personne attendue »), **formes de liste défensives** (tableau brut, objet sans `results`), **replis de configuration** (salut par username sans `first_name`, appel stats sans query string une fois tout filtre vidé). Deux tests **`[écart]`** figurent le comportement actuel défectueux : rafraîchissement de visibilité non silencieux (**§10.16**) et `presence_period` inconnue qui fait planter la page / date vidée → « Référence: Invalid Date » (**§10.17**). Les rares branches résiduelles sont inatteignables par l'UI (appel sans argument de `handleApplyVhPeriod`, voie `silent` tant que §10.16 ouvert, fallback des libellés tant que §10.17 ouvert, utilisateur non authentifié, et un artefact d'instrumentation v8 sur la flèche à corps de bloc du `map` des modules). |
 | `src/test/smoke/pages.smoke.test.jsx` | smoke | **53 pages montent sans erreur** (voir §6.3). |
 
 ### 6.3 Smoke « une page = un montage »
@@ -624,7 +641,7 @@ entrée dans `FIXTURES` plutôt que de modifier l'écran.
 
 ## 7. Couverture et seuils (qui ne peuvent que monter)
 
-Mesure après le LOT 41 (V8, `npm run test:coverage`), sur les zones ciblées :
+Mesure après le LOT 42 (V8, `npm run test:coverage`), sur les zones ciblées :
 
 | Zone | Lignes | Instructions | Fonctions | Branches |
 | --- | --- | --- | --- | --- |
@@ -636,7 +653,7 @@ Mesure après le LOT 41 (V8, `npm run test:coverage`), sur les zones ciblées :
 | `pages/DecisionsPedagogiques.jsx` | **100 %** | 100 % | 100 % | **95 %** |
 | `pages/Referentiels.jsx` (LOT 35) | **99,7 %** | **99,7 %** | **100 %** | **95,2 %** |
 | `pages/Users.jsx` (LOT 36) | **99,8 %** | **99,8 %** | **100 %** | **98,1 %** |
-| `pages/Dashboard.jsx` | **75 %** | 75 % | 43 % | **84 %** |
+| `pages/Dashboard.jsx` (LOT 42) | **99,7 %** | **99,7 %** | **100 %** | **98 %** |
 | `pages/Modules.jsx` (LOT 39) | **100 %** | **100 %** | **100 %** | **89 %** |
 | `pages/NotesModule.jsx` (LOT 14) | **98 %** | 98 % | **92 %** | **84 %** |
 | `pages/Rattrapages.jsx` (LOT 15) | **97 %** | 97 % | **77 %** | **86 %** |
@@ -685,7 +702,7 @@ Mesure après le LOT 41 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 873 (LOT 28) → 908 (LOT 29) → 937 (LOT 30) → 964 (LOT 31) → 999 (LOT 32)
 > → 1022 (LOT 33) → 1078 (LOT 35) → 1115 (LOT 36) → 1159 (LOT 38a) →
 > 1204 (LOT 38b) → 1250 (LOT 38c) → 1285 (LOT 38d) → 1314 (LOT 38e) →
-> 1354 (LOT 39) → 1374 (LOT 40) → **1379 (LOT 41)** ;
+> 1354 (LOT 39) → 1374 (LOT 40) → 1379 (LOT 41) → **1406 (LOT 42)** ;
 > lignes couvertes globalement 35,3 % (LOT 5) → … → 41,6 % (LOT 14) →
 > 43,1 % (LOT 15) → 45,3 % (LOT 16/17) → 47,4 % (LOT 18) → 47,5 % (LOT 19) →
 > 48,1 % (LOT 20) → 50,3 % (LOT 21) → 52,2 % (LOT 22) → 53,7 % (LOT 23) →
@@ -694,9 +711,9 @@ Mesure après le LOT 41 (V8, `npm run test:coverage`), sur les zones ciblées :
 > 60,6 % (LOT 32) → 60,8 % (LOT 33) → 62,3 % (LOT 35) → 62,5 % (LOT 36) →
 > 68,9 % (LOT 38a) → 72,4 % (LOT 38b) → 73,4 % (LOT 38c) →
 > 73,9 % (LOT 38d) → 75,2 % (LOT 38e) → 76,6 % (LOT 39) →
-> 76,8 % (LOT 40) → **76,9 % (LOT 41)** — le seuil des 60 % de lignes reste
-> largement franchi, **les fonctions montent à 72,0 % (plancher CI 23 %)**,
-> les branches à 82,3 % (plancher CI 60 %). Le LOT 38b porte `Statistiques.jsx`
+> 76,8 % (LOT 40) → 76,9 % (LOT 41) → **77,5 % (LOT 42)** — le seuil des
+> 60 % de lignes reste largement franchi, **les fonctions montent à
+> 72,4 % (plancher CI 23 %)**, les branches à 82,9 % (plancher CI 60 %). Le LOT 38b porte `Statistiques.jsx`
 > de 64 % à 87 % de lignes, le LOT 38c verrouille `RapportsWorkflowPanel` à
 > 99,2 %, le LOT 38d les deux composants de présentation du point
 > journalier (`AuditeursNotoiresPanel`, `PointJournalierCPFAE`) à 100 % de
@@ -704,11 +721,15 @@ Mesure après le LOT 41 (V8, `npm run test:coverage`), sur les zones ciblées :
 > internes de `Statistiques.jsx` de 87 % à 95,7 % de lignes, le LOT 39 porte
 > l'écran CRUD `Modules.jsx` de 37 % à **100 % de lignes et de fonctions**,
 > le LOT 40 verrouille la liste `Maquettes.jsx` (sans test jusqu'alors) à
-> **100 % de lignes et de fonctions**, et le LOT 41 achève `MonEspace.jsx`
-> (74 % → **100 % de lignes, fonctions et branches**), portant le dossier
-> `pages/scolarite/` à 96,6 % de lignes et 94,2 % de fonctions ; les
-> quelques lignes non couvertes ailleurs sont des replis défensifs
-> inatteignables via le parcours réel.
+> **100 % de lignes et de fonctions**, le LOT 41 achève `MonEspace.jsx`
+> (74 % → **100 % de lignes, fonctions et branches**, dossier
+> `pages/scolarite/` porté à 96,6 % de lignes et 94,2 % de fonctions), et
+> le LOT 42 porte le tableau de bord transverse `Dashboard.jsx` de 75 % à
+> **99,7 % de lignes et 100 % de fonctions** : le panier des pages
+> fonctionnelles à parachever est désormais vide (les pages restantes sont
+> toutes au moins en test smoke) ; les quelques lignes non couvertes sont
+> des replis défensifs inatteignables via le parcours réel ou des branches
+> liées aux écarts ouverts §10.16 et §10.17.
 > Les LOT 17 et 19 corrigent
 > la logique (transformation de tests `[écart]` en régressions, sans
 > nouveau fichier) ; le LOT 18 était un lot de tests purs qui a révélé le
@@ -990,7 +1011,7 @@ logique applicative : les écarts y étaient seulement constatés et tracés. Le
 §10.6), de même que les LOT 6/7 (§10.2, §10.7, §10.8), le LOT 13 (§10.10), le
 **LOT 17 (§10.11)**, le **LOT 19 (§10.12)**, le **LOT 34 (§10.13)** et le
 **LOT 37 (§10.14)**. Les points encore ouverts sont ci-dessous (§10.1,
-§10.9 et §10.15).
+§10.9, §10.15, §10.16 et §10.17).
 
 ### 10.1 Changement de mot de passe obligatoire ignoré par le web
 
@@ -1495,6 +1516,100 @@ les sommes qui fonctionnent déjà (groupes, absents, VH, TOTAL backend) et le
 test nommé **`[écart]`** constate explicitement l'effectif figé à 20 face au
 TOTAL 45.
 
+### 10.16 Écart constaté au LOT 42 — `Dashboard` : le rafraîchissement au retour d'onglet n'est jamais silencieux (contrat `silent` booléen / objet)
+
+Révélé par les tests LOT 42 de `Dashboard.test.jsx`. Le hook
+`useVisibilityPolling` (utilisé par `Dashboard` et `ModuleDetail`) appelle la
+fonction de rafraîchissement avec un **booléen** :
+
+```js
+// useVisibilityPolling.js
+const tick = () => { if (document.visibilityState === 'visible') callbackRef.current(true) }
+```
+
+Les deux consommateurs n'ont pourtant pas la même signature :
+
+```js
+// ModuleDetail.jsx — convention du hook : un booléen positionnel
+const refreshPresences = useCallback(async (silent = true) => { … }, …)
+
+// Dashboard.jsx — attend un OBJET d'options
+const loadDashboardData = useCallback(async ({ silent = false } = {}) => { … })
+```
+
+Quand le hook transmet `true`, la déstructuration `{ silent = false }`
+s'applique à une valeur booléenne (qui n'a pas de propriété `silent`) : le
+défaut `false` s'applique. Conséquence : sur `Dashboard`, le rechargement
+déclenché par un retour sur l'onglet (`visibilitychange`) ou par le polling
+passe systématiquement par la branche non silencieuse, qui réécrit `error` et
+`loading` (lignes ~93-103). Concrètement, un **échec passager du
+rafraîchissement de fond fait apparaître le bandeau « Certaines données n'ont
+pas pu être chargées »**, là où un rafraîchissement réellement silencieux
+n'aurait pas touché à l'affichage ; inversement, un rafraîchissement réussi
+peut effacer un message d'erreur légitimement affiché.
+
+**Sévérité faible** : les données sont quand même rechargées, aucun appel
+supplémentaire n'est perdu, et `setLoading(false)` après le premier
+chargement n'a pas d'effet visible ; seul le comportement d'erreur du
+rafraîchissement de fond est incohérent avec l'intention documentée par le
+paramètre `silent`.
+
+Le test **`[écart] le rafraîchissement au retour d'onglet n'est pas
+silencieux et affiche l'échec de fond (§10.16)** fige ce comportement
+RÉEL (première réponse saine, échec au `visibilitychange` → bandeau affiché).
+**Correctif proposé (non appliqué, en attente de feu vert utilisateur)** :
+harmoniser le contrat — soit appeler `callback({ silent: true })` dans le
+hook et adapter `ModuleDetail.refreshPresences`, soit faire accepter à
+`Dashboard.loadDashboardData` un booléen comme son voisin. En cas de feu
+vert, le test `[écart]` deviendra une régression exigeant que l'échec d'un
+rafraîchissement de fond n'affiche pas le bandeau ; la branche `silent`
+actuellement inatteignable (Dashboard.jsx lignes ~119-121) sera alors
+couverte.
+
+### 10.17 Écart constaté au LOT 42 — `Dashboard` : absence de validation de `presence_period` (URL) et de date de référence vidée (page blanche / « Invalid Date »)
+
+Révélé par les tests LOT 42 de `Dashboard.test.jsx`. Deux manifestations
+liées au manque de validation des filtres :
+
+1. **`presence_period` non validé.** `readDashboardFilters`
+   (`utils/listFilters.js`) transmet tel quel le paramètre d'URL
+   `presence_period`. Avec une valeur inconnue (URL trafiquée ou lien
+   erroné, ex. `?presence_period=bizarre`), si les *valeurs* sont
+   sauvegardées par un filet (`periodStats[presencePeriod] ||
+   periodStats.jour`, ~L160), les *libellés* ne le sont pas : le rendu lève
+   sur `periodLabels[presencePeriod].toUpperCase()` (~Dashboard.jsx:390),
+   puis `.toLowerCase()` (~L423), et le bloc présences afficherait
+   « Présences undefined ». Aucun `ErrorBoundary` n'encadre la page :
+   **l'écran devient entièrement blanc**. Le test
+   **`[écart] une presence_period inconnue dans l'URL fait planter le
+   rendu (§10.17)`**, qui encapsule la page dans une sonde de rendu de test,
+   fige l'exception (`Cannot read properties of undefined (reading
+   'toUpperCase')`).
+
+2. **Date de référence vidée.** Lorsque l'utilisateur efface complètement le
+   champ « Jour spécifique », `referenceDate` devient `''` : le bloc
+   présences et la liste retombent bien sur le jour courant
+   (`seance_en_cours=true`, libellé « du jour »), mais le sous-titre de
+   bienvenue construit `new Date('T00:00:00')` et affiche
+   **« • Référence: Invalid Date »** (~Dashboard.jsx L278). Le test
+   **`[écart] vider « Jour spécifique » replace sur le jour mais affiche
+   « Référence: Invalid Date » (§10.17)`** fige ce comportement.
+
+**Sévérité :** (1) moyenne mais uniquement déclenchable par une URL
+manuelle erronée (l'interface ne produit jamais de valeur inconnue via les
+boutons) ; (2) purement cosmétique, déclenchée par un effacement complet du
+champ date.
+
+**Correctif proposé (non appliqué, en attente de feu vert utilisateur)** :
+valider/normaliser `presence_period` à la lecture (`['jour','semaine',
+'mois','annee'].includes(...) || 'jour'`), ce qui couvrira aussi les
+libellés et le fallback `periodFields[presencePeriod] || periodFields.jour`
+(~L566) aujourd'hui inatteignable (le crash se produit avant) ; et
+masquer la mention « Référence » / remplacer par la date du jour quand
+`referenceDate` est vide ou invalide. En cas de feu vert, les deux tests
+`[écart]` deviendront des régressions (page rendue avec repli « jour » ;
+sous-titre absent ou cohérent).
+
 
 ---
 
@@ -1992,8 +2107,12 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
    ont été maillés au sous-lot 38e, restant l'écart §10.15 à corriger sur
    feu vert (clé `effectif_auditeurs` dans la fusion Point global). Les
    montées en profondeur de `Modules` (LOT 39), `Maquettes` (LOT 40) et
-   `MonEspace` (LOT 41, porté à 100 %) sont faites ; **ne reste dans ce
-   panier que `Dashboard.jsx` (75 % de lignes, 43 % de fonctions)** ;
+   `MonEspace` (LOT 41) et `Dashboard` (LOT 42, porté à 99,7 % de lignes et
+   100 % de fonctions) sont faites ; **ce panier est désormais vide** —
+   toutes les pages ont au moins un test smoke et les écrans fonctionnels
+   majeurs sont verrouillés ; les deux seuls points ouverts sur `Dashboard`
+   sont les écarts signalés §10.16 et §10.17 (correctifs en attente de feu
+   vert) ;
 4. écarts encore ouverts, dans des lots dédiés :
    - ~~§10.12 bug bloquant de la modale d'**assignation d'un enseignant**
      (prop `enseignant`/`formateur`)~~ **corrigé au LOT 19** (alignement du
@@ -2008,6 +2127,14 @@ Backlog proposé pour les lots suivants (ordre de valeur) :
      la fusion de lignes en doublon d'un même grade (clé erronée
      `effectif_étudiants`) — test `[écart]` au LOT 38b, correctif d'une ligne
      en attente de feu vert ;
+   - §10.16 `Dashboard` : le rafraîchissement au retour d'onglet n'est jamais
+     silencieux (le hook `useVisibilityPolling` passe un booléen là où
+     `loadDashboardData` attend un objet `{ silent }`) — test `[écart]` au
+     LOT 42, harmonisation du contrat en attente de feu vert ;
+   - §10.17 `Dashboard` : `presence_period` d'URL non validé (valeur inconnue
+     → page blanche sur `periodLabels[presencePeriod].toUpperCase()`) et date
+     de référence vidée qui affiche « Référence: Invalid Date » — deux tests
+     `[écart]` au LOT 42, validation/normalisation en attente de feu vert ;
    - ~~§10.14 écart cosmétique **`Users`** : le toast d'erreur de suppression
      ne réécrivait pas CPFAE en INJS contrairement aux badges et aux alertes
      des modales~~ **corrigé au LOT 37** (toast normalisé comme les autres
