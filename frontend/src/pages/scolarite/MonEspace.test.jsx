@@ -71,4 +71,104 @@ describe('pages/scolarite/MonEspace — chargement de la fiche', () => {
     // L'écran se contente de la fiche par défaut (prénom/nom vides), sans crasher.
     expect(screen.getByRole('heading', { name: /mon espace étudiant/i })).toBeInTheDocument()
   })
+
+  it('affiche les compteurs par défaut et la zone attestations avec une fiche vide', async () => {
+    // Le service répond sans profil ni stats : les valeurs de repli doivent
+    // s'afficher (0 module, taux « — ») et la zone L4 rester présente.
+    apiController.setRoute('/scan/me/fiche/', () => ({}))
+
+    renderWithProviders(<MonEspace />, { routePattern: '*', initialEntries: ['/mon-espace'] })
+
+    expect(await screen.findByRole('heading', { name: /mes attestations/i })).toBeInTheDocument()
+    expect(screen.getByText(/0 module\(s\) inscrit\(s\)/)).toBeInTheDocument()
+    expect(screen.getByText(/—% de présence/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Les attestations de scolarité et de réussite seront disponibles ici/),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('pages/scolarite/MonEspace — téléchargement du relevé de notes', () => {
+  let clickedDownload = null
+
+  const mount = () =>
+    renderWithProviders(<MonEspace />, { routePattern: '*', initialEntries: ['/mon-espace'] })
+
+  const fiche = (profil) =>
+    apiController.setRoute('/scan/me/fiche/', () => ({
+      profil,
+      stats: { nb_modules_inscrits: 3, taux_presence: 88 },
+    }))
+
+  const clickTelechargement = async () => {
+    await act(async () => {
+      screen.getByRole('button', { name: /Télécharger mon relevé de notes/i }).click()
+    })
+    await settle()
+  }
+
+  beforeEach(() => {
+    clickedDownload = null
+    URL.createObjectURL = vi.fn(() => 'blob:notes')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+      clickedDownload = this.download
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('télécharge le PDF du relevé nommé avec le matricule', async () => {
+    fiche({ id: 42, prenom: 'Awa', nom: 'Koné', numero: 'MAT-042' })
+    mount()
+    expect(await screen.findByText(/Awa Koné/)).toBeInTheDocument()
+    await clickTelechargement()
+
+    expect(apiMock.getBlob).toHaveBeenCalledTimes(1)
+    expect(apiMock.getBlob.mock.calls[0][0]).toBe(
+      '/presences/participant/42/notes-fiche/export/pdf/',
+    )
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    expect(clickedDownload).toBe('releve-notes-MAT-042.pdf')
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:notes')
+  })
+
+  it("retombe sur l'identifiant du dossier dans le nom du fichier en l'absence de matricule", async () => {
+    fiche({ id: 42, prenom: 'Awa', nom: 'Koné' })
+    mount()
+    expect(await screen.findByText(/Awa Koné/)).toBeInTheDocument()
+    expect(screen.queryByText(/matricule/)).not.toBeInTheDocument()
+    await clickTelechargement()
+
+    expect(apiMock.getBlob).toHaveBeenCalledTimes(1)
+    expect(clickedDownload).toBe('releve-notes-42.pdf')
+  })
+
+  it("refuse le téléchargement et notifie quand aucun dossier étudiant n'est rattaché", async () => {
+    apiController.setRoute('/scan/me/fiche/', () => ({}))
+    mount()
+    expect(await screen.findByRole('heading', { name: /mes notes/i })).toBeInTheDocument()
+    await clickTelechargement()
+
+    expect(apiMock.getBlob).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText('Aucun dossier étudiant rattaché à ce compte.'),
+    ).toBeInTheDocument()
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it("notifie l'impossibilité du téléchargement quand le service échoue", async () => {
+    fiche({ id: 42, prenom: 'Awa', nom: 'Koné', numero: 'MAT-042' })
+    apiMock.getBlob.mockRejectedValueOnce(new Error('generation ko'))
+    mount()
+    expect(await screen.findByText(/Awa Koné/)).toBeInTheDocument()
+    await clickTelechargement()
+
+    expect(
+      await screen.findByText('Téléchargement du relevé de notes impossible.'),
+    ).toBeInTheDocument()
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+  })
 })
