@@ -59,6 +59,11 @@ class JournalHabilitation(models.Model):
         POLITIQUE_MODIFIEE = 'POLITIQUE_MODIFIEE', 'Modification de politique'
         CONNEXION = 'CONNEXION', 'Connexion'
         CONNEXION_ECHOUEE = 'CONNEXION_ECHOUEE', 'Échec de connexion'
+        CONNEXION_REFUSEE_VERROUILLEE = 'CONNEXION_REFUSEE_VERROUILLEE', \
+            'Connexion refusée : compte verrouillé'
+        MFA_ETAPSE_DEMANDEE = 'MFA_ETAPSE_DEMANDEE', 'Étape MFA demandée à la connexion'
+        MFA_ACTIVE = 'MFA_ACTIVE', 'Activation du MFA (TOTP)'
+        MFA_DESACTIVE = 'MFA_DESACTIVE', 'Désactivation du MFA (TOTP)'
         DECONNEXION = 'DECONNEXION', 'Déconnexion'
         SESSION_REVOQUEE = 'SESSION_REVOQUEE', 'Révocation de session'
         APPAREIL_REVOQUE = 'APPAREIL_REVOQUE', 'Révocation d’appareil'

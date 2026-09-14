@@ -84,6 +84,10 @@ class CompteUtilisateur(models.Model):
     date_preavis_inactivite = models.DateField(null=True, blank=True)
 
     mfa_actif = models.BooleanField(default=False)
+    mfa_secret = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text='Secret TOTP (base32) du MFA ; vide tant que le MFA n’est pas armé.',
+    )
     langue = models.CharField(max_length=8, default='fr')
     notes = models.TextField(blank=True, default='')
 

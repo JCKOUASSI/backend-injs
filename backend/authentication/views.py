@@ -36,6 +36,7 @@ from .role_groups import (
     users_with_roles,
 )
 from .throttles import LoginRateThrottle
+from . import connexion_sure
 from .emails import send_welcome_email
 from .capabilities import CapabilitiesResponseSerializer, compute_capabilities
 from drf_spectacular.utils import extend_schema
@@ -170,11 +171,41 @@ def login_view(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     username_try = serializer.validated_data['username']
+
+    # ── Verrouillage de compte (CURP U6, drapeau curp_verrouillage_connexion) ──
+    # Vérifié AVANT l'authentification : un compte verrouillé ne laisse pas
+    # filtrer le bon mot de passe et son délai n'est pas contournable.
+    secondes_restantes = connexion_sure.verifier_verrouillage(
+        username=username_try)
+    if secondes_restantes is not None:
+        compte_verrouille = connexion_sure.compte_curp(username=username_try)
+        if compte_verrouille is not None:
+            connexion_sure.journaliser_refus_verrouille(
+                compte_verrouille, secondes_restantes)
+        logger.warning(
+            'login_refuse_verrouille username=%r secondes=%s ip=%s',
+            username_try, secondes_restantes, client_ip,
+        )
+        return Response(
+            {
+                'code': 'COMPTE_VERROUILLE',
+                'detail': (
+                    'Ce compte est verrouillé après plusieurs échecs '
+                    'd’authentification. Réessayez dans quelques minutes '
+                    'ou contactez un administrateur.'
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     user = authenticate(
         username=username_try,
         password=serializer.validated_data['password'],
     )
     if user is None:
+        connexion_sure.enregistrer_echec(
+            username_try, {'ip': client_ip, 'ua': user_agent},
+        )
         logger.warning(
             'login_failed_bad_credentials username=%r ip=%s ua=%r',
             username_try,
@@ -247,39 +278,36 @@ def login_view(request):
                 },
             )
 
-    logger.info(
-        'login_ok user_id=%s username=%r role=%s ip=%s device_id=%r',
-        user.pk,
-        user.username,
-        user_role,
-        client_ip,
-        device_id[:16] + '…' if len(device_id) > 16 else device_id,
-    )
-
-    refresh = RefreshToken.for_user(user)
-    refresh['role'] = user_role
-    refresh['full_name'] = user.get_full_name()
-    refresh['must_change_password'] = bool(getattr(user, 'must_change_password', False))
-    _log_audit(
-        action=AuditLog.Action.USER_LOGIN,
-        request=request,
-        cible_type='user',
-        cible_numero=user.username,
-        cible_nom=user.get_full_name() or user.username,
-        extra={'role': user_role, 'device_id': bool(device_id)},
-    )
-    response = Response({
-        'access': str(refresh.access_token),
-        # Conservé pour l'app mobile (stockage sécurisé applicatif) ;
-        # le web utilise désormais le cookie HttpOnly (risque R6).
-        'refresh': str(refresh),
-        'refresh_in_cookie': True,
-        'must_change_password': bool(getattr(user, 'must_change_password', False)),
-        'user': _user_payload(user),
-        'role_context': user_role_context(user),
-    })
-    _set_refresh_cookie(response, str(refresh))
-    return response
+    # ── Étape MFA (CURP U6, drapeau curp_mfa_active) ──
+    etat = connexion_sure.etat_mfa(user)
+    if etat == 'obligatoire':
+        return Response(
+            {
+                'code': 'MFA_OBLIGATOIRE',
+                'detail': (
+                    'Ce compte porte un rôle sensible : l’authentification '
+                    'multifactor (MFA) doit être activée par un '
+                    'administrateur avant de pouvoir se connecter.'
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if etat == 'etape':
+        compte = connexion_sure.compte_curp(user)
+        connexion_sure.journaliser_etape_mfa(compte)
+        return Response(
+            {
+                'code': 'MFA_REQUIRED',
+                'detail': (
+                    'Vérification en deux étapes : saisissez le code à 6 '
+                    'chiffres de votre application d’authentification.'
+                ),
+                'mfa_token': connexion_sure.jeton_etape_mfa(user),
+                'mfa_duree': connexion_sure.DUREE_JETON_MFA,
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return connexion_sure.finaliser_connexion(user, request, device_id=device_id)
 
 
 @api_view(['GET', 'PATCH'])
@@ -596,3 +624,136 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             extra={'role': get_user_role(instance), 'secretariat': str(instance.secretariat) if instance.secretariat else None},
         )
         return super().destroy(request, *args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# MFA TOTP (CURP U6, LOT 2) — montée / vérification / descente
+# ---------------------------------------------------------------------------
+def _compte_cible_mfa(request):
+    """Compte cible : soi par défaut ; un tiers si le demandeur détient
+    ``authentication.mutate_users``. Retourne ``(compte, erreur_response)``.
+    """
+    compte_id = request.data.get('compte_id')
+    if compte_id in (None, ''):
+        cible = request.user
+    else:
+        if not request.user.has_perm('authentication.mutate_users'):
+            return None, Response(
+                {'detail': 'Droits insuffisants pour gérer ce compte.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            cible = User.objects.get(pk=int(compte_id))
+        except (ValueError, TypeError, User.DoesNotExist):
+            return None, Response(
+                {'detail': 'Compte introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+    from habilitations.models import CompteUtilisateur
+    try:
+        return cible.profil_habilitation, None
+    except CompteUtilisateur.DoesNotExist:
+        return None, Response(
+            {'detail': 'Ce compte n’a pas de profil CURP (MFA indisponible).'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
+def mfa_verify_view(request):
+    """Complète la connexion après l'étape MFA (jeton court + code TOTP)."""
+    from habilitations.services import totp
+
+    username = connexion_sure.verifier_etape_mfa(
+        (request.data.get('mfa_token') or '').strip())
+    if username is None:
+        return Response(
+            {'code': 'MFA_JETON_INVALIDE',
+             'detail': 'Jeton MFA invalide ou expiré : relancez la connexion.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user = User.objects.filter(username=username).first()
+    if user is None or not user.is_active:
+        return Response(
+            {'code': 'MFA_JETON_INVALIDE',
+             'detail': 'Jeton MFA invalide ou expiré : relancez la connexion.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    secondes = connexion_sure.verifier_verrouillage(user)
+    if secondes is not None:
+        compte_verrouille = connexion_sure.compte_curp(user)
+        if compte_verrouille is not None:
+            connexion_sure.journaliser_refus_verrouille(compte_verrouille, secondes)
+        return Response(
+            {'code': 'COMPTE_VERROUILLE',
+             'detail': 'Ce compte est verrouillé : réessayez plus tard ou '
+                       'contactez un administrateur.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    compte = connexion_sure.compte_curp(user)
+    if compte is None or not (compte.mfa_actif and compte.mfa_secret):
+        return Response(
+            {'code': 'MFA_JETON_INVALIDE',
+             'detail': 'Ce compte n’a pas de MFA actif : relancez la connexion.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not totp.verifier_code(compte.mfa_secret, request.data.get('code', '')):
+        return Response(
+            {'code': 'MFA_CODE_INVALIDE',
+             'detail': 'Code MFA invalide : vérifiez votre application '
+                       'd’authentification.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return connexion_sure.finaliser_connexion(
+        user, request, device_id=(request.data.get('device_id') or '').strip())
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mfa_setup_view(request):
+    """Arme un secret TOTP (soi, ou un tiers pour un détenteur de
+    ``mutate_users``) — renvoie le secret et l'URI d'enrôlement."""
+    compte, erreur = _compte_cible_mfa(request)
+    if erreur is not None:
+        return erreur
+    secret, otpauth_url = connexion_sure.armer_mfa(compte)
+    return Response({
+        'secret': secret,
+        'otpauth_url': otpauth_url,
+        'detail': 'Secret armé : confirmez avec un code de votre application.',
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mfa_confirm_view(request):
+    """Active le MFA après vérification d'un code valide sur le secret armé."""
+    compte, erreur = _compte_cible_mfa(request)
+    if erreur is not None:
+        return erreur
+    try:
+        connexion_sure.confirmer_mfa(
+            compte, str(request.data.get('code') or '').strip(), request.user)
+    except connexion_sure.ErreurMfa as erreur_mfa:
+        return Response(
+            {'detail': erreur_mfa.message}, status=erreur_mfa.statut)
+    return Response({'detail': 'MFA activé : la prochaine connexion exigera un code.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mfa_disable_view(request):
+    """Désactive le MFA (code exigé pour soi ; un tiers par ``mutate_users``)."""
+    compte, erreur = _compte_cible_mfa(request)
+    if erreur is not None:
+        return erreur
+    try:
+        connexion_sure.desactiver_mfa(
+            compte, request.user,
+            code=str(request.data.get('code') or '').strip())
+    except connexion_sure.ErreurMfa as erreur_mfa:
+        return Response(
+            {'detail': erreur_mfa.message}, status=erreur_mfa.statut)
+    return Response({'detail': 'MFA désactivé.'})

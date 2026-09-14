@@ -493,11 +493,20 @@ def _appliquer_transition(compte, acteur, transition, motif, meta):
                 409,
             )
     compte.statut = statut_cible
+    if statut_cible == CompteUtilisateur.Statut.ACTIF and transition == 'deverrouiller':
+        # LOT 2 (U6) : la levée d'un verrouillage (auto ou admin) remet le
+        # compteur d'échecs à zéro — de nouveaux échecs complets sont
+        # requis pour re-verrouiller.
+        compte.echecs_consecutifs = 0
     if actif:
         compte.date_activation = compte.date_activation or timezone.now()
         compte.date_suspension = None
     elif statut_cible == CompteUtilisateur.Statut.SUSPENDU:
         compte.date_suspension = timezone.now()
+    elif statut_cible == CompteUtilisateur.Statut.VERROUILLE:
+        # LOT 2 (U6) : l'horodatage du verrouillage pilote le délai de
+        # déverrouillage automatique à la connexion.
+        compte.date_verrouillage = timezone.now()
     compte.motif_statut = motif
     compte.save()
     # Miroir réel sur le compte de connexion.

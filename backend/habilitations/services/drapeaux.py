@@ -25,6 +25,11 @@ DRAPEAU_INACTIVITE = 'flag.curp_suspension_inactivite'
 DRAPEAU_EXPIRATION = 'flag.curp_expiration_auto'
 DRAPEAU_IMPORT_MASSE = 'flag.curp_import_masse'
 
+# ── LOT 2 (U6) — sécurité de la connexion, livrés ÉTEINTS ─────────────────
+DRAPEAU_VERROUILLAGE_CONNEXION = 'flag.curp_verrouillage_connexion'
+DRAPEAU_MFA = 'flag.curp_mfa_active'
+DRAPEAU_MFA_OBLIGATOIRE_SENSIBLES = 'flag.curp_mfa_obligatoire_sensibles'
+
 
 def sonde_active(code_declencheur, user=None):
     """Une sonde n'est active que si le maître ET son drapeau sont ouverts."""
@@ -44,3 +49,18 @@ def expiration_active():
 
 def import_masse_actif():
     return is_enabled(DRAPEAU_IMPORT_MASSE)
+
+
+def verrouillage_connexion_active():
+    """Verrouillage du compte à la connexion (seuil/délai de la politique)."""
+    return is_enabled(DRAPEAU_VERROUILLAGE_CONNEXION)
+
+
+def mfa_active():
+    """Étape MFA TOTP à la connexion pour les comptes avec mfa_actif."""
+    return is_enabled(DRAPEAU_MFA)
+
+
+def mfa_obligatoire_sensibles_active():
+    """MFA obligatoire pour les comptes portant un rôle sensible actif."""
+    return is_enabled(DRAPEAU_MFA_OBLIGATOIRE_SENSIBLES)

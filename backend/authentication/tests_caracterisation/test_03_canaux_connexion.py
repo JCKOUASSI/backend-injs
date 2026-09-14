@@ -246,12 +246,12 @@ class TraceDerniereConnexionTests(_IsolationLimiteurTestCase):
     def setUpTestData(cls):
         ensure_role_groups()
 
-    def test_connexion_jwt_ne_met_pas_a_jour_last_login_comportement_connu(self):
-        # ÉCART E11 CARACTÉRISÉ : la vue login émet un JETON sans appel à
-        # django.contrib.auth.login/update_last_login. last_login n'est donc
-        # pas alimenté par les connexions applicatives (web ou mobile) ;
-        # l'inventaire des comptes inutilisés devra s'appuyer sur une autre
-        # trace (à brancher en U4/U8). On fige le comportement actuel.
+    def test_connexion_jwt_met_a_jour_last_login(self):
+        # ÉCART E11 CORRIGÉ (LOT 2 / unité U6) : la vue login alimente
+        # désormais ``User.last_login`` (et
+        # ``CompteUtilisateur.derniere_connexion``) à chaque connexion
+        # réussie, web comme mobile — les comptes dormants sont à nouveau
+        # détectables à partir de la trace de connexion elle-même.
         compte = _creer('car-trace', 'SECRETARIAT')
         self.assertIsNone(compte.last_login)
         reponse = self.client.post(
@@ -261,7 +261,7 @@ class TraceDerniereConnexionTests(_IsolationLimiteurTestCase):
         )
         self.assertEqual(reponse.status_code, 200)
         compte.refresh_from_db()
-        self.assertIsNone(compte.last_login)
+        self.assertIsNotNone(compte.last_login)
 
 
 class CookieRafraichissementTests(_IsolationLimiteurTestCase):
