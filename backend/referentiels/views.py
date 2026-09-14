@@ -25,6 +25,7 @@ from .models import (
     RefTypeNotification,
 )
 from .permissions import ReferentielPermission
+from .utils import libelle_en_doublon
 from .serializers import (
     ReferentielJournalSerializer,
     RefGradeEnseignantSerializer,
@@ -65,11 +66,27 @@ class ReferentielSocleViewSet(viewsets.ModelViewSet):
                 {'detail': 'Cette valeur existe déjà (code ou libellé en doublon).'}
             )
 
+    def _controler_doublon_libelle(self, libelle, pk_exclu=None):
+        # ADR-006 — défense de profondeur au niveau application : la
+        # comparaison normalisée (casse + accents) est portable sur
+        # SQLite/PostgreSQL, là où la contrainte Lower() de base ne l'est
+        # pas. La contrainte DB reste en garde-fou.
+        if libelle and libelle_en_doublon(self.queryset.model, libelle, pk_exclu):
+            raise ValidationError(
+                {'detail': 'Cette valeur existe déjà (code ou libellé en doublon).'}
+            )
+
     def perform_create(self, serializer):
+        self._controler_doublon_libelle(
+            serializer.validated_data.get('libelle'))
         obj = self._save_or_400(serializer)
         obj.journaliser(ReferentielJournal.Action.CREATION, self.request.user)
 
     def perform_update(self, serializer):
+        self._controler_doublon_libelle(
+            serializer.validated_data.get('libelle'),
+            pk_exclu=serializer.instance.pk,
+        )
         before = {f: getattr(serializer.instance, f) for f in ('code', 'libelle', 'description', 'actif')}
         obj = self._save_or_400(serializer)
         after = {f: getattr(obj, f) for f in before}

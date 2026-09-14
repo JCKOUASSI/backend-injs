@@ -58,6 +58,27 @@ class ReferentielsAPIAccessTests(TestCase):
         res = self.client.post(LIST_URL, {'code': 'ECRIT2', 'libelle': 'épreuve ÉCRITE'})
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_regle4_doublon_libelle_casse_rejete_au_patch(self):
+        # ADR-006 — la même forme normalisée (casse/accent) est refusée en
+        # modification, pour le même modèle, portable sur SQLite.
+        self.client.force_authenticate(make_user('admin_ref3b', role='ADMIN'))
+        res = self.client.post(LIST_URL, {'code': 'ORAL', 'libelle': 'Oral'})
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        res = self.client.patch(
+            self.detail_url, {'libelle': 'oral  '},
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        # Une forme normalisée différente passe.
+        res = self.client.patch(
+            self.detail_url, {'libelle': 'Épreuve écrite avec barème'},
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # Se renommer sans changer la forme normalisée : accepté (pk exclu).
+        res = self.client.patch(
+            self.detail_url, {'libelle': '  ÉPREUVE écrite '},
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
     def test_regle2_delete_interdit(self):
         self.client.force_authenticate(make_user('admin_ref4', role='ADMIN'))
         res = self.client.delete(self.detail_url)
