@@ -101,6 +101,59 @@ export const creerDelegation = (payload) =>
 export const terminerDelegation = (id, motif) =>
   api.post(`${BASE}/delegations/${id}/terminer/`, { motif }).then((r) => r.data)
 
+// ── U5 : cycle de vie, file de provisionnement, imports écrits ──────────
+export const listerPropositions = (filtres = {}) =>
+  api.get(`${BASE}/propositions/${urlParams(filtres)}`).then((r) => r.data)
+
+export const approuverProposition = (id, motif, ajustements) =>
+  api
+    .post(`${BASE}/propositions/${id}/approuver/`, { motif, ajustements })
+    .then((r) => r.data)
+
+export const rejeterProposition = (id, motif) =>
+  api.post(`${BASE}/propositions/${id}/rejeter/`, { motif }).then((r) => r.data)
+
+export const scannerProvisions = (declencheurs) =>
+  api
+    .post(`${BASE}/provisions/scanner/`, { declencheurs })
+    .then((r) => r.data)
+
+export const executerImport = (lignes, nomFichier = '') =>
+  api
+    .post(`${BASE}/comptes/imports/`, { lignes, nom_fichier: nomFichier })
+    .then((r) => r.data)
+
+export const recupererImport = (reference) =>
+  api
+    .get(`${BASE}/comptes/imports/${encodeURIComponent(reference)}/`)
+    .then((r) => r.data)
+
+export const annulerImport = (reference, motif) =>
+  api
+    .post(`${BASE}/comptes/imports/${encodeURIComponent(reference)}/annuler/`, {
+      motif,
+    })
+    .then((r) => r.data)
+
+export const listerNotifications = (filtres = {}) =>
+  api.get(`${BASE}/notifications/${urlParams(filtres)}`).then((r) => r.data)
+
+export const lireNotification = (id) =>
+  api.post(`${BASE}/notifications/${id}/lire/`).then((r) => r.data)
+
+export const toutLireNotifications = () =>
+  api.post(`${BASE}/notifications/tout-lire/`).then((r) => r.data)
+
+export const activerDelegation = (id, motif) =>
+  api
+    .post(`${BASE}/delegations/${id}/activer/`, { motif })
+    .then((r) => r.data)
+
+export const actionParDelegation = (id, action, detail) =>
+  api
+    .post(`${BASE}/delegations/${id}/action/`, { action, detail })
+    .then((r) => r.data)
+
 /** Extrait le message français d'une erreur DRF (403, 409, 400). */
 export function messageErreur(erreur, repli = 'Une erreur est survenue.') {
   const data = erreur?.response?.data

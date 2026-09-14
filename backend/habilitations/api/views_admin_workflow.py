@@ -157,6 +157,21 @@ class DelegationListCreateView(APIView):
         if delegant is None or delegataire is None:
             return Response({'detail': 'Compte délégant ou délégataire introuvable.'},
                             status=404)
+        # U5 — contrôles de cohérence : droits réellement détenus en direct,
+        # pas de re-délégation, terme borné, périmètres couverts. La
+        # délégation reste PROPOSÉE tant qu'un administrateur ne l'active pas.
+        try:
+            from ..services.delegations_u5 import controler_delegation
+            controler_delegation(
+                delegant, delegataire,
+                donnees.get('roles') or [], donnees.get('permissions') or [],
+                donnees['date_fin'],
+                perimetres_ids=None,
+                date_debut=donnees.get('date_debut') or timezone.localdate(),
+            )
+        except service.ErreurConsole as erreur:
+            return Response({'detail': str(erreur), 'code': erreur.code},
+                            status=getattr(erreur, 'statut', 400))
         delegation = DelegationHabilitation.objects.create(
             delegant=delegant, delegataire=delegataire,
             date_debut=donnees.get('date_debut') or timezone.localdate(),

@@ -1,11 +1,18 @@
-"""Modèles de l'application ``habilitations`` (socle CURP, unité U1).
+"""Modèles de l'application ``habilitations`` (socle CURP, unités U1, U4, U5).
 
 Répartis par fichier selon la chaîne :
 PERSONNE → COMPTE → RÔLE / PERMISSION → PÉRIMÈTRE → ATTRIBUTIONS/DÉLÉGATIONS,
-avec la politique de sécurité et le journal append-only chaîné.
+avec la politique de sécurité, le journal append-only chaîné et les objets
+du cycle de vie U5 (file de provisionnement, imports réversibles,
+notifications).
 """
 from .attribution import AttributionRole, PermissionAttribuee
 from .compte import CompteUtilisateur
+from .cycle_vie import (
+    ExecutionImport,
+    NotificationHabilitation,
+    PropositionProvisionnement,
+)
 from .delegation import DelegationHabilitation
 from .enums import (
     CanalAcces,
@@ -33,6 +40,9 @@ __all__ = [
     'AttributionRole',
     'PermissionAttribuee',
     'DelegationHabilitation',
+    'PropositionProvisionnement',
+    'ExecutionImport',
+    'NotificationHabilitation',
     'PolitiqueSecurite',
     'JournalHabilitation',
     'JournalImmuableError',

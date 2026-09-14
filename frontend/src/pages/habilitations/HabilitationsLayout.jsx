@@ -15,7 +15,9 @@ const LIENS = [
   { to: '/administration/comptes/matrice', icone: 'bi-grid-3x3-gap', libelle: 'Matrice des permissions' },
   { to: '/administration/comptes/derogations', icone: 'bi-key', libelle: 'Dérogations' },
   { to: '/administration/comptes/delegations', icone: 'bi-person-check', libelle: 'Délégations' },
+  { to: '/administration/comptes/provisionnement', icone: 'bi-inbox', libelle: 'File de provisionnement' },
   { to: '/administration/comptes/operations-masse', icone: 'bi-upload', libelle: 'Opérations en masse' },
+  { to: '/administration/comptes/notifications', icone: 'bi-bell', libelle: 'Notifications' },
   { to: '/administration/comptes/revue', icone: 'bi-clipboard-check', libelle: 'Revue des habilitations' },
   { to: '/administration/comptes/journal', icone: 'bi-journal-text', libelle: 'Journal' },
 ]

@@ -72,6 +72,7 @@ def journaliser(
     type_evenement, *, acteur=None, compte=None, personne=None, cible=None,
     ancienne_valeur=None, nouvelle_valeur=None, motif='', adresse_ip=None,
     agent_utilisateur='', correlation_id='', horodatage=None,
+    delegation_source=None,
 ):
     """Crée une entrée immuable et chaînée, et la retourne.
 
@@ -112,6 +113,9 @@ def journaliser(
             correlation_id=correlation_id,
             empreinte_precedente=(precedente.empreinte if precedente else GENESE),
             empreinte='',
+            # U5 : référence de délégation (hors empreinte, donc sans
+            # conséquence sur le chaînage des lignes existantes).
+            delegation_source=delegation_source,
         )
         entree.empreinte = calculer_empreinte(entree)
         try:

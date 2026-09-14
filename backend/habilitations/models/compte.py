@@ -58,6 +58,17 @@ class CompteUtilisateur(models.Model):
 
     echecs_consecutifs = models.PositiveIntegerField(default=0)
 
+    # U5 — réversibilité des imports en masse et exemption d'inactivité.
+    import_execution = models.ForeignKey(
+        'habilitations.ExecutionImport', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='comptes_crees',
+    )
+    exempt_inactivite = models.BooleanField(
+        default=False,
+        help_text="Exempte le compte de la suspension pour inactivité (congé longue durée…).",
+    )
+    date_preavis_inactivite = models.DateField(null=True, blank=True)
+
     mfa_actif = models.BooleanField(default=False)
     langue = models.CharField(max_length=8, default='fr')
     notes = models.TextField(blank=True, default='')

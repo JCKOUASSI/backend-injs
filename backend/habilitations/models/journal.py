@@ -64,6 +64,16 @@ class JournalHabilitation(models.Model):
         APPAREIL_REVOQUE = 'APPAREIL_REVOQUE', 'Révocation d’appareil'
         ACCES_REFUSE = 'ACCES_REFUSE', 'Accès refusé sur ressource sensible'
         AUTO_ELEVATION_TENTEE = 'AUTO_ELEVATION_TENTEE', 'Tentative d’auto-élévation'
+        # U5 — cycle de vie, provisionnement, imports et délégation.
+        TRANSITION_REFUSEE = 'TRANSITION_REFUSEE', 'Transition de statut refusée'
+        PROPOSITION_DEPOSEE = 'PROPOSITION_DEPOSEE', 'Proposition de provisionnement déposée'
+        PROPOSITION_APPROUVEE = 'PROPOSITION_APPROUVEE', 'Proposition approuvée'
+        PROPOSITION_REJETEE = 'PROPOSITION_REJETEE', 'Proposition rejetée'
+        IMPORT_EXECUTE = 'IMPORT_EXECUTE', 'Exécution d’import en masse'
+        IMPORTA_ANNULE = 'IMPORTA_ANNULE', 'Annulation d’import en masse'
+        EXPIRATION_AUTO = 'EXPIRATION_AUTO', 'Expiration automatique à terme'
+        DELEGATION_ACTIVEE = 'DELEGATION_ACTIVEE', 'Activation de délégation'
+        ACTION_DELEGUEE = 'ACTION_DELEGUEE', 'Action exercée par délégation'
         AUTRE = 'AUTRE', 'Autre événement'
 
     #: Numéro de séquence, continue et dans l'ordre du chaînage.
@@ -107,6 +117,13 @@ class JournalHabilitation(models.Model):
 
     empreinte_precedente = models.CharField(max_length=64, blank=True, default='', db_index=True)
     empreinte = models.CharField(max_length=64, unique=True, db_index=True)
+
+    # U5 — quand l'action a été exercée EN VERTU d'une délégation, on porte
+    # sa référence (la mention du délégant figure dans nouvelle_valeur).
+    delegation_source = models.ForeignKey(
+        'habilitations.DelegationHabilitation', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='actions_journalisees',
+    )
 
     objects = JournalQuerySet.as_manager()
 

@@ -1,8 +1,9 @@
-/** Delegations — création bornée, suivi et fin anticipée (U4). */
+/** Delegations — création bornée U4, contrôles U5 (détention, re-délégation,
+ * activation par un administrateur, action déléguée tracée, fin anticipée). */
 import { useEffect, useState } from 'react'
 import {
   listerComptes, listerRolesCurp, listerDelegations, creerDelegation,
-  terminerDelegation, messageErreur,
+  terminerDelegation, activerDelegation, actionParDelegation, messageErreur,
 } from '@/services/habilitations'
 import { useToast } from '@/context/ToastContext'
 import { EnChargement } from './partages'
@@ -11,6 +12,46 @@ import './habilitations.css'
 
 const formVide = { delegant: '', delegataire: '', roles: [], date_fin: '', motif: '' }
 
+/** Petite fenêtre de saisie d'une action faite par délégation. */
+function ActionDelegueeModal({ delegation, onClose, onFait }) {
+  const { showToast } = useToast()
+  const [action, setAction] = useState('')
+  const enregistrer = async () => {
+    try {
+      const r = await actionParDelegation(delegation.id, action.trim())
+      showToast(`Action tracée (n° ${r.numero}) « Agit par délégation de ${r.delegant} ».`, 'success')
+      onFait()
+      onClose()
+    } catch (e) {
+      showToast(messageErreur(e), 'error')
+    }
+  }
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h5><i className="bi bi-person-check me-2" />Action exercée par délégation</h5>
+          <button className="btn-close" onClick={onClose} aria-label="Fermer">&times;</button>
+        </div>
+        <div className="modal-body">
+          <p className="small text-muted">
+            Délégation {delegation.delegant} → {delegation.delegataire}. L'action est journalisée
+            avec la mention du délégant ; seul le délégataire peut l'enregistrer.
+          </p>
+          <label className="form-label">Description de l'action</label>
+          <textarea className="form-control" rows="2" data-testid="action-deleguee-input"
+                    value={action} onChange={(e) => setAction(e.target.value)} />
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Annuler</button>
+          <button className="btn btn-success" data-testid="action-deleguee-valider"
+                  disabled={action.trim().length < 3} onClick={enregistrer}>Journaliser</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Delegations() {
   const { showToast } = useToast()
   const [comptes, setComptes] = useState([])
@@ -18,6 +59,8 @@ export default function Delegations() {
   const [donnees, setDonnees] = useState(null)
   const [form, setForm] = useState(formVide)
   const [aTerminer, setATerminer] = useState(null)
+  const [aActiver, setAActiver] = useState(null)
+  const [aTracer, setATracer] = useState(null)
 
   const charger = () => listerDelegations({ page_size: 200 }).then(setDonnees)
   useEffect(() => {
@@ -52,6 +95,17 @@ export default function Delegations() {
     setATerminer(null)
     charger()
   }
+  const confirmerActivation = async (motif) => {
+    try {
+      await activerDelegation(aActiver.id, motif)
+      showToast('Délégation activée après contrôle des droits détenus.', 'success')
+      setAActiver(null)
+      charger()
+    } catch (e) {
+      showToast(messageErreur(e), 'error')
+      setAActiver(null)
+    }
+  }
 
   if (!donnees) return <EnChargement />
   return (
@@ -59,8 +113,10 @@ export default function Delegations() {
       <div className="hab-carte">
         <h2 className="h5">Délégations temporaires</h2>
         <p className="hab-muted">
-          Toute délégation est bornée dans le temps. Le contrôle « on ne délègue que ce que l'on
-          détient » et l'interdiction de re-délégation sont appliqués à l'unité U5.
+          Toute délégation est bornée dans le temps. Le serveur vérifie que le délégant détient
+          réellement et directement chaque droit jusqu'à la date de fin (la re-délégation est
+          interdite), puis un administrateur active la délégation. Chaque action exercée par le
+          délégataire est journalisée avec la mention du délégant.
         </p>
         <form className="row g-2" onSubmit={creer} data-testid="form-delegation">
           <div className="col-md-3">
@@ -99,17 +155,30 @@ export default function Delegations() {
       </div>
       <div className="hab-carte">
         <table className="hab-table">
-          <thead><tr><th>Délégant</th><th>Délégataire</th><th>Rôles</th><th>Fin</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Délégant</th><th>Délégataire</th><th>Rôles</th><th>Fin</th><th>Statut</th><th>Actions</th></tr></thead>
           <tbody>
             {donnees.results.map((d) => (
-              <tr key={d.id}>
+              <tr key={d.id} data-testid={`delegation-${d.id}`}>
                 <td>{d.delegant}</td>
                 <td>{d.delegataire}</td>
                 <td>{(d.roles || []).join(', ') || '—'}</td>
                 <td>{d.date_fin}</td>
                 <td>{d.statut}</td>
-                <td>{['PROPOSEE', 'ACTIVE'].includes(d.statut) && (
-                  <button className="btn btn-sm btn-outline-danger" onClick={() => setATerminer(d)}>Terminer</button>)}</td>
+                <td>
+                  <div className="d-flex gap-1 flex-wrap">
+                    {d.statut === 'PROPOSEE' && (
+                      <button className="btn btn-sm btn-success" data-testid={`activer-${d.id}`}
+                              onClick={() => setAActiver(d)}>Activer</button>
+                    )}
+                    {d.statut === 'ACTIVE' && (
+                      <button className="btn btn-sm btn-outline-primary" data-testid={`action-${d.id}`}
+                              onClick={() => setATracer(d)}>Action déléguée</button>
+                    )}
+                    {['PROPOSEE', 'ACTIVE'].includes(d.statut) && (
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => setATerminer(d)}>Terminer</button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
             {donnees.results.length === 0 && <tr><td colSpan="6" className="hab-muted text-center py-3">Aucune délégation.</td></tr>}
@@ -120,6 +189,16 @@ export default function Delegations() {
         <MotifModal titre="Terminer la délégation" action={`Mettre fin à la délégation ${aTerminer.delegant} → ${aTerminer.delegataire}`}
                     consequences="Le délégataire perd dès l'enregistrement les droits correspondants."
                     onConfirmer={confirmerFin} onAnnuler={() => setATerminer(null)} />
+      )}
+      {aActiver && (
+        <MotifModal titre="Activer la délégation" variant="success"
+                    confirmationLabel="Activer"
+                    action={`Activer la délégation ${aActiver.delegant} → ${aActiver.delegataire}`}
+                    consequences="Le serveur recontrôle que les droits sont détenus directement et couverts jusqu'à la date de fin."
+                    onConfirmer={confirmerActivation} onAnnuler={() => setAActiver(null)} />
+      )}
+      {aTracer && (
+        <ActionDelegueeModal delegation={aTracer} onClose={() => setATracer(null)} onFait={charger} />
       )}
     </section>
   )

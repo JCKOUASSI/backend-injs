@@ -47,6 +47,24 @@ class PolitiqueSecurite(models.Model):
     duree_max_derogation_jours = models.PositiveIntegerField(default=90)
     periodicite_revue_jours = models.PositiveIntegerField(default=180)
 
+    # U5 — cycle de vie et provisionnement événementiel.
+    preavis_suspension_jours = models.PositiveIntegerField(
+        default=15,
+        help_text="Préavis notifié avant la proposition de suspension d'inactivité.",
+    )
+    delai_grace_fin_relation_jours = models.PositiveIntegerField(
+        default=7,
+        help_text="Délai de grâce après une fin de relation avant toute proposition.",
+    )
+    plafond_quotidien_propositions = models.PositiveIntegerField(
+        default=50,
+        help_text="Au-delà, les propositions excédentaires sont bloquées et une alerte est émise.",
+    )
+    echeance_notification_jours = models.PositiveIntegerField(
+        default=7,
+        help_text="Anticipation (jours) de la notification d'échéance des attributions.",
+    )
+
     # Canaux / MFA par rôle : listes de codes de rôles en JSON.
     roles_mfa_obligatoire = models.JSONField(
         default=list, blank=True,

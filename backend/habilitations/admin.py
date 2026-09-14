@@ -11,12 +11,15 @@ from .models import (
     AttributionRole,
     CompteUtilisateur,
     DelegationHabilitation,
+    ExecutionImport,
     JournalHabilitation,
+    NotificationHabilitation,
     PermissionAttribuee,
     PermissionMetier,
     Perimetre,
     Personne,
     PolitiqueSecurite,
+    PropositionProvisionnement,
     RoleMetier,
 )
 
@@ -115,6 +118,53 @@ class JournalHabilitationAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PropositionProvisionnement)
+class PropositionProvisionnementAdmin(admin.ModelAdmin):
+    list_display = ('id', 'declencheur', 'action_proposee', 'statut',
+                    'source_app', 'source_modele', 'cree_le', 'approuve_par')
+    list_filter = ('statut', 'declencheur', 'action_proposee')
+    search_fields = ('source_libelle', 'motif', 'motif_rejet',
+                     'cle_dedoublonnage')
+    date_hierarchy = 'cree_le'
+    readonly_fields = ('cree_le', 'traite_le')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ExecutionImport)
+class ExecutionImportAdmin(admin.ModelAdmin):
+    list_display = ('reference', 'statut', 'total', 'crees', 'erreurs',
+                    'lance_par', 'date_execution')
+    list_filter = ('statut',)
+    search_fields = ('reference', 'nom_fichier', 'motif_annulation')
+    date_hierarchy = 'date_execution'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(NotificationHabilitation)
+class NotificationHabilitationAdmin(admin.ModelAdmin):
+    list_display = ('id', 'categorie', 'destinataire', 'titre', 'lu',
+                    'date_creation')
+    list_filter = ('categorie', 'lu')
+    search_fields = ('titre', 'message')
+    date_hierarchy = 'date_creation'
+
+    def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):

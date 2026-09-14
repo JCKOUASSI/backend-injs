@@ -20,6 +20,7 @@ from ..models import (
     AttributionRole,
     CompteUtilisateur,
     DelegationHabilitation,
+    JournalHabilitation,
     PermissionAttribuee,
     PermissionMetier,
     Perimetre,
@@ -28,6 +29,11 @@ from ..models import (
 )
 from .identite import generer_matricule_personne
 from .journalisation import journaliser
+from .machine_etats import (
+    TRANSITIONS as _GRAPHE_ETATS,
+    TransitionIllegale,
+    transition_legale,
+)
 
 User = get_user_model()
 
@@ -401,26 +407,76 @@ def _appliquer_roles(compte, lignes, acteur, meta, motif=''):
 
 
 # ---------------------------------------------------------------------------
-# Changements de statut (machine à états A5 — transitions U4 de base)
+# Changements de statut — machine à états stricte A5 (U5, L1)
 # ---------------------------------------------------------------------------
+#: Vue nom -> (statut cible, événement, miroir User.is_active), dérivée du
+#: graphe de :mod:`habilitations.services.machine_etats`.
 TRANSITIONS_STATUT = {
-    'activer': (CompteUtilisateur.Statut.ACTIF, 'COMPTE_ACTIVE', True),
-    'suspendre': (CompteUtilisateur.Statut.SUSPENDU, 'COMPTE_SUSPENDU', False),
-    'desactiver': (CompteUtilisateur.Statut.DESACTIVE, 'COMPTE_DESACTIVE', False),
-    'verrouiller': (CompteUtilisateur.Statut.VERROUILLE, 'COMPTE_VERROUILLE', False),
-    'deverrouiller': (CompteUtilisateur.Statut.ACTIF, 'COMPTE_DEVERROUILLE', True),
+    nom: {'cible': regle[0], 'evenement': regle[2], 'actif': regle[3]}
+    for nom, regle in _GRAPHE_ETATS.items()
 }
 
 
-@transaction.atomic
 def changer_statut(compte, acteur, transition, motif, meta=None):
+    """Applique une transition en respectant strictement le graphe A5.
+
+    Les vérifications REJETANT l'opération ont lieu AVANT l'ouverture de la
+    transaction d'écriture : la trace d'une tentative interdite (transition
+    illégale, comme pour l'auto-élévation S6) est ainsi bien conservée et
+    n'est pas emportée par une annulation de transaction.
+    """
     meta = meta or {}
-    if transition not in TRANSITIONS_STATUT:
+    if transition not in _GRAPHE_ETATS:
         raise ErreurConsole('TRANSITION_INCONNUE', f'Transition {transition} inconnue.')
     if not (motif or '').strip():
         raise ErreurConsole('MOTIF_REQUIS',
                             'Un motif est obligatoire pour changer le statut d’un compte.')
-    statut_cible, evenement, actif = TRANSITIONS_STATUT[transition]
+    if not transition_legale(compte.statut, transition):
+        journaliser(
+            JournalHabilitation.TypeEvenement.TRANSITION_REFUSEE,
+            acteur=acteur, compte=compte,
+            nouvelle_valeur={
+                'transition': transition,
+                'statut_source': compte.statut,
+            },
+            motif=(motif or 'Tentative de transition interdite.')[:1000],
+            adresse_ip=meta.get('ip', ''),
+            agent_utilisateur=meta.get('ua', ''),
+        )
+        raise ErreurConsole(
+            'TRANSITION_ILLEGALE',
+            f"La transition « {transition} » n'est pas autorisée depuis le statut "
+            f"« {compte.statut} » (machine à états A5).",
+            409,
+        )
+    return _appliquer_transition(compte, acteur, transition, motif, meta)
+
+
+def _revoquer_sessions_utilisateur(user):
+    """Supprime les sessions Django actives d'un utilisateur (A5).
+
+    Retourne le nombre de sessions révoquées. La fonction est défensive :
+    si le moteur de sessions ne publie pas le modèle ``Session`` (moteur
+    déporté en production), elle ne fait rien.
+    """
+    try:
+        from django.contrib.sessions.models import Session
+    except Exception:  # pragma: no cover - moteur de sessions absent
+        return 0
+    from django.utils import timezone as _tz
+    nombre = 0
+    for session in Session.objects.filter(expire_date__gte=_tz.now()):
+        donnees = session.get_decoded()
+        if str(donnees.get('_auth_user_id')) == str(user.pk):
+            session.delete()
+            nombre += 1
+    return nombre
+
+
+@transaction.atomic
+def _appliquer_transition(compte, acteur, transition, motif, meta):
+    statut_cible, evenement, actif = TRANSITIONS_STATUT[transition].values()
+    statut_source = compte.statut
     etait_admin = (
         compte.user.role in ROLES_LEGACY_ADMIN
         or compte.attributions.filter(
@@ -428,7 +484,7 @@ def changer_statut(compte, acteur, transition, motif, meta=None):
         ).exists()
     )
     if etait_admin and not actif:
-        # Simuler le retrait pour vérifier le seuil avant d'écrire.
+        # Simuler le retrait pour vérifier le seuil avant d'écrire (S7).
         if administrateurs_actifs() <= SEUIL_ADMINISTRATEURS:
             raise ErreurConsole(
                 'SEUIL_ADMINISTRATEURS',
@@ -447,13 +503,30 @@ def changer_statut(compte, acteur, transition, motif, meta=None):
     # Miroir réel sur le compte de connexion.
     compte.user.is_active = actif
     compte.user.save(update_fields=['is_active'])
+    sessions_revoquees = 0
+    if not actif:
+        # A5 : une transition bloquante (suspension, verrouillage,
+        # désactivation, expiration) coupe immédiatement les sessions
+        # existantes, sans attendre leur expiration naturelle.
+        sessions_revoquees = _revoquer_sessions_utilisateur(compte.user)
     journaliser(
         evenement, acteur=acteur, compte=compte,
-        ancienne_valeur={'statut': compte.statut},
-        nouvelle_valeur={'statut': statut_cible.value},
+        ancienne_valeur={'statut': statut_source},
+        nouvelle_valeur={'statut': statut_cible.value,
+                         'sessions_revoquees': sessions_revoquees},
         motif=motif, adresse_ip=meta.get('ip', ''),
         agent_utilisateur=meta.get('ua', ''),
     )
+    if sessions_revoquees:
+        journaliser(
+            JournalHabilitation.TypeEvenement.SESSION_REVOQUEE,
+            acteur=acteur, compte=compte,
+            nouvelle_valeur={'nombre': sessions_revoquees,
+                             'transition': transition},
+            motif=f"Sessions actives révoquées lors de la transition « {transition} ».",
+            adresse_ip=meta.get('ip', ''),
+            agent_utilisateur=meta.get('ua', ''),
+        )
     return compte
 
 

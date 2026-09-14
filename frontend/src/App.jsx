@@ -34,6 +34,8 @@ import MatricePermissions from './pages/habilitations/MatricePermissions'
 import Derogations from './pages/habilitations/Derogations'
 import Delegations from './pages/habilitations/Delegations'
 import OperationsMasse from './pages/habilitations/OperationsMasse'
+import FileProvisionnement from './pages/habilitations/FileProvisionnement'
+import NotificationsHabilitation from './pages/habilitations/NotificationsHabilitation'
 import RevueHabilitations from './pages/habilitations/RevueHabilitations'
 import JournalHabilitations from './pages/habilitations/JournalHabilitations'
 import Modules from './pages/Modules'
@@ -710,7 +712,9 @@ function App() {
           }>
             <Route index element={<ListeComptes />} />
             <Route path="nouveau" element={<AssistantCreation />} />
+            <Route path="provisionnement" element={<FileProvisionnement />} />
             <Route path="operations-masse" element={<OperationsMasse />} />
+            <Route path="notifications" element={<NotificationsHabilitation />} />
             <Route path="revue" element={<RevueHabilitations />} />
             <Route path="journal" element={<JournalHabilitations />} />
             <Route path="roles" element={<GestionRoles />} />

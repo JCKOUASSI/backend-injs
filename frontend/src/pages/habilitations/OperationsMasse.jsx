@@ -1,12 +1,17 @@
 /**
- * OperationsMasse — import tabulaire avec PRÉVISUALISATION INTÉGRALE et
- * rapport ligne à ligne. L'écriture en une transaction et la réversibilité
- * sont livrées à l'unité U5 : le bouton d'écriture est volontairement masqué.
+ * OperationsMasse (U4/U5, C3) — import tabulaire : prévisualisation
+ * intégrale, exécution en UNE transaction et annulation unitaire par
+ * RÉFÉRENCE d'exécution. Tant que le drapeau ``flag.curp_import_masse`` est
+ * fermé, l'écriture renvoie un 403 explicite : l'aperçu reste utilisable.
  */
 import { useState } from 'react'
-import { simulerImport } from '@/services/habilitations'
+import {
+  simulerImport, executerImport, annulerImport, recupererImport,
+  messageErreur,
+} from '@/services/habilitations'
 import { analyserCsv, lignesCsvVersImport } from '@/utils/habilitations'
-import { messageErreur } from '@/services/habilitations'
+import { useToast } from '@/context/ToastContext'
+import MotifModal from './MotifModal'
 import './habilitations.css'
 
 const ENTETE = 'identifiant;nom;prenoms;email;mot_de_passe;roles;canal'
@@ -22,28 +27,113 @@ function telechargerModele() {
   URL.revokeObjectURL(url)
 }
 
+function RapportExecution({ execution, onAnnule }) {
+  const { showToast } = useToast()
+  const [aAnnuler, setAAnnuler] = useState(null)
+
+  const confirmer = async (motif) => {
+    try {
+      const resultat = await annulerImport(aAnnuler.reference, motif)
+      showToast(`Import ${resultat.reference} annulé : tous les comptes sont désactivés.`, 'success')
+      setAAnnuler(null)
+      onAnnule(resultat)
+    } catch (e) {
+      showToast(messageErreur(e), 'error')
+    }
+  }
+
+  return (
+    <div className="hab-carte" data-testid="rapport-execution">
+      <h3 className="h6">
+        Exécution <span className="font-monospace">{execution.reference}</span>
+      </h3>
+      <p className="mb-1">
+        État : <strong>{execution.statut_libelle || execution.statut}</strong> ·{' '}
+        {execution.crees} compte(s) créé(s) sur {execution.total} ligne(s)
+        {execution.nom_fichier ? ` · ${execution.nom_fichier}` : ''}
+      </p>
+      {execution.statut === 'ANNULE' && (
+        <div className="hab-avertissement">
+          <i className="bi bi-arrow-counterclockwise me-1" />
+          Import annulé{execution.motif_annulation ? ` : ${execution.motif_annulation}` : '.'}{' '}
+          Aucun compte n'a été supprimé physiquement : tous ont été désactivés (S5).
+        </div>
+      )}
+      <div className="d-flex gap-2 mt-2 flex-wrap">
+        {execution.statut === 'TERMINE' && (
+          <button className="btn btn-outline-danger btn-sm" data-testid="bouton-annuler-import"
+                  onClick={() => setAAnnuler(execution)}>
+            <i className="bi bi-arrow-counterclockwise me-1" />Annuler tout cet import
+          </button>
+        )}
+      </div>
+      {aAnnuler && (
+        <MotifModal
+          titre="Annuler l'import"
+          action={`Annuler l'exécution ${aAnnuler.reference} (${execution.crees} comptes)`}
+          consequences="Chaque compte créé par cet import passe en DÉSACTIVÉ (machine à états A5) ; aucune suppression physique."
+          confirmationLabel="Annuler l'import"
+          onConfirmer={confirmer}
+          onAnnuler={() => setAAnnuler(null)}
+        />
+      )}
+    </div>
+  )
+}
+
 export default function OperationsMasse() {
+  const { showToast } = useToast()
+  const [lignes, setLignes] = useState([])
+  const [nomFichier, setNomFichier] = useState('')
   const [rapport, setRapport] = useState(null)
+  const [execution, setExecution] = useState(null)
   const [enCours, setEnCours] = useState(false)
-  const [erreur, setErreur] = useState('')
+  const [referenceARetrouver, setReferenceARetrouver] = useState('')
 
   const lireFichier = async (fichier) => {
     setEnCours(true)
-    setErreur('')
     try {
       const texte = await fichier.text()
-      const lignes = lignesCsvVersImport(analyserCsv(texte))
-      if (lignes.length === 0) {
-        setErreur("Le fichier ne contient aucune ligne de données.")
+      const parsed = lignesCsvVersImport(analyserCsv(texte))
+      if (parsed.length === 0) {
+        showToast("Le fichier ne contient aucune ligne de données.", 'error')
       } else {
-        setRapport(await simulerImport(lignes))
+        setLignes(parsed)
+        setNomFichier(fichier.name)
+        setRapport(await simulerImport(parsed))
+        setExecution(null)
       }
     } catch (e) {
-      setErreur(messageErreur(e, "Lecture du fichier impossible."))
+      showToast(messageErreur(e, "Lecture du fichier impossible."), 'error')
     } finally {
       setEnCours(false)
     }
   }
+
+  const executer = async () => {
+    setEnCours(true)
+    try {
+      const resultat = await executerImport(lignes, nomFichier)
+      setExecution(resultat)
+      setRapport(null)
+      showToast(`Import ${resultat.reference} exécuté : ${resultat.crees} compte(s).`, 'success')
+    } catch (e) {
+      showToast(messageErreur(e), 'error')
+    } finally {
+      setEnCours(false)
+    }
+  }
+
+  const retrouver = async (e) => {
+    e?.preventDefault()
+    try {
+      setExecution(await recupererImport(referenceARetrouver.trim()))
+    } catch (e2) {
+      showToast(messageErreur(e2, "Exécution introuvable."), 'error')
+    }
+  }
+
+  const aucuneErreur = rapport && rapport.erreurs === 0 && lignes.length > 0
 
   return (
     <section data-testid="ecran-operations-masse">
@@ -51,9 +141,9 @@ export default function OperationsMasse() {
         <h2 className="h5">Création de comptes en masse</h2>
         <div className="hab-avertissement">
           <i className="bi bi-info-circle me-1" />
-          Aperçu uniquement : la création effective en une transaction, le rejeu de l'import
-          corrigé et la réversibilité sont prévus à l'unité <strong>U5</strong>. Aucune ligne
-          n'est écrite à ce stade.
+          Prévisualisation intégrale, puis exécution en une seule transaction (une seule ligne en
+          erreur annule tout). Chaque exécution reçoit une référence permettant d'annuler
+          globalement le lot. Aucune suppression physique n'est jamais faite.
         </div>
         <div className="d-flex gap-2 align-items-center flex-wrap">
           <input type="file" accept=".csv,text/csv" className="form-control" style={{ maxWidth: 420 }}
@@ -63,8 +153,7 @@ export default function OperationsMasse() {
             <i className="bi bi-download me-1" />Modèle CSV
           </button>
         </div>
-        {enCours && <p className="hab-muted mt-2">Analyse et prévisualisation…</p>}
-        {erreur && <p className="text-danger mt-2">{erreur}</p>}
+        {enCours && <p className="hab-muted mt-2">Traitement…</p>}
       </div>
 
       {rapport && (
@@ -92,12 +181,25 @@ export default function OperationsMasse() {
               ))}
             </tbody>
           </table>
-          <button className="btn btn-secondary mt-2" disabled title="Écriture en une transaction livrée à U5"
-                  data-testid="bouton-ecrire">
-            <i className="bi bi-lock me-1" />Créer les comptes (disponible en U5)
+          <button className="btn btn-success mt-2" data-testid="bouton-ecrire"
+                  disabled={!aucuneErreur || enCours} onClick={executer}
+                  title={aucuneErreur ? "Crée tous les comptes en une transaction" : "Corrigez les lignes en erreur"}>
+            <i className="bi bi-hdd-stack me-1" />Exécuter l'import ({rapport.valides} comptes)
           </button>
         </div>
       )}
+
+      {execution && <RapportExecution execution={execution} onAnnule={setExecution} />}
+
+      <div className="hab-carte">
+        <h3 className="h6">Retrouver / annuler une exécution</h3>
+        <form className="d-flex gap-2" onSubmit={retrouver}>
+          <input className="form-control" style={{ maxWidth: 300 }} placeholder="Référence IMP-AAAAMMJJ-NNNN"
+                 value={referenceARetrouver} data-testid="reference-recherche"
+                 onChange={(e) => setReferenceARetrouver(e.target.value)} />
+          <button className="btn btn-outline-secondary btn-sm" data-testid="bouton-retrouver">Retrouver</button>
+        </form>
+      </div>
     </section>
   )
 }

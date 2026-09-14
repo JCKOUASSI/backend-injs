@@ -54,6 +54,8 @@ class DelegationHabilitation(models.Model):
     raison_arret = models.TextField(blank=True, default='')
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
+    # U5 — dernier préavis d'expiration (J-7) envoyé, une seule fois.
+    notification_echeance_le = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Délégation d’habilitation'

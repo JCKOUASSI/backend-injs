@@ -97,6 +97,37 @@ class SimulationImportSerializer(serializers.Serializer):
     )
 
 
+# ─────────────────────────────────────────────────────────────────────
+# U5 — cycle de vie, file de provisionnement, imports écrits, délégation
+# ─────────────────────────────────────────────────────────────────────
+class ImportExecuterSerializer(serializers.Serializer):
+    lignes = serializers.ListField(
+        child=serializers.DictField(), min_length=1, max_length=2000,
+    )
+    nom_fichier = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class AnnulationImportSerializer(serializers.Serializer):
+    motif = serializers.CharField(min_length=8)
+
+
+class PropositionDecisionSerializer(serializers.Serializer):
+    motif = serializers.CharField(min_length=8)
+    # Corrections autorisées à la validation (rôle d'accès notamment pour
+    # les agents recrutés dont le rôle n'est pas déductible).
+    ajustements = serializers.DictField(required=False)
+
+
+class DelegationActiverSerializer(serializers.Serializer):
+    motif = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class ActionDelegueeSerializer(serializers.Serializer):
+    action = serializers.CharField(min_length=3, max_length=200)
+    detail = serializers.DictField(required=False)
+    motif = serializers.CharField(required=False, allow_blank=True, default='')
+
+
 class DerogationInputSerializer(serializers.Serializer):
     compte = serializers.IntegerField()
     permission = serializers.CharField()

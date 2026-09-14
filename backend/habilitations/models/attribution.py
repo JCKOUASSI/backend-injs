@@ -58,6 +58,9 @@ class AttributionRole(models.Model):
     motif_revocation = models.TextField(blank=True, default='')
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
+    # U5 — date du dernier préavis d'expiration envoyé (J-7), pour n'en
+    # envoyer qu'un seul.
+    notification_echeance_le = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Attribution de rôle'
@@ -157,6 +160,8 @@ class PermissionAttribuee(models.Model):
         db_index=True,
     )
     date_creation = models.DateTimeField(auto_now_add=True)
+    # U5 — dernier préavis d'expiration (J-7) envoyé, une seule fois.
+    notification_echeance_le = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Permission attribuée (dérogation)'

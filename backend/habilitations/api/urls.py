@@ -3,6 +3,7 @@ from django.urls import path
 
 from . import views
 from . import views_admin
+from . import views_admin_cycle as vc
 from . import views_admin_workflow as wf
 
 urlpatterns = [
@@ -62,5 +63,55 @@ urlpatterns = [
     path(
         'delegations/<int:pk>/terminer/',
         wf.DelegationTerminateView.as_view(), name='hab-delegation-terminer',
+    ),
+
+    # ── U5 : cycle de vie, file de provisionnement, imports et délégation ──
+    path(
+        'propositions/',
+        vc.PropositionListView.as_view(), name='hab-propositions',
+    ),
+    path(
+        'propositions/<int:pk>/approuver/',
+        vc.PropositionApprouverView.as_view(), name='hab-proposition-approuver',
+    ),
+    path(
+        'propositions/<int:pk>/rejeter/',
+        vc.PropositionRejeterView.as_view(), name='hab-proposition-rejeter',
+    ),
+    path(
+        'provisions/scanner/',
+        vc.ProvisionScanView.as_view(), name='hab-provisions-scanner',
+    ),
+    path(
+        'comptes/imports/',
+        vc.ImportExecuterView.as_view(), name='hab-comptes-imports-executer',
+    ),
+    path(
+        'comptes/imports/<str:reference>/',
+        vc.ImportDetailView.as_view(), name='hab-comptes-import-detail',
+    ),
+    path(
+        'comptes/imports/<str:reference>/annuler/',
+        vc.ImportAnnulerView.as_view(), name='hab-comptes-import-annuler',
+    ),
+    path(
+        'notifications/',
+        vc.NotificationListView.as_view(), name='hab-notifications',
+    ),
+    path(
+        'notifications/tout-lire/',
+        vc.NotificationToutLireView.as_view(), name='hab-notifications-tout-lire',
+    ),
+    path(
+        'notifications/<int:pk>/lire/',
+        vc.NotificationLireView.as_view(), name='hab-notification-lire',
+    ),
+    path(
+        'delegations/<int:pk>/activer/',
+        vc.DelegationActiverView.as_view(), name='hab-delegation-activer',
+    ),
+    path(
+        'delegations/<int:pk>/action/',
+        vc.DelegationActionView.as_view(), name='hab-delegation-action',
     ),
 ]
