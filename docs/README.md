@@ -23,6 +23,24 @@ dans le [README racine](../README.md) ; l'architecture réelle et les décisions
 > Les guides d'administration du backend (dépannage, actions courantes) se trouvent dans
 > [`../backend/docs/`](../backend/docs/).
 
+## Identité, droits et administration — module Utilisateurs (LOT 4)
+
+Documents de consolidation du chantier CURP (identité, comptes, rôles, permissions,
+périmètres, journal). Ils décrivent **l'état réel du dépôt** au 2026-09-14 et sont
+adossés aux tests cités.
+
+| Document | Contenu |
+|---------|---------|
+| [architecture/IAM.md](architecture/IAM.md) | Architecture d'identité et de contrôle d'accès : les deux couches (legacy + CURP), authentification (JWT, MFA TOTP, verrouillage), autorisation et modes du moteur, organisation, journalisation, surface d'API et écrans, plan de bascule |
+| [security/RBAC.md](security/RBAC.md) | Règles de droits : niveaux N0–N4, 81 rôles, 1 155 permissions, matrice A2/J2, 12 périmètres, les 10 contrôles et leurs motifs, séparation des tâches, écarts à arbitrer |
+| [administration/utilisateurs.md](administration/utilisateurs.md) | Guide d'exploitation : drapeaux, création/modification de comptes, machine à états A5, MFA, organisation, dérogations et délégations, imports, surveillance et dépannage |
+| [audit/permissions.md](audit/permissions.md) | Rapport d'audit LOT 4 : méthode, volumes mesurés, 60 tests de refus croisés (§34) et de bout en bout (§35), écarts numérotés (L4-01…L4-06, J2-1…J2-4), plan de remédiation |
+
+> **Note de nomenclature** : les rapports d'audit **datés** du projet sont dans
+> [`audits/`](audits/) (pluriel) ; le dossier [`audit/`](audit/) (singulier) porte le
+> rapport consolidé des permissions du module Utilisateurs, comme prévu par le plan
+> [`curp/05-architecture-completion-module-utilisateurs.md`](curp/05-architecture-completion-module-utilisateurs.md) §5.
+
 ## Manuel utilisateur — Module Statistiques
 
 | Fichier | Description |

@@ -470,6 +470,10 @@ evaluations, notes, scolarite, exports, dashboard`.
 | [docs/SECURITE_DONNEES.md](docs/SECURITE_DONNEES.md) | Sécurité et protection des données, jeux de données fictifs |
 | [docs/modeles/](docs/modeles/) | Modèles de données fictifs (jamais de données réelles dans le dépôt) |
 | [docs/audits/BASELINE_2026-09.md](docs/audits/BASELINE_2026-09.md) | Baseline chiffrée de référence (applications, modèles, migrations, tests) |
+| [docs/architecture/IAM.md](docs/architecture/IAM.md) | Identité et contrôle d'accès (module Utilisateurs) : couches legacy + CURP, JWT/MFA, moteur, journal |
+| [docs/security/RBAC.md](docs/security/RBAC.md) | Rôles, niveaux N0–N4, permissions, périmètres, séparations de tâches, écarts à arbitrer |
+| [docs/administration/utilisateurs.md](docs/administration/utilisateurs.md) | Guide d'exploitation des comptes : console CURP, statuts, MFA, organisation, dérogations |
+| [docs/audit/permissions.md](docs/audit/permissions.md) | Rapport d'audit des permissions (LOT 4) : tests de refus croisés, scénario de bout en bout, écarts |
 | [docs/legal/](docs/legal/) | Pages légales (confidentialité mobile/web/plateforme, droits, cookies, mentions) |
 | [backend/docs/](backend/docs/) | Guides admin Django : dépannage et actions courantes |
 | [docs/archives/](docs/archives/README.md) | Documents d'époque (badgeage QR initial) — **« Document d'archive — ne pas utiliser »** |
