@@ -315,6 +315,87 @@ class FileSondesTests(APITestCase):
         self.assertFalse(drapeaux.sonde_active('ADMISSION'))
         self.assertEqual(file_service.scanner(acteur=self.admin), {})
 
+    def test_21_jury_propose_role_avec_perimetre_formation(self):
+        fx.ouvrir(fx.F_MAITRE, fx.F_JURY)
+        fx.membre_jury(self.annee, self.formation, self.niveau,
+                       avec_compte=True, role_code='ENSEIGNANT',
+                       cree_par=self.admin)
+        bilan = file_service.scanner(acteur=self.admin)
+        self.assertEqual(bilan['JURY'], 1)
+        prop = PropositionProvisionnement.objects.get()
+        self.assertEqual(prop.declencheur, PropositionProvisionnement.Declencheur.JURY)
+        self.assertEqual(prop.action_proposee,
+                         PropositionProvisionnement.Action.ATTRIBUER_ROLE)
+        self.assertEqual(prop.source_app, 'jurys')
+        self.assertEqual(prop.source_modele, 'MembreJury')
+        ligne = prop.proposition['roles'][0]
+        self.assertEqual(ligne['role'], 'MEMBRE_JURY')
+        perimetre = ligne['perimetres_generiques'][0]
+        self.assertEqual(perimetre['type'], 'FORMATION')
+        self.assertEqual(perimetre['objet_id'], self.formation.pk)
+        # Second scan le même jour : aucun doublon (clé idempotente).
+        self.assertEqual(file_service.scanner(acteur=self.admin)['JURY'], 0)
+
+    def test_22_jury_membre_deja_role_rien_ne_passe(self):
+        fx.ouvrir(fx.F_MAITRE, fx.F_JURY)
+        fx.membre_jury(self.annee, self.formation, self.niveau,
+                       avec_compte=True, role_code='MEMBRE_JURY',
+                       cree_par=self.admin)
+        self.assertEqual(file_service.scanner(acteur=self.admin), {'JURY': 0})
+        self.assertEqual(PropositionProvisionnement.objects.count(), 0)
+
+    def test_23_jury_sans_compte_curp_pas_de_fait(self):
+        # L'utilisateur métier existe mais n'a pas encore de compte CURP :
+        # la sonde ne dépose rien (la création passe par l'écran U4, jamais
+        # de rôle d'accès deviné automatiquement).
+        fx.ouvrir(fx.F_MAITRE, fx.F_JURY)
+        fx.membre_jury(self.annee, self.formation, self.niveau)
+        self.assertEqual(file_service.scanner(acteur=self.admin), {'JURY': 0})
+        self.assertEqual(PropositionProvisionnement.objects.count(), 0)
+
+    def test_24_jury_approbation_attribue_role_avec_perimetre(self):
+        from habilitations.models import Perimetre
+        fx.ouvrir(fx.F_MAITRE, fx.F_JURY)
+        fx.membre_jury(self.annee, self.formation, self.niveau,
+                       fonction='PRESIDENT', avec_compte=True,
+                       role_code='ENSEIGNANT', cree_par=self.admin)
+        file_service.scanner(acteur=self.admin)
+        prop = PropositionProvisionnement.objects.get()
+        self.assertIn('président', prop.proposition['motif'])
+        prop = approbation.approuver(prop, self.admin, 'Désignation vérifiée.', {})
+        self.assertEqual(prop.statut, PropositionProvisionnement.Statut.APPLIQUEE)
+        compte = prop.compte_cible
+        attribution = compte.attributions.get(role__code='MEMBRE_JURY')
+        self.assertEqual(attribution.statut, AttributionRole.Statut.ACTIVE)
+        perimetres = attribution.perimetres.all()
+        self.assertEqual(perimetres.count(), 1)
+        self.assertEqual(perimetres[0].type, Perimetre.Type.FORMATION)
+        self.assertEqual(perimetres[0].object_id, self.formation.pk)
+        # Le fait métier persiste : un nouveau scan ne redépose pas
+        # (la proposition est déjà vivante).
+        self.assertEqual(file_service.scanner(acteur=self.admin)['JURY'], 0)
+
+    def test_25_jury_deux_sessions_meme_membre_deux_faits(self):
+        fx.ouvrir(fx.F_MAITRE, fx.F_JURY)
+        _, session_normale, user = fx.membre_jury(
+            self.annee, self.formation, self.niveau,
+            avec_compte=True, role_code='ENSEIGNANT', cree_par=self.admin)
+        # Même membre, même académie : une session de rattrapage distincte
+        # (maquette version suivante).
+        fx.membre_jury(self.annee, self.formation, self.niveau, user=user,
+                       type_session='RATTRAPAGE', version=2)
+        bilan = file_service.scanner(acteur=self.admin)
+        self.assertEqual(bilan['JURY'], 2)
+        cles = set(
+            PropositionProvisionnement.objects
+            .values_list('cle_dedoublonnage', flat=True))
+        self.assertEqual(len(cles), 2)
+        # Rejet du premier fait : il peut être redéposé, le second n'est
+        # pas touché (clé versionnée par session).
+        premiere = PropositionProvisionnement.objects.first()
+        approbation.rejeter(premiere, self.admin, 'Jury annulé.', {})
+        self.assertEqual(file_service.scanner(acteur=self.admin)['JURY'], 1)
+
 
 class InactiviteExpirationTests(APITestCase):
     """Suspension d'inactivité (préavis puis file) et expiration à terme."""

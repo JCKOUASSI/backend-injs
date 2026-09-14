@@ -26,12 +26,13 @@ F_INSCRIPTION = 'flag.curp_declencheur_inscription'
 F_RECRUTEMENT = 'flag.curp_declencheur_recrutement'
 F_AFFECTATION = 'flag.curp_declencheur_affectation_enseignant'
 F_FIN_RELATION = 'flag.curp_declencheur_fin_relation'
+F_JURY = 'flag.curp_declencheur_jury'
 F_INACTIVITE = 'flag.curp_suspension_inactivite'
 F_EXPIRATION = 'flag.curp_expiration_auto'
 F_IMPORT = 'flag.curp_import_masse'
 F_UI = 'flag.curp_ui_admin'
 TOUS_F_SONDES = [F_MAITRE, F_ADMISSION, F_INSCRIPTION, F_RECRUTEMENT,
-                 F_AFFECTATION, F_FIN_RELATION]
+                 F_AFFECTATION, F_FIN_RELATION, F_JURY]
 
 
 def referentiel_charge():
@@ -177,6 +178,53 @@ def agent_actif(matricule='AG001', date_entree=None, date_sortie=None,
                 date_debut=timezone.localdate(),
             )
     return agent, user, compte
+
+
+def membre_jury(annee, formation, niveau, user=None, fonction='MEMBRE',
+                username='jury001', legacy_role='FORMATEUR',
+                avec_compte=False, role_code=None, cree_par=None,
+                type_session='NORMALE', version=1):
+    """Session de jury (maquette verrouillée) + membre désigné (historisé).
+
+    - ``user`` : utilisateur métier existant (sinon créé par le jeu) ;
+    - ``avec_compte`` : un profil CURP ACTIF porte l'utilisateur.
+    Retourne ``(membre, session, user)``.
+    """
+    from jurys.models import MembreJury, SessionJury
+    from scolarite.models import Maquette
+    maquette = Maquette.objects.create(
+        annee_academique=annee, ref_formation=formation, niveau=niveau,
+        version=version, statut=Maquette.Statut.VALIDEE,
+        libelle='Maquette de jeu de test U5.',
+    )
+    session = SessionJury.objects.create(
+        annee_academique=annee, ref_formation=formation, niveau=niveau,
+        maquette=maquette, type_session=type_session,
+        statut=SessionJury.Statut.DELIBERATION,
+    )
+    if user is None:
+        user = User.objects.create_user(
+            username=username, password='Mot#2026x', role=legacy_role,
+            first_name='Aïcha', last_name='Koné',
+            email=f'{username}@injs.ci',
+        )
+    if avec_compte:
+        compte = CompteUtilisateur.objects.create(
+            user=user, statut=CompteUtilisateur.Statut.ACTIF,
+            canal=CanalAcces.WEB, cree_par=cree_par,
+            date_activation=timezone.now(),
+        )
+        if role_code:
+            role = RoleMetier.objects.get(code=role_code)
+            AttributionRole.objects.create(
+                compte=compte, role=role, niveau_effectif='N2',
+                motif='Attribution de jeu de test U5.',
+                statut=AttributionRole.Statut.ACTIVE,
+                date_debut=timezone.localdate(),
+            )
+    membre = MembreJury.objects.create(session=session, user=user,
+                                       fonction=fonction)
+    return membre, session, user
 
 
 def affectation_enseignant(annee, formation, niveau, semestre,

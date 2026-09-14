@@ -74,7 +74,7 @@ Nouveau modèle `PropositionProvisionnement` (file) :
   et une notification d'alerte `ALERTE_PLAFOND` est émise (risque
   « création en masse par erreur lors d'une reprise »).
 
-Les cinq sondes lisent les modèles métier réels, de façon **défensive**
+Les six sondes lisent les modèles métier réels, de façon **défensive**
 (imports tolérants ; une app absente ne fait que rendre la sonde vide) :
 
 | Déclencheur (drapeau) | Source réelle | Proposition |
@@ -84,14 +84,17 @@ Les cinq sondes lisent les modèles métier réels, de façon **défensive**
 | `…_recrutement` | `ressources_humaines.Agent` ACTIF sans compte | CREER_COMPTE agent (rôle à compléter par le valideur si non déductible) |
 | `…_affectation_enseignant` | `scolarite.AffectationPedagogique` (formateur affecté à un ECUE) | ATTRIBUER_ROLE `ENSEIGNANT` (+ périmètres ECUE), legacy `FORMATEUR`, MOBILE |
 | `…_fin_relation` | `Agent.date_sortie` / `InscriptionAdministrative` TERMINEE / fin de vacation, après délai de grâce | SUSPENDRE_COMPTE (la désactivation reste un geste admin ultérieur) |
+| `…_jury` | `jurys.MembreJury` (membre désigné, `user` existant) | ATTRIBUER_ROLE `MEMBRE_JURY` (+ périmètre FORMATION de la session) ; sans compte CURP, la création passe par l'écran U4 |
 
-Une sonde jury n'est **pas** ajoutée : la « désignation d'un jury » du
-prompt existe via `jurys.MembreJury` qui référence déjà un `User` existant
-; elle fournit une proposition `MEMBRE_JURY` via le déclencheur
-`…_affectation_enseignant` si le membre n'est pas un formateur ? **Non** —
-pour ne pas inventer, la désignation de jury est couverte par la
-proposition manuelle depuis la fiche de compte (l'écran U4 existe) ; la
-sonde automatique est limitée aux cinq cas écrits au point 1 de C3.
+La sonde jury observe `jurys.MembreJury`, qui référence déjà un `User`
+existant (FK PROTECT) : la sonde ne propose donc **que** l'attribution du
+rôle `MEMBRE_JURY` aux utilisateurs qui ont déjà un compte CURP, bornée
+sur la formation de la session de jury. Un membre désigné sans compte CURP
+ne génère aucun fait : sa création reste une décision humaine depuis la
+fiche de compte (écran U4) — aucun rôle d'accès n'est deviné
+automatiquement. Le rôle d'approbation cible `MEMBRE_JURY` (catalogue,
+borné sur FORMATION) ; la fonction (président/secrétaire/membre) est
+consignée dans le motif pour aide à la décision.
 
 L'approbation réutilise les services U4 (`creer_compte`, `changer_statut`,
 `_appliquer_roles`) dans une transaction, avec le motif de l'approbateur.
@@ -135,7 +138,8 @@ si la source change, via une nouvelle clé d'idempotence datée).
   pas elle-même : « jamais de suspension silencieuse » et règle générale
   d'approbation humaine de C3. `CompteUtilisateur.exempt_inactivite` porte
   les exemptions déclarables (congé longue durée).
-- Commande `provisionnement_scanner` : lance les cinq sondes actives.
+- Commande `provisionnement_scanner` : lance les sondes actives (cinq
+  événementielles métier + la sonde jury).
 
 Ces trois commandes sont idempotentes et conçues pour être appelées par la
 planification de production (quotidienne) ; en sandbox elles se lancent à
@@ -179,7 +183,8 @@ d'accroche du canal d'envoi de production.
 ## 8. Périmètre livré et replis
 
 **Livré en U5 (tranche démo)** : L1 machine à états stricte, L2 file +
-cinq sondes drapeautées + plafond, L3 import transactionnel et annulable,
+six sondes drapeautées (dont la sonde jury, ajoutée à la demande) +
+plafond, L3 import transactionnel et annulable,
 L4 délégation complète (contrôles, activation, extinction, action tracée),
 commandes planifiables, écran de file, finalisation de l'écran d'import et
 de l'écran délégations, ≥ 30 tests backend et tests Vitest des nouveaux

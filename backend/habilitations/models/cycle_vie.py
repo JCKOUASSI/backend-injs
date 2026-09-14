@@ -24,6 +24,7 @@ class PropositionProvisionnement(models.Model):
         RECRUTEMENT = 'RECRUTEMENT', 'Recrutement d’un agent enregistré en RH'
         AFFECTATION_ENSEIGNANT = 'AFFECTATION_ENSEIGNANT', 'Affectation pédagogique d’un enseignant'
         FIN_RELATION = 'FIN_RELATION', 'Fin d’inscription, départ ou fin de contrat'
+        JURY = 'JURY', 'Désignation d’un membre de jury'
         INACTIVITE = 'INACTIVITE', 'Compte inactif au-delà de la durée admise'
 
     class Action(models.TextChoices):

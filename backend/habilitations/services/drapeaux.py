@@ -18,6 +18,7 @@ DRAPEAUX_SONDES = {
     'RECRUTEMENT': 'flag.curp_declencheur_recrutement',
     'AFFECTATION_ENSEIGNANT': 'flag.curp_declencheur_affectation_enseignant',
     'FIN_RELATION': 'flag.curp_declencheur_fin_relation',
+    'JURY': 'flag.curp_declencheur_jury',
 }
 
 DRAPEAU_INACTIVITE = 'flag.curp_suspension_inactivite'

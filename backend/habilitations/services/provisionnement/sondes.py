@@ -337,6 +337,71 @@ def sonde_fin_relation(grace_jours=7):
     return faits
 
 
+# ---------------------------------------------------------------------------
+# 6. Désignation d'un membre de jury → rôle MEMBRE_JURY (+ périmètre
+#    formation de la session). ``jurys.MembreJury.user`` référence un User
+#    EXISTANT (PROTECT) ; la sonde se limite aux utilisateurs qui ont déjà
+#    un compte CURP : un membre sans compte passe par la proposition
+#    manuelle depuis la fiche de compte (écran U4), pas par la sonde
+#    (aucun droit d'accès n'est deviné automatiquement).
+# ---------------------------------------------------------------------------
+def sonde_jury():
+    try:
+        from jurys.models import MembreJury
+    except ImportError:
+        return []
+    faits = []
+    membres = (
+        MembreJury.objects
+        .select_related(
+            'session', 'session__annee_academique',
+            'session__ref_formation', 'session__niveau', 'user',
+        )
+        .order_by('pk')
+    )
+    for membre in membres:
+        session = membre.session
+        user = membre.user
+        profil = getattr(user, 'profil_habilitation', None)
+        if profil is None:
+            # Pas de compte CURP : le création passe par l'écran U4
+            # (proposition manuelle), pas par la sonde.
+            continue
+        if profil.attributions.filter(
+            statut='ACTIVE', role__code='MEMBRE_JURY',
+        ).exists():
+            continue
+        formation = getattr(session, 'ref_formation', None)
+        libelle_formation = (
+            getattr(formation, 'intitule', '') or str(formation or '')
+        )
+        # Périmètre du rôle : la formation de la session de jury
+        # (catalogue des rôles : MEMBRE_JURY est borné sur FORMATION).
+        perimetres = []
+        if formation is not None:
+            perimetres.append({
+                'type': 'FORMATION', 'app': 'formations',
+                'modele': 'RefFormation', 'objet_id': formation.pk,
+                'reference': libelle_formation,
+            })
+        roles = [{'role': 'MEMBRE_JURY', 'niveau': 'N2',
+                  'perimetres_generiques': perimetres}]
+        fonction = membre.get_fonction_display()
+        motif = (
+            f"Désignation au jury en tant que {fonction.lower()} "
+            f"({session})."
+        )
+        faits.append(Fait(
+            'JURY', 'ATTRIBUER_ROLE', 'jurys', 'MembreJury', str(membre.pk),
+            f"{user.get_full_name() or user.get_username()} — "
+            f"{fonction} — {libelle_formation}",
+            {'motif': motif, 'roles': roles},
+            username_cible=user.get_username(),
+            version=str(session.pk),
+        ))
+    return faits
+
+
 #: Ordre de parcours et fonction associée (la déclaration active se fait
 #: via :func:`habilitations.services.drapeaux.sonde_active`).
 SONDES = {
@@ -345,4 +410,5 @@ SONDES = {
     'RECRUTEMENT': sonde_recrutement,
     'AFFECTATION_ENSEIGNANT': sonde_affectation_enseignant,
     'FIN_RELATION': sonde_fin_relation,
+    'JURY': sonde_jury,
 }

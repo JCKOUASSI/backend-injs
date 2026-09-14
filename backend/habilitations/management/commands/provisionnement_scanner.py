@@ -24,7 +24,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--declencheur', action='append', default=None,
             choices=['ADMISSION', 'INSCRIPTION', 'RECRUTEMENT',
-                     'AFFECTATION_ENSEIGNANT', 'FIN_RELATION'],
+                     'AFFECTATION_ENSEIGNANT', 'FIN_RELATION', 'JURY'],
             help="Limite le scan à un ou plusieurs déclencheurs.",
         )
 
