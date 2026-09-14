@@ -150,7 +150,31 @@ CAPACITES_DESCRIPTEURS = {
     'dashboard': {
         'filtrer_secretariat': ('roles', DASHBOARD_SECRETARIAT_FILTER_ROLES),
     },
+    # CURP U4 — console d'administration des comptes. Source callable pour
+    # appliquer le kill-switch même au super-utilisateur (un drapeau éteint
+    # reste éteint pour tout le monde, voir parametres.flags).
+    'habilitations_admin': {
+        'gerer': ('callable', 'authentication.capabilities._peut_gerer_console_curp'),
+    },
 }
+
+
+def _peut_gerer_console_curp(user):
+    """Console CURP U4 visible uniquement si le drapeau est ouvert ET que
+    l'utilisateur fait partie du trio d'administration de l'habilitation.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    try:
+        from parametres.flags import is_enabled
+        if not is_enabled('flag.curp_ui_admin', user):
+            return False
+    except Exception:
+        # Application parametres absente ou indisponible : repli fermé.
+        return False
+    return user_in_roles(
+        user, ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'),
+    )
 
 
 def _evalue_perm_class(permission_class, method, user):

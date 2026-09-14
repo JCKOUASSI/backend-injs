@@ -50,3 +50,30 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - GET /api/habilitations/roles/ — clé de réponse 200 supprimée : GET /api/habilitations/roles/ → réponse 200.results.[].incompatible_avec
   - GET /api/habilitations/roles/ — clé de réponse 200 supprimée : GET /api/habilitations/roles/ → réponse 200.results.[].permissions_count
 
+## 2026-09-14 05:51 UTC
+
+- **Justification :** U4 CURP : console web d administration des comptes derriere flag.curp_ui_admin (off par defaut) et trio administrateur ; nouvelles routes /api/habilitations/ : comptes (creation, fiche, differentiel obligatoire, modification, statuts), personnes, roles detail, matrice, journal + integrite, derogations, delegations, import-simuler (apercu), revue consultative. Aucune route existante modifiee ni rompue, aucun refus applique (moteur en observation).
+- Routes dans le contrat : 556
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 19
+  - Route supprimée ou renommée : GET /api/habilitations/comptes/
+  - Route supprimée ou renommée : GET /api/habilitations/comptes/revue/
+  - Route supprimée ou renommée : GET /api/habilitations/comptes/{id}/
+  - Route supprimée ou renommée : GET /api/habilitations/delegations/
+  - Route supprimée ou renommée : GET /api/habilitations/derogations/
+  - Route supprimée ou renommée : GET /api/habilitations/journal/
+  - Route supprimée ou renommée : GET /api/habilitations/journal/integrite/
+  - Route supprimée ou renommée : GET /api/habilitations/matrice/
+  - Route supprimée ou renommée : GET /api/habilitations/personnes/
+  - Route supprimée ou renommée : GET /api/habilitations/roles/{code}/
+  - Route supprimée ou renommée : PATCH /api/habilitations/comptes/{id}/modifier/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/import-simuler/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/{id}/simuler-modification/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/{id}/statut/
+  - Route supprimée ou renommée : POST /api/habilitations/delegations/
+  - Route supprimée ou renommée : POST /api/habilitations/delegations/{id}/terminer/
+  - Route supprimée ou renommée : POST /api/habilitations/derogations/
+  - Route supprimée ou renommée : POST /api/habilitations/derogations/{id}/revoquer/
+

@@ -22,6 +22,20 @@ import Secretariats from './pages/Secretariats'
 import Referentiels from './pages/Referentiels'
 import Parametres from './pages/Parametres'
 import FeatureFlags from './pages/FeatureFlags'
+// U4 — console CURP d'administration des comptes (derrière le drapeau
+// CURP_UI_ADMIN : sans la capacité habilitations_admin.gerer, rien n'apparaît).
+import HabilitationsLayout from './pages/habilitations/HabilitationsLayout'
+import ListeComptes from './pages/habilitations/ListeComptes'
+import FicheCompte from './pages/habilitations/FicheCompte'
+import AssistantCreation from './pages/habilitations/AssistantCreation'
+import ModificationCompte from './pages/habilitations/ModifierCompte'
+import GestionRoles from './pages/habilitations/GestionRoles'
+import MatricePermissions from './pages/habilitations/MatricePermissions'
+import Derogations from './pages/habilitations/Derogations'
+import Delegations from './pages/habilitations/Delegations'
+import OperationsMasse from './pages/habilitations/OperationsMasse'
+import RevueHabilitations from './pages/habilitations/RevueHabilitations'
+import JournalHabilitations from './pages/habilitations/JournalHabilitations'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
@@ -121,6 +135,7 @@ function Layout({ children, breadcrumb }) {
   const canViewFormateurs = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'])
     || canViewFinanceModule
   const canViewUsers = peut(user, 'utilisateurs', 'voir')
+  const canViewHabilitations = peut(user, 'habilitations_admin', 'gerer')
   const canViewSecretariats = hasAppRole(user, ADMIN_LEVEL_ROLES)
   const canViewImport = peut(user, 'participants', 'gerer')
   const canViewEvaluations = peut(user, 'evaluations', 'gerer_questionnaires')
@@ -277,6 +292,11 @@ function Layout({ children, breadcrumb }) {
           {canViewUsers && (
             <Link to={listHref('/users', LIST_STORAGE_KEYS.users)} className={`nav-item ${isActive('/users') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
               <span><i className="bi bi-person-gear"></i> <span className="nav-label">Utilisateurs</span></span>
+            </Link>
+          )}
+          {canViewHabilitations && (
+            <Link to="/administration/comptes" className={`nav-item ${path.startsWith('/administration/comptes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)} data-testid="nav-habilitations">
+              <span><i className="bi bi-shield-lock"></i> <span className="nav-label">Habilitations (CURP)</span></span>
             </Link>
           )}
           {canViewSecretariats && (
@@ -681,6 +701,25 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/administration/comptes" element={
+            <ProtectedRoute capacite={{ module: 'habilitations_admin', action: 'gerer' }}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Habilitations</li></>}>
+                <HabilitationsLayout />
+              </Layout>
+            </ProtectedRoute>
+          }>
+            <Route index element={<ListeComptes />} />
+            <Route path="nouveau" element={<AssistantCreation />} />
+            <Route path="operations-masse" element={<OperationsMasse />} />
+            <Route path="revue" element={<RevueHabilitations />} />
+            <Route path="journal" element={<JournalHabilitations />} />
+            <Route path="roles" element={<GestionRoles />} />
+            <Route path="matrice" element={<MatricePermissions />} />
+            <Route path="derogations" element={<Derogations />} />
+            <Route path="delegations" element={<Delegations />} />
+            <Route path=":id" element={<FicheCompte />} />
+            <Route path=":id/modifier" element={<ModificationCompte />} />
+          </Route>
           <Route path="/secretariats" element={
             <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Secrétariats</li></>}>

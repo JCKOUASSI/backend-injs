@@ -159,3 +159,27 @@ class EstAdministrateurHabilitations(BasePermission):
             )
         except ImportError:
             return False
+
+
+class ExigeDrapeauAdmin(BasePermission):
+    """Garde des endpoints de la console CURP U4.
+
+    Exige à la fois :
+    * le drapeau ``flag.curp_ui_admin`` ouvert pour l'utilisateur (kill-switch
+      sans passe-droit super-utilisateur) ;
+    * l'appartenance au trio d'administration de l'habilitation.
+
+    Drapeau fermé → 403 (et les routes ne sont pas référencées côté interface)
+    : l'administration Django reste la seule voie, conformément au repli U4.
+    """
+
+    message = "Console d'habilitation indisponible (drapeau fermé ou droit insuffisant)."
+
+    def has_permission(self, request, view):
+        if not EstAdministrateurHabilitations().has_permission(request, view):
+            return False
+        try:
+            from parametres.flags import is_enabled
+            return is_enabled('flag.curp_ui_admin', request.user)
+        except Exception:
+            return False

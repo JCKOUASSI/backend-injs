@@ -1712,6 +1712,64 @@
         "200": null
       }
     },
+    "GET /api/habilitations/comptes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/comptes/revue/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/comptes/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/delegations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/derogations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/journal/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/journal/integrite/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/matrice/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/mes-acces/": {
       "parameters": [],
       "request_keys": null,
@@ -1754,6 +1812,13 @@
         }
       }
     },
+    "GET /api/habilitations/personnes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/roles/": {
       "parameters": [
         "page"
@@ -1785,6 +1850,15 @@
             }
           }
         }
+      }
+    },
+    "GET /api/habilitations/roles/{code}/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
       }
     },
     "GET /api/health/": {
@@ -3384,6 +3458,15 @@
         "200": null
       }
     },
+    "PATCH /api/habilitations/comptes/{id}/modifier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "PATCH /api/juries/notifications/": {
       "parameters": [],
       "request_keys": null,
@@ -4829,6 +4912,70 @@
       }
     },
     "POST /api/graduation/registres/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/comptes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/comptes/import-simuler/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/comptes/{id}/simuler-modification/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/comptes/{id}/statut/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/delegations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/delegations/{id}/terminer/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/derogations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/derogations/{id}/revoquer/": {
       "parameters": [
         "id"
       ],

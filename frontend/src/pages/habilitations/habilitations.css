@@ -1,0 +1,176 @@
+/* Console CURP d'administration des comptes (U4) — styles dédiés. */
+
+.hab-bandeau {
+  background: #7b1fa2;
+  color: #fff;
+  font-size: 0.82rem;
+  padding: 0.4rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hab-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .hab-layout { grid-template-columns: 1fr; }
+}
+
+.hab-nav {
+  position: sticky;
+  top: 1rem;
+  background: var(--ci-white, #fff);
+  border: 1px solid var(--ci-light, #dce6f2);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+.hab-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  color: #233;
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.hab-nav a:hover { background: #f1f5fa; }
+.hab-nav a.active {
+  background: var(--ci-success, #2277c1);
+  color: #fff;
+}
+
+.hab-carte {
+  background: var(--ci-white, #fff);
+  border: 1px solid var(--ci-light, #dce6f2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.hab-carte h2, .hab-carte h3 { margin-top: 0; }
+
+.hab-badge-sensible {
+  background: #c62828;
+  color: #fff;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+.hab-badge-canal {
+  background: #e8eef6;
+  color: #1a3a5c;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+}
+.hab-statut {
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.74rem;
+  background: #e8eef6;
+}
+.hab-statut-ACTIF { background: #d8f0dd; color: #1d6b35; }
+.hab-statut-SUSPENDU { background: #fdeccd; color: #8a5a00; }
+.hab-statut-DESACTIVE, .hab-statut-VERROUILLE, .hab-statut-EXPIRE {
+  background: #f8d9d9; color: #8b1c1c;
+}
+
+.hab-diff-gagne { color: #1d6b35; }
+.hab-diff-perdu { color: #8b1c1c; }
+.hab-diff-liste {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  max-height: 220px;
+  overflow: auto;
+  background: #f8fafc;
+  border: 1px solid #e3e9f0;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.4rem 0;
+}
+.hab-avertissement {
+  border-left: 4px solid var(--ci-warning, #f5b100);
+  background: #fdf6e3;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  margin: 0.35rem 0;
+  font-size: 0.85rem;
+}
+.hab-avertissement.bloquant {
+  border-left-color: var(--ci-danger, #c62828);
+  background: #fbe7e7;
+}
+
+.hab-etapes {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.hab-etape {
+  flex: 1;
+  min-width: 130px;
+  border: 1px solid var(--ci-light, #dce6f2);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  color: #667;
+}
+.hab-etape.active { border-color: var(--ci-success, #2277c1); color: #14466f; font-weight: 600; }
+.hab-etape.terminee { background: #eef6ff; }
+
+.hab-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.hab-table th, .hab-table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #edf1f6;
+  text-align: left;
+  vertical-align: top;
+}
+.hab-table thead th {
+  background: #f4f7fb;
+  position: sticky;
+  top: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #5a6b7d;
+}
+.hab-matrice { font-size: 0.72rem; border-collapse: collapse; }
+.hab-matrice th, .hab-matrice td {
+  border: 1px solid #e6ebf1;
+  padding: 0.18rem 0.35rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.hab-matrice th { background: #f4f7fb; }
+.hab-niveau-N4 { background: #c62828; color: #fff; font-weight: 700; }
+.hab-niveau-N3 { background: #e69700; color: #fff; font-weight: 600; }
+.hab-niveau-N2 { background: #2277c1; color: #fff; }
+.hab-niveau-N1 { background: #d6e7f6; }
+.hab-niveau-N0 { background: #eef1f5; color: #556; }
+.hab-provisoire { position: relative; outline: 1px dashed #7b1fa2; }
+
+.hab-filtres {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+.hab-filtres input, .hab-filtres select { max-width: 220px; }
+
+.hab-recap { line-height: 1.7; }
+.hab-recap .libelle { color: #5a6b7d; display: inline-block; min-width: 11rem; }
+.hab-403 {
+  border: 1px solid #f0c9c9;
+  background: #fbeaea;
+  color: #7c1d1d;
+  border-radius: 8px;
+  padding: 1.2rem;
+  margin: 1.5rem 0;
+}
+.hab-muted { color: #78889a; font-size: 0.84rem; }
