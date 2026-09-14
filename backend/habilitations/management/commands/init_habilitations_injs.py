@@ -1,10 +1,11 @@
 """Initialisation minimale et idempotente du dispositif CURP (unité U1).
 
 Crée la politique de sécurité singleton avec ses valeurs par défaut. Le
-chargement des 33 rôles et du catalogue de permissions (annexes A1/A3) est
-explicitement réalisé par une migration de données de l'unité **U3** ; U1 ne
-fournit que la structure et ne peuple aucun droit. La commande ne touche à
-aucune donnée des applications existantes.
+chargement des rôles et du catalogue de permissions (annexes A1/A3, 35
+lignes du tableau A1 — le recueil en titre 33) est explicitement réalisé
+par la migration de données de l'unité **U3** ; U1 ne fournit que la
+structure et ne peuple aucun droit. La commande ne touche à aucune donnée
+des applications existantes.
 """
 from django.core.management.base import BaseCommand
 

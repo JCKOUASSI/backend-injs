@@ -56,7 +56,16 @@ class PermissionMetierTests(TestCase):
         self.assertEqual(permission.code, 'evaluations.note.valider')
 
     def test_les_treize_actions_sont_proposees(self):
-        self.assertEqual(len(PermissionMetier.Action.values), 13)
+        # U3 : les treize verbes canoniques restent tous proposés (extension
+        # additive R2) ; l'annexe A3 ajoute des verbes métier (saisir,
+        # signer, verrouiller…), d'où une inclusion plutôt qu'un décompte figé.
+        treize_canoniques = {
+            'consulter', 'creer', 'modifier', 'soumettre', 'valider',
+            'rejeter', 'publier', 'annuler', 'exporter', 'imprimer',
+            'archiver', 'supprimer', 'administrer',
+        }
+        self.assertTrue(treize_canoniques.issubset(set(PermissionMetier.Action.values)))
+        self.assertGreaterEqual(len(PermissionMetier.Action.values), 13)
 
     def test_une_consultation_n_est_pas_journalisee_par_defaut(self):
         permission = creer_permission(action=PermissionMetier.Action.CONSULTER)

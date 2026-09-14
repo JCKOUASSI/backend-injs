@@ -12,6 +12,7 @@ from .perimetre import Perimetre
 
 class PermissionMetier(models.Model):
     class Action(models.TextChoices):
+        # Les treize verbes canoniques du modèle fonctionnel de référence.
         CONSULTER = 'consulter', 'Consulter'
         CREER = 'creer', 'Créer'
         MODIFIER = 'modifier', 'Modifier'
@@ -25,6 +26,27 @@ class PermissionMetier(models.Model):
         ARCHIVER = 'archiver', 'Archiver'
         SUPPRIMER = 'supprimer', 'Supprimer'
         ADMINISTRER = 'administrer', 'Administrer'
+        # Verbes métier supplémentaires utilisés par le catalogue de
+        # permissions de l'annexe A3 (U3). Chacun est rattaché à un niveau
+        # d'accès dans referentiel/catalogue_modules.py (NIVEAU_VERBE).
+        SAISIR = 'saisir', 'Saisir'
+        VERROUILLER = 'verrouiller', 'Verrouiller'
+        CALCULER = 'calculer', 'Calculer'
+        SIGNER = 'signer', 'Signer'
+        GENERER = 'generer', 'Générer'
+        EDITER = 'editer', 'Éditer'
+        REVOQUER = 'revoquer', 'Révoquer'
+        DEPOSER = 'deposer', 'Déposer'
+        INSTRUIRE = 'instruire', 'Instruire'
+        DECIDER = 'decider', 'Décider'
+        OUVRIR = 'ouvrir', 'Ouvrir'
+        CLOTURER = 'cloturer', 'Clôturer'
+        FORCER = 'forcer', 'Forcer'
+        CERTIFIER = 'certifier', 'Certifier'
+        DEPLACER = 'deplacer', 'Déplacer'
+        REMPLACER = 'remplacer', 'Remplacer'
+        RESOUDRE = 'resoudre', 'Résoudre'
+        CONFIGURER = 'configurer', 'Configurer'
 
     class Criticite(models.TextChoices):
         NORMALE = 'NORMALE', 'Normale'

@@ -13,6 +13,7 @@ Aucune de ces vues ne modifie une décision d'accès legacy : l'écriture des
 attributions relève de l'admin Django et, plus tard, des écrans U4.
 """
 from django.contrib.auth import get_user_model
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
@@ -178,7 +179,12 @@ class RoleListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return RoleMetier.objects.all().order_by('domaine', 'ordre', 'libelle')
+        return (
+            RoleMetier.objects.all()
+            .prefetch_related('incompatible_avec')
+            .annotate(_permissions_count=Count('permissions', distinct=True))
+            .order_by('domaine', 'ordre', 'libelle')
+        )
 
 
 class PermissionListView(generics.ListAPIView):

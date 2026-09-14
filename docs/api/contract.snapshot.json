@@ -1772,11 +1772,15 @@
               "cumulable": null,
               "disponible": null,
               "domaine": null,
+              "incompatible_avec": {
+                "[]": null
+              },
               "libelle": null,
               "libelle_court": null,
               "module_requis": null,
               "niveau_defaut": null,
               "perimetre_defaut": null,
+              "permissions_count": null,
               "sensible": null
             }
           }

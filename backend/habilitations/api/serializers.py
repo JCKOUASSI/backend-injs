@@ -10,14 +10,27 @@ from habilitations.models import PermissionMetier, RoleMetier
 
 
 class RoleMetierSerializer(serializers.ModelSerializer):
+    # U3 : codes des rôles incompatibles (séparation des tâches) et volume de
+    # permissions ; la liste complète des codes atomiques reste accessible via
+    # le catalogue ``/permissions/`` pour ne pas alourdir la liste des rôles.
+    incompatible_avec = serializers.SlugRelatedField(
+        slug_field='code', many=True, read_only=True,
+    )
+    permissions_count = serializers.SerializerMethodField()
+
     class Meta:
         model = RoleMetier
         fields = (
             'code', 'libelle', 'libelle_court', 'domaine', 'niveau_defaut',
             'perimetre_defaut', 'module_requis', 'disponible', 'sensible',
-            'cumulable', 'canal_impose', 'actif',
+            'cumulable', 'canal_impose', 'actif', 'incompatible_avec',
+            'permissions_count',
         )
         read_only_fields = fields
+
+    def get_permissions_count(self, obj):
+        compteur = getattr(obj, '_permissions_count', None)
+        return compteur if compteur is not None else obj.permissions.count()
 
 
 class PermissionMetierSerializer(serializers.ModelSerializer):

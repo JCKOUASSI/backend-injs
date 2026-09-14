@@ -40,3 +40,13 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : POST /api/habilitations/evaluer/
   - Route supprimée ou renommée : POST /api/habilitations/observations/remettre-a-zero/
 
+## 2026-09-14 04:56 UTC
+
+- **Justification :** U3 CURP : peuplement du referentiel roles/permissions (annexes A1-A6) ; ajout de deux cles en lecture dans GET /api/habilitations/roles/ (incompatible_avec, permissions_count) ; aucune route ajoutee, modifiee ou supprimee.
+- Routes dans le contrat : 537
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 2
+  - GET /api/habilitations/roles/ — clé de réponse 200 supprimée : GET /api/habilitations/roles/ → réponse 200.results.[].incompatible_avec
+  - GET /api/habilitations/roles/ — clé de réponse 200 supprimée : GET /api/habilitations/roles/ → réponse 200.results.[].permissions_count
+
