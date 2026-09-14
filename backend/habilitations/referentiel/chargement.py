@@ -27,6 +27,7 @@ from .catalogue_matrice import (
     NIVEAU_PERMISSION_SURCHARGE,
     NIVEAUX,
     NIVEAUX_EXTRA_PROVISOIRES,
+    NIVEAUX_ROLES_CIBLES,
 )
 
 ORDRE_NIVEAUX = {'N0': 0, 'N1': 1, 'N2': 2, 'N3': 3, 'N4': 4}
@@ -102,6 +103,11 @@ def niveaux_du_role(code_role, domaine):
     niveaux = dict(NIVEAUX.get(code_role, {}))
     origine = {module: 'A2' for module in niveaux}
     for module, niveau in NIVEAUX_EXTRA_PROVISOIRES.get(code_role, {}).items():
+        niveaux[module] = niveau
+        origine[module] = 'J2'
+    # Rôles cibles du prompt module Utilisateurs (2026-09) : cases J2
+    # provisoires, valables en sus de l'A2 (inexistante pour ces rôles).
+    for module, niveau in NIVEAUX_ROLES_CIBLES.get(code_role, {}).items():
         niveaux[module] = niveau
         origine[module] = 'J2'
     # Les exports courants suivent le niveau statistique ; l'export sensible

@@ -391,7 +391,7 @@ class ConsoleU4Tests(APITestCase):
         self.assertEqual(reponse.data['permissions_count'], 1155)
         reponse = self.client.get('/api/habilitations/matrice/')
         self.assertEqual(reponse.status_code, 200)
-        self.assertEqual(len(reponse.data['lignes']), 35)
+        self.assertEqual(len(reponse.data['lignes']), 81)
         self.assertEqual(len(reponse.data['modules']), 20)
 
     def test_22_revue_est_consultative(self):

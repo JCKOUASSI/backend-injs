@@ -17,6 +17,11 @@ class Service(models.Model):
 
     nom = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True, default='')
+    departement = models.ForeignKey(
+        'administrations.Departement', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='services',
+        help_text='Département de rattachement (nullable : service non rattaché).',
+    )
     actif = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -32,6 +32,20 @@ class CompteUtilisateur(models.Model):
         null=True, blank=True, related_name='comptes',
     )
 
+    # Rattachements organisationnels (complétion module Utilisateurs, 2026-09) :
+    # ce sont des affiliations administratives, distinctes des périmètres CURP
+    # qui bornent les permissions (les périmètres DIRECTION/SERVICE y porteront
+    # ces mêmes entités — note J2). M2M additifs, vides par défaut : aucun
+    # compte existant n'est modifié.
+    departements = models.ManyToManyField(
+        'administrations.Departement', blank=True, related_name='comptes',
+        help_text='Départements dont le compte est rattaché.',
+    )
+    services = models.ManyToManyField(
+        'ressources_humaines.Service', blank=True, related_name='comptes',
+        help_text='Services dont le compte est rattaché.',
+    )
+
     statut = models.CharField(
         max_length=12, choices=Statut.choices, default=Statut.ACTIF,
         db_index=True,

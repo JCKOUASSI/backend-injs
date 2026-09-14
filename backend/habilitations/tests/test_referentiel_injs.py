@@ -39,7 +39,13 @@ from habilitations.referentiel.catalogue_matrice import (
 # ---------------------------------------------------------------------------
 class CatalogueDonneesTests(TestCase):
     def test_01_les_35_lignes_A1_sont_chargees(self):
-        self.assertEqual(len(ROLES), 35)
+        # 35 lignes A1 + 46 rôles cibles J2 du prompt module Utilisateurs
+        # (section « CIBLES (J2) », ordre >= 360) = 81 lignes au total.
+        a1 = [l for l in ROLES if l[8] < 360]
+        cibles = [l for l in ROLES if l[8] >= 360]
+        self.assertEqual(len(a1), 35)
+        self.assertEqual(len(cibles), 46)
+        self.assertEqual(len(ROLES), 81)
 
     def test_02_32_roles_internes_et_3_destinataires(self):
         codes = [l[0] for l in ROLES]
@@ -50,14 +56,22 @@ class CatalogueDonneesTests(TestCase):
             len([l for l in ROLES if l[2] == 'DESTINATAIRES']), 3
         )
 
-    def test_03_les_onze_roles_sensibles(self):
+    def test_03_les_roles_sensibles(self):
+        # Les 11 rôles sensibles de l'annexe A1 sont préservés ; 11 rôles
+        # cibles J2 y sont ajoutés (signature, finances, paie, SI).
         sensibles = sorted(l[0] for l in ROLES if l[6])
         self.assertEqual(sensibles, sorted([
+            # A1 (11)
             'ADMIN_SYSTEME', 'DIRECTION_GENERALE', 'DIRECTION_ETUDES',
             'RESPONSABLE_CONCOURS', 'RESPONSABLE_JURY',
             'RESPONSABLE_GRADUATION', 'RESPONSABLE_DIPLOMATION',
             'GESTIONNAIRE_FINANCES_ETUD', 'VALIDATEUR_FINANCIER',
             'GESTIONNAIRE_VACATIONS', 'GESTIONNAIRE_RH',
+            # Cibles J2 (11)
+            'SIGNATAIRE', 'VALIDATEUR_DIPLOMES', 'BOURSE_MANAGER',
+            'RESPONSABLE_FINANCES', 'CONTROLEUR_FINANCIER', 'PAIE_MANAGER',
+            'SYSADMIN', 'NETWORK_ADMIN', 'DB_ADMIN', 'SECURITY_ADMIN',
+            'API_MANAGER',
         ]))
 
     def test_04_codes_uniques_et_attributs_complets(self):
@@ -187,9 +201,9 @@ class ChargementBaseTests(TestCase):
         # attendus sont bien là dans une base de test migrée.
         cls.rapport = charger_referentiel()
 
-    def test_20_35_roles_et_permissions_en_base(self):
-        self.assertEqual(RoleMetier.objects.count(), 35)
-        self.assertEqual(self.rapport.roles, 35)
+    def test_20_81_roles_et_permissions_en_base(self):
+        self.assertEqual(RoleMetier.objects.count(), 81)
+        self.assertEqual(self.rapport.roles, 81)
         self.assertGreater(PermissionMetier.objects.count(), 900)
 
     def test_21_aucune_permission_orpheline(self):
@@ -218,7 +232,7 @@ class ChargementBaseTests(TestCase):
         self.assertEqual(RoleMetier.objects.filter(actif=True).count(), 0)
         self.assertEqual(PermissionMetier.objects.filter(actif=True).count(), 0)
         # Les lignes ne sont pas supprimées.
-        self.assertEqual(RoleMetier.objects.count(), 35)
+        self.assertEqual(RoleMetier.objects.count(), 81)
 
 
 # ---------------------------------------------------------------------------
@@ -419,7 +433,7 @@ class ReglesTransversalesTests(TestCase):
         sortie = StringIO()
         call_command('charger_referentiel_injs', '--dry-run', stdout=sortie)
         self.assertIn('[simulation]', sortie.getvalue())
-        self.assertIn('35 rôles', sortie.getvalue())
+        self.assertIn('81 rôles', sortie.getvalue())
 
     def test_59_commande_chargement_reel(self):
         sortie = StringIO()
@@ -460,12 +474,14 @@ class ReglesTransversalesTests(TestCase):
         interne = RoleMetier.objects.get(code='ADMIN_SYSTEME')
         self.assertEqual(interne.module_requis, '')
 
-    def test_64_un_accord_et_un_refus_pour_chacun_des_35_roles(self):
+    def test_64_un_accord_et_un_refus_pour_chacun_des_81_roles(self):
         # ACCORD : chaque rôle détient au moins une permission d'un module que
-        # la matrice A2 lui ouvre. REFUS : seul ADMIN_SYSTEME détient la
-        # permission d'administration des paramètres (verbe N4 exclusif).
+        # sa matrice (A2 ou cases J2) lui ouvre. REFUS : la permission
+        # d'administration des paramètres (verbe N4) n'est détenue que par les
+        # rôles N4 du module parametres — ADMIN_SYSTEME (A2) et SYSADMIN (J2).
         roles = list(RoleMetier.objects.prefetch_related('permissions'))
-        self.assertEqual(len(roles), 35)
+        self.assertEqual(len(roles), 81)
+        n4_parametres = {'ADMIN_SYSTEME', 'SYSADMIN'}
         for role in roles:
             codes = set(role.permissions.values_list('code', flat=True))
             self.assertTrue(codes, f'{role.code} sans permission')
@@ -475,17 +491,17 @@ class ReglesTransversalesTests(TestCase):
                 for module in niveaux
             )
             self.assertTrue(ouvert, f'{role.code} aucune permission de ses cases')
-            if role.code != 'ADMIN_SYSTEME':
+            if role.code not in n4_parametres:
                 self.assertNotIn(
                     'parametres.parametre.administrer', codes, role.code
                 )
-        detenants = [
+        detenants = sorted(
             role.code for role in roles
             if role.permissions.filter(
                 code='parametres.parametre.administrer'
             ).exists()
-        ]
-        self.assertEqual(detenants, ['ADMIN_SYSTEME'])
+        )
+        self.assertEqual(detenants, sorted(n4_parametres))
 
 
 # ---------------------------------------------------------------------------
@@ -517,7 +533,7 @@ class MigrationChargementTests(TestCase):
 
         with mock.patch.dict(os.environ, {'CURP_FORCER_REFERENTIEL': '1'}):
             migration.charger(None, None)
-            self.assertEqual(RoleMetier.objects.count(), 35)
+            self.assertEqual(RoleMetier.objects.count(), 81)
             self.assertEqual(
                 PermissionMetier.objects.count(), len(deplier_permissions())
             )
@@ -525,7 +541,7 @@ class MigrationChargementTests(TestCase):
 
             # Repasser la migration ne crée aucun doublon.
             migration.charger(None, None)
-            self.assertEqual(RoleMetier.objects.count(), 35)
+            self.assertEqual(RoleMetier.objects.count(), 81)
             self.assertEqual(
                 PermissionMetier.objects.count(), len(deplier_permissions())
             )
@@ -535,7 +551,7 @@ class MigrationChargementTests(TestCase):
 
         self.assertEqual(RoleMetier.objects.filter(actif=True).count(), 0)
         self.assertEqual(PermissionMetier.objects.filter(actif=True).count(), 0)
-        self.assertEqual(RoleMetier.objects.count(), 35)
+        self.assertEqual(RoleMetier.objects.count(), 81)
         self.assertEqual(
             PermissionMetier.objects.count(), len(deplier_permissions())
         )

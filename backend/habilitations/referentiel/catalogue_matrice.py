@@ -193,6 +193,100 @@ NIVEAUX_EXTRA_PROVISOIRES = {
     'GESTIONNAIRE_CHARGES': {'finances_form': 'N1'},
 }
 
+#: Niveaux des rôles CIBLES du prompt module Utilisateurs (2026-09) — J2.
+#: Ces cases n'existent pas dans le recueil A2 : elles sont PROVISOIRES, à
+#: valider ligne à ligne en atelier, comme les cases ``*`` du document de
+#: matrice. Les rôles SI (SUPPORT_IT→API_MANAGER) portent un niveau minimal
+#: sur ``parametres`` : placeholder documenté, leur emprise métier réelle
+#: restant hors du catalogue de permissions (règle : ne pas deviner de
+#: droits métier sur les données de gestion).
+NIVEAUX_ROLES_CIBLES = {
+    'SECRETARIAT_GENERAL': {
+        'administration': 'N3', 'administrations': 'N2', 'candidatures': 'N1',
+        'scolarite': 'N1', 'statistiques': 'N1',
+    },
+    'QUALITE_MANAGER': {
+        'administration': 'N1', 'candidatures': 'N1', 'scolarite': 'N1',
+        'pedagogie': 'N1', 'enseignants': 'N1', 'evaluations': 'N1',
+        'jurys': 'N1', 'diplomation': 'N1', 'finances_etud': 'N1',
+        'stages': 'N1', 'rh': 'N1', 'patrimoine': 'N1', 'edt': 'N1',
+        'presences': 'N1', 'statistiques': 'N3',
+    },
+    'AUDITEUR': {
+        'administration': 'N1', 'candidatures': 'N1', 'scolarite': 'N1',
+        'pedagogie': 'N1', 'enseignants': 'N1', 'evaluations': 'N1',
+        'jurys': 'N1', 'diplomation': 'N1', 'finances_etud': 'N1',
+        'stages': 'N1', 'rh': 'N1', 'patrimoine': 'N1', 'edt': 'N1',
+        'presences': 'N1', 'statistiques': 'N1',
+    },
+    'AUDIT_READONLY': {'administration': 'N1', 'statistiques': 'N1'},
+    'PLANIFICATION_MANAGER': {
+        'administration': 'N2', 'pedagogie': 'N2', 'edt': 'N3',
+        'statistiques': 'N2',
+    },
+    'STATISTICIEN': {
+        'administration': 'N1', 'scolarite': 'N1', 'evaluations': 'N1',
+        'finances_etud': 'N1', 'statistiques': 'N3',
+    },
+    'CHEF_DEPARTEMENT': {
+        'administration': 'N2', 'scolarite': 'N2', 'pedagogie': 'N2',
+        'enseignants': 'N2', 'evaluations': 'N1', 'stages': 'N1',
+        'statistiques': 'N2',
+    },
+    'RESPONSABLE_PARCOURS': {
+        'pedagogie': 'N3', 'scolarite': 'N2', 'enseignants': 'N1',
+        'evaluations': 'N1', 'statistiques': 'N1',
+    },
+    'SIGNATAIRE': {'jurys': 'N3', 'diplomation': 'N3', 'evaluations': 'N1'},
+    'VALIDATEUR_DIPLOMES': {'diplomation': 'N3', 'jurys': 'N2', 'scolarite': 'N1'},
+    'RESPONSABLE_CANDIDATURES': {'candidatures': 'N3', 'scolarite': 'N1'},
+    'CORRECTEUR_CONCOURS': {'candidatures': 'N2'},
+    'SURVEILLANT_CONCOURS': {'candidatures': 'N2'},
+    'RESPONSABLE_ADMISSIONS': {'candidatures': 'N3', 'scolarite': 'N2'},
+    'RESPONSABLE_INSCRIPTIONS': {
+        'scolarite': 'N3', 'candidatures': 'N1', 'presences': 'N1',
+    },
+    'VACATAIRE': {'evaluations': 'N2', 'presences': 'N2', 'scolarite': 'N1'},
+    'RESPONSABLE_EVALUATIONS': {
+        'evaluations': 'N3', 'scolarite': 'N1', 'statistiques': 'N1',
+    },
+    'SECRETAIRE_JURY': {'jurys': 'N2', 'evaluations': 'N1', 'scolarite': 'N1'},
+    'ENCADREUR_STAGE': {'stages': 'N2', 'scolarite': 'N1'},
+    'TUTEUR_ENTREPRISE': {'stages': 'N1'},
+    'RECHERCHE_MANAGER': {'statistiques': 'N2', 'pedagogie': 'N1'},
+    'CHERCHEUR': {'statistiques': 'N1'},
+    'VIE_ETUDIANTE': {'presences': 'N2', 'scolarite': 'N1'},
+    'BOURSE_MANAGER': {'finances_etud': 'N3', 'scolarite': 'N1'},
+    'RESPONSABLE_FINANCES': {
+        'finances_etud': 'N4', 'finances_form': 'N3', 'statistiques': 'N1',
+    },
+    'COMPTABLE': {'finances_etud': 'N2'},
+    'CAISSIER': {'finances_etud': 'N2'},
+    'RECOUVREMENT': {'finances_etud': 'N2', 'scolarite': 'N1'},
+    'CONTROLEUR_FINANCIER': {'finances_etud': 'N3', 'statistiques': 'N1'},
+    'RESPONSABLE_RH': {'rh': 'N3', 'administration': 'N1'},
+    'AGENT_RH': {'rh': 'N2'},
+    'PAIE_MANAGER': {'rh': 'N3'},
+    'RESPONSABLE_ADMINISTRATION': {
+        'administration': 'N3', 'administrations': 'N2', 'patrimoine': 'N2',
+        'statistiques': 'N1',
+    },
+    'ACHATS_MANAGER': {'administrations': 'N3', 'patrimoine': 'N1'},
+    'LOGISTICIEN': {'patrimoine': 'N2', 'administrations': 'N1'},
+    'RESPONSABLE_PATRIMOINE': {'patrimoine': 'N3', 'administrations': 'N1'},
+    'MAINTENANCE': {'patrimoine': 'N2'},
+    'GED_MANAGER': {'administrations': 'N3'},
+    'COMMUNICATION_MANAGER': {'administration': 'N1'},
+    # Rôles SI : placeholder parametres (documenté ci-dessus).
+    'SUPPORT_IT': {'parametres': 'N2'},
+    'SYSADMIN': {'parametres': 'N4'},
+    'NETWORK_ADMIN': {'parametres': 'N2'},
+    'DB_ADMIN': {'parametres': 'N3'},
+    'SECURITY_ADMIN': {'parametres': 'N3', 'statistiques': 'N1'},
+    'DATA_ANALYST': {'statistiques': 'N3', 'parametres': 'N1'},
+    'API_MANAGER': {'parametres': 'N3'},
+}
+
 #: Permissions dont le niveau requis déroge au niveau de leur verbe (actes
 #: que seul un niveau administrateur doit obtenir, quel que soit le module).
 NIVEAU_PERMISSION_SURCHARGE = {

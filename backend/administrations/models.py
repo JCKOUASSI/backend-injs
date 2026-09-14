@@ -188,3 +188,54 @@ class Mission(models.Model):
     def clean(self):
         if self.date_fin < self.date_debut:
             raise ValidationError({'date_fin': 'La date de fin est antérieure à la date de début.'})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Organisation institutionnelle (complétion module Utilisateurs — 2026-09)
+# ─────────────────────────────────────────────────────────────────────────────
+# Référentiel additif Direction → Département, rattachant les services RH
+# existants. Aucun service/secretariat existant n'est modifié : le rattachement
+# est nullable (un service existe légitimement sans département rattaché) et le
+# périmètre CURP « DIRECTION » portera ces entités (note J2).
+class Direction(models.Model):
+    """Direction de l'établissement (Direction Générale, Secrétariat Général…)."""
+
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    libelle = models.CharField(max_length=150)
+    description = models.TextField(blank=True, default='')
+    ordre = models.PositiveSmallIntegerField(default=0)
+    actif = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ordre', 'libelle']
+        verbose_name = 'LMD – Direction'
+        verbose_name_plural = 'LMD – Directions'
+
+    def __str__(self):
+        return self.libelle
+
+
+class Departement(models.Model):
+    """Département rattaché à une direction (ou autonome tant que non rattaché)."""
+
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    libelle = models.CharField(max_length=150)
+    description = models.TextField(blank=True, default='')
+    direction = models.ForeignKey(
+        Direction, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='departements',
+        help_text='Direction de rattachement (nullable : département autonome).',
+    )
+    ordre = models.PositiveSmallIntegerField(default=0)
+    actif = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ordre', 'libelle']
+        verbose_name = 'LMD – Département'
+        verbose_name_plural = 'LMD – Départements'
+
+    def __str__(self):
+        return self.libelle
