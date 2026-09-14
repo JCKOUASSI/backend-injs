@@ -337,10 +337,24 @@ même trio — `authentication.capabilities._peut_gerer_console_curp`). Un volet
 403. Un test d'invariant verrouille cette règle
 (`menu/arborescence.test.js` → « alignement menu ↔ garde serveur »).
 
+**Verrou kill-switch côté affichage.** La projection des capacités accorde
+*toutes* les actions à un super-utilisateur (contrat LOT 2, test
+`test_superutilisateur_obtient_toutes_les_actions`), alors que la garde serveur
+applique le drapeau **même au super-utilisateur**. Sans verrou, un
+super-utilisateur verrait donc des entrées que le serveur refuse tant que le
+drapeau est fermé — exactement le symptôme observé en recette (écran
+« Intégrité de la chaîne » en 403). Les entrées marquées `console: true`
+exigent donc en plus `flag.curp_ui_admin === true` tel que renvoyé par
+`GET /api/parametres/flags/` (évalué par le serveur pour le compte courant) :
+drapeau fermé ou inconnu → entrée masquée. L'affichage reste ainsi plus fermé
+que le serveur, jamais l'inverse (règle S3). Le contrat backend LOT 2 n'est
+**pas** modifié.
+
 Corollaire d'exploitation : drapeau fermé (défaut, kill-switch), les entrées
 de console sont masquées pour tout le monde ; pour ouvrir la console en
-recette, créer/activer `flag.curp_ui_admin` (type booléen, rôles du trio) via
-l'admin Django `Parametres` — jamais en durcissant le code.
+recette, activer `flag.curp_ui_admin` (type booléen, modifiable par le trio)
+via l'écran Paramètres ou l'admin Django `Parametres` — jamais en durcissant
+le code.
 
 ### 10.3 Fixtures de contrat et régénération
 
@@ -364,12 +378,12 @@ cd backend && USE_SQLITE=1 .venv/bin/python ../arena/genere-catalogues-menu.py
 | Suite | Tests | Objet |
 |---|---|---|
 | `habilitations.tests.test_menu_rbac_mes_acces` (backend) | **14** | `mes-acces` : 401 anonyme, abstention (compte non gouverné, attribution révoquée/expirée, dérogation non signée), codes des rôles actifs, priorité RETRAIT, additivité des clés, identité avec le service et l'écran admin |
-| `menu/autorisation.test.js` | 23 | résolution de source, filtrage, fermeture par défaut, non-mutation |
-| `menu/arborescence.test.js` | 58 | couverture du modèle 15 sections, contrat de droits (CURP + legacy + console), intégrité des descripteurs, non-régression des chemins historiques |
+| `menu/autorisation.test.js` | 29 | résolution de source, filtrage, fermeture par défaut, non-mutation |
+| `menu/arborescence.test.js` | 59 | couverture du modèle 15 sections, contrat de droits (CURP + legacy + console), intégrité des descripteurs, non-régression des chemins historiques |
 | `menu/ecrans.test.js` | 11 | validité des endpoints/chemins/documents contre le catalogue d'URL |
 | `menu/routesGeneriques.test.jsx` | 7 | dérivation des routes, rendu de bout en bout, visiteur non authentifié |
-| `components/layout/Sidebar.test.jsx` | 19 | source CURP/legacy, masquage, sections vides, persistance, pied de barre |
+| `components/layout/Sidebar.test.jsx` | 20 | source CURP/legacy, masquage, sections vides, persistance, pied de barre |
 | `components/generique/EcranRessource.test.jsx` | 22 | liste, colonnes auto, filtres, actions (confirmation, téléchargement, navigation), détail, 403/500 |
 | `pages/EcranGenerique.test.jsx` | 7 | résolution, garde d'URL directe, variantes documents/indicateurs |
 
-Suite frontend complète après LOT 6 : **80 fichiers, 1 689 tests, OK**.
+Suite frontend complète après LOT 6 : **80 fichiers, 1 697 tests, OK**.

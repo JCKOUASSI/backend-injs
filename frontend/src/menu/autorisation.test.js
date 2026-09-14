@@ -7,8 +7,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  FLAG_CONSOLE,
   SOURCES,
   droitRequis,
+  estEntreeConsole,
   filtrerArborescence,
   indexParChemin,
   itemAutorise,
@@ -176,6 +178,54 @@ describe('itemAutorise — compte non gouverné (capacités projetées)', () => 
 
   it('entrée inconnue → refus (fermeture par défaut)', () => {
     expect(itemAutorise(null, { source: SOURCES.LEGACY, codes: new Set(), user: null })).toBe(false)
+  })
+})
+
+describe('verrou kill-switch de la console CURP', () => {
+  const ENTREE_CONSOLE = {
+    id: 'console',
+    console: true,
+    droit: { legacy: [['habilitations_admin', 'gerer']] },
+  }
+  const ctx = (drapeauConsole) => ({
+    source: SOURCES.LEGACY,
+    codes: new Set(),
+    drapeauConsole,
+    user: userAvecCapacites({ habilitations_admin: ['gerer'] }),
+  })
+
+  it('estEntreeConsole reconnaît les entrées de la console', () => {
+    expect(estEntreeConsole(ENTREE_CONSOLE)).toBe(true)
+    expect(estEntreeConsole(ARBRE[0].enfants[0])).toBe(false)
+    expect(estEntreeConsole(null)).toBe(false)
+  })
+
+  it('drapeau fermé : masquée même avec la capacité projetée (cas super-utilisateur)', () => {
+    expect(itemAutorise(ENTREE_CONSOLE, ctx(false))).toBe(false)
+  })
+
+  it('drapeau inconnu (flags non chargés) : masquée (fermeture par défaut)', () => {
+    expect(itemAutorise(ENTREE_CONSOLE, ctx(undefined))).toBe(false)
+  })
+
+  it('drapeau ouvert : la capacité projetée décide', () => {
+    expect(itemAutorise(ENTREE_CONSOLE, ctx(true))).toBe(true)
+    const sansCapacite = { ...ctx(true), user: userAvecCapacites({}) }
+    expect(itemAutorise(ENTREE_CONSOLE, sansCapacite)).toBe(false)
+  })
+
+  it('une entrée hors console est indifférente au drapeau', () => {
+    const ctxFerme = {
+      source: SOURCES.LEGACY,
+      codes: new Set(),
+      drapeauConsole: false,
+      user: userAvecCapacites({ scolarite: ['voir'] }),
+    }
+    expect(itemAutorise(ARBRE[0].enfants[0], ctxFerme)).toBe(true)
+  })
+
+  it('la clef de drapeau attendue est celle du kill-switch serveur', () => {
+    expect(FLAG_CONSOLE).toBe('flag.curp_ui_admin')
   })
 })
 

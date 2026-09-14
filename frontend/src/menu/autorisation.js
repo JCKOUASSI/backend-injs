@@ -27,6 +27,35 @@ export const SOURCES = {
   LEGACY: 'LEGACY',
 }
 
+/** Drapeau kill-switch de la console d'habilitation (voir §10.2 de l'audit). */
+export const FLAG_CONSOLE = 'flag.curp_ui_admin'
+
+/**
+ * Une entrée ouvre-t-elle la **console CURP** ?
+ *
+ * Ces entrées exigent la capacité projetée `habilitations_admin.gerer`, seule
+ * projection qui reproduise la garde serveur `ExigeDrapeauAdmin`. Deux asymétries
+ * imposent un verrou supplémentaire côté affichage :
+ *
+ * 1. la projection des capacités accorde **toutes** les actions à un
+ *    super-utilisateur (contrat LOT 2 assumé), y compris celle-ci ;
+ * 2. la garde serveur, elle, applique le kill-switch `flag.curp_ui_admin`
+ *    **même au super-utilisateur**.
+ *
+ * Sans verrou, un super-utilisateur verrait donc des entrées que le serveur
+ * refuse tant que le drapeau est fermé. Le drapeau effectif (renvoyé par
+ * `GET /api/parametres/flags/`, évalué par le serveur pour le compte courant)
+ * est donc exigé en plus : drapeau fermé ou inconnu → entrée masquée.
+ * L'affichage reste plus fermé que le serveur, jamais l'inverse (règle S3).
+ *
+ * Les entrées concernées portent le marqueur déclaratif `console: true` dans
+ * l'arborescence ; un test d'invariant vérifie qu'elles exigent bien la
+ * capacité `habilitations_admin.gerer` et aucun volet CURP.
+ */
+export function estEntreeConsole(item) {
+  return Boolean(item?.console)
+}
+
 /**
  * Détermine la source applicable au compte courant.
  *
@@ -62,6 +91,7 @@ export function resoudreSource({ user, mesAcces } = {}) {
  */
 export function itemAutorise(item, contexte) {
   if (!item) return false
+  if (estEntreeConsole(item) && contexte?.drapeauConsole !== true) return false
   const droit = item.droit || {}
   const curp = Array.isArray(droit.curp) ? droit.curp : []
   const legacy = Array.isArray(droit.legacy) ? droit.legacy : []

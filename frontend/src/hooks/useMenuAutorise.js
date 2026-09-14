@@ -2,8 +2,10 @@ import { useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useCapabilities } from './useCapabilities'
 import { useMesAcces } from './useMesAcces'
+import { useFlags } from './useFlag'
 import { ARBORESCENCE, PIED_DE_BARRE } from '../menu/arborescence'
 import {
+  FLAG_CONSOLE,
   SOURCES,
   filtrerArborescence,
   indexParChemin,
@@ -33,6 +35,9 @@ export function useMenuAutorise(arbre = ARBORESCENCE, pied = PIED_DE_BARRE) {
   const { user } = useAuth()
   const { data: capacites, isLoading: chargeCapacites } = useCapabilities()
   const { data: mesAcces, isLoading: chargeAcces } = useMesAcces()
+  // Drapeau kill-switch de la console CURP, évalué par le serveur pour le
+  // compte courant : voir `estEntreeConsole` (menu/autorisation.js).
+  const flags = useFlags()
 
   const utilisateur = useMemo(
     () => (user ? { ...user, capabilities: capacites ?? user.capabilities ?? null } : null),
@@ -41,6 +46,7 @@ export function useMenuAutorise(arbre = ARBORESCENCE, pied = PIED_DE_BARRE) {
 
   return useMemo(() => {
     const contexte = resoudreSource({ user: utilisateur, mesAcces })
+    contexte.drapeauConsole = flags?.[FLAG_CONSOLE] === true
     const sections = filtrerArborescence(arbre, contexte)
     return {
       sections,
@@ -54,7 +60,7 @@ export function useMenuAutorise(arbre = ARBORESCENCE, pied = PIED_DE_BARRE) {
       compte: mesAcces?.compte ?? null,
       attributions: mesAcces?.attributions ?? [],
     }
-  }, [arbre, pied, utilisateur, mesAcces, chargeCapacites, chargeAcces])
+  }, [arbre, pied, utilisateur, mesAcces, chargeCapacites, chargeAcces, flags])
 }
 
 export default useMenuAutorise

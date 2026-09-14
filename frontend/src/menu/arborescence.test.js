@@ -265,6 +265,17 @@ describe('alignement menu ↔ garde serveur', () => {
   const entreesConsole = toutesEntrees.filter((entree) =>
     PREFIXES_CONSOLE.some((prefixe) => (entree.chemin || '').startsWith(prefixe)))
 
+  it('toute entrée de la console porte le marqueur `console` (verrou kill-switch)', () => {
+    const nonMarquees = entreesConsole.filter((entree) => !entree.console).map((e) => e.id)
+    expect(nonMarquees).toEqual([])
+    // Réciproque : aucun marqueur hors des chemins de la console.
+    const horsConsole = toutesEntrees
+      .filter((entree) => entree.console)
+      .filter((entree) => !PREFIXES_CONSOLE.some((p) => (entree.chemin || '').startsWith(p)))
+      .map((entree) => entree.id)
+    expect(horsConsole).toEqual([])
+  })
+
   it('des entrées de la console CURP sont bien présentes au menu', () => {
     expect(entreesConsole.length).toBeGreaterThan(10)
   })

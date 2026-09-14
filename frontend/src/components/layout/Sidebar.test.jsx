@@ -41,11 +41,18 @@ const CAPACITES_ADMIN = {
   },
 }
 
-function monter({ user, mesAcces, capacites = CAPACITES_ADMIN, chemin = '/dashboard' } = {}) {
+function monter({
+  user,
+  mesAcces,
+  capacites = CAPACITES_ADMIN,
+  chemin = '/dashboard',
+  drapeauConsole = true,
+} = {}) {
   const compte = user || makeUser('ADMIN')
   apiController.setMe(compte)
   apiController.setRoute('/auth/capabilities/', capacites)
   apiController.setRoute('/habilitations/mes-acces/', mesAcces ?? { gouverne: false })
+  apiController.setRoute('/parametres/flags/', { flags: { 'flag.curp_ui_admin': drapeauConsole } })
   render(<Sidebar />, {
     wrapper: ({ children }) => (
       <AllProviders authUser={compte} routePattern="*" initialEntries={[chemin]}>
@@ -264,6 +271,18 @@ describe('comportement de la navigation', () => {
     const tete = await screen.findByRole('button', { name: /Audit & Traçabilité/i })
     await waitFor(() => expect(tete.getAttribute('aria-expanded')).toBe('true'))
     expect(tete.className).toContain('active')
+  })
+
+  it('kill-switch fermé : les entrées de console disparaissent même pour un super-compte', async () => {
+    // Capacités complètes (projection super-utilisateur) mais drapeau
+    // `flag.curp_ui_admin` fermé : le serveur refuserait la console, le menu
+    // ne doit donc pas la proposer.
+    monter({ drapeauConsole: false })
+    const audit = await ouvrirSection('Audit & Traçabilité')
+    expect(audit.queryByTestId('nav-audit.integrite')).toBeNull()
+    expect(audit.queryByTestId('nav-audit.archives')).toBeNull()
+    // … tandis que les entrées hors console restent proposées.
+    expect(audit.getByTestId('nav-audit.journal')).toBeTruthy()
   })
 
   it('chaque entrée rend un lien vers son chemin', async () => {

@@ -856,6 +856,7 @@ export const ARBORESCENCE = [
       {
         id: 'administration.services',
         libelle: 'Services',
+        console: true,
         chemin: '/administration/services',
         ecran: 'organisation_services',
         droit: {
@@ -871,6 +872,7 @@ export const ARBORESCENCE = [
       {
         id: 'administration.departements',
         libelle: 'Départements',
+        console: true,
         chemin: '/administration/departements',
         ecran: 'organisation_departements',
         droit: {
@@ -886,6 +888,7 @@ export const ARBORESCENCE = [
       {
         id: 'administration.directions',
         libelle: 'Directions',
+        console: true,
         chemin: '/administration/directions',
         ecran: 'organisation_directions',
         droit: {
@@ -985,6 +988,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.comptes',
         libelle: 'Comptes utilisateurs',
+        console: true,
         chemin: '/administration/comptes',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -999,6 +1003,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.roles',
         libelle: 'Rôles',
+        console: true,
         chemin: '/administration/comptes/roles',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1013,6 +1018,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.permissions',
         libelle: 'Permissions',
+        console: true,
         chemin: '/administration/comptes/matrice',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1027,6 +1033,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.organisation',
         libelle: 'Départements & Services',
+        console: true,
         chemin: '/administration/comptes/organisation',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1050,6 +1057,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.derogations',
         libelle: 'Dérogations',
+        console: true,
         chemin: '/administration/comptes/derogations',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1064,6 +1072,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.delegations',
         libelle: 'Délégations',
+        console: true,
         chemin: '/administration/comptes/delegations',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1078,6 +1087,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.revue',
         libelle: 'Revue des habilitations',
+        console: true,
         chemin: '/administration/comptes/revue',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1092,6 +1102,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.provisionnement',
         libelle: 'File de provisionnement',
+        console: true,
         chemin: '/administration/comptes/provisionnement',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1106,6 +1117,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.operations_masse',
         libelle: 'Opérations en masse',
+        console: true,
         chemin: '/administration/comptes/operations-masse',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1120,6 +1132,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.notifications',
         libelle: 'Notifications d\'échéance',
+        console: true,
         chemin: '/administration/comptes/notifications',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1134,6 +1147,7 @@ export const ARBORESCENCE = [
       {
         id: 'utilisateurs.journal',
         libelle: 'Journal des accès',
+        console: true,
         chemin: '/administration/comptes/journal',
         droit: {
           // Console CURP : la garde serveur (`ExigeDrapeauAdmin`) exige le
@@ -1445,6 +1459,7 @@ export const ARBORESCENCE = [
       {
         id: 'audit.integrite',
         libelle: 'Intégrité de la chaîne',
+        console: true,
         chemin: '/audit/integrite',
         ecran: 'audit_integrite',
         droit: {
@@ -1460,6 +1475,7 @@ export const ARBORESCENCE = [
       {
         id: 'audit.archives',
         libelle: "Archives d'audit",
+        console: true,
         chemin: '/audit/archives',
         ecran: 'audit_archives',
         droit: {
@@ -1481,6 +1497,7 @@ export const PIED_DE_BARRE = [
   {
     id: 'pied.notifications',
     libelle: 'Notifications',
+    console: true,
     icone: 'bi-bell',
     chemin: '/administration/comptes/notifications',
     droit: {
