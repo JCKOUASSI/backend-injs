@@ -358,6 +358,20 @@ MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS = int(
     os.environ.get('MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)
 )
 
+# ─────────────────────────────────────────────────────────────────────────
+# CURP — unité U2 : moteur d'habilitation.
+# OBSERVATION (défaut) évalue et mesure les écarts sans jamais modifier une
+# réponse ; APPLICATION (défaut éteint, jamais activé en U2) rend les refus
+# effectifs. Les deux à faux = no-op total. L'ancien dispositif reste seul
+# décideur tant qu'aucun compte n'est gouverné (migration de comptes U8).
+# ─────────────────────────────────────────────────────────────────────────
+def _flag_env(nom, defaut):
+    return os.environ.get(nom, defaut).lower() in ('1', 'true', 'yes')
+
+
+HABILITATIONS_OBSERVATION = _flag_env('HABILITATIONS_OBSERVATION', 'true')
+HABILITATIONS_APPLICATION = _flag_env('HABILITATIONS_APPLICATION', 'false')
+
 # CORS — liste stricte d'origines (ou vide = rien)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -499,6 +513,12 @@ LOGGING = {
             'propagate': False,
         },
         'presences': {
+            'handlers': ['console', 'file_rotating'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # CURP U2 : décisions du moteur d'habilitation et écarts observés.
+        'habilitations': {
             'handlers': ['console', 'file_rotating'],
             'level': 'INFO',
             'propagate': False,

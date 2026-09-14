@@ -26,3 +26,17 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : GET /api/core/audit/
   - Route supprimée ou renommée : GET /api/core/audit/{code}/
 
+## 2026-09-14 03:01 UTC
+
+- **Justification :** U2 CURP : ajout des routes /api/habilitations/ (mes-acces, evaluer, observations, référentiels en lecture) ; aucune route existante modifiée.
+- Routes dans le contrat : 537
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 6
+  - Route supprimée ou renommée : GET /api/habilitations/mes-acces/
+  - Route supprimée ou renommée : GET /api/habilitations/observations/synthese/
+  - Route supprimée ou renommée : GET /api/habilitations/permissions/
+  - Route supprimée ou renommée : GET /api/habilitations/roles/
+  - Route supprimée ou renommée : POST /api/habilitations/evaluer/
+  - Route supprimée ou renommée : POST /api/habilitations/observations/remettre-a-zero/
+

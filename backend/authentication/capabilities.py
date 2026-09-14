@@ -340,7 +340,7 @@ def compute_capabilities(user):
             if _evalue_source(user, source)
         )
 
-    return {
+    projection = {
         'version': 1,
         'role': get_user_role(user) if roles else getattr(user, 'role', None),
         'roles': sorted(roles),
@@ -353,3 +353,21 @@ def compute_capabilities(user):
         },
         'role_context': user_role_context(user) if roles else {},
     }
+    # CURP U2 — clé additive strictement descriptive (le moteur est en mode
+    # observation : cette clé n'accorde ni ne retire aucune action). L'app
+    # habilitations est techniquement optionnelle (repli par retrait d'app).
+    projection['habilitations'] = _projection_habilitations(user)
+    return projection
+
+
+def _projection_habilitations(user):
+    try:
+        from habilitations.services.projection import projection_capacites
+    except Exception:
+        # Repli : application habilitations absente, on l'indique sans casser
+        # la capacité.
+        return {'gouverne': False, 'mode': 'OFF'}
+    try:
+        return projection_capacites(user)
+    except Exception:
+        return {'gouverne': False, 'mode': 'OFF'}

@@ -1712,6 +1712,77 @@
         "200": null
       }
     },
+    "GET /api/habilitations/mes-acces/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/observations/synthese/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/permissions/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "action": null,
+              "code": null,
+              "criticite": null,
+              "journalisee": null,
+              "libelle": null,
+              "module": null,
+              "necessite_double_validation": null,
+              "necessite_motif": null,
+              "portee_maximale": null,
+              "ressource": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/habilitations/roles/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "canal_impose": null,
+              "code": null,
+              "cumulable": null,
+              "disponible": null,
+              "domaine": null,
+              "libelle": null,
+              "libelle_court": null,
+              "module_requis": null,
+              "niveau_defaut": null,
+              "perimetre_defaut": null,
+              "sensible": null
+            }
+          }
+        }
+      }
+    },
     "GET /api/health/": {
       "parameters": [],
       "request_keys": null,
@@ -4757,6 +4828,20 @@
       "parameters": [
         "id"
       ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/evaluer/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/observations/remettre-a-zero/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null

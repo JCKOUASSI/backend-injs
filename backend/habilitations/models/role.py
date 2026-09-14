@@ -58,6 +58,15 @@ class RoleMetier(models.Model):
         help_text="Rôles inconciliables (séparation des tâches).",
     )
 
+    # Matrice rôle → permissions (U2 : structure nécessaire au moteur ;
+    # la table est VIDE jusqu'à la migration de données U3, qui charge les
+    # 33 rôles et leurs permissions).
+    permissions = models.ManyToManyField(
+        'habilitations.PermissionMetier', blank=True,
+        related_name='roles_octroyants',
+        help_text="Permissions canoniques octroyées par ce rôle (matrice U3).",
+    )
+
     canal_impose = models.CharField(
         max_length=10, choices=CanalAcces.choices, blank=True, default='',
         help_text="Canal d'accès imposé, le cas échéant (ex. MOBILE).",

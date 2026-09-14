@@ -35,6 +35,8 @@ urlpatterns = [
     # API endpoints
     path('api/', api_root, name='api-root'),
     path('api/core/', include('core.urls')),  # P01-01 — audit unifié
+    # CURP U2 — moteur d'habilitation (observation ; routes nouvelles uniquement).
+    path('api/habilitations/', include('habilitations.api.urls')),
     path('api/auth/', include('authentication.urls')),
     path('api/formations/', include('formations.urls')),
     path('api/', include('presences.urls')),

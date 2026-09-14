@@ -111,6 +111,21 @@ jobs:
           python manage.py init_habilitations_injs
           python manage.py verifier_chaine_habilitations
 
+      - name: CURP U2 : moteur d'habilitation en mode observation
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+          # U2 : observation pure, les refus ne sont jamais appliqués.
+          HABILITATIONS_OBSERVATION: "true"
+          HABILITATIONS_APPLICATION: "false"
+        # Aucun refus n'est appliqué en U2 ; la commande sort toujours 0.
+        # Avant U3 (référentiel) et U8 (rattachement des comptes), la
+        # campagne est explicitement sans objet : elle vérifie le mécanisme.
+        run: |
+          python manage.py observations_habilitations
+          python manage.py observations_habilitations --campagne
+
       - name: Intégrité du journal d'audit unifié (P01-01)
         working-directory: backend
         env:
