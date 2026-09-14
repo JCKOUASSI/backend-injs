@@ -10,7 +10,11 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, isAuthenticated } = useAuth()
+  // Étape MFA (CURP U6) : le backend répond 403 « MFA_REQUIRED » avec un
+  // jeton court ; l'utilisateur saisit ensuite son code TOTP.
+  const [etapeMfa, setEtapeMfa] = useState(null) // { token, duree, username }
+  const [codeMfa, setCodeMfa] = useState('')
+  const { login, verifierMfa, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
   if (isAuthenticated) return <Navigate to="/" replace />
@@ -24,7 +28,35 @@ export default function Login() {
       await login(username, password)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err.response?.data?.detail || 'Identifiants incorrects')
+      const data = err.response?.data || {}
+      if (data.code === 'MFA_REQUIRED' && data.mfa_token) {
+        setCodeMfa('')
+        setEtapeMfa({ token: data.mfa_token, duree: data.mfa_duree, username })
+      } else {
+        // MFA_OBLIGATOIRE, COMPTE_VERROUILLE, identifiants erronés…
+        setError(data.detail || 'Identifiants incorrects')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      await verifierMfa(etapeMfa.token, codeMfa)
+      setEtapeMfa(null)
+      navigate('/', { replace: true })
+    } catch (err) {
+      const data = err.response?.data || {}
+      if (data.code === 'MFA_JETON_INVALIDE') {
+        // Jeton expiré : retour à la saisie des identifiants.
+        setEtapeMfa(null)
+      }
+      setError(data.detail || 'Vérification MFA impossible')
     } finally {
       setLoading(false)
     }
@@ -50,9 +82,60 @@ export default function Login() {
         </aside>
 
         <section className="login-panel-form">
-          <h2>Connexion</h2>
-          <p className="login-form-lead">Connectez-vous avec votre compte INJS-LMD</p>
+          <h2>{etapeMfa ? 'Deuxième étape' : 'Connexion'}</h2>
+          <p className="login-form-lead">
+            {etapeMfa
+              ? 'Mot de passe correct : validez avec votre code de vérification.'
+              : 'Connectez-vous avec votre compte INJS-LMD'}
+          </p>
 
+          {etapeMfa ? (
+            <form onSubmit={handleMfaSubmit}>
+              <p className="login-form-lead">
+                Saisissez le code à 6 chiffres généré par votre application
+                d'authentification pour <strong>{etapeMfa.username}</strong>
+                {etapeMfa.duree ? ` (valable ${etapeMfa.duree} minutes).` : '.'}
+              </p>
+              <div className="login-field">
+                <label htmlFor="login-mfa-code">Code de vérification</label>
+                <div className="login-input">
+                  <i className="bi bi-shield-lock"></i>
+                  <input
+                    id="login-mfa-code"
+                    data-testid="mfa-code-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={codeMfa}
+                    onChange={(e) => setCodeMfa(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required
+                    autoFocus
+                    placeholder="000000"
+                  />
+                </div>
+              </div>
+              {error && (
+                <div className="login-error" role="alert">
+                  <i className="bi bi-exclamation-triangle-fill"></i>
+                  {error}
+                </div>
+              )}
+              <button type="submit" className="btn-login" disabled={loading}>
+                <i className="bi bi-shield-check"></i>
+                {loading ? 'Vérification…' : 'Vérifier le code'}
+              </button>
+              <div className="text-center" style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="login-admin-link"
+                  data-testid="mfa-back"
+                  onClick={() => { setEtapeMfa(null); setCodeMfa(''); setError('') }}
+                >
+                  <i className="bi bi-arrow-left me-1"></i>Modifier les identifiants
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="login-username">Nom d'utilisateur</label>
@@ -108,6 +191,7 @@ export default function Login() {
               {loading ? 'Connexion…' : 'Se connecter'}
             </button>
           </form>
+          )}
 
           <div className="text-center" style={{ marginTop: '1rem' }}>
             <a href={ADMIN_URL} className="login-admin-link" title="Interface d'administration">

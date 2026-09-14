@@ -20,6 +20,7 @@ const LIENS = [
   { to: '/administration/comptes/notifications', icone: 'bi-bell', libelle: 'Notifications' },
   { to: '/administration/comptes/revue', icone: 'bi-clipboard-check', libelle: 'Revue des habilitations' },
   { to: '/administration/comptes/journal', icone: 'bi-journal-text', libelle: 'Journal' },
+  { to: '/administration/comptes/organisation', icone: 'bi-diagram-3', libelle: 'Organisation' },
 ]
 
 export default function HabilitationsLayout() {

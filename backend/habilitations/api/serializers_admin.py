@@ -203,6 +203,8 @@ def serialiser_compte(compte, detail=False):
     ]
     data = {
         'id': compte.pk,
+        # PK de l'utilisateur Django (cible des endpoints /auth/mfa/*).
+        'user_id': compte.user_id,
         'username': compte.user.get_username(),
         'email': compte.user.email,
         'is_active': compte.user.is_active,

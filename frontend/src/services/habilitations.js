@@ -154,6 +154,61 @@ export const actionParDelegation = (id, action, detail) =>
     .post(`${BASE}/delegations/${id}/action/`, { action, detail })
     .then((r) => r.data)
 
+// ── LOT 3 : organisation administrative ───────────────────────────────
+export const ORG_KEYS = {
+  directions: ['habilitations', 'organisation', 'directions'],
+  departements: ['habilitations', 'organisation', 'departements'],
+  services: ['habilitations', 'organisation', 'services'],
+}
+
+export const listerDirections = () =>
+  api.get(`${BASE}/organisation/directions/`).then((r) => r.data.results)
+
+export const creerDirection = (payload) =>
+  api.post(`${BASE}/organisation/directions/`, payload).then((r) => r.data)
+
+export const modifierDirection = (id, payload) =>
+  api.patch(`${BASE}/organisation/directions/${id}/`, payload).then((r) => r.data)
+
+export const listerDepartements = (filtres = {}) =>
+  api.get(`${BASE}/organisation/departements/${urlParams(filtres)}`).then((r) => r.data.results)
+
+export const creerDepartement = (payload) =>
+  api.post(`${BASE}/organisation/departements/`, payload).then((r) => r.data)
+
+export const modifierDepartement = (id, payload) =>
+  api.patch(`${BASE}/organisation/departements/${id}/`, payload).then((r) => r.data)
+
+export const recupererDepartement = (id) =>
+  api.get(`${BASE}/organisation/departements/${id}/`).then((r) => r.data)
+
+export const rattacherCompteDepartement = (id, compteId) =>
+  api.post(`${BASE}/organisation/departements/${id}/comptes/`, { compte_id: compteId }).then((r) => r.data)
+
+export const detacherCompteDepartement = (id, compteId) =>
+  api.delete(`${BASE}/organisation/departements/${id}/comptes/`, { data: { compte_id: compteId } }).then((r) => r.data)
+
+export const listerServicesOrganisation = (filtres = {}) =>
+  api.get(`${BASE}/organisation/services/${urlParams(filtres)}`).then((r) => r.data.results)
+
+export const creerServiceOrganisation = (payload) =>
+  api.post(`${BASE}/organisation/services/`, payload).then((r) => r.data)
+
+export const modifierServiceOrganisation = (id, payload) =>
+  api.patch(`${BASE}/organisation/services/${id}/`, payload).then((r) => r.data)
+
+export const recupererServiceOrganisation = (id) =>
+  api.get(`${BASE}/organisation/services/${id}/`).then((r) => r.data)
+
+export const rattacherCompteService = (id, compteId) =>
+  api.post(`${BASE}/organisation/services/${id}/comptes/`, { compte_id: compteId }).then((r) => r.data)
+
+export const detacherCompteService = (id, compteId) =>
+  api.delete(`${BASE}/organisation/services/${id}/comptes/`, { data: { compte_id: compteId } }).then((r) => r.data)
+
+export const permissionsEffectives = (id) =>
+  api.get(`${BASE}/comptes/${id}/effective-permissions/`).then((r) => r.data)
+
 /** Extrait le message français d'une erreur DRF (403, 409, 400). */
 export function messageErreur(erreur, repli = 'Une erreur est survenue.') {
   const data = erreur?.response?.data

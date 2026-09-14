@@ -79,6 +79,9 @@ class JournalHabilitation(models.Model):
         EXPIRATION_AUTO = 'EXPIRATION_AUTO', 'Expiration automatique à terme'
         DELEGATION_ACTIVEE = 'DELEGATION_ACTIVEE', 'Activation de délégation'
         ACTION_DELEGUEE = 'ACTION_DELEGUEE', 'Action exercée par délégation'
+        # LOT 3 — organisation administrative (directions/départements/services).
+        ORGANISATION_MODIFIEE = 'ORGANISATION_MODIFIEE', \
+            'Modification de l’organisation (direction, département, service, rattachement)'
         AUTRE = 'AUTRE', 'Autre événement'
 
     #: Numéro de séquence, continue et dans l'ordre du chaînage.

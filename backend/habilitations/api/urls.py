@@ -4,6 +4,7 @@ from django.urls import path
 from . import views
 from . import views_admin
 from . import views_admin_cycle as vc
+from . import views_admin_organisation as org
 from . import views_admin_workflow as wf
 
 urlpatterns = [
@@ -46,6 +47,44 @@ urlpatterns = [
     path(
         'comptes/<int:pk>/statut/',
         views_admin.CompteStatutView.as_view(), name='hab-compte-statut',
+    ),
+    path(
+        'comptes/<int:pk>/effective-permissions/',
+        org.ComptePermissionsEffectivesView.as_view(),
+        name='hab-compte-effective-permissions',
+    ),
+    # ── LOT 3 : organisation administrative ────────────────────────────
+    path(
+        'organisation/directions/',
+        org.DirectionListCreateView.as_view(), name='hab-org-directions',
+    ),
+    path(
+        'organisation/directions/<int:pk>/',
+        org.DirectionDetailView.as_view(), name='hab-org-direction-detail',
+    ),
+    path(
+        'organisation/departements/',
+        org.DepartementListCreateView.as_view(), name='hab-org-departements',
+    ),
+    path(
+        'organisation/departements/<int:pk>/',
+        org.DepartementDetailView.as_view(), name='hab-org-departement-detail',
+    ),
+    path(
+        'organisation/departements/<int:pk>/comptes/',
+        org.DepartementComptesView.as_view(), name='hab-org-departement-comptes',
+    ),
+    path(
+        'organisation/services/',
+        org.ServiceListCreateView.as_view(), name='hab-org-services',
+    ),
+    path(
+        'organisation/services/<int:pk>/',
+        org.ServiceDetailView.as_view(), name='hab-org-service-detail',
+    ),
+    path(
+        'organisation/services/<int:pk>/comptes/',
+        org.ServiceComptesView.as_view(), name='hab-org-service-comptes',
     ),
     path('roles/<str:code>/', views_admin.RoleDetailView.as_view(), name='hab-role-detail'),
     path('matrice/', views_admin.MatriceView.as_view(), name='hab-matrice'),

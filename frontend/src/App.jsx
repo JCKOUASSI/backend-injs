@@ -38,6 +38,7 @@ import FileProvisionnement from './pages/habilitations/FileProvisionnement'
 import NotificationsHabilitation from './pages/habilitations/NotificationsHabilitation'
 import RevueHabilitations from './pages/habilitations/RevueHabilitations'
 import JournalHabilitations from './pages/habilitations/JournalHabilitations'
+import Organisation from './pages/habilitations/Organisation'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
@@ -721,6 +722,7 @@ function App() {
             <Route path="matrice" element={<MatricePermissions />} />
             <Route path="derogations" element={<Derogations />} />
             <Route path="delegations" element={<Delegations />} />
+            <Route path="organisation" element={<Organisation />} />
             <Route path=":id" element={<FicheCompte />} />
             <Route path=":id/modifier" element={<ModificationCompte />} />
           </Route>

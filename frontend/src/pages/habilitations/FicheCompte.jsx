@@ -1,7 +1,11 @@
-/** FicheCompte — identité, rôles, dérogations, délégations, journal. */
+/** FicheCompte — identité, rôles, dérogations, délégations, MFA,
+ * permissions effectives, journal. */
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { recupererCompte, changerStatutCompte, messageErreur } from '@/services/habilitations'
+import {
+  recupererCompte, changerStatutCompte, messageErreur, permissionsEffectives,
+} from '@/services/habilitations'
+import { mfaSetup, mfaConfirm, mfaDisable, messageErreurMfa } from '@/services/mfa'
 import { useToast } from '@/context/ToastContext'
 import { BadgeCanal, BadgeSensible, BadgeStatut, EnChargement } from './partages'
 import MotifModal from './MotifModal'
@@ -14,11 +18,11 @@ const TRANSITIONS = [
   { transition: 'activer', label: 'Réactiver / activer', variant: 'success' },
 ]
 
-function Section({ titre, valeur, enfants }) {
+function Section({ titre, valeur, children }) {
   return (
     <div className="hab-carte">
       <h3 className="h6">{titre}</h3>
-      {valeur ? <p className="hab-muted mb-0">{valeur}</p> : enfants}
+      {valeur ? <p className="hab-muted mb-0">{valeur}</p> : children}
     </div>
   )
 }
@@ -29,11 +33,64 @@ export default function FicheCompte() {
   const [compte, setCompte] = useState(null)
   const [erreur, setErreur] = useState('')
   const [action, setAction] = useState(null)
+  // Permissions effectives (rôles actifs + dérogations), lecture seule.
+  const [perms, setPerms] = useState(null)
+  // Bloc MFA : null (masqué) | { secret, otpauth_url } (en cours d'activation).
+  const [mfa, setMfa] = useState(null)
+  const [codeMfa, setCodeMfa] = useState('')
+  const [mfaBusy, setMfaBusy] = useState(false)
 
-  const charger = () => recupererCompte(id).then(setCompte).catch((e) => setErreur(messageErreur(e)))
+  const charger = () => {
+    recupererCompte(id).then(setCompte).catch((e) => setErreur(messageErreur(e)))
+    permissionsEffectives(id).then(setPerms).catch(() => setPerms(null))
+  }
   // Rechargement uniquement au changement d'identifiant de compte.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { charger() }, [id])
+
+  const genererSecretMfa = async () => {
+    setMfaBusy(true)
+    try {
+      const donnees = await mfaSetup(compte.user_id)
+      setMfa(donnees)
+      setCodeMfa('')
+    } catch (e) {
+      showToast(messageErreurMfa(e), 'error')
+    } finally {
+      setMfaBusy(false)
+    }
+  }
+
+  const confirmerMfa = async () => {
+    setMfaBusy(true)
+    try {
+      await mfaConfirm(compte.user_id, codeMfa)
+      showToast('MFA activé pour ce compte.', 'success')
+      setMfa(null)
+      setCodeMfa('')
+      charger()
+    } catch (e) {
+      showToast(messageErreurMfa(e), 'error')
+    } finally {
+      setMfaBusy(false)
+    }
+  }
+
+  const desactiverMfa = async () => {
+    if (!window.confirm(
+      `Désactiver le MFA du compte ${compte.username} ?\nCette action est tracée au journal immuable.`
+    )) return
+    setMfaBusy(true)
+    try {
+      await mfaDisable(compte.user_id)
+      showToast('MFA désactivé.', 'success')
+      charger()
+    } catch (e) {
+      showToast(messageErreurMfa(e), 'error')
+    } finally {
+      setMfaBusy(false)
+    }
+  }
 
   const confirmer = async (motif) => {
     try {
@@ -111,6 +168,112 @@ export default function FicheCompte() {
             ))}
           </ul>
         ) : <p className="hab-muted mb-0">Aucune délégation reçue.</p>}
+      </Section>
+
+      <Section titre="MFA (authentification multifacteur)">
+        <div className="d-flex align-items-center gap-2">
+          <span className={`badge ${compte.mfa_actif ? 'text-bg-success' : 'text-bg-secondary'}`}>
+            {compte.mfa_actif ? 'Activé (TOTP)' : 'Désactivé'}
+          </span>
+          {compte.mfa_actif ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-danger"
+              data-testid="mfa-desactiver"
+              disabled={mfaBusy}
+              onClick={desactiverMfa}
+            >
+              <i className="bi bi-shield-slash me-1" />Désactiver le MFA
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              data-testid="mfa-activer"
+              disabled={mfaBusy}
+              onClick={() => setMfa(mfa ? null : { secret: null, otpauth_url: null })}
+            >
+              <i className="bi bi-shield-check me-1" />
+              {mfa ? 'Fermer la configuration' : 'Activer le MFA'}
+            </button>
+          )}
+        </div>
+        {!compte.mfa_actif && mfa && (
+          <div className="mt-3" data-testid="mfa-configuration">
+            <ol className="small">
+              <li>
+                {mfa.secret ? (
+                  <>Secret armé : <code>{mfa.secret}</code></>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    data-testid="mfa-generer"
+                    disabled={mfaBusy}
+                    onClick={genererSecretMfa}
+                  >
+                    <i className="bi bi-key me-1" />Générer le secret
+                  </button>
+                )}
+              </li>
+              <li>
+                {mfa.otpauth_url ? (
+                  <>
+                    À scanner par l'utilisateur (application TOTP) :<br />
+                    <code className="small text-break">{mfa.otpauth_url}</code>
+                  </>
+                ) : <span className="hab-muted">L'utilisateur scannera l'URI otpauth avec son application.</span>}
+              </li>
+              <li>
+                {mfa.secret ? (
+                  <div className="d-flex gap-2 align-items-center">
+                    <input
+                      className="form-control form-control-sm"
+                      style={{ maxWidth: '140px' }}
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Code 6 chiffres"
+                      value={codeMfa}
+                      data-testid="mfa-code-confirm"
+                      onChange={(e) => setCodeMfa(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-success"
+                      data-testid="mfa-confirmer"
+                      disabled={mfaBusy || codeMfa.length !== 6}
+                      onClick={confirmerMfa}
+                    >
+                      Confirmer l'activation
+                    </button>
+                  </div>
+                ) : <span className="hab-muted">Saisissez ensuite le code affiché dans l'application.</span>}
+              </li>
+            </ol>
+          </div>
+        )}
+      </Section>
+
+      <Section titre={`Permissions effectives (${perms ? perms.count : '…'})`}>
+        {perms ? (
+          <>
+            <p className="hab-muted mb-1">
+              Calculé par le backend : rôles actifs (périmètres et échéances)
+              plus dérogations actives (octrois ajoutés, retraits soustraits).
+            </p>
+            {perms.count > 0 ? (
+              <details>
+                <summary className="hab-muted">Afficher les {perms.count} codes</summary>
+                <div className="small" style={{ maxHeight: '260px', overflow: 'auto' }}>
+                  {perms.codes.slice(0, 400).map((code) => (
+                    <code key={code} className="me-1 mb-1 d-inline-block">{code}</code>
+                  ))}
+                  {perms.count > 400 && <span className="hab-muted">… et {perms.count - 400} autres.</span>}
+                </div>
+              </details>
+            ) : <p className="hab-muted mb-0">Aucune permission effective (aucun rôle actif ni dérogation).</p>}
+          </>
+        ) : <p className="hab-muted mb-0">Chargement…</p>}
       </Section>
 
       <Section titre="Chronologie (journal)">

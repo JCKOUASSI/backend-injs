@@ -53,6 +53,14 @@ class ConsoleU4Tests(APITestCase):
         )
         invalidate_flags_cache()
 
+    def tearDown(self):
+        # Le cache de flags est partagé par le processus (LocMem) et n'est
+        # pas remis à zéro par le rollback de la transaction : on le purge
+        # pour ne pas polluer les tests suivants (contrat de capacités).
+        from django.core.cache import cache
+        cache.clear()
+        super().tearDown()
+
     def _auth(self, user=None):
         self.client.force_authenticate(user or self.admin)
 

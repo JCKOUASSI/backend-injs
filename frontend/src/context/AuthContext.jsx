@@ -73,9 +73,10 @@ export function AuthProvider({ children }) {
     }
   }, [_clearSession])
 
-  const login = async (username, password) => {
-    const response = await api.post('/auth/login/', { username, password })
-    const { access, refresh, refresh_in_cookie: refreshInCookie, user: userData } = response.data
+  // Stockage de session commun à la connexion directe et à la finalisation
+  // de l'étape MFA (le backend renvoie la même forme de réponse).
+  const _finaliserConnexion = (data) => {
+    const { access, refresh, refresh_in_cookie: refreshInCookie, user: userData } = data
 
     if (!canAccessWeb(userData)) {
       const err = new Error('Web access forbidden')
@@ -99,13 +100,27 @@ export function AuthProvider({ children }) {
     }
     setUser(normalizeUser({
       ...userData,
-      role_context: response.data.role_context || userData.role_context || {},
+      role_context: data.role_context || userData.role_context || {},
     }))
     // Les capacités et flags de la nouvelle session doivent être (re)chargés.
     queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
     queryClient.invalidateQueries({ queryKey: FLAGS_QUERY_KEY })
 
-    return response.data
+    return data
+  }
+
+  const login = async (username, password) => {
+    const response = await api.post('/auth/login/', { username, password })
+    return _finaliserConnexion(response.data)
+  }
+
+  // Étape MFA (CURP U6) : complète la connexion demandée par
+  // /auth/login/ (code 403 « MFA_REQUIRED » + jeton court) avec le code TOTP.
+  const verifierMfa = async (mfaToken, code) => {
+    const response = await api.post('/auth/mfa/verify/', {
+      mfa_token: mfaToken, code,
+    })
+    return _finaliserConnexion(response.data)
   }
 
   const logout = () => {
@@ -139,6 +154,7 @@ export function AuthProvider({ children }) {
       loading,
       isAuthenticated,
       login,
+      verifierMfa,
       logout,
       refreshUser,
       syncCapabilities,
