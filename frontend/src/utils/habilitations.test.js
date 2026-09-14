@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   libelleStatut, libelleCanal, libelleDomaine, compterParModule,
   resumerDifferential, differentialAvertissementBloquant,
   peutValiderModification, analyserCsv, lignesCsvVersImport, normaliserCle,
+  telechargerCsv,
 } from './habilitations'
 
 describe('utils/habilitations — libellés', () => {
@@ -102,5 +103,19 @@ describe('utils/habilitations — CSV', () => {
       username: 'curp_x', prenoms: 'Fatou', mot_de_passe: 'secret123',
       roles: 'SECRETARIAT', canal: 'WEB',
     })
+  })
+})
+
+describe('telechargerCsv', () => {
+  it('construit un CSV point-virgule avec échappement des cellules', () => {
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    URL.createObjectURL = vi.fn(() => 'blob:test')
+    URL.revokeObjectURL = vi.fn(() => {})
+    const creer = URL.createObjectURL
+    telechargerCsv('essai.csv', ['a', 'b'], [['1', 'valeur; spéciale'], ['2', 'ligne']])
+    expect(clic).toHaveBeenCalledTimes(1)
+    expect(creer).toHaveBeenCalledTimes(1)
+    const blob = creer.mock.calls[0][0]
+    expect(blob.type).toContain('text/csv')
   })
 })

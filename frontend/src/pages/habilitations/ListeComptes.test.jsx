@@ -49,6 +49,9 @@ beforeEach(() => {
   cleanup()
   apiController.reset()
   window.localStorage.clear()
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  URL.createObjectURL = vi.fn(() => 'blob:test')
+  URL.revokeObjectURL = vi.fn(() => {})
 })
 
 describe('ListeComptes', () => {
@@ -59,6 +62,13 @@ describe('ListeComptes', () => {
     expect(screen.getByText('curp_b')).toBeInTheDocument()
     expect(screen.getByText('Comptes gouvernés (2)')).toBeInTheDocument()
     expect(within(screen.getByTestId('table-comptes')).getAllByText(/Sensible/).length).toBeGreaterThan(0)
+  })
+
+  it('exporte la vue filtrée courante en CSV', async () => {
+    monter()
+    await screen.findByTestId('table-comptes')
+    fireEvent.click(screen.getByTestId('export-comptes'))
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
   })
 
   it('répercute le filtre de statut dans l\'appel API', async () => {

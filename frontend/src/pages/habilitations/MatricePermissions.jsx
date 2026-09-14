@@ -1,23 +1,19 @@
 /** MatricePermissions — visualisation croisée rôle × module, filtrable, exportable. */
 import { useEffect, useMemo, useState } from 'react'
 import { recupererMatrice } from '@/services/habilitations'
+import { telechargerCsv } from '@/utils/habilitations'
 import { EnChargement } from './partages'
 import './habilitations.css'
 
-function telechargerCsv(lignes, modules) {
-  const entetes = ['role', ...modules.map((m) => m.code)]
-  const corps = lignes.map((l) => [
-    l.code,
-    ...modules.map((m) => l.niveaux[m.code]?.niveau || ''),
-  ])
-  const csv = [entetes, ...corps].map((ligne) => ligne.join(';')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'matrice_habilitations_injs.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+const exporter = (matrice) => {
+  telechargerCsv(
+    'matrice_habilitations_injs.csv',
+    ['role', ...matrice.modules.map((m) => m.code)],
+    matrice.lignes.map((l) => [
+      l.code,
+      ...matrice.modules.map((m) => l.niveaux[m.code]?.niveau || ''),
+    ]),
+  )
 }
 
 export default function MatricePermissions() {
@@ -46,7 +42,7 @@ export default function MatricePermissions() {
         <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <h2 className="h5 mb-0">Matrice rôle × module</h2>
           <button className="btn btn-outline-success btn-sm" data-testid="export-matrice"
-                  onClick={() => telechargerCsv(matrice.lignes, matrice.modules)}>
+                  onClick={() => exporter(matrice)}>
             <i className="bi bi-download me-1" />Exporter (CSV)
           </button>
         </div>

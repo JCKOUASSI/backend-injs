@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listerComptes, listerRolesCurp, changerStatutCompte, messageErreur } from '@/services/habilitations'
-import { libelleCanal, libelleDomaine, libelleStatut } from '@/utils/habilitations'
+import { libelleCanal, libelleDomaine, libelleStatut, telechargerCsv } from '@/utils/habilitations'
 import { useToast } from '@/context/ToastContext'
 import { BadgeStatut, BadgeSensible, BadgeCanal, EnChargement, nomCompte } from './partages'
 import MotifModal from './MotifModal'
@@ -63,14 +63,31 @@ export default function ListeComptes() {
 
   const totalPages = Math.max(1, Math.ceil(donnees.count / 50))
 
+  const exporterCsv = () => {
+    telechargerCsv(
+      'comptes_gouvernes.csv',
+      ['identifiant', 'nom', 'statut', 'roles', 'canal', 'derniere_connexion'],
+      donnees.results.map((c) => [
+        c.username, nomCompte(c), c.statut,
+        c.roles_actifs.map((r) => r.role).join('|'), c.canal, c.derniere_connexion || '',
+      ]),
+    )
+  }
+
   return (
     <section>
       <div className="hab-carte">
         <div className="d-flex justify-content-between align-items-center mb-2">
           <h2 className="h5 mb-0">Comptes gouvernés ({donnees.count})</h2>
-          <Link to="/administration/comptes/nouveau" className="btn btn-success btn-sm">
-            <i className="bi bi-person-plus me-1" />Nouveau compte
-          </Link>
+          <span>
+            <button type="button" className="btn btn-outline-secondary btn-sm me-2" data-testid="export-comptes"
+                    onClick={exporterCsv} disabled={donnees.results.length === 0}>
+              <i className="bi bi-download me-1" />Exporter (CSV)
+            </button>
+            <Link to="/administration/comptes/nouveau" className="btn btn-success btn-sm">
+              <i className="bi bi-person-plus me-1" />Nouveau compte
+            </Link>
+          </span>
         </div>
         <p className="hab-muted mb-2">
           Les comptes existants non encore rattachés (migration U8) n'apparaissent pas encore ici ;

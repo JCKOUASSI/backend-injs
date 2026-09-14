@@ -1,6 +1,7 @@
 /** JournalHabilitations — consultation filtrable et vérification du chaînage. */
 import { useEffect, useState } from 'react'
 import { listerJournal, integriteJournal } from '@/services/habilitations'
+import { telechargerCsv } from '@/utils/habilitations'
 import { EnChargement } from './partages'
 import './habilitations.css'
 
@@ -25,11 +26,26 @@ export default function JournalHabilitations() {
 
   const maj = (k, v) => { setPage(1); setFiltres((f) => ({ ...f, [k]: v })) }
   const totalPages = donnees ? Math.max(1, Math.ceil(donnees.count / 50)) : 1
+  const exporterCsv = () => {
+    telechargerCsv(
+      'journal_habilitations.csv',
+      ['numero', 'horodatage', 'evenement', 'acteur', 'objet', 'motif'],
+      donnees.results.map((e) => [
+        e.numero, e.horodatage, e.type_libelle, e.acteur, e.objet_libelle, e.motif,
+      ]),
+    )
+  }
 
   return (
     <section data-testid="ecran-journal">
       <div className="hab-carte">
-        <h2 className="h5">Journal des habilitations</h2>
+        <div className="d-flex justify-content-between align-items-center">
+          <h2 className="h5 mb-0">Journal des habilitations</h2>
+          <button type="button" className="btn btn-outline-success btn-sm" data-testid="export-journal"
+                  onClick={exporterCsv} disabled={!donnees || donnees.results.length === 0}>
+            <i className="bi bi-download me-1" />Exporter (CSV)
+          </button>
+        </div>
         {integrite && (
           <div className={integrite.integre ? 'hab-avertissement' : 'hab-avertissement bloquant'}
                style={{ borderLeftColor: integrite.integre ? '#1d6b35' : '#c62828', background: integrite.integre ? '#e8f5ec' : '#fbe7e7' }}

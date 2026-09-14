@@ -144,3 +144,26 @@ export function lignesCsvVersImport(lignes = []) {
 
 export const filtreNonNull = (obj) =>
   Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== '' && v != null))
+
+/** Échappe une cellule CSV (point-virgule, guillemets, sauts de ligne). */
+const celluleCsv = (valeur) => {
+  const texte = String(valeur ?? '')
+  return /[;"\n]/.test(texte) ? `"${texte.replace(/"/g, '""')}"` : texte
+}
+
+/**
+ * Provoque le téléchargement navigateur d'un CSV (export de consultation :
+ * l'export serveur paginé/global n'est pas au périmètre U4).
+ */
+export function telechargerCsv(nomFichier, entetes, lignes) {
+  const corps = lignes.map((ligne) => ligne.map(celluleCsv).join(';')).join('\n')
+  const blob = new Blob([`${entetes.map(celluleCsv).join(';')}\n${corps}`], {
+    type: 'text/csv;charset=utf-8;',
+  })
+  const url = URL.createObjectURL(blob)
+  const lien = document.createElement('a')
+  lien.href = url
+  lien.download = nomFichier
+  lien.click()
+  URL.revokeObjectURL(url)
+}
