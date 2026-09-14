@@ -1,11 +1,13 @@
-import { useState, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
-import logo from './assets/logo-injs.svg'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { hasAppRole, getUserRoles, peut } from './utils/roles'
 import { ToastProvider } from './context/ToastContext'
-import AppNotificationsBell from './components/AppNotificationsBell'
 import ProtectedRoute, { FORCED_PASSWORD_PATH } from './components/auth/ProtectedRoute'
+// Coquille (barre latérale RBAC + barre supérieure) extraite de ce fichier :
+// la navigation est déclarée dans `src/menu/arborescence.js` et filtrée par les
+// droits du compte connecté (`hooks/useMenuAutorise`).
+import Layout from './components/layout/Layout'
+import { routesGeneriques } from './menu/routesGeneriques'
 import CapabilitiesSync from './components/auth/CapabilitiesSync'
 import Login from './pages/Login'
 import ForcedPasswordChange from './pages/ForcedPasswordChange'
@@ -62,8 +64,6 @@ import ArchivesDashboard from './pages/archives/ArchivesDashboard'
 import ArchiveListesNotes from './pages/archives/ArchiveListesNotes'
 import ArchiveCahiersAppel from './pages/archives/ArchiveCahiersAppel'
 import ModulesListLink from './components/ModulesListLink'
-import { LIST_STORAGE_KEYS, listHref } from './utils/listFilters'
-import { financeNavHref } from './utils/financePeriod'
 import {
   ADMIN_LEVEL_ROLES,
   STATS_ALLOWED_ROLES,
@@ -71,7 +71,6 @@ import {
   IMPORT_ALLOWED_ROLES,
   EVALUATION_ALLOWED_ROLES,
   NOTE_GESTION_ROLES,
-  FINANCE_MODULE_ROLES,
   FINANCE_EXPORT_ROLES,
   FINANCE_SETTINGS_ROLES,
   OPERATION_VIEW_ROLES,
@@ -100,296 +99,6 @@ const Jurys = lazy(() => import('./pages/scolarite/Jurys'))
 const Graduation = lazy(() => import('./pages/scolarite/Graduation'))
 const FinancesEtudiantes = lazy(() => import('./pages/scolarite/FinancesEtudiantes'))
 
-
-function Layout({ children, breadcrumb }) {
-  const { user } = useAuth()
-  const location = useLocation()
-  const path = location.pathname
-  const searchTab = new URLSearchParams(location.search).get('tab')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
-  const isMobileViewport = () => window.matchMedia('(max-width: 768px)').matches
-  const toggleSidebar = () => {
-    if (isMobileViewport()) {
-      setSidebarOpen((o) => !o)
-      return
-    }
-    setSidebarCollapsed((c) => !c)
-  }
-
-  const isActive = (route) => {
-    if (route === '/') return path === '/'
-    if (route === '/formations') return path.startsWith('/formations') && !path.includes('/modules/')
-    return path.startsWith(route)
-  }
-
-  const isFinanceRole = hasAppRole(user, ['FINANCE'])
-  const isArchiveRole = hasAppRole(user, ['ARCHIVE'])
-  const isSuperviseurRole = hasAppRole(user, ['SUPERVISEUR'])
-  // P00-06 : la visibilité des entrées de menu dérive des capacités backend
-  // (repli statique identique tant qu'elles ne sont pas chargées).
-  const canViewFinanceModule = peut(user, 'finance', 'voir') && !isArchiveRole
-  const canViewFinanceDashboard = peut(user, 'finance', 'exporter') && !isArchiveRole
-  const canViewFinanceSettings = peut(user, 'finance', 'parametrer')
-  const canViewParticipants = peut(user, 'participants', 'lister')
-  const canViewScolarite = peut(user, 'scolarite', 'voir')
-  const canViewRattrapages = peut(user, 'presences', 'voir')
-  const canViewFormateurs = hasAppRole(user, [...ADMIN_LEVEL_ROLES, 'DIRECTION', 'ARCHIVE', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR'])
-    || canViewFinanceModule
-  const canViewUsers = peut(user, 'utilisateurs', 'voir')
-  const canViewHabilitations = peut(user, 'habilitations_admin', 'gerer')
-  const canViewSecretariats = hasAppRole(user, ADMIN_LEVEL_ROLES)
-  const canViewImport = peut(user, 'participants', 'gerer')
-  const canViewEvaluations = peut(user, 'evaluations', 'gerer_questionnaires')
-  const canViewReferentiels = hasAppRole(user, ADMIN_LEVEL_ROLES)
-  const canViewStatistiques = peut(user, 'statistiques', 'voir')
-  const isDirection = hasAppRole(user, ['DIRECTION'])
-  const canViewFinanceNotifications = hasAppRole(user, FINANCE_MODULE_ROLES) && !hasAppRole(user, ['ARCHIVE'])
-  const showAppNotifications = isDirection || canViewStatistiques || canViewFinanceNotifications
-
-  const ROLE_LABELS = { ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef INJS Admin', CPFAE_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat', FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur', FORMATEUR: 'Enseignant', AUDITEUR: 'Étudiant' }
-  const userInitials = `${(user?.first_name || '')[0] || ''}${(user?.last_name || '')[0] || ''}`
-  const fullName = user?.get_full_name ? user.get_full_name() : `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username
-
-  return (
-    <div className={`app-container${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-            zIndex: 99, display: 'block'
-          }}
-        />
-      )}
-      <aside className={`sidebar${sidebarOpen ? ' show' : ''}`} id="sidebar">
-        <div className="sidebar-brand">
-          <img src={logo} alt="INJS Abidjan" className="sidebar-logo" />
-          <h5 style={{ marginBottom: '0.1rem' }}>INJS UFR STAPS-JL</h5>
-          <small>Institut National de la Jeunesse et des Sports</small>
-        </div>
-
-        {user && (
-          <div className="sidebar-user">
-            <small>Connecté en tant que</small><br/>
-            <span className="user-name">{fullName}</span><br/>
-            {hasAppRole(user, ['SECRETARIAT']) && user.secretariat_nom
-              ? <small style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}><i className="bi bi-building me-1"></i>{user.secretariat_nom}</small>
-              : <span className="user-role">{getUserRoles(user).map((r) => ROLE_LABELS[r] || r).join(', ') || user.role}</span>
-            }
-          </div>
-        )}
-
-        <nav className="sidebar-nav">
-          
-          {!isFinanceRole && !isArchiveRole && !isSuperviseurRole && (
-            <Link to={listHref('/dashboard', LIST_STORAGE_KEYS.dashboard)} className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de bord</span></span>
-            </Link>
-          )}
-
-          {isArchiveRole && (
-            <>
-              <Link to="/archives" className={`nav-item ${path === '/archives' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-archive"></i> <span className="nav-label">Tableau de bord</span></span>
-              </Link>
-              <Link to="/archives/listes-notes" className={`nav-item ${isActive('/archives/listes-notes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-card-checklist"></i> <span className="nav-label">Listes de note</span></span>
-              </Link>
-              <Link to="/archives/cahiers-appel" className={`nav-item ${isActive('/archives/cahiers-appel') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-journal-check"></i> <span className="nav-label">Cahiers d'appel</span></span>
-              </Link>
-            </>
-          )}
-
-          {canViewFinanceDashboard && (
-            <Link to={financeNavHref('/finance-dashboard')} className={`nav-item ${isActive('/finance-dashboard') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Tableau de Bord Finance</span></span>
-            </Link>
-          )}
-          {canViewStatistiques && (
-            <Link to="/statistiques" className={`nav-item ${isActive('/statistiques') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-bar-chart-line"></i> <span className="nav-label">Statistiques</span></span>
-            </Link>
-          )}
-          {!isFinanceRole && !isArchiveRole && (
-            <Link to={listHref('/modules', LIST_STORAGE_KEYS.modules)} className={`nav-item ${isActive('/modules') || isActive('/formations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-book"></i> <span className="nav-label">Cours</span></span>
-            </Link>
-          )}
-          {canViewParticipants && (
-            <Link to={listHref('/participants', LIST_STORAGE_KEYS.participants)} className={`nav-item ${isActive('/participants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-people"></i> <span className="nav-label">Étudiants</span></span>
-            </Link>
-          )}
-          {canViewScolarite && (
-            <>
-              <div className="nav-section-title">Scolarité LMD</div>
-              <Link to="/scolarite" className={`nav-item ${path === '/scolarite' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-mortarboard"></i> <span className="nav-label">Tableau de bord</span></span>
-              </Link>
-              <Link to="/scolarite/candidatures" className={`nav-item ${isActive('/scolarite/candidatures') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-file-earmark-person"></i> <span className="nav-label">Candidatures</span></span>
-              </Link>
-              <Link to="/scolarite/admissions" className={`nav-item ${isActive('/scolarite/admissions') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-check2-circle"></i> <span className="nav-label">Admissions</span></span>
-              </Link>
-              <Link to="/scolarite/inscriptions" className={`nav-item ${isActive('/scolarite/inscriptions') || isActive('/scolarite/etudiants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-journal-check"></i> <span className="nav-label">Inscriptions</span></span>
-              </Link>
-              <Link to="/scolarite/groupes" className={`nav-item ${isActive('/scolarite/groupes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-diagram-3"></i> <span className="nav-label">Groupes</span></span>
-              </Link>
-              <Link to="/scolarite/maquettes" className={`nav-item ${isActive('/scolarite/maquettes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-layout-text-window-reverse"></i> <span className="nav-label">Maquettes LMD</span></span>
-              </Link>
-              <Link to="/scolarite/campagnes" className={`nav-item ${isActive('/scolarite/campagnes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-megaphone"></i> <span className="nav-label">Campagnes</span></span>
-              </Link>
-              <Link to="/scolarite/equivalences" className={`nav-item ${isActive('/scolarite/equivalences') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-arrow-left-right"></i> <span className="nav-label">Équivalences</span></span>
-              </Link>
-              <Link to="/scolarite/charges" className={`nav-item ${isActive('/scolarite/charges') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-person-workspace"></i> <span className="nav-label">Charges pédagogiques</span></span>
-              </Link>
-              <Link to="/scolarite/jurys" className={`nav-item ${isActive('/scolarite/jurys') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Jurys LMD</span></span>
-              </Link>
-              <Link to="/scolarite/graduation" className={`nav-item ${isActive('/scolarite/graduation') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-mortarboard-fill"></i> <span className="nav-label">Diplômation</span></span>
-              </Link>
-              <Link to="/scolarite/finances" className={`nav-item ${isActive('/scolarite/finances') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-cash-coin"></i> <span className="nav-label">Finances étudiantes</span></span>
-              </Link>
-            </>
-          )}
-          {canViewRattrapages && (
-            <Link to="/rattrapages" className={`nav-item ${isActive('/rattrapages') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-arrow-left-right"></i> <span className="nav-label">Rattrapages</span></span>
-            </Link>
-          )}
-          {canViewFormateurs && (
-            <Link
-              to={canViewFinanceModule ? financeNavHref('/formateurs') : listHref('/formateurs', LIST_STORAGE_KEYS.formateurs)}
-              className={`nav-item ${isActive('/formateurs') ? 'active' : ''}`}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span>
-                <i className={`bi ${canViewFinanceModule ? 'bi-cash-stack' : 'bi-person-video3'}`}></i>
-                {' '}
-                <span className="nav-label">{canViewFinanceModule ? 'Suivi Finance' : 'Enseignants'}</span>
-              </span>
-            </Link>
-          )}
-          {canViewFinanceDashboard && (
-            <Link to={financeNavHref('/finance-encadrants')} className={`nav-item ${isActive('/finance-encadrants') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-person-badge"></i> <span className="nav-label">Encadrants</span></span>
-            </Link>
-          )}
-          {canViewFinanceSettings && (
-            <Link to={financeNavHref('/finance-parametrage')} className={`nav-item ${isActive('/finance-parametrage') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-sliders"></i> <span className="nav-label">Paramétrage</span></span>
-            </Link>
-          )}
-          {canViewUsers && (
-            <Link to={listHref('/users', LIST_STORAGE_KEYS.users)} className={`nav-item ${isActive('/users') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-person-gear"></i> <span className="nav-label">Utilisateurs</span></span>
-            </Link>
-          )}
-          {canViewHabilitations && (
-            <Link to="/administration/comptes" className={`nav-item ${path.startsWith('/administration/comptes') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)} data-testid="nav-habilitations">
-              <span><i className="bi bi-shield-lock"></i> <span className="nav-label">Habilitations (CURP)</span></span>
-            </Link>
-          )}
-          {canViewSecretariats && (
-            <Link to={listHref('/secretariats', LIST_STORAGE_KEYS.secretariats)} className={`nav-item ${isActive('/secretariats') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-building"></i> <span className="nav-label">Secrétariats</span></span>
-            </Link>
-          )}
-          {isSuperviseurRole && (
-            <Link to="/evaluations?tab=dashboard" className={`nav-item ${isActive('/evaluations') && searchTab !== 'questionnaires' && !path.includes('/analyse') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-speedometer2"></i> <span className="nav-label">Dashboard</span></span>
-            </Link>
-          )}
-          {isSuperviseurRole && (
-            <Link to="/evaluations?tab=questionnaires" className={`nav-item ${isActive('/evaluations') && searchTab === 'questionnaires' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
-            </Link>
-          )}
-          {canViewEvaluations && !isSuperviseurRole && (
-            <>
-              <Link to="/evaluations" className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-                <span><i className="bi bi-clipboard-check"></i> <span className="nav-label">Évaluations</span></span>
-              </Link>
-            </>
-          )}
-          {canViewImport && (
-            <Link to="/import" className={`nav-item ${isActive('/import') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-file-earmark-excel"></i> <span className="nav-label">Import Excel</span></span>
-            </Link>
-          )}
-          {canViewReferentiels && (
-            <Link to={listHref('/referentiels', LIST_STORAGE_KEYS.referentiels)} className={`nav-item ${isActive('/referentiels') ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-sliders"></i> <span className="nav-label">Référentiels</span></span>
-            </Link>
-          )}
-          {canViewReferentiels && (
-            <Link to="/parametres" className={`nav-item ${path === '/parametres' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-gear"></i> <span className="nav-label">Paramètres</span></span>
-            </Link>
-          )}
-          {canViewReferentiels && (
-            <Link to="/parametres/flags" className={`nav-item ${path === '/parametres/flags' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-              <span><i className="bi bi-toggles"></i> <span className="nav-label">Fonctionnalités</span></span>
-            </Link>
-          )}
-        </nav>
-
-        <div className="sidebar-footer">
-          <Link to="/profile" className={`nav-item ${path === '/profile' ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
-            <span><i className="bi bi-person-circle"></i> <span className="nav-label">Mon profil</span></span>
-          </Link>
-          <div className="nav-label" style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', fontSize: '0.68rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
-            Développé par<br/>
-            <span style={{ fontWeight: 600, letterSpacing: '0.02em' }}>Ophir Technologies</span>
-          </div>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <div className="top-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button className="btn btn-sm btn-outline-secondary sidebar-toggle" onClick={toggleSidebar}>
-              <i className={`bi ${isMobileViewport() ? 'bi-list' : (sidebarCollapsed ? 'bi-layout-sidebar-inset' : 'bi-layout-sidebar')}`}></i>
-            </button>
-            <nav>
-              <ol className="breadcrumb">
-                {breadcrumb || <li>Accueil</li>}
-              </ol>
-            </nav>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            {showAppNotifications && (
-              <AppNotificationsBell
-                showNotes={isDirection}
-                showRapports={canViewStatistiques}
-                showFinance={canViewFinanceNotifications}
-              />
-            )}
-            <Link to="/profile" className="top-bar-user" title="Mon profil" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <span className="text-muted small">{fullName}</span>
-              <div className="user-avatar">{userInitials}</div>
-            </Link>
-          </div>
-        </div>
-        <div className="page-content">
-          {children}
-        </div>
-      </main>
-    </div>
-  )
-}
 
 function App() {
   function HomeRoute() {
@@ -838,6 +547,9 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          {/* Écrans de la navigation réorganisée : routes dérivées de
+              l'arborescence du menu (une seule source de vérité). */}
+          {routesGeneriques()}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

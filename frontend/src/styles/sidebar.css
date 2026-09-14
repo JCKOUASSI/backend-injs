@@ -1,0 +1,173 @@
+/* ---------------------------------------------------------------------------
+   Barre latérale RBAC — arborescence repliable (sections → sous-menus).
+   Fichier **additif** : les classes historiques de `index.css` (.sidebar,
+   .nav-item, .sidebar-brand, .sidebar-user, .sidebar-footer…) sont conservées
+   telles quelles ; seules les nouvelles classes d'arborescence sont définies
+   ici. Aucune règle existante n'est écrasée, sauf normalisation du <button>
+   qui reprend exactement l'apparence d'un .nav-item (liens et boutons de
+   section doivent être indiscernables).
+   --------------------------------------------------------------------------- */
+
+/* Tête de section : un bouton, mais l'apparence d'une entrée de navigation. */
+.sidebar .nav-item.nav-groupe-tete {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.sidebar .nav-item.nav-groupe-tete:hover,
+.sidebar .nav-item.nav-groupe-tete.active {
+  color: #fff;
+  background: rgba(197, 210, 228, 0.18);
+  border-left-color: var(--dusty);
+}
+
+.sidebar .nav-groupe-tete.active { border-left-color: var(--dusty); }
+
+.sidebar .nav-racine { font-weight: 600; letter-spacing: 0.01em; }
+
+.sidebar .nav-chevron {
+  width: auto !important;
+  margin-right: 0 !important;
+  font-size: 0.7rem;
+  opacity: 0.65;
+}
+
+.sidebar .nav-sous-titre {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 0.1rem;
+}
+
+/* Sous-menu : liste nue, connecteurs d'arborescence comme dans la maquette. */
+.sidebar .nav-sous-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0.1rem 0 0.35rem 0;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.sidebar .nav-sous-ligne {
+  display: flex;
+  align-items: stretch;
+}
+
+.sidebar .nav-connecteur {
+  flex: 0 0 auto;
+  width: 2.35rem;
+  padding-left: 1.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 2.05rem;
+  color: rgba(255, 255, 255, 0.28);
+  user-select: none;
+}
+
+.sidebar .nav-sous-item {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.9rem 0.42rem 0;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  font-size: 0.845rem;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, color 0.15s, border-left-color 0.15s;
+}
+
+.sidebar .nav-sous-item:hover {
+  color: #fff;
+  background: rgba(197, 210, 228, 0.14);
+}
+
+.sidebar .nav-sous-item.active {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(197, 210, 228, 0.22);
+  border-left-color: var(--dusty);
+}
+
+.sidebar .nav-sous-item i { width: 16px; text-align: center; font-size: 0.8rem; opacity: 0.85; }
+
+/* Entrée de pied de barre rendue comme un bouton (déconnexion). */
+.sidebar .nav-item.nav-deconnexion {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.sidebar .nav-item.nav-deconnexion:hover {
+  color: #fff;
+  background: rgba(197, 210, 228, 0.18);
+  border-left-color: var(--dusty);
+}
+
+.sidebar .nav-mention {
+  text-align: center;
+  padding: 0.75rem 0 0.25rem;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+.sidebar .nav-mention span { font-weight: 600; letter-spacing: 0.02em; }
+
+/* Badge indiquant la source des droits qui pilote le menu (diagnostic). */
+.sidebar .user-droits-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.64rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar .user-droits-source.curp {
+  background: rgba(120, 200, 160, 0.22);
+  color: #dff5e8;
+}
+
+/* Compte sans aucune entrée autorisée : message explicite, jamais de menu vide. */
+.sidebar .nav-vide {
+  margin: 1rem 1.2rem;
+  padding: 0.9rem;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.sidebar .nav-vide i { font-size: 1.1rem; display: block; margin-bottom: 0.35rem; }
+.sidebar .nav-vide p { margin: 0 0 0.3rem; font-weight: 600; }
+.sidebar .nav-vide small { color: rgba(255, 255, 255, 0.55); }
+
+/* Barre repliée (desktop) : seules les icônes de racine restent lisibles. */
+.app-container.sidebar-collapsed .sidebar .nav-sous-menu,
+.app-container.sidebar-collapsed .sidebar .nav-chevron,
+.app-container.sidebar-collapsed .sidebar .nav-sous-titre { display: none; }
+
+@media (max-width: 768px) {
+  .sidebar .nav-connecteur { width: 2rem; padding-left: 1rem; }
+  .sidebar .nav-sous-item { font-size: 0.86rem; padding-right: 0.6rem; }
+}

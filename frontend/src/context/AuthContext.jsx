@@ -2,7 +2,13 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useQueryClient } from '@tanstack/react-query'
 import api, { setSessionExpiredCallback } from '../services/api'
 import { hasAppRole, webLoginForbiddenMessage, ALLOWED_WEB_ROLES } from '../utils/roles'
-import { CAPABILITIES_QUERY_KEY, FLAGS_QUERY_KEY } from '../lib/queryClient'
+import {
+  CAPABILITIES_QUERY_KEY,
+  FLAGS_QUERY_KEY,
+  // Navigation RBAC : l'état gouverné du compte (permissions effectives CURP)
+  // ne doit pas traverser les sessions, au même titre que les capacités.
+  MES_ACCES_QUERY_KEY,
+} from '../lib/queryClient'
 
 const AuthContext = createContext(null)
 
@@ -45,6 +51,8 @@ export function AuthProvider({ children }) {
     // non-traversée des sessions que pour les capacités).
     queryClient.removeQueries({ queryKey: FLAGS_QUERY_KEY })
     queryClient.setQueryData(FLAGS_QUERY_KEY, undefined)
+    queryClient.removeQueries({ queryKey: MES_ACCES_QUERY_KEY })
+    queryClient.setQueryData(MES_ACCES_QUERY_KEY, undefined)
     setCapabilities(null)
   }, [queryClient])
 
@@ -105,6 +113,7 @@ export function AuthProvider({ children }) {
     // Les capacités et flags de la nouvelle session doivent être (re)chargés.
     queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
     queryClient.invalidateQueries({ queryKey: FLAGS_QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: MES_ACCES_QUERY_KEY })
 
     return data
   }
@@ -139,6 +148,7 @@ export function AuthProvider({ children }) {
     // Un changement de rôle éventuel change capacités et flags : on rafraîchit.
     queryClient.invalidateQueries({ queryKey: CAPABILITIES_QUERY_KEY })
     queryClient.invalidateQueries({ queryKey: FLAGS_QUERY_KEY })
+    queryClient.invalidateQueries({ queryKey: MES_ACCES_QUERY_KEY })
   }, [_clearSession, queryClient])
 
   const isAuthenticated = !!user

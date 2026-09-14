@@ -19,3 +19,8 @@ export const CAPABILITIES_QUERY_KEY = ['auth', 'capabilities']
 // Feature flags (P00-08) : carte {cle: bool} évaluée serveur ; invalidée à
 // la connexion/déconnexion et après toute bascule depuis l'écran d'admin.
 export const FLAGS_QUERY_KEY = ['parametres', 'flags']
+
+// Navigation RBAC : état gouverné du compte connecté (profil CURP, statut,
+// permissions effectives). Invalider cette clé après tout geste d'habilitation
+// qui touche le compte courant (attribution, révocation, suspension).
+export const MES_ACCES_QUERY_KEY = ['habilitations', 'mes-acces']

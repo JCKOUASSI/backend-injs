@@ -210,6 +210,7 @@ livré est inerte**.
 | **J2-4** | Décision humaine | Aucun type de périmètre `DEPARTEMENT` ; `DIRECTION` sert de périmètre par défaut aux rôles de département. Résolveurs hiérarchiques non livrés. | `…::ChefDepartementCroiseTests::test_05` | LOT 5 : ajouter le type + résolveurs (additif), ou assumer `DIRECTION`. |
 | **L4-05** | Environnement | Suite backend complète : **1 556 tests, 4 erreurs, 5 ignorés**. Les 4 erreurs sont toutes `dashboard.tests.PublicBadgePage{Enabled,Disabled}Test` et proviennent du `CompressedManifestStaticFilesStorage` sans manifeste (`Missing staticfiles manifest entry for 'img/logo-injs.png'`) — `collectstatic` n'avait pas été joué dans le bac à sable. **Après `collectstatic`, ces 4 tests passent (OK)** : cause d'environnement, sans lien avec le LOT 4. Les 5 ignorés comprennent les 2 tests de déclencheurs d'immuabilité PostgreSQL. | `/tmp/tests_backend_lot4.log` (525 s) ; rejeu ciblé `manage.py test dashboard.tests.PublicBadgePage*` → OK après `collectstatic` | Ajouter `collectstatic` au préalable d'exécution de la suite (CI déjà pourvue) ; rejouer sous PostgreSQL en intégration ; **jamais** masquer l'écart. |
 | **L4-06** | Documentation | Homonymie : `flag.lot01_…lot12_…` (lots de construction du produit) ≠ « LOT 1 → LOT 5 » (lots du module Utilisateurs). | seed `parametres/flags.py` vs plan CURP §7 | Clarifié dans [`IAM.md`](../architecture/IAM.md) §13 ; renommage **non** proposé (additif, risque de casse). |
+| **L4-07** | P2 — **écart assumé** | La projection `permissions_effectives()` (`habilitations/services/comptes_admin.py`) applique le RETRAIT de façon **prioritaire et sans effet de date** (tri `-date_creation`, puis boucle qui écarte toute ligne déjà couverte), alors que le moteur implémente la règle S4 `_octroi_postérieur` (un OCTROI postérieur à un RETRAIT l'emporte). Les deux réponses peuvent donc différer pour un compte portant un retrait ancien puis un octroi récent. | `test_menu_rbac_mes_acces.py::PermissionsEffectivesTests::test_10_projection_plus_stricte_que_le_moteur_sur_un_retrait_leve` (et `test_09_derogation_retrait_a_la_priorite`) | **Aucune correction** : la projection est *plus fermée* que le moteur (fail-closed) et n'alimente que l'affichage du menu ; le moteur reste l'autorité de décision. Écart documenté, à trancher au LOT 5 (aligner la projection sur S4, additif) si le commanditaire le souhaite. |
 
 ---
 
@@ -295,3 +296,80 @@ hiérarchiques (J2-4).
 | Audit de phase 0 (antérieur) | `docs/audits/2026-09-14-audit-module-utilisateurs.md` |
 | Plan du chantier | `docs/curp/05-architecture-completion-module-utilisateurs.md` |
 | Notes de conception | `docs/curp/00-…05-*.md`, `docs/curp/U1…U6-note-conception.md` |
+
+---
+
+## 10. LOT 6 — Barre latérale réorganisée, pilotée par les droits (2026-09-14)
+
+La navigation a été reconstruite sur le modèle en 15 sections fourni par le
+commanditaire (Tableau de bord → Audit & Traçabilité). Principe directeur :
+**une seule source de vérité** (`frontend/src/menu/arborescence.js`) dont sont
+dérivés à la fois la barre latérale (`components/layout/Sidebar.jsx`) et les
+routes des écrans génériques (`menu/routesGeneriques.jsx` →
+`pages/EcranGenerique.jsx` + `components/generique/*`). Aucun chemin, aucun
+droit n'est dupliqué dans un composant.
+
+### 10.1 Modèle de droits (hybride, arbitré avec le commanditaire)
+
+| Compte | Source de la décision d'affichage |
+|---|---|
+| **Gouverné** (profil CURP + attributions) | `GET /api/habilitations/mes-acces/ → permissions_effectives` (codes `module.ressource.action`) ; une entrée déclarant des codes CURP est évaluée **uniquement** sur eux |
+| **Non gouverné** | capacités projetées `GET /api/auth/capabilities/` (`peut(user, module, action)`), repli statique `utils/roles.js` avant chargement |
+| Entrée **sans volet CURP** (écrans purement legacy, console CURP) | toujours le volet legacy, quel que soit le compte : personne ne perd d'accès du fait de la réorganisation |
+
+Entrées non autorisées : **masquées** (choix commanditaire) ; une section sans
+aucune entrée autorisée disparaît. Une URL saisie à la main vers une entrée
+masquée affiche un refus explicite avec les droits requis
+(`EcranGenerique`), sans jamais accorder quoi que ce soit (règle S3) : chaque
+vue DRF conserve ses `permission_classes`.
+
+### 10.2 Alignement menu ↔ garde serveur (console CURP)
+
+Les endpoints de la console (`/api/habilitations/comptes*`,
+`…/organisation/*`, `…/journal*`) sont gardés par `ExigeDrapeauAdmin` :
+drapeau `flag.curp_ui_admin` **ouvert** *et* trio d'administration
+(`ADMIN`, `CPFAE_ADMIN`, `CHEF_CPFAE_ADMIN`). Cette garde **ne consulte aucune
+permission CURP**. Les 17 entrées du menu ouvrant la console ne déclarent donc
+**aucun volet `curp`** et exigent la capacité projetée
+`habilitations_admin.gerer`, qui reproduit exactement la garde (même drapeau,
+même trio — `authentication.capabilities._peut_gerer_console_curp`). Un volet
+`curp` y ferait apparaître l'entrée pour un compte gouverné qui recevrait un
+403. Un test d'invariant verrouille cette règle
+(`menu/arborescence.test.js` → « alignement menu ↔ garde serveur »).
+
+Corollaire d'exploitation : drapeau fermé (défaut, kill-switch), les entrées
+de console sont masquées pour tout le monde ; pour ouvrir la console en
+recette, créer/activer `flag.curp_ui_admin` (type booléen, rôles du trio) via
+l'admin Django `Parametres` — jamais en durcissant le code.
+
+### 10.3 Fixtures de contrat et régénération
+
+Trois fixtures générées depuis le backend verrouillent les références croisées
+du menu (`frontend/src/menu/__fixtures__/`) :
+
+| Fixture | Contenu | Garde-fou |
+|---|---|---|
+| `catalogue-curp.json` | 1 155 codes `module.ressource.action` (table `habilitations_permissionmetier`) | aucun code CURP **inventé** dans l'arborescence (un code faux masquerait l'entrée en silence) |
+| `catalogue-capacites.json` | 13 modules / 25 actions de `CAPACITES_DESCRIPTEURS` | aucun couple legacy inexistant |
+| `catalogue-endpoints.json` | 486 motifs d'URL issus du résolveur Django | aucun `endpoint` de descripteur pointant vers un 404 |
+
+Régénération (lecture seule côté backend) :
+
+```bash
+cd backend && USE_SQLITE=1 .venv/bin/python ../arena/genere-catalogues-menu.py
+```
+
+### 10.4 Couverture ajoutée par le LOT 6
+
+| Suite | Tests | Objet |
+|---|---|---|
+| `habilitations.tests.test_menu_rbac_mes_acces` (backend) | **14** | `mes-acces` : 401 anonyme, abstention (compte non gouverné, attribution révoquée/expirée, dérogation non signée), codes des rôles actifs, priorité RETRAIT, additivité des clés, identité avec le service et l'écran admin |
+| `menu/autorisation.test.js` | 23 | résolution de source, filtrage, fermeture par défaut, non-mutation |
+| `menu/arborescence.test.js` | 58 | couverture du modèle 15 sections, contrat de droits (CURP + legacy + console), intégrité des descripteurs, non-régression des chemins historiques |
+| `menu/ecrans.test.js` | 11 | validité des endpoints/chemins/documents contre le catalogue d'URL |
+| `menu/routesGeneriques.test.jsx` | 7 | dérivation des routes, rendu de bout en bout, visiteur non authentifié |
+| `components/layout/Sidebar.test.jsx` | 19 | source CURP/legacy, masquage, sections vides, persistance, pied de barre |
+| `components/generique/EcranRessource.test.jsx` | 22 | liste, colonnes auto, filtres, actions (confirmation, téléchargement, navigation), détail, 403/500 |
+| `pages/EcranGenerique.test.jsx` | 7 | résolution, garde d'URL directe, variantes documents/indicateurs |
+
+Suite frontend complète après LOT 6 : **80 fichiers, 1 689 tests, OK**.

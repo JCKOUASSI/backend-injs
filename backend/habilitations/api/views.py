@@ -78,6 +78,14 @@ def mes_acces_view(request):
         .select_related('delegant__user', 'delegataire__user')
         .prefetch_related('roles', 'permissions', 'perimetres')
     )
+    # Clé additive (réorganisation de la navigation RBAC) : codes de permissions
+    # effectivement détenus par le compte connecté (rôles actifs + dérogations
+    # OCTROI − RETRAIT). Lecture seule, auto-portée (aucun droit tiers), et
+    # strictement descriptive : l'API reste la seule autorité, cette liste ne
+    # sert qu'à masquer/afficher des entrées de menu. Même calcul que
+    # ``GET comptes/<pk>/effective-permissions/`` (réservé aux administrateurs).
+    from habilitations.services.comptes_admin import permissions_effectives
+
     reponse.update({
         'compte': {
             'statut': compte.statut,
@@ -88,6 +96,7 @@ def mes_acces_view(request):
                 if compte.date_expiration else None
             ),
         },
+        'permissions_effectives': sorted(permissions_effectives(compte)),
         'attributions': [
             serialiser_attribution(a) for a in attributions
             if a.est_active(date)
