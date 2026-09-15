@@ -195,3 +195,18 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : POST /api/administrations/organigramme/secretariats/
   - Route supprimée ou renommée : POST /api/administrations/organigramme/services/
 
+## 2026-09-15 04:10 UTC
+
+- **Justification :** Lot C refonte (modèle 08 appliqué à l'EDT) : ajout de 6 routes /api/presences/seances-edt/* (QR de séance LMD, scan, liste nominative, émargement manuel à motif, clôture auto) + 10 routes organigramme déjà inscrites au lot A — aucune rupture ; Pointage.session assoupli en nullable (migration additive).
+- Routes dans le contrat : 664
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 7
+  - Route supprimée ou renommée : GET /api/presences/seances-edt/du-jour/
+  - Route supprimée ou renommée : GET /api/presences/seances-edt/{id}/presences/
+  - Route supprimée ou renommée : GET /api/presences/seances-edt/{id}/qr/
+  - Route supprimée ou renommée : POST /api/presences/seances-edt/scan/
+  - Route supprimée ou renommée : POST /api/presences/seances-edt/{id}/autoclore/
+  - Route supprimée ou renommée : POST /api/presences/seances-edt/{id}/emargement/
+  - Route supprimée ou renommée : POST /api/presences/seances-edt/{id}/qr/
+

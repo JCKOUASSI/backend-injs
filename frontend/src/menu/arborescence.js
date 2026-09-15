@@ -337,6 +337,15 @@ export const ARBORESCENCE = [
         },
       },
       {
+        id: 'get_injs.presences_seance',
+        libelle: 'Présences de séance (QR & émargement)',
+        chemin: '/edt/presences',
+        droit: {
+          curp: ['presences.emargement.consulter'],
+          legacy: [['web', 'operationnel']],
+        },
+      },
+      {
         id: 'get_injs.cours',
         libelle: 'Cours',
         chemin: '/modules',

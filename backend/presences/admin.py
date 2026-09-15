@@ -213,7 +213,7 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
             cible_type=cible_type,
             cible_numero=cible_numero,
             cible_nom=cible_nom,
-            formation=pointage.session.module.formation,
+            formation=(pointage.session.module.formation if pointage.session_id else None),
             pointage=pointage,
             extra={'via_admin': True, 'action': 'remettre_en_cours'},
         )
@@ -259,27 +259,46 @@ class PointageAdmin(AdminScopeMixin, admin.ModelAdmin):
 
     @admin.display(description="Formation", ordering='session__module__formation__formation')
     def formation_label(self, obj):
+        # Lot C : les pointages de séance LMD (QR EDT) n'ont pas de session legacy.
+        if not obj.session_id:
+            return getattr(obj.seance_edt.formation, 'intitule', '—') if obj.seance_edt_id and obj.seance_edt.formation_id else 'Séance LMD (EDT)'
         return obj.session.module.formation
 
     @admin.display(description="Grade", ordering='session__module__grade')
     def grade_label(self, obj):
+        if not obj.session_id:
+            return "—"
         return obj.session.module.grade or "—"
 
     @admin.display(description="Groupe", ordering='session__module__groupe')
     def groupe_label(self, obj):
+        if not obj.session_id:
+            if obj.seance_edt_id and obj.seance_edt.groupe_id:
+                return getattr(obj.seance_edt.groupe, 'nom', '—') or '—'
+            return "—"
         return obj.session.module.groupe or "—"
 
     @admin.display(description="Vague", ordering='session__module__vague')
     def vague_label(self, obj):
+        if not obj.session_id:
+            return "—"
         return obj.session.module.vague or "—"
 
     @admin.display(description="Module", ordering='session__module__intitule')
     def module_label(self, obj):
+        if not obj.session_id:
+            if obj.seance_edt_id:
+                return obj.seance_edt.intitule or str(obj.seance_edt.creneau_template)
+            return "—"
         url = reverse('admin:formations_module_change', args=[obj.session.module_id])
         return format_html('<a href="{}">{}</a>', url, obj.session.module.intitule)
 
     @admin.display(description="Séance", ordering='session__intitule')
     def session_label(self, obj):
+        if not obj.session_id:
+            if obj.seance_edt_id:
+                return f"Séance EDT #{obj.seance_edt_id}"
+            return "—"
         label = obj.session.intitule or f"Session {obj.session.numero}"
         url = reverse('admin:formations_sessionmodule_change', args=[obj.session_id])
         return format_html('<a href="{}">{}</a>', url, label)

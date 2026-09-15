@@ -2440,6 +2440,31 @@
         "200": null
       }
     },
+    "GET /api/presences/seances-edt/du-jour/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/presences/seances-edt/{id}/presences/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/presences/seances-edt/{id}/qr/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/rattrapages/": {
       "parameters": [],
       "request_keys": null,
@@ -5768,6 +5793,40 @@
     },
     "POST /api/patrimoine/vehicules/": {
       "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/presences/seances-edt/scan/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/presences/seances-edt/{id}/autoclore/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/presences/seances-edt/{id}/emargement/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/presences/seances-edt/{id}/qr/": {
+      "parameters": [
+        "id"
+      ],
       "request_keys": null,
       "responses": {
         "200": null

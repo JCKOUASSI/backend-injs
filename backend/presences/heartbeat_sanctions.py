@@ -71,6 +71,9 @@ def process_mobile_heartbeat_sanctions(*, dry_run=False, write=None):
             'formateur',
             'encadrant',
         )
+        # Lot C : les pointages de séances LMD (QR EDT) n'ont pas de session
+        # legacy et ne reçoivent pas de heartbeat ; ils sont exclus.
+        .filter(session__isnull=False)
     )
 
     for pt in pointages_ouverts:

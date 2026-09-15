@@ -2,8 +2,21 @@ from django.urls import path
 from . import views
 from . import rattrapage_api
 from . import stats_api
+from . import seances_edt_api
 
 urlpatterns = [
+    # Lot C refonte — présence par QR sur les séances LMD (EDT), émargement
+    # manuel à motif et clôture automatique (modèle fonctionnel MODULE 08).
+    path('presences/seances-edt/du-jour/', seances_edt_api.seances_du_jour, name='presences-edt-du-jour'),
+    path('presences/seances-edt/scan/', seances_edt_api.scan_seance, name='presences-edt-scan'),
+    path('presences/seances-edt/<int:pk>/qr/', seances_edt_api.qr_seance, name='presences-edt-qr'),
+    path('presences/seances-edt/<int:pk>/presences/', seances_edt_api.presences_seance,
+         name='presences-edt-liste'),
+    path('presences/seances-edt/<int:pk>/emargement/', seances_edt_api.emargement_seance,
+         name='presences-edt-emargement'),
+    path('presences/seances-edt/<int:pk>/autoclore/', seances_edt_api.autoclore_seance,
+         name='presences-edt-autoclore'),
+
     # Lot L1 — statistiques de présence et alertes d'absence
     path('stats/taux/', stats_api.taux, name='presences-stats-taux'),
     path('stats/alertes/', stats_api.alertes, name='presences-stats-alertes'),

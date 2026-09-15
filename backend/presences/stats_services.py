@@ -85,12 +85,12 @@ def taux_par_groupe(annee=None):
 
 def taux_par_module(annee=None):
     """Taux de présence agrégé par module (socle)."""
-    return _taux_agrege('module', lambda p: p.session.module, annee)
+    return _taux_agrege('module', lambda p: p.session.module if p.session_id else None, annee)
 
 
 def taux_par_formation(annee=None):
     """Taux de présence agrégé par formation."""
-    return _taux_agrege('formation', lambda p: p.session.module.formation, annee)
+    return _taux_agrege('formation', lambda p: p.session.module.formation if p.session_id else None, annee)
 
 
 def _seuil_absence():

@@ -93,6 +93,9 @@ class Command(BaseCommand):
                 'formateur',
                 'encadrant',
             )
+            # Lot C : les séances LMD se clôturent par leur propre endpoint
+            # (fenêtre EDT) ; ce commando ne traite que le flux legacy.
+            .filter(session__isnull=False)
         )
 
         traites = 0

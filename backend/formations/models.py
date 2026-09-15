@@ -847,7 +847,20 @@ class QRToken(models.Model):
         SessionModule,
         on_delete=models.CASCADE,
         related_name='qr_tokens',
+        null=True,
+        blank=True,
         help_text="Séance liée à ce QR code",
+    )
+    # Lot C refonte — présence par QR sur les séances LMD de l'EDT : le même
+    # jeton vit désormais pour une affectation de créneau (empilement, pas de
+    # remplacement : les tokens legacy gardent leur séance).
+    seance_edt = models.ForeignKey(
+        'edts.AffectationCreneau',
+        on_delete=models.CASCADE,
+        related_name='qr_tokens',
+        null=True,
+        blank=True,
+        help_text="Séance LMD (créneau d'emploi du temps) liée à ce QR code",
     )
     token = models.UUIDField(default=uuid.uuid4, unique=True)
     genere_par = models.ForeignKey(
@@ -867,12 +880,20 @@ class QRToken(models.Model):
 
     @property
     def formation(self):
-        return self.session.module.formation
+        return self.session.module.formation if self.session_id else None
 
     def __str__(self):
-        session_label = self.session.intitule or f"Session {self.session.numero}"
-        label = self.session.module.intitule or self.session.module.formation.formation
-        return f"QR {label} — {session_label} ({'actif' if self.actif else 'inactif'})"
+        if self.session_id:
+            session_label = self.session.intitule or f"Session {self.session.numero}"
+            label = self.session.module.intitule or self.session.module.formation.formation
+            etat = 'actif' if self.actif else 'inactif'
+            return f"QR {label} — {session_label} ({etat})"
+        if self.seance_edt_id:
+            libelle = (self.seance_edt.intitule
+                       or str(self.seance_edt.creneau_template))
+            etat = 'actif' if self.actif else 'inactif'
+            return f"QR séance LMD — {libelle} ({etat})"
+        return f"QR orphelin ({'actif' if self.actif else 'inactif'})"
 
     @property
     def is_expired(self):
@@ -882,7 +903,9 @@ class QRToken(models.Model):
     def is_valid(self):
         if not self.actif or self.is_expired:
             return False
-        if self.session.est_terminee:
+        if self.session_id and self.session.est_terminee:
+            return False
+        if self.seance_edt_id and not self.seance_edt.actif:
             return False
         return True
 

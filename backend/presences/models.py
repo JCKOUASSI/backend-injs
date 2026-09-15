@@ -40,7 +40,19 @@ class Pointage(models.Model):
         SessionModule,
         on_delete=models.CASCADE,
         related_name='pointages',
-        help_text="Séance liée à ce pointage",
+        null=True,
+        blank=True,
+        help_text="Séance liée à ce pointage (null pour une séance LMD badgée via QR EDT)",
+    )
+    # Lot C refonte — séance LMD badgée via le QR des créneaux d'EDT
+    # (empilement avec le badgeage legacy ; les pointages existants gardent
+    # leur séance d'origine).
+    seance_edt = models.ForeignKey(
+        'edts.AffectationCreneau',
+        on_delete=models.CASCADE,
+        related_name='pointages',
+        null=True,
+        blank=True,
     )
     date_journee = models.DateField(default=timezone.localdate)
     device_id = models.CharField(max_length=255, blank=True, default='')

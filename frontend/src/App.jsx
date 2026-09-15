@@ -52,6 +52,7 @@ import EvaluationList from './pages/EvaluationList'
 import EvaluationDetail from './pages/EvaluationDetail'
 import EvaluationTake from './pages/EvaluationTake'
 import Edts from './pages/Edts'
+import EdtPresences from './pages/EdtPresences'
 import EdtNew from './pages/EdtNew'
 import AffectationNew from './pages/AffectationNew'
 
@@ -540,6 +541,13 @@ function App() {
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES} capacite={{ module: 'web', action: 'operationnel' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Emplois du temps</li></>}>
                 <Edts />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/edt/presences" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES} capacite={{ module: 'web', action: 'operationnel' }}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/edt">Emplois du temps</Link></li><li className="separator">/</li><li>Présences de séance</li></>}>
+                <EdtPresences />
               </Layout>
             </ProtectedRoute>
           } />
