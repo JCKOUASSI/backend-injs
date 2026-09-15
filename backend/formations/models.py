@@ -155,9 +155,34 @@ class RefVague(models.Model):
 
 
 class RefFormation(models.Model):
-    """Cycles de formation prédéfinis (ex: FORMATION EN ADMINISTRATION DE BASE)."""
+    """Cycle de formation du référentiel (modèle fonctionnel 04.4) : le descripteur
+    administratif et pédagogique d'un cursus — la *formation opérationnelle*
+    (``Formation``, session ouverte) s'y adosse par ``ref_formation`` (lien D3)."""
+
+    class TypeDiplome(models.TextChoices):
+        LICENCE = 'LICENCE', 'Licence'
+        MASTER = 'MASTER', 'Master'
+        DOCTORAT = 'DOCTORAT', 'Doctorat'
+        DUT = 'DUT', 'DUT / BTS'
+        PROFESSIONNALISANT = 'PROFESSIONNALISANT', 'Cycle professionnalisant'
+        AUTRE = 'AUTRE', 'Autre'
+
     intitule = models.CharField(max_length=255, unique=True)
     actif = models.BooleanField(default=True)
+    # --- Lot B refonte (modèle 04.4) : descripteur de cycle ---
+    code = models.CharField(max_length=30, blank=True, default='', db_index=True,
+                            help_text='Code court du cycle (ex. LIC-ADMIN).')
+    type_diplome = models.CharField(max_length=20, blank=True, default='',
+                                    choices=TypeDiplome.choices, verbose_name='Type de diplôme')
+    domaine = models.CharField(max_length=100, blank=True, default='')
+    mention = models.CharField(max_length=100, blank=True, default='')
+    duree_annees = models.PositiveSmallIntegerField(null=True, blank=True,
+                                                     verbose_name='Durée (années)')
+    nb_semestres = models.PositiveSmallIntegerField(null=True, blank=True,
+                                                     verbose_name='Nombre de semestres')
+    nb_credites = models.PositiveSmallIntegerField(null=True, blank=True,
+                                                   verbose_name='Crédits ECTS visés')
+    description = models.TextField(blank=True, default='')
     prix_heure_realisee = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -401,6 +426,13 @@ class Formation(models.Model):
 
     numero_formation = models.PositiveSmallIntegerField(null=True, blank=True, help_text="N° de la formation dans le cycle")
     formation = models.CharField(max_length=255)
+    # Lien D3 résolu (lot B refonte) : la session ouverte s'adosse au cycle du
+    # référentiel. Nullable + SET_NULL : aucune formation existante n'est
+    # contrainte, la chaîne LMD (parcours/maquettes/EDT) peut la remonter.
+    ref_formation = models.ForeignKey(
+        RefFormation, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='formations', verbose_name='Cycle de référence',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

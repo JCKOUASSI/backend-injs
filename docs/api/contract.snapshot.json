@@ -1238,6 +1238,8 @@
               "nb_participants": null,
               "nb_presents": null,
               "numero_formation": null,
+              "ref_formation": null,
+              "ref_formation_intitule": null,
               "updated_at": null
             }
           }
@@ -1786,6 +1788,8 @@
           "numero_formation": null,
           "participants": null,
           "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
           "sessions": null,
           "updated_at": null
         }
@@ -3164,6 +3168,13 @@
         "200": null
       }
     },
+    "GET /api/scolarite/pedagogie/cours/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/scolarite/ref/{ressource}/": {
       "parameters": [
         "ressource"
@@ -3862,6 +3873,8 @@
         "numero_formation": null,
         "participants": null,
         "participants_attendus": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
         "sessions": null,
         "updated_at": null
       },
@@ -3881,6 +3894,8 @@
           "numero_formation": null,
           "participants": null,
           "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
           "sessions": null,
           "updated_at": null
         }
@@ -5017,6 +5032,8 @@
         "nb_participants": null,
         "nb_presents": null,
         "numero_formation": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
         "updated_at": null
       },
       "responses": {
@@ -5031,6 +5048,8 @@
           "nb_participants": null,
           "nb_presents": null,
           "numero_formation": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
           "updated_at": null
         }
       }
@@ -7398,6 +7417,8 @@
         "numero_formation": null,
         "participants": null,
         "participants_attendus": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
         "sessions": null,
         "updated_at": null
       },
@@ -7417,6 +7438,8 @@
           "numero_formation": null,
           "participants": null,
           "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
           "sessions": null,
           "updated_at": null
         }

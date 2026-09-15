@@ -210,3 +210,28 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : POST /api/presences/seances-edt/{id}/emargement/
   - Route supprimée ou renommée : POST /api/presences/seances-edt/{id}/qr/
 
+## 2026-09-15 04:28 UTC
+
+- **Justification :** Lot B refonte (modèle 04) : ajout de GET /api/scolarite/pedagogie/cours/ (vue Enseignements LMD) et expos des descripteurs de cycle sur /api/formations/ref/formations/ ; Formation.ref_formation (lien D3) ajouté en écriture — aucune route retirée.
+- Routes dans le contrat : 665
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 17
+  - GET /api/formations/ — clé de réponse 200 supprimée : GET /api/formations/ → réponse 200.results.[].ref_formation
+  - GET /api/formations/ — clé de réponse 200 supprimée : GET /api/formations/ → réponse 200.results.[].ref_formation_intitule
+  - GET /api/formations/{id}/ — clé de réponse 200 supprimée : GET /api/formations/{id}/ → réponse 200.ref_formation
+  - GET /api/formations/{id}/ — clé de réponse 200 supprimée : GET /api/formations/{id}/ → réponse 200.ref_formation_intitule
+  - Route supprimée ou renommée : GET /api/scolarite/pedagogie/cours/
+  - PATCH /api/formations/{id}/ — clé de requête supprimée : PATCH /api/formations/{id}/ → requête.ref_formation
+  - PATCH /api/formations/{id}/ — clé de requête supprimée : PATCH /api/formations/{id}/ → requête.ref_formation_intitule
+  - PATCH /api/formations/{id}/ — clé de réponse 200 supprimée : PATCH /api/formations/{id}/ → réponse 200.ref_formation
+  - PATCH /api/formations/{id}/ — clé de réponse 200 supprimée : PATCH /api/formations/{id}/ → réponse 200.ref_formation_intitule
+  - POST /api/formations/ — clé de requête supprimée : POST /api/formations/ → requête.ref_formation
+  - POST /api/formations/ — clé de requête supprimée : POST /api/formations/ → requête.ref_formation_intitule
+  - POST /api/formations/ — clé de réponse 201 supprimée : POST /api/formations/ → réponse 201.ref_formation
+  - POST /api/formations/ — clé de réponse 201 supprimée : POST /api/formations/ → réponse 201.ref_formation_intitule
+  - PUT /api/formations/{id}/ — clé de requête supprimée : PUT /api/formations/{id}/ → requête.ref_formation
+  - PUT /api/formations/{id}/ — clé de requête supprimée : PUT /api/formations/{id}/ → requête.ref_formation_intitule
+  - PUT /api/formations/{id}/ — clé de réponse 200 supprimée : PUT /api/formations/{id}/ → réponse 200.ref_formation
+  - PUT /api/formations/{id}/ — clé de réponse 200 supprimée : PUT /api/formations/{id}/ → réponse 200.ref_formation_intitule
+

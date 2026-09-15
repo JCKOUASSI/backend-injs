@@ -26,7 +26,7 @@ const emptyForm = {
   site: '', batiment: '', salle: '', duree_prevue_heures: '',
 }
 
-const emptyFormationForm = { formation: '', module: '' }
+const emptyFormationForm = { formation: '', module: '', ref_formation: '' }
 const STATUT_VALUES = ['PLANIFIEE', 'EN_COURS', 'TERMINEE', 'SUSPENDUE']
 const DATE_MODES = ['today', 'all', 'date']
 const FILTER_LABELS = {
@@ -267,7 +267,14 @@ export default function Modules() {
     setFormationError('')
     setSavingFormation(true)
     try {
-      const res = await api.post('/formations/', { formation: formationForm.formation, module_input: formationForm.module })
+      // Lien D3 (modèle 04.4) : si l'intitulé choisi provient du référentiel
+      // des cycles, la session est adossée au cycle correspondant.
+      const cycle = (refs.formations || []).find((f) => f.intitule === formationForm.formation)
+      const res = await api.post('/formations/', {
+        formation: formationForm.formation,
+        module_input: formationForm.module,
+        ...(cycle ? { ref_formation: cycle.id } : {}),
+      })
       const created = res.data
       const title = created?.formation || created?.intitule || formationForm.formation
       if (created?.id) {

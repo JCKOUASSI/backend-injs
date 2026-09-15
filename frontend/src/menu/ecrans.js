@@ -1467,10 +1467,16 @@ export const ECRANS = {
     endpoint: '/formations/ref/formations/',
     colonnes: [
       { cle: 'id', libelle: 'ID' },
+      { cle: 'code', libelle: 'Code' },
       { cle: 'intitule', libelle: 'Intitulé' },
+      { cle: 'type_diplome', libelle: 'Diplôme' },
+      { cle: 'domaine', libelle: 'Domaine' },
+      { cle: 'mention', libelle: 'Mention' },
+      { cle: 'duree_annees', libelle: 'Durée (ans)' },
+      { cle: 'nb_credites', libelle: 'Crédits ECTS' },
       { cle: 'actif', libelle: 'Actif', format: 'booleen' },
     ],
-    note: 'Source : /api/formations/ref/formations/',
+    note: 'Source : /api/formations/ref/formations/ — descripteur de cycle (modèle 04.4).',
   },
 
   ref_filieres: {

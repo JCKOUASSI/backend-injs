@@ -1,6 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Formation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
+from .models import Formation, RefFormation, Participant, Secretariat, ModuleParticipant, ModuleFormateur, Formateur, QRToken, SessionModule, Module
 from .formateur_privacy import can_view_formateur_sensitive_data, can_edit_formateur_sensitive_data
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
@@ -290,6 +290,9 @@ class FormationListSerializer(serializers.ModelSerializer):
     module_input = serializers.CharField(write_only=True, required=False, allow_blank=True)
     nb_participants = serializers.SerializerMethodField()
     nb_presents = serializers.SerializerMethodField()
+    ref_formation = serializers.PrimaryKeyRelatedField(
+        queryset=RefFormation.objects.filter(actif=True), required=False, allow_null=True)
+    ref_formation_intitule = serializers.SerializerMethodField()
 
     class Meta:
         model = Formation
@@ -297,9 +300,13 @@ class FormationListSerializer(serializers.ModelSerializer):
             'id', 'numero_formation', 'intitule', 'formation',
             'module', 'modules_list', 'module_input',
             'nb_participants', 'nb_presents',
+            'ref_formation', 'ref_formation_intitule',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_ref_formation_intitule(self, obj):
+        return obj.ref_formation.intitule if obj.ref_formation_id else ''
 
     def get_module(self, obj):
         """Retourne l'intitulé du premier module lié (compatibilité)."""

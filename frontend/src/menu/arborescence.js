@@ -278,8 +278,17 @@ export const ARBORESCENCE = [
         },
       },
       {
+        id: 'formations.cours_lmd',
+        libelle: 'Cours (LMD)',
+        chemin: '/cours',
+        droit: {
+          curp: ['pedagogie.volume_horaire.consulter'],
+          legacy: [['web', 'operationnel']],
+        },
+      },
+      {
         id: 'formations.cours',
-        libelle: 'Cours & modules',
+        libelle: 'Cours & modules (CPFAE — héritage)',
         chemin: '/modules',
         droit: {
           curp: ['pedagogie.volume_horaire.consulter'],
@@ -348,7 +357,7 @@ export const ARBORESCENCE = [
       {
         id: 'get_injs.cours',
         libelle: 'Cours',
-        chemin: '/modules',
+        chemin: '/cours',
         droit: {
           curp: ['edt.seance.creer'],
           legacy: [['web', 'operationnel']],

@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import (
     api_views,
+    cours_lmd_api,
     edt_export,
     groupes_api,
     inscription_api,
@@ -82,6 +83,9 @@ urlpatterns = [
     path('ues/<int:pk>/',                         api_views.ue_detail,               name='scolarite-ue-detail'),
     path('ues/<int:pk>/ecues/',                   api_views.ue_ecue_create,          name='scolarite-ue-ecue-create'),
     path('ecues/<int:pk>/',                       api_views.ecue_detail,             name='scolarite-ecue-detail'),
+
+    # Lot B refonte — vue « Cours / Enseignements » LMD (affectations × EDT).
+    path('pedagogie/cours/',                      cours_lmd_api.cours_list,          name='scolarite-pedagogie-cours'),
 
     path('ref/<str:ressource>/',                  api_views.referentiel_list,        name='scolarite-ref-list'),
     path('ref/<str:ressource>/<int:pk>/',         api_views.referentiel_detail,      name='scolarite-ref-detail'),

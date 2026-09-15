@@ -813,9 +813,12 @@ describe('pages/Modules.jsx (LOT 39) — création d’une formation', () => {
     fireEvent.click(within(formationModal).getByRole('button', { name: 'Créer' }))
 
     await waitFor(() =>
+      // Lot B (lien D3) : l'intitulé choisi dans le référentiel des cycles est
+      // automatiquement rattaché via ref_formation (id du cycle).
       expect(apiMock.post).toHaveBeenCalledWith('/formations/', {
         formation: 'Licence 1 LSF',
         module_input: 'Module inaugural',
+        ref_formation: 1,
       }),
     )
     expect(await screen.findByText('Formation créée — vous pouvez y rattacher d’autres modules')).toBeInTheDocument()

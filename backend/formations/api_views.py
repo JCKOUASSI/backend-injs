@@ -3082,14 +3082,62 @@ def api_import_excel(request):
     })
 
 
+_REF_FORMATION_CHAMPS = ('code', 'type_diplome', 'domaine', 'mention', 'duree_annees',
+                         'nb_semestres', 'nb_credites', 'description')
+
+
+def _ref_formation_payload(obj):
+    return {'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif,
+            'prix_heure_realisee': obj.prix_heure_realisee,
+            **{c: getattr(obj, c) for c in _REF_FORMATION_CHAMPS}}
+
+
+def _ref_formation_nettoye(data, obj=None):
+    """Validation légère du cycle référentiel (lot B) — retourne (payload, erreur)."""
+    code = (data.get('code') or '').strip().upper()
+    if code and RefFormation.objects.filter(code=code).exclude(
+            pk=obj.pk if obj else None).exists():
+        return None, {'error': f'Le code « {code} » est déjà utilisé par un autre cycle.'}
+    intitule = (data.get('intitule') or '').strip()
+    if not intitule:
+        return None, {'error': '« intitule » est requis.'}
+    type_diplome = (data.get('type_diplome') or '').strip().upper()
+    valides = {c[0] for c in RefFormation.TypeDiplome.choices}
+    if type_diplome and type_diplome not in valides:
+        return None, {'error': 'Type de diplôme inconnu (LICENCE, MASTER, DOCTORAT, '
+                              'DUT, PROFESSIONNALISANT, AUTRE).'}
+    payload = {
+        'intitule': intitule, 'code': code, 'type_diplome': type_diplome,
+        'domaine': (data.get('domaine') or '').strip(),
+        'mention': (data.get('mention') or '').strip(),
+        'description': (data.get('description') or '').strip(),
+        'duree_annees': data.get('duree_annees'),
+        'nb_semestres': data.get('nb_semestres'),
+        'nb_credites': data.get('nb_credites'),
+        'actif': data.get('actif', True),
+    }
+    for cle in ('duree_annees', 'nb_semestres', 'nb_credites'):
+        if payload[cle] in (None, '', 0, '0'):
+            payload[cle] = None
+        else:
+            try:
+                payload[cle] = int(payload[cle])
+            except (TypeError, ValueError):
+                return None, {'error': f'« {cle} » doit être un entier.'}
+    return payload, None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsDFRC])
 def ref_formation_list(request):
     if request.method == 'GET':
-        data = list(RefFormation.objects.values('id', 'intitule', 'actif'))
+        data = [_ref_formation_payload(o) for o in RefFormation.objects.all()]
         return Response(data)
-    obj = RefFormation.objects.create(intitule=request.data.get('intitule', ''), actif=request.data.get('actif', True))
-    return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif}, status=201)
+    payload, err = _ref_formation_nettoye(request.data)
+    if err:
+        return Response(err, status=400)
+    obj = RefFormation.objects.create(**payload)
+    return Response(_ref_formation_payload(obj), status=201)
 
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsDFRC])
@@ -3099,10 +3147,26 @@ def ref_formation_detail(request, pk):
     except RefFormation.DoesNotExist:
         return Response({'error': 'Introuvable'}, status=404)
     if request.method == 'PUT':
-        obj.intitule = request.data.get('intitule', obj.intitule)
-        obj.actif = request.data.get('actif', obj.actif)
+        data = dict(request.data)
+        # PUT à sémantique douce : champs absents conservés.
+        for cle in ('code', 'type_diplome', 'domaine', 'mention', 'description',
+                    'duree_annees', 'nb_semestres', 'nb_credites'):
+            if cle not in data and getattr(obj, cle, None) not in (None, ''):
+                data[cle] = getattr(obj, cle)
+        if 'intitule' not in data:
+            data['intitule'] = obj.intitule
+        if 'actif' not in data:
+            data['actif'] = obj.actif
+        payload, err = _ref_formation_nettoye(data, obj=obj)
+        if err:
+            return Response(err, status=400)
+        for cle, valeur in payload.items():
+            setattr(obj, cle, valeur)
         obj.save()
-        return Response({'id': obj.id, 'intitule': obj.intitule, 'actif': obj.actif})
+        return Response(_ref_formation_payload(obj))
+    if Formation.objects.filter(ref_formation=obj).exists():
+        return Response({'error': 'Des sessions de formation s’appuient sur ce cycle : '
+                                  'désactivez-le plutôt que de le supprimer.'}, status=409)
     obj.delete()
     return Response(status=204)
 
