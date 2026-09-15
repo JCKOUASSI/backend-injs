@@ -233,7 +233,9 @@ function App() {
           <Route path="/scolarite" element={
             <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES} capacite={{ module: 'scolarite', action: 'voir' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Scolarité</li></>}>
-                <ScolariteDashboard />
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <ScolariteDashboard />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />
@@ -267,7 +269,9 @@ function App() {
           <Route path="/scolarite/etudiants/:id" element={
             <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES} capacite={{ module: 'scolarite', action: 'voir' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Fiche étudiant</li></>}>
-                <FicheEtudiant />
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <FicheEtudiant />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />
