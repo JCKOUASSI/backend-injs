@@ -115,9 +115,16 @@ L'existant (badgeage legacy `SessionModule`, geofence, heartbeats, rattrapages) 
 1. **Enseignant non badgeable sur séance LMD** : le scan EDT est réservé aux auditeurs
    inscrits ; la présence de l'enseignant continue de passer par le flux SessionModule
    (paie) — à réunifier au prompt « heures réalisées » si le besoin apparaît.
-2. `NotificationAbsence` et les alertes restent branchés sur le flux legacy ; les
-   absences d'émargement LMD sont traçables (AuditLog + lignes `ABSENT_NON_BADGE`)
-   mais ne déclenchent pas encore de notification — prompt suivant éventuel.
+2. ~~`NotificationAbsence` et les alertes restent branchés sur le flux legacy~~ —
+   **résolu par le lot suivant** (`90325c1+` : alerte à la clôture) :
+   `auto_clore` vérifie le cumul d'absences de chaque absent de la séance contre les
+   seuils `ConfigAlerteSeuil` (les mêmes que l'agrégat global) et notifie
+   immédiatement Direction/Secrétariat ; idempotence garantie par contrainte
+   d'unicité (destinataire, étudiant, séance, niveau) ; désactivable par le
+   paramètre `presences.edt.notifier_a_cloture`. La **cloche** de l'application
+   (`AppNotificationsBell`) gagne une source « Présences » (`GET/PATCH
+   /api/stats/notifications/recues/`, contrat `tout`+`ids`) — 7 tests backend,
+   4 tests vitest.
 3. La gouvernance complète des cycles (formulaire de création du référentiel dans la
    console) s'appuie sur l'API durcie (`/formations/ref/formations/`) ; l'écran
    générique reste en lecture — l'ajout d'un formulaire CURP dédié est un lot à part.

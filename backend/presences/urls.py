@@ -21,6 +21,8 @@ urlpatterns = [
     path('stats/taux/', stats_api.taux, name='presences-stats-taux'),
     path('stats/alertes/', stats_api.alertes, name='presences-stats-alertes'),
     path('stats/notifications/', stats_api.notifications, name='presences-stats-notifications'),
+    path('stats/notifications/recues/', stats_api.notifications_recues,
+         name='presences-stats-notifications-recues'),
 
     # Rattrapages inter-cohorte (DFRC / Encadrant / Secrétariat)
     path('rattrapages/', rattrapage_api.rattrapage_list_create, name='rattrapage-list-create'),

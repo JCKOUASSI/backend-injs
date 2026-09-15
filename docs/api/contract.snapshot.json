@@ -3357,6 +3357,13 @@
         "200": null
       }
     },
+    "GET /api/stats/notifications/recues/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/stats/taux/": {
       "parameters": [],
       "request_keys": null,
@@ -4334,6 +4341,13 @@
       "parameters": [
         "rapport_id"
       ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/stats/notifications/recues/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null

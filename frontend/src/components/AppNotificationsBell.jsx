@@ -17,6 +17,7 @@ const SOURCE_META = {
   notes: { label: 'Notes', icon: 'bi-pencil-square', color: '#1565C0' },
   rapports: { label: 'Rapports', icon: 'bi-file-earmark-text', color: '#125a99' },
   finance: { label: 'Finance', icon: 'bi-cash-coin', color: '#F5B100' },
+  presences: { label: 'Présences', icon: 'bi-calendar-x', color: '#C0392B' },
 }
 
 function normalizeItems(data, source) {
@@ -27,7 +28,7 @@ function normalizeItems(data, source) {
   }))
 }
 
-export default function AppNotificationsBell({ showNotes, showRapports, showFinance }) {
+export default function AppNotificationsBell({ showNotes, showRapports, showFinance, showPresences }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const [nonLues, setNonLues] = useState(0)
@@ -58,6 +59,14 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
           .catch(() => []),
       )
     }
+    if (showPresences) {
+      // Alerte d'absence LMD née à la clôture de séance (ou agrégat manuel).
+      requests.push(
+        api.get('/stats/notifications/recues/')
+          .then(r => normalizeItems(r.data, 'presences'))
+          .catch(() => []),
+      )
+    }
 
     try {
       const groups = await Promise.all(requests)
@@ -69,7 +78,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
     } finally {
       setLoading(false)
     }
-  }, [showNotes, showRapports, showFinance])
+  }, [showNotes, showRapports, showFinance, showPresences])
 
   useEffect(() => {
     fetchNotifications()
@@ -91,6 +100,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
   const patchEndpoint = (source) => {
     if (source === 'rapports') return '/statistiques/rapports/notifications/'
     if (source === 'finance') return '/formations/finance/notifications/'
+    if (source === 'presences') return '/stats/notifications/recues/'
     return '/formations/notes/notifications/'
   }
 
@@ -104,7 +114,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
   }
 
   const markAllRead = async () => {
-    const bySource = { notes: [], rapports: [], finance: [] }
+    const bySource = { notes: [], rapports: [], finance: [], presences: [] }
     items.filter(n => !n.lu).forEach(n => {
       if (bySource[n.source]) bySource[n.source].push(n.id)
     })
@@ -125,7 +135,7 @@ export default function AppNotificationsBell({ showNotes, showRapports, showFina
     return null
   }
 
-  if (!showNotes && !showRapports && !showFinance) return null
+  if (!showNotes && !showRapports && !showFinance && !showPresences) return null
 
   return (
     <div ref={panelRef} style={{ position: 'relative' }}>

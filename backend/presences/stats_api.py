@@ -10,6 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.permissions import IsSecretariatOrDFRC
+
+from .models import NotificationAbsence
 from scolarite.models import AnneeAcademique
 
 from . import stats_services
@@ -46,6 +48,45 @@ def alertes(request):
     annee = _annee(request)
     return Response({'annee': annee.libelle if annee else None,
                      'alertes': stats_services.alertes_absence(annee)})
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def notifications_recues(request):
+    """Cloche de l'utilisateur : alertes d'absence reçues (LMD et legacy).
+
+    GET  → {notifications: […], non_lues: n} — les 50 plus récentes.
+    PATCH → {ids: […]} marque lues les notifications du destinataire.
+    """
+    queryset = (NotificationAbsence.objects
+                .filter(destinataire=request.user)
+                .select_related('etudiant__participant', 'seance_edt'))
+    if request.method == 'GET':
+        try:
+            limite = min(max(int(request.query_params.get('limit') or 50), 1), 200)
+        except ValueError:
+            limite = 50
+        notifications = [
+            {
+                'id': notif.id,
+                'message': notif.message,
+                'niveau': notif.niveau,
+                'lu': notif.lue,
+                'created_at': notif.cree_le.isoformat(),
+                'matricule': (notif.etudiant.participant.matricule
+                              if notif.etudiant_id and notif.etudiant.participant_id else ''),
+                'seance': str(notif.seance_edt) if notif.seance_edt_id else '',
+            }
+            for notif in queryset[:limite]
+        ]
+        return Response({'notifications': notifications,
+                         'non_lues': queryset.filter(lue=False).count()})
+    if request.data.get('tout'):
+        # « Tout marquer lu » de la cloche : même contrat que les autres
+        # sources de notifications.
+        return Response({'marquees': queryset.update(lue=True)})
+    ids = [int(x) for x in (request.data.get('ids') or []) if str(x).isdigit()]
+    return Response({'marquees': queryset.filter(id__in=ids).update(lue=True)})
 
 
 @api_view(['POST'])

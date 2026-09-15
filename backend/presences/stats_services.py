@@ -134,6 +134,65 @@ def alertes_absence(annee=None):
     return alertes
 
 
+def notifier_absences_seance(affectation, date, participant_ids, utilisateur=None):
+    """Lot C+ — après clôture d'une séance LMD, alerter Direction/Secrétariat
+    pour les étudiants dont le cumul d'absences franchit un seuil
+    ConfigAlerteSeuil. Idempotent : la contrainte d'unicité
+    (destinataire, étudiant, séance, niveau) interdit le doublon."""
+    if not participant_ids:
+        return 0
+    avertissement, critique = _seuil_absence()
+    if avertissement is None and critique is None:
+        return 0
+    from authentication.models import User
+    from scolarite.models import DossierEtudiant
+
+    destinataires = list(User.objects.filter(
+        role__in=('DIRECTION', 'SECRETARIAT', 'CHEF_SECRETARIAT')))
+    if not destinataires:
+        return 0
+    annee = affectation.emploi_du_temps.annee_academique
+    # Taux calculés uniquement pour les absents du jour (pas d'agrégation
+    # globale : la clôture d'une séance ne doit pas scanner toute l'année).
+    par_participant = {pid: {'total': 0, 'presents': 0} for pid in set(participant_ids)}
+    for pointage in _pointages(annee=annee).filter(participant_id__in=par_participant):
+        entree = par_participant[pointage.participant_id]
+        entree['total'] += 1
+        if _assiduite_presente(pointage):
+            entree['presents'] += 1
+    intitule = getattr(affectation, 'intitule', '') or str(affectation)
+    creees = 0
+    for pid, entree in par_participant.items():
+        taux_presence = taux_from_counts(entree['presents'], entree['total'])
+        if taux_presence is None:
+            continue
+        taux_absence = round(100 - taux_presence, 2)
+        niveau = None
+        if critique is not None and taux_absence >= critique:
+            niveau = 'CRITIQUE'
+        elif avertissement is not None and taux_absence >= avertissement:
+            niveau = 'AVERTISSEMENT'
+        if niveau is None:
+            continue
+        participant = next(
+            (pt.participant for pt in
+             Pointage.objects.filter(participant_id=pid).select_related('participant')[:1]), None)
+        matricule = getattr(participant, 'matricule', f'#{pid}')
+        dossier = DossierEtudiant.objects.filter(participant_id=pid).first()
+        message = (
+            f"Absences {niveau.lower()} : {matricule} — taux de présence "
+            f"{taux_presence} % (séance LMD « {intitule} » du {date})"
+        )
+        for destinataire in destinataires:
+            _, creee = NotificationAbsence.objects.get_or_create(
+                destinataire=destinataire, etudiant=dossier, seance_edt=affectation,
+                niveau=niveau,
+                defaults={'auteur': utilisateur, 'message': message},
+            )
+            creees += int(creee)
+    return creees
+
+
 def notifier_absences(annee, utilisateur=None):
     """Génère les notifications in-app d'absence (Direction / Secrétariat)."""
     from authentication.models import User

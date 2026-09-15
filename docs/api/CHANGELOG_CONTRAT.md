@@ -235,3 +235,13 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - PUT /api/formations/{id}/ — clé de réponse 200 supprimée : PUT /api/formations/{id}/ → réponse 200.ref_formation
   - PUT /api/formations/{id}/ — clé de réponse 200 supprimée : PUT /api/formations/{id}/ → réponse 200.ref_formation_intitule
 
+## 2026-09-15 09:31 UTC
+
+- **Justification :** Refonte — écart n°2 résolu : GET/PATCH /api/stats/notifications/recues/ (cloche d'alertes d'absence, incluant les alertes nées d'une clôture de séance LMD) ; aucune route retirée.
+- Routes dans le contrat : 667
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 2
+  - Route supprimée ou renommée : GET /api/stats/notifications/recues/
+  - Route supprimée ou renommée : PATCH /api/stats/notifications/recues/
+

@@ -30,7 +30,10 @@ _JOURS = {'LUNDI': 0, 'MARDI': 1, 'MERCREDI': 2, 'JEUDI': 3,
 CLE_OUVERTURE_ANTICIPEE = 'presences.edt.ouverture_anticipee_minutes'
 CLE_TOLERANCE_RETARD = 'presences.edt.tolerance_retard_minutes'
 CLE_TOLERANCE_CLOTURE = 'presences.edt.tolerance_cloture_minutes'
-DEFAUTS = {CLE_OUVERTURE_ANTICIPEE: 10, CLE_TOLERANCE_RETARD: 10, CLE_TOLERANCE_CLOTURE: 15}
+CLE_NOTIFIER_CLOTURE = 'presences.edt.notifier_a_cloture'
+
+DEFAUTS = {CLE_OUVERTURE_ANTICIPEE: 10, CLE_TOLERANCE_RETARD: 10, CLE_TOLERANCE_CLOTURE: 15,
+           CLE_NOTIFIER_CLOTURE: 1}
 
 
 def _parametre(cle):
@@ -453,7 +456,9 @@ def auto_clore(request, affectation, date):
     badge = set(Pointage.objects.filter(seance_edt=affectation, date_journee=date)
                 .values_list('participant_id', flat=True))
     nb_absents = 0
+    absents_du_jour = []
     for membre in membres_groupe(affectation).exclude(pk__in=badge):
+        absents_du_jour.append(membre.pk)
         Pointage.objects.create(
             participant=membre, seance_edt=affectation, date_journee=date,
             timestamp_entree=horodatages(affectation, date)[0],
@@ -466,6 +471,17 @@ def auto_clore(request, affectation, date):
         )
         nb_absents += 1
     QRToken.objects.filter(seance_edt=affectation, actif=True).update(actif=False)
+    # Alerte d'absence ciblée (rapport de refonte, écart n°2) : les absents de
+    # cette séance ne déclenchent plus seulement l'agrégat manuel global —
+    # chaque franchissement de seuil notifie immédiatement la chaîne
+    # Direction/Secrétariat, une fois par séance et par niveau (contrainte DB).
+    nb_alertes = 0
+    if _parametre(CLE_NOTIFIER_CLOTURE) and absents_du_jour:
+        from .stats_services import notifier_absences_seance
+        nb_alertes = notifier_absences_seance(
+            affectation, date, absents_du_jour,
+            utilisateur=request.user if request and request.user.is_authenticated else None,
+        )
     AuditLog.objects.create(
         action=AuditLog.Action.CLOSE_SESSION,
         acteur=request.user if request and request.user.is_authenticated else None,
@@ -474,6 +490,8 @@ def auto_clore(request, affectation, date):
         cible_type='seance_edt', cible_numero=str(affectation.pk),
         cible_nom=affectation.intitule or str(affectation.creneau_template),
         extra={'canal': 'EDT_LMD', 'date': date.isoformat(),
-               'pointages_clotures': nb_clotures, 'absents_marques': nb_absents},
+               'pointages_clotures': nb_clotures, 'absents_marques': nb_absents,
+               'alertes_absence': nb_alertes},
     )
-    return {'pointages_clotures': nb_clotures, 'absents_marques': nb_absents}
+    return {'pointages_clotures': nb_clotures, 'absents_marques': nb_absents,
+            'alertes_absence': nb_alertes}

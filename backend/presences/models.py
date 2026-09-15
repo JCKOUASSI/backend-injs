@@ -579,6 +579,16 @@ class NotificationAbsence(models.Model):
         related_name='notifications_absence',
         null=True, blank=True,
     )
+    # Lot C+ — l'alerte née d'une clôture de séance LMD référence la séance
+    # d'origine (le flux legacy SessionModule reste sans seance_edt).
+    seance_edt = models.ForeignKey(
+        'edts.AffectationCreneau',
+        on_delete=models.SET_NULL,
+        related_name='notifications_absence',
+        null=True, blank=True,
+        verbose_name="Séance LMD",
+        help_text="Séance d'origine de l'alerte (flux EDT/LMD uniquement).",
+    )
     message = models.TextField()
     niveau = models.CharField(
         max_length=15,
@@ -592,6 +602,13 @@ class NotificationAbsence(models.Model):
         ordering = ['-cree_le']
         verbose_name = "Notification d'absence"
         verbose_name_plural = "Notifications d'absence"
+        constraints = [
+            models.UniqueConstraint(
+                fields=('destinataire', 'etudiant', 'seance_edt', 'niveau'),
+                condition=models.Q(seance_edt__isnull=False),
+                name='notif_absence_lmd_non_dupliquee',
+            ),
+        ]
 
     def __str__(self):
         return f'[{self.niveau}] {self.message[:60]}'

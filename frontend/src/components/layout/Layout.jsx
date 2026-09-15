@@ -34,6 +34,8 @@ export default function Layout({ children, breadcrumb }) {
 
   // Gardes de notification conservées à l'identique de l'écran historique.
   const isDirection = hasAppRole(user, ['DIRECTION'])
+  // Destinataires des alertes d'absence (modèle 08) : direction + secrétariat.
+  const isChaineAbsences = hasAppRole(user, ['DIRECTION', 'SECRETARIAT', 'CHEF_SECRETARIAT'])
   const canViewStatistiques = peut(user, 'statistiques', 'voir')
   const canViewFinanceNotifications = hasAppRole(user, FINANCE_MODULE_ROLES)
     && !hasAppRole(user, ['ARCHIVE'])
@@ -76,6 +78,7 @@ export default function Layout({ children, breadcrumb }) {
                 showNotes={isDirection}
                 showRapports={canViewStatistiques}
                 showFinance={canViewFinanceNotifications}
+                showPresences={isChaineAbsences}
               />
             )}
             <Link to="/profile" className="top-bar-user" title="Mon profil" style={{ textDecoration: 'none', color: 'inherit' }}>
