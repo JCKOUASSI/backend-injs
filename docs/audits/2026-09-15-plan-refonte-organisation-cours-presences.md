@@ -1,6 +1,9 @@
 # Plan — refonte Organisation / Cours-Formations / Présences QR (d'après le Modèle fonctionnel de référence)
 
-**Date :** 2026-09-15 · **Source :** `workspace/uploads/` — *Audit complet détaillé* (11/09/2026),
+**Date :** 2026-09-15 · **Statut :** TROIS LOTS LIVRÉS (A `7520d7e`, C `4c04dbb`, B `86ceb57`) —
+gate feux verts passée (backend 1672 OK, frontend 1725 OK + lint + build) ;
+rapport détaillé : `docs/audits/2026-09-15-rapport-refonte-organisation-cours-presences.md`.
+**Source :** `workspace/uploads/` — *Audit complet détaillé* (11/09/2026),
 *Modèle fonctionnel de référence INJS-LMD 2026* (MODULES 04, 08, 13 ; §§ 15, 17-18, 35),
 *Rapport de mise en œuvre* (gap analysis, D1-D5, phases 1-10).
 **Méthode :** zéro régression — additif, réversible, nothing-but-bridge ; les notions

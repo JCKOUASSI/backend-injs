@@ -47,7 +47,7 @@ function ResponsableBadge({ valeur }) {
   return <span title={`Responsable : ${valeur.nom}`}><i className="bi bi-person-badge me-1"></i>{valeur.nom}</span>
 }
 
-function NoeudArbre({ libelle, code, effectif, actifs, children }) {
+function NoeudArbre({ libelle, code, effectif, sousNoeuds }) {
   return (
     <li className="mb-1">
       <span>
@@ -57,7 +57,7 @@ function NoeudArbre({ libelle, code, effectif, actifs, children }) {
           <span className="badge-bg-secondary ms-2" title="Comptes rattachés">{effectif}</span>
         )}
       </span>
-      {children && children.length > 0 && <ul className="list-unstyled ms-4 mt-1">{children}</ul>}
+      {sousNoeuds && sousNoeuds.length > 0 && <ul className="list-unstyled ms-4 mt-1">{sousNoeuds}</ul>}
     </li>
   )
 }
@@ -448,14 +448,14 @@ export default function Organisation() {
                     code={d.code}
                     libelle={d.libelle}
                     effectif={d.effectif}
-                    children={[
+                    sousNoeuds={[
                       ...(d.departements || []).map((dep) => (
                         <NoeudArbre
                           key={`p-${dep.id}`}
                           code={dep.code}
                           libelle={dep.libelle}
                           effectif={dep.effectif}
-                          children={[
+                          sousNoeuds={[
                             ...(dep.services || []).map((s) => (
                               <NoeudArbre key={`s-${s.id}`} code={s.code} libelle={s.libelle} effectif={s.effectif} />
                             )),
@@ -475,7 +475,7 @@ export default function Organisation() {
                   + (arbres.non_rattaches?.secretariats || []).length > 0 && (
                   <NoeudArbre
                     libelle='Unités sans rattachement'
-                    children={[
+                    sousNoeuds={[
                       ...(arbres.non_rattaches.departements || []).map((d) => (
                         <NoeudArbre key={`nd-${d.id}`} code={d.code} libelle={d.libelle} effectif={d.effectif} />
                       )),

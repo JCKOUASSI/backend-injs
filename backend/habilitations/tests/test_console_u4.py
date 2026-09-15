@@ -396,7 +396,8 @@ class ConsoleU4Tests(APITestCase):
         self._auth()
         reponse = self.client.get('/api/habilitations/roles/ADMIN_SYSTEME/')
         self.assertEqual(reponse.status_code, 200)
-        self.assertEqual(reponse.data['permissions_count'], 1155)
+        # 1155 + 2 codes lot A refonte (administrations.organigramme.consulter/gerer).
+        self.assertEqual(reponse.data['permissions_count'], 1157)
         reponse = self.client.get('/api/habilitations/matrice/')
         self.assertEqual(reponse.status_code, 200)
         self.assertEqual(len(reponse.data['lignes']), 81)
