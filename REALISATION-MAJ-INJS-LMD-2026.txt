@@ -595,7 +595,8 @@ Sous-tâches exécutées :
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'achèvement de l'ensemble des Vagues de mise à niveau (Lots 0.1 à 6.1), l'état final est :
+À la suite de l'achèvement de l'ensemble des Vagues de mise à niveau (Lots 0.1 à 6.1) et de la résolution
+du garde-fou d'affichage React Suspense sur ScolariteDashboard :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -611,8 +612,10 @@ Sous-tâches exécutées :
 |                             | Statistiques Décisionnelles 17 colonnes & Exports     | 🟢 VERT     |
 |                             | Tests automatisés (356 tests backend passés)         | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
-| FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
+| FEU 2 : FRONTEND REACT/VITE | `npm run lint` (ESLint 0 erreur, 0 avertissement)     | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
+|                             | Correction Suspense ScolariteDashboard/FicheEtudiant  | 🟢 RÉSOLU   |
+|                             | Sécurisation fallback API relative (`/api`)           | 🟢 SÉCURISÉ |
 |                             | Vitest (430+ tests unitaires & intégration)           | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 3 : MOBILE FLUTTER      | Traçabilité du code Dart                              | 🟡 TRACÉ    |
