@@ -207,21 +207,76 @@ Les travaux s'appuient sur l'analyse exhaustive des 16 pièces maîtresses du do
   * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
   * Intégrité de la chaîne d'audit : **100% conforme**.
 
+----------------------------------------------------------------------------------------------------
+VAGUE 1 / LOT 1.1 — RÉSORPTION DES DOUBLES REPRÉSENTATIONS & INTÉGRITÉ LMD (UE/ECUE/ECTS)
+----------------------------------------------------------------------------------------------------
+- Date de réalisation : 15 Septembre 2026
+- Statut : **RÉALISÉ AVEC SUCCÈS (FEU VERT EXÉCUTÉ)**
+- Travaux accomplis :
+  1. Résorption des doubles représentations `Formation` ↔ `RefFormation` (Lien D3) :
+     - Réconciliation complète via la commande `reconcilier_formations_cycles --creer-cycles-manquants`.
+     - 3 cycles de formation référentiels reliés aux formations opérationnelles (FAB, FAC, Finances Publiques).
+     - Intégrité référentielle : 100% des formations sont désormais rattachées à un `RefFormation`.
+  2. Résorption des doubles représentations `Module` ↔ `RefModule` (Nomenclature unifiée) :
+     - Reconstruction et association canonique via la commande `rebuild_ref_modules`.
+     - 6 `RefModule` canoniques créés et rattachés aux instances opérationnelles de `Module`.
+     - Intégrité référentielle : 100% des modules disposent d'un `ref_module` normalisé.
+  3. Matérialisation de l'infrastructure physique du campus INJS Marcory (Lien D1) :
+     - Référentiel des types d'espaces sportifs (`RefTypeEspaceSportif`) : AMPHI, SALLE_TD, SALLE_INFO, TERRAIN_EXT, GYMNASE, SALLE_REUNION.
+     - Site principal créé : « Campus INJS Marcory (Abidjan) », Boulevard Valéry Giscard d'Estaing, géofencing précis (lat 5.302500, lon -3.978500, rayon 300 m).
+     - 3 bâtiments référencés : Bâtiment Pédagogique STAPS, Complexe Sportif & Gymnase, Bâtiment Direction & Administration.
+     - 7 salles et équipements configurés : Amphithéâtres A et B, Salles STAPS 101/102, Gymnase Omnisports Central (capacité 500), Salle Spécifique Gymnastique, Salle du Conseil et Jurys.
+     - Raccordement physique : 100% des modules opérationnels affectés à un site et une salle de cours.
+  4. Référentiels pédagogiques LMD & Maquette d'enseignement active (Lot L1) :
+     - Niveaux d'études : L1, L2, L3, M1, M2 (cycles Licence et Master STAPS).
+     - Semestres académiques : S1 à S10 initialisés.
+     - Régimes d'études : Initial, Continu, Alternance, Professionnel.
+     - Statuts étudiant : Actif, Suspendu, Abandon, Exclu, Diplômé, Transféré (avec blocage d'inscription paramétré).
+     - Parcours INJS officiels créés : Professorat de Collège STAPS, Éducation et Motricité (EM), Entraînement Sportif (ES), Management du Sport (MS), Activité Physique Adaptée et Santé (APAS), Animation Socio-Éducative (ASE), Métiers de la Jeunesse (MJ).
+     - Règle de validation LMD pour L3 STAPS : seuil d'admission 10.00/20, compensation semestrielle, note éliminatoire 7.00/20, 30 crédits semestriels, capitalisation active.
+     - Maquette pédagogique L3 STAPS (v1, Année 2026-2027) :
+       * Unité d'Enseignement UE51 : Sciences et Didactique des APS (12 ECTS)
+         - ECUE511 : Athlétisme & Pratiques Sportives (6 ECTS, CM 20h, TD 30h, TP 20h, Coeff 2.0)
+         - ECUE512 : Didactique et Pédagogie STAPS (6 ECTS, CM 25h, TD 25h, TP 10h, Coeff 2.0)
+       * Unité d'Enseignement UE52 : Sciences Fondamentales & Biomécanique (10 ECTS)
+         - ECUE521 : Biomécanique et Physiologie de l'effort (5 ECTS, CM 25h, TD 20h, TP 15h, Coeff 1.5)
+         - ECUE522 : Santé, Hygiène et Secourisme (5 ECTS, CM 20h, TD 20h, TP 10h, Coeff 1.5)
+       * Unité d'Enseignement UE53 : Management, Droit et Éthique du Sport (8 ECTS)
+         - ECUE531 : Déontologie et Fonction Publique (4 ECTS, CM 20h, TD 15h, Coeff 1.0, lié RefModule)
+         - ECUE532 : Leadership, Management et Droit Administratif (4 ECTS, CM 20h, TD 15h, Coeff 1.0, lié RefModule)
+       * Total crédits maquette Semestre 5 : **30 ECTS**, volume horaire total : **310 heures**.
+       * Cohérence LMD : **0 incohérence (`verifier_coherence() == []`)**.
+       * Statut de maquette verrouillée après contrôle : **ACTIVE** (respect des gardes-fous d'immutabilité R4).
+  5. Commande d'orchestration globale :
+     - Création de la commande unifiée et idempotente `backend/formations/management/commands/seed_lot1_1_injs.py`.
+- Validation des API HTTP :
+  * `GET /api/scolarite/maquettes/` : **HTTP 200 OK** (Maquette L3 Professorat STAPS 2026-2027 ACTIVE retournée).
+  * `GET /api/formations/` : **HTTP 200 OK** (Formations opérationnelles reliées aux cycles RefFormation).
+  * `GET /api/formations/ref/sites/` : **HTTP 200 OK** (Campus INJS Marcory avec coordonnées GPS).
+- Résultats des contrôles :
+  * Backend Django `check` : **0 issue**.
+  * Backend Django `makemigrations --check --dry-run` : **0 migration manquante**.
+  * Suite de tests de régression (`scolarite.tests.test_referentiels`, `test_maquettes_workflow`, `test_passerelle`, `test_charges_pedagogiques`, `test_cours_lmd`, `test_inscriptions`, `test_smoke_command`) : **129 tests passés avec succès (100% OK)**.
+  * Frontend React : Vitest exécuté sur 14 suites / 126 tests : **126 passés avec succès**. Lint : **0 erreur, 0 warning**.
+
 
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution du Lot 0.1, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2 et 1.1, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 1 : BACKEND DJANGO      | `manage.py check --settings=arena.settings_sandbox`   | 🟢 VERT     |
 |                             | `manage.py makemigrations --check --dry-run`          | 🟢 VERT     |
-|                             | Intégrité de la base de données et des données démo   | 🟢 VERT     |
+|                             | Intégrité LMD Maquettes UE/ECUE/ECTS                  | 🟢 VERT     |
+|                             | Réconciliation Formations/Cycles & Modules/RefModules | 🟢 VERT     |
+|                             | Suite de tests automatisés (129 tests)                | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
+|                             | Vitest (126 tests unitaires & intégration)            | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 3 : MOBILE FLUTTER      | Traçabilité du code Dart                              | 🟡 TRACÉ    |
 |                             | Hors bac à sable (convention de relevé d'audit)       |             |
@@ -235,18 +290,18 @@ Les travaux s'appuient sur l'analyse exhaustive des 16 pièces maîtresses du do
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 0 / LOT 0.2 :
-  Finalisation de l'intégration du module CURP-INJS (Comptes Utilisateurs, Rôles & Permissions) :
-  * Contrôle de la matrice des 12 rôles canoniques (N0 à N4) et raccordement complet de l'interface
-    de consultation / édition des comptes utilisateurs dans React (`frontend/src/pages/Users.jsx` et `habilitations/`).
-  * Vérification des endpoints d'attribution de rôle et journalisation immuable d'audit (`AuditLog`).
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 1 / LOT 1.2 :
+  Cycle Inscriptions Administratives (IA), Inscriptions Pédagogiques (IP) & Constitution des Groupes :
+  * Modélisation et vérification des candidatures et admissions (concours STAPS INJS).
+  * Génération des matricules normalisés étudiants INJS (ex: `INJS26-XXXX`).
+  * Inscriptions pédagogiques automatiques et individuelles rattachées aux UEs/ECUEs de la maquette active.
+  * Affectation aux groupes pédagogiques (TD, TP, CM) et vérification des capacités d'accueil.
 
-- ÉTAPES ULTÉRIEURES (VAGUES 1 À 6) :
-  * Vague 1 : Référentiels géographiques et scolarité LMD (maquettes UE/ECUE, crédits ECTS).
-  * Vague 2 : Emplois du temps (GET-INJS) et badgeage par QR Code sécurisé.
-  * Vague 3 : Évaluations, jurys LMD et diplômation.
-  * Vague 4 : Finances étudiantes et vacations formateurs.
-  * Vague 5 : Domaines orphelins (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
+- ÉTAPES ULTÉRIEURES (VAGUES 2 À 6) :
+  * Vague 2 : Emplois du temps (GET-INJS), passerelle séances/modules et badgeage QR Code sécurisé.
+  * Vague 3 : Évaluations, jurys LMD, PV de délibération et diplômation avec empreinte SHA-256.
+  * Vague 4 : Finances étudiantes, tarifications, factures, quittances et vacations formateurs.
+  * Vague 5 : Domaines transversaux (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
   * Vague 6 : Statistiques CPFAE 17 colonnes, BI et clôture de refonte.
 
 Ce fichier est mis à jour à chaque lot validé et reste consultable et téléchargeable en permanence.
