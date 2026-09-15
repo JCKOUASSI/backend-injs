@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from authentication.permissions import IsDFRC
+from habilitations.permissions import ExigePermission
 from scolarite.models import DossierEtudiant
 from admissions.models import Candidat
 
@@ -162,9 +163,17 @@ def paiement_detail_api(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsDFRC])
+@permission_classes([IsAuthenticated, IsDFRC,
+                     ExigePermission.pour('finances_etud.paiement.valider')])
 def paiement_confirmer_api(request, pk):
-    """Confirme un paiement (exige une preuve) — réservé à FINANCE/DIRECTION."""
+    """Confirme un paiement (exige une preuve) — réservé à FINANCE/DIRECTION.
+
+    LOT 5 / U8 : première vue « acte critique » branchée sur le moteur
+    (permission ``finances_etud.paiement.valider``). Le branchement est
+    inerte tant que le mode livré reste OBSERVATION (comptage des écarts,
+    aucune réponse modifiée) ; le kill-switch ``HABILITATIONS_APPLICATION``
+    rendrait seul le refus effectif, vue par vue.
+    """
     try:
         p = Paiement.objects.get(pk=pk)
     except Paiement.DoesNotExist:

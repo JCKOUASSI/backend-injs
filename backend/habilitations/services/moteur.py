@@ -35,6 +35,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.utils import timezone
 
+from .resolveurs import couvert_par_ancetre
+
 from ..models import (
     AttributionRole,
     CanalAcces,
@@ -123,11 +125,17 @@ def mode_moteur():
 
 
 def _decrire_perimetre(perimetre):
+    # LOT 5 (L4-01) : ``content_type_id`` et ``id`` sont exposés pour que la
+    # description sérialisée résolve aussi les cibles « objet métier » du
+    # contrôle 9 (``has_object_permission``). Additif : les consommateurs
+    # existants (dict du contrat d'API, affichages) sont inchangés.
     return {
         'type': perimetre.type,
         'reference': perimetre.reference_lisible,
         'object_id': perimetre.object_id,
         'global': perimetre.est_global,
+        'content_type_id': getattr(perimetre, 'content_type_id', None),
+        'id': getattr(perimetre, 'pk', None),
     }
 
 
@@ -459,6 +467,12 @@ def _cible_couverte(perimetre, cible, contexte):
             sid = getattr(cible, 'secretariat_id', None)
             if sid is not None and str(sid) == str(perimetre.object_id or ''):
                 return True
+        # LOT 5 (J2-4) : résolveur hiérarchique — un périmètre couvre aussi
+        # les objets rattachés (Direction ⊃ Département, Formation ⊃
+        # Parcours ⊃ Groupe/Niveau, ECUE ⊃ sa formation…). Additif : seule
+        # une paire auparavant refusée peut basculer vers « couvert ».
+        if couvert_par_ancetre(perimetre, cible):
+            return True
     return False
 
 

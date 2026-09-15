@@ -47,7 +47,25 @@ class AttributionInputSerializer(serializers.Serializer):
     perimetres_secretariats = serializers.ListField(
         child=serializers.IntegerField(), required=False, default=list,
     )
+    # LOT 5 (L4-02) : périmètres bornés de tout type, en plus de l'alliage
+    # historique secrétariat. Ex. [{"type": "DIRECTION", "object_id": 3}].
+    perimetres = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list,
+    )
     sensible_valide = serializers.BooleanField(required=False, default=False)
+
+    def validate_perimetres(self, valeur):
+        from habilitations.services.resolveurs import TYPES_OBJETS
+        for spec in valeur:
+            if not isinstance(spec, dict) or 'type' not in spec \
+                    or 'object_id' not in spec:
+                raise serializers.ValidationError(
+                    'Chaque périmètre doit porter « type » et « object_id ».')
+            if spec['type'] not in TYPES_OBJETS:
+                raise serializers.ValidationError(
+                    f'Type de périmètre « {spec["type"]} » non posable par la '
+                    'console.')
+        return valeur
 
 
 class IdentifiantsInputSerializer(serializers.Serializer):

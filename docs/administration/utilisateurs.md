@@ -349,18 +349,57 @@ motif, auteur et valeurs avant/après.
 | 403 `COMPTE_SUSPENDU` après suspension | Comportement attendu | `activer` (transition A5) + motif |
 | 403 `MFA_REQUIRED` sans possibilité de désactiver | Rôle sensible + `flag.curp_mfa_obligatoire_sensibles` | Réinitialiser le MFA par un administrateur |
 | 403 `COMPTE_VERROUILLE` | 5 échecs consécutifs | Attendre 15 min ou `deverrouiller` |
-| Refus `CIBLE_HORS_PERIMETRE` sur un objet métier | Écart **L4-01** (couverture objet) | Voir [audit §5](../audit/permissions.md) ; en observation, aucun impact utilisateur |
-| Compte legacy sans droits CURP | Profil non gouverné | Le moteur s'abstient (`gouverne: false`) ; rattacher au LOT 5 |
+| Refus `CIBLE_HORS_PERIMETRE` sur un objet métier | L4-01 corrigé au LOT 5 : vérifier que l'objet est bien rattaché au périmètre posé (le résolveur suit Direction ⊃ Département ⊃ Service et Formation ⊃ Parcours ⊃ Groupe/ECUE) | Voir [audit §11](../audit/permissions.md) ; en observation, aucun impact utilisateur |
+| Compte legacy sans droits CURP | Profil non gouverné | `python manage.py rattacher_comptes_legacy` (simulation), puis `--appliquer` — rattachement additif et idempotent (LOT 5) |
 | `IDENTIFIANT_EXISTANT` | Unicité des identifiants | Choisir un autre identifiant (aucun compte fantôme créé) |
 
 ---
 
-## 13. Ce qui reste à ouvrir (LOT 5)
+## 13. LOT 5 (U8) — bascule CURP : livré et reste
 
-- pose de **périmètres non secrétariat** depuis la console (L4-02) ;
-- **couverture des cibles objet** par le moteur (L4-01) et résolveurs
-  hiérarchiques Direction → Département → Service, Formation → Parcours →
-  Groupe → ECUE ;
-- événement `CONNEXION` au journal d'habilitation (L4-03) ;
-- arbitrage des cases **J2** de la matrice (RBAC §9) ;
-- bascule progressive en mode APPLICATION, vue par vue, avec repli immédiat.
+Exécuté le 2026-09-15 sur feu vert ; tout est additif et réversible, le défaut
+livré reste OBSERVATION (aucun impact production). Détail des preuves :
+[audit §11](../audit/permissions.md).
+
+**Livré par le LOT 5** :
+
+- **couverture des cibles « objet métier »** (L4-01) : `moteur._decrire_perimetre`
+  expose `content_type_id` et `id` ; la voie DRF `has_object_permission` décide
+  désormais au contrôle 9, refus à l'identique journalisé ;
+- **résolveurs hiérarchiques** (`habilitations/services/resolveurs.py`) :
+  Direction ⊃ Département ⊃ Service RH ; Formation ⊃ Parcours ⊃ Groupe
+  (coupes Niveau/Site) ; maquette ⊃ UE ⊃ ECUE ; un périmètre `ETUDIANT` couvre
+  les inscriptions du dossier. Nouveau type de périmètre `DEPARTEMENT`
+  (migration `habilitations/0013`) ;
+- **périmètres non secrétariat depuis la console** (L4-02) : chaque ligne
+  d'attribution accepte `perimetres: [{type, object_id}]` (objets vérifiés,
+  400 `PERIMETRE_INCONNU` sinon, aucun compte fantôme) ; `perimetres_secretariats`
+  reste accepté. L'assistant de création et l'écran de modification portent les
+  sélecteurs « Directions couvertes / Départements couverts » ; les types
+  pédagogiques se posent par l'API (l'admin Django reste le repli universel) ;
+- **événement `CONNEXION`** (L4-03) : chaque connexion réussie d'un compte
+  gouverné est tracée au journal d'habilitation (best effort, jamais bloquante ;
+  la double piste avec `presences.AuditLog` est assumée) ;
+- **cible dict journalisée** (L4-04) ;
+- **rattachement des comptes legacy** : `manage.py rattacher_comptes_legacy`
+  (simulation par défaut, `--appliquer` pour écrire, `--role` pour filtrer) —
+  table A6, attributions non sensibles posées actives, rôles sensibles en
+  proposition (double signature en console, jamais d'auto-élévation),
+  idempotent ;
+- **vues pilotes** branchées en OBSERVATION : liste des inscriptions
+  (`GET /api/scolarite/inscriptions/`, code `scolarite.inscription_administrative.consulter`)
+  et confirmation de paiement (`POST /api/finances-etudiantes/paiements/<id>/confirmer/`,
+  code `finances_etud.paiement.valider`). Leurs réponses ne changent pas ;
+  les compteurs se lisent via `manage.py observations_habilitations`
+  (ou `--remettre-a-zero` avant une campagne).
+
+**Ce qui reste ouvert** :
+
+- arbitrage des cases **J2** de la matrice (RBAC §9 — atelier commanditaire,
+  aucun changement unilatéral engagé) ;
+- branchement des vues restantes, vue par vue, puis mode **APPLICATION**
+  progressif par drapeau (`HABILITATIONS_APPLICATION`, kill-switch console
+  verrouillé au LOT 6) ;
+- retrait du legacy (écarts E1/E2/E7) après stabilisation — hors périmètre ;
+- alignement éventuel de la projection `permissions_effectives()` sur la règle
+  S4 (écart L4-07 : la projection reste volontairement plus fermée, fail-closed).

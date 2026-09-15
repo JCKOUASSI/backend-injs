@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from admissions.models import Admission
 from authentication.permissions import IsSecretariatOrDFRC
+from habilitations.permissions import ExigePermission
 
 from . import inscription_services
 from .models import DossierEtudiant, InscriptionAdministrative
@@ -137,7 +138,8 @@ def etudiant_detail(request, pk):
 # ── Inscriptions administratives ────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC,
+                     ExigePermission.pour('scolarite.inscription_administrative.consulter')])
 def inscription_list(request):
     queryset = _inscription_queryset()
     for champ in (

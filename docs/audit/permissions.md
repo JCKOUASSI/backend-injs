@@ -387,3 +387,47 @@ cd backend && USE_SQLITE=1 .venv/bin/python ../arena/genere-catalogues-menu.py
 | `pages/EcranGenerique.test.jsx` | 7 | résolution, garde d'URL directe, variantes documents/indicateurs |
 
 Suite frontend complète après LOT 6 : **80 fichiers, 1 697 tests, OK**.
+
+---
+
+## 11. Suivi LOT 5 (2026-09-15) — statut des écarts
+
+Le LOT 5 (U8, bascule CURP) a été exécuté sur feu vert du commanditaire
+(« relance le lot 5 »). Tout est **additif et réversible** ; le défaut livré
+(OBSERVATION) n'a pas changé et la bascule applicative reste progressive.
+
+| ID | Devenu | Comment |
+|---|---|---|
+| **L4-01** | ✅ **corrigé** | `moteur._decrire_perimetre` expose `content_type_id` **et** `id` ; la voie objet (`has_object_permission`) résout le contrôle 9 par rapprochement exact. La classe témoin `CouvertureObjetEcartTests` a été **inversée** en verrou de non-régression (5 tests, dont refus tracé sur objet hors périmètre et chaîne d'audit intacte). |
+| **L4-02** | ✅ **livré** | La console accepte `perimetres: [{type, object_id}]` sur chaque ligne d'attribution (`comptes_admin._perimetre_borne`, types bornables du registre `resolveurs.TYPES_OBJETS`, objet vérifié — sinon 400 `PERIMETRE_INCONNU`, atomicité préservée). L'alliage `perimetres_secretariats` reste accepté. UI : sélecteurs « Directions couvertes / Départements couverts » dans l'assistant de création et l'écran de modification (`PerimetresOrganisation.jsx`) ; les types pédagogiques restent posables par l'API (l'admin Django demeure le repli universel). |
+| **L4-03** | ✅ **livré** | La connexion réussie d'un compte gouverné émet `CONNEXION` au journal d'habilitation (`connexion_sure.finaliser_connexion`, best effort — une panne du journal ne bloque jamais la connexion). La double piste est **assumée** : `presences.AuditLog` reste l'horodatage métier, le journal CURP la trace de gouvernance. |
+| **L4-04** | ✅ **corrigé** | `journalisation._resoudre_cible` accepte la cible dict du contrat d'API (journalisée avec son type/object_id/référence, sans ContentType). |
+| **J2-4** | ✅ **traité** | Type de périmètre `DEPARTEMENT` ajouté (migration `habilitations/0013`, alter de choices seul) + **résolveurs hiérarchiques livrés** (`services/resolveurs.py`) : Direction ⊃ Département ⊃ Service RH ; Formation ⊃ Parcours ⊃ Groupe/Niveau/SITE ; maquette ⊃ UE ⊃ ECUE ; ETUDIANT ⊃ ses inscriptions. Le moteur les applique par défaut sur la voie objet et accepte toujours un résolveur injecté (prioritaire). `DIRECTION` reste le périmètre par défaut des rôles de département (aucune réécriture des octrois existants). |
+| **J2-1 / J2-2 / J2-3** | ⏸ atelier | inchangés par le LOT 5 — aucun contenu de matrice n'a été modifié unilatéralement ; les refus croisés restent verrouillés par les tests du LOT 4. |
+| **L4-07** | ⏸ maintenu | La projection `permissions_effectives()` garde sa priorité au RETRAIT (fail-closed, affichage seulement). Alignement sur S4 non engagé : le moteur reste l'autorité ; à trancher si un usage d'affichage l'exige. |
+
+**Étape 1 de la bascule (IAM §10)** : commande `rattacher_comptes_legacy`
+— simulation par défaut, `--appliquer` pour écrire ; profil + attributions
+non sensibles issues de la table A6 ; **jamais d'auto-validation d'un rôle
+sensible** (ADMIN/ADMIN_SYSTEME restent à traiter dans la console, double
+signature) ; idempotent (un second passage ne fait rien) ; `--role` filtre
+le lot. Rejeu démo mesuré : 8 comptes posés, rejoués → 0.
+
+**Étapes 2-3** : le mode OBSERVATION (défaut des réglages,
+`HABILITATIONS_OBSERVATION=true`) est mesuré sur les vues réelles ; deux
+vues pilotes portent `ExigePermission` — `GET /api/scolarite/inscriptions/`
+(`scolarite.inscription_administrative.consulter`) et
+`POST /api/finances-etudiantes/paiements/<id>/confirmer/`
+(`finances_etud.paiement.valider`). En OBSERVATION leurs réponses sont
+inchangées (écarts comptés via `observations_habilitations`) ; seul le mode
+APPLICATION rendrait les refus effectifs, et la progression reste vue par
+vue avec repli immédiat par drapeau (kill-switch verrouillé LOT 6).
+
+**Couverture de tests ajoutée** : `habilitations.tests.test_lot5_bascule`
+(**26** tests : résolveurs hiérarchiques, console périmètres, cible dict
+journalisée, `CONNEXION`, commande de rattachement, vues pilotes inertes en
+observation) + inversion de `CouvertureObjetEcartTests`. Suite
+`habilitations` après LOT 5 : **415 tests OK** (2 ignorés, déclencheurs
+PostgreSQL) ; `authentication` + `scolarite` + `finances_etudiantes` :
+**467 tests OK** ; frontend `pages/habilitations` : **63 tests OK** dont 6
+nouveaux sur le sélecteur de bornage.

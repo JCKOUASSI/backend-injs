@@ -22,9 +22,9 @@ Cinq familles de refus croisés sont verrouillées, dans l'ordre du §34 :
    portent aucun acte métier sensible ; l'administrateur système reste un rôle
    sensible à seconde signature (et l'écart J2 de sa ligne A2 est caractérisé).
 
-Une sixième classe **caractérise un écart livré** (résolution des cibles
-« objet métier » non branchée) sans le masquer : voir
-:doc:`/docs/audit/permissions` §4 et le rapport du LOT 4.
+Une sixième classe **verrouille le correctif L4-01** (résolution des cibles
+« objet métier », posé au LOT 5) ; elle était née pour caractériser
+l'écart : voir :doc:`/docs/audit/permissions` §5.
 
 Deux garde-fous transverses ferment le fichier : l'**abstention** d'un compte
 non gouverné n'est pas un refus, et le mode **OFF** livré reste un *no-op*.
@@ -32,8 +32,8 @@ non gouverné n'est pas un refus, et le mode **OFF** livré reste un *no-op*.
 Contrat de cible rappelé (``est_autorise``) : la cible nommée est un **dict**
 ``{'type': <type de périmètre>, 'object_id': <pk>}`` — c'est aussi le format
 accepté par ``POST /api/habilitations/evaluer/``. La résolution d'un objet
-métier passé directement (``has_object_permission``) n'est pas encore
-branchée : c'est l'objet de la classe ``CouvertureObjetEcartTests``.
+métier passé directement (``has_object_permission``) est résolue depuis le
+correctif L4-01 (LOT 5) : voir la classe ``CouvertureObjetEcartTests``.
 """
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -299,10 +299,10 @@ class EnseignantCroiseTests(SocleLot4):
 def couverture_direction(perimetre, cible):
     """Sonde de résolveur hiérarchique Direction → Département (LOT 4).
 
-    Le moteur accepte une fonction de couverture par le contexte (contrôle 9) ;
-    aucun résolveur hiérarchique n'est livré en production tant que le mode
-    reste OFF (l'industrialisation relève du LOT 5 / U8). Cette sonde prouve
-    que la couverture hiérarchique fonctionne dès qu'un résolveur est fourni.
+    Le moteur accepte une fonction de couverture par le contexte (contrôle 9).
+    Depuis le LOT 5, un résolveur hiérarchique est **livré par défaut**
+    (``services/resolveurs.py``) ; cette sonde reste la preuve que la voie
+    d'injection est utilisable et prioritaire, sans fork du moteur.
     """
     if perimetre.type != Perimetre.Type.DIRECTION or perimetre.object_id is None:
         return False
@@ -675,26 +675,24 @@ class AdminSiTests(SocleLot4):
 
 
 # ===========================================================================
-# Écart livré — résolution des cibles « objet métier » (annonce U4, non branchée)
+# Écart L4-01 corrigé au LOT 5 — résolution des cibles « objet métier » verrouillée
 # ===========================================================================
 @override_settings(**APPLICATION)
 class CouvertureObjetEcartTests(SocleLot4):
-    """Caractérise l'écart de couverture des objets métier (bloquant LOT 5).
+    """Verrouille le correctif L4-01 (classe née caractérisation, inversée au LOT 5).
 
     ``est_autorise`` accepte deux formes de cible : le dict du contrat d'API
     ``{'type', 'object_id'}`` et l'objet métier lui-même (celui que DRF
-    transmet à ``has_object_permission``). **Seule la forme dict est résolue
-    aujourd'hui** : les périmètres d'un octroi sont sérialisés en dicts par
-    ``moteur._decrire_perimetre`` sans ``content_type_id``, si bien que
-    ``_PerimetreDict.content_type_id`` vaut ``None`` et la comparaison de
-    type échoue toujours (contrôle 9 → ``CIBLE_HORS_PERIMETRE``).
+    transmet à ``has_object_permission``). Les **deux formes sont résolues**
+    depuis le LOT 5 : ``moteur._decrire_perimetre`` expose ``content_type_id``
+    et ``id`` et le contrôle 9 rapproche alors les périmètres sérialisés des
+    objets, par type+pk exacts d'abord, règle générique ``SECRETARIAT``
+    ensuite, ancêtres hiérarchiques enfin (``services/resolveurs.py``).
 
-    Conséquence : brancher ``ExigePermission`` sur une vue métier qui utilise
-    ``get_object()`` (LOT 5 / U8) produirait des refus en masse. Le correctif
-    est additif et tient en une ligne (exposer ``content_type_id`` — et ``id``
-    — dans ``_decrire_perimetre``) ; il est **proposé, non appliqué** ici
-    (périmètre du LOT 4 : tests + documentation). Voir
-    ``docs/audit/permissions.md`` §4 et le rapport de lot.
+    Cette classe affirmait l'inverse pour rendre l'écart visible (écarts
+    numérotés, ``docs/audit/permissions.md`` §5) ; elle garantit désormais sa
+    non-régression. La voie du résolveur injecté reste l'extension prévue du
+    moteur, sans fork.
     """
 
     def setUp(self):
@@ -702,6 +700,8 @@ class CouvertureObjetEcartTests(SocleLot4):
         from formations.models import Secretariat
         self.secretariat = Secretariat.objects.create(
             numero='SECR-L4-EC', nom='Secrétariat écart')
+        self.hors_perimetre = Secretariat.objects.create(
+            numero='SECR-L4-HS', nom='Secrétariat voisin')
         perimetre = _perimetre(
             Perimetre.Type.SECRETARIAT, self.secretariat,
             reference=self.secretariat.numero)
@@ -710,39 +710,52 @@ class CouvertureObjetEcartTests(SocleLot4):
             role_legacy='SECRETARIAT', nom='OUATTARA')
         self.permission = 'scolarite.inscription_administrative.creer'
 
-    def test_01_cible_dict_couverte_cible_objet_non_couverte(self):
+    def test_01_cible_dict_et_cible_objet_toutes_deux_couvertes(self):
         en_dict = est_autorise(
             self.user, self.permission,
             cible=_cible(Perimetre.Type.SECRETARIAT, self.secretariat))
         self.assertAutorise(en_dict)
         en_objet = est_autorise(
             self.user, self.permission, cible=self.secretariat)
-        self.assertRefuse(en_objet, 'CIBLE_HORS_PERIMETRE')
+        self.assertAutorise(en_objet)
 
-    def test_02_la_description_du_perimetre_ne_porte_pas_le_content_type(self):
-        """Cause technique documentée de l'écart (garde-fou de diagnostic)."""
+    def test_02_objet_hors_perimetre_toujours_refuse(self):
+        """Le correctif n'élargit rien hors des ancêtres connus : pas d'accord, pas d'accès."""
+        decision = est_autorise(
+            self.user, self.permission, cible=self.hors_perimetre)
+        self.assertRefuse(decision, 'CIBLE_HORS_PERIMETRE')
+
+    def test_03_la_description_du_perimetre_porte_le_content_type(self):
+        """Trace du correctif : ``content_type_id`` et ``id`` sont exposés."""
         from habilitations.services.moteur import _decrire_perimetre
         decrit = _decrire_perimetre(
             self.compte.attributions.first().perimetres.first())
         self.assertEqual(decrit['type'], Perimetre.Type.SECRETARIAT)
         self.assertEqual(decrit['object_id'], self.secretariat.pk)
-        self.assertNotIn('content_type_id', decrit)
+        self.assertEqual(
+            decrit['content_type_id'],
+            ContentType.objects.get_for_model(self.secretariat).pk)
+        self.assertIsNotNone(decrit['id'])
 
-    def test_03_refus_sur_objet_est_quand_meme_trace_au_journal(self):
-        """La piste d'audit fonctionne sur la voie ``has_object_permission``."""
+    def test_04_has_object_permission_accorde_puis_refuse_en_le_journalisant(self):
+        """La voie DRF est opérationnelle : couvert → oui ; hors → refus tracé."""
         permission = ExigePermission(self.permission)
-        self.assertFalse(
+        self.assertTrue(
             permission.has_object_permission(
                 _requete(self.user), None, self.secretariat))
+        self.assertEqual(_refus_journalises(self.compte).count(), 0)
+        self.assertFalse(
+            permission.has_object_permission(
+                _requete(self.user), None, self.hors_perimetre))
         refus = _refus_journalises(self.compte)
         self.assertEqual(refus.count(), 1)
         entree = refus.first()
         self.assertEqual(entree.objet_type, 'formations.secretariat')
-        self.assertEqual(entree.object_id, str(self.secretariat.pk))
+        self.assertEqual(entree.object_id, str(self.hors_perimetre.pk))
         self.assertEqual(verifier_chaine(), [])
 
-    def test_04_un_resolveur_injecte_leve_l_ecart_sans_correctif(self):
-        """Voie de contournement disponible : la fonction de couverture."""
+    def test_05_un_resolveur_injecte_reste_la_voie_d_extensibilite(self):
+        """Une couverture maison injectée a toujours priorité sur le défaut."""
         def couverture(perimetre, cible):
             return (perimetre.type == Perimetre.Type.SECRETARIAT
                     and str(perimetre.object_id) == str(getattr(cible, 'pk', '')))

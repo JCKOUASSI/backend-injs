@@ -77,3 +77,90 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : POST /api/habilitations/derogations/
   - Route supprimée ou renommée : POST /api/habilitations/derogations/{id}/revoquer/
 
+## 2026-09-15 03:04 UTC
+
+- **Justification :** GET-INJS (lot L8, 4e453e7) : le détail creneaux-types/{id} passe de POST à PUT/PATCH (contrat EDT v1.1, addendum docs/EDT_CONTRAT_DONNEES.md) ; LOT 5 (U8) : ajout non cassant du champ perimetres aux lignes d'attribution de la console CURP. Routes et clés retirées hors EDT : aucune.
+- Routes dans le contrat : 634
+- **Ruptures (retraits/renommages) : 1**
+  - Route supprimée ou renommée : POST /api/edts/creneaux-types/{id}/
+- Ajouts (extensions non cassantes) : 79
+  - Route supprimée ou renommée : DELETE /api/edts/creneaux-types/{id}/
+  - Route supprimée ou renommée : DELETE /api/habilitations/organisation/departements/{id}/comptes/
+  - Route supprimée ou renommée : DELETE /api/habilitations/organisation/services/{id}/comptes/
+  - Route supprimée ou renommée : DELETE /api/timetable/affectations/{id}/
+  - Route supprimée ou renommée : DELETE /api/timetable/creneaux-types/{id}/
+  - Route supprimée ou renommée : DELETE /api/timetable/emplois/{id}/
+  - Route supprimée ou renommée : GET /api/edts/emplois/{id}/export.csv/
+  - Route supprimée ou renommée : GET /api/edts/emplois/{id}/grille/
+  - Route supprimée ou renommée : GET /api/edts/referentiel-enseignants/
+  - Route supprimée ou renommée : GET /api/habilitations/comptes/imports/{reference}/
+  - Route supprimée ou renommée : GET /api/habilitations/comptes/{id}/effective-permissions/
+  - Route supprimée ou renommée : GET /api/habilitations/notifications/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/departements/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/departements/{id}/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/directions/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/directions/{id}/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/services/
+  - Route supprimée ou renommée : GET /api/habilitations/organisation/services/{id}/
+  - Route supprimée ou renommée : GET /api/habilitations/propositions/
+  - Route supprimée ou renommée : GET /api/timetable/affectations/
+  - Route supprimée ou renommée : GET /api/timetable/affectations/{id}/
+  - Route supprimée ou renommée : GET /api/timetable/conflits/
+  - Route supprimée ou renommée : GET /api/timetable/creneaux-types/
+  - Route supprimée ou renommée : GET /api/timetable/creneaux-types/{id}/
+  - Route supprimée ou renommée : GET /api/timetable/emplois/
+  - Route supprimée ou renommée : GET /api/timetable/emplois/{id}/
+  - Route supprimée ou renommée : GET /api/timetable/emplois/{id}/export.csv/
+  - Route supprimée ou renommée : GET /api/timetable/emplois/{id}/grille/
+  - Route supprimée ou renommée : GET /api/timetable/publics/
+  - Route supprimée ou renommée : GET /api/timetable/referentiel-enseignants/
+  - Route supprimée ou renommée : PATCH /api/edts/creneaux-types/{id}/
+  - Route supprimée ou renommée : PATCH /api/habilitations/organisation/departements/{id}/
+  - Route supprimée ou renommée : PATCH /api/habilitations/organisation/directions/{id}/
+  - Route supprimée ou renommée : PATCH /api/habilitations/organisation/services/{id}/
+  - Route supprimée ou renommée : PATCH /api/timetable/affectations/{id}/
+  - Route supprimée ou renommée : PATCH /api/timetable/creneaux-types/{id}/
+  - Route supprimée ou renommée : PATCH /api/timetable/emplois/{id}/
+  - Route supprimée ou renommée : POST /api/auth/mfa/confirm/
+  - Route supprimée ou renommée : POST /api/auth/mfa/disable/
+  - Route supprimée ou renommée : POST /api/auth/mfa/setup/
+  - Route supprimée ou renommée : POST /api/auth/mfa/verify/
+  - Route supprimée ou renommée : POST /api/edts/affectations/{id}/deplacer/
+  - Route supprimée ou renommée : POST /api/edts/creneaux-types/
+  - Route supprimée ou renommée : POST /api/edts/emplois/{id}/archiver/
+  - Route supprimée ou renommée : POST /api/edts/emplois/{id}/depublier/
+  - Route supprimée ou renommée : POST /api/edts/emplois/{id}/generer/
+  - Route supprimée ou renommée : POST /api/edts/emplois/{id}/publier/
+  - Route supprimée ou renommée : POST /api/edts/emplois/{id}/soumettre/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/imports/
+  - Route supprimée ou renommée : POST /api/habilitations/comptes/imports/{reference}/annuler/
+  - Route supprimée ou renommée : POST /api/habilitations/delegations/{id}/action/
+  - Route supprimée ou renommée : POST /api/habilitations/delegations/{id}/activer/
+  - Route supprimée ou renommée : POST /api/habilitations/notifications/tout-lire/
+  - Route supprimée ou renommée : POST /api/habilitations/notifications/{id}/lire/
+  - Route supprimée ou renommée : POST /api/habilitations/organisation/departements/
+  - Route supprimée ou renommée : POST /api/habilitations/organisation/departements/{id}/comptes/
+  - Route supprimée ou renommée : POST /api/habilitations/organisation/directions/
+  - Route supprimée ou renommée : POST /api/habilitations/organisation/services/
+  - Route supprimée ou renommée : POST /api/habilitations/organisation/services/{id}/comptes/
+  - Route supprimée ou renommée : POST /api/habilitations/propositions/{id}/approuver/
+  - Route supprimée ou renommée : POST /api/habilitations/propositions/{id}/rejeter/
+  - Route supprimée ou renommée : POST /api/habilitations/provisions/scanner/
+  - Route supprimée ou renommée : POST /api/timetable/affectations/
+  - Route supprimée ou renommée : POST /api/timetable/affectations/{id}/deplacer/
+  - Route supprimée ou renommée : POST /api/timetable/conflits/
+  - Route supprimée ou renommée : POST /api/timetable/conflits/{id}/resoudre/
+  - Route supprimée ou renommée : POST /api/timetable/creneaux-types/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/archiver/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/conflits/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/depublier/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/generer/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/publier/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/soumettre/
+  - Route supprimée ou renommée : POST /api/timetable/emplois/{id}/valider/
+  - Route supprimée ou renommée : PUT /api/edts/creneaux-types/{id}/
+  - Route supprimée ou renommée : PUT /api/timetable/affectations/{id}/
+  - Route supprimée ou renommée : PUT /api/timetable/creneaux-types/{id}/
+  - Route supprimée ou renommée : PUT /api/timetable/emplois/{id}/
+

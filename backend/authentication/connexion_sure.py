@@ -193,6 +193,25 @@ def finaliser_connexion(user, request, device_id=''):
         user.pk, user.username, user_role, client_ip,
         device_id[:16] + '…' if len(device_id) > 16 else device_id,
     )
+    # LOT 5 (L4-03) : l'horodatage de connexion est reflété au journal
+    # d'habilitation pour les comptes gouvernés (type CONNEXION prévu au
+    # modèle et jamais émis jusque-là). Best effort : une panne du journal ne
+    # bloque jamais la connexion (le miroir presences.AuditLog reste posé en
+    # aval, la double piste est assumée et documentée).
+    if compte is not None:
+        try:
+            journaliser(
+                'CONNEXION', acteur=user, compte=compte,
+                nouvelle_valeur={'canal': 'MOBILE' if device_id else 'WEB'},
+                motif='Connexion réussie (émission additive LOT 5).',
+                adresse_ip=client_ip,
+                agent_utilisateur=(
+                    request.META.get('HTTP_USER_AGENT', '')[:250]),
+            )
+        except Exception:  # pragma: no cover - jamais bloquant
+            auth_views.logger.warning(
+                'journal CONNEXION indisponible user_id=%s', user.pk,
+                exc_info=True)
 
     from presences.models import AuditLog
     from rest_framework_simplejwt.tokens import RefreshToken

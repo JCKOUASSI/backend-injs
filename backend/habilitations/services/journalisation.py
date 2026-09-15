@@ -58,9 +58,23 @@ def calculer_empreinte(entree: JournalHabilitation) -> str:
 
 
 def _resoudre_cible(cible):
-    """Retourne ``(content_type, object_id, objet_type, libelle)``."""
+    """Retourne ``(content_type, object_id, objet_type, libelle)``.
+
+    LOT 5 (L4-04) : accepte aussi la cible décrite en dict au format du
+    contrat d'API (``{'type', 'object_id', 'reference'}``) — un refus portant
+    une cible sérialisée est désormais journalisé avec sa cible, sans
+    ``ContentType`` (l'objet peut n'exister nulle part ; la trace prime).
+    """
     if cible is None:
         return None, '', '', ''
+    if isinstance(cible, dict):
+        object_id = str(cible.get('object_id', '') or '')
+        type_p = str(cible.get('type', '') or '')[:100]
+        libelle = str(
+            cible.get('reference')
+            or (f'{type_p}#{object_id}' if object_id else type_p)
+        )[:255]
+        return None, object_id, type_p, libelle
     from django.contrib.contenttypes.models import ContentType
     ct = ContentType.objects.get_for_model(cible.__class__)
     libelle = str(cible)[:255]

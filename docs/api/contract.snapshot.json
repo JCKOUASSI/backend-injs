@@ -42,6 +42,15 @@
         "204": null
       }
     },
+    "DELETE /api/edts/creneaux-types/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
     "DELETE /api/edts/emplois/{id}/": {
       "parameters": [
         "id"
@@ -260,6 +269,24 @@
         "204": null
       }
     },
+    "DELETE /api/habilitations/organisation/departements/{id}/comptes/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/habilitations/organisation/services/{id}/comptes/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
     "DELETE /api/scolarite/ecues/{id}/": {
       "parameters": [
         "id"
@@ -300,6 +327,33 @@
     "DELETE /api/statistiques/rapports/{rapport_id}/": {
       "parameters": [
         "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/timetable/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/timetable/creneaux-types/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/timetable/emplois/{id}/": {
+      "parameters": [
+        "id"
       ],
       "request_keys": null,
       "responses": {
@@ -686,7 +740,32 @@
         "200": null
       }
     },
+    "GET /api/edts/emplois/{id}/export.csv/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/emplois/{id}/grille/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/edts/publics/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/referentiel-enseignants/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -1719,6 +1798,15 @@
         "200": null
       }
     },
+    "GET /api/habilitations/comptes/imports/{reference}/": {
+      "parameters": [
+        "reference"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/comptes/revue/": {
       "parameters": [],
       "request_keys": null,
@@ -1727,6 +1815,15 @@
       }
     },
     "GET /api/habilitations/comptes/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/comptes/{id}/effective-permissions/": {
       "parameters": [
         "id"
       ],
@@ -1777,8 +1874,63 @@
         "200": null
       }
     },
+    "GET /api/habilitations/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/observations/synthese/": {
       "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/departements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/departements/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/directions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/directions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/services/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/organisation/services/{id}/": {
+      "parameters": [
+        "id"
+      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -1813,6 +1965,13 @@
       }
     },
     "GET /api/habilitations/personnes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/propositions/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -3048,6 +3207,93 @@
         "200": null
       }
     },
+    "GET /api/timetable/affectations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/conflits/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/creneaux-types/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/creneaux-types/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/emplois/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/emplois/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/emplois/{id}/export.csv/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/emplois/{id}/grille/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/publics/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/referentiel-enseignants/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /formations/{id}/qr-image/": {
       "parameters": [
         "id"
@@ -3149,6 +3395,15 @@
       }
     },
     "PATCH /api/edts/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/edts/creneaux-types/{id}/": {
       "parameters": [
         "id"
       ],
@@ -3459,6 +3714,33 @@
       }
     },
     "PATCH /api/habilitations/comptes/{id}/modifier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/habilitations/organisation/departements/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/habilitations/organisation/directions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/habilitations/organisation/services/{id}/": {
       "parameters": [
         "id"
       ],
@@ -3860,6 +4142,33 @@
         "200": null
       }
     },
+    "PATCH /api/timetable/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/timetable/creneaux-types/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/timetable/emplois/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/administrations/courriers/creer/": {
       "parameters": [],
       "request_keys": null,
@@ -4117,6 +4426,34 @@
         "200": null
       }
     },
+    "POST /api/auth/mfa/confirm/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/auth/mfa/disable/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/auth/mfa/setup/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/auth/mfa/verify/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/auth/token/refresh/": {
       "parameters": [],
       "request_keys": {
@@ -4170,6 +4507,15 @@
         "200": null
       }
     },
+    "POST /api/edts/affectations/{id}/deplacer/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/edts/conflits/": {
       "parameters": [],
       "request_keys": null,
@@ -4186,10 +4532,8 @@
         "200": null
       }
     },
-    "POST /api/edts/creneaux-types/{id}/": {
-      "parameters": [
-        "id"
-      ],
+    "POST /api/edts/creneaux-types/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null
@@ -4202,7 +4546,52 @@
         "200": null
       }
     },
+    "POST /api/edts/emplois/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/edts/emplois/{id}/conflits/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/emplois/{id}/depublier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/emplois/{id}/generer/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/emplois/{id}/publier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/emplois/{id}/soumettre/": {
       "parameters": [
         "id"
       ],
@@ -4934,6 +5323,22 @@
         "200": null
       }
     },
+    "POST /api/habilitations/comptes/imports/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/comptes/imports/{reference}/annuler/": {
+      "parameters": [
+        "reference"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/habilitations/comptes/{id}/simuler-modification/": {
       "parameters": [
         "id"
@@ -4954,6 +5359,24 @@
     },
     "POST /api/habilitations/delegations/": {
       "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/delegations/{id}/action/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/delegations/{id}/activer/": {
+      "parameters": [
+        "id"
+      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -4991,7 +5414,87 @@
         "200": null
       }
     },
+    "POST /api/habilitations/notifications/tout-lire/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/notifications/{id}/lire/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/habilitations/observations/remettre-a-zero/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/organisation/departements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/organisation/departements/{id}/comptes/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/organisation/directions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/organisation/services/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/organisation/services/{id}/comptes/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/propositions/{id}/approuver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/propositions/{id}/rejeter/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/provisions/scanner/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -6223,6 +6726,115 @@
         "200": null
       }
     },
+    "POST /api/timetable/affectations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/affectations/{id}/deplacer/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/conflits/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/conflits/{id}/resoudre/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/creneaux-types/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/conflits/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/depublier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/generer/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/publier/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/soumettre/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/emplois/{id}/valider/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "PUT /api/admissions/ref/{ressource}/{id}/": {
       "parameters": [
         "id",
@@ -6271,6 +6883,15 @@
       }
     },
     "PUT /api/edts/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/edts/creneaux-types/{id}/": {
       "parameters": [
         "id"
       ],
@@ -6569,6 +7190,33 @@
     },
     "PUT /api/statistiques/alertes/seuils/": {
       "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/timetable/affectations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/timetable/creneaux-types/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/timetable/emplois/{id}/": {
+      "parameters": [
+        "id"
+      ],
       "request_keys": null,
       "responses": {
         "200": null

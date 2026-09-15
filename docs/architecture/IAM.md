@@ -297,33 +297,50 @@ Service d'accès aux données : `frontend/src/services/habilitations.js`
 
 ---
 
-## 10. Bascule (LOT 5 / U8) — ce qui reste à faire
+## 10. Bascule (LOT 5 / U8) — état d'avancement
 
-La bascule n'est **pas** engagée : aucun impact production avant un feu vert
-explicite. Séquence prévue :
+Le LOT 5 a été exécuté le 2026-09-15 (feu vert du commanditaire) : les
+**étapes 1 à 3** de la séquence sont livrées, de façon additive et
+réversible. Le défaut livré reste OBSERVATION : **aucun impact production**
+— les refus effectifs exigent le mode APPLICATION, activable vue par vue.
+Séquence et état :
 
-1. rattachement **additif** des comptes legacy à un profil CURP (aucune
-   suppression, règle S5) ;
-2. mode **OBSERVATION** mesuré sur les vues réelles (compteurs d'écarts,
-   `observations_habilitations`) ;
-3. branchement de `ExigePermission` sur les vues critiques, vue par vue ;
-4. mode **APPLICATION** progressif, drapeau par drapeau, avec repli immédiat ;
-5. retrait du legacy (écarts E1/E2/E7) après stabilisation.
+1. ✅ rattachement **additif** des comptes legacy à un profil CURP —
+   commande `rattacher_comptes_legacy` (simulation par défaut, `--appliquer`
+   pour écrire, table A6, jamais d'auto-validation d'un rôle sensible,
+   idempotente) ;
+2. ✅ mode **OBSERVATION** mesuré sur les vues réelles (compteurs d'écarts,
+   `observations_habilitations` ; défaut des réglages
+   `HABILITATIONS_OBSERVATION=true`) ;
+3. ✅ début de branchement de `ExigePermission` sur les vues critiques,
+   vue par vue — deux vues pilotes : liste des inscriptions
+   (`scolarite.inscription_administrative.consulter`) et confirmation de
+   paiement (`finances_etud.paiement.valider`) ; la suite se pose au cas par
+   cas, chaque vue restant débranchable sans redéploiement ;
+4. ⏸ mode **APPLICATION** progressif, drapeau par drapeau, avec repli
+   immédiat (`HABILITATIONS_APPLICATION=false`, kill-switch verrouillé au
+   LOT 6) — à décider vue par vue sur la base des compteurs d'observation ;
+5. ⏸ retrait du legacy (écarts E1/E2/E7) après stabilisation — hors périmètre
+   du LOT 5.
 
-**Prérequis techniques identifiés par le LOT 4** (détail et preuves :
-[`docs/audit/permissions.md`](../audit/permissions.md) §5) :
+**Prérequis techniques du LOT 4 — état après exécution** (détail et preuves :
+[`docs/audit/permissions.md`](../audit/permissions.md) §5 et §11) :
 
-- **résolution des cibles « objet métier »** : le moteur ne couvre aujourd'hui
-  que les cibles au format dict `{type, object_id}` ; `has_object_permission`
-  (donc tout branchement sur `get_object()`) exige soit l'exposition de
-  `content_type_id` dans `moteur._decrire_perimetre`, soit des résolveurs de
-  couverture injectés ;
-- **résolveurs hiérarchiques** Direction → Département → Service et
-  Formation → Parcours → Groupe → ECUE (le moteur accepte une fonction de
-  couverture par le contexte, aucun résolveur n'est livré) ;
-- **pose de périmètres non secrétariat** par la console (aujourd'hui :
-  `perimetres_secretariats` uniquement, le reste passe par l'admin Django) ;
-- arbitrage atelier des cases **J2** de la matrice (voir RBAC §9).
+- ✅ **résolution des cibles « objet métier »** :
+  `moteur._decrire_perimetre` expose `content_type_id` et `id` (L4-01) ; la
+  voie `has_object_permission` rapproche type+pk exacts au contrôle 9 ;
+- ✅ **résolveurs hiérarchiques** : `habilitations/services/resolveurs.py` —
+  Direction ⊃ Département ⊃ Service RH, Formation ⊃ Parcours ⊃
+  Groupe/Niveau/SITE, maquette ⊃ UE ⊃ ECUE, ETUDIANT ⊃ ses inscriptions ;
+  appliqués par défaut sur la voie objet, un résolveur injecté
+  (`contexte={'couverture': …}`) reste prioritaire ; type de périmètre
+  `DEPARTEMENT` ajouté (migration 0013) ;
+- ✅ **pose de périmètres non secrétariat** par la console : champ additif
+  `perimetres: [{type, object_id}]` sur les lignes d'attribution +
+  sélecteurs Direction/Département dans l'assistant et la modification
+  (les types pédagogiques restent posables par l'API, repli admin Django) ;
+- ⏸ arbitrage atelier des cases **J2** de la matrice (voir RBAC §9) — hors de
+  main du LOT 5, rien de unilatéral.
 
 ---
 
@@ -332,7 +349,7 @@ explicite. Séquence prévue :
 | Règle | Traduction dans le code |
 |---|---|
 | Additif d'abord (R2) | migrations additives et réversibles ; M2M vides par défaut ; aucune donnée existante modifiée |
-| Observation avant refus (R3) | `HABILITATIONS_APPLICATION=false` par défaut ; `ExigePermission` posée sur 0 vue métier |
+| Observation avant refus (R3) | `HABILITATIONS_APPLICATION=false` par défaut ; `ExigePermission` posée uniquement sur les vues pilotes du LOT 5, en OBSERVATION (aucune réponse changée) |
 | Backend seule autorité (S3) | `capabilities` et `habilitations` sont des projections ; les vues gardent leurs `permission_classes` |
 | Élargissement explicite (S4) | un RETRAIT ne se lève que par un OCTROI postérieur **et** doublement signé |
 | Jamais de suppression physique (S5) | révocations (statut REVOQUEE), désactivation du référentiel, annulations d'import |
@@ -355,7 +372,7 @@ explicite. Séquence prévue :
 | Types d'événements du journal | **37** |
 | Couples d'incompatibilité (séparation des tâches) | **5** |
 | Applications Django | 20 métier + `habilitations`, `parametres`, `core`, `authentication`, `referentiels`, `exports` |
-| Tests backend `habilitations` | **374** (2 ignorés : déclencheurs PostgreSQL), dont **60 ajoutés par le LOT 4** |
+| Tests backend `habilitations` | **415** (2 ignorés : déclencheurs PostgreSQL), dont **60 ajoutés par le LOT 4** et **26 par le LOT 5** (rejeu 2026-09-15) |
 
 Rejouer les mesures :
 

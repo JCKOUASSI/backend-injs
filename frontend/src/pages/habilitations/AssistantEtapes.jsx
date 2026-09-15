@@ -1,5 +1,6 @@
 /** Contenu des étapes de l'assistant de création (U4, §3.5). */
 import { BadgeSensible, BadgeCanal } from './partages'
+import PerimetresOrganisation from './PerimetresOrganisation'
 import { libelleDomaine } from '@/utils/habilitations'
 
 const input = 'form-control'
@@ -150,7 +151,8 @@ export function EtapeRoles({ roles, selection, basculerRole, changerNiveau, chan
   )
 }
 
-export function EtapePerimetres({ secretariats, basculerSecretariat, motif, setMotif, besoinPerimetre }) {
+export function EtapePerimetres({ secretariats, basculerSecretariat, motif, setMotif, besoinPerimetre,
+                               perimetres, setPerimetres, directions, departements }) {
   return (
     <div data-testid="etape-perimetres">
       <h3 className="h6">4 · Périmètres et motif</h3>
@@ -168,6 +170,11 @@ export function EtapePerimetres({ secretariats, basculerSecretariat, motif, setM
             ))}
           </select>
         </>
+      )}
+      {setPerimetres && (
+        <PerimetresOrganisation perimetres={perimetres || []}
+                                onChange={setPerimetres}
+                                directions={directions} departements={departements} />
       )}
       <label className="form-label mt-2">Motif de la création (obligatoire, tracé au journal)</label>
       <textarea className="form-control" rows="3" value={motif} data-testid="input-motif"

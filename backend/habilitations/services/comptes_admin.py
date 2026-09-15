@@ -214,24 +214,47 @@ def _verifier_seuil_admin(si_retrait_admin=False, compte=None):
 # ---------------------------------------------------------------------------
 # Périmètres
 # ---------------------------------------------------------------------------
-def _perimetre_secretariat(secretariat_id):
-    from formations.models import Secretariat
-    secretariat = Secretariat.objects.filter(pk=secretariat_id).first()
-    if secretariat is None:
+def _perimetre_borne(type_p, object_id):
+    """Pose un périmètre borné sur un objet métier quelconque (LOT 5, L4-02).
+
+    Les types admissibles sont ceux du registre du résolveur
+    (``resolveurs.TYPES_OBJETS``) : la console ne peut borner que sur des
+    objets réels, vérifiés ici. ``PERIMETRE_INCONNU`` (400) sur type inconnu
+    ou objet introuvable — la saisie ne crée jamais de périmètre fantôme.
+    """
+    from habilitations.services.resolveurs import TYPES_OBJETS
+    if type_p not in TYPES_OBJETS:
         raise ErreurConsole(
             'PERIMETRE_INCONNU',
-            f'Secrétariat {secretariat_id} introuvable.',
+            f'Type de périmètre « {type_p} » non posable par la console.',
         )
-    ct = ContentType.objects.get_for_model(Secretariat)
+    app, model = TYPES_OBJETS[type_p]
+    ct = ContentType.objects.get_by_natural_key(app, model)
+    classe = ct.model_class()
+    objet = classe.objects.filter(pk=object_id).first()
+    if objet is None:
+        raise ErreurConsole(
+            'PERIMETRE_INCONNU',
+            f'{type_p} {object_id} introuvable.',
+        )
+    reference = (
+        str(getattr(objet, 'numero', '') or getattr(objet, 'code', '')
+            or getattr(objet, 'nom', '') or getattr(objet, 'libelle', '')
+            or objet.pk)
+    )[:100]
+    libelle = (
+        str(getattr(objet, 'nom', '') or getattr(objet, 'libelle', '') or '')
+    )[:255]
     perimetre, _ = Perimetre.objects.get_or_create(
-        type=Perimetre.Type.SECRETARIAT,
-        content_type=ct, object_id=secretariat.pk,
-        defaults={
-            'reference_lisible': getattr(secretariat, 'numero', '') or str(secretariat.pk),
-            'libelle': getattr(secretariat, 'nom', '') or '',
-        },
+        type=type_p, content_type=ct, object_id=objet.pk,
+        defaults={'reference_lisible': reference, 'libelle': libelle},
     )
     return perimetre
+
+
+def _perimetre_secretariat(secretariat_id):
+    # Alliage historique de la console (LOT 4) : conservé, additif.
+    return _perimetre_borne(Perimetre.Type.SECRETARIAT, secretariat_id)
 
 
 # ---------------------------------------------------------------------------
@@ -372,10 +395,16 @@ def _appliquer_roles(compte, lignes, acteur, meta, motif=''):
         existante = compte.attributions.filter(
             role=role, statut=AttributionRole.Statut.ACTIVE
         ).first()
+        # LOT 5 (L4-02) : le sélecteur de périmètre est généralisé — la ligne
+        # peut porter « perimetres » (liste de {type, object_id}) en plus de
+        # l'alliage historique « perimetres_secretariats » (additif, combiné).
         périmètres = [
             _perimetre_secretariat(sid)
             for sid in ligne.get('perimetres_secretariats', [])
         ]
+        for spec in ligne.get('perimetres', []):
+            périmètres.append(_perimetre_borne(
+                (spec or {}).get('type'), (spec or {}).get('object_id')))
         champs = {
             'niveau_effectif': niveau,
             'date_fin': ligne.get('date_fin') or None,

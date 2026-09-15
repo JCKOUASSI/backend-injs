@@ -24,6 +24,9 @@ class Perimetre(models.Model):
     class Type(models.TextChoices):
         INJS_ENTIER = 'INJS_ENTIER', 'INJS tout entière'
         DIRECTION = 'DIRECTION', 'Une direction'
+        # LOT 5 (J2-4) : le département devient un périmètre bornable à part
+        # entière (chaîne Direction ⊃ Département ⊃ Service) ; additif.
+        DEPARTEMENT = 'DEPARTEMENT', 'Un département'
         SERVICE = 'SERVICE', 'Un service administratif'
         SECRETARIAT = 'SECRETARIAT', 'Un secrétariat'
         SITE = 'SITE', 'Un site physique'

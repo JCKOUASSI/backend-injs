@@ -31,6 +31,7 @@ export default function AssistantCreation() {
   const [compte, setCompte] = useState(compteVide)
   const [selection, setSelection] = useState([])
   const [secretariatsChoisis, setSecretariatsChoisis] = useState([])
+  const [bornes, setBornes] = useState([])
   const [motif, setMotif] = useState('')
   const [enCours, setEnCours] = useState(false)
   const [erreur, setErreur] = useState('')
@@ -92,6 +93,8 @@ export default function AssistantCreation() {
       role: s.code, niveau: s.niveau,
       sensible_valide: s.sensible_valide,
       perimetres_secretariats: besoinPerimetre ? secretariatsChoisis : [],
+      // LOT 5 (L4-02) : bornages Direction/Département, additifs et optionnels.
+      perimetres: bornes,
     })),
   })
 
@@ -128,6 +131,7 @@ export default function AssistantCreation() {
                                      changerSignature={(c, v) => setSelection((s) => s.map((x) => x.code === c ? { ...x, sensible_valide: v } : x))} />}
         {etape === 3 && <EtapePerimetres secretariats={secretariats} secretariatsChoisis={secretariatsChoisis}
                                           basculerSecretariat={setSecretariatsChoisis} motif={motif}
+                                          perimetres={bornes} setPerimetres={setBornes}
                                           setMotif={setMotif} besoinPerimetre={besoinPerimetre} />}
         {etape === 4 && (
           <div className="hab-recap" data-testid="etape-recap">

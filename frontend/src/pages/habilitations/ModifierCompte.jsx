@@ -12,6 +12,7 @@ import { useSecretariats } from '@/hooks/useSecretariats'
 import { useToast } from '@/context/ToastContext'
 import DifferentialPanel from './DifferentialPanel'
 import { BadgeSensible, EnChargement } from './partages'
+import PerimetresOrganisation from './PerimetresOrganisation'
 import { peutValiderModification, resumerDifferential } from '@/utils/habilitations'
 import './habilitations.css'
 
@@ -24,6 +25,7 @@ export default function ModifierCompte() {
   const [compte, setCompte] = useState(null)
   const [selection, setSelection] = useState([])
   const [secretariatsChoisis, setSecretariatsChoisis] = useState([])
+  const [bornes, setBornes] = useState([])
   const [motif, setMotif] = useState('')
   const [acquitte, setAcquitte] = useState(false)
   const [differentiel, setDifferentiel] = useState(null)
@@ -45,9 +47,11 @@ export default function ModifierCompte() {
     roles: selection.map((s) => ({
       role: s.code, niveau: s.niveau, sensible_valide: s.sensible_valide,
       perimetres_secretariats: besoinPerimetre ? secretariatsChoisis : [],
+      // LOT 5 (L4-02) : bornages Direction/Département, additifs et optionnels.
+      perimetres: bornes,
       motif: motif || 'Modification via la console CURP.',
     })),
-  }), [selection, secretariatsChoisis, besoinPerimetre, motif])
+  }), [selection, secretariatsChoisis, besoinPerimetre, motif, bornes])
 
   const calculer = async () => {
     setAcquitte(false)
@@ -124,6 +128,7 @@ export default function ModifierCompte() {
                 </select>
               </div>
             )}
+            <PerimetresOrganisation perimetres={bornes} onChange={setBornes} />
           </div>
           <div className="col-md-6">
             <button className="btn btn-outline-success btn-sm mb-2" data-testid="bouton-calculer"

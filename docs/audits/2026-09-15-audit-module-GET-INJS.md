@@ -195,3 +195,15 @@ Suppression + reliquat              204, zéro orphan (avant : suppression en ca
   apparaître, puis **Générer le brouillon** pour l'exemple de génération.
 - Comptes de démonstration : `admin/admin123` (tous droits), `secretariat/sec123`
   (planification), `superviseur1/sup123` (encadrant).
+
+---
+
+## Suivi (2026-09-15, LOT 5)
+
+Le test de contrat d'API (`config.tests.test_api_contract`) signalait la
+disparition de `POST /api/edts/creneaux-types/{id}/` (remplacé par
+PUT/PATCH/DELETE au détail dans la refonte L8, addendum du contrat de
+données) : le snapshot a été **régénéré** lors du LOT 5 via
+`manage.py update_api_contract --justification "…"` — une rupture justifiée,
+79 ajouts non cassants (routes L8 + alias `/api/timetable/`), voir
+`docs/api/CHANGELOG_CONTRAT.md` (entrée 2026-09-15).
