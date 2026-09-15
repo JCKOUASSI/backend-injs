@@ -1,0 +1,759 @@
+================================================================================
+GÉNÉRATION DE PROMPTS — MODULE / APPLICATION « EDT-INJS »
+Gestion des emplois du temps + gestion des présences par QR Code
+Projet : app-injslmd2026demo (INJS Marcory — Côte d'Ivoire, système LMD)
+Version du document : 1.0 — 2026-09-14
+================================================================================
+SOMMAIRE
+  0.  MODE D'EMPLOI DE CE FICHIER
+  1.  PIÈCES SOURCES À JOINDRE À CHAQUE PROMPT
+  2.  DIRECTIVE DE CONDUITE (à rappeler à chaque prompt)
+  3.  BLOC DE CONTEXTE COMMUN « BC-EDT » (à inclure dans chaque prompt)
+  4.  SÉQUENCE D'EXÉCUTION ET DÉPENDANCES
+  5.  LES PROMPTS (P0 → P9)
+        P0 — Cadrage, inventaire et matrice de traçabilité
+        P1 — Référentiel temporel et structurel de planification
+        P2 — Moteur natif de planification (génération, conflits, validation)
+        P3 — Séances opérationnelles, calendrier et QR de séance
+        P4 — Présences QR automatiques (multi-populations, anti-fraude, hors-ligne)
+        P5 — Badgeage manuel forcé et rattrapages (motifs et traçabilité)
+        P6 — Écrans web EDT + présences (calendrier, vues, exports)
+        P7 — Application mobile EDT / présence
+        P8 — Statistiques, alertes et notifications
+        P9 — Performance, sécurité, contrat API, CI, recette et bascule
+  6.  GABARIT DE RAPPORT FINAL (obligatoire pour chaque prompt)
+  7.  CHECKLIST GLOBALE DE FIN DE MODULE
+================================================================================
+0. MODE D'EMPLOI DE CE FICHIER
+================================================================================
+Ce fichier contient une suite de prompts autonomes, exécutables dans l'ordre par un
+agent de développement (Agent Mode / Cline) travaillant sur le dépôt
+`app-injslmd2026demo`.
+RÈGLES D'USAGE
+  1. Exécuter les prompts UN PAR UN, dans l'ordre P0 → P9.
+  2. Chaque prompt est COPIÉ-COLLÉ INTÉGRALEMENT, précédé :
+        - des 4 pièces sources (§1) jointes au prompt ;
+        - du bloc de contexte commun « BC-EDT » (§3) si l'agent n'a pas déjà lu ce
+          fichier en entier ;
+        - de la directive de conduite (§2).
+  3. Ne jamais lancer P(n+1) avant que P(n) soit terminé, vérifié, commité et que son
+     rapport final (§6) soit produit.
+  4. À chaque prompt, l'application doit rester FONCTIONNELLE, OPÉRATIONNELLE et
+     PERFORMANTE : aucune étape ne doit laisser le dépôt dans un état non testable.
+  5. Les prompts supposent que l'agent connaît le dépôt ; ils lui interdisent
+     explicitement d'inventer un fichier, un modèle, une route ou un test.
+LIVRABLE DE CHAQUE PROMPT : code + migrations + tests + documentation + rapport final.
+================================================================================
+1. PIÈCES SOURCES À JOINDRE À CHAQUE PROMPT
+================================================================================
+Les quatre documents de référence du commanditaire (à joindre au prompt) sont :
+  S1. ORGANIGRAMME-FONCTIONNEL-GLOBAL-INJS-LMD.txt
+  S2. Audit-complet-détaillé-app-injs-lmd2026OK.txt
+  S3. Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt
+  S4. RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL-DE-RÉFÉRENCE-APP-INJS-LMD2026.txt
+Ces documents sont la SOURCE MÉTIER. Ils priment sur toute interprétation personnelle,
+mais JAMAIS sur le code réellement présent dans le dépôt (le code est la vérité de fait).
+DOCUMENTS INTERNES AU DÉPÔT À LIRE SYSTÉMATIQUEMENT (chemins réels) :
+  - docs/CARTOGRAPHIE_CIBLE_INJS_LMD.md          (état cible par module, §5 enseignants,
+                                                  §6 EDT, §7 présences, §13 patrimoine)
+  - docs/EDT_CONTRAT_DONNEES.md                  (contrat EDT v1.1, lecture seule)
+  - docs/ADR/ADR-003-edt-externe-et-moteur-natif-complementaires.md
+                                                 (DÉCISION ACTÉE : moteur natif
+                                                  complémentaire, jamais substitué
+                                                  sans feu de bascule)
+  - docs/ADR/ADR-001 doubles représentations, ADR-004 middlewares démo,
+    ADR-005 arborescence à plat, ADR-006 unicité insensible casse
+  - docs/GARDE_FOUS.md                           (flags, contrat d'API, smoke, hygiène)
+  - docs/SECURITE_DONNEES.md
+  - docs/audits/BASELINE_2026-09.md              (baseline chiffrée de non-régression)
+  - docs/API_ENDPOINTS.md, docs/ARCHITECTURE.md
+  - .clinerules/INJS-LMD.md
+  - backend/config/settings.py, backend/config/urls.py
+  - backend/edts/          (moteur natif existant : modèles, services, api, permissions)
+  - backend/scolarite/edt_export.py             (contrat externe v1.1, lecture seule)
+  - backend/scolarite/models.py  → IndisponibiliteEnseignant
+  - backend/presences/     (Pointage, AuditLog, DeviceBinding, Rattrapage, scan QR, rattrapage)
+  - backend/formations/models.py → Module, SessionModule, QRToken, RefSite, RefBatiment,
+                                    RefSalle, RefTypeEspaceSportif, Formateur, ModuleFormateur
+  - backend/patrimoine/models.py → ReservationEspace (+ api.py, urls.py)
+  - backend/parametres/flags.py + parametres/migrations/0004_feature_flags_seed.py
+  - frontend/src/pages/Edts.jsx, EdtNew.jsx, Rattrapages.jsx, frontend/src/App.jsx
+  - frontend/src/services/api.js
+  - qr_badge_mobile/lib/pages/scan_page.dart, home_page.dart, history_page.dart,
+    lib/services/scan_service.dart, api_client.dart, mobile_config_service.dart
+  - .github/workflows/ci.yml
+================================================================================
+2. DIRECTIVE DE CONDUITE (à rappeler à chaque prompt)
+================================================================================
+  comprendre → décider → exécuter → vérifier → livrer.
+  Zéro détour ; zéro question dont la réponse est dans le dépôt ;
+  modification MINIMALE, ADDITIVE et RÉVERSIBLE ;
+  aucune affirmation non prouvée (test, commit, mesure) ;
+  aucune opération destructive (DROP / TRUNCATE / reset --hard / clean -fd /
+  réinitialisation de base / suppression de données de démonstration) ;
+  la sécurité et l'intégrité des données priment sur la rapidité ;
+  le backend est la SEULE autorité d'autorisation (le masquage d'un bouton front
+  n'est jamais une mesure de sécurité) ;
+  français partout : code, commentaires, journaux, documentation, écrans ;
+  l'application doit rester fonctionnelle, opérationnelle et performante après chaque prompt.
+  PRIORITÉ EN CAS DE CONFLIT :
+  1) sécurité et intégrité des données ; 2) règles métier INJS-LMD ; 3) exactitude
+  technique ; 4) stabilité du projet ; 5) tests et vérification ; 6) rapidité ;
+  7) documentation et confort.
+================================================================================
+3. BLOC DE CONTEXTE COMMUN « BC-EDT » (à inclure dans chaque prompt)
+================================================================================
+--- DÉBUT BLOC BC-EDT ----------------------------------------------------------
+CONTEXTE TECHNIQUE VÉRIFIÉ DU DÉPÔT (ne pas ré-auditer, mais re-vérifier en 30 s)
+- Piste backend   : `backend/` — Django 5.1 + Django REST Framework, PostgreSQL en
+                    production, SQLite de secours (`USE_SQLITE=1`, overlay
+                    `arena/settings_sandbox.py`).
+- Piste frontend  : `frontend/` — React + Vite (JSX), Vitest, ESLint.
+- Piste mobile    : `qr_badge_mobile/` — Flutter (apps auditeurs/formateurs/encadrants).
+- Bootstrap       : `bash arena/bootstrap.sh` (idempotent : venv, deps, node_modules).
+- Lanceurs        : `bash arena/lancer-api.sh` (API 0.0.0.0:8000),
+                    `bash arena/lancer-front.sh` (front 3000).
+MOTEUR EDT NATIF DÉJÀ PRÉSENT (à ÉTENDRE, jamais à réécrire)
+- App `backend/edts/` : `CreneauTemplate` (jour, heure_debut, heure_fin,
+  duree_prevue_minutes), `EmploiDuTemps` (annee_academique, population_type ∈
+  FORMATION|GROUPE|ENSEIGNANT|SALLE, population_id, titre, statut ∈ BROUILLON|
+  EN_VALIDATION|VALIDE|PUBLIE|ARCHIVE, rentree, cree_par), `AffectationCreneau`
+  (emploi_du_temps, creneau_template, semaine_debut, semaine_fin, salle_nom [TEXTE],
+  formation FK RefFormation, groupe FK Groupe, enseignant_id [ENTIER], enseignant_nom,
+  nature ∈ COURS|TD|TP|EVALUATION|REMPLACEMENT|AUTRE, intitule, commentaire, actif),
+  `ConflitCreneau` (type_conflit, description, lignes_creneaux JSON, actif, signale_par).
+- Service existant : `edts/services.py::detecter_conflits(emploi_du_temps)`.
+- API existante : `/api/edts/` → `creneaux-types/`, `emplois/`, `emplois/<pk>/`,
+  `emplois/<pk>/valider/`, `emplois/<pk>/detecter-conflits/`, `affectations/`,
+  `affectations/<pk>/`, `conflits/`, `conflits/<pk>/resoudre/`, `publics/`.
+- Permissions existantes : `edts/permissions.py` → `IsEdtPlanification`,
+  `IsEdtValidation`, `IsEdtReadOnlyOrPlanification`, `IsEdtEnseignantReadOnly`,
+  `IsEnseignantOuReadOnly`.
+- ⚠️ `backend/edts/tests/` ne contient AUCUN test : toute livraison EDT doit créer
+  le paquet de tests (c'est une exigence, pas une option).
+CONTRAT EDT EXTERNE (à ne jamais casser)
+- `/api/scolarite/edt/` : `contrat`, `groupes/`, `enseignements/`, `etudiants/`,
+  `indisponibilites/`, `creneaux/`, `affectations/`, `espaces/<salle_id>/occupation/`,
+  export JSON/CSV (`?export=csv`), champ `version` (v1.1).
+- Implémentation : `backend/scolarite/edt_export.py` ; tests :
+  `backend/scolarite/tests/test_edt_export.py`, `test_edt_extensions.py`.
+- Paramètre verrouillé : `edt_source_externe` (non modifiable).
+- Règle ADR-003 : le planificateur externe reste alimenté EN LECTURE SEULE ; le moteur
+  natif produit des brouillons validés par un rôle habilité ; la bascule est un feu
+  ultérieur (flag), jamais un effet de bord.
+SOCLE PÉDAGOGIQUE ET PATRIMONIAL RÉUTILISABLE
+- `formations.Module` : formation, ref_module, cycle, duree_prevue_heures, grade,
+  groupe (texte), vague, secretariat, site FK RefSite, batiment (texte), salle (texte),
+  date_debut, date_fin, statut, formateur FK, superviseur FK, archived.
+- `formations.SessionModule` : module, date_journee, numero (unique par module/date/numéro),
+  intitule, heure_debut_prevue, heure_fin_prevue, auto_demarrage, demarree_le,
+  terminee_le, demarree_par.
+- `formations.QRToken` : session FK, token UUID unique, genere_par, actif, expire_at
+  (+ propriétés `is_valid`, `is_expired`).
+- `formations.RefSite`, `RefBatiment`, `RefSalle` (site, batiment, nom, type_lieu,
+  capacite, equipements, type_espace → RefTypeEspaceSportif, indisponible_du/au, actif),
+  `Formateur`, `ModuleFormateur`.
+- `scolarite.IndisponibiliteEnseignant` (FK Formateur, période, motif).
+- `patrimoine.ReservationEspace` (salle FK RefSalle, motif, date_debut, date_fin,
+  statut ∈ PROVISOIRE|VALIDEE|REFUSEE|ANNULEE, demande_par, valide_par) + API
+  `/api/patrimoine/reservations/` et `/reservations/<pk>/valider/`.
+- `scolarite.Groupe`, `AffectationGroupe`, `InscriptionPedagogique`, `Maquette`, `UE`,
+  `ECUE`, `AnneeAcademique` (une seule courante — test dédié).
+SOCLE PRÉSENCES / QR DÉJÀ PRÉSENT (à ÉTENDRE, jamais à dupliquer)
+- `presences.Pointage` : participant | formateur | encadrant, session FK SessionModule,
+  date_journee, device_id, heartbeat (dernier heartbeat, lat/lon/accuracy/batterie),
+  `outside_geofence_count`, timestamp_entree, timestamp_sortie, duree_presence_minutes,
+  `statut`, `statut_assiduite`, annee_academique, groupe_lmd, ecue_lmd.
+- `presences.AuditLog` : actions incluant SCAN_ENTREE, SCAN_SORTIE, SCAN_SECURE_ENTREE,
+  SCAN_SECURE_SORTIE, FORCE_ENTREE, FORCE_SORTIE, CLOSE_SESSION, AUTO_ABSENT,
+  SCAN_HEARTBEAT, NO_HEARTBEAT, OUT_OF_GEOFENCE, AUTO_EXIT, DEVICE_UNBIND,
+  SEANCE_CREATE/START/STOP/UPDATE/DELETE/IMPORT, RATTRAPAGE_CREATE/PRESENCE/CANCEL.
+- `presences.DeviceBinding` (verrouillage appareil/compte), `presences.Rattrapage`
+  (participant, seance_rattrapage, module_origine, seance_manquee, pointage OneToOne,
+  statut PLANIFIE|EFFECTUE|ANNULE, motif, cree_par), `presences.NotificationAbsence`.
+- API : `/api/scan/` (public, gardé par `PUBLIC_QR_SCAN_ENABLED`), `/api/scan/offline-data/`,
+  `/api/scan/secure/` (+`heartbeat/`, +`check-status/`), `/api/presences/mobile/config/`,
+  `/me/historique/`, `/me/fiche/`, `/formations/<pk>/dashboard|presences|force-pointage|
+  force-badgeage-auditeurs-bulk|close-session/`, `/formations/<uuid:token>/offline-data/`,
+  `/participant/...`, `/devices/` (+`unbind/`), `/audit-logs/`,
+  `/presences/rattrapages/` (+`generer-presence/`, `annuler/`),
+  `/presences/stats/taux|alertes|notifications/`.
+- Sérialiseurs existants : `ForcePointageSerializer` (motif OBLIGATOIRE, non vide ;
+  `personne_id`, `type_personne` ∈ participant|formateur|encadrant, `action` ENTREE|SORTIE,
+  `date_journee`, `timestamp_entree`, `timestamp_sortie`, `module_id`),
+  `ForceBadgeageBulkAuditeursSerializer` (motif obligatoire).
+- Commandes : `auto_close_pointages`, `process_mobile_heartbeats`, `recalc_durees_pointages`,
+  `corriger_presences_forcees_auditeurs`, `force_badgeage_module_test`,
+  `diag_volume_horaire_fiche`.
+GARDE-FOUS PROJET (aucun affaiblissement autorisé)
+- Flags (`parametres/flags.py`) livrés ÉTEINTS ; un flag éteint = comportement identique
+  à l'existant, prouvé par test. Flag EDT existant : `flag.lot06_edt_campus_patrimoine`.
+- Contrat d'API figé : `python manage.py export_api_contract --check`
+  (snapshot `docs/api/contract.snapshot.json` ; ruptures ⇒ `update_api_contract
+  --justification` + `docs/api/CHANGELOG_CONTRAT.md`).
+- Parcours de fumée : `python manage.py smoke_test_injs` (23 étapes, transaction annulée).
+- Fumée auth CURP : `python manage.py fumee_authentification --tous --creer`.
+- intégrité journal : `python manage.py verifier_chaine_habilitations`,
+  `python manage.py audit_integrity_check`.
+- Zéro `print()` runtime : `python manage.py check_repo_hygiene`.
+- Base de démonstration (comptes témoins, formations, modules, séances) : INTERDIT de
+  la réinitialiser ; toute donnée créée doit être idempotente et documentée.
+- CI (`.github/workflows/ci.yml`) : backend (hygiène, collectstatic, migrate, tests,
+  contrat, smoke, fumées, journal, docker), frontend (lint, build, vitest+couverture),
+  mobile (flutter analyze). Toute étape ajoutée doit être idempotente.
+--- FIN BLOC BC-EDT -----------------------------------------------------------
+================================================================================
+4. SÉQUENCE D'EXÉCUTION ET DÉPENDANCES
+================================================================================
+  P0 ──▶ P1 ──▶ P2 ──▶ P3 ──┬─▶ P4 ──▶ P5 ──▶ P8 ──▶ P9
+                            └─▶ P6 ──▶ P7 ──┘
+  P0 : cadrage (aucun code métier, sauf commande d'inventaire si utile).
+  P1 : socle de données de planification (additif, aucun impact fonctionnel).
+  P2 : moteur natif ; dépend de P1.
+  P3 : séances datées ; dépend de P2 (mais peut partir des séances existantes).
+  P4/P5 : présences QR automatiques puis manuelles forcées ; dépendent de P3.
+  P6/P7 : écrans web puis mobile ; dépendent de P3 (et P4/P5 pour les écrans associés).
+  P8 : statistiques et alertes ; dépend de P4/P5.
+  P9 : durcissement, contrat, performance, recette, bascule ; dépend de tout.
+  À tout moment : le module doit rester utilisable en l'état, avec le planificateur
+  externe (contrat v1.1) toujours opérationnel.
+================================================================================
+5. LES PROMPTS
+================================================================================
+--------------------------------------------------------------------------------
+PROMPT P0 — CADRAGE, INVENTAIRE ET MATRICE DE TRAÇABILITÉ « EDT-INJS »
+--------------------------------------------------------------------------------
+RÔLE : agent d'implémentation du module EDT-INJS (emplois du temps + présences QR).
+MISSION : produire le cadrage exécutable du module EDT-INJS à partir des 4 pièces
+sources (S1→S4) et de l'état réel du dépôt, SANS écrire de code métier.
+TÂCHES
+1. Lire S1→S4 et les documents internes listés au §1 du présent fichier.
+2. Relever la ligne de base : `git status -sb` (branche, commit), puis
+   `bash arena/bootstrap.sh`, `python manage.py test --noinput` (backend, mode SQLite
+   documenté si PostgreSQL absent), `npm run lint` + `npm run test:coverage` (frontend),
+   `flutter analyze` (mobile) — consigner nombre de tests, échecs et durée, et distinguer
+   l'échec SQLite documenté (`referentiels.test_regle4_doublon_libelle_casse_rejete`)
+   des échecs éventuellement introduits.
+3. Produire l'INVENTAIRE EDT réel : ce qui existe (modèles, services, API, permissions,
+   écrans, commandes, tests, contrat externe) vs ce qui manque, avec chemins et numéros
+   de ligne réels — interdiction absolue d'inventer.
+4. Produire la MATRICE DE TRAÇABILITÉ : chaque exigence EDT-INJS des documents S2/S3/S4
+   (module emplois du temps, sous-modules, règles, acteurs, écrans attendus) est reliée à :
+   (a) l'existant réutilisé, (b) le prompt Pn qui la livre, (c) le test qui la prouvera.
+   Toute exigence non couverte doit être signalée comme QUESTION MÉTIER OUVERTE — jamais
+   comblée par déduction silencieuse.
+5. Écrire le plan de charge : fichiers à créer/modifier par prompt, migrations attendues,
+   risques, points de vigilance (ex. `AffectationCreneau.salle_nom` en texte vs
+   `RefSalle` FK ; `enseignant_id` entier vs `Formateur` FK ; écart ADR-003/CARTOGRAPHIE §6).
+6. Livrables documentaires : `docs/edt/00-CADRAGE-EDT-INJS.md`,
+   `docs/edt/01-MATRICE-TRACABILITE-EDT-INJS.md`,
+   `docs/edt/02-BASELINE-EDT-INJS.md` (chiffres réels datés).
+CONTRAINTES : aucune migration de données, aucun changement de comportement, aucun
+flag activé, aucune donnée de démonstration modifiée.
+CRITÈRES D'ACCEPTATION : baseline chiffrée reproduite par commande ; matrice couvrant
+100 % des exigences listées ou les déclarant ouvertes ; inventaire adossé à des chemins
+réels ; aucun code métier écrit.
+REPLI : supprimer les documents produits (aucun impact applicatif).
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P1 — RÉFÉRENTIEL TEMPOREL ET STRUCTUREL DE PLANIFICATION
+--------------------------------------------------------------------------------
+OBJECTIF : doter le module EDT-INJS du référentiel nécessaire à toute planification
+fiable (temps académique, espaces, disponibilités), sans modifier les comportements
+existants.
+PÉRIMÈTRE INCLUS
+- Référentiel temporel : semestres/periodes académiques exploitables par l'EDT,
+  semaines académiques numérotées, jours fériés et périodes de vacances.
+- Créneaux types normalisés (matin/après-midi/soirée), cohérents avec
+  `edts.CreneauTemplate` (ne pas casser l'existant).
+- Disponibilités/indisponibilités des enseignants : réutiliser
+  `scolarite.IndisponibiliteEnseignant` ; ajouter si nécessaire la granularité
+  horaire (jour + plage) — additif.
+- Espaces : lecture de `formations.RefSalle`/`RefBatiment`/`RefSite`, capacité,
+  équipements, `type_espace`, indisponibilités (`indisponible_du`/`au`) ; ALIGNEMENT
+  avec `patrimoine.ReservationEspace` (aucune duplication de moteur de réservation).
+- Occupation des espaces : service de consultation unifiant séances planifiées +
+  réservations validées + occupations connues (épreuves de concours) — LECTURE seule.
+HORS PÉRIMÈTRE : génération automatique d'EDT (P2), séances datées (P3), présences (P4/P5).
+MODÈLE DE DONNÉES (règles)
+- Toute nouveauté est additive, dans l'app `edts` (ou `scolarite` si le modèle y vit
+  déjà), avec FK `on_delete=PROTECT` ou `SET_NULL` — jamais CASCADE sur une donnée
+  pédagogique existante.
+- Contraintes d'unicité explicites (ex. pas deux périodes de mêmes bornes pour une même
+  année académique).
+- Migrations réversibles, idempotentes, sans perte de données.
+API (additive)
+- `GET /api/edts/periodes/`, `GET /api/edts/periodes/<pk>/`,
+  `GET /api/edts/jours-feries/`, `GET /api/edts/disponibilites/?enseignant=` ,
+  `GET /api/edts/occupation-espace/?salle=&date_debut=&date_fin=`.
+- Permissions : lecture pour tout compte authentifié ; écriture réservée via
+  `IsEdtPlanification` (réutiliser `edts/permissions.py`).
+- Aucune rupture du contrat `/api/scolarite/edt/` (v1.1) : ajouts uniquement, sinon feu
+  de versionnement documenté (`docs/EDT_CONTRAT_DONNEES.md`).
+SÉCURITÉ : cloisonnement par secrétariat respecté pour les rôles non globaux ;
+pas d'exposition nominative inutile ; champs de traçabilité (créé/modifié par, horodatage).
+TESTS (créer `backend/edts/tests/` — ≥ 15 tests, succès ET refus)
+- contraintes d'unicité et de validation (plages inversées, chevauchements) ;
+- numérotation des semaines et bornes de période ;
+- indisponibilité chevauchante détectée ;
+- occupation d'espace combinant séances + réservations validées + occupations connues ;
+- permissions : lecture 200, écriture 403 pour un rôle non planificateur, 401 anonyme ;
+- additivité : le contrat `/api/scolarite/edt/` reste bit-à-bit compatible (tests
+  existants verts).
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test edts scolarite.tests.test_edt_export scolarite.tests.test_edt_extensions -v 2
+  python manage.py test --noinput
+  python manage.py check_repo_hygiene && python manage.py export_api_contract --check
+  python manage.py smoke_test_injs
+  cd ../frontend && npm run lint && npm run test:coverage && npm run build
+CRITÈRES D'ACCEPTATION : référentiel exploitable par l'API, migrations réversibles
+testées, aucun écran ni comportement existant modifié, tests verts, contrat d'API vert.
+REPLI : `migrate edts <migration_précédente>` ; les nouvelles routes se désactivent en
+retirant leur entrée d'URL (aucun consommateur en P1).
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P2 — MOTEUR NATIF DE PLANIFICATION (GÉNÉRATION, CONFLITS, VALIDATION)
+--------------------------------------------------------------------------------
+OBJECTIF : livrer le moteur natif complémentaire prévu par l'ADR-003 : produire des
+BROUILLONS d'emploi du temps contraints, détecter et expliquer les conflits, faire
+valider puis publier par un rôle habilité — sans jamais court-circuiter le planificateur
+externe.
+PÉRIMÈTRE INCLUS
+- Consolidation du modèle : rattacher proprement les affectations aux référentiels
+  (`RefSalle` en plus de `salle_nom`, `Formateur` en plus de `enseignant_id`) par ajout
+  de FK NULLABLE + maintien des champs texte legacy (compatibilité, ADR-005/ADR-001).
+  Toute migration de données est additive et idempotente (jamais de suppression de colonne).
+- Génération assistée de brouillon : proposer un placement des volumes horaires
+  (`formations.Module.duree_prevue_heures`, maquettes/ECUE, groupes, effectifs) sur les
+  créneaux disponibles, en respectant : capacité de salle, disponibilités enseignants,
+  occupations d'espaces, plages de période, une seule séance simultanée par groupe,
+  par enseignant et par salle.
+- Détection de conflits COMPLÈTE et EXPLIQUÉE : enseignant, groupe/étudiant, salle,
+  module, indisponibilité, capacité — en étendant `edts/services.py::detecter_conflits`
+  sans casser sa signature publique ; chaque conflit produit un message lisible en
+  français et une action suggérée (déplacer, changer de salle, changer d'enseignant).
+- Workflow d'état : BROUILLON → EN_VALIDATION → VALIDE → PUBLIE → ARCHIVE, avec
+  permissions `IsEdtPlanification` (écriture) et `IsEdtValidation` (validation/publication),
+  horodatage et traçabilité de l'acteur.
+- Publication : un EDT publié devient LISIBLE par les enseignants concernés et par le
+  frontend ; la publication est journalisée.
+HORS PÉRIMÈTRE : séances datées et QR (P3), présences (P4/P5), écrans complets (P6).
+API (additive, sous `/api/edts/`)
+- `POST /emplois/<pk>/generer/` (ou `POST /emplois/generer/`) : génération de brouillon
+  (paramètres : période, groupes, contraintes, graine aléatoire) — réponse : statistiques
+  de placement + conflits résiduels.
+- `POST /emplois/<pk>/exporter-excel/` (optionnel) ; `GET /emplois/<pk>/conflits/`
+  (déjà en partie existant via `detecter-conflits/`).
+- `POST /emplois/<pk>/transition/` : transitions contrôlées avec motif pour les refus.
+- Idempotence : rejouer une génération ne crée pas de doublons (clé de session de
+  génération ou suppression logique des propositions précédentes — jamais de DELETE physique).
+RÈGLES MÉTIER LMD
+- Aucune séance pour un groupe dont un étudiant a une inscription pédagogique
+  incompatible ; respect des volumes CM/TD/TP et des périodes de la maquette ACTIVE.
+- Les EDT publiés du planificateur externe restent la référence tant qu'aucun feu de
+  bascule n'est acté (§ADR-003, DA-12).
+TESTS (≥ 20) : génération sur jeu de démonstration ; conflits enseignant/salle/groupe/
+module/indisponibilité/capacité ; non-régression de `detecter_conflits` ; transitions
+d'état autorisées et refusées ; séparation planification/validation (un planificateur ne
+peut pas publier) ; idempotence de la génération ; performances (temps de génération sur
+un jeu réaliste mesuré et consigné).
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test edts -v 2 && python manage.py test --noinput
+  python manage.py export_api_contract --check && python manage.py smoke_test_injs
+  cd ../frontend && npm run lint && npm run test:coverage
+CRITÈRES D'ACCEPTATION : un brouillon généré pour une formation réelle de la base de
+démonstration est validable et publiable ; aucun conflit enregistré sur un EDT publié ;
+planificateur externe non impacté ; tests verts.
+REPLI : abandon du brouillon (statut ARCHIVE) ; les nouvelles FK restent nullables et
+n'influencent aucun comportement si non renseignées.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P3 — SÉANCES OPÉRATIONNELLES, CALENDRIER ET QR DE SÉANCE
+--------------------------------------------------------------------------------
+OBJECTIF : transformer un EDT publié en SÉANCES réelles (occurrences datées) exploitables
+par le badgeage QR, en réutilisant `formations.SessionModule` et `formations.QRToken`.
+PÉRIMÈTRE INCLUS
+- Génération d'occurrences : à partir des `AffectationCreneau` validées/publiées d'un EDT
+  et d'un calendrier (semaines académiques, jours fériés, vacances de P1), créer les
+  séances correspondantes (`SessionModule` : date_journee, numero, intitule,
+  heure_debut_prevue, heure_fin_prevue) — IDEMPOTENT (aucune séance en double : contrainte
+  `unique_together (module, date_journee, numero)` respectée ; ré-exécution sans doublon).
+- Liaison EDT ↔ séance : conserver le lien vers l'affectation d'origine (FK nullable
+  additive) pour permettre la traçabilité « cette séance vient de cet EDT ».
+- Salle réelle de la séance : référencer la salle (`RefSalle`) et conserver le libellé
+  texte ; cohérence contrôlée avec `patrimoine.ReservationEspace` (alerte si la salle est
+  par ailleurs réservée).
+- Enseignant/formateur/encadrant attendu : rattacher les personnes attendues pour
+  permettre les présences enseignantes et encadrantes (P4).
+- QR de séance : génération des `QRToken` (durée de validité paramétrable, unicité,
+  régénération, révocation), démarrage/arrêt de séance (`auto_demarrage`, `demarree_le`,
+  `terminee_le`, `demarree_par`), fermeture automatique (`auto_close_pointages` existant).
+- Calendrier annuel : endpoints de lecture par période, par groupe, par salle, par
+  enseignant, par formation.
+HORS PÉRIMÈTRE : scan et enregistrement des présences (P4/P5), écrans riches (P6).
+API (additive, sous `/api/edts/` et `/api/formations/`)
+- `POST /api/edts/emplois/<pk>/generer-seances/` (paramètres : période, mode
+  simulation/écriture ; réponse : nombre d'occurrences créées/ignorées).
+- `GET /api/edts/seances/?date_debut=&date_fin=&groupe=&salle=&enseignant=&formation=`
+- `POST /api/formations/sessions/<pk>/demarrer/`, `POST /api/formations/sessions/<pk>/terminer/`
+  (si l'existant n'offre pas déjà l'équivalent — vérifier avant d'ajouter).
+- `POST /api/formations/sessions/<pk>/qr/` (générer/régénérer), `DELETE`-libre :
+  révocation par `actif=False` (jamais de suppression physique).
+- Les routes publiques de scan existantes ne changent pas de contrat.
+RÈGLES MÉTIER
+- Une séance ne peut pas exister hors période académique active ni sur un jour férié
+  (sauf dérogation explicite avec motif et traçabilité).
+- Un QR de séance n'est valide que pendant la plage prévue (tolérance paramétrable) et
+  seulement si la séance est ouverte.
+- Toute génération, démarrage, arrêt, régénération de QR est journalisée
+  (`presences.AuditLog` avec SEANCE_CREATE/START/STOP/QR ou `JournalScolarite` selon
+  le domaine — choisir le journal du domaine concerné et le documenter).
+TESTS (≥ 20) : idempotence de la génération d'occurrences ; respect des jours fériés et
+périodes ; unicité des séances ; validité/expiration du QR ; démarrage/arrêt et verrous
+(démarrage double refusé) ; fermeture automatique ; permissions (planificateur vs
+enseignant vs secrétariat) ; perméabilité des filtres ; volume (génération sur une année
+complète sans dépassement de temps raisonnable, mesure consignée).
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test edts presences formations -v 2
+  python manage.py test --noinput && python manage.py export_api_contract --check
+  python manage.py smoke_test_injs
+  python manage.py auto_close_pointages --dry-run   (si l'option existe ; sinon lecture seule)
+CRITÈRES D'ACCEPTATION : un EDT publié génère ses séances sans doublon ; un enseignant
+voit son calendrier ; les séances sont badgeables par QR avec les mécanismes existants ;
+aucune régression sur les séances historiques de la base de démonstration.
+REPLI : les séances générées sont identifiables (marqueur de génération) et peuvent être
+passées à un statut inactif sans suppression ; le lien vers l'affectation reste nullable.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P4 — PRÉSENCES QR AUTOMATIQUES (ÉTUDIANTS, ENSEIGNANTS, FORMATEURS, ENCADRANTS)
+--------------------------------------------------------------------------------
+OBJECTIF : garantir un pointage fiable, anti-fraude et traçable pour TOUTES les
+populations (étudiants/auditeurs, enseignants/formateurs, encadrants), par QR Code,
+y compris en mode dégradé (hors-ligne), en réutilisant intégralement le socle
+`presences` existant.
+PÉRIMÈTRE INCLUS
+- Pointage automatique : scan du QR de séance → entrée/sortie selon l'état du pointage
+  (réutiliser `/api/scan/`, `/api/scan/secure/`, `check-status/`).
+- Multi-populations : participant (auditeur), formateur (enseignant), encadrant — la
+  détermination de la population est faite CÔTÉ SERVEUR à partir du compte authentifié
+  (jamais d'un paramètre client).
+- Anti-fraude : device binding (`DeviceBinding`), heartbeat géolocalisé, geofence
+  paramétrable (`MOBILE_*` dans `settings.py`), détection de sortie de périmètre
+  (`OUT_OF_GEOFENCE`), alerte absence de heartbeat (`NO_HEARTBEAT`), sortie automatique
+  (`AUTO_EXIT`), statut `ABSENT_NON_BADGE` via `AUTO_ABSENT_DELAI_MINUTES`.
+- Mode hors-ligne : file d'attente locale (mobile) + réconciliation serveur ; l'API
+  `/api/scan/offline-data/` et `formations/<token>/offline-data/` restent la source ;
+  horodatage client conservé SÉPARÉMENT de l'horodatage serveur (les deux sont stockés).
+- Statuts et assiduité : présent / retard / absent justifié / absent — règles explicites
+  (tolérance de retard paramétrable), calcul de `duree_presence_minutes` et de
+  `statut_assiduite`, recalcul par `recalc_durees_pointages`.
+- Présence des enseignants/formateurs : ouverture de séance = présence de l'enseignant
+  attendu (règle à expliciter et tester) ; présence des encadrants : rattachement au
+  module/séance supervisée.
+- Notifications minimales : absence détectée → `NotificationAbsence` (aucun nouveau canal).
+HORS PÉRIMÈTRE : badgeage manuel forcé (P5), statistiques avancées (P8), refonte mobile (P7).
+API (additive, sous `/api/presences/` et `/api/formations/`)
+- `GET /api/presences/seance/<pk>/feuille-presence/` (qui est attendu / qui a pointé /
+  qui manque) — lecture, selon permissions.
+- `POST /api/presences/seance/<pk>/cloturer/` (si l'existant `close-session/` ne couvre
+  pas le cas ; sinon documenter la réutilisation).
+- `GET /api/presences/me/statut-jour/` (état du badgeage du jour pour le compte appelant).
+- Conserver strictement les contrats existants des routes de scan.
+RÈGLES MÉTIER
+- Un pointage n'est possible que sur une séance ouverte et dans la fenêtre autorisée.
+- Un seul pointage actif par personne et par séance : le doublon est fusionné, jamais
+  dupliqué (contrainte à tester).
+- Un appareil est lié à un compte (`DeviceBinding`) ; tout autre usage déclenche un refus
+  `DEVICE_LOCKED` avec message français.
+- Toute présence automatique est journalisée (`AuditLog`), y compris les refus.
+TESTS (≥ 25) : scan nominal par population ; refus hors fenêtre ; refus séance fermée ;
+verrou appareil ; geofence ; heartbeat manquant ; sortie automatique ; hors-ligne puis
+réconciliation (aucun doublon, horodatage client conservé) ; idempotence du scan ;
+cloisonnement (un auditeur ne pointe pas pour un autre) ; permissions d'API ;
+non-régression des tests existants `presences/tests.py`.
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test presences -v 2 && python manage.py test --noinput
+  python manage.py process_mobile_heartbeats --dry-run    (ou lecture seule si absent)
+  python manage.py auto_close_pointages                   (idempotent, vérifié)
+  python manage.py smoke_test_injs && python manage.py export_api_contract --check
+CRITÈRES D'ACCEPTATION : pointage nominal des 4 populations en recette ; aucun doublon ;
+traçabilité complète ; hors-ligne fonctionnel ; tests existants intacts.
+REPLI : les nouvelles règles sont paramétrables (seuils, tolérances) et un flag
+(§ BC-EDT) permet de revenir au comportement précédent sans redéploiement.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P5 — BADGEAGE MANUEL FORCÉ ET RATTRAPAGES (MOTIFS ET TRAÇABILITÉ)
+--------------------------------------------------------------------------------
+OBJECTIF : permettre à un acteur habilité de FORCER un badgeage (entrée ou sortie) pour
+un étudiant, un enseignant/formateur ou un encadrant, avec MOTIF obligatoire typé,
+traçabilité immuable, contrôles anti-abus, et gestion des rattrapages inter-cohortes.
+PÉRIMÈTRE INCLUS
+- Forçage unitaire : réutiliser `POST /api/presences/formations/<pk>/force-pointage/`
+  et son `ForcePointageSerializer` (motif déjà obligatoire, non vide, max 500).
+  ENRICHIR de façon ADDITIVE : `motifs` (liste typée) en PLUS du texte libre.
+- Référentiel de motifs : créer un référentiel paramétrable (ex. app `parametres` ou
+  `presences`) — codes et libellés français, par exemple : ABSENCE_JUSTIFIEE,
+  RETARD_JUSTIFIE, PANNE_RESEAU, APPAREIL_PERDU, ERREUR_TECHNIQUE, CONSIGNE_DIRECTION,
+  MISSION_INSTITUTIONNELLE, RATTRAPAGE, CAS_FORCE_MAJEUR. Le référentiel est une DONNÉE,
+  pas une liste figée au code ; il est administrable sans redéploiement.
+- Forçage en masse : réutiliser `force-badgeage-auditeurs-bulk/`
+  (`ForceBadgeageBulkAuditeursSerializer`) en exigeant le motif typé ; plafond de volume
+  par appel ; confirmation explicite ; les forçages massifs sont marqués comme tels.
+- Contrôles anti-abus (côté SERVEUR, testés) :
+    * interdiction d'auto-forçage (un acteur ne force pas son propre badgeage) ;
+    * un formateur/encadrant ne force pas pour une séance qui n'est pas la sienne ;
+    * fenêtre temporelle de forçage paramétrable (ex. rétroactif limité à N jours) ;
+    * plafond journalier de forçages par acteur, paramétrable ;
+    * double validation exigée au-delà d'un seuil critique (rôle N3/N4) ;
+    * interdiction de modifier/supprimer un pointage forcé (correction par nouveau
+      pointage compensatoire + motif, jamais par écrasement).
+- Traçabilité immuable : `AuditLog` (FORCE_ENTREE/FORCE_SORTIE) enrichi additivement du
+  motif typé, du texte libre, de l'acteur, du rôle, de l'IP, du device, de l'horodatage,
+  du caractère massif, et du pointage cible. Aucune suppression possible ; les forçages
+  restent consultables via `/api/presences/audit-logs/`.
+- Justificatifs : possibilité d'associer une pièce justificative (fichier) au forçage,
+  stockée dans MEDIA_ROOT NON servi publiquement, consultable uniquement par les rôles
+  habilités (cf. `docs/SECURITE_DONNEES.md`).
+- Rattrapages : réutiliser `presences.Rattrapage` et `/api/presences/rattrapages/…`
+  (création, génération de présence, annulation) ; vérifier que statut, motif et
+  journalisation couvrent le besoin ; compléter uniquement si nécessaire.
+- Écran web dédié : dans `frontend/src/pages/` (page Rattrapages existante à étendre ou
+  nouvelle page « Forçages », cf. P6 pour l'intégration de navigation).
+HORS PÉRIMÈTRE : refonte du socle de scan (P4), statistiques (P8).
+API (additive)
+- `GET /api/presences/motifs-forcage/` (référentiel), `POST` réservé à l'administration
+  des paramètres.
+- `POST /api/presences/formations/<pk>/force-pointage/` : accepte désormais
+  `motifs: [codes]` + `motif_libre` (compatibilité ascendante : `motif` texte reste accepté).
+- `POST /api/presences/pointages/<pk>/compensation/` (correction tracée, si nécessaire).
+- `GET /api/presences/forcages/?acteur=&date_debut=&date_fin=&motif=&seance=` (audit).
+RÈGLES MÉTIER
+- Aucun forçage sans motif typé VALIDE issu du référentiel (refus explicite sinon).
+- Un forçage ne crée jamais deux pointages pour la même personne/séance (fusion idempotente).
+- Les forçages massifs sont réservés aux rôles habilités (Secrétariat/Chef Secrétariat/
+  DFRC/Direction/Admin) et n'excèdent pas les plafonds paramétrés.
+- Toute action est journalisée et l'acting est imputable nommément.
+TESTS (≥ 25) : forçage unitaire accepté avec motif typé ; refus sans motif / motif inconnu ;
+refus d'auto-forçage ; refus hors fenêtre ; refus au-delà du plafond ; forçage par un
+formateur hors de ses séances refusé ; forçage massif plafonné ; idempotence ; compensation
+tracée ; immuabilité (tentative de modification/suppression refusée) ; accès au justificatif
+contrôlé ; permissions 401/403 pour chaque route ; rattrapage nominal et annulation.
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test presences -v 2 && python manage.py test --noinput
+  python manage.py export_api_contract --check && python manage.py smoke_test_injs
+  cd ../frontend && npm run lint && npm run test:coverage
+CRITÈRES D'ACCEPTATION : un forçage documenté est réalisable en < 1 minute par un acteur
+habilité ; toute tentative abusive est refusée par le serveur (preuves 403) ; la piste
+d'audit permet de reconstituer qui a forcé quoi, quand, pourquoi.
+REPLI : les nouveaux motifs sont désactivables (paramètre `actif`) ; l'ancien
+comportement (`motif` texte) reste accepté sans régression.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P6 — ÉCRANS WEB EDT + PRÉSENCES (CALENDRIER, VUES, EXPORTS)
+--------------------------------------------------------------------------------
+OBJECTIF : rendre le module exploitable au quotidien par les acteurs de l'INJS :
+planification, consultation, pilotage des séances et des présences, dans l'identité
+visuelle existante.
+PÉRIMÈTRE INCLUS
+- Page « Emplois du temps » : calendrier jour/semaine/mois ; vues par formation, groupe,
+  salle, enseignant ; navigation par période ; indicateurs de conflits ; publication ;
+  impression et export (PDF/Excel cohérents avec les exports existants).
+- Page « Planification » : édition d'un EDT (créneaux, affectations, glisser-déposer si
+  raisonnable), détection de conflits en direct, simulation avant enregistrement.
+- Page « Séances » : suivi du jour (prévues / ouvertes / closes), démarrage/arrêt,
+  génération et affichage du QR de séance (grand format pour projection), effectifs attendus.
+- Page « Présences » : feuille de présence d'une séance (attendus / présents / retards /
+  absents), forçage avec motif (lien avec P5), rattrapages, export.
+- Page « Mon emploi du temps » pour enseignants/encadrants (vue restreinte à leurs séances).
+- Navigation : entrées conditionnées par les CAPACITÉS serveur
+  (`peut(user, module, action)` dans `frontend/src/utils/roles.js`) — jamais par une
+  nouvelle liste de rôles locale ; le backend reste la seule autorité.
+- Étendre `frontend/src/App.jsx` de façon additive (routes protégées par
+  `ProtectedRoute` avec `capacite={{ module: ..., action: ... }}`), sans casser les routes
+  existantes `/edts` (Edts.jsx), `/edts/new` (EdtNew.jsx) et `/presences/rattrapages`.
+HORS PÉRIMÈTRE : mobile (P7), statistiques avancées (P8).
+EXIGENCES D'INTERFACE
+- Réutiliser les composants, styles et services existants (`frontend/src/services/api.js`,
+  composants de listes/modales existants, identité visuelle INJS).
+- Aucun appel direct à `localhost` : les appels passent par le service `api` (URL relative
+  ou `VITE_API_URL`) pour rester compatibles avec l'aperçu hébergé.
+- Accessibilité : contrastes, libellés explicites, navigation clavier sur le calendrier.
+- Responsive : le calendrier reste lisible et manipulable sur écran réduit.
+TESTS FRONTEND (Vitest + Testing Library, ≥ 20)
+- rendu et filtres de chaque page ; navigation de période ; affichage des conflits ;
+  démarrage/arrêt de séance ; affichage du QR ; forçage avec motif (y compris refus serveur
+  affiché à l'utilisateur) ; export ; droits d'affichage (action masquée ≠ sécurité : le
+  refus serveur est testé en plus) ; accessibilité de base ; couverture en hausse
+  (les seuils de `vitest.config.js` ne baissent jamais).
+COMMANDES DE VÉRIFICATION
+  cd frontend && npm run lint && npm run test:coverage && npm run build
+  cd ../backend && python manage.py export_api_contract --check
+CRITÈRES D'ACCEPTATION : un planificateur peut préparer, valider et publier un EDT depuis
+l'interface ; un encadrant peut ouvrir une séance et suivre sa feuille de présence ; un
+enseignant consulte son planning ; aucune régression visuelle ni fonctionnelle.
+REPLI : les nouvelles routes front sont supprimables sans impact backend (drapeau
+d'affichage + capacités).
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P7 — APPLICATION MOBILE EDT / PRÉSENCE (FLUTTER)
+--------------------------------------------------------------------------------
+OBJECTIF : permettre aux enseignants, formateurs, encadrants et étudiants d'exécuter le
+parcours EDT/présence depuis `qr_badge_mobile/`, en mode dégradé (hors-ligne) sans perte
+de données ni de traçabilité.
+PÉRIMÈTRE INCLUS
+- « Mon planning du jour » : séances prévues (heure, module, salle, groupe), état
+  (à venir / ouverte / close), actions enseignant (démarrer/terminer la séance).
+- Scanner QR : réutiliser `scan_page.dart` et `scan_service.dart` ; pointage entrée/sortie
+  selon l'état ; gestion du verrou d'appareil (`DeviceBinding`) et des messages de refus
+  en français.
+- Présences : vue de la feuille de présence de la séance ouverte pour l'encadrant/enseignant
+  (lecture + forçage motivé si son rôle l'y autorise, avec confirmation explicite).
+- Hors-ligne : file d'attente locale (scan + forçage), synchronisation différée, aucun
+  doublon après réconciliation, horodatage client conservé distinctement.
+- Notifications locales : séance sur le point de commencer, séance non démarrée, badgeage
+  manquant.
+- Sécurité mobile : stockage sécurisé du jeton, `background_keepalive` inchangé,
+  `flutter analyze` vert, aucun secret embarqué.
+HORS PÉRIMÈTRE : refonte graphique de l'application, nouveaux canaux de notification,
+canal FORMATEUR/AUDITEUR non concerné par les règles existantes de connectivité.
+TESTS ET VÉRIFICATIONS
+  cd qr_badge_mobile && flutter pub get --enforce-lockfile && flutter analyze
+  (tests de widgets si le projet en contient déjà : les exécuter et les étendre)
+  Parcours de recette manuel documenté : scan nominal, scan refusé, hors-ligne, reconnexion.
+CRITÈRES D'ACCEPTATION : `flutter analyze` vert ; le parcours nominal aboutit sur un
+appareil/appareil émulé ; aucune donnée perdue en hors-ligne ; contrats API inchangés
+(ou évolution additive documentée).
+REPLI : l'application mobile reste fonctionnelle avec l'ancien écran si la fonctionnalité
+est désactivée côté serveur (flag) — jamais de crash.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P8 — STATISTIQUES, ALERTES ET NOTIFICATIONS
+--------------------------------------------------------------------------------
+OBJECTIF : donner à la Direction, à la DFRC, aux secrétariats et aux encadrants la
+lecture chiffrée de l'occupation des emplois du temps et de la présence réelle.
+PÉRIMÈTRE INCLUS
+- Indicateurs EDT : taux d'occupation des salles (par site, bâtiment, type d'espace),
+  taux d'utilisation des créneaux, volume horaire programmé vs réalisé par groupe/module,
+  séances annulées/non démarrées, conflits résiduels, dérives de planification.
+- Indicateurs présences : taux de présence par séance/module/groupe/enseignant, retards,
+  absences justifiées/non justifiées, forçages (nombre, motifs, acteurs), détection
+  d'anomalies (forçages répétés d'un même acteur, présences sans heartbeat, séances
+  jamais pointées).
+- Alertes : seuils paramétrables (ex. taux de présence < X %, forçages > Y/jour),
+  notification in-app (`NotificationAbsence` étendu ou mécanisme existant) et dans la
+  page d'accueil ; aucune notification par canal nouveau.
+- Exports : PDF/Excel réutilisant le socle `exports` existant ; libellés en français ;
+  cloisonnement par secrétariat respecté (les statistiques globales restent réservées aux
+  rôles globaux).
+- Écrans : tableau de bord EDT/présence (frontend), filtres période/formation/groupe/
+  enseignant ; performance : requêtes agrégées, pagination, aucune boucle N+1.
+HORS PÉRIMÈTRE : refonte du module Statistiques existant ; décisionnel avancé.
+TESTS (≥ 20) : exactitude des taux sur un jeu de démonstration calculé à la main ;
+cloisonnement des statistiques par secrétariat ; refus 403 pour un rôle non habilité ;
+seuils d'alerte déclenchés/non déclenchés ; export non nominatif conforme à
+`docs/SECURITE_DONNEES.md` ; temps de réponse mesuré sur volume réaliste.
+COMMANDES DE VÉRIFICATION
+  cd backend && python manage.py test presences statistiques -v 2
+  python manage.py test --noinput && python manage.py export_api_contract --check
+  cd ../frontend && npm run lint && npm run test:coverage
+CRITÈRES D'ACCEPTATION : les chiffres affichés sont reproductibles par commande/requête
+(écart nul), les alertes se déclenchent selon les seuils, aucun dépassement de temps de
+réponse anormal.
+REPLI : les nouveaux indicateurs sont derrière flag ; l'écran Statistiques existant reste
+intact.
+RAPPORT FINAL : au gabarit §6.
+--------------------------------------------------------------------------------
+PROMPT P9 — PERFORMANCE, SÉCURITÉ, CONTRAT API, CI, RECETTE ET BASCULE
+--------------------------------------------------------------------------------
+OBJECTIF : verrouiller le module, prouver ses qualités non fonctionnelles, figer son
+contrat, sécuriser son exploitation et préparer (sans la déclencher) la bascule depuis
+le planificateur externe.
+PÉRIMÈTRE INCLUS
+- PERFORMANCE : profilage des endpoints EDT/présences (temps de réponse, requêtes SQL,
+  index) ; correction des N+1 ; index manquants ajoutés par migration ; pagination ;
+  cache là où c'est justifié ; objectif chiffré proposé et mesuré (ex. p95 < 400 ms sur
+  les listes filtrées en recette) ; volumétrie de test réaliste (une année académique).
+- SÉCURITÉ : revue systématique des routes nouvelles (401/403/périmètre/écriture directe
+  sans interface), cloisonnement secrétariat, absence de secrets dans le dépôt
+  (`check_repo_hygiene`), validation des entrées (bornes de dates, longueurs, types),
+  protection contre l'énumération (identifiants non devinables ou contrôlés), journaux
+  sans données sensibles inutiles.
+- CONTRAT : passer `docs/EDT_CONTRAT_DONNEES.md` et `/api/scolarite/edt/` en version 1.2
+  si et seulement si des ajouts ont été livrés (jamais de rupture sans accord) ;
+  régénérer `docs/api/contract.snapshot.json` ; documenter dans
+  `docs/api/CHANGELOG_CONTRAT.md`.
+- CI : ajouter les étapes nécessaires (tests ciblés EDT, vérification des alertes,
+  contrôle d'intégrité) sans retirer ni modifier les étapes existantes ; toutes
+  idempotentes.
+- DOCUMENTATION : `docs/edt/10-MANUEL-PLANIFICATION.md` (procédures,
+  rôles, captures), `docs/edt/11-MANUEL-PRESENCES-FORCAGE.md` (forçage et motifs,
+  anti-abus), `docs/edt/12-EXPLOITATION-SUPERVISION.md` (commandes, alertes, incidents),
+  `docs/edt/13-RECETTE-EDT-INJS.md` (scénarios de recette pas-à-pas avec résultats attendus).
+- RECETTE : exécuter la recette sur base de démonstration, enregistrer les preuves
+  (sorties de commandes, captures, extraits de journaux), produire
+  `docs/edt/14-PV-RECETTE-EDT-INJS.md`.
+- BASCULE (préparation seulement) : décrire le feu de bascule progressif depuis le
+  planificateur externe vers le moteur natif (flag par flag, population par population,
+  avec critères de retour arrière), SANS l'activer.
+TESTS ET COMMANDES OBLIGATOIRES (sorties à joindre au rapport)
+  cd backend
+  python manage.py check_repo_hygiene
+  python manage.py test --noinput
+  python manage.py export_api_contract --check
+  python manage.py smoke_test_injs
+  COMPTE_TEMOIN_MOT_DE_PASSE='<jetable>' python manage.py fumee_authentification --tous --creer
+  python manage.py verifier_chaine_habilitations
+  python manage.py audit_integrity_check
+  cd ../frontend && npm ci && npm run lint && npm run test:coverage && npm run build
+  cd ../qr_badge_mobile && flutter pub get --enforce-lockfile && flutter analyze
+CRITÈRES D'ACCEPTATION : toutes les commandes ci-dessus vertes ; mesure de performance
+consignée avant/après ; aucun secret ni donnée nominative nouvelle versionnée ; PV de
+recette signé ; feu de bascule documenté mais NON activé.
+REPLI : plan de retour arrière documenté, par fonctionnalité, avec la commande exacte.
+RAPPORT FINAL : au gabarit §6.
+================================================================================
+6. GABARIT DE RAPPORT FINAL (fin de chaque prompt)
+================================================================================
+FAIT
+  Ce qui a réellement été réalisé (fonctionnalités, règles, écrans, commandes).
+FICHIERS
+  Principaux fichiers créés / modifiés (chemins réels).
+MODÈLE DE DONNÉES
+  Migrations créées, modèles modifiés, réversibilité vérifiée.
+API
+  Routes ajoutées/modifiées, permissions appliquées, impact contrat.
+TESTS
+  Commandes réellement exécutées, résultat chiffré avant/après, échecs préexistants
+  distingués explicitement des échecs propres.
+PERFORMANCE
+  Mesures réalisées (endpoints concernés, volumétrie, avant/après).
+SÉCURITÉ
+  Preuves 401/403/périmètre/journal pour les routes touchées.
+GIT
+  Branche, état, commit(s) créés (unité fonctionnelle par commit, message préfixé
+  « EDT-INJS … »), push réellement effectué (sinon le dire).
+RESTE
+  Uniquement les points bloquants, les arbitrages métier nécessaires et les écarts
+  constatés non corrigés (avec référence).
+================================================================================
+7. CHECKLIST GLOBALE DE FIN DE MODULE
+================================================================================
+  [ ] P0 à P9 exécutés, chacun avec rapport final et commit dédié.
+  [ ] Matrice de traçabilité complète : 100 % des exigences S1→S4 couvertes ou déclarées
+      ouvertes avec justification métier.
+  [ ] Aucune régression : suite backend complète, tests frontend avec couverture,
+      `flutter analyze`, smoke, fumées, contrat d'API, intégrité du journal.
+  [ ] Application fonctionnelle, opérationnelle et performante : recette jouée sur base de
+      démonstration, preuves archivées.
+  [ ] Contrat EDT externe toujours lisible (v1.1 ou v1.2 documenté) ; planificateur externe
+      non impacté.
+  [ ] Présences : QR automatique ET badgeage manuel forcé motivé, tracés, anti-abus,
+      rattrapages opérationnels.
+  [ ] Sécurité : cloisonnement, séparation des responsabilités, aucune donnée sensible
+      exposée, journaux immuables.
+  [ ] Documentation d'exploitation et de recette livrée ; feu de bascule documenté et
+      NON activé.
+  [ ] Données de démonstration préservées ; aucune opération destructive effectuée.
+================================================================================
+FIN DU FICHIER — Génération-prompts-EDTINJS-app-injs-lmd2026.txt
+================================================================================

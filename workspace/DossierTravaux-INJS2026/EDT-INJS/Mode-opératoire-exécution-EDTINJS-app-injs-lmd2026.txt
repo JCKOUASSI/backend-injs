@@ -1,0 +1,1892 @@
+====================================================================================================
+MODE OPÉRATOIRE D'EXÉCUTION
+Comment exécuter concrètement le « Plan-exécution-prompts-EDTINJS-app-injs-lmd2026.txt »
+Projet EDT-INJS — app-injs-lmd2026demo — INJS Marcory, Abidjan, Côte d'Ivoire
+====================================================================================================
+Version            : 1.0
+Date               : 13 septembre 2026
+Nature             : Procédure opérationnelle — document de travail quotidien
+Public             : Exécutant(s) technique(s), responsable technique, expert fonctionnel,
+                     exploitant, référents INJS
+Documents liés     : [D1] Génération-prompts-EDTINJS-app-injs-lmd2026.txt      (LE QUOI)
+                     [D2] Plan-exécution-prompts-EDTINJS-app-injs-lmd2026.txt  (LE QUAND)
+                     [D3] Le présent mode opératoire                            (LE COMMENT)
+                     [S1] Audit-complet-détaillé-app-injs-lmd2026OK.txt
+                     [S2] Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt
+                     [S3] RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL...txt
+Règle d'usage      : Ce document se lit une fois en entier, puis se consulte chapitre par chapitre
+                     au moment d'agir. Les commandes sont à copier telles quelles.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+ 0.  COMMENT UTILISER CE DOCUMENT — LES TROIS DOCUMENTS ET LEUR ARTICULATION
+ 1.  PHASE 0 — MISE EN PLACE AVANT LE PREMIER PROMPT (J-10 À J0)
+     1.1 Check-list de démarrage en 24 points
+     1.2 Installation et vérification de l'environnement de développement
+     1.3 Création de l'environnement de recette
+     1.4 Vérification de la sauvegarde et de la restauration
+     1.5 Mise en place de l'arborescence documentaire du projet
+     1.6 Recueil des données de référence auprès de l'INJS
+     1.7 Configuration du dépôt Git et de la CI
+ 2.  LE CYCLE D'EXÉCUTION D'UN PROMPT — PROCÉDURE PAS À PAS
+     2.1 Vue d'ensemble du cycle
+     2.2 Étape 1 — Ouverture du prompt
+     2.3 Étape 2 — Note de conception et validation
+     2.4 Étape 3 — Soumission du prompt à l'agent de codage
+     2.5 Étape 4 — Conduite du dialogue avec l'agent
+     2.6 Étape 5 — Reprise en main humaine et finition
+     2.7 Étape 6 — Batterie de vérification locale
+     2.8 Étape 7 — Revue par un pair
+     2.9 Étape 8 — Validation fonctionnelle
+     2.10 Étape 9 — Fusion, déploiement en recette et consignation
+ 3.  MODE OPÉRATOIRE DE L'AGENT DE CODAGE
+     3.1 Règles de soumission
+     3.2 Gabarit de soumission à copier
+     3.3 Les dix consignes de reprise en main
+     3.4 Que faire quand l'agent dérape — 8 situations et leur traitement
+     3.5 Découpage d'un prompt trop volumineux en sous-tâches
+ 4.  MODE OPÉRATOIRE DES VÉRIFICATIONS
+     4.1 Batterie standard (à exécuter systématiquement)
+     4.2 Vérifications complémentaires selon le type de prompt
+     4.3 Vérification de non-régression approfondie
+     4.4 Vérification de performance
+     4.5 Vérification de sécurité
+     4.6 Interprétation des échecs et arbre de décision
+ 5.  MODE OPÉRATOIRE DES PORTES DE QUALITÉ
+     5.1 Déroulement d'une séance de porte
+     5.2 Porte G0 — procédure détaillée
+     5.3 Porte G1 — procédure détaillée
+     5.4 Porte G2 — procédure détaillée
+     5.5 Porte G3 — procédure détaillée
+     5.6 Que faire en cas de porte non franchie
+ 6.  MODE OPÉRATOIRE DES ITÉRATIONS
+     6.1 Lundi de début d'itération — lancement
+     6.2 Quotidien — le point de 15 minutes
+     6.3 Vendredi — relevé d'indicateurs
+     6.4 Fin d'itération — revue, rétrospective, note de version
+ 7.  MODE OPÉRATOIRE DES JALONS ET DÉMONSTRATIONS
+     7.1 Préparation d'une démonstration
+     7.2 Scripts de démonstration des 5 jalons
+     7.3 Règles de conduite en démonstration
+ 8.  MODE OPÉRATOIRE DE LA RECETTE
+     8.1 Organisation d'une session de recette
+     8.2 Exécution d'un scénario de recette
+     8.3 Traitement des anomalies détectées
+     8.4 Conduite des 6 scénarios de recette terrain
+ 9.  MODE OPÉRATOIRE DES MISES EN PRODUCTION ET BASCULES
+     9.1 Préparation d'une mise en production
+     9.2 Déroulement du déploiement
+     9.3 Contrôle post-déploiement
+     9.4 Activation d'un drapeau de fonctionnalité
+     9.5 Conduite d'une vague de bascule
+10.  MODE OPÉRATOIRE DES INCIDENTS ET DU REPLI
+     10.1 Qualification d'un incident en 4 gravités
+     10.2 Réflexes des 5 premières minutes
+     10.3 Exécution du repli par niveau
+     10.4 Analyse de cause racine
+11.  MODE OPÉRATOIRE DE LA DOCUMENTATION PROJET
+     11.1 Les 8 fichiers à tenir et qui en est responsable
+     11.2 Rythme de mise à jour
+     11.3 Gabarits prêts à l'emploi
+12.  MODE OPÉRATOIRE EN ÉQUIPE RÉDUITE (UN SEUL EXÉCUTANT)
+13.  FICHE RÉFLEXE — L'ESSENTIEL SUR UNE PAGE
+ANNEXE 1 — TOUTES LES COMMANDES DU PROJET, CLASSÉES PAR USAGE
+ANNEXE 2 — GABARITS À COPIER
+ANNEXE 3 — GLOSSAIRE DES SIGLES DU PROJET
+====================================================================================================
+
+
+====================================================================================================
+0. COMMENT UTILISER CE DOCUMENT — LES TROIS DOCUMENTS ET LEUR ARTICULATION
+====================================================================================================
+
+0.1 RÉPARTITION DES RÔLES ENTRE LES TROIS DOCUMENTS
+
+  [D1] Génération-prompts-EDTINJS ......... LE QUOI
+       Contient le PROMPT MAÎTRE et les 22 prompts P00 à P22. C'est la matière première que l'on
+       soumet à l'agent de codage. On n'y touche pas : c'est la référence figée du périmètre.
+
+  [D2] Plan-exécution-prompts-EDTINJS ..... LE QUAND ET AVEC QUI
+       Contient l'ordonnancement en 10 itérations, le graphe de dépendances, les fiches
+       d'exécution des 22 prompts, les portes de qualité, le planning, les risques, la RACI.
+       On le consulte pour savoir quoi faire cette semaine et dans quelles conditions.
+
+  [D3] Le présent mode opératoire ......... LE COMMENT
+       Contient les gestes concrets, les commandes, les gabarits, les procédures pas à pas.
+       On l'ouvre au moment d'agir.
+
+0.2 RÈGLE DE PRÉSÉANCE EN CAS DE CONTRADICTION
+  En cas de divergence apparente entre les trois documents, l'ordre de préséance est :
+      [S2] Modèle fonctionnel de référence  >  [D1] Prompts  >  [D2] Plan  >  [D3] Mode opératoire
+  Toute contradiction constatée est signalée au responsable technique, tranchée, et corrigée dans
+  le document concerné le jour même. On ne laisse jamais deux versions d'une même règle coexister.
+
+0.3 LE RÉFLEXE QUOTIDIEN
+  Chaque matin, l'exécutant se pose trois questions :
+      1. Quel prompt suis-je en train d'exécuter ? (réponse dans [D2] §8, planning hebdomadaire)
+      2. Quel est son critère de sortie ? (réponse dans [D2] §7, fiche du prompt)
+      3. Quelle est ma prochaine action concrète ? (réponse dans [D3] §2, cycle d'exécution)
+
+====================================================================================================
+1. PHASE 0 — MISE EN PLACE AVANT LE PREMIER PROMPT (J-10 À J0)
+====================================================================================================
+
+Cette phase précède la semaine S1 du planning. Elle dure environ 10 jours ouvrés en temps partiel.
+Aucun prompt ne démarre tant que la check-list du §1.1 n'est pas intégralement cochée.
+
+----------------------------------------------------------------------------------------------------
+1.1 CHECK-LIST DE DÉMARRAGE EN 24 POINTS
+----------------------------------------------------------------------------------------------------
+ ORGANISATION
+  ☐ 01 Les rôles RT, DB, DF, DM, EF, RS, RP, EX sont nommément attribués (cf. [D2] §2)
+  ☐ 02 La Direction de l'INJS a validé le lancement et le calendrier des 5 jalons
+  ☐ 03 Le comité de pilotage bimensuel est inscrit dans les agendas jusqu'à la semaine 20
+  ☐ 04 Le point quotidien de 15 minutes est calé à heure fixe
+  ☐ 05 Le canal de communication de l'équipe est créé et connu de tous
+
+ DOCUMENTS
+  ☐ 06 Les trois documents [D1] [D2] [D3] sont lus intégralement par RT et DB
+  ☐ 07 Le PROMPT MAÎTRE est lu et compris par tout exécutant technique
+  ☐ 08 Les trois documents sources [S1] [S2] [S3] sont accessibles à toute l'équipe
+
+ TECHNIQUE
+  ☐ 09 Chaque exécutant a un environnement de développement fonctionnel (cf. §1.2)
+  ☐ 10 La suite de tests complète passe en local sur `main` (943 tests verts)
+  ☐ 11 `npm run lint` et `npm run build` passent en local
+  ☐ 12 `flutter analyze` a été exécuté et son état actuel est consigné (échec connu sur app.env)
+  ☐ 13 L'accès à la CI GitHub Actions est opérationnel pour tous
+  ☐ 14 La convention de branches et de commits est diffusée et comprise
+  ☐ 15 La protection de la branche `main` est activée (revue + CI obligatoires)
+
+ ENVIRONNEMENTS
+  ☐ 16 L'environnement de recette est commandé, en cours de création ou disponible (cf. §1.3)
+  ☐ 17 Une copie anonymisée de la base de production est disponible pour les tests
+  ☐ 18 La sauvegarde de production fonctionne et une restauration a été testée (cf. §1.4)
+
+ DONNÉES DE RÉFÉRENCE — LE PLUS SOUVENT SOUS-ESTIMÉ
+  ☐ 19 La demande formelle du calendrier académique 2026-2027 est envoyée à RS
+  ☐ 20 La demande formelle de l'inventaire des espaces est envoyée à RS
+  ☐ 21 Le périmètre pilote (formation, niveau, groupes) est choisi et validé par EF et RS
+  ☐ 22 L'état de complétude des maquettes LMD du périmètre pilote est vérifié
+
+ DOCUMENTATION PROJET
+  ☐ 23 L'arborescence docs/ du projet est créée (cf. §1.5)
+  ☐ 24 Les 8 fichiers de suivi sont initialisés avec leur en-tête
+
+----------------------------------------------------------------------------------------------------
+1.2 INSTALLATION ET VÉRIFICATION DE L'ENVIRONNEMENT DE DÉVELOPPEMENT
+----------------------------------------------------------------------------------------------------
+À exécuter par chaque exécutant technique, une seule fois.
+
+  # 1. Récupération du dépôt
+  git clone <url-du-depot> app-injs-lmd2026demo
+  cd app-injs-lmd2026demo
+  git checkout main
+  git pull
+
+  # 2. Backend — environnement Python 3.12
+  cd backend
+  python3.12 -m venv .venv
+  source .venv/bin/activate
+  pip install --upgrade pip
+  pip install -r requirements.txt
+
+  # 3. Base de données de développement
+  export USE_SQLITE=1          # démarrage rapide ; PostgreSQL recommandé dès que possible
+  python manage.py migrate
+  python manage.py createsuperuser
+
+  # 4. Contrôle de santé backend — DOIT passer avant toute chose
+  python manage.py check
+  python manage.py makemigrations --check --dry-run     # doit répondre : aucun changement
+  python manage.py test                                  # doit afficher 943 tests, OK
+
+  # 5. Frontend
+  cd ../frontend
+  npm ci
+  npm run lint          # état actuel attendu : 0 erreur, 89 avertissements
+  npm run build         # doit réussir
+
+  # 6. Mobile (uniquement pour DM)
+  cd ../qr_badge_mobile
+  flutter --version     # doit afficher 3.41.7 stable
+  flutter pub get --enforce-lockfile
+  flutter analyze       # échec connu sur assets/app.env — à corriger en P19
+
+  # 7. Consignation de l'état initial
+  # Noter dans docs/EDT_INJS_JOURNAL.md : version Python, Node, Flutter, nombre de tests,
+  # nombre d'avertissements ESLint, date. C'est la référence de départ du projet.
+
+  RÈGLE : si l'une de ces étapes échoue, ne pas démarrer P00. Résoudre d'abord, et consigner
+  la résolution — elle servira aux prochains arrivants dans l'équipe.
+
+----------------------------------------------------------------------------------------------------
+1.3 CRÉATION DE L'ENVIRONNEMENT DE RECETTE
+----------------------------------------------------------------------------------------------------
+L'audit [S1] §6.3 signale qu'aucun environnement de recette n'existe. Sa création est un prérequis
+bloquant de la porte G2 : elle doit donc être engagée dès la phase 0.
+
+  Caractéristiques minimales attendues
+    • Même pile que la production : Docker, PostgreSQL 15 ou 16, Redis, Nginx, Gunicorn.
+    • Base alimentée par une copie ANONYMISÉE de la production (noms, e-mails, téléphones,
+      matricules remplacés ; volumétrie et structure conservées).
+    • Accès restreint aux membres du projet et aux référents INJS de la recette.
+    • DEBUG à 0, comme en production, pour détecter les comportements dépendant du mode débogage.
+    • Déploiement déclenché à chaque fusion dans `main`.
+    • Réinitialisable à la demande depuis une copie fraîche, en moins d'une heure.
+
+  Procédure d'anonymisation recommandée (à scripter dans scripts/anonymiser_base.py)
+    1. Restaurer le dump de production dans une base temporaire isolée.
+    2. Remplacer les données personnelles : noms, prénoms, e-mails, téléphones, adresses,
+       matricules, coordonnées bancaires, pièces jointes remplacées par des fichiers factices.
+    3. Conserver strictement : volumétrie, structure, relations, dates, statuts, montants
+       agrégés — tout ce qui influe sur le comportement et la performance.
+    4. Vérifier par sondage qu'aucune donnée nominative ne subsiste.
+    5. Consigner la date de la copie et sa version dans le journal.
+
+  RÈGLE : aucune donnée nominative réelle ne transite vers la recette. Cette règle est absolue
+  et relève de la protection des données personnelles.
+
+----------------------------------------------------------------------------------------------------
+1.4 VÉRIFICATION DE LA SAUVEGARDE ET DE LA RESTAURATION
+----------------------------------------------------------------------------------------------------
+À réaliser par EX avant P00, puis avant chaque vague de bascule.
+
+  # 1. Exécuter la sauvegarde existante
+  bash scripts/backup_injs_lmd.sh
+
+  # 2. Vérifier le fichier produit et son empreinte
+  ls -lh ~/Backups/INJS-LMD/
+  sha256sum -c ~/Backups/INJS-LMD/<fichier>.sha256
+
+  # 3. Restaurer dans une base de test isolée — L'ÉTAPE QUE L'ON OUBLIE TOUJOURS
+  createdb injs_lmd_test_restore
+  pg_restore -d injs_lmd_test_restore ~/Backups/INJS-LMD/<fichier>.dump
+
+  # 4. Contrôler l'intégrité de la restauration
+  psql -d injs_lmd_test_restore -c "SELECT COUNT(*) FROM scolarite_dossieretudiant;"
+  psql -d injs_lmd_test_restore -c "SELECT COUNT(*) FROM presences_pointage;"
+  # Comparer avec la production : les nombres doivent être identiques
+
+  # 5. Nettoyer
+  dropdb injs_lmd_test_restore
+
+  ☐ Consigner dans le journal : date, durée de la sauvegarde, durée de la restauration,
+    taille du fichier, verdict.
+
+  RÈGLE : une sauvegarde qui n'a jamais été restaurée n'est pas une sauvegarde. Ce test est
+  répété avant chaque vague de bascule, sans exception.
+
+----------------------------------------------------------------------------------------------------
+1.5 MISE EN PLACE DE L'ARBORESCENCE DOCUMENTAIRE DU PROJET
+----------------------------------------------------------------------------------------------------
+  # Depuis la racine du dépôt, sur une branche dédiée
+  git checkout -b feature/edt-injs-P00-etat-des-lieux
+  mkdir -p docs
+
+  # Créer les 8 fichiers de suivi avec leur en-tête
+  # (cf. §11.1 pour le contenu et le responsable de chacun)
+  touch docs/EDT_INJS_JOURNAL.md
+  touch docs/EDT_INJS_ETAT_DES_LIEUX.md
+  touch docs/EDT_INJS_RESTE_A_FAIRE.md
+  touch docs/EDT_INJS_TABLEAU_DE_BORD.md
+  touch docs/EDT_INJS_DEMANDES.md
+  touch docs/EDT_INJS_DECISIONS.md
+  touch docs/EDT_INJS_INCIDENTS.md
+  touch docs/EDT_INJS_RISQUES.md
+
+----------------------------------------------------------------------------------------------------
+1.6 RECUEIL DES DONNÉES DE RÉFÉRENCE AUPRÈS DE L'INJS
+----------------------------------------------------------------------------------------------------
+C'est le point le plus sous-estimé de tout le projet. Un retard ici bloque P01, P02 et P03,
+c'est-à-dire trois prompts du chemin critique. Le recueil démarre en phase 0, pas en semaine 2.
+
+  DEMANDE 1 — CALENDRIER ACADÉMIQUE 2026-2027 (destinataire : RS, échéance : fin S1)
+    Éléments attendus :
+      • dates de début et de fin de l'année académique ;
+      • pour chaque semestre : début des cours, fin des cours, période d'évaluations,
+        période d'examens, période de rattrapages, dates de jurys ;
+      • vacances et interruptions pédagogiques ;
+      • jours fériés retenus par l'institut pour l'année ;
+      • jours et heures d'ouverture du campus (le samedi est-il travaillé ?) ;
+      • créneaux horaires réellement pratiqués, y compris les créneaux atypiques des activités
+        sportives (séances matinales, créneaux piscine, entraînements en fin de journée).
+    Format accepté : document, tableur, ou entretien d'une heure avec prise de notes validée.
+
+  DEMANDE 2 — INVENTAIRE DES ESPACES (destinataire : RS, échéance : fin S2)
+    Éléments attendus, pour chaque espace :
+      • code et nom usuel ;
+      • type (salle de cours, TD, TP, amphithéâtre, laboratoire, gymnase, terrain, piscine,
+        piste d'athlétisme, salle de musculation, salle de combat, bureau, salle de réunion…) ;
+      • localisation : site, zone, bâtiment, niveau ;
+      • capacité normale et capacité maximale ;
+      • surface si connue ;
+      • équipements présents (vidéoprojecteur, tableau, climatisation, wifi, vestiaires,
+        gradins, éclairage, matériel sportif, paillasses…) ;
+      • état actuel et indisponibilités connues (travaux, maintenance programmée).
+    Méthode recommandée : tableur pré-rempli par l'équipe projet à partir des RefSalle existantes,
+    puis complété et corrigé sur le terrain par RS, avec une visite physique des installations
+    sportives. Prévoir une demi-journée de relevé terrain.
+
+  DEMANDE 3 — RÈGLES DE PLANIFICATION (destinataire : EF et responsables pédagogiques, S5)
+    À recueillir en atelier d'une demi-journée :
+      • amplitude horaire maximale d'une journée pour un étudiant et pour un enseignant ;
+      • pause méridienne obligatoire, et sa plage ;
+      • nombre maximal d'heures consécutives d'une même matière ;
+      • règles propres aux activités sportives (récupération après séance intense, créneaux
+        interdits, contraintes météo, accès à la piscine) ;
+      • préférences habituelles des enseignants ;
+      • usages tacites à ne pas casser (ce point produit toujours des surprises utiles).
+
+  DEMANDE 4 — COMPLÉTUDE DES MAQUETTES DU PÉRIMÈTRE PILOTE (destinataire : RS, échéance : fin S3)
+    Vérifier en base, pour la formation pilote et son semestre :
+      • maquette ACTIVE existante, avec UE et ECUE ;
+      • volumes horaires CM, TD, TP renseignés pour chaque ECUE ;
+      • crédits ECTS renseignés ;
+      • affectations enseignant ↔ ECUE réalisées ;
+      • groupes créés et étudiants affectés aux groupes.
+    Toute lacune constitue un prérequis fonctionnel à faire combler par RS AVANT la semaine 4.
+
+  SUIVI DES DEMANDES
+    Chaque demande est tracée dans docs/EDT_INJS_JOURNAL.md avec sa date d'envoi, son échéance,
+    son destinataire et son état. Une relance est systématique à J-3 de l'échéance. Un retard de
+    plus de 5 jours est escaladé à la Direction (risque X04 du registre).
+
+----------------------------------------------------------------------------------------------------
+1.7 CONFIGURATION DU DÉPÔT GIT ET DE LA CI
+----------------------------------------------------------------------------------------------------
+  Protection de la branche `main` — à activer par RT
+    ☐ Revue obligatoire par au moins un pair avant fusion
+    ☐ Statuts de CI obligatoires : Backend, Frontend, Mobile, edt-injs
+    ☐ Branche à jour requise avant fusion
+    ☐ Poussée directe interdite, y compris pour les administrateurs
+    ☐ Historique linéaire recommandé
+
+  Ajout du job CI `edt-injs` — livré par P00
+    Ce job exécute spécifiquement les tests de caractérisation et, à partir de P21, la mesure
+    de couverture et le bench de performance. Il doit rester rapide (moins de 5 minutes) pour
+    ne pas décourager son usage.
+
+  Modèle de description de pull request — à créer dans .github/pull_request_template.md
+    Il reprend la grille de revue de [D2] §9.3 sous forme de cases à cocher, afin que le
+    relecteur n'ait rien à mémoriser. Le gabarit complet figure en Annexe 2 du présent document.
+
+====================================================================================================
+2. LE CYCLE D'EXÉCUTION D'UN PROMPT — PROCÉDURE PAS À PAS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+2.1 VUE D'ENSEMBLE DU CYCLE
+----------------------------------------------------------------------------------------------------
+        ┌─────────────────────────────────────────────────────────────────────┐
+        │  1. OUVERTURE            lire, vérifier les entrées, créer la branche│
+        │  2. CONCEPTION           note d'une page, validation RT              │
+        │  3. SOUMISSION           prompt maître + prompt PXX à l'agent        │
+        │  4. DIALOGUE             conduire l'agent, recadrer, itérer          │
+        │  5. FINITION             reprise humaine, nettoyage, cohérence       │
+        │  6. VÉRIFICATION         batterie de commandes, aucune impasse       │
+        │  7. REVUE                un pair, grille imposée                     │
+        │  8. VALIDATION           démonstration à EF, verdict                 │
+        │  9. CLÔTURE              fusion, recette, journal                    │
+        └─────────────────────────────────────────────────────────────────────┘
+                  Toute étape sautée se paie plus tard, toujours plus cher.
+
+----------------------------------------------------------------------------------------------------
+2.2 ÉTAPE 1 — OUVERTURE DU PROMPT
+----------------------------------------------------------------------------------------------------
+  Durée : 1 à 2 heures.
+
+  a) Lire, dans cet ordre :
+       1. la fiche du prompt dans [D2] §7 (entrées, sorties, déroulé jour par jour, risques) ;
+       2. le prompt lui-même dans [D1] (contexte, objectif, à faire, à ne pas faire, livrables) ;
+       3. les sections des documents sources citées par le prompt.
+
+  b) Vérifier les critères d'entrée de la fiche. S'il en manque un, NE PAS DÉMARRER : signaler
+     le blocage au point quotidien et traiter le prérequis d'abord. Démarrer un prompt sur un
+     prérequis manquant est la première cause de reprise de travail.
+
+  c) Créer la branche :
+       git checkout main && git pull
+       git checkout -b feature/edt-injs-PXX-<libelle-court>
+
+  d) Ouvrir immédiatement une pull request en brouillon, même vide, avec :
+       • le titre : « PXX — <intitulé du prompt> » ;
+       • la description issue du gabarit (Annexe 2) ;
+       • la liste des critères de sortie copiée depuis la fiche [D2] §7.
+     Cette PR sert de carnet de bord visible par toute l'équipe pendant l'exécution.
+
+----------------------------------------------------------------------------------------------------
+2.3 ÉTAPE 2 — NOTE DE CONCEPTION ET VALIDATION
+----------------------------------------------------------------------------------------------------
+  Durée : 2 à 4 heures pour les prompts de modélisation (P01 à P05, P12), intégrée pour les autres.
+  Cette étape est obligatoire pour : P01, P02, P03, P04, P05, P06, P11, P12, P13.
+
+  Contenu de la note — une page maximum, publiée en commentaire de la PR :
+    1. Modèles créés ou étendus : nom, champs principaux, relations, contraintes, index.
+    2. Endpoints créés : chemin, méthode, permission, forme de la réponse.
+    3. Ponts de rétrocompatibilité : quoi, vers quoi, pilotés par quel drapeau.
+    4. Décisions d'architecture : ce qui est retenu, ce qui est écarté, et pourquoi.
+    5. Points de vigilance identifiés et leur mitigation.
+    6. Estimation du découpage en commits.
+
+  Validation : RT commente la note dans la PR, demande les ajustements nécessaires, puis écrit
+  explicitement « Conception validée » avant que la moindre ligne de code ne soit écrite.
+
+  Pourquoi cette étape ne se saute pas : sur le pont Seance ↔ SessionModule (P05) ou sur la
+  référence unifiée des personnes (P12), une erreur de conception détectée après trois jours de
+  code coûte trois jours. Détectée dans la note, elle coûte dix minutes.
+
+----------------------------------------------------------------------------------------------------
+2.4 ÉTAPE 3 — SOUMISSION DU PROMPT À L'AGENT DE CODAGE
+----------------------------------------------------------------------------------------------------
+  Voir le chapitre 3 pour le détail complet. En résumé :
+    a) Ouvrir une session neuve de l'agent, avec le dépôt accessible.
+    b) Coller le PROMPT MAÎTRE intégral ([D1] Partie B) — jamais un résumé.
+    c) Coller le prompt PXX intégral ([D1] Partie C).
+    d) Ajouter le bloc de contexte de session (gabarit au §3.2) : branche, note de conception
+       validée, contraintes du jour, périmètre de la sous-tâche.
+    e) Demander à l'agent de reformuler sa compréhension AVANT de produire du code. Si la
+       reformulation est fausse ou incomplète, corriger immédiatement — ne jamais laisser
+       l'agent partir sur une compréhension approximative.
+
+----------------------------------------------------------------------------------------------------
+2.5 ÉTAPE 4 — CONDUITE DU DIALOGUE AVEC L'AGENT
+----------------------------------------------------------------------------------------------------
+  Principe directeur : l'agent produit, l'humain décide. On ne délègue jamais un arbitrage.
+
+  Rythme recommandé
+    • Faire produire par lots cohérents : les modèles d'abord, puis les migrations, puis les
+      services, puis les tests, puis la documentation. Jamais tout d'un coup.
+    • Après chaque lot : relire intégralement le code produit, exécuter les tests, commiter.
+    • Ne jamais accumuler plus d'une demi-journée de production non relue.
+
+  Contrôles permanents pendant le dialogue
+    ☐ L'agent n'a supprimé aucun fichier existant
+    ☐ L'agent n'a pas modifié un modèle existant sans que ce soit demandé
+    ☐ Les fichiers produits respectent les seuils de taille (600 lignes / 400 côté frontend)
+    ☐ Aucun print() n'est apparu
+    ☐ Les messages utilisateur sont en français
+    ☐ Les valeurs métier sont en paramètre, pas en dur
+    ☐ Les tests écrits testent réellement quelque chose (pas de test tautologique)
+
+  Bonne pratique : commiter après chaque lot validé. Un commit par lot permet de revenir en
+  arrière chirurgicalement si l'agent part dans une mauvaise direction au lot suivant.
+
+----------------------------------------------------------------------------------------------------
+2.6 ÉTAPE 5 — REPRISE EN MAIN HUMAINE ET FINITION
+----------------------------------------------------------------------------------------------------
+  L'agent produit un premier jet de qualité variable. La finition humaine est systématique et
+  porte sur sept points :
+
+   1. COHÉRENCE DE NOMMAGE — vérifier que les noms de modèles, champs, services et routes sont
+      cohérents avec l'existant et entre eux. L'agent tend à varier les conventions.
+   2. QUALITÉ DES MESSAGES — relire chaque message d'erreur et d'interface comme le lirait un
+      agent de scolarité. Reformuler tout ce qui est technique ou ambigu.
+   3. PERTINENCE DES TESTS — supprimer les tests tautologiques, ajouter les cas limites oubliés,
+      vérifier que chaque test échoue si l'on casse volontairement le code qu'il teste.
+   4. PERFORMANCE — relire chaque requête : select_related, prefetch_related, only, index.
+      L'agent produit rarement des requêtes optimisées spontanément.
+   5. PERMISSIONS — vérifier qu'aucune route n'est restée sans classe de permission explicite.
+   6. TRAÇABILITÉ — vérifier que chaque action sensible écrit bien dans un journal.
+   7. DOCUMENTATION — docstrings en français, mise à jour des fichiers docs/ concernés.
+
+  Test de robustesse recommandé (5 minutes, très rentable)
+    Casser volontairement une ligne du code produit, relancer les tests : au moins un test doit
+    échouer. S'ils passent tous, les tests ne testent rien. Rétablir ensuite la ligne.
+
+----------------------------------------------------------------------------------------------------
+2.7 ÉTAPE 6 — BATTERIE DE VÉRIFICATION LOCALE
+----------------------------------------------------------------------------------------------------
+  Voir le chapitre 4 pour le détail. Aucune PR ne sort du brouillon sans que la batterie
+  standard soit intégralement verte.
+
+----------------------------------------------------------------------------------------------------
+2.8 ÉTAPE 7 — REVUE PAR UN PAIR
+----------------------------------------------------------------------------------------------------
+  Durée attendue : 1 à 2 heures pour un prompt moyen, 3 à 4 heures pour P05, P06, P12, P13.
+
+  Procédure pour le demandeur
+    a) Sortir la PR du mode brouillon.
+    b) Remplir la grille de revue du gabarit : cocher, et commenter chaque point non trivial.
+    c) Signaler explicitement au relecteur les 2 ou 3 points sur lesquels on souhaite un
+       regard attentif. Un relecteur guidé est un relecteur efficace.
+
+  Procédure pour le relecteur
+    a) Lire d'abord la note de conception, puis le code, puis les tests.
+    b) Dérouler la grille de [D2] §9.3 point par point, sans en sauter.
+    c) Distinguer clairement dans les commentaires :
+         BLOQUANT  — doit être corrigé avant la fusion
+         IMPORTANT — doit être corrigé, peut faire l'objet d'un commit de suite
+         SUGGESTION— amélioration facultative, à noter dans le reste-à-faire si non traitée
+    d) Vérifier personnellement au moins un point de non-régression : exécuter soi-même les
+       tests de caractérisation, ne pas se contenter du vert affiché par la CI.
+
+  RÈGLE : le relecteur ne se contente jamais d'approuver. S'il n'a aucun commentaire, c'est
+  généralement qu'il n'a pas lu assez attentivement. Un prompt de 6 jours produit toujours
+  matière à au moins deux remarques.
+
+----------------------------------------------------------------------------------------------------
+2.9 ÉTAPE 8 — VALIDATION FONCTIONNELLE
+----------------------------------------------------------------------------------------------------
+  Durée : 10 à 20 minutes de démonstration, en présence de EF et, selon le prompt, de RS ou RP.
+
+  Déroulé de la démonstration
+    a) Rappeler en une phrase l'objectif du prompt.
+    b) Dérouler le critère de sortie de la fiche [D2] §7, point par point, en montrant.
+    c) Montrer au moins un cas d'erreur et la façon dont le système le présente à l'utilisateur.
+       Un système ne se juge pas sur son cas nominal mais sur sa façon d'échouer.
+    d) Recueillir le verdict et le consigner séance tenante.
+
+  Les trois verdicts possibles
+    ACCEPTÉ ................. tous les critères de sortie sont satisfaits, fusion autorisée.
+    ACCEPTÉ AVEC RÉSERVES ... l'essentiel est là, les réserves sont listées, datées, affectées
+                              et inscrites dans le reste-à-faire ; la fusion est autorisée.
+    REFUSÉ .................. un critère de sortie essentiel n'est pas satisfait ; le prompt
+                              retourne en exécution, avec la liste précise de ce qui manque.
+
+  RÈGLE : un verdict n'est jamais implicite. Tant qu'il n'est pas écrit dans le journal, le
+  prompt n'est pas terminé.
+
+----------------------------------------------------------------------------------------------------
+2.10 ÉTAPE 9 — FUSION, DÉPLOIEMENT EN RECETTE ET CONSIGNATION
+----------------------------------------------------------------------------------------------------
+  a) Vérifier une dernière fois :
+       git checkout main && git pull
+       git checkout feature/edt-injs-PXX-<libelle>
+       git rebase main            # ou merge selon la convention retenue
+       # relancer la batterie de vérification après le rebase — obligatoire
+
+  b) Attendre la CI verte sur la branche rebasée.
+
+  c) Fusionner via l'interface, avec un message de fusion explicite.
+
+  d) Vérifier le déploiement automatique en recette, puis contrôler :
+       curl -s https://<recette>/api/health/ | jq .
+       # connexion avec un compte de test, un parcours clé du prompt
+
+  e) Consigner dans docs/EDT_INJS_JOURNAL.md, LE JOUR MÊME, selon le gabarit de l'Annexe F
+     de [D2]. Une consignation reportée au lendemain est une consignation incomplète.
+
+  f) Mettre à jour docs/EDT_INJS_RESTE_A_FAIRE.md si des réserves ont été émises.
+
+  g) Supprimer la branche de fonctionnalité une fois la fusion vérifiée.
+
+====================================================================================================
+3. MODE OPÉRATOIRE DE L'AGENT DE CODAGE
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+3.1 RÈGLES DE SOUMISSION
+----------------------------------------------------------------------------------------------------
+  R1 — Le PROMPT MAÎTRE est collé INTÉGRALEMENT au début de chaque nouvelle session. Il contient
+       le contexte technique, les faiblesses connues et les 12 règles d'or. Un agent privé de ce
+       contexte produira du code correct dans l'absolu, mais inadapté à app-injs-lmd2026demo.
+
+  R2 — Un seul prompt PXX par session. Ne jamais enchaîner P03 et P04 dans la même session : le
+       contexte se dilue et l'agent commence à mélanger les périmètres.
+
+  R3 — Une session longue se réinitialise. Au-delà d'une demi-journée de dialogue, ouvrir une
+       session neuve en recollant le prompt maître et en résumant l'état d'avancement.
+
+  R4 — Toujours demander une reformulation avant production. C'est le moyen le plus économique
+       de détecter un malentendu.
+
+  R5 — Toujours indiquer à l'agent ce qu'il ne doit PAS toucher. La section « À NE PAS FAIRE »
+       du prompt est aussi importante que la section « À FAIRE », voire davantage sur ce projet
+       où la non-régression prime.
+
+  R6 — Ne jamais laisser l'agent décider d'un arbitrage fonctionnel. S'il pose une question de
+       règle métier, la question remonte à EF ; on ne laisse pas l'agent trancher.
+
+----------------------------------------------------------------------------------------------------
+3.2 GABARIT DE SOUMISSION À COPIER
+----------------------------------------------------------------------------------------------------
+À coller APRÈS le prompt maître et le prompt PXX, pour cadrer la session du jour.
+
+--- DÉBUT DU GABARIT ---
+
+CONTEXTE DE CETTE SESSION DE TRAVAIL
+
+  Prompt en cours ....... PXX — <intitulé>
+  Branche ............... feature/edt-injs-PXX-<libellé>
+  Itération ............. Ix, jour <n> sur <total>
+  Conception ............ validée par le responsable technique le <date>
+                          Décisions retenues : <résumé en 3 lignes maximum>
+
+  PÉRIMÈTRE DE CETTE SESSION (et rien d'autre)
+    <liste précise de ce qui doit être produit maintenant, par exemple :
+     « les modèles CalendrierAcademique, PeriodePedagogique et JourFerie, leurs contraintes,
+       leurs index, leur enregistrement dans l'admin, et rien de plus »>
+
+  DÉJÀ FAIT DANS LES SESSIONS PRÉCÉDENTES
+    <liste, pour éviter que l'agent refasse ou contredise>
+
+  À NE SURTOUT PAS TOUCHER DANS CETTE SESSION
+    <liste des fichiers et modules sensibles, systématiquement :
+     backend/formations/models.py, backend/presences/models.py,
+     backend/referentiels/, les migrations existantes, les tests existants>
+
+  AVANT DE PRODUIRE DU CODE
+    Reformule en cinq lignes maximum ce que tu vas faire, les fichiers que tu vas créer et
+    ceux que tu vas modifier. Attends ma confirmation.
+
+  APRÈS AVOIR PRODUIT LE CODE
+    Indique : la liste des fichiers créés et modifiés avec leur nombre de lignes, les migrations
+    générées, les commandes de vérification à exécuter, et les points sur lesquels tu as dû
+    faire un choix en l'absence d'instruction explicite.
+
+--- FIN DU GABARIT ---
+
+----------------------------------------------------------------------------------------------------
+3.3 LES DIX CONSIGNES DE REPRISE EN MAIN
+----------------------------------------------------------------------------------------------------
+Phrases à garder sous la main pour recadrer l'agent en cours de session.
+
+   1. « Tu as modifié <fichier existant>. Ce fichier ne doit pas être touché. Rétablis-le à
+      l'identique et procède par extension dans un nouveau fichier. »
+   2. « Ce fichier dépasse la limite de 600 lignes. Découpe-le en modules cohérents par
+      responsabilité, sans changer le comportement. »
+   3. « Tu as codé la valeur <X> en dur. Elle doit être un paramètre en base, résolu en cascade.
+      Reprends en conséquence. »
+   4. « Ce message d'erreur est technique. Réécris-le en français, pour un agent de scolarité qui
+      ne connaît rien à l'informatique, en indiquant quoi faire. »
+   5. « Cette vue va produire une requête par élément de la liste. Ajoute les select_related et
+      prefetch_related nécessaires et ajoute un test assertNumQueries. »
+   6. « Cette route n'a pas de classe de permission explicite. Ajoute-la et écris le test de
+      refus pour les rôles non autorisés. »
+   7. « Cette action est sensible mais n'écrit rien dans un journal d'audit. Ajoute la
+      journalisation avec auteur, date, ancienne valeur, nouvelle valeur et motif. »
+   8. « Tes tests passeraient même si le code était faux. Écris des tests qui échouent quand on
+      casse volontairement le comportement testé. »
+   9. « Tu as utilisé print(). Remplace par le module logging avec le niveau approprié. »
+  10. « Tu sors du périmètre de cette session. Arrête-toi, reviens à <périmètre>, et note la
+      proposition de côté : je l'arbitrerai séparément. »
+
+----------------------------------------------------------------------------------------------------
+3.4 QUE FAIRE QUAND L'AGENT DÉRAPE — 8 SITUATIONS ET LEUR TRAITEMENT
+----------------------------------------------------------------------------------------------------
+ SITUATION 1 — L'agent réécrit du code existant au lieu de l'étendre
+   Symptôme : des fichiers de `formations` ou `presences` apparaissent modifiés.
+   Traitement : `git checkout -- <fichier>` pour rétablir, puis consigne 1 du §3.3.
+   Prévention : lister explicitement les fichiers interdits dans le gabarit de session.
+
+ SITUATION 2 — L'agent produit un fichier géant
+   Symptôme : un models.py ou un api_views.py de 1 200 lignes.
+   Traitement : consigne 2, en imposant le découpage souhaité (un module par famille de modèles).
+   Prévention : annoncer dès la soumission la structure de fichiers attendue.
+
+ SITUATION 3 — L'agent invente une règle métier
+   Symptôme : un seuil, un arrondi, une transition d'état qui ne figure dans aucun document.
+   Traitement : arrêter la session, poser la question à EF, obtenir l'arbitrage, le consigner
+   dans docs/EDT_INJS_DECISIONS.md, puis relancer l'agent avec la règle explicite.
+   Prévention : préciser dans le gabarit « en cas de doute sur une règle métier, demande-moi ».
+
+ SITUATION 4 — L'agent produit des tests qui ne testent rien
+   Symptôme : des assertions triviales, des tests sans cas d'erreur, aucun test de permission.
+   Traitement : consigne 8, puis vérifier soi-même par le test de robustesse du §2.6.
+   Prévention : demander explicitement « pour chaque fonction : un test nominal, un test limite,
+   un test d'erreur, un test de permission ».
+
+ SITUATION 5 — L'agent casse la suite de tests existante
+   Symptôme : des tests de `formations` ou `presences` deviennent rouges.
+   Traitement : ARRÊT IMMÉDIAT. Ne jamais « adapter » un test existant pour le faire passer.
+   Identifier ce qui a changé, rétablir, et reprendre par extension. Si la rupture semble
+   inévitable, elle remonte à RT pour arbitrage écrit — c'est la règle R-E de [D2].
+
+ SITUATION 6 — L'agent propose d'installer une dépendance lourde
+   Symptôme : ajout de Celery, d'une bibliothèque de calendrier, d'un framework de composants.
+   Traitement : refuser par défaut. Toute dépendance nouvelle est un arbitrage de RT, justifié
+   par écrit, avec examen du repli en cas d'indisponibilité. Rappel : ortools est la seule
+   dépendance nouvelle prévue, et elle doit rester optionnelle.
+
+ SITUATION 7 — L'agent perd le fil sur une session longue
+   Symptôme : contradictions avec ce qui a été produit le matin, oubli de contraintes.
+   Traitement : clore la session, en ouvrir une neuve, recoller le prompt maître, résumer
+   l'état d'avancement et le code déjà produit.
+
+ SITUATION 8 — L'agent produit un résultat plausible mais faux
+   Symptôme : le code compile, les tests passent, mais le comportement métier est erroné.
+   Traitement : c'est précisément ce que l'étape 8 de validation fonctionnelle doit attraper.
+   D'où la règle : on ne fusionne jamais sans démonstration à un humain qui connaît le métier.
+
+----------------------------------------------------------------------------------------------------
+3.5 DÉCOUPAGE D'UN PROMPT TROP VOLUMINEUX EN SOUS-TÂCHES
+----------------------------------------------------------------------------------------------------
+Les prompts de plus de 6 JH se découpent systématiquement. Découpage recommandé :
+
+  P05 (8 JH) → 4 sous-tâches : (a) modèles et migrations · (b) machine à états et permissions ·
+               (c) pont SessionModule et non-régression · (d) versionnement et journal
+  P06 (10 JH) → 5 sous-tâches : (a) contexte et chargement · (b) modèle de décision et
+               contraintes dures · (c) solveur et repli heuristique · (d) exécution asynchrone
+               et PlanificationRun · (e) modes simulation et incrémental
+  P11 (10 JH) → déjà découpé en P11(a) lecture et P11(b) action par le plan
+  P13 (8 JH) → 4 sous-tâches : (a) jeton et rotation · (b) endpoint de scan et contrôles ·
+               (c) scan inverse · (d) anti-fraude et hors-ligne
+  P17 (14 JH) → déjà découpé en P17(a) et P17(b), chacun à re-découper par écran
+  P18 (9 JH) → par écran, dans l'ordre de priorité imposé par la fiche [D2] §7
+
+  Chaque sous-tâche : une session d'agent, un ou plusieurs commits, une vérification locale.
+  La PR reste unique pour le prompt entier.
+
+====================================================================================================
+4. MODE OPÉRATOIRE DES VÉRIFICATIONS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+4.1 BATTERIE STANDARD — À EXÉCUTER SYSTÉMATIQUEMENT AVANT TOUTE SORTIE DE BROUILLON
+----------------------------------------------------------------------------------------------------
+  # ------ BACKEND ------
+  cd backend && source .venv/bin/activate
+
+  # 1. Cohérence du projet Django
+  python manage.py check
+  python manage.py check --deploy        # contrôles de production
+
+  # 2. Aucune migration oubliée
+  python manage.py makemigrations --check --dry-run
+  #    Réponse attendue : « No changes detected ». Toute autre réponse = migration manquante.
+
+  # 3. Migrations sur base vide
+  rm -f db_test.sqlite3
+  DJANGO_SETTINGS_MODULE=config.settings USE_SQLITE=1 python manage.py migrate
+
+  # 4. Migrations sur base peuplée — L'ÉTAPE CRITIQUE, souvent oubliée
+  #    Restaurer une copie de la base de recette, puis :
+  python manage.py migrate
+  #    Noter la durée. Une migration de plus de 30 secondes en production doit être signalée.
+
+  # 5. Réversibilité de la nouvelle migration
+  python manage.py migrate <app> <migration_precedente>
+  python manage.py migrate <app>
+  #    Les deux sens doivent fonctionner sans erreur.
+
+  # 6. Suite de tests complète
+  python manage.py test
+  #    Attendu : 943 tests initiaux + les nouveaux, tous verts, aucun ignoré.
+
+  # 7. Tests de caractérisation spécifiquement — la règle R-E
+  python manage.py test edts.tests.test_caracterisation_edts
+  python manage.py test presences.tests.test_caracterisation_pointage
+
+  # ------ FRONTEND (si touché) ------
+  cd ../frontend
+  npm run lint
+  #    Le nombre d'avertissements doit être INFÉRIEUR OU ÉGAL à la baseline de 89.
+  npm run build
+  npm run test          # à partir de P17(a)
+
+  # ------ MOBILE (si touché) ------
+  cd ../qr_badge_mobile
+  flutter pub get --enforce-lockfile
+  flutter analyze
+  flutter test
+
+  # ------ PERFORMANCE (si périmètre concerné) ------
+  cd ../backend
+  python scripts/edt_injs_bench.py --compare-baseline
+  #    Aucune dégradation supérieure à 5 % ne doit apparaître.
+
+  RÈGLE ABSOLUE : aucune de ces commandes ne se « saute parce qu'on est pressé ». La batterie
+  complète prend entre 10 et 20 minutes. Un bogue détecté en production coûte une journée.
+
+----------------------------------------------------------------------------------------------------
+4.2 VÉRIFICATIONS COMPLÉMENTAIRES SELON LE TYPE DE PROMPT
+----------------------------------------------------------------------------------------------------
+ PROMPT DE MODÈLE (P01, P02, P03, P04, P05, P12)
+   ☐ Chaque modèle possède verbose_name, verbose_name_plural et __str__ en français
+   ☐ Chaque champ de filtre ou de tri possède un index
+   ☐ Chaque contrainte d'unicité est testée par un test qui tente de la violer
+   ☐ L'admin Django est enregistré, avec list_display, list_filter et search_fields
+   ☐ La migration est réversible et ne verrouille pas longuement une grosse table
+
+ PROMPT DE SERVICE (P06, P07, P08, P09, P15, P16)
+   ☐ Les fonctions de calcul sont pures autant que possible et testables isolément
+   ☐ Aucune requête en base dans une boucle
+   ☐ Les transactions atomiques encadrent toute écriture multiple
+   ☐ Les cas d'échec renvoient un message exploitable, jamais une exception brute
+
+ PROMPT D'API (P11)
+   ☐ Chaque route a une classe de permission explicite
+   ☐ Chaque route est documentée dans OpenAPI (summary, description, exemples)
+   ☐ Chaque route a un test de succès ET un test de refus par rôle non autorisé
+   ☐ La pagination est active sur toute liste
+   ☐ Le nombre de requêtes SQL est mesuré par assertNumQueries sur les vues de liste
+   ☐ La comparaison de schéma v1.1 est verte
+
+ PROMPT DE SÉCURITÉ (P13, P14)
+   ☐ Revue de sécurité formelle par RT, tracée dans la PR
+   ☐ Chaque code d'erreur produit un message distinct et testé
+   ☐ Le rejeu, le double émargement et l'élévation de privilège sont testés et refusés
+   ☐ Aucune donnée personnelle inutile dans les journaux
+   ☐ Le journal d'audit résiste à une tentative de modification et de suppression
+
+ PROMPT D'INTERFACE (P17, P18, P19)
+   ☐ Aucun fichier de plus de 400 lignes
+   ☐ États de chargement, états vides et états d'erreur présents sur chaque écran
+   ☐ Navigation clavier fonctionnelle, contrastes vérifiés
+   ☐ Aucune ressource chargée depuis un CDN
+   ☐ Testé sur tablette, et sur un réseau volontairement ralenti
+   ☐ Les actions non autorisées sont masquées ET désactivées
+
+----------------------------------------------------------------------------------------------------
+4.3 VÉRIFICATION DE NON-RÉGRESSION APPROFONDIE
+----------------------------------------------------------------------------------------------------
+À exécuter avant chaque porte de qualité et avant chaque mise en production.
+
+  # 1. Suite complète, sans exception
+  python manage.py test --verbosity=2 2>&1 | tee /tmp/tests.log
+  grep -E "FAIL|ERROR|skipped" /tmp/tests.log
+  #    Attendu : aucun échec, aucun test ignoré.
+
+  # 2. Contrat EDT v1.1 — comparaison de schéma
+  python manage.py test scolarite.tests.test_contrat_edt_v11
+  #    Ce test compare la forme des réponses avec la référence figée. Toute différence est
+  #    une régression pour le planificateur externe app-ept-injs-lmd2026.
+
+  # 3. Exports existants — les 14 routes historiques
+  python manage.py test exports
+
+  # 4. Parcours manuel de non-régression (15 minutes, sur la recette)
+  ☐ Connexion avec un compte ADMIN, un compte SECRETARIAT, un compte DIRECTION
+  ☐ Ouverture d'une formation existante et de son détail
+  ☐ Ouverture d'un module et de ses séances
+  ☐ Génération d'un QR sur une séance historique et scan depuis le mobile
+  ☐ Consultation de l'historique des pointages d'un auditeur
+  ☐ Génération d'un export PDF et d'un export Excel existants
+  ☐ Ouverture du tableau de bord et des statistiques
+  ☐ Vérification que l'admin Django répond
+
+  RÈGLE : ce parcours manuel se fait réellement, pas de tête. Les tests automatisés ne couvrent
+  pas tout, en particulier le rendu et l'enchaînement des écrans.
+
+----------------------------------------------------------------------------------------------------
+4.4 VÉRIFICATION DE PERFORMANCE
+----------------------------------------------------------------------------------------------------
+  # Bench comparatif à la baseline établie en P00
+  python scripts/edt_injs_bench.py --compare-baseline --format=table
+
+  # Budgets contractuels à vérifier (cf. [D2] §15.3)
+  #   Grille hebdomadaire ................ < 400 ms et < 15 requêtes SQL
+  #   Feuille d'émargement 300 étudiants . < 600 ms
+  #   Scan, 95e centile .................. < 200 ms
+  #   Génération de 520 séances .......... < 120 s
+  #   Clôture d'une séance de 300 étud. .. < 3 s
+
+  # Détection des requêtes N+1 sur une vue précise
+  python manage.py shell -c "
+  from django.test.utils import CaptureQueriesContext
+  from django.db import connection
+  from django.test import Client
+  c = Client()
+  # s'authentifier puis :
+  with CaptureQueriesContext(connection) as ctx:
+      c.get('/api/timetable/views/group/1/?semaine=7')
+  print('Nombre de requêtes :', len(ctx.captured_queries))
+  "
+
+  Si un budget est dépassé : ne pas fusionner. Profiler, indexer, mettre en cache, puis
+  re-mesurer. La performance se traite au moment où on écrit le code, jamais « plus tard ».
+
+----------------------------------------------------------------------------------------------------
+4.5 VÉRIFICATION DE SÉCURITÉ
+----------------------------------------------------------------------------------------------------
+  # 1. Contrôles Django de déploiement
+  python manage.py check --deploy
+
+  # 2. Tests d'accès croisés — la matrice des 12 rôles
+  python manage.py test edt_injs.tests.test_permissions
+
+  # 3. Vérifications manuelles (avant chaque porte)
+  ☐ Un compte AUDITEUR ne voit que son propre EDT et ses propres présences
+  ☐ Un compte FORMATEUR ne voit que ses séances et ses groupes
+  ☐ Un compte SECRETARIAT ne voit rien hors de son secrétariat
+  ☐ Un compte FORMATEUR ou AUDITEUR ne peut pas se connecter à l'interface web
+  ☐ Une pièce justificative n'est pas accessible par URL directe sans authentification
+  ☐ Un jeton QR n'est pas exposé à un rôle non habilité
+  ☐ Les middlewares de démonstration sont inertes quand DEBUG vaut 0
+
+  # 4. Contrôle d'intégrité du journal d'audit (à partir de P14)
+  python manage.py edt_injs_verifier_journal --periode=<mois>
+  #    Doit confirmer que le chaînage de hachage est intact.
+
+----------------------------------------------------------------------------------------------------
+4.6 INTERPRÉTATION DES ÉCHECS ET ARBRE DE DÉCISION
+----------------------------------------------------------------------------------------------------
+        Un test échoue
+              │
+              ├─ Est-ce un test que je viens d'écrire ?
+              │     OUI → corriger le code ou le test, c'est le travail normal
+              │
+              ├─ Est-ce un test de caractérisation (P00) ?
+              │     OUI → ARRÊT. Règle R-E. Ne jamais adapter le test.
+              │            Identifier le changement de comportement, rétablir,
+              │            et si la rupture semble inévitable : arbitrage écrit de RT.
+              │
+              ├─ Est-ce un test existant d'une autre application ?
+              │     OUI → forte présomption de régression. Même traitement que ci-dessus.
+              │
+              └─ Est-ce un échec intermittent ?
+                    OUI → ne jamais relancer en espérant que ça passe. Identifier la cause
+                          (dépendance à l'ordre, à l'horloge, à un état partagé) et la corriger.
+                          Un test instable est un test à réparer, pas à ignorer.
+
+        La CI échoue mais le local passe
+              → Vérifier : version de Python ou de Node, base PostgreSQL contre SQLite,
+                fuseau horaire, variables d'environnement, ordre d'exécution des tests,
+                fichiers non commités. Reproduire en local dans les conditions de la CI.
+
+        Le bench se dégrade
+              → Identifier le commit responsable par bisection, profiler la vue concernée,
+                corriger avant de poursuivre. Une dégradation acceptée devient permanente.
+
+====================================================================================================
+5. MODE OPÉRATOIRE DES PORTES DE QUALITÉ
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+5.1 DÉROULEMENT D'UNE SÉANCE DE PORTE
+----------------------------------------------------------------------------------------------------
+  Durée : 2 heures pour G0 et G1, une demi-journée pour G2 et G3.
+  Participants : RT (préside), DB, EF, plus DF/DM/RS/EX selon la porte.
+  Préparation : la veille, RT diffuse la liste des points à contrôler et l'état déclaré de chacun.
+
+  Déroulé
+    1. Rappel de l'objectif de la porte et de ce qu'elle protège (10 min).
+    2. Contrôle point par point de la check-list, EN EXÉCUTANT réellement les vérifications à
+       l'écran. Un point déclaré satisfait mais non démontré est réputé non satisfait (60 à 120 min).
+    3. Relevé des points non satisfaits, avec responsable et échéance (15 min).
+    4. Décision : PORTE FRANCHIE / FRANCHIE SOUS CONDITION / NON FRANCHIE (10 min).
+    5. Consignation immédiate dans docs/EDT_INJS_JOURNAL.md, signée par RT et EF.
+
+  Les trois décisions possibles
+    FRANCHIE ............... tous les points sont satisfaits. L'itération suivante démarre.
+    FRANCHIE SOUS CONDITION  au plus deux points mineurs restent, avec échéance sous 5 jours
+                             et responsable nommé. L'itération suivante démarre, mais les
+                             conditions sont vérifiées avant la porte suivante.
+    NON FRANCHIE ........... un point structurant manque. L'itération suivante ne démarre pas.
+                             Voir §5.6.
+
+----------------------------------------------------------------------------------------------------
+5.2 PORTE G0 — PROCÉDURE DÉTAILLÉE (fin de semaine 1)
+----------------------------------------------------------------------------------------------------
+  Objet : s'assurer que le filet de sécurité est en place avant de toucher quoi que ce soit.
+
+  Contrôles à exécuter en séance
+    1. Ouvrir docs/EDT_INJS_ETAT_DES_LIEUX.md et vérifier qu'il couvre réellement les 5 volets
+       demandés par P00 (modèles, routes, écrans, commandes cron, schéma des flux).
+    2. Lancer en direct :   python manage.py test edts presences
+       et constater le vert, ainsi que la présence effective des tests de caractérisation.
+    3. Vérifier que le domaine `edts`, qui n'avait aucun test, en possède désormais.
+    4. Ouvrir le résultat du bench et constater que la baseline est chiffrée et datée.
+    5. Déclencher une exécution de la CI et constater la présence et le vert du job `edt-injs`.
+    6. Faire confirmer par EX que la restauration de sauvegarde a été testée avec succès.
+    7. Faire confirmer par RS l'état des demandes de données de référence.
+    8. Vérifier que l'environnement de recette est disponible ou que sa création est engagée
+       avec une date.
+
+  Point de vigilance : la tentation est grande de franchir G0 rapidement pour « entrer dans le
+  vif ». C'est précisément l'erreur à ne pas commettre : tout le reste du projet s'appuie sur
+  ce filet.
+
+----------------------------------------------------------------------------------------------------
+5.3 PORTE G1 — PROCÉDURE DÉTAILLÉE (fin de semaine 5)
+----------------------------------------------------------------------------------------------------
+  Objet : valider que le socle de données est sain, réversible et paramétrable.
+
+  Contrôles à exécuter en séance
+    1. Appliquer les migrations sur une copie fraîche de la base de recette, chronométrer,
+       puis exécuter le rollback complet et le rejeu. Les trois opérations doivent réussir.
+    2. Exécuter deux fois de suite :
+         python manage.py init_calendrier_injs --annee 2026-2027
+         python manage.py migrer_salles_vers_espaces
+       et constater par requête que la seconde exécution n'a rien modifié.
+    3. Rechercher dans le code les valeurs métier codées en dur :
+         grep -rn "25\s*%\|0\.25\|'08:00'\|\"08:00\"" backend/edt_injs/ --include="*.py" \
+           | grep -v test | grep -v migrations
+       Toute occurrence suspecte est examinée en séance.
+    4. Faire lire docs/EDT_INJS_CONTRAINTES.md par EF à voix haute : s'il ne comprend pas une
+       contrainte, elle est à reformuler.
+    5. Vérifier que RefSalle, RefSite et patrimoine.ReservationEspace sont intacts :
+         python manage.py test referentiels patrimoine
+    6. Vérifier que le calendrier réel 2026-2027 et l'inventaire réel des espaces sont saisis.
+    7. Constater le bench non dégradé.
+
+----------------------------------------------------------------------------------------------------
+5.4 PORTE G2 — PROCÉDURE DÉTAILLÉE (fin de semaine 11)
+----------------------------------------------------------------------------------------------------
+  Objet : valider que le module EDT est fonctionnellement utilisable par la scolarité.
+
+  Contrôles à exécuter en séance, sur l'environnement de recette
+    1. PARCOURS COMPLET, réalisé par RS en autonomie, sans assistance de l'équipe technique :
+         a) sélectionner l'année et le semestre ;
+         b) générer les besoins depuis la maquette ;
+         c) lancer une génération automatique ;
+         d) consulter le rapport et la liste des conflits ;
+         e) corriger manuellement au moins deux séances ;
+         f) valider puis publier l'emploi du temps ;
+         g) consulter l'EDT par groupe, par enseignant et par espace.
+       Si RS bute sur une étape sans comprendre pourquoi, la porte n'est pas franchie.
+    2. GÉNÉRATIONS RÉPÉTÉES : lancer 10 générations avec des graines différentes et vérifier
+       par requête qu'aucune contrainte dure n'est violée.
+    3. QUALITÉ DES EXPLICATIONS : provoquer un cas insoluble (groupe surdimensionné) et faire
+       lire l'explication par RS. Elle doit être comprise sans traduction.
+    4. CONTRAT v1.1 : exécuter le test de comparaison de schéma et, si possible, une requête
+       réelle depuis le planificateur externe.
+    5. JOURNAL : tenter une modification et une suppression d'une entrée de ModificationSeance,
+       y compris via l'admin Django. Les deux doivent être refusées.
+    6. PERMISSIONS : se connecter successivement avec un compte de chaque rôle principal et
+       constater le périmètre visible.
+    7. PERFORMANCE : mesurer la grille hebdomadaire en direct, sur données réalistes.
+
+----------------------------------------------------------------------------------------------------
+5.5 PORTE G3 — PROCÉDURE DÉTAILLÉE (fin de semaine 19)
+----------------------------------------------------------------------------------------------------
+  Objet : autoriser la mise en production et l'ouverture des vagues de bascule.
+
+  Contrôles à exécuter en séance
+    1. Rapport de couverture affiché : ≥ 85 % sur le périmètre EDT-INJS.
+    2. Décompte des tests : backend, frontend (≥ 50), mobile (≥ 20).
+    3. Bench complet exécuté en direct, tous budgets respectés.
+    4. Contrôle d'intégrité du journal d'audit exécuté en direct.
+    5. Vérification de l'observabilité : /api/health/ enrichi, route de métriques, journal métier.
+    6. Décompte des print() résiduels :
+         grep -rn "print(" backend/ --include="*.py" | grep -v test | grep -v migrations \
+           | grep -v management | wc -l
+       Attendu : en baisse d'au moins 30 % par rapport aux 288 initiaux.
+    7. Documents officiels : RS examine les épreuves papier de la feuille d'émargement vierge,
+       de l'EDT hebdomadaire et du PV de séance. Validation formelle ou remarques.
+    8. Check-list de mise en production (Annexe C de [D2]) déroulée intégralement.
+    9. PROCÉDURE DE REPLI TESTÉE EN CONDITIONS RÉELLES sur la recette : désactiver
+       EDT_INJS_QR_V2 et constater le retour immédiat au dispositif historique. Chronométrer.
+
+----------------------------------------------------------------------------------------------------
+5.6 QUE FAIRE EN CAS DE PORTE NON FRANCHIE
+----------------------------------------------------------------------------------------------------
+  1. Ne pas démarrer l'itération suivante. C'est la règle, et elle protège le projet.
+  2. Établir séance tenante la liste précise des points manquants, avec pour chacun : le
+     responsable, l'effort estimé, l'échéance.
+  3. Décider du mode de rattrapage :
+       • rattrapage court (≤ 3 jours) : on comble, on repasse la porte, on poursuit ;
+       • rattrapage long (> 3 jours) : on applique l'arbitrage de périmètre de l'Annexe E de
+         [D2], on réduit le contenu de l'itération suivante, et on informe la Direction sous 48 h.
+  4. Consigner la non-franchissement, sa cause et la décision dans le journal. Ce n'est pas un
+     échec à masquer : c'est une information de pilotage.
+  5. En rétrospective, chercher pourquoi le manque n'a pas été détecté plus tôt.
+
+====================================================================================================
+6. MODE OPÉRATOIRE DES ITÉRATIONS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+6.1 LUNDI DE DÉBUT D'ITÉRATION — LANCEMENT (45 minutes)
+----------------------------------------------------------------------------------------------------
+  ☐ Rappeler l'objectif de l'itération et les prompts engagés ([D2] §3 et §8)
+  ☐ Vérifier que les critères d'entrée de chaque prompt sont satisfaits
+  ☐ Vérifier l'état des données de référence attendues pour cette itération
+  ☐ Répartir les prompts entre les exécutants
+  ☐ Identifier les dépendances internes à l'itération et l'ordre à respecter
+  ☐ Passer en revue les risques actifs du registre concernant ces prompts
+  ☐ Convenir de la date de la démonstration de fin d'itération
+  ☐ Confirmer que la branche `main` est verte au démarrage
+
+----------------------------------------------------------------------------------------------------
+6.2 QUOTIDIEN — LE POINT DE 15 MINUTES
+----------------------------------------------------------------------------------------------------
+  Format strict, debout, à heure fixe. Chaque participant répond à trois questions :
+    1. Qu'ai-je terminé depuis hier ?
+    2. Que vais-je faire aujourd'hui ?
+    3. Qu'est-ce qui me bloque ou risque de me bloquer ?
+
+  Deux questions supplémentaires posées par RT chaque jour :
+    4. La branche `main` est-elle verte ?
+    5. Un prérequis fonctionnel manque-t-il à quelqu'un ?
+
+  Les sujets techniques détaillés ne se traitent pas dans ce point : ils font l'objet d'un
+  échange séparé entre les personnes concernées, immédiatement après.
+
+  Tout blocage non levé en 24 heures est escaladé à RT ; tout blocage non levé en 48 heures
+  est escaladé à la Direction.
+
+----------------------------------------------------------------------------------------------------
+6.3 VENDREDI — RELEVÉ D'INDICATEURS (30 minutes, par RT)
+----------------------------------------------------------------------------------------------------
+  # Avancement
+  #   Prompts terminés / 22 ; prompts du chemin critique terminés / 12
+  #   Effort consommé / 148 JH ; écart à la trajectoire
+  #   Marge restante sur le chemin critique
+
+  # Qualité — commandes de relevé
+  cd backend && python manage.py test 2>&1 | tail -3        # nombre de tests
+  cd ../frontend && npm run lint 2>&1 | tail -3             # avertissements ESLint
+  cd ../qr_badge_mobile && flutter test 2>&1 | tail -3      # tests mobile
+  cd ../backend && grep -rn "print(" --include="*.py" . \
+      | grep -v test | grep -v migrations | grep -v management | wc -l
+
+  # Performance
+  python scripts/edt_injs_bench.py --compare-baseline
+
+  ☐ Reporter les valeurs dans docs/EDT_INJS_TABLEAU_DE_BORD.md
+  ☐ Signaler toute tendance défavorable sur trois relevés consécutifs
+
+----------------------------------------------------------------------------------------------------
+6.4 FIN D'ITÉRATION — REVUE, RÉTROSPECTIVE, NOTE DE VERSION
+----------------------------------------------------------------------------------------------------
+ A. REVUE D'ITÉRATION (1 heure, tous acteurs)
+    ☐ Démonstration intégrée : montrer le produit, pas des diapositives
+    ☐ Dérouler la check-list de fin d'itération (Annexe B de [D2])
+    ☐ Revoir et mettre à jour le registre des risques
+    ☐ Actualiser le tableau de bord
+    ☐ Engager le contenu de l'itération suivante
+
+ B. RÉTROSPECTIVE (45 minutes, équipe technique et EF)
+    Trois questions, et une seule décision :
+      • Qu'est-ce qui a bien fonctionné et que nous voulons conserver ?
+      • Qu'est-ce qui nous a coûté du temps ou de l'énergie inutilement ?
+      • Quelle UNE action d'amélioration décidons-nous pour l'itération suivante ?
+    L'action retenue est consignée, affectée à quelqu'un, et sa mise en œuvre est vérifiée à la
+    rétrospective suivante. Une seule action à la fois : on n'améliore pas tout en même temps.
+
+ C. NOTE DE VERSION (30 minutes, par RT)
+    Rédigée en français, destinée aux utilisateurs et à l'exploitant :
+      • fonctions ajoutées, décrites en termes métier et non techniques ;
+      • corrections apportées ;
+      • points de vigilance et limites connues ;
+      • actions requises de l'exploitant (migrations, drapeaux, paramétrage) ;
+      • état des drapeaux de fonctionnalité après cette version.
+    Puis étiquetage Git :
+      git tag -a v2026.EDT.Ix -m "Itération x — <titre>"
+      git push origin v2026.EDT.Ix
+
+====================================================================================================
+7. MODE OPÉRATOIRE DES JALONS ET DÉMONSTRATIONS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+7.1 PRÉPARATION D'UNE DÉMONSTRATION
+----------------------------------------------------------------------------------------------------
+  À J-3
+    ☐ Définir le scénario précis, écrit, minuté
+    ☐ Vérifier que l'environnement de démonstration est stable et alimenté en données crédibles
+      (noms d'ECUE réels de l'INJS, vrais noms de salles, vrais intitulés de formation)
+    ☐ Identifier les questions probables de l'auditoire et préparer les réponses
+  À J-1
+    ☐ Répéter le scénario intégralement, chronomètre en main
+    ☐ Préparer un plan de secours : captures d'écran ou enregistrement, au cas où
+    ☐ Geler l'environnement : aucun déploiement entre la répétition et la démonstration
+  Le jour même
+    ☐ Vérifier la connexion et l'affichage 30 minutes avant
+    ☐ Se connecter avec les comptes prévus, onglets préparés
+
+  RÈGLE : on ne démontre jamais une fonction que l'on n'a pas testée la veille dans les mêmes
+  conditions. Et l'on ne démontre jamais depuis une branche non fusionnée.
+
+----------------------------------------------------------------------------------------------------
+7.2 SCRIPTS DE DÉMONSTRATION DES 5 JALONS
+----------------------------------------------------------------------------------------------------
+ JALON J1 — EDT MANUEL UTILISABLE (semaine 7, 20 minutes)
+   Message : « L'ossature est là : on peut désormais construire et publier un emploi du temps. »
+   1. Montrer le calendrier académique 2026-2027 réel, saisi et paramétré. (3 min)
+   2. Montrer le référentiel des espaces, dont la piscine, la piste et le gymnase, avec leurs
+      capacités et leurs règles de compatibilité. (4 min)
+   3. Créer manuellement trois séances pour un groupe, dont une en installation sportive. (5 min)
+   4. Montrer le refus d'une séance en conflit de salle, avec le message d'explication. (3 min)
+   5. Valider et publier l'emploi du temps ; montrer le journal de publication. (3 min)
+   6. Montrer que le badgeage historique et les exports existants fonctionnent toujours. (2 min)
+
+ JALON J2 — GÉNÉRATION AUTOMATIQUE (semaine 9, 25 minutes)
+   Message : « La machine planifie, l'humain arbitre. »
+   1. Rappeler les besoins d'enseignement dérivés de la maquette. (3 min)
+   2. Montrer le catalogue de contraintes, en activer et en désactiver une. (4 min)
+   3. Lancer une génération en direct, montrer la progression. (5 min)
+   4. Présenter le rapport : séances planifiées, non planifiées, score, métriques. (4 min)
+   5. Ouvrir le centre de conflits, lire une explication d'échec à voix haute, appliquer une
+      suggestion. (6 min)
+   6. Montrer qu'aucune contrainte dure n'est violée. (3 min)
+
+ JALON J3 — PRÉSENCES OPÉRATIONNELLES (semaine 13, 25 minutes)
+   Message : « De la séance planifiée à la présence certifiée, sans rupture. »
+   1. Ouvrir une séance d'émargement depuis l'EDT publié. (3 min)
+   2. Projeter le QR de séance, montrer la rotation du jeton. (3 min)
+   3. Scanner depuis un téléphone : entrée, puis sortie. (4 min)
+   4. Montrer trois refus distincts : jeton expiré, étudiant hors groupe, hors fenêtre. (4 min)
+   5. Réaliser un forçage motivé avec deux motifs, et montrer la trace produite. (5 min)
+   6. Clôturer la séance, montrer les compteurs et la mise à jour des statistiques. (3 min)
+   7. Montrer le contrôle d'intégrité du journal d'audit. (3 min)
+
+ JALON J4 — PILOTE V1 EN SERVICE (semaine 17, 30 minutes)
+   Message : « Le système est entre les mains des utilisateurs. »
+   1. Faire dérouler le parcours par un agent de scolarité, en autonomie. (10 min)
+   2. Faire dérouler le parcours enseignant par l'enseignant pilote, sur son téléphone. (8 min)
+   3. Montrer la vue étudiant. (4 min)
+   4. Présenter le tableau de bord administration en temps réel. (4 min)
+   5. Montrer la procédure de repli : désactivation d'un drapeau, retour immédiat. (4 min)
+
+ JALON J5 — GÉNÉRALISATION V3 (semaine 20 et suivantes, 45 minutes)
+   Message : « L'UFR STAPS-JL est intégralement gérée par le système. »
+   1. Bilan chiffré du pilote et de l'extension : taux d'émargement, incidents, adhésion. (10 min)
+   2. Rapport de réconciliation : zéro écart. (5 min)
+   3. Démonstration de la chaîne complète, de la maquette au bilan de suivi des enseignements. (15 min)
+   4. Documents officiels imprimés, en main. (5 min)
+   5. Indicateurs d'exploitation et tableaux de bord de direction. (5 min)
+   6. Perspectives : vague V4, extension aux autres UFR et sites. (5 min)
+
+----------------------------------------------------------------------------------------------------
+7.3 RÈGLES DE CONDUITE EN DÉMONSTRATION
+----------------------------------------------------------------------------------------------------
+  • Parler métier, jamais technique. On ne dit pas « le sérialiseur renvoie un 409 », on dit
+    « le système signale que la séance a été modifiée entre-temps et invite à recharger ».
+  • Montrer les limites de son plein gré. Une limite annoncée est une limite acceptée ; une
+    limite découverte par l'auditoire est un problème de crédibilité.
+  • Ne jamais improviser une fonction non préparée, même sur demande insistante. Noter la
+    demande, la traiter dans le registre, y répondre à la démonstration suivante.
+  • Si un incident survient en direct : l'assumer calmement, basculer sur le plan de secours,
+    et l'analyser en rétrospective. Cela arrive, et ce n'est pas grave si c'est bien géré.
+  • Terminer systématiquement par : ce qui vient ensuite, et ce qu'on attend de l'auditoire.
+
+====================================================================================================
+8. MODE OPÉRATOIRE DE LA RECETTE
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+8.1 ORGANISATION D'UNE SESSION DE RECETTE
+----------------------------------------------------------------------------------------------------
+  Cadre
+    • Lieu : salle équipée, avec un poste par recetteur et une connexion représentative.
+    • Durée : demi-journée par session, 3 sessions pour couvrir les 60 scénarios.
+    • Participants : EF (anime), RS et RP (exécutent), DB (observe et note, n'intervient pas).
+    • Environnement : recette uniquement, jamais la production.
+    • Données : jeu de démonstration réaliste, avec les vrais intitulés de l'INJS.
+
+  Règle d'or de la recette : l'équipe technique OBSERVE et NOTE, elle n'aide pas. Si le
+  recetteur ne trouve pas, c'est une anomalie d'ergonomie, pas une erreur de l'utilisateur.
+  Cette règle est difficile à tenir et pourtant c'est elle qui produit le plus de valeur.
+
+----------------------------------------------------------------------------------------------------
+8.2 EXÉCUTION D'UN SCÉNARIO DE RECETTE
+----------------------------------------------------------------------------------------------------
+  Chaque scénario est décrit et renseigné selon ce cadre :
+
+    Identifiant ........ RC-xx
+    Domaine ............ <ex. Émargement manuel et forçage>
+    Acteur ............. <rôle utilisé pour le test>
+    Préconditions ...... <état du système avant>
+    Étapes ............. 1. … 2. … 3. …
+    Résultat attendu ... <ce que l'utilisateur doit voir ou obtenir>
+    Résultat observé ... <à renseigner pendant l'exécution>
+    Verdict ............ CONFORME / NON CONFORME / BLOQUÉ / NON TESTÉ
+    Anomalie ........... <référence si non conforme>
+    Testeur, date ...... <nom, date>
+
+  Conseils d'exécution
+    • Exécuter les scénarios dans l'ordre, sans en sauter.
+    • Noter le temps mis par le recetteur : un scénario qui prend trois fois plus longtemps que
+      prévu révèle un problème, même s'il aboutit.
+    • Noter les hésitations et les questions à voix haute : ce sont des indices d'ergonomie.
+    • Ne pas corriger une anomalie pendant la session : noter, poursuivre, traiter après.
+
+----------------------------------------------------------------------------------------------------
+8.3 TRAITEMENT DES ANOMALIES DÉTECTÉES
+----------------------------------------------------------------------------------------------------
+  Qualification par EF, immédiatement après la session :
+    A1 BLOQUANTE ...... empêche l'usage. Corrigée avant la fin de l'itération, sans discussion.
+    A2 MAJEURE ........ contournement pénible existant. Corrigée avant la porte suivante.
+    A3 MINEURE ........ gêne légère. Planifiée dans le reste-à-faire.
+    A4 COSMÉTIQUE ..... confort. Traitée si le temps le permet, après V3 sinon.
+
+  Chaque anomalie est enregistrée avec : identifiant, scénario d'origine, description précise,
+  capture d'écran, gravité, responsable, échéance, état. Suivi dans docs/EDT_INJS_INCIDENTS.md.
+
+  Après correction : le scénario est intégralement rejoué, pas seulement l'étape corrigée.
+
+----------------------------------------------------------------------------------------------------
+8.4 CONDUITE DES 6 SCÉNARIOS DE RECETTE TERRAIN
+----------------------------------------------------------------------------------------------------
+  Ces scénarios se déroulent en conditions réelles, dans les locaux et sur les installations
+  sportives de l'INJS Marcory. Ils conditionnent le passage de la vague V1 à la vague V2.
+
+  PRÉPARATION COMMUNE
+    ☐ Prévenir l'enseignant et les étudiants concernés, obtenir leur accord
+    ☐ Prévoir la feuille d'émargement papier de secours, imprimée
+    ☐ Prévoir un téléphone de secours chargé
+    ☐ Un observateur de l'équipe projet est présent, avec de quoi noter
+    ☐ Convenir à l'avance du signal d'arrêt en cas de perturbation du cours
+
+  T1 — COURS MAGISTRAL EN AMPHITHÉÂTRE, 120 ÉTUDIANTS, QR PROJETÉ
+    Observer : temps total d'émargement de 120 étudiants, lisibilité du QR depuis le fond de
+    l'amphithéâtre, nombre d'échecs de scan, comportement du compteur en direct, charge serveur.
+    Critère : émargement complet en moins de 5 minutes, moins de 5 % d'échecs.
+
+  T2 — TP EN LABORATOIRE, 20 ÉTUDIANTS, SCAN INVERSE DES BADGES
+    Observer : fluidité du scan des cartes par l'enseignant, retour sonore et visuel, gestion
+    des étudiants sans carte.
+    Critère : 20 étudiants scannés en moins de 3 minutes.
+
+  T3 — SÉANCE D'ATHLÉTISME SUR LA PISTE, RÉSEAU DÉGRADÉ
+    Observer : comportement de l'application en réseau instable, mise en file des scans,
+    lisibilité de l'écran en plein soleil, autonomie de la batterie, synchronisation au retour.
+    Critère : aucun scan perdu, indicateur de synchronisation compris par l'enseignant.
+
+  T4 — SÉANCE DE NATATION, TÉLÉPHONES INTERDITS AU BORD DU BASSIN
+    Observer : émargement manuel intégral par l'encadrant depuis le vestiaire ou avant l'entrée,
+    usage du forçage motivé, praticité réelle.
+    Critère : émargement complet sans matériel au bord du bassin, motifs pertinents disponibles.
+
+  T5 — PANNE RÉSEAU TOTALE PENDANT UNE SÉANCE
+    Déroulé : couper volontairement l'accès pendant la séance, basculer sur la feuille papier,
+    puis saisir a posteriori avec forçage en lot motivé.
+    Observer : disponibilité de la feuille papier, facilité de la saisie a posteriori, qualité
+    de la trace produite.
+    Critère : présence de tous les étudiants correctement enregistrée dans les 24 heures, avec
+    motif unique en lot et journal complet.
+
+  T6 — ANNULATION D'UNE SÉANCE PUBLIÉE LA VEILLE
+    Observer : réception effective des notifications par les étudiants et l'enseignant, délai,
+    clarté du message, programmation du rattrapage.
+    Critère : tous les concernés informés en moins de 5 minutes, rattrapage programmé sans conflit.
+
+  RESTITUTION
+    Chaque scénario terrain fait l'objet d'un compte rendu d'une page : conditions réelles,
+    déroulé, chiffres relevés, anomalies, verdict, recommandations. Ces comptes rendus sont
+    présentés en comité de pilotage avant la décision de passage en vague V2.
+
+====================================================================================================
+9. MODE OPÉRATOIRE DES MISES EN PRODUCTION ET BASCULES
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+9.1 PRÉPARATION D'UNE MISE EN PRODUCTION
+----------------------------------------------------------------------------------------------------
+  À J-2
+    ☐ Choisir la fenêtre : hors heures de cours, jamais un vendredi après-midi, jamais la veille
+      d'une échéance académique
+    ☐ Informer les utilisateurs de la fenêtre et de l'indisponibilité éventuelle
+    ☐ Relire la note de version et les actions requises de l'exploitant
+    ☐ Vérifier que la CI est verte sur le commit à déployer
+    ☐ Estimer la durée des migrations en les rejouant sur une copie de la base de production
+  À J-1
+    ☐ Exécuter une sauvegarde manuelle supplémentaire et vérifier son empreinte
+    ☐ Dérouler la check-list de production (Annexe C de [D2])
+    ☐ Relire la procédure de repli et vérifier qu'elle est applicable
+    ☐ Confirmer la disponibilité de EX et de DB pendant et après la fenêtre
+
+----------------------------------------------------------------------------------------------------
+9.2 DÉROULEMENT DU DÉPLOIEMENT
+----------------------------------------------------------------------------------------------------
+  # 1. Sauvegarde immédiate avant intervention
+  bash scripts/backup_injs_lmd.sh
+  sha256sum -c ~/Backups/INJS-LMD/<fichier>.sha256
+
+  # 2. Noter l'étiquette de la version actuellement en service (pour le repli)
+  git -C /chemin/vers/prod describe --tags
+
+  # 3. Récupération de la nouvelle version
+  git fetch --tags && git checkout v2026.EDT.Ix
+
+  # 4. Migrations — en surveillant la durée
+  python manage.py migrate --noinput
+
+  # 5. Fichiers statiques
+  python manage.py collectstatic --noinput
+
+  # 6. Redémarrage des services
+  docker compose up -d --build app cron
+  #    ou la procédure de redémarrage en vigueur
+
+  # 7. Contrôle de santé immédiat
+  curl -s https://<prod>/api/health/ | jq .
+  #    Attendu : base OK, cache OK, cron OK
+
+  RÈGLE : les drapeaux de fonctionnalité restent à leur valeur actuelle pendant le déploiement.
+  L'activation d'une fonction est une opération SÉPARÉE du déploiement du code (cf. §9.4).
+  Cette séparation est ce qui rend le repli instantané possible.
+
+----------------------------------------------------------------------------------------------------
+9.3 CONTRÔLE POST-DÉPLOIEMENT
+----------------------------------------------------------------------------------------------------
+  Dans les 15 minutes
+    ☐ Connexion réussie avec un compte ADMIN, un compte SECRETARIAT, un compte DIRECTION
+    ☐ Connexion mobile réussie avec un compte AUDITEUR et un compte FORMATEUR
+    ☐ Un parcours EDT complet
+    ☐ Un parcours émargement complet, avec un scan réel
+    ☐ Un export PDF généré
+    ☐ Journaux applicatifs surveillés : aucune erreur inhabituelle
+
+  Dans les 24 heures
+    ☐ Vérifier que les tâches cron se sont exécutées à l'heure prévue
+    ☐ Vérifier les compteurs de scans et de refus
+    ☐ Vérifier les temps de réponse sur les vues principales
+    ☐ Recueillir les premiers retours des utilisateurs
+
+  ☐ Consigner le déploiement dans le journal : version, durée, incidents, verdict
+
+----------------------------------------------------------------------------------------------------
+9.4 ACTIVATION D'UN DRAPEAU DE FONCTIONNALITÉ
+----------------------------------------------------------------------------------------------------
+  Opération distincte du déploiement, décidée par RT, exécutée par EX, tracée.
+
+  Avant
+    ☐ La fonction concernée a été validée en recette
+    ☐ Le périmètre d'activation est défini : global, ou par secrétariat, ou par formation
+    ☐ Les utilisateurs concernés sont prévenus et formés
+    ☐ Un membre de l'équipe est disponible pendant les 2 heures qui suivent
+    ☐ La procédure de désactivation est connue et à portée de main
+
+  Exécution
+    python manage.py edt_injs_drapeau --nom EDT_INJS_QR_V2 --valeur 1 --portee <périmètre> \
+        --motif "Ouverture de la vague V1 sur la formation <X>"
+    #    La commande historise automatiquement : auteur, date, ancienne et nouvelle valeur, motif.
+
+  Après
+    ☐ Vérifier immédiatement l'effet sur un cas réel
+    ☐ Surveiller les journaux et les indicateurs pendant 2 heures
+    ☐ Consigner l'activation dans le journal
+
+  RÈGLE : on n'active jamais deux drapeaux structurants le même jour. Si un problème survient,
+  on doit pouvoir attribuer la cause sans ambiguïté.
+
+----------------------------------------------------------------------------------------------------
+9.5 CONDUITE D'UNE VAGUE DE BASCULE
+----------------------------------------------------------------------------------------------------
+  SEMAINE -1 — PRÉPARATION
+    ☐ Périmètre précis arrêté : formations, groupes, enseignants, effectif
+    ☐ Utilisateurs formés, manuels et fiches mémo distribués
+    ☐ Données du périmètre vérifiées : EDT publié, groupes à jour, comptes actifs
+    ☐ Sauvegarde et restauration testées
+    ☐ Permanence d'assistance organisée et communiquée
+    ☐ Critères de suspension rappelés à tous ([D2] §10.3)
+
+  JOUR 1 — OUVERTURE
+    ☐ Activation des drapeaux prévus, dans l'ordre, un par un
+    ☐ Présence physique d'un membre de l'équipe aux premières séances
+    ☐ Relevé des incidents en temps réel
+    ☐ Point de fin de journée : incidents, ressenti, décision de poursuivre
+
+  SEMAINES 1 À 4 — OBSERVATION
+    ☐ Point quotidien les 5 premiers jours, puis hebdomadaire
+    ☐ Relevé des indicateurs d'exploitation ([D2] §15.4)
+    ☐ Réconciliation hebdomadaire entre l'ancien et le nouveau dispositif si double saisie
+    ☐ Traitement des anomalies selon leur gravité
+    ☐ Recueil du ressenti des utilisateurs, à chaud
+
+  FIN DE VAGUE — PORTE G4
+    ☐ Aucun incident de gravité 1 ou 2 non résolu
+    ☐ Écarts de réconciliation nuls
+    ☐ Questionnaire de satisfaction dépouillé
+    ☐ Comptes rendus des scénarios terrain, le cas échéant
+    ☐ Décision explicite de la Direction pour la vague suivante
+
+  SUSPENSION IMMÉDIATE — sans validation préalable, si :
+    • perte ou corruption d'une donnée de présence ;
+    • impossibilité pour un enseignant d'émarger une séance en cours ;
+    • écart de réconciliation inexpliqué ;
+    • indisponibilité de plus de 15 minutes en heures ouvrées.
+    Le repli de niveau 1 (désactivation de drapeau) est appliqué sur-le-champ. L'analyse vient après.
+
+====================================================================================================
+10. MODE OPÉRATOIRE DES INCIDENTS ET DU REPLI
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+10.1 QUALIFICATION D'UN INCIDENT EN 4 GRAVITÉS
+----------------------------------------------------------------------------------------------------
+  G1 CRITIQUE ... L'émargement est impossible en séance, ou une donnée de présence est perdue,
+                  ou le service est indisponible en heures ouvrées.
+                  Prise en charge immédiate. Contournement proposé sous 15 minutes.
+                  Résolution ou repli sous 4 heures ouvrées. Information de la Direction.
+  G2 MAJEUR ..... Une fonction essentielle est dégradée mais contournable.
+                  Prise en charge dans la journée. Résolution sous 1 jour ouvré.
+  G3 MINEUR ..... Gêne ou comportement inattendu sans blocage.
+                  Planifié dans l'itération suivante.
+  G4 COSMÉTIQUE . Confort, présentation. Traité si le temps le permet.
+
+----------------------------------------------------------------------------------------------------
+10.2 RÉFLEXES DES 5 PREMIÈRES MINUTES
+----------------------------------------------------------------------------------------------------
+   1. CONSTATER — reproduire l'incident, noter l'heure exacte, l'utilisateur, l'action, le message.
+   2. PROTÉGER — si une donnée est en jeu, arrêter l'écriture avant toute autre chose. En cas de
+      doute, désactiver le drapeau concerné : le repli de niveau 1 est réversible et sans risque.
+   3. CONTOURNER — donner immédiatement une solution à l'utilisateur : feuille papier, émargement
+      manuel, saisie a posteriori. L'utilisateur ne doit jamais rester bloqué.
+   4. ALERTER — informer RT et EF. Ne jamais traiter seul un incident de gravité 1.
+   5. TRACER — ouvrir la fiche d'incident immédiatement, même incomplète.
+
+  Ce qu'il ne faut jamais faire : modifier la production dans l'urgence sans sauvegarde, relancer
+  plusieurs fois en espérant que cela passe, ou supprimer des données « pour débloquer ».
+
+----------------------------------------------------------------------------------------------------
+10.3 EXÉCUTION DU REPLI PAR NIVEAU
+----------------------------------------------------------------------------------------------------
+ NIVEAU 1 — REPLI FONCTIONNEL (moins d'une minute) — À PRIVILÉGIER TOUJOURS
+   python manage.py edt_injs_drapeau --nom <DRAPEAU> --valeur 0 \
+       --motif "Incident <référence> — repli d'urgence"
+   Vérifier immédiatement le retour au comportement antérieur. Informer les utilisateurs.
+
+ NIVEAU 2 — REPLI APPLICATIF (5 à 15 minutes)
+   git checkout <étiquette-version-précédente>
+   python manage.py collectstatic --noinput
+   docker compose up -d --build app cron
+   curl -s https://<prod>/api/health/ | jq .
+   Les migrations additives restent en place : elles sont compatibles avec la version antérieure.
+
+ NIVEAU 3 — REPLI DE DONNÉES (30 à 60 minutes)
+   bash scripts/backup_injs_lmd.sh          # sauvegarder AVANT de modifier quoi que ce soit
+   python manage.py migrer_edt_vers_edt_injs --rollback --run-id <identifiant> --dry-run
+   # examiner le rapport, puis seulement ensuite :
+   python manage.py migrer_edt_vers_edt_injs --rollback --run-id <identifiant>
+   python manage.py edt_injs_reconcilier_presences --controle-seul
+
+ NIVEAU 4 — RESTAURATION COMPLÈTE (1 à 2 heures) — DERNIER RECOURS
+   Décision de RT avec information immédiate de la Direction.
+   Arrêt du service, restauration de la sauvegarde vérifiée la plus récente, contrôle d'intégrité,
+   redémarrage, communication aux utilisateurs sur la fenêtre de données perdue.
+   Analyse de cause racine écrite sous 48 heures, obligatoire.
+
+----------------------------------------------------------------------------------------------------
+10.4 ANALYSE DE CAUSE RACINE
+----------------------------------------------------------------------------------------------------
+  Obligatoire pour tout incident de gravité 1 ou 2, sous 48 heures, en une page :
+    • Chronologie factuelle : détection, actions, résolution, horaires précis.
+    • Impact : utilisateurs touchés, données concernées, durée.
+    • Cause immédiate : ce qui a techniquement échoué.
+    • Cause profonde : pourquoi cela n'a pas été détecté avant. C'est la partie la plus utile.
+    • Actions correctives : ce qui est corrigé.
+    • Actions préventives : le test, le contrôle ou la procédure ajoutés pour que cela ne se
+      reproduise pas. Chaque incident de gravité 1 doit produire au moins un test automatisé.
+    • Responsable et échéance de chaque action.
+
+  L'analyse est présentée en rétrospective. On cherche la faiblesse du processus, jamais le
+  responsable individuel : une culture de la recherche de coupable produit des incidents cachés.
+
+====================================================================================================
+11. MODE OPÉRATOIRE DE LA DOCUMENTATION PROJET
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+11.1 LES 8 FICHIERS À TENIR ET QUI EN EST RESPONSABLE
+----------------------------------------------------------------------------------------------------
+ Fichier                              Responsable  Rythme              Contenu
+ -----------------------------------  -----------  ------------------  ------------------------------
+ EDT_INJS_JOURNAL.md                  Exécutant    À chaque prompt     Compte rendu d'exécution
+ EDT_INJS_ETAT_DES_LIEUX.md           DB           P00, puis figé      Cartographie de l'existant
+ EDT_INJS_RESTE_A_FAIRE.md            Exécutant    À chaque réserve    Éléments reportés
+ EDT_INJS_TABLEAU_DE_BORD.md          RT           Chaque vendredi     Indicateurs de pilotage
+ EDT_INJS_DEMANDES.md                 RT           À chaque demande    Demandes hors périmètre
+ EDT_INJS_DECISIONS.md                RT           À chaque décision   Arbitrages et leur motif
+ EDT_INJS_INCIDENTS.md                Exécutant    À chaque incident   Anomalies et incidents
+ EDT_INJS_RISQUES.md                  RT           Chaque itération    Registre des risques actualisé
+
+ S'ajoutent les documentations produites par les prompts eux-mêmes : MODELE_DONNEES, CONTRAINTES,
+ MOTEUR, WORKFLOW, API, PRESENCES_QR, FORCAGE_ET_JUSTIFICATIFS, VOLUMES_HORAIRES, EXAMENS,
+ DOCUMENTS, MOBILE, QUALITE, PLAN_DE_BASCULE, et les 4 manuels utilisateurs.
+
+----------------------------------------------------------------------------------------------------
+11.2 RYTHME DE MISE À JOUR
+----------------------------------------------------------------------------------------------------
+  Le jour même ......... journal après fusion d'un prompt, incidents, décisions
+  Chaque vendredi ...... tableau de bord
+  Chaque itération ..... registre des risques, note de version
+  À chaque occurrence .. demandes, reste-à-faire
+
+  RÈGLE : une documentation mise à jour « quand on aura le temps » n'est jamais mise à jour.
+  La consignation fait partie de la définition de fini d'un prompt, au même titre que les tests.
+
+----------------------------------------------------------------------------------------------------
+11.3 GABARITS PRÊTS À L'EMPLOI
+----------------------------------------------------------------------------------------------------
+  Voir l'Annexe 2 du présent document pour :
+    • le gabarit de description de pull request ;
+    • le gabarit de note de conception ;
+    • le gabarit de compte rendu d'exécution de prompt (repris de l'Annexe F de [D2]) ;
+    • le gabarit de fiche d'incident ;
+    • le gabarit de fiche de décision ;
+    • le gabarit de note de version.
+
+====================================================================================================
+12. MODE OPÉRATOIRE EN ÉQUIPE RÉDUITE (UN SEUL EXÉCUTANT)
+====================================================================================================
+
+Si le projet est conduit par une seule personne polyvalente, l'horizon passe de 20 à 32 semaines
+et les adaptations suivantes s'appliquent. Les portes de qualité, elles, restent inchangées.
+
+ 12.1 ORDONNANCEMENT
+   Exécution strictement en série : P00 → P01 → … → P22. Aucune parallélisation.
+   Le découpage P11(a)/P11(b) et P17(a)/P17(b) reste pertinent : il permet de valider l'API
+   avant de construire dessus.
+
+ 12.2 REVUE PAR UN PAIR — LE POINT LE PLUS DÉLICAT
+   Sans second développeur, la revue se remplace par trois pratiques cumulatives :
+     • Relecture différée : ne jamais relire son propre code le jour où on l'a écrit. Relire le
+       lendemain matin, avant toute autre tâche. Le regard est différent et attrape beaucoup.
+     • Relecture guidée par la grille : dérouler la grille de [D2] §9.3 point par point, à voix
+       haute, en cochant. Le formalisme compense l'absence de second regard.
+     • Revue externe périodique : faire relire par un tiers compétent, même extérieur au projet,
+       les prompts les plus sensibles : P05 (pont SessionModule), P13 (sécurité QR), P14 (audit),
+       P22 (migration). Une demi-journée de revue externe sur ces quatre prompts est un
+       investissement très rentable.
+
+ 12.3 VALIDATION FONCTIONNELLE
+   Elle reste OBLIGATOIRE et ne peut pas être auto-administrée. Le référent scolarité de l'INJS
+   doit voir et valider. Si aucun référent n'est disponible, le projet doit être suspendu : un
+   système de gestion académique validé par son seul développeur est un système qui sera rejeté
+   à la mise en service.
+
+ 12.4 RYTHME
+   • Alterner les natures de tâche : une journée de modèles, une journée de tests, une journée
+     d'interface. La monotonie produit des erreurs.
+   • Ne jamais enchaîner deux prompts sans faire la consignation du premier.
+   • Prévoir une demi-journée de consolidation à la fin de chaque prompt : documentation,
+     nettoyage, reste-à-faire.
+
+ 12.5 CE QUI NE SE NÉGOCIE PAS, MÊME SEUL
+   • La batterie de vérification complète avant chaque fusion.
+   • Les tests de caractérisation verts.
+   • La consignation au journal le jour même.
+   • Les portes de qualité, avec au minimum la présence du référent fonctionnel.
+   • La validation fonctionnelle par un utilisateur métier.
+   • La procédure de repli testée avant chaque bascule.
+
+====================================================================================================
+13. FICHE RÉFLEXE — L'ESSENTIEL SUR UNE PAGE
+====================================================================================================
+
+ AVANT DE COMMENCER UN PROMPT
+   Lire la fiche [D2] §7 → vérifier les entrées → créer la branche → ouvrir la PR en brouillon
+   → écrire la note de conception → la faire valider.
+
+ POUR SOUMETTRE À L'AGENT
+   Prompt maître intégral + prompt PXX intégral + gabarit de session (§3.2)
+   → demander une reformulation → confirmer → produire par lots → relire chaque lot → commiter.
+
+ AVANT DE SORTIR DU BROUILLON
+   check → makemigrations --check → migrate (vide + peuplée) → rollback → test → caractérisation
+   → lint → build → test frontend → analyze → bench.
+
+ AVANT DE FUSIONNER
+   Revue par un pair avec la grille → validation fonctionnelle par EF → CI verte après rebase.
+
+ APRÈS AVOIR FUSIONNÉ
+   Vérifier la recette → consigner au journal LE JOUR MÊME → mettre à jour le reste-à-faire
+   → supprimer la branche.
+
+ EN CAS DE DOUTE SUR UNE RÈGLE MÉTIER
+   Ne pas trancher soi-même. Ne pas laisser l'agent trancher. Demander à EF, obtenir l'arbitrage,
+   le consigner dans EDT_INJS_DECISIONS.md.
+
+ EN CAS DE TEST EXISTANT QUI CASSE
+   ARRÊT. Ne jamais adapter le test. Identifier la régression, rétablir, ou arbitrage écrit de RT.
+
+ EN CAS D'INCIDENT EN PRODUCTION
+   Constater → protéger (désactiver le drapeau) → contourner pour l'utilisateur → alerter → tracer.
+
+ EN CAS DE RETARD
+   Ne jamais réduire la qualité. Réduire le périmètre selon l'ordre de l'Annexe E de [D2].
+   Jamais réductibles : tests de non-régression, traçabilité, forçage motivé, sécurité QR,
+   permissions, réversibilité, feuille d'émargement papier.
+
+ LA QUESTION À SE POSER CHAQUE SOIR
+   « Si je déployais en production demain matin, est-ce que l'INJS pourrait fonctionner ? »
+   Si la réponse n'est pas un oui franc, c'est qu'il reste quelque chose à faire avant d'avancer.
+
+====================================================================================================
+ANNEXE 1 — TOUTES LES COMMANDES DU PROJET, CLASSÉES PAR USAGE
+====================================================================================================
+
+ VÉRIFICATION QUOTIDIENNE
+   python manage.py check
+   python manage.py check --deploy
+   python manage.py makemigrations --check --dry-run
+   python manage.py test
+   python manage.py test edts presences
+   npm run lint && npm run build && npm run test
+   flutter analyze && flutter test
+
+ MIGRATIONS
+   python manage.py migrate
+   python manage.py migrate <app> <numero>            # retour arrière
+   python manage.py showmigrations
+   python manage.py sqlmigrate <app> <numero>         # inspecter le SQL généré
+
+ INITIALISATION ET DONNÉES (livrées par les prompts)
+   python manage.py init_calendrier_injs --annee 2026-2027 [--dry-run]
+   python manage.py migrer_salles_vers_espaces [--dry-run]
+   python manage.py seed_edt_injs --profil injs-marcory
+   python manage.py generer_edt --edt <id> [--dry-run]
+
+ MIGRATION ET RÉCONCILIATION
+   python manage.py migrer_edt_vers_edt_injs [--dry-run] [--rollback --run-id <id>]
+   python manage.py edt_injs_reconcilier_presences [--controle-seul]
+   python manage.py edt_injs_recalculer_statistiques
+   python manage.py edt_injs_diag
+
+ EXPLOITATION
+   python manage.py edt_injs_drapeau --nom <X> --valeur <0|1> --portee <p> --motif "<m>"
+   python manage.py edt_injs_verifier_journal --periode <mois>
+   python manage.py auto_close_sessions
+   python manage.py auto_close_pointages
+   python manage.py process_mobile_heartbeats
+   python manage.py recalc_durees_pointages
+   python manage.py sync_role_groups
+
+ SAUVEGARDE
+   bash scripts/backup_injs_lmd.sh
+   sha256sum -c ~/Backups/INJS-LMD/<fichier>.sha256
+   pg_restore -d <base_test> <fichier>.dump
+
+ PERFORMANCE ET QUALITÉ
+   python scripts/edt_injs_bench.py --compare-baseline
+   coverage run --source=edt_injs manage.py test && coverage report
+   grep -rn "print(" backend/ --include="*.py" | grep -v test | grep -v migrations | wc -l
+   find backend/edt_injs -name "*.py" -exec wc -l {} + | sort -rn | head -20
+
+ GIT
+   git checkout -b feature/edt-injs-PXX-<libelle>
+   git rebase main
+   git tag -a v2026.EDT.Ix -m "Itération x — <titre>"
+   git bisect start / bad / good                      # pour isoler une régression
+
+====================================================================================================
+ANNEXE 2 — GABARITS À COPIER
+====================================================================================================
+
+--- GABARIT 1 : DESCRIPTION DE PULL REQUEST ---
+## PXX — <intitulé du prompt>
+
+### Objectif
+<une phrase>
+
+### Critères de sortie (repris de la fiche [D2] §7)
+- [ ] <critère 1>
+- [ ] <critère 2>
+
+### Conception
+Note de conception : <lien vers le commentaire> — validée par <RT> le <date>
+
+### Vérifications exécutées
+- [ ] `manage.py check` et `check --deploy`
+- [ ] `makemigrations --check --dry-run` : aucun changement
+- [ ] `migrate` sur base vide et sur base peuplée
+- [ ] Rollback de migration testé
+- [ ] `manage.py test` : <N> tests, verts
+- [ ] Tests de caractérisation verts
+- [ ] `npm run lint` : <N> avertissements (baseline 89)
+- [ ] `npm run build` et `npm run test`
+- [ ] `flutter analyze` et `flutter test`
+- [ ] Bench : aucune dégradation > 5 %
+
+### Grille de revue
+- [ ] Aucun élément existant supprimé ou renommé
+- [ ] Migration réversible et testée
+- [ ] Permission explicite sur chaque route
+- [ ] Traçabilité des actions sensibles
+- [ ] Aucune valeur métier en dur
+- [ ] Aucun print(), aucune dépendance CDN
+- [ ] Taille des fichiers respectée
+- [ ] Messages en français, clairs
+- [ ] Tests pertinents, incluant les refus
+- [ ] Pas de requête N+1
+
+### Points sur lesquels j'attends un regard attentif
+1. <…>
+2. <…>
+
+--- GABARIT 2 : NOTE DE CONCEPTION ---
+## Note de conception — PXX
+
+**Modèles** : <nom : champs clés, relations, contraintes, index>
+**Endpoints** : <chemin, méthode, permission, réponse>
+**Ponts de rétrocompatibilité** : <quoi → quoi, drapeau associé>
+**Décisions** : <retenu / écarté / pourquoi>
+**Points de vigilance** : <risque → mitigation>
+**Découpage prévu** : <liste des commits>
+
+--- GABARIT 3 : FICHE D'INCIDENT ---
+## Incident INC-<numéro> — <titre>
+Gravité : G<1-4>    Détecté le : <date, heure>    Par : <qui>
+Périmètre : <utilisateurs, données, service touchés>
+Chronologie : <horodatée>
+Contournement proposé : <quoi, à quelle heure>
+Cause immédiate : <…>
+Cause profonde : <…>
+Résolution : <…>    Repli appliqué : <niveau, si applicable>
+Actions préventives : <action, responsable, échéance>
+Test automatisé ajouté : <référence>
+Clos le : <date>    Par : <qui>
+
+--- GABARIT 4 : FICHE DE DÉCISION ---
+## Décision DEC-<numéro> — <objet>
+Date : <…>    Demandeur : <…>    Décideur : <…>
+Contexte : <pourquoi la question se pose>
+Options examinées : A <…> / B <…> / C <…>
+Décision retenue : <…>
+Motif : <…>
+Conséquences : <sur le code, le planning, le périmètre>
+Prompts impactés : <liste>
+Réexamen prévu : <date ou « aucun »>
+
+--- GABARIT 5 : NOTE DE VERSION ---
+## Version v2026.EDT.Ix — <titre de l'itération>
+Date de livraison : <…>    Environnement : recette / production
+
+### Ce qui est nouveau pour les utilisateurs
+- <en langage métier, pas technique>
+
+### Corrections
+- <…>
+
+### Actions requises de l'exploitant
+- Migrations : <oui/non, durée estimée>
+- Drapeaux à positionner : <liste et valeurs>
+- Paramétrage à réaliser : <…>
+
+### Limites connues et points de vigilance
+- <…>
+
+### État des drapeaux après cette version
+| Drapeau | Valeur | Portée |
+|---|---|---|
+
+====================================================================================================
+ANNEXE 3 — GLOSSAIRE DES SIGLES DU PROJET
+====================================================================================================
+ [D1] [D2] [D3] ...... Les trois documents du projet : prompts, plan, mode opératoire
+ [S1] [S2] [S3] ...... Documents sources : audit, modèle fonctionnel, rapport de mise en œuvre
+ RT, DB, DF, DM ...... Responsable technique, développeurs backend, frontend, mobile
+ EF, RS, RP, EX ...... Expert fonctionnel, référent scolarité, référent pédagogique, exploitant
+ DIR ................. Direction de l'INJS
+ P00 à P22 ........... Les 22 prompts de mise en œuvre
+ I0 à I10 ............ Les 11 itérations du plan
+ G0 à G4 ............. Les portes de qualité
+ J1 à J5 ............. Les jalons présentés à la Direction
+ V1 à V4 ............. Les vagues de bascule
+ T1 à T6 ............. Les scénarios de recette terrain
+ A1 à A4 ............. Gravités d'anomalie de recette
+ G1 à G4 (incidents) . Gravités d'incident en exploitation
+ D1 à D5 ............. Les cinq doubles représentations à résorber
+ R1 à R8 ............. Les huit faiblesses majeures identifiées par l'audit
+ X01 à X15 ........... Les risques du registre
+ EDT ................. Emploi du temps
+ ECUE ................ Élément constitutif d'unité d'enseignement
+ UE .................. Unité d'enseignement
+ VH .................. Volume horaire
+ IA / IP ............. Inscription administrative / inscription pédagogique
+ JH .................. Jour-homme
+
+====================================================================================================
+RAPPEL FINAL
+====================================================================================================
+Ce mode opératoire ne vaut que s'il est réellement suivi. Les procédures qu'il décrit ne sont pas
+des formalités : chacune découle d'un risque identifié sur ce projet précis. La note de conception
+protège du code à refaire. La batterie de vérification protège de la régression. La validation
+fonctionnelle protège du système techniquement juste et métier faux. La consignation protège de
+l'oubli. La procédure de repli protège l'INJS le jour où quelque chose se passe mal — et ce jour
+arrive toujours.
+
+L'objectif n'est pas de suivre un processus. L'objectif est que, chaque matin de l'année
+académique, un enseignant de l'INJS Marcory puisse ouvrir sa séance, que ses étudiants puissent
+badger, et que personne n'ait à se demander si le système va tenir.
+====================================================================================================
+FIN DU MODE OPÉRATOIRE — Mode-opératoire-exécution-EDTINJS-app-injs-lmd2026.txt
+====================================================================================================

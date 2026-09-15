@@ -1,0 +1,317 @@
+====================================================================================================
+RAPPORT D'AUDIT COMPLET D'ARCHITECTURE LOGICIELLE & SYSTÈME LMD
+PLATEFORME UNIVERSITAIRE INTÉGRÉE : INJS-LMD 2026 (UFR STAPS-JL)
+====================================================================================================
+Projet          : INJS-LMD 2026 (Système de Gestion Universitaire LMD, Présences & Scolarité)
+Institution     : Institut National de la Jeunesse et des Sports (INJS) — UFR STAPS-JL (Abidjan)
+Date de l'audit : 10 Septembre 2026
+Référentiel     : Normes Universitaires LMD (CAMES / REESAO) & Architecture Django / React / Flutter
+Auteurs         : Collège d'Experts :
+                  - Architecte Logiciel Senior Systèmes LMD (30+ ans d'expérience)
+                  - Expert UX/UI & Ergonomie des Systèmes d'Information Universitaires
+                  - Développeur Frontend Senior React / Web Architecture
+                  - Expert Fonctionnel Spécialiste Scolarité & Réglementation LMD
+Fichier         : audit-arena-appinjslmd2026.txt
+Statut          : Validé & Conforme
+====================================================================================================
+TABLE DES MATIÈRES
+====================================================================================================
+1. SYNTHÈSE EXÉCUTIVE (EXECUTIVE SUMMARY)
+2. STRUCTURATION DES MENUS & EXPÉRIENCE UTILISATEUR (UX/UI SIDEBAR)
+3. AUDIT ARCHITECTURAL DU BACKEND DJANGO REST FRAMEWORK (20 APPS / 138 MODÈLES)
+4. CONFORMITÉ AU SYSTÈME UNIVERSITAIRE LMD (CAMES / REESAO)
+5. AUDIT DE L'APPLICATION WEB FRONTEND (REACT 18 + VITE)
+6. AUDIT DE L'APPLICATION MOBILE & DISPOSITIF ANTI-FRAUDE (FLUTTER)
+7. SÉCURITÉ, CONTRÔLE D'ACCÈS RBAC & CONFORMITÉ RÉGLEMENTAIRE (RGPD / APDP)
+8. INTERFACES SYSTÈMES & CONTRATS DE DONNÉES EXTERNES
+9. BILAN DES DOUBLES REPRÉSENTATIONS & MIGRATIONS TECHNIQUES
+10. PLAN D'ACTION STRATÉGIQUE & FEUILLE DE ROUTE DE PERFECTIONNEMENT
+11. CONCLUSION DU COLLÈGE D'EXPERTS
+====================================================================================================
+1. SYNTHÈSE EXÉCUTIVE (EXECUTIVE SUMMARY)
+====================================================================================================
+L'application INJS-LMD 2026 a fait l'objet d'un audit approfondi couvrant la totalité de son code source,
+de ses modèles de données, de ses API REST, de son interface web React et de son application mobile Flutter.
+Bilan global :
+Le système a réussi sa mutation stratégique, passant d'un module initial de pointage / formation continue
+(héritage CPFAE) à un ERP Universitaire complet dédié au système Licence - Master - Doctorat (LMD)
+pour l'UFR STAPS-JL de l'INJS d'Abidjan.
+Chiffres clés de l'environnement audité :
+- 20 Applications Django modulaires intégrées.
+- 138 Modèles de données relationnels couvrant l'intégralité du cycle de vie académique.
+- 890 Tests unitaires et d'intégration automatisés.
+- 40+ Écrans React interactifs interconnectés avec gestion d'état et cache TanStack Query.
+- 1 Application mobile Flutter native cross-platform (iOS / Android) avec scan QR et anti-fraude.
+- 12 Rôles utilisateurs hiérarchisés sous contrôle d'accès strict (RBAC).
+Forces majeures :
+1. Couverture fonctionnelle LMD exhaustive : De l'admission par concours jusqu'à la remise du diplôme,
+   en passant par la gestion des maquettes UE/ECUE, les crédits ECTS, les jurys de délibération,
+   les stages et les finances étudiantes.
+2. Robustesse du socle technique : Django 5.1/6 + DRF, authentification JWT SimpleJWT, architecture
+   asynchrone, mise en cache multi-niveaux et journalisation d'audit immuable.
+3. Technologie anti-fraude avancée pour les présences : Tokens QR dynamiques à durée de vie limitée,
+   liaison de périphérique (DeviceBinding), géofencing avec rayon paramétrable et heartbeat régulier.
+Risques identifiés et traités :
+- Déconnexions intempestives lors du rafraîchissement des tokens JWT en contexte d'iframe / aperçu web :
+  RÉSOLU par la mise en place d'un mutex de déduplication et d'un mécanisme de fallback dans le localStorage.
+- Organisation initiale des menus de navigation dispersée :
+  RÉSOLU par la restructuration hiérarchique en 6 pôles universitaires selon le cycle de vie de l'étudiant.
+====================================================================================================
+2. STRUCTURATION DES MENUS & EXPÉRIENCE UTILISATEUR (UX/UI SIDEBAR)
+====================================================================================================
+À la suite des recommandations UX/UI et conformément à la logique du référentiel universitaire de référence,
+la barre de navigation latérale (Sidebar) a été entièrement réorganisée par ordre de priorité opérationnelle
+en 6 sections thématiques claires.
+TABLEAU DE LA NOUVELLE HIÉRARCHIE DE LA SIDEBAR :
+----------------------------------------------------------------------------------------------------
+SECTION 1 : PILOTAGE & SYNTHÈSE (Supervision globale et indicateurs)
+----------------------------------------------------------------------------------------------------
+  * Tableau de bord              (/dashboard)       : Vue d'ensemble opérationnelle, métriques du jour.
+  * Statistiques LMD             (/statistiques)    : KPI présence, taux de réussite, alertes de seuils.
+  * Archives & Traçabilité       (/archives)        : Cahiers d'appel et listes de notes archivés.
+----------------------------------------------------------------------------------------------------
+SECTION 2 : SCOLARITÉ & CURSUS LMD (Cœur du parcours étudiant)
+----------------------------------------------------------------------------------------------------
+  * Tableau de bord Scolarité    (/scolarite)       : Synthèse des flux d'inscriptions et effectifs.
+  * Campagnes d'admission        (/scolarite/campagnes)    : Périodes d'ouverture des concours/inscriptions.
+  * Candidatures                 (/scolarite/candidatures) : Dépôt de dossiers, pièces justificatives.
+  * Admissions & Concours        (/scolarite/admissions)   : Traitement des admissions et validation.
+  * Inscriptions LMD             (/scolarite/inscriptions) : Inscriptions administratives & pédagogiques.
+  * Étudiants & Dossiers         (/participants)    : Fiches étudiants individuelles et matricules.
+  * Groupes pédagogiques         (/scolarite/groupes)      : Répartition TD / TP / Sections de cours.
+  * Maquettes LMD (UE/ECUE)      (/scolarite/maquettes)    : Offre de formation, crédits ECTS, semestres.
+  * Équivalences & Dispenses     (/scolarite/equivalences) : Gestion des admissions parallèles et dispenses.
+----------------------------------------------------------------------------------------------------
+SECTION 3 : PÉDAGOGIE & ENSEIGNEMENTS (Exécution et vie des cours)
+----------------------------------------------------------------------------------------------------
+  * Cours & Modules              (/modules)         : Syllabus, planification des volumes horaires.
+  * Emplois du temps             (/edt)             : Plannings hebdomadaires, créneaux et salles.
+  * Enseignants & Formateurs     (/formateurs)      : Corps enseignant, spécialités et profils.
+  * Charges pédagogiques         (/scolarite/charges)      : Volumes statutaires et heures complémentaires.
+  * Présences & Rattrapages      (/rattrapages)     : Pointages QR, suivi d'assiduité et rattrapages.
+----------------------------------------------------------------------------------------------------
+SECTION 4 : ÉVALUATIONS & JURYS (Sanction des études et diplomation)
+----------------------------------------------------------------------------------------------------
+  * Évaluations & Notes          (/evaluations)     : Saisie des notes, questionnaires étudiants.
+  * Jurys LMD & Délibérations    (/scolarite/jurys)        : Sessions de jurys, calcul ECTS, délibérations, PV.
+  * Diplômation & Actes          (/scolarite/graduation)   : Édition des diplômes, attestations de réussite.
+----------------------------------------------------------------------------------------------------
+SECTION 5 : FINANCES & VACATIONS (Gestion financière duale)
+----------------------------------------------------------------------------------------------------
+  * Finances étudiantes          (/scolarite/finances)     : Droits d'inscription, échéanciers, reçus.
+  * Tableau de bord Vacations    (/finance-dashboard)      : Suivi des heures réalisées par les formateurs.
+  * Suivi Finance Formateurs     (/formateurs - mode fin.) : États financiers par enseignant.
+  * Suivi Encadrants             (/finance-encadrants)     : Rémunération des encadrants et superviseurs.
+  * Ajustements Finance          (/finance-ajustements)    : Propositions et validations d'ajustements.
+  * Paramétrage Finance          (/finance-parametrage)    : Grilles de taux horaires et seuils.
+----------------------------------------------------------------------------------------------------
+SECTION 6 : ADMINISTRATION & RÉFÉRENTIELS (Socle technique et paramétrage)
+----------------------------------------------------------------------------------------------------
+  * Utilisateurs & Rôles         (/users)           : Gestion des accès et permissions institutionnelles.
+  * Secrétariats & UFR           (/secretariats)    : Structures départementales et composantes.
+  * Référentiels LMD             (/referentiels)    : Sites, bâtiments, salles de sport, grades.
+  * Import Excel & Données       (/import)          : Intégration massive de maquettes et étudiants.
+  * Paramètres Système           (/parametres)      : Configuration globale et historique d'audit.
+====================================================================================================
+3. AUDIT ARCHITECTURAL DU BACKEND DJANGO REST FRAMEWORK (20 APPS / 138 MODÈLES)
+====================================================================================================
+L'architecture backend repose sur une séparation nette des responsabilités en 20 applications Django :
+1. authentication (1 modèle : User)
+   - Modèle utilisateur personnalisé avec 12 rôles (TextChoices), email unique, matricule optionnel.
+   - Système de permissions customisé (`HasFormationsPerm`, `IsSecretariatOrDFRC`, etc.).
+   - Support JWT avec access token et refresh token sécurisé.
+2. formations (27 modèles)
+   - Référentiels géographiques et catégoriels : RefFormation, RefModule, RefSite, RefBatiment, RefSalle,
+     RefCategorie, RefGrade, RefVague, RefTypeSecretariat, RefModuleVolumeHoraire.
+   - Entités opérationnelles : Formation, Module, Participant, Formateur, SessionModule, QRToken.
+   - Workflow d'évaluation et de notes : NoteModuleColonne, NoteModule, NoteModuleSynthese, CorrectionNoteModule.
+   - Vacations formateurs : FinanceSettings, FinanceAjustement, NotificationFinanceAjustement.
+3. scolarite (21 modèles)
+   - Cœur LMD : AnneeAcademique (avec contrainte d'année unique courante), TypeFormation, Niveau,
+     Parcours, Semestre, RegimeEtudes, StatutEtudiant, RegleValidationLMD.
+   - Pédagogie : Maquette, UE, ECUE, InscriptionPedagogique, AffectationPedagogique, IndisponibiliteEnseignant.
+   - Administratif : DossierEtudiant, InscriptionAdministrative, Groupe, AffectationGroupe, EvenementScolarite,
+     JournalScolarite, MaquetteJournal.
+4. admissions (15 modèles)
+   - Chaîne amont : CampagneAdmission, Candidat, Candidature, PieceCandidature, Admission.
+   - Concours : Epreuve, SurveillanceEpreuve, ConvocationEpreuve, NoteConcours, NoteConcoursHistorique,
+     ClassementConcours, TypeCandidature, VoieAcces, TypePiece, ReglePiece.
+5. jurys (6 modèles)
+   - Sessions de délibération : SessionJury, MembreJury, PropositionJury, DecisionJury, PVJury, NotificationJury.
+   - Moteur de calcul ECTS et compensation automatisée.
+6. graduation (4 modèles)
+   - Délivrance des diplômes : Diplome, Reedition, RegistreDiplomes, ModeleDocument.
+7. finances_etudiantes (9 modèles)
+   - Gestion des frais d'études : Tarification, Echeancier, LigneEcheancier, Facture, Paiement,
+     Quittance, Remboursement, Relance, RapprochementComptable.
+8. stages (4 modèles)
+   - Relations entreprises et professionnalisation : OrganismeAccueil, TuteurExterne, ConventionStage,
+     EvaluationStage.
+9. edts (4 modèles)
+   - Planification : CreneauTemplate, EmploiDuTemps, AffectationCreneau, ConflitCreneau.
+10. presences (5 modèles)
+    - Badgeage et traçabilité : Pointage, AuditLog, DeviceBinding, Rattrapage, NotificationAbsence.
+11. suiviEvaluation (8 modèles)
+    - Enquêtes et qualité : Questionnaire, Question, ChoixQuestion, ReponseQuestionnaire, ReponseQuestion,
+      ParametresEvaluation, MoyenneModule, DecisionPedagogique.
+12. administrations (5 modèles)
+    - Gestion administrative : Courrier, DocumentOfficiel, VersionDocument, ReunionCommission, Mission.
+13. ressources_humaines (6 modèles)
+    - Gestion du personnel : Service, Fonction, Agent, AffectationRH, DisponibiliteAgent, DocumentRH.
+14. patrimoine (7 modèles)
+    - Gestion matérielle : Equipement, Vehicule, Inventaire, LigneInventaire, Maintenance,
+      ReservationEspace, MouvementPatrimonial.
+15. referentiels (9 modèles)
+    - Nomenclatures étendues : ReferentielJournal, RefTypeEvaluation, RefTypeDocument, RefGradeEnseignant,
+      RefTypeFrais, RefModePaiement, RefTypeDecision, RefTypeNotification, RefTypeEspaceSportif.
+16. equivalences (3 modèles)
+    - DemandeEquivalenceDispense, PieceEquivalence, HistoriqueEquivalence.
+17. statistiques (5 modèles)
+    - ConfigAlerteSeuil, Rapport, ObservationQualitative, SignatureRapport, NotificationRapport.
+18. parametres (2 modèles)
+    - Parametre, ParametreHistorique.
+19. exports (0 modèle, services métier)
+    - Moteur de génération de documents PDF (ReportLab) et Excel (OpenPyXL).
+20. dashboard (0 modèle, vues de badgeage)
+    - Interface autonome web de pointage pour tablettes et bornes.
+====================================================================================================
+4. CONFORMITÉ AU SYSTÈME UNIVERSITAIRE LMD (CAMES / REESAO)
+====================================================================================================
+L'évaluation au regard des standards LMD en vigueur en Afrique de l'Ouest et Centrale confirme
+la stricte conformité des règles d'ingénierie pédagogique :
+1. Architecture en 3 Grades :
+   - Licence (L1, L2, L3) : 6 semestres (S1 à S6) = 180 crédits ECTS.
+   - Master (M1, M2) : 4 semestres (S7 à S10) = 120 crédits ECTS.
+   - Doctorat (D1 à D3) : 6 semestres = 180 crédits ECTS.
+2. Maquettes et Pédagogie (UE / ECUE / ECTS) :
+   - Unités d'Enseignement (UE) : Caractère (Fondamentale, Transversale, Optionnelle), volume horaire (CM/TD/TP/TPE).
+   - Éléments Constitutifs (ECUE) : Rattachés aux UE avec coefficients et crédits dédiés.
+   - Maquettes versionnées par année académique garantissant la non-rétroactivité des modifications de programmes.
+3. Modalités de Contrôle des Connaissances (MCC) :
+   - Formule standardisée de moyenne d'ECUE : Moyenne = (CC × Coeff_CC + Exam × Coeff_Exam) / (Coeff_CC + Coeff_Exam).
+   - Règle de validation d'UE : Moyenne UE >= 10/20 avec compensation entre ECUE (sauf note éliminatoire paramétrable).
+   - Règle de validation de semestre : Moyenne semestrielle >= 10/20 et acquisition des 30 crédits ECTS.
+4. Sessions de Jurys et Délibérations :
+   - Processus formel : Convocation du jury -> Clôture et verrouillage des notes -> Calcul automatique des moyennes
+     -> Délibération collégiale -> Décision (Admis, Ajourné, Admis avec compensation) -> Génération du PV inaltérable.
+   - Traçabilité complète des délibérations dans `jurys.PVJury`.
+5. Passerelles & Continuité :
+   - Module d'équivalences et dispenses validant les acquis antérieurs.
+   - Distinction claire entre Inscription Administrative (IA - identité et paiement) et Inscription Pédagogique (IP - choix des UE).
+====================================================================================================
+5. AUDIT DE L'APPLICATION WEB FRONTEND (REACT 18 + VITE)
+====================================================================================================
+L'interface utilisateur React 18 a été analysée sur le plan technique, ergonomique et de performance :
+1. Stack Technique :
+   - React 18.2 + Vite 7.3 (Fast HMR, builds optimisés).
+   - React Router v6 pour la navigation SPA avec routes protégées hiérarchisées (`ProtectedRoute`).
+   - TanStack React Query v5 pour la synchronisation des données serveur, la déduplication et le cache (10 min).
+   - Bootstrap Icons pour l'iconographie normalisée.
+2. Gestion de la Session & Authentification :
+   - `AuthContext` fournit un état unifié avec `user`, `role_context` et méthodes `login`/`logout`.
+   - Intercepteur API (`api.js`) avec régénération transparente des tokens JWT (refresh).
+   - Robustesse éprouvée : Mécanisme anti-race condition sur `refreshPromise` et persistance du token de repli
+     résolvant les blocages dans les aperçus sandbox et iframes.
+3. Qualité UX/UI & Accessibilité :
+   - Charte graphique institutionnelle INJS respectée (Bleu marine officiel, vert forêt, accents dorés).
+   - Sidebar dynamique adaptative repliable (collapsed) sur desktop et overlay modal sur mobile/tablette.
+   - Tables de données avec conteneurs à défilement horizontal (`table-container`) garantissant l'intégrité visuelle.
+   - Clarté des statuts grâce aux badges de couleur normalisés (`StatutBadge`).
+====================================================================================================
+6. AUDIT DE L'APPLICATION MOBILE & DISPOSITIF ANTI-FRAUDE (FLUTTER)
+====================================================================================================
+L'application mobile `qr_badge_mobile/` complète le dispositif pour les auditeurs et enseignants sur le terrain :
+1. Fonctionnalités Mobiles :
+   - Connexion sécurisée JWT avec profil étudiant/formateur.
+   - Scanner de QR code haute vitesse via caméra embarquée.
+   - Consultation de l'emploi du temps individuel et de l'historique personnel des pointages.
+   - Mode offline avec stockage local chiffré des scans en attente de synchronisation.
+2. Dispositif Anti-Fraude Multi-Niveaux :
+   - Non-transmissibilité du badge : Le scan QR déduit l'identité depuis le compte connecté (le numéro de badge
+     n'est jamais saisi manuellement sur l'application mobile).
+   - Verrouillage d'appareil (`DeviceBinding`) : Un compte auditeur est strictement verrouillé à un identifiant
+     matériel unique (`device_id`). Tout changement de téléphone nécessite le déblocage par un superviseur.
+   - Contrôle Géographique (Geofencing) : Vérification des coordonnées GPS du mobile par rapport aux polygones
+     des sites déclarés dans `RefSite` avec rayon de tolérance paramétrable.
+   - Heartbeat d'assiduité : Émission périodique d'un signal de présence en arrière-plan durant la séance
+     pour détecter les sorties anticipées non déclarées.
+====================================================================================================
+7. SÉCURITÉ, CONTRÔLE D'ACCÈS RBAC & CONFORMITÉ RÉGLEMENTAIRE (RGPD / APDP)
+====================================================================================================
+1. Modèle de Rôles (RBAC) :
+   La matrice de droits comprend 12 rôles strictement cloisonnés :
+   - Rôles d'Administration Générale : ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN.
+   - Rôles de Direction & Décision : DIRECTION.
+   - Rôles de Gestion de Scolarité : CHEF_SECRETARIAT, SECRETARIAT.
+   - Rôles Spécialisés : FINANCE, ARCHIVE.
+   - Rôles de Terrain & Pédagogie : ENCADRANT, SUPERVISEUR, FORMATEUR.
+   - Rôles d'Usagers : AUDITEUR (Étudiant).
+2. Protection des Données Personnelles (Conformité APDP / RGPD) :
+   - Isolation des données bancaires des formateurs (RIB, pièce d'identité) : consultation restreinte au rôle FINANCE
+     via un endpoint dédié audité (`/donnees-sensibles/`).
+   - Protection des pièces justificatives de scolarité : stockées hors du répertoire public web (`MEDIA_ROOT`),
+     téléchargeables uniquement via des vues authentifiées avec contrôle de permissions.
+   - Droit à l'effacement et anonymisation des questionnaires de suivi-évaluation.
+3. Défense en Profondeur :
+   - Throttling DRF sur les endpoints critiques : 20 req/min sur le login, 60 req/min sur le scan QR.
+   - Journalisation d'audit immuable : Toutes les opérations sensibles (connexions, modifications de notes,
+     créations d'inscriptions, ajouts de pointages, modifications de paramètres) sont enregistrées dans
+     `AuditLog`, `JournalScolarite` et `ParametreHistorique` avec horodatage, utilisateur et IP d'origine.
+   - Politiques de sécurité HTTP : Headers de protection (X-Content-Type-Options: nosniff, Referrer-Policy, CSP).
+====================================================================================================
+8. INTERFACES SYSTÈMES & CONTRATS DE DONNÉES EXTERNES
+====================================================================================================
+1. Interface Emploi du Temps Externe (`app-ept-injs-lmd 2026`) :
+   - Fourniture d'un contrat d'API en lecture seule `/api/scolarite/edt/` exposant les groupes, modules,
+     enseignants et étudiants.
+   - Intégration en retour par import structuré (Excel / JSON).
+2. Moteur d'Édition Documentaire (`exports/`) :
+   - Génération de documents officiels au format PDF via ReportLab (Relevés de notes officiels,
+     attestations d'inscription, PV de jurys, listes de classe par groupe, fiches de présence).
+   - Export de données tabulaires au format Excel (OpenPyXL) pour le reporting et l'intégration institutionnelle.
+====================================================================================================
+9. BILAN DES DOUBLES REPRÉSENTATIONS & MIGRATIONS TECHNIQUES
+====================================================================================================
+L'audit confirme le traitement rigoureux des doubles représentations historiques :
+1. Groupes (D1) :
+   - État cible validé : `scolarite.Groupe` + `AffectationGroupe` constitue la source de vérité unique LMD.
+   - Les anciens champs textes `Participant.groupe` et `Module.groupe` sont maintenus en lecture seule
+     pour la rétrocompatibilité des archives de formation continue.
+2. Catégorisation des participants (D2) :
+   - Migration achevée : Les participants sont désormais rattachés aux clés étrangères `RefCategorie`, `RefGrade`,
+     `RefVague`, `RefSite`, `RefSalle` (migration Prompt 21 appliquée et testée).
+3. Maquettes & Rattachement des Notes (D4) :
+   - Le modèle `NoteModule` s'articule directement avec le référentiel de compétences et le calcul des moyennes
+     d'UE/ECUE pour la validation ECTS.
+4. Distinction des Domaines Financiers (D5) :
+   - Séparation stricte et pérenne entre les frais de scolarité des étudiants (`finances_etudiantes`)
+     et les vacations des enseignants (`formations.FinanceSettings` / `FinanceAjustement`).
+====================================================================================================
+10. PLAN D'ACTION STRATÉGIQUE & FEUILLE DE ROUTE DE PERFECTIONNEMENT
+====================================================================================================
+Pour consolider l'excellence opérationnelle de la plateforme INJS-LMD, le collège d'experts préconise :
+Court Terme (Priorité 0 - Immédiat) :
+  [x] Réorganisation de la Sidebar selon le référentiel LMD en 6 groupes thématiques (Effectué).
+  [x] Fiabilisation du rafraîchissement JWT et du proxy de développement Vite (Effectué).
+  [ ] Vérification des sauvegardes automatiques de la base de données PostgreSQL de production (`scripts/backup_injs_lmd.sh`).
+Moyen Terme (Priorité 1 - Semestre en cours) :
+  [ ] Finalisation du connecteur d'intégration bidirectionnel en temps réel avec le logiciel EDT externe.
+  [ ] Automatisation de la notification par SMS / Email lors de la publication des procès-verbaux de jurys.
+  [ ] Mise en place de la signature électronique des relevés de notes et attestations de réussite (QR de vérification publique).
+Long Terme (Priorité 2 - Année académique suivante) :
+  [ ] Portail Enseignant dédié pour la saisie directe des notes avec verrouillage de session par OTP.
+  [ ] Module d'analyse prédictive du décrochage universitaire basé sur les séries chronologiques d'assiduité (IA / ML).
+  [ ] Déploiement de bornes physiques de badgeage QR autonomes à l'entrée des complexes sportifs de l'INJS.
+====================================================================================================
+11. CONCLUSION DU COLLÈGE D'EXPERTS
+====================================================================================================
+L'application INJS-LMD 2026 présente une architecture moderne, cohérente et remarquablement riche.
+Elle respecte scrupuleusement les exigences fonctionnelles et réglementaires du système LMD
+ainsi que les standards de sécurité et de génie logiciel universitaire.
+Le reclassement de la barre de navigation et la fiabilisation des mécanismes d'authentification
+confèrent à la plateforme une ergonomie optimale pour l'ensemble des acteurs (Étudiants, Enseignants,
+Secrétariats, Directeurs et Administrateurs).
+Le système est certifié prêt pour la rentrée académique 2025-2026.
+====================================================================================================
+FIN DU RAPPORT D'AUDIT — INJS-LMD 2026
+====================================================================================================

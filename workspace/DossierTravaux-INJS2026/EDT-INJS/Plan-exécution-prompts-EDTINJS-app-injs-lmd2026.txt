@@ -1,0 +1,1604 @@
+====================================================================================================
+PLAN D'EXÉCUTION DES PROMPTS « EDT-INJS »
+Mise en œuvre du module de gestion des emplois du temps et des présences par QR Code
+dans l'application app-injs-lmd2026demo
+====================================================================================================
+Institution        : Institut National de la Jeunesse et des Sports (INJS) — Marcory, Abidjan, Côte d'Ivoire
+Unité              : UFR STAPS-JL
+Application cible  : app-injs-lmd2026demo (Django 5.1.4 + DRF / React 18 + Vite 7 / Flutter + PWA / PostgreSQL / Redis)
+Objet du document  : Plan d'exécution ordonné, séquencé et contrôlé des 22 prompts du fichier
+                     « Génération-prompts-EDTINJS-app-injs-lmd2026.txt »
+Date               : 13 septembre 2026
+Horizon            : 20 semaines calendaires (10 itérations de 2 semaines) + 2 semestres d'observation
+Statut             : Document opérationnel de pilotage — à tenir à jour à chaque itération
+Principe directeur : ZÉRO RÉGRESSION. L'application reste fonctionnelle, opérationnelle et
+                     performante à la fin de CHAQUE prompt, de CHAQUE jour et de CHAQUE itération.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+ 1.  OBJET, PÉRIMÈTRE ET RÈGLES DE PILOTAGE
+ 2.  ORGANISATION DE L'ÉQUIPE ET RÔLES
+ 3.  ORDONNANCEMENT GÉNÉRAL — VUE SYNOPTIQUE DES 10 ITÉRATIONS
+ 4.  GRAPHE DE DÉPENDANCES ENTRE PROMPTS ET CHEMIN CRITIQUE
+ 5.  PROCÉDURE STANDARD D'EXÉCUTION D'UN PROMPT (CYCLE EN 9 ÉTAPES)
+ 6.  PORTES DE QUALITÉ (QUALITY GATES) ET CRITÈRES DE PASSAGE
+ 7.  FICHES D'EXÉCUTION DÉTAILLÉES — LES 22 PROMPTS
+ 8.  PLANNING DÉTAILLÉ SEMAINE PAR SEMAINE
+ 9.  STRATÉGIE DE BRANCHES, DE VERSIONS ET DE LIVRAISON
+10.  GESTION DES DRAPEAUX DE FONCTIONNALITÉ ET PLAN DE BASCULE EN 4 VAGUES
+11.  PLAN DE TESTS ET DE RECETTE PAR ÉTAPE
+12.  PLAN DE MIGRATION ET DE RÉVERSIBILITÉ DES DONNÉES
+13.  REGISTRE DES RISQUES ET PLANS DE CONTOURNEMENT
+14.  MATRICE RACI DE L'EXÉCUTION
+15.  INDICATEURS DE PILOTAGE ET TABLEAU DE BORD PROJET
+16.  RITUELS, INSTANCES ET CIRCUIT DE DÉCISION
+17.  PLAN DE CONDUITE DU CHANGEMENT ET DE FORMATION
+18.  CONDITIONS DE CLÔTURE DU PROJET
+ANNEXE A — CHECKLIST QUOTIDIENNE DE L'EXÉCUTANT
+ANNEXE B — CHECKLIST DE FIN D'ITÉRATION
+ANNEXE C — CHECKLIST DE MISE EN PRODUCTION
+ANNEXE D — PROCÉDURE DE REPLI D'URGENCE
+ANNEXE E — SCÉNARIOS DE DÉGRADATION ACCEPTABLE ET ARBITRAGES DE PÉRIMÈTRE
+ANNEXE F — MODÈLE DE COMPTE RENDU D'EXÉCUTION DE PROMPT
+====================================================================================================
+
+
+====================================================================================================
+1. OBJET, PÉRIMÈTRE ET RÈGLES DE PILOTAGE
+====================================================================================================
+
+1.1 OBJET
+Ce plan organise l'exécution des 22 prompts (P00 à P22) consignés dans le fichier
+« Génération-prompts-EDTINJS-app-injs-lmd2026.txt ». Il précise, pour chaque prompt : le moment de
+son exécution, ses prérequis, ses livrables, ses critères d'entrée et de sortie, son effort estimé,
+ses acteurs, ses risques et sa procédure de repli.
+
+1.2 PÉRIMÈTRE COUVERT
+  • Module 06 du Modèle fonctionnel de référence — Emplois du temps & planification (26 sous-modules)
+  • Module 07 — Campus, patrimoine & espaces de formation (volet nécessaire à la planification)
+  • Module 08 — Présences, émargement & suivi des enseignements (17 sous-modules)
+  • Les interfaces web React, mobile Flutter et PWA correspondantes
+  • Les exports documentaires, la qualité, l'observabilité et la mise en production
+
+1.3 HORS PÉRIMÈTRE (traité par d'autres chantiers, à ne pas engager ici)
+  • Les domaines orphelins Stages, Patrimoine (hors espaces), RH, Administrations — sauf ce qui est
+    strictement nécessaire à l'EDT (réservations et maintenance des espaces).
+  • La refonte des écrans Statistiques, Jurys, Finances étudiantes.
+  • Le retrait complet du socle HTML/QR legacy, qui n'intervient qu'en vague V4 (P22).
+
+1.4 LES SEPT RÈGLES DE PILOTAGE
+  R-A  Un seul prompt en cours d'exécution à la fois par exécutant ; jamais deux prompts du même lot
+       ouverts simultanément sans accord du responsable technique.
+  R-B  Aucune fusion dans `main` sans CI complètement verte et revue d'un pair.
+  R-C  Toute itération se termine par une application démontrable ; aucune itération ne se termine
+       sur une branche cassée ou une migration non appliquée.
+  R-D  Tout dépassement de plus de 30 % de l'effort estimé d'un prompt déclenche un arbitrage
+       formel (réduction de périmètre, report, ou renfort) — jamais un allongement silencieux.
+  R-E  Les tests de caractérisation issus de P00 sont sacrés : leur rupture bloque toute fusion
+       jusqu'à justification écrite et validation du responsable technique.
+  R-F  Chaque prompt terminé est consigné dans docs/EDT_INJS_JOURNAL.md le jour même.
+  R-G  Aucune donnée de production n'est manipulée hors procédure de sauvegarde préalable vérifiée.
+
+1.5 UNITÉS DE MESURE
+  • Effort exprimé en JH (jours-homme) pour une personne expérimentée sur la pile technique.
+  • Durée exprimée en jours ouvrés calendaires, en tenant compte des parallélisations possibles.
+  • Total planifié : 148 JH sur 20 semaines, soit une équipe moyenne de 1,9 ETP développement
+    plus les contributions fonctionnelles et de recette.
+
+====================================================================================================
+2. ORGANISATION DE L'ÉQUIPE ET RÔLES
+====================================================================================================
+
+2.1 COMPOSITION MINIMALE RECOMMANDÉE
+  • RT  — Responsable technique / architecte (0,5 ETP) : arbitrages, revues, portes de qualité.
+  • DB  — Développeur backend Django/DRF senior (1 ETP) : lots 0 à 4 et 6.
+  • DF  — Développeur frontend React senior (0,7 ETP à partir de l'itération 4) : lot 5.
+  • DM  — Développeur mobile Flutter (0,4 ETP à partir de l'itération 7) : P19.
+  • EF  — Expert fonctionnel scolarité LMD (0,3 ETP, permanent) : spécification fine, recette.
+  • RS  — Référent scolarité INJS (0,2 ETP) : données réelles, validation métier, recette.
+  • RP  — Référent pédagogique / enseignant pilote (0,1 ETP) : recette terrain, cahier de texte.
+  • EX  — Exploitant / administrateur système (0,2 ETP) : CI/CD, sauvegardes, bascules.
+  • DIR — Direction INJS : approbation des jalons J1 à J5.
+
+2.2 MODE DÉGRADÉ (si l'équipe se réduit à un seul exécutant polyvalent)
+  Exécuter strictement en série dans l'ordre P00 → P22, en allongeant l'horizon à 32 semaines.
+  Les parallélisations décrites au §3 deviennent des séquences. Les portes de qualité restent
+  obligatoires et inchangées.
+
+2.3 ENVIRONNEMENTS REQUIS (à disposer AVANT l'itération 1)
+  • DEV    : poste local, SQLite ou PostgreSQL local, données de démonstration (seed).
+  • CI     : GitHub Actions existant, jobs Backend / Frontend / Mobile + nouveau job `edt-injs`.
+  • RECETTE: environnement de recette avec copie ANONYMISÉE de la base de production — à créer,
+             car l'audit signale son absence. Prérequis bloquant de la porte G2.
+  • PROD   : environnement existant, avec sauvegarde quotidienne vérifiée et procédure de
+             restauration testée.
+
+====================================================================================================
+3. ORDONNANCEMENT GÉNÉRAL — VUE SYNOPTIQUE DES 10 ITÉRATIONS
+====================================================================================================
+
+ IT  Semaines  Intitulé de l'itération                       Prompts        Jalon / Porte
+ --  --------  --------------------------------------------  -------------  ------------------------
+ I0  S1        Cadrage, filet de sécurité, environnements     P00            G0 — Socle de contrôle
+ I1  S2-S3     Socle temporel et référentiel des espaces      P01, P02       G1 — Socle de données 1/2
+ I2  S4-S5     Besoins d'enseignement et contraintes          P03, P04       G1 — Socle de données 2/2
+ I3  S6-S7     Séances, EDT, workflow et API de base          P05, P11(a)    J1 — EDT manuel utilisable
+ I4  S8-S9     Moteur de planification et conflits            P06, P07       J2 — Génération automatique
+ I5  S10-S11   Planification manuelle, perturbations, API     P08, P09, P11(b) G2 — Recette EDT
+ I6  S12-S13   Émargement, QR sécurisé, forçage motivé        P12, P13, P14  J3 — Présences opérationnelles
+ I7  S14-S15   Intervenants, seuils, examens, UI EDT          P15, P16, P10, P17(a) —
+ I8  S16-S17   Interfaces web complètes et mobile             P17(b), P18, P19 J4 — Pilote V1 en service
+ I9  S18-S19   Exports, qualité, performance, observabilité   P20, P21       G3 — Prêt pour production
+ I10 S20       Migration, bascule, documentation, formation   P22            J5 — Généralisation V3
+
+ Légende : Gx = porte de qualité interne (bloquante) · Jx = jalon présenté à la Direction.
+ P11(a) = premières routes de lecture (calendrier, espaces, séances) ;
+ P11(b) = routes d'action (generate, validate, publish, move, cancel) et finalisation du contrat.
+ P17(a) = socle frontend + écrans de consultation ; P17(b) = grille interactive et publication.
+
+3.1 PARALLÉLISATIONS AUTORISÉES
+  • À partir de I3, DF peut préparer le socle frontend (structure de dossiers, services, hooks,
+    configuration Vitest) en s'appuyant sur les contrats OpenAPI publiés par P11(a), sans attendre
+    la fin du backend.
+  • À partir de I6, DM peut corriger la CI mobile (première tâche de P19) indépendamment.
+  • P10 (examens et réservations) est le seul prompt du lot 2 qui peut glisser sans bloquer le
+    chemin critique : il est positionné en I7 pour cette raison.
+  • P20 (exports) peut démarrer dès I8 si DB est disponible, ses dépendances étant satisfaites.
+
+3.2 PARALLÉLISATIONS INTERDITES
+  • P06 (moteur) ne démarre pas tant que P04 (contraintes) n'est pas fusionné : le moteur consomme
+    le registre de contraintes.
+  • P13 (QR) ne démarre pas tant que P12 (séance d'émargement) n'est pas fusionné.
+  • P22 (migration/bascule) ne démarre pas tant que P21 (qualité/perf) n'est pas passé en G3.
+  • Aucun prompt d'interface (P17-P19) ne démarre sur une API non figée : le contrat doit être
+    publié et versionné avant.
+
+====================================================================================================
+4. GRAPHE DE DÉPENDANCES ENTRE PROMPTS ET CHEMIN CRITIQUE
+====================================================================================================
+
+4.1 GRAPHE DE DÉPENDANCES
+
+                                    P00 (état des lieux, filet de sécurité)
+                                     │
+                 ┌───────────────────┼───────────────────┐
+                 ↓                   ↓                   ↓
+               P01                  P02                  │
+        (calendrier, créneaux)  (espaces)                │
+                 │                   │                   │
+                 └─────────┬─────────┘                   │
+                           ↓                             │
+                          P03 ──────────► P04            │
+                  (besoins à planifier) (contraintes)     │
+                           │                 │           │
+                           └────────┬────────┘           │
+                                    ↓                    │
+                                   P05 ◄─────────────────┘
+                        (séances, EDT, workflow)
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              ↓                     ↓                     ↓
+            P06                   P11(a)                 P12
+        (moteur)            (API lecture)        (séance d'émargement)
+              │                     │                     │
+              ↓                     │                     ↓
+            P07                     │                    P13
+       (conflits)                   │              (QR, anti-fraude)
+              │                     │                     │
+              ↓                     │                     ↓
+            P08 ──────► P09         │                    P14
+      (manuel)    (perturbations)   │          (manuel, forçage, justificatifs)
+              │          │          │                     │
+              └────┬─────┘          │              ┌──────┴──────┐
+                   ↓                │              ↓             ↓
+                  P10 ◄─────────────┘             P15           P16
+          (examens, réservations)          (intervenants, VH) (seuils, stats)
+                   │                              │             │
+                   └──────────────┬───────────────┴─────────────┘
+                                  ↓
+                               P11(b)
+                          (API complète)
+                                  │
+              ┌───────────────────┼───────────────────┐
+              ↓                   ↓                   ↓
+            P17                  P18                 P19
+        (UI EDT)           (UI présences)       (mobile/PWA)
+              └───────────────────┼───────────────────┘
+                                  ↓
+                                 P20
+                          (exports, documents)
+                                  ↓
+                                 P21
+                    (tests, performance, observabilité)
+                                  ↓
+                                 P22
+                (migration, bascule, recette, documentation)
+
+4.2 CHEMIN CRITIQUE (à surveiller en priorité, tout retard s'y propage intégralement)
+    P00 → P01 → P03 → P04 → P05 → P06 → P07 → P08 → P11(b) → P17 → P21 → P22
+    Longueur : 12 prompts, 96 JH, 17 semaines. Marge totale du projet : 3 semaines.
+
+4.3 PROMPTS À MARGE CONFORTABLE (peuvent absorber un aléa)
+    P02 (2 j de marge), P10 (5 j), P15 (3 j), P16 (3 j), P19 (4 j), P20 (4 j).
+
+4.4 RÈGLE DE PROPAGATION DE RETARD
+    Un retard sur un prompt du chemin critique se traite dans l'ordre suivant :
+      1. réduction de périmètre du prompt selon l'Annexe E (dégradation acceptable) ;
+      2. consommation de la marge des prompts non critiques de l'itération ;
+      3. décalage du jalon concerné, avec information de la Direction sous 48 h ;
+      4. en dernier recours seulement : renfort d'équipe ou décalage global.
+    Le report d'un prompt de qualité (P21) ou de traçabilité (P14) n'est JAMAIS une option.
+
+====================================================================================================
+5. PROCÉDURE STANDARD D'EXÉCUTION D'UN PROMPT (CYCLE EN 9 ÉTAPES)
+====================================================================================================
+
+Chaque prompt, sans exception, suit ce cycle. Aucune étape n'est facultative.
+
+  ÉTAPE 1 — PRÉPARATION (0,5 j)
+    • Relire le prompt intégralement ainsi que le PROMPT MAÎTRE (Partie B du fichier de prompts).
+    • Vérifier les critères d'entrée de la fiche §7 correspondante.
+    • Relire les sections concernées des trois documents sources (audit, modèle fonctionnel,
+      rapport de mise en œuvre) pour ancrer les décisions dans la référence.
+    • Créer la branche : `feature/edt-injs-PXX-<libellé-court>` depuis `main` à jour.
+    • Ouvrir une PR en brouillon dès le premier commit, avec la checklist de l'Annexe A.
+
+  ÉTAPE 2 — CADRAGE TECHNIQUE (0,5 j pour les prompts de modélisation, sinon intégré)
+    • Rédiger une note de conception courte (1 page maximum) dans la PR : modèles, champs,
+      contraintes, index, endpoints, décisions d'architecture, alternatives écartées.
+    • Faire valider cette note par RT avant d'écrire le code. Cette étape évite les refontes
+      tardives et constitue la trace de la décision.
+
+  ÉTAPE 3 — EXÉCUTION DU PROMPT
+    • Soumettre le PROMPT MAÎTRE puis le prompt PXX à l'agent de codage, ou réaliser le travail
+      manuellement en suivant scrupuleusement la section « À FAIRE ».
+    • Travailler par petits commits atomiques, en français, préfixés `PXX:`.
+    • Respecter en permanence : aucun fichier > 600 lignes (400 côté frontend), aucun `print()`,
+      aucune dépendance CDN, aucune suppression de l'existant.
+
+  ÉTAPE 4 — TESTS ACCOMPAGNANT LE CODE
+    • Écrire les tests EN MÊME TEMPS que le code, jamais après coup.
+    • Couvrir systématiquement : cas nominal, cas limites, cas d'erreur, permissions par rôle.
+    • Vérifier le nombre de requêtes SQL sur toute vue de liste ou de grille.
+
+  ÉTAPE 5 — VÉRIFICATION LOCALE (obligatoire avant de sortir du brouillon)
+        python manage.py makemigrations --check --dry-run
+        python manage.py migrate            (sur base vide ET sur copie peuplée)
+        python manage.py test               (suite complète, 100 % verte)
+        npm run lint && npm run build && npm run test        (si frontend touché)
+        flutter analyze && flutter test                       (si mobile touché)
+        python scripts/edt_injs_bench.py --compare-baseline   (si périmètre performant touché)
+
+  ÉTAPE 6 — REVUE PAR UN PAIR
+    • Revue obligatoire par RT ou par un développeur senior.
+    • Points de contrôle imposés au relecteur : non-régression, permissions, traçabilité,
+      réversibilité des migrations, taille des fichiers, qualité des messages en français,
+      absence de valeur métier codée en dur.
+
+  ÉTAPE 7 — VALIDATION FONCTIONNELLE
+    • Démonstration de 10 à 20 minutes à EF et, selon le prompt, à RS ou RP.
+    • Vérification des critères de sortie de la fiche §7.
+    • Verdict consigné : ACCEPTÉ / ACCEPTÉ AVEC RÉSERVES (réserves tracées) / REFUSÉ.
+
+  ÉTAPE 8 — FUSION ET DÉPLOIEMENT EN RECETTE
+    • CI verte, PR approuvée, fusion en `main` (squash ou merge selon convention du dépôt).
+    • Déploiement automatique ou manuel sur l'environnement de recette.
+    • Vérification de santé post-déploiement : /api/health/, connexion, un parcours clé.
+
+  ÉTAPE 9 — CONSIGNATION
+    • Mise à jour de docs/EDT_INJS_JOURNAL.md selon le modèle de l'Annexe F, le jour même.
+    • Report éventuel dans docs/EDT_INJS_RESTE_A_FAIRE.md.
+    • Mise à jour du tableau de bord projet (§15).
+
+====================================================================================================
+6. PORTES DE QUALITÉ (QUALITY GATES) ET CRITÈRES DE PASSAGE
+====================================================================================================
+
+Une porte est un point d'arrêt formel : tant qu'elle n'est pas franchie, aucun prompt de l'étape
+suivante ne démarre. Le franchissement est prononcé par RT, contresigné par EF.
+
+PORTE G0 — SOCLE DE CONTRÔLE (fin de I0, après P00)
+  ☐ docs/EDT_INJS_ETAT_DES_LIEUX.md complet et relu
+  ☐ Tests de caractérisation écrits et verts (edts + presences)
+  ☐ Premiers tests du domaine `edts` en place (le trou « 0 test » est comblé)
+  ☐ Baseline de performance mesurée et consignée
+  ☐ Job CI `edt-injs` opérationnel
+  ☐ Environnement de recette commandé ou disponible
+  ☐ Sauvegarde de production vérifiée et restauration testée au moins une fois
+
+PORTE G1 — SOCLE DE DONNÉES (fin de I2, après P01 à P04)
+  ☐ Migrations appliquées sans erreur sur base vide ET sur copie de production
+  ☐ Toutes les migrations réversibles (test de rollback effectué)
+  ☐ Aucune valeur métier codée en dur (créneaux, seuils, jours fériés) — vérification par revue
+  ☐ Commandes init_calendrier_injs et migrer_salles_vers_espaces idempotentes (double exécution)
+  ☐ Catalogue de contraintes documenté et lisible par un fonctionnel (validation EF)
+  ☐ Suite complète verte, bench non dégradé de plus de 5 %
+  ☐ RefSalle / RefSite / patrimoine intacts et fonctionnels
+
+PORTE G2 — RECETTE EDT (fin de I5, après P05 à P11)
+  ☐ Parcours complet réalisable : besoins → génération → conflits → correction → validation →
+    publication → consultation par groupe / enseignant / espace
+  ☐ Aucune contrainte dure violée sur 10 générations aléatoires
+  ☐ Explication d'échec systématiquement compréhensible par un agent de scolarité (test EF)
+  ☐ Contrat /api/scolarite/edt/ v1.1 strictement inchangé (comparaison de schéma automatisée)
+  ☐ Le planificateur externe app-ept-injs-lmd2026 fonctionne sans modification
+  ☐ Journal des modifications de séances append-only vérifié
+  ☐ Tests d'accès croisés passés pour les 12 rôles
+  ☐ Grille hebdomadaire servie en moins de 400 ms
+
+PORTE G3 — PRÊT POUR LA PRODUCTION (fin de I9, après P20 et P21)
+  ☐ Couverture ≥ 85 % sur backend/edt_injs et sur les modules de présences
+  ☐ Tests frontend (≥ 50) et mobile (≥ 20) en place et verts
+  ☐ Budgets de performance tous respectés (grille < 400 ms, émargement < 600 ms,
+    scan < 200 ms au 95e centile, génération de 520 séances < 120 s)
+  ☐ Journal d'audit immuable, chaînage vérifiable, tentative de suppression rejetée
+  ☐ Observabilité en place (logging structuré, /api/health/ enrichi, métriques)
+  ☐ Documents officiels générés et validés visuellement par RS
+  ☐ Checklist de mise en production (Annexe C) intégralement cochée
+  ☐ Procédure de repli (Annexe D) testée en conditions réelles sur la recette
+
+PORTE G4 — CLÔTURE DE VAGUE (répétée à chaque vague de bascule V1 à V4)
+  ☐ Aucun incident de gravité 1 ou 2 non résolu
+  ☐ Écarts de réconciliation nuls sur les totaux (effectifs, volumes, taux de présence)
+  ☐ Satisfaction des utilisateurs pilotes mesurée et ≥ seuil convenu
+  ☐ Décision explicite de la Direction de passer à la vague suivante
+
+====================================================================================================
+7. FICHES D'EXÉCUTION DÉTAILLÉES — LES 22 PROMPTS
+====================================================================================================
+
+Légende des fiches :
+  IT = itération · Effort = jours-homme · Acteur = rôle principal (cf. §2)
+  Entrée = conditions pour démarrer · Sortie = conditions pour déclarer terminé
+
+----------------------------------------------------------------------------------------------------
+FICHE P00 — AUDIT DE L'EXISTANT EDT/PRÉSENCES ET PLAN DE NON-RÉGRESSION
+----------------------------------------------------------------------------------------------------
+IT : I0 (semaine 1)                Effort : 5 JH          Acteur : DB (+ RT 0,5 j, EF 0,5 j)
+Dépend de : — (point de départ)    Bloque : tous les prompts suivants
+Entrée
+  • Accès en lecture au dépôt, à la CI et à une copie de la base de production
+  • PROMPT MAÎTRE relu et validé par RT
+Déroulé recommandé (5 jours)
+  J1 : cartographie des modèles et migrations des apps edts, presences, formations, scolarite,
+       patrimoine, referentiels ; rédaction de la première moitié de l'état des lieux.
+  J2 : inventaire des routes, écrans React, écrans Flutter, commandes cron ; schéma des flux.
+  J3 : écriture des tests de caractérisation `edts` (CRUD, permissions, conflits, sérialisation).
+  J4 : écriture des tests de caractérisation `presences` (pointage entrée/sortie, heartbeat,
+       clôture automatique, durées, DeviceBinding).
+  J5 : script de bench, mesure de la baseline, job CI, journal, revue et fusion.
+Sortie
+  ☐ Les 5 livrables du prompt produits et fusionnés
+  ☐ Suite complète verte (943 tests existants + nouveaux)
+  ☐ Baseline chiffrée consignée dans le journal
+  ☐ Porte G0 franchie
+Risques spécifiques
+  • Découverte de comportements non documentés du pointage → les figer tels quels dans les tests,
+    ne rien « corriger » à ce stade. Ouvrir une fiche d'anomalie si nécessaire.
+Repli : aucun (prompt non destructif, sans modification fonctionnelle).
+
+----------------------------------------------------------------------------------------------------
+FICHE P01 — SOCLE TEMPOREL : CALENDRIER, PÉRIODES, CRÉNEAUX, JOURS
+----------------------------------------------------------------------------------------------------
+IT : I1 (semaines 2-3)             Effort : 6 JH          Acteur : DB (+ EF 1 j pour le calendrier réel)
+Dépend de : P00                    Bloque : P03, P05, P06
+Entrée
+  • Porte G0 franchie
+  • Calendrier académique 2026-2027 réel de l'INJS fourni par RS (dates de rentrée, semestres,
+    vacances, examens, jurys) — PRÉREQUIS À OBTENIR DÈS L'ITÉRATION 0
+Déroulé recommandé (6 jours)
+  J1 : note de conception, création de l'app `edt_injs`, arborescence, enregistrement.
+  J2-J3 : les 7 modèles, contraintes, index, admin.
+  J4 : services de calendrier (fonctions pures) et leurs tests.
+  J5 : commande init_calendrier_injs, data migration des jours fériés ivoiriens.
+  J6 : tests complémentaires, documentation, revue, démonstration à EF, fusion.
+Sortie
+  ☐ 25 tests minimum, verts
+  ☐ Double exécution de la commande d'initialisation sans effet de bord
+  ☐ Calendrier réel 2026-2027 de l'INJS saisi et vérifié par RS
+  ☐ Aucun créneau ni jour férié codé en dur
+Risques
+  • Calendrier réel non disponible à temps → utiliser un calendrier fictif documenté et prévoir
+    une saisie ultérieure ; ne pas bloquer le développement.
+Repli : l'app est additive et inactive tant qu'aucune donnée n'y est saisie ; désinstallable
+        par retrait d'INSTALLED_APPS et rollback de migration.
+
+----------------------------------------------------------------------------------------------------
+FICHE P02 — RÉFÉRENTIEL DES ESPACES ET COMPATIBILITÉ ESPACE ↔ ACTIVITÉ
+----------------------------------------------------------------------------------------------------
+IT : I1 (semaines 2-3)             Effort : 7 JH          Acteur : DB (+ RS 1 j pour l'inventaire réel)
+Dépend de : P00 (P01 recommandé)   Bloque : P03, P06, P10        Marge : 2 jours
+Entrée
+  • Inventaire réel des espaces de l'INJS Marcory fourni par RS : salles, amphithéâtres,
+    laboratoires, gymnase, terrains, piscine, piste d'athlétisme, avec capacités et équipements
+    — PRÉREQUIS À OBTENIR DÈS L'ITÉRATION 0
+Déroulé recommandé (7 jours)
+  J1 : note de conception, arbitrage sur le pont RefSalle ↔ Espace.
+  J2-J3 : modèles Zone, Batiment, Niveau, TypeEspace, Espace, EquipementEspace.
+  J4 : RegleCompatibilite et IndisponibiliteEspace ; data migration des 23 types d'espaces.
+  J5 : service espaces_compatibles avec motifs d'exclusion explicites.
+  J6 : service occupation_espace fédérant EDT + patrimoine + maintenance ; commande de pont.
+  J7 : tests (30+), saisie de l'inventaire réel avec RS, revue, fusion.
+Sortie
+  ☐ Toutes les salles RefSalle existantes ont leur Espace correspondant, sans modification de RefSalle
+  ☐ Une réservation patrimoine rend le créneau indisponible pour l'EDT, et réciproquement
+  ☐ Compatibilités sportives vérifiées : natation→piscine, athlétisme→piste, TP→laboratoire
+  ☐ Un espace en maintenance est exclu automatiquement
+Risques
+  • Inventaire des espaces sportifs incomplet ou imprécis → saisir ce qui est connu, marquer les
+    espaces incertains comme inactifs, planifier une campagne de relevé terrain avec RS.
+Repli : les nouvelles tables sont additives ; RefSalle reste la référence pour tout le code existant.
+
+----------------------------------------------------------------------------------------------------
+FICHE P03 — BESOINS D'ENSEIGNEMENT À PLANIFIER
+----------------------------------------------------------------------------------------------------
+IT : I2 (semaines 4-5)             Effort : 6 JH          Acteur : DB (+ EF 1,5 j)
+Dépend de : P01, P02               Bloque : P04, P05, P06
+Entrée
+  • Au moins une maquette LMD complète et ACTIVE en base (UE, ECUE, volumes CM/TD/TP, ECTS)
+  • Affectations pédagogiques enseignant ↔ ECUE renseignées pour le semestre pilote
+  • Groupes et affectations de groupe renseignés (source de vérité D1)
+Déroulé recommandé (6 jours)
+  J1 : note de conception, cartographie des données de maquette réellement disponibles.
+  J2 : modèle BesoinEnseignement, migrations, admin.
+  J3-J4 : service generer_besoins (idempotent), règles de découpage volume → nombre de séances,
+          gestion CM promotion / TD groupe / TP sous-groupe.
+  J5 : services controler_couverture, anomalies, charges enseignantes.
+  J6 : endpoint de prévisualisation, tests (25+), validation croisée avec EF, fusion.
+Sortie
+  ☐ La somme des volumes des besoins générés = la somme des volumes de la maquette (exact)
+  ☐ Ré-exécution de generer_besoins : zéro doublon, mise à jour propre
+  ☐ Les anomalies détectées (ECUE sans enseignant, effectif > toute capacité) sont listées et
+    compréhensibles
+Risques
+  • Maquettes incomplètes en base → identifier dès I0 le périmètre pilote et faire compléter les
+    maquettes par RS ; c'est un prérequis fonctionnel, pas un problème technique.
+  • Règles de découpage ambiguës (25 h / 2 h) → arbitrage formel par EF, consigné en paramètre.
+Repli : génération en lecture seule tant que le résultat n'est pas validé ; les besoins n'ont
+        aucun effet tant que P05 n'est pas livré.
+
+----------------------------------------------------------------------------------------------------
+FICHE P04 — DISPONIBILITÉS, INDISPONIBILITÉS ET CONTRAINTES
+----------------------------------------------------------------------------------------------------
+IT : I2 (semaines 4-5)             Effort : 7 JH          Acteur : DB (+ EF 1 j, RP 0,5 j)
+Dépend de : P01, P02, P03          Bloque : P06 (bloquant strict)
+Entrée
+  • Modèle d'indisponibilité existant dans scolarite analysé (étendre, ne pas dupliquer)
+  • Liste des règles de planification réelles de l'INJS recueillie par EF auprès des responsables
+    (pause méridienne, amplitude maximale, samedi travaillé ou non, contraintes sportives)
+Déroulé recommandé (7 jours)
+  J1 : note de conception, décision d'extension vs création pour les indisponibilités.
+  J2 : modèles DisponibiliteEnseignant, IndisponibiliteGroupe ; migration additive.
+  J3 : modèles TypeContrainte, ContrainteEDT, schéma JSON des paramètres.
+  J4-J5 : registre de contraintes, une classe par contrainte, 13 dures + 12 souples.
+  J6 : data migration du catalogue, écrans d'administration, messages d'explication en français.
+  J7 : tests (30+, deux par contrainte), documentation du catalogue, revue, fusion.
+Sortie
+  ☐ Chaque contrainte possède un test passant et un test échouant avec message explicite
+  ☐ Le catalogue docs/EDT_INJS_CONTRAINTES.md est compris et validé par EF et RP
+  ☐ /api/scolarite/edt/indisponibilites/ fonctionne toujours à l'identique
+  ☐ Activation/désactivation et pondération possibles sans redéploiement
+  ☐ Porte G1 franchie
+Risques
+  • Sur-ingénierie du système de contraintes → limiter strictement au catalogue listé, refuser
+    toute contrainte supplémentaire avant la porte G2.
+Repli : contraintes désactivables individuellement ; le système fonctionne avec les seules
+        contraintes dures fondamentales.
+
+----------------------------------------------------------------------------------------------------
+FICHE P05 — SÉANCES, EMPLOIS DU TEMPS, VERSIONS ET WORKFLOW
+----------------------------------------------------------------------------------------------------
+IT : I3 (semaines 6-7)             Effort : 8 JH          Acteur : DB (+ RT 1 j sur le pont SessionModule)
+Dépend de : P01, P02, P03          Bloque : P06, P08, P11, P12 — NŒUD CENTRAL DU PROJET
+Entrée
+  • Porte G1 franchie
+  • Décision d'architecture validée par RT sur le pont Seance ↔ formations.SessionModule
+Déroulé recommandé (8 jours)
+  J1 : note de conception approfondie, schéma du pont de rétrocompatibilité, revue RT.
+  J2-J3 : modèles EmploiDuTempsINJS, Seance, ModificationSeance, VersionEDT ; contraintes
+          d'unicité (espace/date/plage, enseignant/date/plage) ; index composites.
+  J4 : machine à états et service workflow_edt, contrôles de permission par transition.
+  J5 : pont SessionModule (création/mise à jour à la publication), tests de non-régression
+       des exports et des statistiques existants.
+  J6 : verrouillage après publication, journal append-only, versionnement et restauration.
+  J7-J8 : tests (40+), démonstration, revue, fusion.
+Sortie
+  ☐ Publier un EDT crée les SessionModule attendues, sans altérer un seul pointage existant
+  ☐ Les tests de caractérisation P00 restent verts
+  ☐ Tentative de suppression physique d'une séance ou d'une entrée de journal : rejetée
+  ☐ Restauration d'une version antérieure fonctionnelle
+  ☐ JALON J1 : un EDT peut être saisi manuellement, validé et publié (sans moteur automatique)
+Risques
+  • Le pont SessionModule est le point le plus délicat du projet : il touche le cœur historique.
+    Mitigation : revue à deux, tests de caractérisation renforcés, drapeau de fonctionnalité
+    EDT_INJS_PONT_SESSIONS activable/désactivable, et essai préalable sur copie de production.
+Repli : drapeau EDT_INJS_PONT_SESSIONS à 0 → aucune SessionModule créée, l'EDT reste autonome
+        et le badgeage historique continue sur ses propres séances.
+
+----------------------------------------------------------------------------------------------------
+FICHE P06 — MOTEUR DE PLANIFICATION ET SOLVEUR
+----------------------------------------------------------------------------------------------------
+IT : I4 (semaines 8-9)             Effort : 10 JH         Acteur : DB (+ RT 1,5 j)
+Dépend de : P03, P04, P05          Bloque : P07, P08
+Entrée
+  • Porte G1 franchie, P05 fusionné
+  • Jeu de données de test réaliste disponible (peut être issu du seed préliminaire)
+  • Décision validée sur la dépendance optionnelle ortools
+Déroulé recommandé (10 jours)
+  J1 : note de conception de l'architecture en couches, choix du solveur, protocole de repli.
+  J2 : couche contexte (chargement en mémoire, dataclasses immuables, requêtes optimisées).
+  J3 : couche modèle (variables de décision) et traduction des contraintes dures.
+  J4-J5 : implémentation du solveur CP-SAT, budget de temps, arrêt propre.
+  J6 : implémentation de repli (heuristique gloutonne + recherche locale) — OBLIGATOIRE.
+  J7 : fonction objectif pondérée, lecture des poids depuis la base.
+  J8 : modèle PlanificationRun, exécution asynchrone, verrou Redis, progression.
+  J9 : modes simulation et incrémental, reproductibilité par graine.
+  J10 : tests (30+), mesures de performance, documentation du moteur, revue, fusion.
+Sortie
+  ☐ Génération de 520 séances en moins de 120 secondes
+  ☐ Zéro contrainte dure violée sur 10 exécutions à graines différentes
+  ☐ Même contexte + même graine = résultat identique (test automatisé)
+  ☐ L'application démarre et fonctionne SANS ortools installé (test en CI dédié)
+  ☐ Aucun accès ORM pendant la résolution (compteur de requêtes à zéro)
+  ☐ JALON J2 : génération automatique démontrée à la Direction
+Risques
+  • Prompt le plus long et le plus incertain du projet. Mitigation : livrer d'abord le mode de
+    repli heuristique (fin J6), qui garantit un résultat utilisable même si CP-SAT pose problème.
+    Point d'étape obligatoire à J5 avec RT : si CP-SAT n'est pas maîtrisé, on bascule
+    définitivement sur l'heuristique et on réaffecte les 3 jours restants aux tests.
+  • Explosion combinatoire sur gros volumes → limiter la portée de génération (une formation et
+    un semestre à la fois), documenter la limite.
+Repli : mode manuel de P05 et P08 suffit à exploiter le système ; le moteur est un accélérateur,
+        pas une condition d'usage.
+
+----------------------------------------------------------------------------------------------------
+FICHE P07 — CONFLITS, EXPLICATION DES ÉCHECS, OPTIMISATION
+----------------------------------------------------------------------------------------------------
+IT : I4 (semaines 8-9)             Effort : 6 JH          Acteur : DB (+ EF 1 j sur la qualité des messages)
+Dépend de : P06                    Bloque : P08, P17
+Entrée
+  • P06 fusionné, générant des propositions et des non-planifiés
+Déroulé recommandé (6 jours)
+  J1 : modèle Conflit (extension de ConflitCreneau ou création avec pont), migrations.
+  J2 : détecteur à la volée, en lot et périodique.
+  J3-J4 : explicateur — chaîne de causes ordonnée avec comptage des options éliminées à chaque
+          étape et exemple concret. C'est le cœur de la valeur de ce prompt.
+  J5 : suggestions automatiques classées avec impact estimé sur le score.
+  J6 : métriques d'optimisation exposées, tests (25+), validation EF, fusion.
+Sortie
+  ☐ Scénario insoluble type « groupe de 65, salles de 40 » : explication exacte + proposition
+    d'amphithéâtre ou de division de groupe
+  ☐ Aucun message générique, aucune trace technique visible par l'utilisateur
+  ☐ Un agent de scolarité non informaticien comprend chaque message (test réalisé avec RS)
+Risques
+  • Messages restant trop techniques → faire relire TOUS les messages par RS avant fusion.
+Repli : la détection de conflit seule (sans explication enrichie) reste exploitable.
+
+----------------------------------------------------------------------------------------------------
+FICHE P08 — PLANIFICATION MANUELLE ET DÉPLACEMENT CONTRÔLÉ
+----------------------------------------------------------------------------------------------------
+IT : I5 (semaines 10-11)           Effort : 6 JH          Acteur : DB
+Dépend de : P05, P07               Bloque : P09, P17
+Déroulé recommandé (6 jours)
+  J1 : service valider_placement (< 150 ms, sans écriture).
+  J2 : service appliquer (transaction atomique, journal, recalcul des conflits, cache).
+  J3 : annulation de la dernière modification depuis le journal.
+  J4 : récurrence multi-semaines avec exclusion des fériés et des périodes non planifiables.
+  J5 : verrouillage optimiste (version, HTTP 409), forçage administrateur des contraintes souples.
+  J6 : tests (25+), revue, fusion.
+Sortie
+  ☐ Validation de placement en moins de 150 ms
+  ☐ Deux utilisateurs simultanés : le second reçoit un 409 explicite, base cohérente
+  ☐ Une contrainte DURE n'est jamais contournable, même par un administrateur
+  ☐ Récurrence sur 14 semaines avec 2 fériés : 12 séances créées, 2 écartées avec motif
+Repli : création de séance simple sans récurrence ni glisser-déposer.
+
+----------------------------------------------------------------------------------------------------
+FICHE P09 — ANNULATIONS, RATTRAPAGES, REMPLACEMENTS, NOTIFICATIONS
+----------------------------------------------------------------------------------------------------
+IT : I5 (semaines 10-11)           Effort : 6 JH          Acteur : DB (+ EF 0,5 j sur les motifs)
+Dépend de : P05, P08               Bloque : P17 (écran Perturbations)
+Déroulé recommandé (6 jours)
+  J1 : annulation avec motifs codifiés, déclenchement d'obligation de rattrapage.
+  J2 : modèle et service de rattrapage, fédération avec presences.Rattrapage existant.
+  J3 : planification automatique des rattrapages par le moteur dans les semaines dédiées.
+  J4 : remplacement d'enseignant, recherche de remplaçants compatibles classés.
+  J5 : service de notifications unifié multi-canal, modèles de messages français, anti-spam.
+  J6 : tests (25+), revue, fusion.
+Sortie
+  ☐ Annuler une séance publiée de 45 étudiants : 45 notifications + 1 enseignant + 1 obligation
+    de rattrapage, en une transaction, en moins de 2 secondes
+  ☐ Aucune notification émise pour un EDT non publié
+  ☐ presences.NotificationAbsence non dupliqué
+Risques
+  • Envoi massif accidentel de notifications → interrupteur global EDT_INJS_NOTIFICATIONS à 0 par
+    défaut jusqu'à la vague V1 ; backend e-mail en mémoire dans tous les environnements hors prod.
+Repli : notifications désactivées ; les annulations et rattrapages restent pleinement fonctionnels.
+
+----------------------------------------------------------------------------------------------------
+FICHE P10 — EXAMENS ET RÉSERVATIONS D'ESPACES UNIFIÉES
+----------------------------------------------------------------------------------------------------
+IT : I7 (semaines 14-15)           Effort : 7 JH          Acteur : DB (+ EF 1 j)      Marge : 5 jours
+Dépend de : P02, P05, P08          Bloque : P17 (écran Examens), P20 (convocations)
+Note d'ordonnancement : positionné en I7 car hors chemin critique ; peut glisser en I8 si besoin.
+Déroulé recommandé (7 jours)
+  J1 : modèle SessionExamen, articulation avec les évaluations existantes.
+  J2-J3 : répartition en salles, numéros de place, affectation des surveillants selon ratio.
+  J4 : convocations et PV d'émargement PDF via le moteur d'exports existant.
+  J5 : réservation unifiée et workflow, pont avec patrimoine.ReservationEspace.
+  J6 : règles de priorité et arbitrage entre usages.
+  J7 : tests (25+), revue, fusion.
+Sortie
+  ☐ Double réservation impossible quelle que soit la source (EDT, examen, concours, patrimoine)
+  ☐ Ventilation de 250 candidats dans 6 salles conforme aux capacités d'examen
+  ☐ Convocations PDF générées avec QR de vérification
+Repli : les examens restent planifiés comme des séances ordinaires de type EXAMEN ; la
+        répartition en salles se fait manuellement.
+
+----------------------------------------------------------------------------------------------------
+FICHE P11 — API REST COMPLÈTE ET COMPATIBILITÉ v1.1
+----------------------------------------------------------------------------------------------------
+IT : I3 pour P11(a) — 4 JH · I5 pour P11(b) — 6 JH        Effort total : 10 JH    Acteur : DB
+Dépend de : P05 (a) puis P06-P10 (b)    Bloque : P17, P18, P19 (bloquant strict)
+Découpage imposé
+  P11(a) — I3, après P05 : routes de LECTURE (calendars, periods, slots, spaces, teachings,
+           constraints, timetables, sessions, vues grille student/teacher/group/space) +
+           publication du schéma OpenAPI. Objectif : débloquer le travail frontend dès I4.
+  P11(b) — I5, après P08/P09 : routes d'ACTION (generate, simulate, validate, publish, activate,
+           move, cancel, duplicate, replace-teacher, conflicts/resolve, makeups, replacements) +
+           finalisation, throttling, idempotency, v1.2 additive du contrat.
+Déroulé P11(a) — 4 jours
+  J1 : serializers light/detail, structure api/ par domaine (aucun fichier > 600 lignes).
+  J2 : ViewSets de lecture, filtres, tri, pagination.
+  J3 : vues grille optimisées avec ETag, cache Redis, budget < 400 ms et < 15 requêtes SQL.
+  J4 : permissions par famille, tests d'accès croisés 12 rôles, documentation OpenAPI, fusion.
+Déroulé P11(b) — 6 jours
+  J1-J2 : routes d'action et leurs contrôles.
+  J3 : throttling dédié, idempotency key, format d'erreur normalisé {code, message_fr, details}.
+  J4 : adaptateur des routes `edts` historiques avec en-têtes Deprecation/Sunset.
+  J5 : v1.2 additive, table de correspondance v1.1→v1.2, test de non-régression du schéma v1.1.
+  J6 : tests (60+ au total), documentation d'exemples, revue, fusion.
+Sortie
+  ☐ /api/docs/ expose l'ensemble des routes, schéma valide sans avertissement
+  ☐ Comparaison automatisée : le schéma de réponse v1.1 est identique octet à octet à l'existant
+  ☐ Le planificateur externe fonctionne sans aucune modification
+  ☐ Grille hebdomadaire < 400 ms, < 15 requêtes SQL
+  ☐ Porte G2 franchie (avec P05-P09)
+Risques
+  • Frontend bloqué par une API non figée → c'est précisément la raison du découpage (a)/(b) :
+    le contrat de lecture est figé dès I3 et ne change plus.
+Repli : les routes `edts` historiques restent actives et suffisent aux usages existants.
+
+----------------------------------------------------------------------------------------------------
+FICHE P12 — SÉANCE D'ÉMARGEMENT, OUVERTURE/CLÔTURE, LISTES
+----------------------------------------------------------------------------------------------------
+IT : I6 (semaines 12-13)           Effort : 7 JH          Acteur : DB (+ RT 0,5 j)
+Dépend de : P05                    Bloque : P13, P14, P15, P16 — NŒUD CENTRAL DU VOLET PRÉSENCES
+Entrée
+  • Porte G2 franchie
+  • Décision d'architecture validée : nouvelle app `emargement` ou module de `edt_injs`
+Déroulé recommandé (7 jours)
+  J1 : note de conception, arbitrage sur la référence unifiée « PersonnePresente »
+       (DossierEtudiant LMD vs Participant formation continue).
+  J2-J3 : modèles SeanceEmargement et LigneEmargement, contraintes, index, pont Pointage.
+  J4 : génération de la liste avec snapshot d'effectif gelé.
+  J5 : ouverture et clôture manuelles et automatiques, règles de traitement des non-badgés.
+  J6 : extension des commandes cron existantes, idempotence, reprise après incident.
+  J7 : tests (35+), mesures de performance (clôture de 300 étudiants < 3 s), revue, fusion.
+Sortie
+  ☐ Tests de caractérisation P00 du pointage verts
+  ☐ Un pointage historique reste lisible et se rattache à sa ligne d'émargement
+  ☐ Clôture d'une séance de 300 étudiants en moins de 3 secondes (bulk operations)
+  ☐ Crons idempotents : double exécution sans effet de bord
+Risques
+  • Deux populations d'apprenants (LMD et formation continue) à réconcilier → la référence
+    unifiée doit être tranchée en J1 par RT, pas improvisée en cours de route.
+Repli : drapeau EDT_INJS_EMARGEMENT à 0 → le badgeage historique continue intact.
+
+----------------------------------------------------------------------------------------------------
+FICHE P13 — QR DYNAMIQUE, SCAN, ANTI-FRAUDE
+----------------------------------------------------------------------------------------------------
+IT : I6 (semaines 12-13)           Effort : 8 JH          Acteur : DB (+ RT 1 j sécurité)
+Dépend de : P12 (bloquant strict)  Bloque : P18, P19
+Déroulé recommandé (8 jours)
+  J1 : note de conception sécurité, revue RT, choix de la clé HMAC dédiée (jamais SECRET_KEY).
+  J2 : modèle JetonEmargement, rotation, signature, révocation.
+  J3 : endpoints de génération et de rafraîchissement du QR.
+  J4 : endpoint de scan avec la chaîne ordonnée des 9 contrôles et les codes d'erreur normalisés.
+  J5 : scan inverse (badge de personne scanné par l'enseignant) — indispensable pour les
+       étudiants sans smartphone.
+  J6 : anti-fraude — DeviceBinding, geofencing tolérant, détection de comportements suspects,
+       IncidentEmargement.
+  J7 : mode hors-ligne et synchronisation, extension du heartbeat existant.
+  J8 : tests (45+) dont test de charge 200 scans en 60 s, revue sécurité, fusion.
+Sortie
+  ☐ Les 7 codes d'erreur produisent 7 messages distincts et explicites en français
+  ☐ Rejeu de jeton impossible, double émargement impossible
+  ☐ Test de coupure réseau : aucun scan valide perdu
+  ☐ Géolocalisation non bloquante par défaut (marquage « à vérifier » si précision insuffisante)
+  ☐ formations.QRToken et le flux de badgeage actuel intacts
+  ☐ JALON J3 : présences opérationnelles démontrées
+Risques
+  • Régression sur le badgeage en production : c'est le risque le plus sensible du projet pour
+    les utilisateurs finaux. Mitigation : drapeau EDT_INJS_QR_V2 à 0 par défaut, coexistence
+    complète des deux dispositifs, bascule uniquement en vague V1 sur un groupe pilote.
+  • Faille de sécurité → revue de sécurité formelle par RT obligatoire avant fusion (étape J8).
+Repli : EDT_INJS_QR_V2 à 0 → retour immédiat au dispositif QRToken historique, sans redéploiement.
+
+----------------------------------------------------------------------------------------------------
+FICHE P14 — ÉMARGEMENT MANUEL, FORÇAGE MOTIVÉ, JUSTIFICATIFS, AUDIT
+----------------------------------------------------------------------------------------------------
+IT : I6 (semaines 12-13)           Effort : 7 JH          Acteur : DB (+ EF 1 j, RS 0,5 j sur les motifs)
+Dépend de : P12                    Bloque : P18
+Exigence utilisateur explicite : ce prompt porte la demande « possibilité de forcer un badgeage
+avec motif(s) ». Son périmètre ne peut être réduit.
+Déroulé recommandé (7 jours)
+  J1 : référentiel MotifForcage, validation de la liste des 14 motifs avec RS et EF,
+       règles par motif (commentaire obligatoire, pièce obligatoire, rôles autorisés).
+  J2 : émargement manuel en lot (bulk-mark), calcul automatique des retards.
+  J3 : endpoint de forçage — motifs multiples, pièce jointe, forçage en lot.
+  J4 : règles de délai (72 h) et d'escalade de rôle ; compteur de forçages par agent.
+  J5 : journal immuable append-only, chaînage de hash, protection save()/delete().
+  J6 : justificatifs d'absence — dépôt, instruction, décision, recalcul automatique des stats.
+  J7 : tests (40+), revue, démonstration à RS, fusion.
+Sortie
+  ☐ Forçage sans motif : refusé avec message français explicite
+  ☐ Motif « AUTRE » sans commentaire : refusé
+  ☐ Forçage à plus de 72 h par un rôle insuffisant : refusé
+  ☐ Tentative de modification ou de suppression d'une entrée de journal, y compris via
+    l'admin Django : rejetée
+  ☐ Chaînage de hash vérifiable par une commande de contrôle d'intégrité
+  ☐ Rapport « forçages du mois » extractible
+Risques
+  • Usage abusif du forçage par les agents → le compteur par agent et le rapport de contrôle
+    interne sont des livrables obligatoires, pas des options ; à présenter à la Direction en J3.
+Repli : aucun. Ce prompt est une exigence fonctionnelle et réglementaire de traçabilité.
+
+----------------------------------------------------------------------------------------------------
+FICHE P15 — PRÉSENCE DES INTERVENANTS ET VOLUMES HORAIRES
+----------------------------------------------------------------------------------------------------
+IT : I7 (semaines 14-15)           Effort : 6 JH          Acteur : DB (+ EF 0,5 j)      Marge : 3 jours
+Dépend de : P12, P14               Bloque : P18 (écran intervenants), P20 (état des heures)
+Déroulé recommandé (6 jours)
+  J1 : modèle PresenceIntervenant avec rôles tenus sur la séance.
+  J2 : cahier de texte numérique, délai de modification paramétrable.
+  J3-J4 : service de calcul VH prévue / planifiée / réalisée, écarts, alertes.
+  J5 : workflow de certification des heures, pont en LECTURE SEULE vers la finance formateurs.
+  J6 : tableau de bord intervenant (données), tests (30+), revue, fusion.
+Sortie
+  ☐ Pour une ECUE de 30 h dont 26 h réalisées : « Écart : −4 h ⚠ rattrapage nécessaire »
+  ☐ Aucune écriture dans les tables de finances formateurs (vérification par test)
+  ☐ Cas du remplacement : les heures sont attribuées au remplaçant
+  ☐ Cas du co-enseignement : répartition paramétrable et testée
+Repli : suivi des volumes en lecture seule, sans certification ni pont finance.
+
+----------------------------------------------------------------------------------------------------
+FICHE P16 — SEUILS, ALERTES ET STATISTIQUES DE PRÉSENCE
+----------------------------------------------------------------------------------------------------
+IT : I7 (semaines 14-15)           Effort : 6 JH          Acteur : DB (+ EF 0,5 j)      Marge : 3 jours
+Dépend de : P12, P14               Bloque : P18 (tableaux de bord), P20 (états d'absence)
+Déroulé recommandé (6 jours)
+  J1 : modèle SeuilAbsence et résolution en cascade du plus spécifique au plus général.
+  J2-J3 : agrégats dénormalisés, recalcul incrémental à la clôture et après justificatif,
+          tâche nocturne de réconciliation complète.
+  J4 : indicateurs par étudiant, ECUE, groupe, formation, institution, pédagogie.
+  J5 : alertes typées via statistiques.ConfigAlerteSeuil existant ; service d'avis d'éligibilité.
+  J6 : fournisseurs d'indicateurs pour les bilans existants, tests (30+), fusion.
+Sortie
+  ☐ Passer le seuil d'une formation de 25 % à 30 % change immédiatement les alertes,
+    sans redéploiement (vérification en direct devant EF)
+  ☐ La valeur 25 % n'apparaît nulle part dans le code
+  ☐ Les bilans existants (point journalier, bilan de fin de semestre, bilan FAC) se génèrent
+    à l'identique
+  ☐ L'avis d'éligibilité est un AVIS : aucune sanction automatique
+  ☐ Vues statistiques servies en moins de 500 ms sur 1 250 étudiants
+Repli : statistiques calculées à la demande sans agrégats (plus lent mais fonctionnel).
+
+----------------------------------------------------------------------------------------------------
+FICHE P17 — FRONTEND REACT : ÉCRANS EDT
+----------------------------------------------------------------------------------------------------
+IT : I7 pour P17(a) — 5 JH · I8 pour P17(b) — 9 JH        Effort total : 14 JH    Acteur : DF
+Dépend de : P11(a) puis P11(b)     Bloque : J4 (pilote)
+Découpage imposé
+  P17(a) — I7 : socle (arborescence, services/edt.js, hooks, styles, configuration Vitest) +
+           écrans de CONSULTATION (TableauBordEDT, CalendrierAcademique, Creneaux, Espaces,
+           Besoins, Contraintes, VuesEDT).
+  P17(b) — I8 : écrans INTERACTIFS (GenerationEDT avec suivi de progression, PlanningHebdomadaire
+           avec glisser-déposer, Conflits, Publication, Perturbations, Examens, Reservations).
+Points de vigilance imposés
+  • Aucun fichier > 400 lignes. La grille interactive doit être décomposée en au moins 6 composants.
+  • Le glisser-déposer doit TOUJOURS avoir une alternative clavier et une alternative formulaire :
+    c'est une exigence d'accessibilité non négociable, et un filet en cas de bogue.
+  • Aucune dépendance CDN : toute bibliothèque de calendrier ou de glisser-déposer est installée
+    localement via npm, sinon développée en interne.
+  • Le compteur d'avertissements ESLint doit DIMINUER par rapport à la baseline de 89.
+Déroulé P17(b) — 9 jours
+  J1 : assistant de génération en 5 étapes, suivi de progression.
+  J2-J4 : grille hebdomadaire — rendu, virtualisation, glisser-déposer, validation temps réel,
+          annulation, alternative clavier.
+  J5 : centre de résolution des conflits avec suggestions applicables en un clic.
+  J6 : écran de publication, comparateur de versions.
+  J7 : écrans Perturbations, Examens, Reservations.
+  J8 : accessibilité, impression, responsive tablette, états de chargement et d'erreur.
+  J9 : tests Vitest (25+), revue, démonstration, fusion.
+Sortie
+  ☐ Parcours « générer → contrôler → corriger → valider → publier » sans rechargement de page
+  ☐ Rendu d'une semaine complète en moins de 200 ms après réception des données
+  ☐ Navigation clavier complète sur la grille, contrastes AA
+  ☐ Socle de tests frontend en place et intégré à la CI (comble la faiblesse R2 de l'audit)
+  ☐ Edts.jsx / EdtNew.jsx / AffectationNew.jsx conservés et redirigés par drapeau
+Risques
+  • Sous-estimation classique de la grille interactive. Mitigation : livrer d'abord une grille en
+    LECTURE SEULE fonctionnelle (fin J2), puis ajouter l'interactivité. La lecture seule est
+    déjà une valeur utilisable en production.
+Repli : EDT_INJS_UI_NOUVELLE à 0 → les écrans Edts.jsx historiques restent servis.
+
+----------------------------------------------------------------------------------------------------
+FICHE P18 — FRONTEND REACT : ÉCRANS PRÉSENCES ET FORÇAGE
+----------------------------------------------------------------------------------------------------
+IT : I8 (semaines 16-17)           Effort : 9 JH          Acteur : DF
+Dépend de : P12, P13, P14, P15, P16, P11(b)
+Priorité interne des écrans (en cas de temps contraint, livrer dans cet ordre)
+  1. FeuilleEmargement (usage quotidien en salle — indispensable)
+  2. ForcageBadgeage (exigence utilisateur explicite — indispensable)
+  3. AffichageQR plein écran pour vidéoprojecteur
+  4. TableauBordEnseignant
+  5. Justificatifs
+  6. TableauBordEtudiant
+  7. TableauBordAdmin temps réel
+  8. ScanBadge par webcam
+  9. PresencesIntervenants et cahier de texte
+ 10. HistoriqueAudit
+Points de vigilance imposés
+  • Ergonomie de terrain : gros boutons, contraste élevé, utilisable d'une main sur tablette.
+  • Réseau instable : interface optimiste avec réconciliation, file locale, indicateur de
+    synchronisation visible en permanence.
+  • L'écran de forçage doit afficher un avertissement clair « action tracée et auditée » et
+    présenter la trace créée après validation.
+  • Ne jamais afficher un jeton QR à un rôle non habilité.
+Sortie
+  ☐ Un enseignant ouvre une séance, projette le QR, voit les scans arriver en direct, force deux
+    présences avec motif, clôture et consulte la trace — en moins de 2 minutes (chronométré
+    avec RP en conditions réelles)
+  ☐ Refus de forçage sans motif correctement affiché en français
+  ☐ Tests Vitest (25+) verts
+  ☐ Aucun chargement depuis un CDN
+Repli : émargement possible via l'admin Django et via le mobile ; la feuille d'émargement
+        papier (livrée en P20) reste le secours ultime.
+
+----------------------------------------------------------------------------------------------------
+FICHE P19 — MOBILE FLUTTER ET PWA
+----------------------------------------------------------------------------------------------------
+IT : I8 (semaines 16-17)           Effort : 8 JH          Acteur : DM        Marge : 4 jours
+Dépend de : P11(b), P13, P14
+Séquence imposée
+  J1 : CORRECTION DE LA CI MOBILE EN PREMIER (asset assets/app.env — faiblesse R6 de l'audit).
+       Cette tâche est indépendante et peut être exécutée dès I6 par anticipation.
+  J2-J3 : écrans étudiant — Mon EDT, Badger, Mon badge, Mes présences, Notifications.
+  J4-J5 : écrans intervenant — mes séances, ouverture/clôture, QR sur téléphone, scan continu,
+          feuille d'émargement avec forçage motivé, cahier de texte.
+  J6 : hors-ligne robuste — file chiffrée, synchronisation, résolution de conflits, indicateur.
+  J7 : PWA, retrait des vestiges « qr-badge-v3 » et des CDN, service worker propre « edt-injs ».
+  J8 : tests (porter de 3 à 20+), revue, fusion.
+Sortie
+  ☐ Job Mobile de la CI vert (faiblesse R6 résolue)
+  ☐ Scénario avion : 10 scans hors-ligne puis reconnexion → 10 présences, aucun doublon
+  ☐ Application utilisable sans GPS (dégradation propre, jamais de blocage silencieux)
+  ☐ Flux de scan actuel des auditeurs en production non cassé
+  ☐ Couverture mobile portée à 20 tests minimum
+Risques
+  • Montées de version de plugins introduisant des régressions → ne monter que si analyze et
+    tests restent verts ; sinon consigner et reporter, ce n'est pas un objectif du projet.
+Repli : l'application mobile actuelle continue de fonctionner sur le dispositif historique ;
+        la PWA web reste accessible.
+
+----------------------------------------------------------------------------------------------------
+FICHE P20 — EXPORTS, DOCUMENTS OFFICIELS ET IMPRESSIONS
+----------------------------------------------------------------------------------------------------
+IT : I9 (semaines 18-19)           Effort : 7 JH          Acteur : DB (+ RS 1 j de validation visuelle)
+Dépend de : P05, P10, P15, P16     Marge : 4 jours
+Priorité interne (livrer dans cet ordre)
+  1. Feuille d'émargement VIERGE (secours papier — indispensable avant toute bascule)
+  2. Emploi du temps hebdomadaire par groupe et par enseignant (PDF A4/A3 + Excel)
+  3. Feuille d'émargement renseignée (PV de séance) avec mentions de forçage
+  4. Registre d'assiduité par étudiant
+  5. État des heures certifiées par intervenant
+  6. Planning d'occupation des espaces
+  7. État des absences par groupe/ECUE
+  8. Planning des examens, listes de salles, convocations avec QR
+  9. Rapport de génération d'EDT
+ 10. Rapport de forçages et extrait du journal d'audit
+ 11. Bilan VH prévue/planifiée/réalisée
+Points de vigilance imposés
+  • Charte documentaire commune PARAMÉTRABLE : mentions institutionnelles jamais codées en dur.
+  • Aucun logo hérité (logo-sygepcpfae.png) dans un document neuf.
+  • Comble le trou « 0 test sur les exports » signalé par l'audit : 20 tests minimum.
+Sortie
+  ☐ Les 14 exports existants fonctionnent toujours à l'identique
+  ☐ Chaque nouveau document s'imprime correctement en A4 et en A3
+  ☐ Validation visuelle formelle par RS sur épreuve papier
+  ☐ Aucune fuite de donnée hors périmètre de rôle (test dédié)
+Repli : export Excel brut à défaut de PDF mis en forme.
+
+----------------------------------------------------------------------------------------------------
+FICHE P21 — TESTS, PERFORMANCE ET OBSERVABILITÉ
+----------------------------------------------------------------------------------------------------
+IT : I9 (semaines 18-19)           Effort : 8 JH          Acteur : DB + DF + DM (réparti) + EX 1 j
+Dépend de : tous les prompts précédents      Bloque : P22 (bloquant strict)
+Ce prompt n'est JAMAIS reportable ni réductible : il conditionne la porte G3.
+Déroulé recommandé (8 jours)
+  J1 : commande seed_edt_injs (jeu réaliste : 1 250 étudiants, 520 séances, 4 semaines de
+       présences simulées) — protégée contre toute exécution accidentelle en production.
+  J2 : mesure de couverture, identification et comblement des trous jusqu'à 85 %.
+  J3 : tests de permissions systématiques — matrice 12 rôles × routes, succès ET refus.
+  J4 : tests de sécurité — rejeu, élévation de privilège, accès inter-secrétariats, injection
+       dans les filtres, exposition de médias.
+  J5 : tests de performance avec assertNumQueries, profilage des 10 requêtes les plus coûteuses,
+       ajout des index manquants, réglage du cache Redis.
+  J6 : migration des print() vers logging structuré (réduction d'au moins 30 % du compteur de 288),
+       journal métier dédié, identifiant de corrélation.
+  J7 : /api/health/ enrichi, route de métriques protégée, intégration APM optionnelle désactivée
+       par défaut.
+  J8 : consolidation CI (job edt-injs, cache des dépendances, durée totale < 20 min), rapport
+       de couverture publié, documentation de la stratégie de test, revue, fusion.
+Sortie
+  ☐ Couverture ≥ 85 % sur le périmètre EDT-INJS
+  ☐ Tests frontend ≥ 50, tests mobile ≥ 20
+  ☐ Tous les budgets de performance respectés sur le jeu de démonstration
+  ☐ Aucun test existant désactivé
+  ☐ Durée totale de CI inférieure à 20 minutes
+  ☐ Porte G3 franchie
+Risques
+  • Tentation de reporter ce prompt sous pression de calendrier → interdiction formelle : en cas
+    de retard, on réduit le périmètre fonctionnel (Annexe E), jamais la qualité.
+Repli : aucun.
+
+----------------------------------------------------------------------------------------------------
+FICHE P22 — MIGRATION, BASCULE, RECETTE ET DOCUMENTATION
+----------------------------------------------------------------------------------------------------
+IT : I10 (semaine 20) puis accompagnement sur 2 semestres
+Effort : 10 JH (dont 4 JH en I10 et 6 JH étalés sur les vagues)    Acteur : DB + EX + EF + RS
+Dépend de : P21 et porte G3 franchie (bloquant strict)
+Séquence imposée
+  Phase 1 — Préparation (I10, 4 jours)
+    J1 : commande migrer_edt_vers_edt_injs avec --dry-run et rapport de réconciliation.
+    J2 : rattachement des pointages historiques ; contrôle des règles D1 à D5.
+    J3 : drapeaux de fonctionnalité, procédure de repli, commandes de diagnostic.
+    J4 : essai complet sur copie de production, rapport de réconciliation à zéro écart.
+  Phase 2 — Documentation et formation (I10, en parallèle par EF et RS)
+    • 4 manuels (administrateur, scolarité, enseignant, étudiant)
+    • Fiches mémo A4 recto pour la salle de cours
+    • Cahier de recette de 60 scénarios couvrant les 26 sous-modules du Module 06 et les 17 du
+      Module 08
+    • Mise à jour du README racine (retrait des mentions « sygepcpfae / MEMFPMA » — faiblesse R5)
+  Phase 3 — Bascule en 4 vagues (cf. §10)
+Sortie de la phase 1
+  ☐ Rapport de réconciliation à zéro écart sur les totaux (effectifs, volumes, taux de présence)
+  ☐ Désactivation d'un drapeau restaure le comportement antérieur en moins d'une minute
+  ☐ Runbook d'incident complet et testé
+  ☐ Checklist de production intégralement cochée
+  ☐ JALON J5 après la vague V3
+Risques
+  • Écart de réconciliation détecté → bascule suspendue, analyse, correction, nouvel essai.
+    Aucune tolérance sur les totaux.
+Repli : voir Annexe D.
+
+====================================================================================================
+8. PLANNING DÉTAILLÉ SEMAINE PAR SEMAINE
+====================================================================================================
+
+ Sem  IT   Prompt(s) actifs        Acteurs      Événements et jalons
+ ---  ---  ----------------------  -----------  ---------------------------------------------------
+ S1   I0   P00                     DB, RT, EF   Lancement projet · Recueil calendrier et inventaire
+                                                espaces auprès de RS · Commande environnement de
+                                                recette · PORTE G0 en fin de semaine
+ S2   I1   P01, P02 (début)        DB, EF, RS   Saisie du calendrier réel 2026-2027
+ S3   I1   P01 (fin), P02 (fin)    DB, RS       Saisie de l'inventaire réel des espaces
+ S4   I2   P03                     DB, EF       Contrôle de complétude des maquettes du pilote
+ S5   I2   P04                     DB, EF, RP   Atelier « règles de planification INJS »
+                                                PORTE G1 en fin de semaine
+ S6   I3   P05                     DB, RT       Revue d'architecture du pont SessionModule
+ S7   I3   P05 (fin), P11(a)       DB, DF       JALON J1 — EDT manuel utilisable (démo Direction)
+                                                DF démarre le socle frontend
+ S8   I4   P06                     DB, RT       Point d'étape solveur à mi-parcours (décision
+                                                CP-SAT ou heuristique)
+ S9   I4   P06 (fin), P07          DB, EF, RS   JALON J2 — Génération automatique (démo Direction)
+                                                Relecture des messages d'explication par RS
+ S10  I5   P08, P11(b) (début)     DB, DF       —
+ S11  I5   P09, P11(b) (fin)       DB, EF       PORTE G2 — Recette EDT avec EF, RS et RP
+ S12  I6   P12, P13 (début)        DB, RT       Revue de sécurité du dispositif QR
+                                                DM corrige la CI mobile par anticipation
+ S13  I6   P13 (fin), P14          DB, EF, RS   Validation de la liste des motifs de forçage
+                                                JALON J3 — Présences opérationnelles (démo)
+ S14  I7   P15, P16, P10, P17(a)   DB, DF, EF   Démarrage effectif du frontend
+ S15  I7   P15-P16-P10 (fin),      DB, DF       Préparation de la recette utilisateur
+           P17(a) (fin)
+ S16  I8   P17(b), P18, P19        DF, DM, DB   Formation des utilisateurs pilotes
+ S17  I8   P17(b)-P18-P19 (fin)    DF, DM, RP   JALON J4 — Pilote V1 mis en service
+                                                Chronométrage du parcours enseignant avec RP
+ S18  I9   P20, P21 (début)        DB, RS, EX   Validation visuelle des documents officiels
+ S19  I9   P21 (fin)               DB, DF, DM   PORTE G3 — Prêt pour la production
+                                                Test de la procédure de repli en conditions réelles
+ S20  I10  P22                     DB, EX, EF   Migration sur copie de production · Manuels ·
+                                                Cahier de recette · Vague V2
+                                                JALON J5 après validation Direction
+ S21+      Accompagnement          Toute équipe Vagues V3 puis V4 (cf. §10) · Observation sur
+                                                2 semestres · Clôture (§18)
+
+====================================================================================================
+9. STRATÉGIE DE BRANCHES, DE VERSIONS ET DE LIVRAISON
+====================================================================================================
+
+9.1 BRANCHES
+  • `main` : toujours déployable, toujours verte. Protection activée : revue obligatoire,
+    CI obligatoire, pas de poussée directe.
+  • `feature/edt-injs-PXX-<libellé>` : une branche par prompt, durée de vie ≤ 10 jours ouvrés.
+    Au-delà, rebasage obligatoire sur `main` au minimum tous les 3 jours.
+  • `hotfix/<incident>` : correction urgente de production, fusionnée dans `main` puis reportée
+    dans les branches de fonctionnalité en cours.
+  • Aucune branche de longue durée de type `develop` : le travail est intégré en continu.
+
+9.2 CONVENTION DE COMMIT
+  `PXX: <verbe à l'infinitif> <objet>` en français.
+  Exemples : `P05: ajouter la machine à états de l'emploi du temps`
+             `P13: refuser un scan hors de la fenêtre d'émargement`
+  Les commits de migration mentionnent explicitement `migration` dans leur message.
+
+9.3 REVUE DE CODE — GRILLE IMPOSÉE AU RELECTEUR
+  ☐ Non-régression : aucun modèle, endpoint, route ou écran existant supprimé ou renommé
+  ☐ Migration réversible et testée sur base peuplée
+  ☐ Permission explicite sur chaque nouvelle route
+  ☐ Traçabilité : toute action sensible écrit dans un journal
+  ☐ Aucune valeur métier codée en dur
+  ☐ Aucun print(), aucune dépendance CDN
+  ☐ Taille des fichiers respectée (600 lignes backend, 400 frontend)
+  ☐ Messages utilisateur en français, clairs, sans trace technique
+  ☐ Tests présents, pertinents, couvrant les refus de permission
+  ☐ Requêtes SQL maîtrisées (pas de N+1)
+
+9.4 VERSIONS
+  • Une version mineure par itération : v2026.EDT.I0 à v2026.EDT.I10.
+  • Une note de version en français par itération, listant fonctions ajoutées, corrections,
+    points de vigilance et actions requises des exploitants.
+  • Étiquetage Git de chaque version livrée en recette et en production.
+
+9.5 LIVRAISON
+  • Recette : déploiement à chaque fusion dans `main`.
+  • Production : déploiement à chaque fin d'itération pour les itérations I0 à I5 (fonctions
+    inactives derrière drapeaux), puis selon le plan de bascule à partir de I8.
+  • Toute mise en production est précédée d'une sauvegarde vérifiée et suivie d'un contrôle
+    de santé.
+
+====================================================================================================
+10. GESTION DES DRAPEAUX DE FONCTIONNALITÉ ET PLAN DE BASCULE EN 4 VAGUES
+====================================================================================================
+
+10.1 DRAPEAUX (stockés dans l'app `parametres` existante, historisés, modifiables sans déploiement)
+
+ Drapeau                      Défaut  Activé en   Effet si désactivé
+ ---------------------------  ------  ----------  -----------------------------------------------
+ EDT_INJS_ACTIF                 0     I3          Module entièrement masqué, aucune route servie
+ EDT_INJS_PONT_SESSIONS         0     I3 (recette) Aucune SessionModule créée par l'EDT
+ EDT_INJS_MOTEUR_AUTO           0     I4 (recette) Génération automatique indisponible, manuel OK
+ EDT_INJS_EMARGEMENT            0     I6 (recette) Badgeage historique seul actif
+ EDT_INJS_QR_V2                 0     V1          Dispositif QRToken historique seul actif
+ EDT_INJS_FORCAGE               0     V1          Forçage indisponible (émargement manuel seul)
+ EDT_INJS_NOTIFICATIONS         0     V1          Aucune notification émise
+ EDT_INJS_UI_NOUVELLE           0     V1          Écrans Edts.jsx historiques servis
+ EDT_INJS_MOBILE                0     V1          Application mobile sur dispositif historique
+ EDT_INJS_GEOFENCING            0     V2          Contrôle géographique désactivé
+ EDT_INJS_LEGACY_RETRAIT        0     V4          Socle HTML/QR legacy conservé
+
+ Règle : chaque drapeau est activable par secrétariat et par formation, pour permettre un pilote
+ restreint. Chaque changement de drapeau est historisé (auteur, date, ancienne et nouvelle valeur).
+
+10.2 PLAN DE BASCULE
+
+ VAGUE V1 — PILOTE (semaines 17 à 20, à partir du jalon J4)
+   Périmètre : 1 formation, 2 groupes, environ 90 étudiants, 6 enseignants, 4 semaines.
+   Dispositif : double saisie de contrôle (l'ancien dispositif reste actif en parallèle).
+   Drapeaux activés : EDT_INJS_ACTIF, PONT_SESSIONS, MOTEUR_AUTO, EMARGEMENT, QR_V2, FORCAGE,
+                      NOTIFICATIONS, UI_NOUVELLE, MOBILE.
+   Accompagnement : présence physique d'un membre de l'équipe lors des 5 premières séances.
+   Critères de sortie (porte G4) : zéro incident de gravité 1 ou 2 non résolu ; écart de
+   réconciliation nul entre l'ancien et le nouveau dispositif sur les présences ; satisfaction
+   des enseignants et étudiants pilotes mesurée par questionnaire.
+
+ VAGUE V2 — EXTENSION (semaines 21 à 26)
+   Périmètre : toutes les formations d'un même niveau (environ 400 étudiants).
+   Nouveauté : activation du geofencing après validation des coordonnées de tous les espaces.
+   Arrêt de la double saisie si V1 s'est déroulée sans écart.
+   Critères de sortie : mêmes que V1, plus stabilité de la performance sous charge réelle.
+
+ VAGUE V3 — GÉNÉRALISATION (semaines 27 à 34)
+   Périmètre : tout l'UFR STAPS-JL (1 250 étudiants, 25 enseignants, 35 espaces).
+   Jalon J5 présenté à la Direction à l'issue du premier mois complet.
+   Critères de sortie : un semestre complet exploité sans incident majeur ; taux de présence
+   cohérent avec les relevés antérieurs ; adhésion des utilisateurs confirmée.
+
+ VAGUE V4 — RETRAIT DU LEGACY (après 2 semestres sans incident)
+   Actions : retrait documenté de la page de badgeage HTML legacy, du service worker
+   « qr-badge-v3 », des CDN tiers, des routes `edts` dépréciées (après la date Sunset annoncée),
+   et archivage des commandes de maintenance ponctuelles.
+   Précondition absolue : aucun consommateur externe résiduel identifié (vérification par
+   analyse des journaux d'accès sur 3 mois).
+
+10.3 RÈGLE DE SUSPENSION DE BASCULE
+  Toute vague est suspendue immédiatement, sans discussion préalable, si l'un de ces faits survient :
+  • perte ou corruption d'une donnée de présence ;
+  • impossibilité pour un enseignant d'émarger une séance en cours ;
+  • écart de réconciliation non expliqué sur les totaux ;
+  • indisponibilité du service supérieure à 15 minutes en heures ouvrées.
+  La reprise n'intervient qu'après analyse de cause racine écrite et validation de RT et de EF.
+
+====================================================================================================
+11. PLAN DE TESTS ET DE RECETTE PAR ÉTAPE
+====================================================================================================
+
+11.1 NIVEAUX DE TEST ET MOMENT D'EXÉCUTION
+
+ Niveau                        Quand                       Qui       Critère
+ ----------------------------  --------------------------  --------  ---------------------------
+ Unitaire                      À chaque commit             DB/DF/DM  100 % vert
+ Intégration                   À chaque PR                 CI        100 % vert
+ Caractérisation (P00)         À chaque PR                 CI        100 % vert, non négociable
+ Permissions 12 rôles          À chaque PR touchant une API CI       Succès ET refus vérifiés
+ Performance (assertNumQueries) À chaque PR touchant une vue CI      Budget respecté
+ Sécurité                      Fin de P13, P14 et P21      RT        Revue formelle
+ Recette fonctionnelle         Portes G2, G3 et chaque vague EF/RS/RP Cahier de 60 scénarios
+ Recette terrain               Vagues V1 à V3              RP/RS     En conditions réelles de salle
+ Charge                        Fin de P21                  DB/EX     Budgets du §6 respectés
+ Restauration de sauvegarde    I0 puis avant chaque vague  EX        Restauration réussie
+
+11.2 CAHIER DE RECETTE — RÉPARTITION DES 60 SCÉNARIOS
+  • Calendrier, périodes, créneaux, jours ouvrables ........................  5 scénarios
+  • Espaces, compatibilités, indisponibilités, occupation ..................  7
+  • Besoins d'enseignement et charges .....................................  4
+  • Contraintes, activation, pondération ..................................  4
+  • Génération automatique, simulation, incrémental .......................  6
+  • Conflits, explications, suggestions ...................................  5
+  • Planification manuelle, déplacement, récurrence .......................  5
+  • Annulations, rattrapages, remplacements, notifications ................  5
+  • Examens, répartition en salles, convocations ..........................  4
+  • Émargement QR automatique (2 sens de scan) ............................  5
+  • Émargement manuel et forçage motivé ...................................  4
+  • Justificatifs d'absence ...............................................  3
+  • Présences intervenants, cahier de texte, heures certifiées ............  3
+  • Seuils, alertes, statistiques .........................................  3
+  • Exports et documents officiels ........................................  3
+  • Permissions, périmètres de secrétariat, accès étudiants/enseignants ...  4
+  Chaque scénario précise : acteur, préconditions, étapes, résultat attendu, statut, date, verdict.
+
+11.3 SCÉNARIOS DE RECETTE TERRAIN OBLIGATOIRES (conditions réelles, non simulées)
+  T1 — Cours magistral en amphithéâtre, 120 étudiants, QR projeté, réseau correct.
+  T2 — TP en laboratoire, 20 étudiants, scan inverse des badges par l'enseignant.
+  T3 — Séance d'athlétisme sur la piste, plein air, réseau mobile dégradé, mode hors-ligne.
+  T4 — Séance de natation à la piscine, téléphones interdits au bord du bassin : émargement
+       manuel intégral par l'encadrant, avec forçage motivé.
+  T5 — Panne réseau totale pendant une séance : bascule sur feuille d'émargement papier puis
+       saisie a posteriori avec forçage en lot motivé.
+  T6 — Annulation d'une séance publiée la veille : vérification de la réception des notifications
+       par les étudiants et l'enseignant, puis programmation du rattrapage.
+  Ces six scénarios conditionnent le passage de la vague V1 à la vague V2.
+
+====================================================================================================
+12. PLAN DE MIGRATION ET DE RÉVERSIBILITÉ DES DONNÉES
+====================================================================================================
+
+12.1 PRINCIPES
+  • Aucune migration destructive, jamais, à aucune étape.
+  • Toute migration est réversible et le rollback est testé avant la fusion.
+  • Les champs legacy ne sont jamais supprimés : ils passent en lecture seule et restent
+    synchronisés (règles D1 à D5 du rapport de mise en œuvre).
+  • Toute migration de données est précédée d'un --dry-run produisant un rapport chiffré.
+
+12.2 SÉQUENCE DE MIGRATION
+  M1 (P02) — RefSalle → Espace : création additive, RefSalle inchangée.
+  M2 (P03) — Maquettes → BesoinEnseignement : dérivation, aucune écriture dans les maquettes.
+  M3 (P05) — edts.EmploiDuTemps / AffectationCreneau → edt_injs : reprise avec conservation des
+             identifiants d'origine pour traçabilité.
+  M4 (P05) — Seance → SessionModule : création descendante, pilotée par drapeau.
+  M5 (P12) — SessionModule historiques → SeanceEmargement : reconstitution sans modification
+             des Pointage existants.
+  M6 (P12) — Pointage → LigneEmargement : rattachement par clé étrangère, lecture seule.
+  M7 (P22) — Contrôle global de réconciliation et bascule des sources de vérité.
+
+12.3 RAPPORT DE RÉCONCILIATION — TOLÉRANCE ZÉRO SUR LES TOTAUX
+  Grandeurs comparées avant et après chaque migration :
+    • nombre d'étudiants inscrits par groupe et par formation ;
+    • nombre de séances par module et par semestre ;
+    • volumes horaires prévus, planifiés et réalisés par ECUE ;
+    • nombre de pointages par séance et par étudiant ;
+    • taux de présence par étudiant, par module, par groupe et global ;
+    • montants et heures exploités par la finance formateurs.
+  Tout écart non nul suspend la migration et déclenche une analyse de cause racine.
+
+12.4 RÉVERSIBILITÉ
+  Pour chaque migration de données, une commande inverse est fournie et testée :
+    `python manage.py migrer_edt_vers_edt_injs --rollback --run-id <identifiant>`
+  Les données créées par une migration sont marquées par un identifiant d'exécution, ce qui rend
+  le retour arrière complet et sûr.
+
+====================================================================================================
+13. REGISTRE DES RISQUES ET PLANS DE CONTOURNEMENT
+====================================================================================================
+
+ Id   Risque                                          P  I  Criticité  Prévention / Contournement
+ ---  ----------------------------------------------  -  -  ---------  ----------------------------------
+ X01  Régression du badgeage en production            M  T  MAJEURE    Drapeau QR_V2 à 0 par défaut,
+      (impact direct sur les étudiants)                              coexistence des deux dispositifs,
+                                                                     tests de caractérisation P00,
+                                                                     bascule pilote seulement
+ X02  Pont Seance ↔ SessionModule mal maîtrisé        M  T  MAJEURE    Revue d'architecture dédiée en S6,
+      (touche le cœur historique)                                    drapeau PONT_SESSIONS, essai sur
+                                                                     copie de production
+ X03  Moteur de planification non maîtrisé            H  F  MAJEURE    Repli heuristique livré en premier,
+      (CP-SAT, explosion combinatoire)                               point d'étape décisionnel à S8,
+                                                                     mode manuel toujours utilisable
+ X04  Données de référence indisponibles              H  F  MAJEURE    Recueil lancé dès S1 ; calendrier
+      (calendrier, inventaire des espaces, maquettes)                 et espaces fictifs documentés en
+                                                                     secours ; escalade Direction à S3
+ X05  Sous-estimation de la grille interactive        H  M  MODÉRÉE    Grille en lecture seule livrée
+                                                                     d'abord ; alternative formulaire
+                                                                     obligatoire ; marge en I8
+ X06  Environnement de recette absent                 M  F  MAJEURE    Commandé en S1, prérequis bloquant
+      (l'audit signale son inexistence)                               de la porte G2
+ X07  Réseau instable sur les sites sportifs          H  M  MODÉRÉE    Mode hors-ligne obligatoire (P19),
+                                                                     scan inverse, feuille papier (P20),
+                                                                     scénarios T3 et T4 en recette
+ X08  Usage abusif du forçage de badgeage             M  M  MODÉRÉE    Motif obligatoire, délai de 72 h,
+                                                                     compteur par agent, rapport de
+                                                                     contrôle interne présenté à la
+                                                                     Direction
+ X09  Résistance au changement des enseignants        M  M  MODÉRÉE    Enseignant pilote associé dès S5,
+                                                                     manuels et fiches mémo, présence
+                                                                     terrain lors des 5 premières séances
+ X10  Dérive du périmètre (demandes additionnelles)   H  M  MODÉRÉE    Périmètre figé par le fichier de
+                                                                     prompts ; toute demande nouvelle
+                                                                     va au registre « après V3 »
+ X11  Dette de tests frontend (0 test aujourd'hui)    M  M  MODÉRÉE    Socle Vitest livré dans P17(a),
+                                                                     soit avant les écrans complexes
+ X12  CI mobile instable (asset app.env)              H  Fa MINEURE    Corrigée en première tâche de P19,
+                                                                     exécutable par anticipation dès I6
+ X13  Performance dégradée sous charge réelle         M  M  MODÉRÉE    Budgets contractualisés dans les
+                                                                     portes, assertNumQueries en CI,
+                                                                     bench à chaque itération
+ X14  Indisponibilité d'un acteur clé                 M  M  MODÉRÉE    Notes de conception systématiques,
+                                                                     journal tenu à jour, revue à deux
+ X15  Écart de réconciliation lors de la migration    M  T  MAJEURE    Tolérance zéro, --dry-run
+                                                                     obligatoire, rollback par run-id,
+                                                                     suspension immédiate de la bascule
+
+ Probabilité : H haute · M moyenne · Fa faible — Impact : T très fort · F fort · M modéré
+ Le registre est revu à chaque fin d'itération et mis à jour dans docs/EDT_INJS_JOURNAL.md.
+
+====================================================================================================
+14. MATRICE RACI DE L'EXÉCUTION
+====================================================================================================
+
+ R = Réalise · A = Approuve · C = Consulté · I = Informé
+
+ Activité                                  RT   DB   DF   DM   EF   RS   RP   EX   DIR
+ ----------------------------------------  ---  ---  ---  ---  ---  ---  ---  ---  ---
+ Note de conception d'un prompt            A    R    R    R    C    I    -    I    -
+ Développement backend (P00-P16, P20-P22)  C    R    -    -    C    C    -    I    -
+ Développement frontend (P17, P18)         C    C    R    -    C    C    C    -    -
+ Développement mobile (P19)                C    C    C    R    C    -    C    -    -
+ Revue de code                             A    R    R    R    -    -    -    -    -
+ Fourniture du calendrier académique réel  I    I    -    -    C    R    C    -    A
+ Fourniture de l'inventaire des espaces    I    I    -    -    C    R    C    C    A
+ Complétude des maquettes LMD du pilote    I    C    -    -    R    R    C    -    A
+ Validation de la liste des motifs         C    C    -    -    R    A    C    -    I
+ Relecture des messages utilisateur        C    C    C    C    R    A    C    -    -
+ Franchissement des portes G0 à G3         A    C    C    C    A    C    C    C    I
+ Recette fonctionnelle (60 scénarios)      C    C    C    C    R    R    C    -    I
+ Recette terrain (scénarios T1 à T6)       I    C    C    C    C    R    R    -    I
+ Migration des données                     A    R    -    -    C    C    -    R    I
+ Activation des drapeaux de bascule        A    C    -    -    C    C    I    R    A
+ Décision de passer d'une vague à l'autre  C    I    I    I    C    C    C    C    A
+ Suspension d'urgence d'une bascule        A    C    -    -    A    C    I    R    I
+ Sauvegardes et restaurations              C    I    -    -    -    -    -    R    I
+ Rédaction des 4 manuels                   C    C    C    C    R    R    C    -    A
+ Formation des utilisateurs                I    C    C    C    R    R    R    -    A
+ Jalons J1 à J5                            R    C    C    C    C    C    C    C    A
+ Arbitrage de périmètre (Annexe E)         R    C    C    C    A    C    C    -    A
+
+====================================================================================================
+15. INDICATEURS DE PILOTAGE ET TABLEAU DE BORD PROJET
+====================================================================================================
+
+15.1 INDICATEURS D'AVANCEMENT (relevés chaque vendredi)
+  • Prompts terminés / 22 et prompts du chemin critique terminés / 12
+  • Effort consommé / 148 JH et écart à la trajectoire
+  • Portes franchies / 4 et jalons atteints / 5
+  • Marge restante sur le chemin critique (en jours)
+
+15.2 INDICATEURS DE QUALITÉ (relevés à chaque fusion)
+  • Nombre de tests backend (référence 943 au départ, cible ≥ 1 300)
+  • Nombre de tests frontend (référence 0, cible ≥ 50)
+  • Nombre de tests mobile (référence 3, cible ≥ 20)
+  • Couverture sur le périmètre EDT-INJS (cible ≥ 85 %)
+  • Avertissements ESLint (référence 89, cible en diminution)
+  • Compteur de print() runtime (référence 288, cible ≤ 200)
+  • Nombre de fichiers dépassant les seuils de taille (cible : zéro nouveau)
+  • Durée totale de la CI (cible < 20 minutes)
+
+15.3 INDICATEURS DE PERFORMANCE (relevés à chaque fin d'itération)
+  • Grille hebdomadaire : temps de réponse et nombre de requêtes SQL (cibles < 400 ms, < 15)
+  • Feuille d'émargement de 300 étudiants (cible < 600 ms)
+  • Scan au 95e centile (cible < 200 ms)
+  • Génération de 520 séances (cible < 120 s)
+  • Clôture d'une séance de 300 étudiants (cible < 3 s)
+
+15.4 INDICATEURS D'EXPLOITATION (à partir de la vague V1)
+  • Taux de séances émargées / séances tenues
+  • Part des présences enregistrées par QR automatique / manuel / forçage
+  • Nombre de forçages par agent et par semaine (indicateur de contrôle interne)
+  • Nombre de scans refusés par code d'erreur
+  • Nombre d'incidents d'émargement ouverts et délai de résolution
+  • Taux de synchronisation des scans hors-ligne
+  • Disponibilité du service en heures ouvrées
+
+15.5 SUPPORT
+  Le tableau de bord est tenu dans docs/EDT_INJS_TABLEAU_DE_BORD.md, mis à jour chaque vendredi
+  par RT et présenté en comité de pilotage bimensuel.
+
+====================================================================================================
+16. RITUELS, INSTANCES ET CIRCUIT DE DÉCISION
+====================================================================================================
+
+16.1 RITUELS
+  • Point quotidien (15 min, équipe technique) : avancement, blocages, entraide.
+  • Revue de fin de prompt (20 min) : démonstration à EF, verdict, consignation.
+  • Revue de fin d'itération (1 h, tous acteurs) : démonstration intégrée, checklist Annexe B,
+    mise à jour du registre des risques, engagement de l'itération suivante.
+  • Comité de pilotage (1 h, bimensuel, avec DIR) : jalons, arbitrages, décisions de bascule.
+  • Rétrospective (45 min, fin d'itération) : ce qui a fonctionné, ce qui doit changer,
+    une action d'amélioration concrète par itération.
+
+16.2 CIRCUIT DE DÉCISION
+  Décision technique courante ................................ RT, immédiate
+  Décision d'architecture structurante ....................... RT après note de conception écrite
+  Décision fonctionnelle (règle métier, motif, seuil) ........ EF avec validation RS
+  Réduction de périmètre d'un prompt ......................... RT + EF, tracée dans le journal
+  Report d'un prompt ou d'un jalon ........................... RT + DIR sous 48 h
+  Activation ou désactivation d'un drapeau ................... EX sur décision RT, historisée
+  Suspension d'urgence d'une bascule ......................... RT ou EF, effet immédiat, sans
+                                                               validation préalable requise
+  Passage d'une vague à la suivante .......................... DIR sur avis de RT et EF
+
+16.3 GESTION DES DEMANDES NOUVELLES
+  Toute demande non prévue par le fichier de prompts est enregistrée dans
+  docs/EDT_INJS_DEMANDES.md avec son demandeur, sa description et sa justification. Elle n'est
+  JAMAIS intégrée en cours d'itération. Elle est arbitrée en comité de pilotage et, si retenue,
+  planifiée après la vague V3. Seules les corrections d'anomalies bloquantes échappent à cette règle.
+
+====================================================================================================
+17. PLAN DE CONDUITE DU CHANGEMENT ET DE FORMATION
+====================================================================================================
+
+17.1 CALENDRIER DE MOBILISATION
+  S1     Note d'information de la Direction à l'ensemble du personnel : objectifs, calendrier,
+         bénéfices attendus, interlocuteurs.
+  S5     Atelier « règles de planification de l'INJS » avec les responsables pédagogiques :
+         recueil des contraintes réelles, validation du catalogue.
+  S7     Démonstration du jalon J1 aux secrétariats.
+  S9     Démonstration du jalon J2 à la Direction et aux responsables de formation.
+  S13    Démonstration du jalon J3 aux enseignants volontaires ; recrutement des pilotes.
+  S16    Formation des utilisateurs pilotes : 1 demi-journée scolarité, 2 h enseignants,
+         30 min étudiants (en présentiel, avec les fiches mémo).
+  S17+   Permanence d'assistance pendant la vague V1 : présence physique lors des 5 premières
+         séances de chaque enseignant pilote.
+  V2/V3  Formation par vagues, avec les pilotes de la vague précédente comme relais.
+
+17.2 SUPPORTS PRODUITS (livrables de P22)
+  • Manuel administrateur — paramétrage, calendrier, espaces, contraintes, génération, incidents
+  • Manuel scolarité — planification quotidienne, conflits, forçages, justificatifs, exports
+  • Manuel enseignant — mes séances, émargement, QR, cahier de texte, heures
+  • Manuel étudiant — mon EDT, badger, mes présences, justificatifs
+  • Fiches mémo A4 recto plastifiées pour les salles de cours et les installations sportives
+  • Vidéo courte (3 min) de démonstration du badgeage, consultable depuis le mobile
+
+17.3 DISPOSITIF D'ASSISTANCE
+  • Point d'entrée unique pour les incidents, avec qualification en 4 gravités.
+  • Gravité 1 (émargement impossible en séance) : prise en charge immédiate, contournement
+    papier systématiquement proposé, résolution sous 4 h ouvrées.
+  • Gravité 2 (fonction dégradée) : sous 1 jour ouvré.
+  • Gravités 3 et 4 : traitées dans l'itération suivante.
+  • Journal des incidents alimentant la rétrospective et le registre des risques.
+
+17.4 MESURE DE L'ADHÉSION
+  Questionnaire court à la fin de chaque vague, auprès des enseignants, des agents de scolarité et
+  d'un échantillon d'étudiants : facilité d'usage, fiabilité perçue, temps gagné ou perdu,
+  suggestions. Résultats présentés en comité de pilotage et conditionnant le passage de vague.
+
+====================================================================================================
+18. CONDITIONS DE CLÔTURE DU PROJET
+====================================================================================================
+
+Le projet EDT-INJS est déclaré clos lorsque l'ensemble des conditions suivantes est réuni :
+
+ C1  Les 22 prompts sont exécutés, ou les écarts sont formellement arbitrés et documentés.
+ C2  Les 4 portes de qualité G0 à G3 sont franchies et les 5 jalons J1 à J5 sont atteints.
+ C3  Les 15 critères de la Definition of Done (Annexe D4 du fichier de prompts) sont satisfaits.
+ C4  La vague V3 est en service depuis un semestre complet sans incident de gravité 1 non résolu.
+ C5  La vague V4 est réalisée : le socle legacy est retiré, le dépôt est assaini, le README ne
+     comporte plus de mention héritée.
+ C6  Le cahier de recette de 60 scénarios et les 6 scénarios terrain sont tous au verdict ACCEPTÉ.
+ C7  Les 4 manuels sont validés par la Direction et diffusés.
+ C8  Le rapport de réconciliation final présente zéro écart sur l'ensemble des totaux.
+ C9  L'exploitation courante est transférée : runbook, commandes de diagnostic, sauvegardes
+     testées, astreinte définie, compétences internes en place.
+ C10 Un bilan de projet est présenté à la Direction : objectifs atteints, écarts, coûts, dettes
+     résiduelles, recommandations pour la suite (extension aux autres UFR, autres sites INJS).
+
+====================================================================================================
+ANNEXE A — CHECKLIST QUOTIDIENNE DE L'EXÉCUTANT
+====================================================================================================
+ Avant de commencer
+  ☐ Ma branche est à jour par rapport à `main`
+  ☐ Je connais le critère de sortie du prompt en cours
+  ☐ Je sais quel est mon livrable de la journée
+ Pendant
+  ☐ Je commits en petites unités cohérentes, en français, préfixées PXX
+  ☐ J'écris les tests en même temps que le code, pas après
+  ☐ Je n'ajoute ni print(), ni dépendance CDN, ni valeur métier codée en dur
+  ☐ Je vérifie la taille de chaque fichier que je touche
+ Avant de quitter
+  ☐ La suite de tests passe localement
+  ☐ Ma branche est poussée
+  ☐ J'ai noté mes blocages pour le point du lendemain
+  ☐ Rien n'est laissé dans un état non compilable
+
+====================================================================================================
+ANNEXE B — CHECKLIST DE FIN D'ITÉRATION
+====================================================================================================
+  ☐ Tous les prompts engagés dans l'itération sont fusionnés ou explicitement reportés
+  ☐ CI complètement verte sur `main`
+  ☐ Migrations appliquées en recette, sans erreur
+  ☐ Bench de performance exécuté, aucune dégradation supérieure à 5 %
+  ☐ docs/EDT_INJS_JOURNAL.md à jour pour chaque prompt
+  ☐ docs/EDT_INJS_RESTE_A_FAIRE.md à jour
+  ☐ Registre des risques revu et mis à jour
+  ☐ Tableau de bord projet actualisé
+  ☐ Note de version rédigée
+  ☐ Démonstration intégrée réalisée devant EF et, selon l'itération, RS ou RP
+  ☐ Rétrospective tenue, une action d'amélioration retenue
+  ☐ Version étiquetée dans Git
+
+====================================================================================================
+ANNEXE C — CHECKLIST DE MISE EN PRODUCTION
+====================================================================================================
+ Avant
+  ☐ Sauvegarde de la base effectuée, empreinte SHA-256 vérifiée, restauration testée
+  ☐ CI verte sur le commit à déployer
+  ☐ Migrations relues, réversibles, durée d'exécution estimée et acceptable
+  ☐ Drapeaux de fonctionnalité positionnés à la valeur prévue (par défaut : inactifs)
+  ☐ DEBUG à 0, SECRET_KEY définie, ALLOWED_HOSTS correct, HSTS actif
+  ☐ Middlewares de démonstration et d'auto-connexion vérifiés INERTES
+  ☐ Médias non servis publiquement, throttles actifs
+  ☐ Fenêtre de déploiement hors heures de cours communiquée aux utilisateurs
+  ☐ Procédure de repli (Annexe D) relue et à portée de main
+ Pendant
+  ☐ Déploiement, migrations, collectstatic, redémarrage des services
+  ☐ Vérification /api/health/ (base, cache, cron)
+ Après
+  ☐ Connexion vérifiée pour un compte de chaque rôle principal
+  ☐ Un parcours EDT et un parcours émargement testés en production
+  ☐ Journaux applicatifs surveillés pendant 30 minutes
+  ☐ Crons vérifiés à leur prochaine exécution
+  ☐ Communication de fin de déploiement aux utilisateurs
+  ☐ Consignation dans le journal
+
+====================================================================================================
+ANNEXE D — PROCÉDURE DE REPLI D'URGENCE
+====================================================================================================
+ Niveau 1 — REPLI FONCTIONNEL (moins de 1 minute, sans redéploiement)
+   Désactiver le drapeau concerné dans l'app `parametres`. Effet immédiat, aucun redémarrage.
+   Exemples : EDT_INJS_QR_V2 à 0 rétablit le badgeage historique ;
+              EDT_INJS_UI_NOUVELLE à 0 rétablit les écrans Edts.jsx.
+   C'est la voie à privilégier dans tous les cas.
+
+ Niveau 2 — REPLI APPLICATIF (5 à 15 minutes)
+   Redéploiement de l'étiquette de version précédente. Les migrations additives restent en place
+   (elles sont conçues pour être compatibles avec la version antérieure du code).
+
+ Niveau 3 — REPLI DE DONNÉES (30 à 60 minutes)
+   Exécution de la commande de rollback par identifiant d'exécution :
+     python manage.py migrer_edt_vers_edt_injs --rollback --run-id <identifiant>
+   Puis contrôle de réconciliation et vérification manuelle d'un échantillon.
+
+ Niveau 4 — RESTAURATION COMPLÈTE (dernier recours, 1 à 2 heures)
+   Restauration de la sauvegarde la plus récente vérifiée. Perte de données limitée à la fenêtre
+   depuis la dernière sauvegarde. Communication obligatoire aux utilisateurs et à la Direction.
+   Analyse de cause racine écrite dans les 48 h.
+
+ Dans tous les cas
+   • Informer immédiatement RT, EF et l'exploitant.
+   • Proposer un contournement aux utilisateurs (feuille d'émargement papier, saisie a posteriori
+     avec forçage motivé).
+   • Consigner l'incident, sa cause, sa résolution et l'action préventive retenue.
+
+====================================================================================================
+ANNEXE E — SCÉNARIOS DE DÉGRADATION ACCEPTABLE ET ARBITRAGES DE PÉRIMÈTRE
+====================================================================================================
+En cas de retard, le périmètre se réduit dans cet ordre précis. Ce qui est en haut de liste se
+sacrifie en premier ; ce qui est en bas ne se sacrifie jamais.
+
+ Rang  Élément réductible                                    Conséquence acceptée
+ ----  ----------------------------------------------------  -------------------------------------
+  1    Optimisation fine du moteur (contraintes souples)      EDT correct mais moins confortable
+  2    Comparateur de versions d'EDT                          Historique consultable sans diff visuel
+  3    Suggestions automatiques de résolution de conflits     L'explication seule reste fournie
+  4    Écran ScanBadge par webcam (P18)                       Le scan inverse reste possible sur mobile
+  5    Examens et répartition en salles (P10)                 Examens planifiés comme séances simples
+  6    Cahier de texte numérique (P15)                        Suivi des contenus hors application
+  7    Notifications e-mail et SMS                            Notifications in-app seules
+  8    Glisser-déposer de la grille (P17)                     Déplacement par formulaire uniquement
+  9    Mode hors-ligne mobile (P19)                           Émargement manuel en cas de coupure
+ 10    Génération automatique d'EDT (P06)                     Planification manuelle intégrale
+
+ JAMAIS RÉDUCTIBLES, EN AUCUNE CIRCONSTANCE
+  • Les tests de non-régression et la suite de tests verte (P00, P21)
+  • La traçabilité et le journal immuable (P05, P14)
+  • Le forçage de badgeage avec motif obligatoire (P14) — exigence utilisateur explicite
+  • Les contrôles de permission et le cloisonnement par secrétariat (P11)
+  • La sécurité du QR et les contrôles anti-fraude (P13)
+  • La réversibilité des migrations et la procédure de repli (P22)
+  • La feuille d'émargement papier de secours (P20)
+
+ Tout arbitrage est écrit, daté, signé par RT et EF, et consigné dans le journal avec sa
+ justification et la date de réexamen prévue.
+
+====================================================================================================
+ANNEXE F — MODÈLE DE COMPTE RENDU D'EXÉCUTION DE PROMPT
+====================================================================================================
+À reproduire dans docs/EDT_INJS_JOURNAL.md pour chaque prompt, le jour de sa fusion.
+
+  PROMPT ............. PXX — <intitulé>
+  Itération .......... Ix        Branche ......... feature/edt-injs-PXX-<libellé>
+  Démarré le ......... jj/mm/aaaa        Terminé le ...... jj/mm/aaaa
+  Exécutant .......... <rôle et nom>     Relecteur ....... <rôle et nom>
+  Effort estimé ...... X JH              Effort réel ..... Y JH        Écart ..... ±Z %
+
+  LIVRABLES PRODUITS
+    • <fichier> (créé / modifié, N lignes)
+    • ...
+  MIGRATIONS
+    • <numéro et nom> — réversibilité testée : oui / non — durée d'exécution : X s
+  TESTS
+    • Ajoutés : N — Suite complète : N tests, verte oui / non
+    • Couverture du périmètre : X %
+  PERFORMANCE
+    • <indicateur> : avant X ms → après Y ms (budget : Z ms) — respecté oui / non
+  DÉCISIONS D'ARCHITECTURE
+    • <décision> — justification — alternative écartée
+  ÉCARTS PAR RAPPORT AU PROMPT
+    • <écart> — justification — arbitré par <rôle> le jj/mm/aaaa
+  RISQUES ET DETTES CRÉÉS
+    • <élément> — gravité — échéance de traitement
+  RESTE À FAIRE (reporté dans EDT_INJS_RESTE_A_FAIRE.md)
+    • <élément>
+  VALIDATION FONCTIONNELLE
+    • Par <rôle et nom>, le jj/mm/aaaa — verdict : ACCEPTÉ / ACCEPTÉ AVEC RÉSERVES / REFUSÉ
+    • Réserves : <liste>
+  CRITÈRES DE SORTIE
+    ☐ ... (reprendre la liste « Sortie » de la fiche §7 correspondante)
+
+====================================================================================================
+RAPPEL FINAL
+====================================================================================================
+Ce plan sert un objectif unique : doter l'INJS Marcory d'un système d'emploi du temps et de
+présences fiable, sans jamais interrompre le service dont l'institut dépend chaque jour. La
+séquence P00 → P22 n'est pas une formalité administrative : chaque prompt prépare le suivant, et
+chaque porte de qualité protège l'existant. Un prompt exécuté hors séquence, une porte franchie
+sans contrôle ou un test désactivé sous la pression du calendrier transforme un projet maîtrisé en
+dette durable.
+
+Livrer peu, mais livrer sûr, souvent, et démontrable — telle est la règle de ce plan.
+====================================================================================================
+FIN DU PLAN D'EXÉCUTION — Plan-exécution-prompts-EDTINJS-app-injs-lmd2026.txt
+====================================================================================================
