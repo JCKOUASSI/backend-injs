@@ -1,0 +1,1543 @@
+1. ORGANIGRAMME FONCTIONNEL GLOBAL INJS-LMD
+
+DIRECTION GÉNÉRALE
+│
+├── 01. GOUVERNANCE & DIRECTION
+│
+├── 02. SECRÉTARIAT GÉNÉRAL
+│
+├── 03. QUALITÉ, AUDIT & ÉVALUATION
+│
+├── 04. PLANIFICATION, STATISTIQUES & PILOTAGE
+│
+├── 05. DIRECTION DES ÉTUDES / PÉDAGOGIE
+│   ├── Formations
+│   ├── Référentiels
+│   ├── Départements pédagogiques
+│   ├── Enseignants
+│   ├── Cours / ECUE
+│   ├── Volumes horaires
+│   └── Emplois du temps
+│
+├── 06. SCOLARITÉ
+│   ├── Candidatures
+│   ├── Concours / sélection
+│   ├── Admissions
+│   ├── Inscriptions
+│   ├── Étudiants
+│   ├── Groupes pédagogiques
+│   ├── Cursus
+│   ├── Transferts / équivalences
+│   └── Diplômes
+│
+├── 07. ÉVALUATIONS, JURYS & DIPLÔMATION
+│
+├── 08. STAGES, INSERTION & RELATIONS PROFESSIONNELLES
+│
+├── 09. RECHERCHE, INNOVATION & COOPÉRATION
+│
+├── 10. VIE ÉTUDIANTE & ACTION SOCIALE
+│
+├── 11. FINANCES & COMPTABILITÉ
+│
+├── 12. RESSOURCES HUMAINES
+│
+├── 13. ADMINISTRATION & MOYENS GÉNÉRAUX
+│
+├── 14. PATRIMOINE, LOGISTIQUE & MAINTENANCE
+│
+├── 15. INFORMATIQUE & SYSTÈMES D'INFORMATION
+│
+├── 16. DOCUMENTATION, ARCHIVES & GED
+│
+├── 17. COMMUNICATION & RELATIONS EXTÉRIEURES
+│
+└── 18. SÉCURITÉ, CONTRÔLE & CONFORMITÉ
+
+⸻
+
+2. GOUVERNANCE & DIRECTION
+
+Département / Direction
+
+Direction Générale
+
+Services :
+
+* Cabinet de la Direction
+* Secrétariat de Direction
+* Conseil de Direction
+* Conseil scientifique/pédagogique
+* Conseil de perfectionnement
+* Cellule juridique
+* Cellule de contrôle interne
+* Cellule de communication institutionnelle
+
+Comptes
+
+* Directeur Général
+* Directeur Général Adjoint
+* Secrétaire Général
+* Directeur des Études
+* Directeur Administratif et Financier
+* Directeur des Ressources Humaines
+* Directeur des Systèmes d’Information
+* Conseiller juridique
+* Responsable contrôle interne
+* Secrétaire de direction
+
+⸻
+
+3. QUALITÉ, AUDIT & ÉVALUATION
+
+Services
+
+* Assurance qualité
+* Évaluation des formations
+* Évaluation des enseignements
+* Audit interne
+* Accréditation / habilitation
+* Suivi des recommandations
+* Gestion des indicateurs qualité
+* Gestion documentaire qualité
+
+Comptes
+
+* Directeur Qualité
+* Responsable Assurance Qualité
+* Auditeur interne
+* Évaluateur
+* Responsable accréditation
+* Responsable indicateurs qualité
+
+⸻
+
+4. PLANIFICATION, STATISTIQUES & PILOTAGE
+
+Services
+
+* Planification
+* Statistiques
+* Business Intelligence
+* Tableaux de bord
+* Reporting
+* Prévisions d’effectifs
+* Analyse des performances
+* Suivi des objectifs
+
+Comptes
+
+* Directeur Planification
+* Statisticien
+* Data Analyst
+* Responsable BI
+* Analyste pédagogique
+* Responsable reporting
+* Administrateur tableaux de bord
+
+⸻
+
+5. DIRECTION DES ÉTUDES / PÉDAGOGIE
+
+C’est le cœur académique.
+
+5.1 Département Formations
+
+* Offres de formation
+* Mentions
+* Domaines
+* Filières
+* Spécialités
+* Parcours
+* Diplômes
+* Niveaux L1/L2/L3/M1/M2
+* Semestres
+* UE
+* ECUE
+* Crédits ECTS
+* Coefficients
+
+Comptes
+
+* Directeur des Études
+* Responsable Formation
+* Responsable Filière
+* Responsable Parcours
+* Coordonnateur pédagogique
+
+⸻
+
+5.2 Département Référentiels
+
+Gestion :
+
+* établissements
+* composantes
+* départements
+* formations
+* diplômes
+* années académiques
+* semestres
+* UE
+* ECUE
+* crédits
+* coefficients
+* types d’enseignement
+* CM
+* TD
+* TP
+* STAGE
+* mémoire
+* soutenance
+
+Comptes
+
+* Administrateur Référentiel
+* Gestionnaire Référentiel
+* Responsable pédagogique
+
+⸻
+
+5.3 Département Enseignements
+
+* Cours
+* ECUE
+* enseignants
+* affectations pédagogiques
+* volumes horaires
+* groupes
+* salles
+* séances
+* emplois du temps
+
+Comptes
+
+* Directeur des Études
+* Chef de département
+* Responsable pédagogique
+* Gestionnaire pédagogique
+* Enseignant
+* Vacataire
+
+⸻
+
+6. SCOLARITÉ
+
+C’est le deuxième cœur critique du SI.
+
+L’UFHB attribue notamment à sa Scolarité centrale les inscriptions administratives, le pilotage des scolarités pédagogiques, la gestion des salles et l’édition des attestations, certificats et diplômes.  
+
+Services
+
+6.1 Candidatures
+
+* ouverture candidature
+* dépôt dossier
+* pièces justificatives
+* contrôle dossier
+* validation dossier
+* rejet
+* demandes de complément
+* convocation
+
+Comptes
+
+* Responsable Candidatures
+* Agent Candidatures
+* Contrôleur dossiers
+
+⸻
+
+6.2 Concours / Sélection
+
+* sessions
+* candidats
+* épreuves
+* convocations
+* jurys
+* notes
+* classement
+* admissibilité
+* admission
+
+Comptes
+
+* Responsable Concours
+* Organisateur concours
+* Correcteur
+* Surveillant
+* Membre jury
+* Président jury
+
+⸻
+
+6.3 Admissions
+
+* candidats admis
+* liste principale
+* liste complémentaire
+* confirmation admission
+* affectation formation
+* admission définitive
+
+Comptes
+
+* Responsable Admissions
+* Agent Admissions
+* Validateur Admissions
+
+⸻
+
+6.4 Inscriptions
+
+* inscription administrative
+* inscription pédagogique
+* réinscription
+* transfert
+* abandon
+* suspension
+* reprise d’études
+
+Comptes
+
+* Responsable Scolarité
+* Agent Scolarité
+* Gestionnaire Inscriptions
+
+⸻
+
+6.5 Gestion étudiants
+
+* dossier étudiant
+* identité
+* photo
+* matricule
+* cursus
+* historique
+* statut
+* situation académique
+* documents
+
+Comptes
+
+* Gestionnaire Étudiants
+* Agent Scolarité
+* Responsable Scolarité
+
+⸻
+
+7. GROUPES PÉDAGOGIQUES
+
+Services :
+
+* création groupes
+* affectation étudiants
+* groupes CM
+* groupes TD
+* groupes TP
+* groupes de stage
+* groupes de mémoire
+* listes de présence
+
+Comptes
+
+* Responsable Groupes
+* Gestionnaire pédagogique
+* Enseignant
+
+⸻
+
+8. ÉVALUATIONS
+
+Services
+
+* contrôle continu
+* examens
+* partiels
+* rattrapage
+* notes
+* absences
+* calcul moyennes
+* crédits
+* compensation
+* validation UE
+* validation semestre
+* progression
+
+Comptes
+
+* Responsable Évaluations
+* Gestionnaire Notes
+* Enseignant
+* Correcteur
+* Responsable pédagogique
+
+⸻
+
+9. JURYS
+
+Services
+
+* constitution jury
+* membres
+* convocations
+* procès-verbal
+* délibération
+* validation résultats
+* classement
+* décision jury
+* publication
+
+Comptes
+
+* Président Jury
+* Membre Jury
+* Rapporteur
+* Secrétaire Jury
+* Responsable Jury
+* Administrateur Jury
+
+⸻
+
+10. DIPLÔMATION
+
+Services
+
+* étudiants diplômables
+* contrôle conditions
+* validation diplôme
+* génération diplôme
+* attestations
+* certificats
+* relevés de notes
+* numérotation
+* signature
+* registre diplômes
+* vérification diplôme
+* duplicata
+
+Comptes
+
+* Responsable Diplômes
+* Agent Diplômes
+* Validateur Diplômes
+* Signataire
+* Administrateur Scolarité
+
+⸻
+
+11. STAGES
+
+Services
+
+* conventions
+* entreprises
+* organismes d’accueil
+* affectation étudiants
+* tuteurs
+* encadreurs
+* suivi stage
+* rapports
+* évaluations
+* soutenances
+
+Comptes
+
+* Responsable Stages
+* Gestionnaire Stages
+* Enseignant encadreur
+* Tuteur entreprise
+* Jury Stage
+* Étudiant
+
+⸻
+
+12. MÉMOIRES / PROJETS / SOUTENANCES
+
+Services
+
+* sujets
+* affectation encadreur
+* dépôt mémoire
+* contrôle
+* planification soutenance
+* jury
+* notation
+* procès-verbal
+* archivage
+
+Comptes
+
+* Responsable Mémoires
+* Encadreur
+* Étudiant
+* Rapporteur
+* Président Jury
+* Secrétaire Jury
+
+⸻
+
+13. RECHERCHE & INNOVATION
+
+Services
+
+* projets de recherche
+* chercheurs
+* publications
+* laboratoires
+* partenariats
+* conférences
+* thèses
+* doctorats
+* financement recherche
+
+Comptes
+
+* Directeur Recherche
+* Responsable Laboratoire
+* Chercheur
+* Enseignant-chercheur
+* Doctorant
+* Gestionnaire Recherche
+
+⸻
+
+14. VIE ÉTUDIANTE
+
+Services
+
+* associations
+* activités
+* clubs
+* événements
+* aide sociale
+* accompagnement
+* santé
+* handicap
+* logement
+* bourses
+* réclamations
+
+Le MESRS ivoirien distingue d’ailleurs la dimension des œuvres universitaires, de la vie associative et du genre au niveau de la DGES.  
+
+Comptes
+
+* Responsable Vie Étudiante
+* Assistant social
+* Gestionnaire Bourses
+* Responsable Associations
+* Responsable Clubs
+* Étudiant
+
+⸻
+
+15. FINANCES ÉTUDIANTES
+
+Services
+
+* frais d’inscription
+* frais de scolarité
+* échéanciers
+* facturation
+* paiements
+* reçus
+* impayés
+* remboursements
+* exonérations
+* bourses
+* aides
+* rapprochement bancaire
+
+Comptes
+
+* Directeur Financier
+* Responsable Finances Étudiantes
+* Comptable
+* Caissier
+* Agent Recouvrement
+* Contrôleur financier
+* Auditeur financier
+
+⸻
+
+16. COMPTABILITÉ & BUDGET
+
+Services
+
+* budget
+* dépenses
+* recettes
+* engagements
+* fournisseurs
+* factures
+* paiements
+* comptabilité
+* trésorerie
+* immobilisations
+* clôture
+* reporting financier
+
+Les organisations universitaires ivoiriennes distinguent bien budget, comptabilité, patrimoine/maintenance et ressources informatiques.  
+
+Comptes
+
+* Directeur Administratif et Financier
+* Responsable Budget
+* Comptable
+* Trésorier
+* Contrôleur
+* Agent financier
+* Gestionnaire fournisseurs
+
+⸻
+
+17. RESSOURCES HUMAINES
+
+Services
+
+* personnels
+* recrutement
+* contrats
+* carrières
+* affectations
+* enseignants
+* administratifs
+* congés
+* absences
+* évaluations
+* formation
+* paie
+* dossiers administratifs
+
+La DRH du MESRS indique notamment comme missions la gestion des ressources humaines et des carrières.  
+
+Comptes
+
+* Directeur RH
+* Responsable RH
+* Gestionnaire RH
+* Gestionnaire Carrière
+* Gestionnaire Paie
+* Responsable Formation
+* Assistant RH
+
+⸻
+
+18. ADMINISTRATION & MOYENS GÉNÉRAUX
+
+Services
+
+* courrier
+* secrétariat
+* achats
+* marchés
+* fournisseurs
+* logistique
+* missions
+* déplacements
+* véhicules
+* fournitures
+
+Comptes
+
+* Directeur Administration
+* Responsable Moyens Généraux
+* Gestionnaire Achats
+* Logisticien
+* Agent administratif
+* Gestionnaire Courrier
+
+⸻
+
+19. PATRIMOINE & MAINTENANCE
+
+Services
+
+* bâtiments
+* salles
+* amphithéâtres
+* laboratoires
+* équipements
+* mobilier
+* véhicules
+* inventaire
+* maintenance
+* interventions
+* énergie
+* sécurité des installations
+
+Comptes
+
+* Responsable Patrimoine
+* Gestionnaire Immobilier
+* Responsable Maintenance
+* Technicien
+* Magasinier
+* Gestionnaire Inventaire
+
+⸻
+
+20. INFORMATIQUE & SYSTÈMES D’INFORMATION
+
+Services
+
+Infrastructure
+
+* serveurs
+* réseau
+* Wi-Fi
+* postes
+* sauvegardes
+
+Applications
+
+* SI LMD
+* API
+* frontend
+* applications mobiles
+* intégrations
+
+Données
+
+* bases de données
+* référentiels
+* BI
+* sauvegardes
+* archivage
+
+Sécurité
+
+* IAM
+* MFA
+* journaux
+* audit
+* sécurité applicative
+* cybersécurité
+
+Comptes
+
+* Directeur SI
+* Administrateur SI
+* Administrateur système
+* Administrateur réseau
+* Administrateur base de données
+* DevOps
+* Développeur
+* Support informatique
+* Analyste sécurité
+* Data Engineer
+* Data Analyst
+
+⸻
+
+21. DOCUMENTATION / ARCHIVES / GED
+
+Services
+
+* courrier entrant
+* courrier sortant
+* documents étudiants
+* documents administratifs
+* archivage
+* GED
+* conservation
+* recherche documentaire
+
+Comptes
+
+* Responsable Archives
+* Archiviste
+* Documentaliste
+* Gestionnaire GED
+* Agent courrier
+
+⸻
+
+22. COMMUNICATION
+
+Services
+
+* communication institutionnelle
+* site web
+* réseaux sociaux
+* événements
+* presse
+* campagnes
+* publications
+
+Comptes
+
+* Directeur Communication
+* Responsable Communication
+* Community Manager
+* Webmaster
+* Chargé événementiel
+
+⸻
+
+23. SÉCURITÉ & CONTRÔLE
+
+Services
+
+* sécurité physique
+* contrôle d’accès
+* badges
+* incidents
+* contrôle interne
+* conformité
+* audit
+* traçabilité
+
+Comptes
+
+* Responsable Sécurité
+* Agent Sécurité
+* Contrôleur interne
+* Auditeur
+* Responsable conformité
+
+⸻
+
+24. LES COMPTES TRANSVERSAUX DU SI
+
+Je recommande de ne jamais créer uniquement des comptes correspondant aux personnes physiques.
+
+Il faut distinguer :
+
+A. Utilisateur
+
+La personne réelle.
+
+User
+├── identité
+├── matricule
+├── email
+├── téléphone
+├── statut
+└── authentification
+
+B. Fonction
+
+Ce que fait la personne.
+
+Fonction
+├── Directeur
+├── Responsable
+├── Gestionnaire
+├── Agent
+├── Enseignant
+├── Étudiant
+└── etc.
+
+C. Rôle
+
+Les droits fonctionnels.
+
+Role
+├── SCOLARITE_AGENT
+├── SCOLARITE_MANAGER
+├── ENSEIGNANT
+├── JURY_PRESIDENT
+├── FINANCE_COMPTABLE
+└── etc.
+
+D. Périmètre
+
+Très important pour INJS-LMD.
+
+Un rôle ne doit pas forcément donner accès à tout l’établissement.
+
+Exemple :
+
+Jean
+  ↓
+Responsable pédagogique
+  ↓
+Role = PEDAGOGIE_MANAGER
+  ↓
+Périmètre = Licence 3
+  ↓
+Filière = STAPS
+
+⸻
+
+25. MATRICE DES RÔLES PRINCIPAUX
+
+Je conseille au minimum les rôles suivants.
+
+Code	Rôle
+SUPER_ADMIN	Super administrateur
+ADMIN_SI	Administrateur SI
+DIRECTION	Direction
+SECRETARIAT_GENERAL	Secrétariat général
+QUALITE_MANAGER	Responsable qualité
+AUDITEUR	Auditeur
+PLANIFICATION_MANAGER	Planification
+STATISTICIEN	Statistiques
+PEDAGOGIE_MANAGER	Direction pédagogique
+CHEF_DEPARTEMENT	Chef de département
+RESPONSABLE_FORMATION	Responsable formation
+RESPONSABLE_PARCOURS	Responsable parcours
+ENSEIGNANT	Enseignant
+VACATAIRE	Vacataire
+SCOLARITE_MANAGER	Responsable scolarité
+SCOLARITE_AGENT	Agent scolarité
+CANDIDATURE_MANAGER	Responsable candidatures
+CANDIDATURE_AGENT	Agent candidatures
+CONCOURS_MANAGER	Responsable concours
+CONCOURS_CORRECTEUR	Correcteur
+CONCOURS_SURVEILLANT	Surveillant
+ADMISSION_MANAGER	Responsable admissions
+INSCRIPTION_MANAGER	Responsable inscriptions
+ETUDIANT_MANAGER	Gestionnaire étudiants
+GROUPE_MANAGER	Gestionnaire groupes
+EVALUATION_MANAGER	Responsable évaluations
+NOTE_MANAGER	Gestionnaire notes
+JURY_PRESIDENT	Président jury
+JURY_MEMBER	Membre jury
+JURY_SECRETARY	Secrétaire jury
+DIPLOME_MANAGER	Responsable diplômes
+DIPLOME_VALIDATOR	Validateur diplômes
+SIGNATAIRE	Signataire
+STAGE_MANAGER	Responsable stages
+ENCADREUR	Encadreur
+TUTEUR_ENTREPRISE	Tuteur externe
+RECHERCHE_MANAGER	Responsable recherche
+CHERCHEUR	Chercheur
+VIE_ETUDIANTE	Vie étudiante
+BOURSE_MANAGER	Gestionnaire bourses
+FINANCE_MANAGER	Responsable finances
+COMPTABLE	Comptable
+CAISSIER	Caissier
+RECOUVREMENT	Recouvrement
+CONTROLEUR_FINANCIER	Contrôleur financier
+RH_MANAGER	Directeur RH
+RH_AGENT	Agent RH
+PAIE_MANAGER	Responsable paie
+ADMIN_MANAGER	Administration
+ACHATS_MANAGER	Achats
+LOGISTICIEN	Logistique
+PATRIMOINE_MANAGER	Patrimoine
+MAINTENANCE	Maintenance
+ARCHIVISTE	Archives
+GED_MANAGER	GED
+COMMUNICATION_MANAGER	Communication
+SUPPORT_IT	Support informatique
+SYSADMIN	Administrateur système
+NETWORK_ADMIN	Administrateur réseau
+DB_ADMIN	Administrateur BDD
+SECURITY_ADMIN	Sécurité
+DATA_ANALYST	Data Analyst
+API_MANAGER	Administration API
+LECTEUR	Lecture seule
+AUDIT_READONLY	Audit lecture seule
+
+⸻
+
+26. LES PERMISSIONS
+
+Il faut éviter de créer des permissions du genre :
+
+« peut accéder à la page Scolarité »
+
+C’est trop grossier.
+
+Il faut construire les permissions selon :
+
+MODULE + OBJET + ACTION
+
+Exemple :
+
+students.view
+students.create
+students.update
+students.delete
+
+Puis :
+
+students.export
+students.import
+students.validate
+students.archive
+
+⸻
+
+27. ACTIONS STANDARD
+
+Pour pratiquement tous les objets :
+
+view
+list
+create
+update
+delete
+validate
+reject
+cancel
+archive
+restore
+export
+import
+print
+download
+publish
+unpublish
+approve
+sign
+
+⸻
+
+28. PERMISSIONS SCOLARITÉ
+
+Candidatures
+
+candidatures.view
+candidatures.create
+candidatures.update
+candidatures.validate
+candidatures.reject
+candidatures.request_completion
+candidatures.import
+candidatures.export
+
+Admissions
+
+admissions.view
+admissions.create
+admissions.update
+admissions.validate
+admissions.reject
+admissions.publish
+
+Inscriptions
+
+inscriptions.view
+inscriptions.create
+inscriptions.update
+inscriptions.validate
+inscriptions.cancel
+inscriptions.export
+
+Étudiants
+
+students.view
+students.create
+students.update
+students.archive
+students.restore
+students.export
+
+Diplômes
+
+diplomas.view
+diplomas.create
+diplomas.validate
+diplomas.sign
+diplomas.publish
+diplomas.revoke
+diplomas.download
+
+⸻
+
+29. PERMISSIONS PÉDAGOGIQUES
+
+formations.view
+formations.create
+formations.update
+formations.delete
+formations.validate
+referentiels.view
+referentiels.create
+referentiels.update
+referentiels.validate
+ues.view
+ues.create
+ues.update
+ues.delete
+ecues.view
+ecues.create
+ecues.update
+ecues.delete
+enseignements.view
+enseignements.create
+enseignements.update
+teacher_assignments.view
+teacher_assignments.create
+teacher_assignments.update
+teacher_assignments.delete
+groups.view
+groups.create
+groups.update
+groups.delete
+schedules.view
+schedules.create
+schedules.update
+schedules.publish
+
+⸻
+
+30. PERMISSIONS NOTES / ÉVALUATIONS
+
+evaluations.view
+evaluations.create
+evaluations.update
+notes.view
+notes.create
+notes.update
+notes.submit
+notes.validate
+notes.lock
+notes.unlock
+results.view
+results.calculate
+results.validate
+results.publish
+transcripts.view
+transcripts.generate
+transcripts.download
+
+Point de sécurité essentiel
+
+Un enseignant doit pouvoir :
+
+voir ses cours
+voir ses groupes
+saisir ses notes
+modifier ses notes avant verrouillage
+soumettre ses notes
+
+Mais il ne doit pas pouvoir :
+
+modifier les notes d'un autre enseignant
+déverrouiller une session validée
+modifier un jury
+modifier un résultat publié
+modifier le référentiel
+
+⸻
+
+31. PERMISSIONS JURY
+
+juries.view
+juries.create
+juries.update
+juries.delete
+jury_members.add
+jury_members.remove
+jury_sessions.create
+jury_sessions.open
+jury_sessions.close
+jury_results.view
+jury_results.deliberate
+jury_results.validate
+jury_results.publish
+pv.generate
+pv.validate
+pv.sign
+pv.download
+
+⸻
+
+32. PERMISSIONS FINANCES
+
+payments.view
+payments.create
+payments.validate
+payments.cancel
+payments.refund
+invoices.view
+invoices.create
+invoices.update
+invoices.cancel
+fees.view
+fees.create
+fees.update
+fees.validate
+scholarships.view
+scholarships.create
+scholarships.validate
+debts.view
+debts.create
+debts.update
+accounting.view
+accounting.create
+accounting.validate
+financial_reports.view
+financial_reports.export
+
+⸻
+
+33. PERMISSIONS RH
+
+employees.view
+employees.create
+employees.update
+employees.archive
+contracts.view
+contracts.create
+contracts.update
+careers.view
+careers.update
+leave_requests.view
+leave_requests.create
+leave_requests.validate
+payroll.view
+payroll.create
+payroll.validate
+payroll.export
+
+⸻
+
+34. PERMISSIONS STAGES
+
+internships.view
+internships.create
+internships.update
+internships.validate
+internships.assign
+internships.close
+internship_companies.view
+internship_companies.create
+internship_companies.update
+internship_reports.view
+internship_reports.submit
+internship_reports.validate
+internship_evaluations.view
+internship_evaluations.create
+internship_evaluations.validate
+
+⸻
+
+35. PERMISSIONS PATRIMOINE
+
+assets.view
+assets.create
+assets.update
+assets.delete
+assets.assign
+assets.transfer
+assets.reform
+rooms.view
+rooms.create
+rooms.update
+rooms.delete
+maintenance.view
+maintenance.create
+maintenance.update
+maintenance.close
+
+⸻
+
+36. PERMISSIONS SI / ADMINISTRATION
+
+users.view
+users.create
+users.update
+users.disable
+users.enable
+roles.view
+roles.create
+roles.update
+roles.delete
+permissions.view
+permissions.assign
+audit_logs.view
+security_logs.view
+system_settings.view
+system_settings.update
+backups.view
+backups.create
+backups.restore
+api_keys.view
+api_keys.create
+api_keys.revoke
+
+⸻
+
+37. RÔLE ÉTUDIANT
+
+Le compte étudiant mérite un traitement particulier.
+
+Il ne doit évidemment pas avoir accès à l’administration interne.
+
+Permissions
+
+profile.view
+profile.update_limited
+application.create
+application.view
+application.update
+admission.view
+registration.view
+registration.request
+courses.view
+groups.view
+schedule.view
+attendance.view
+grades.view
+results.view
+transcript.view
+transcript.download
+diploma.view
+diploma.download
+internship.view
+internship.submit_report
+payments.view
+payments.create
+notifications.view
+complaints.create
+complaints.view
+
+⸻
+
+38. RÔLE ENSEIGNANT
+
+profile.view
+profile.update_limited
+teaching_assignments.view
+courses.view
+groups.view
+schedule.view
+attendance.view
+attendance.create
+attendance.update
+evaluations.view
+evaluations.create
+grades.view
+grades.create
+grades.update
+grades.submit
+students.view_limited
+jury.view
+jury.participate
+internships.view
+internships.supervise
+messages.view
+messages.create
+
+⸻
+
+39. RÔLE RESPONSABLE DE FORMATION
+
+Il dispose de davantage de droits :
+
+formations.view
+formations.update
+courses.view
+courses.create
+courses.update
+groups.view
+groups.create
+groups.update
+teacher_assignments.view
+teacher_assignments.create
+teacher_assignments.update
+evaluations.view
+results.view
+statistics.view
+students.view
+jury.view
+
+Mais pas :
+
+finance.*
+users.*
+system_settings.*
+roles.*
+
+⸻
+
+40. SUPER ADMINISTRATEUR
+
+Le SUPER_ADMIN est extrêmement puissant.
+
+Il peut :
+
+users.*
+roles.*
+permissions.*
+settings.*
+audit_logs.view
+system.*
+database.*
+
+Mais je recommande fortement une règle :
+
+Même le Super Admin ne doit pas modifier directement les résultats académiques, les paiements ou les diplômes sans traçabilité renforcée.
+
+Il faut distinguer :
+
+ADMINISTRER
+
+de :
+
+DÉCIDER
+
+⸻
+
+41. MATRICE DE SÉPARATION DES POUVOIRS
+
+Pour INJS-LMD, c’est particulièrement important.
+
+Fonction	Peut créer	Peut modifier	Peut valider	Peut publier
+Agent Scolarité	Oui	Oui	Non	Non
+Responsable Scolarité	Oui	Oui	Oui	Oui
+Enseignant	Notes	Notes	Soumission	Non
+Responsable pédagogique	Oui	Oui	Oui	Non
+Jury	Résultats	Délibération	Oui	Non
+Président Jury	—	Délibération	Oui	Oui
+Finance Agent	Paiement	Paiement	Non	Non
+Responsable Finance	Oui	Oui	Oui	Oui
+RH Agent	Dossier	Oui	Non	Non
+Directeur RH	Oui	Oui	Oui	Oui
+Administrateur SI	Utilisateurs	Oui	—	—
+Auditeur	Non	Non	Non	Non
+
+⸻
+
+42. MODÈLE DE SÉCURITÉ QUE JE RECOMMANDE POUR INJS-LMD
+
+Il faut finalement avoir 5 niveaux simultanés :
+
+UTILISATEUR
+     ↓
+RÔLE
+     ↓
+PERMISSION
+     ↓
+PÉRIMÈTRE
+     ↓
+DONNÉES
+
+Exemple :
+
+Jean
+│
+├── Rôle : RESPONSABLE_FORMATION
+│
+├── Permissions :
+│   ├── formations.view
+│   ├── formations.update
+│   ├── groups.view
+│   └── teacher_assignments.view
+│
+├── Périmètre :
+│   └── Formation = Licence STAPS
+│
+└── Données accessibles :
+    └── uniquement STAPS
+
+C’est beaucoup plus sûr qu’un simple RBAC.
+
+⸻
+
+43. LES 10 PROFILS À NE SURTOUT PAS CONFONDRE
+
+Pour ton INJS-LMD, je séparerais impérativement :
+
+1. Administrateur SI
+2. Responsable Scolarité
+3. Responsable Pédagogique
+4. Enseignant
+5. Responsable Évaluations
+6. Président/Membre de Jury
+7. Responsable Diplômation
+8. Responsable Finances
+9. Responsable RH
+10. Étudiant
+
+Ce sont des responsabilités différentes et donc des droits différents.
+
+⸻
+
+44. ARCHITECTURE FINALE RECOMMANDÉE POUR TON INJS-LMD
+
+Compte tenu de ton projet actuel, je structurerais le menu principal comme ceci :
+
+TABLEAU DE BORD
+│
+├── GOUVERNANCE
+│
+├── RÉFÉRENTIELS
+│
+├── CANDIDATURES
+│
+├── CONCOURS / SÉLECTION
+│
+├── ADMISSIONS
+│
+├── SCOLARITÉ
+│   ├── Inscriptions
+│   ├── Étudiants
+│   ├── Groupes
+│   ├── Cursus
+│   ├── Transferts
+│   └── Diplômes
+│
+├── PÉDAGOGIE
+│   ├── Formations
+│   ├── UE / ECUE
+│   ├── Cours
+│   ├── Enseignants
+│   ├── Affectations
+│   ├── Volumes horaires
+│   └── Emplois du temps
+│
+├── PRÉSENCES
+│
+├── ÉVALUATIONS
+│   ├── Épreuves
+│   ├── Notes
+│   ├── Résultats
+│   └── Rattrapages
+│
+├── JURYS
+│
+├── DIPLÔMATION
+│
+├── STAGES
+│
+├── MÉMOIRES / SOUTENANCES
+│
+├── RECHERCHE
+│
+├── VIE ÉTUDIANTE
+│
+├── FINANCES
+│
+├── RESSOURCES HUMAINES
+│
+├── ADMINISTRATION
+│
+├── PATRIMOINE
+│
+├── DOCUMENTS / ARCHIVES
+│
+├── QUALITÉ
+│
+├── STATISTIQUES
+│
+├── COMMUNICATION
+│
+└── ADMINISTRATION SI
+    ├── Utilisateurs
+    ├── Rôles
+    ├── Permissions
+    ├── Périmètres
+    ├── Journaux d'audit
+    ├── Paramètres
+    └── Sécurité
+
+Point important pour ton projet actuel
+
+Cette architecture est plus large que les seuls écrans actuellement présents dans app-injs-lmd2026. Elle doit donc être considérée comme le référentiel fonctionnel cible, et non comme l’affirmation que chaque module est déjà implémenté.
+
+Elle correspond néanmoins beaucoup mieux à un SI LMD institutionnel complet : le MESRS ivoirien met lui-même en avant la gestion des formations, l’habilitation, la qualité, les étudiants, les enseignants et les établissements, tandis que les universités structurent leurs fonctions autour de la scolarité, finances, RH, pédagogie, planification et SI.  
+
+Pour INJS-LMD, je transformerais maintenant cette architecture en un véritable référentiel exploitable par le développement : Département → Service → Module → Fonctionnalité → Rôle → Permission → Périmètre → Écran → API → modèle de données. C’est cette étape qui permettrait ensuite de comparer objectivement cette cible avec les modules déjà présents dans ton application et d’identifier les vrais écarts.
+
+
+
+
+
+

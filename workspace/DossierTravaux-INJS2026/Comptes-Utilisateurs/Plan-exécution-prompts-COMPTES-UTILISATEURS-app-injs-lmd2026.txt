@@ -1,0 +1,1575 @@
+====================================================================================================
+PLAN D'EXÉCUTION DES PROMPTS « COMPTES UTILISATEURS — RÔLES & PERMISSIONS » (CURP-INJS)
+Mise en œuvre de la création et de la modification des comptes des acteurs du processus,
+de la gestion des rôles, des permissions, des niveaux N0–N4 et des périmètres
+dans l'application app-injs-lmd2026demo
+====================================================================================================
+Institution        : Institut National de la Jeunesse et des Sports (INJS) — Marcory, Abidjan, Côte d'Ivoire
+Unité              : UFR STAPS-JL
+Application cible  : app-injs-lmd2026demo (Django 5.1.4 + DRF / React 18 + Vite 7 / Flutter + PWA / PostgreSQL / Redis)
+Objet du document  : Plan d'exécution ordonné, séquencé et contrôlé des prompts du fichier
+                     « Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt »
+Date               : 13 septembre 2026
+Horizon            : 16 semaines calendaires (8 itérations de 2 semaines) + 1 semestre d'observation
+                     avant retrait de l'ancien dispositif
+Statut             : Document opérationnel de pilotage — à tenir à jour à chaque itération
+Principe directeur : ZÉRO RÉGRESSION D'ACCÈS. À la fin de CHAQUE prompt, de CHAQUE jour et de CHAQUE
+                     itération, tout compte en service se connecte et accède exactement à ce à quoi
+                     il accédait la veille. Ni moins — ni plus.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+ 1.  OBJET, PÉRIMÈTRE ET RÈGLES DE PILOTAGE
+ 2.  ORGANISATION DE L'ÉQUIPE ET RÔLES
+ 3.  ORDONNANCEMENT GÉNÉRAL — VUE SYNOPTIQUE DES 8 ITÉRATIONS
+ 4.  GRAPHE DE DÉPENDANCES ENTRE UNITÉS ET CHEMIN CRITIQUE
+ 5.  PROCÉDURE STANDARD D'EXÉCUTION D'UNE UNITÉ (CYCLE EN 10 ÉTAPES)
+ 6.  PORTES DE QUALITÉ, JALONS DE SÛRETÉ ET CRITÈRES DE PASSAGE
+ 7.  FICHES D'EXÉCUTION DÉTAILLÉES — LES 9 UNITÉS DE TRAVAIL
+ 8.  PLANNING DÉTAILLÉ SEMAINE PAR SEMAINE
+ 9.  STRATÉGIE DE BRANCHES, DE VERSIONS ET DE LIVRAISON
+10.  DRAPEAUX DE FONCTIONNALITÉ ET PLAN DE BASCULE EN 4 ÉTAPES
+11.  PROTOCOLE DU MODE OBSERVATION — LE CŒUR DE LA NON-RÉGRESSION
+12.  PLAN DE TESTS ET DE RECETTE PAR ÉTAPE
+13.  PLAN DE MIGRATION ET DE RÉVERSIBILITÉ DES DONNÉES
+14.  REGISTRE DES RISQUES ET PLANS DE CONTOURNEMENT
+15.  MATRICE RACI DE L'EXÉCUTION
+16.  INDICATEURS DE PILOTAGE ET TABLEAU DE BORD PROJET
+17.  RITUELS, INSTANCES ET CIRCUIT DE DÉCISION
+18.  PLAN DE CONDUITE DU CHANGEMENT ET DE FORMATION
+19.  ARTICULATION AVEC LE CHANTIER EDT-INJS
+20.  CONDITIONS DE CLÔTURE DU PROJET
+ANNEXE A — CHECKLIST QUOTIDIENNE DE L'EXÉCUTANT
+ANNEXE B — CHECKLIST DE FIN D'ITÉRATION
+ANNEXE C — CHECKLIST DE MISE EN PRODUCTION
+ANNEXE D — PROCÉDURE DE REPLI D'URGENCE ET DE RÉCUPÉRATION D'ACCÈS
+ANNEXE E — SCÉNARIOS DE DÉGRADATION ACCEPTABLE ET ARBITRAGES DE PÉRIMÈTRE
+ANNEXE F — MODÈLE DE COMPTE RENDU D'EXÉCUTION D'UNITÉ
+ANNEXE G — MODE MONO-EXÉCUTANT (UNE SEULE PERSONNE DISPONIBLE)
+====================================================================================================
+
+
+====================================================================================================
+1. OBJET, PÉRIMÈTRE ET RÈGLES DE PILOTAGE
+====================================================================================================
+
+1.1 OBJET
+Ce plan organise l'exécution des sept prompts consignés dans le fichier
+« Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt » : le prompt principal CURP-INJS
+et les six prompts complémentaires C1 à C6. Il précise, pour chaque unité de travail : le moment de
+son exécution, ses prérequis, son déroulé jour par jour, ses livrables, ses critères d'entrée et de
+sortie, son effort estimé, ses acteurs, ses risques et sa procédure de repli.
+
+Il ajoute deux unités qui ne figurent pas dans le recueil de prompts mais sans lesquelles la règle
+de sûreté S1 ne peut pas être tenue :
+  • l'unité U0 « Audit d'habilitation de l'existant et filet de sécurité », qui photographie
+    l'état exact des droits actuels avant toute modification ;
+  • le découpage du prompt principal en deux unités U1 et U2, le socle de données et le moteur de
+    décision n'ayant ni le même risque ni le même rythme de validation.
+
+1.2 PÉRIMÈTRE COUVERT
+  • Module 18 du Modèle fonctionnel de référence — Administration du système & sécurité
+    (24 sous-modules, chaîne PERSONNE → COMPTE → RÔLE → PERMISSION → PÉRIMÈTRE → ACTIONS)
+  • Les 33 rôles métier de l'annexe A1 du recueil, couvrant les 13 domaines énumérés par la
+    maîtrise d'ouvrage : Administration, Candidatures, Scolarité, Pédagogie, Enseignants,
+    Évaluations, Diplômation, Finance, Stages, RH, Administration/Patrimoine, Archives, Usagers
+  • La matrice rôles × 15 modules × niveaux N0–N4 de l'annexe A2
+  • Le catalogue de permissions atomiques des 20 applications Django existantes (annexe A3)
+  • La reprise intégrale des 12 rôles existants sans perte ni gain d'accès (annexe A6)
+  • La résorption de la double matrice de rôles backend/frontend identifiée au risque R3 de l'audit
+
+1.3 HORS PÉRIMÈTRE (à traiter ultérieurement, ne pas ouvrir pendant ces 16 semaines)
+  • Le fédérateur d'identité externe (SSO ministériel, annuaire LDAP) : l'architecture le rend
+    possible, le raccordement n'est pas dans ce plan.
+  • La refonte ergonomique générale de l'application hors écrans d'administration des comptes.
+  • La signature électronique qualifiée des actes (relevés, diplômes) : elle consomme le module
+    d'habilitation mais relève du chantier Diplômation.
+  • La biométrie et la reconnaissance faciale : explicitement exclues.
+
+1.4 LES SEPT RÈGLES DE PILOTAGE — NON NÉGOCIABLES
+  R1. PRIMAUTÉ DE LA SÛRETÉ SUR LE CALENDRIER. Les huit règles S1 à S8 de la Partie I du recueil
+      priment sur toute échéance. Un retard est un incident de projet ; une perte d'accès est un
+      arrêt d'activité de l'institut. On ne troque jamais la seconde contre le premier.
+  R2. ADDITIF D'ABORD, SUBSTITUTIF ENSUITE. Pendant les unités U0 à U6, le dispositif CURP est
+      construit À CÔTÉ du dispositif existant, sans jamais s'y substituer. La substitution ne
+      commence qu'à l'unité U8, sous drapeau, après une campagne d'observation concluante.
+  R3. AUCUNE DÉCISION DE REFUS EFFECTIVE AVANT OBSERVATION. Toute règle d'autorisation nouvelle
+      passe au minimum deux semaines en mode observation, où elle est calculée, journalisée et
+      comparée à la décision de l'ancien dispositif, sans jamais bloquer personne (§11).
+  R4. UN ÉCART D'OBSERVATION EST UN ARRÊT. Si la campagne d'observation révèle un seul écart non
+      expliqué entre l'ancienne et la nouvelle décision, l'unité en cours s'arrête, l'écart est
+      analysé et tranché par l'expert fonctionnel avant toute reprise.
+  R5. LES TESTS EXISTANTS SONT INTOUCHABLES. Les 943 tests backend existants doivent rester verts
+      sans modification. Si l'un casse, c'est le code nouveau qui est fautif, jamais le test. Cette
+      règle, héritée du chantier EDT-INJS, est ici renforcée : un test d'authentification ou de
+      permission qui casse déclenche un arrêt immédiat et une revue avec le RSSI.
+  R6. LE BACKEND DÉCIDE, L'INTERFACE ILLUSTRE. Aucune unité ne sera déclarée terminée si une règle
+      d'autorisation n'existe que côté React ou côté Flutter. Test de succès et test de refus sont
+      exigés par règle et par rôle.
+  R7. TRAÇABILITÉ INTÉGRALE. Toute opération sur un compte, un rôle, une permission, un périmètre
+      ou une délégation est inscrite au journal append-only chaîné, dès l'unité U1. Une fonction
+      livrée sans sa journalisation est une fonction non livrée.
+
+1.5 DÉFINITION DE « L'APPLICATION RESTE OPÉRATIONNELLE »
+À la fin de chaque journée de travail, les sept assertions suivantes sont vraies et vérifiées :
+  a. `python manage.py check --deploy` ne renvoie aucune erreur bloquante.
+  b. `python manage.py makemigrations --check --dry-run` ne détecte aucune migration manquante.
+  c. La suite backend complète est verte : 943 tests existants + les tests nouveaux de l'unité.
+  d. `npm run build` aboutit ; le nombre de warnings ESLint ne dépasse pas la référence de 89.
+  e. `flutter analyze` ne régresse pas.
+  f. Un compte témoin de chacune des 12 familles de rôles existantes se connecte et atteint ses
+     écrans habituels — vérification automatisée par le scénario de fumée d'authentification.
+  g. Le rapport de réconciliation des droits affiche zéro écart non expliqué.
+
+
+====================================================================================================
+2. ORGANISATION DE L'ÉQUIPE ET RÔLES
+====================================================================================================
+
+2.1 RÔLES DU PROJET
+  RT  — Responsable technique. Arbitre l'architecture, valide chaque note de conception, prononce
+        le franchissement des portes de qualité. 30 % de son temps.
+  RSSI— Responsable de la sécurité des systèmes d'information. Rôle SPÉCIFIQUE à ce chantier et
+        obligatoire : valide le moteur d'autorisation, la politique de mots de passe, le MFA, le
+        journal d'audit et la procédure de secours. Dispose d'un droit de veto sur toute mise en
+        production. 25 % de son temps.
+  DB  — Développeur backend Django/DRF. Exécutant principal des unités U0 à U6 et U8. Plein temps.
+  DF  — Développeur frontend React. Exécutant de l'unité U4 et des compléments d'interface. 60 %.
+  EF  — Expert fonctionnel scolarité LMD. Valide la matrice de permissions LIGNE À LIGNE, tranche
+        tous les écarts d'observation. 40 % de son temps — charge réelle, à sécuriser dès le début.
+  RS  — Référent scolarité INJS. Fournit la liste nominative des agents, leurs fonctions réelles et
+        leurs rattachements. Valide le cloisonnement par secrétariat. 25 %.
+  RF  — Référents fonctionnels de domaine. Un correspondant désigné par domaine sensible :
+        candidatures, évaluations, diplômation, finances, RH. Valident la fiche de droits de leur
+        domaine et animent la campagne de revue des habilitations. 2 jours chacun sur le projet.
+  RE  — Responsable exploitation. Sauvegardes, restaurations, bascules, drapeaux, supervision. 20 %.
+  DIR — Direction. Arbitre les conflits de périmètre entre domaines, valide la politique de
+        sécurité et la liste des rôles sensibles soumis au MFA. Participe aux 4 portes de qualité.
+
+2.2 CHARGE GLOBALE ESTIMÉE
+  Développement backend        : 47 jours-homme
+  Développement frontend       : 11 jours-homme
+  Expertise fonctionnelle      : 16 jours-homme (dont 6 sur la seule matrice de permissions)
+  Sécurité (RSSI)              :  9 jours-homme
+  Exploitation                 :  5 jours-homme
+  Pilotage, revues, formation  : 10 jours-homme
+  ------------------------------------------------
+  TOTAL                        : 98 jours-homme sur 16 semaines
+
+2.3 ENGAGEMENT PRÉALABLE À OBTENIR AVANT LE DÉMARRAGE
+Ce chantier échoue si l'expertise fonctionnelle n'est pas disponible. Avant l'ouverture de
+l'itération I0, la direction confirme par écrit :
+  • la disponibilité effective de EF à 40 % pendant 16 semaines ;
+  • la désignation nominative des cinq référents de domaine RF ;
+  • la désignation du RSSI, interne ou prestataire ;
+  • l'existence d'au moins deux personnes habilitées à exécuter la procédure de secours.
+
+
+====================================================================================================
+3. ORDONNANCEMENT GÉNÉRAL — VUE SYNOPTIQUE DES 8 ITÉRATIONS
+====================================================================================================
+
+Nomenclature employée dans tout le document :
+  • Les ITÉRATIONS sont notées I0 à I7 (2 semaines chacune).
+  • Les UNITÉS DE TRAVAIL sont notées U0 à U8.
+  • Les ÉTAPES DE BASCULE sont notées E1 à E4, conformément au prompt C6 du recueil.
+  • Les PORTES DE QUALITÉ sont notées G0 à G4, les JALONS DE SÛRETÉ J1 à J4.
+
++--------+-----------+----------------------------------------------------+----------------+--------+
+| ITÉR.  | SEMAINES  | UNITÉS EXÉCUTÉES                                   | PORTE / JALON  | EFFORT |
++--------+-----------+----------------------------------------------------+----------------+--------+
+| I0     | S1 – S2   | U0 Audit d'habilitation & filet de sécurité        | G0             |  9 JH  |
+| I1     | S3 – S4   | U1 Socle de données (prompt principal, 1re moitié) | —              | 11 JH  |
+| I2     | S5 – S6   | U2 Moteur de décision & API (2e moitié)            | G1 + J1        | 13 JH  |
+| I3     | S7 – S8   | U3 Référentiel et matrice (C1)                     | J2 (matrice)   | 13 JH  |
+| I4     | S9 – S10  | U4 Écrans d'administration (C2)                    | —              | 12 JH  |
+| I5     | S11 – S12 | U5 Cycle de vie et provisionnement (C3)            | G2             | 12 JH  |
+| I6     | S13 – S14 | U6 Sécurité renforcée (C4) + U7 Audit & revue (C5) | J3             | 16 JH  |
+| I7     | S15 – S16 | U8 Migration, bascule, documentation (C6)          | G3 + J4 + G4   | 12 JH  |
++--------+-----------+----------------------------------------------------+----------------+--------+
+                                                                                    TOTAL   98 JH
+
+3.1 LOGIQUE DE L'ORDONNANCEMENT
+  • I0 ne produit aucune fonctionnalité. Elle produit la VÉRITÉ DE DÉPART : qui a accès à quoi
+    aujourd'hui, exactement. Sans cette photographie, la règle S1 est invérifiable et tout le
+    chantier repose sur une conviction au lieu d'une mesure. C'est l'itération la plus rentable.
+  • U1 et U2 séparent volontairement le modèle de données du moteur de décision. Le modèle est
+    additif et sans risque ; le moteur est l'objet le plus critique de l'application. Les mêler
+    dans une seule itération reviendrait à noyer la revue de sécurité dans une revue de schéma.
+  • U3 (la matrice) est placée après le moteur et non avant : la matrice se remplit et se teste
+    dans un moteur qui fonctionne. Tenter de la figer sur le papier avant d'avoir un moteur
+    produit un document que personne ne sait vérifier.
+  • U4 (les écrans) vient après la matrice car l'interface se construit sur l'endpoint de
+    capacités, lequel n'a de contenu utile qu'une fois la matrice chargée.
+  • U6 et U7 sont appariés dans I6 : le MFA et l'audit se testent ensemble, et leurs livrables
+    alimentent le même dossier de conformité soumis au RSSI au jalon J3.
+  • U8 est seule dans I7 : la migration et la bascule exigent une itération entière sans
+    concurrence, avec l'exploitation mobilisée et une fenêtre de repli large.
+
+3.2 PRINCIPE DE LA MARGE
+Le chemin critique représente 62 jours-homme utiles. Le plan en réserve 98, dont une marge de
+sécurité de trois semaines réparties en fin d'itérations I2, I5 et I7. Cette marge est destinée aux
+écarts d'observation et aux arbitrages fonctionnels, PAS à absorber un démarrage tardif.
+
+
+====================================================================================================
+4. GRAPHE DE DÉPENDANCES ENTRE UNITÉS ET CHEMIN CRITIQUE
+====================================================================================================
+
+4.1 GRAPHE
+
+  U0 Audit & filet de sécurité
+   │
+   ├──> U1 Socle de données (Personne, Compte, Rôle, Permission, Périmètre, Journal)
+   │     │
+   │     └──> U2 Moteur de décision + endpoint de capacités + API REST
+   │            │
+   │            ├──> U3 Référentiel des 33 rôles + matrice + séparation des tâches
+   │            │      │
+   │            │      ├──> U4 Écrans web d'administration des comptes
+   │            │      │      │
+   │            │      │      └──> U5 Cycle de vie, provisionnement, imports, délégation
+   │            │      │             │
+   │            │      │             └──> U8 Migration, bascule, documentation
+   │            │      │
+   │            │      └──> U7 Audit, revue des habilitations, conformité ──> U8
+   │            │
+   │            └──> U6 MFA, sessions, appareils, mots de passe ──────────> U8
+   │
+   └──> (campagne d'observation permanente, ouverte en U2, close en U8)
+
+4.2 CHEMIN CRITIQUE
+  U0 (5 JH) → U1 (8 JH) → U2 (9 JH) → U3 (7 JH) → U4 (8 JH) → U5 (9 JH) → U8 (9 JH) = 55 JH
+  Avec les revues de sécurité obligatoires et les temps de validation fonctionnelle : 62 JH.
+  U6 et U7 ne sont pas sur le chemin critique et disposent chacune d'une marge de 2 semaines.
+
+4.3 DÉPENDANCES EXTERNES À SÉCURISER DÈS L'ITÉRATION I0
+  D1. Liste nominative complète des agents de l'INJS avec fonction réelle, service de rattachement,
+      secrétariat d'appartenance et adresse électronique professionnelle — fournie par RS.
+      Sans elle, l'unité U8 ne peut pas rattacher les comptes aux Personnes.
+  D2. Décision de direction sur les rôles soumis au MFA obligatoire — la liste proposée figure en
+      annexe A1 du recueil, elle doit être validée ou amendée avant U6.
+  D3. Politique de mot de passe institutionnelle : longueur, durée de validité, historique.
+      À défaut, appliquer la proposition du prompt C4 et la faire ratifier.
+  D4. Durées légales de conservation des journaux d'authentification applicables en Côte d'Ivoire,
+      à confirmer avec le conseil juridique de l'institut — nécessaires en U7.
+  D5. Copie anonymisée récente de la base de production, accessible à l'équipe — nécessaire dès U0
+      et rafraîchie avant U8.
+  D6. Désignation des deux détenteurs de la procédure de secours et du coffre où elle est conservée.
+
+
+====================================================================================================
+5. PROCÉDURE STANDARD D'EXÉCUTION D'UNE UNITÉ (CYCLE EN 10 ÉTAPES)
+====================================================================================================
+
+Ce cycle s'applique à chaque unité, sans exception. Il reprend le cycle en 9 étapes du chantier
+EDT-INJS et y ajoute une dixième étape propre à la criticité de l'habilitation : la revue de
+sécurité.
+
+  ÉTAPE 1 — PRÉPARATION (0,5 j)
+    Relire l'unité dans le recueil de prompts, ses annexes de référence, et la fiche d'exécution
+    correspondante du présent plan. Vérifier que les critères d'entrée sont satisfaits. Créer la
+    branche `feature/curp-injs-<unité>` à partir de la branche d'intégration.
+
+  ÉTAPE 2 — NOTE DE CONCEPTION (0,5 à 1 j) — OBLIGATOIRE POUR U1, U2, U3, U5, U6, U8
+    Avant toute ligne de code, l'exécutant produit une note de 1 à 2 pages : modèles touchés,
+    routes créées, règles d'autorisation introduites, effets possibles sur les droits existants,
+    stratégie de test, stratégie de repli. Validation écrite de RT. Pour U2, U6 et U8, validation
+    supplémentaire du RSSI. Une unité démarrée sans note validée est un incident de pilotage.
+
+  ÉTAPE 3 — SOUMISSION DU PROMPT À L'AGENT DE CODAGE
+    Le prompt est copié TEL QUEL depuis le recueil, dans une session dédiée. Il est complété par
+    les seules informations de contexte propres à l'itération. L'agent doit, conformément au §7 du
+    prompt principal, REFORMULER sa compréhension et proposer son plan AVANT de produire du code.
+    Si la reformulation est inexacte, on corrige la reformulation ; on ne laisse pas l'agent coder.
+
+  ÉTAPE 4 — PRODUCTION INCRÉMENTALE
+    Le code est produit par tranches revues au fil de l'eau. Aucun fichier serveur ne dépasse
+    600 lignes, aucun fichier d'interface 400 lignes. Chaque tranche laisse l'application en état
+    de démarrer.
+
+  ÉTAPE 5 — TESTS DE SUCCÈS ET TESTS DE REFUS
+    Pour chaque règle d'autorisation, deux tests au minimum : un rôle autorisé qui réussit, un rôle
+    non autorisé qui obtient un refus explicite. Le test de refus est aussi obligatoire que l'autre.
+    Une règle sans test de refus n'est pas considérée comme livrée.
+
+  ÉTAPE 6 — BATTERIE DE VÉRIFICATION DE NON-RÉGRESSION
+    Exécution intégrale de la batterie décrite au §12.2. Aucune dérogation.
+
+  ÉTAPE 7 — SCÉNARIO DE FUMÉE D'AUTHENTIFICATION
+    Les 12 comptes témoins, un par rôle existant, se connectent et atteignent leurs écrans de
+    référence. Automatisé dès U0, rejoué à chaque unité. Un échec bloque la fusion.
+
+  ÉTAPE 8 — RAPPORT DE RÉCONCILIATION DES DROITS
+    Exécution de la commande de comparaison ancien/nouveau sur la totalité des comptes. Le rapport
+    doit afficher zéro écart, ou uniquement des écarts explicitement décidés, datés et signés par EF.
+
+  ÉTAPE 9 — REVUE DE SÉCURITÉ (étape ajoutée pour ce chantier)
+    Le RSSI examine : les règles introduites, le journal produit, les messages d'erreur (aucune
+    fuite d'information), les nouveaux points d'entrée, la gestion des secrets. Il prononce un avis
+    écrit : FAVORABLE, FAVORABLE SOUS RÉSERVE (réserves à lever avant la porte suivante), ou
+    DÉFAVORABLE (fusion interdite). Son avis est archivé avec la pull request.
+
+  ÉTAPE 10 — REVUE, FUSION ET COMPTE RENDU
+    Revue par RT, fusion dans la branche d'intégration, compte rendu selon le modèle de l'annexe F,
+    mise à jour du tableau de bord et du registre des risques.
+
+
+====================================================================================================
+6. PORTES DE QUALITÉ, JALONS DE SÛRETÉ ET CRITÈRES DE PASSAGE
+====================================================================================================
+
+6.1 PORTES DE QUALITÉ — décisions collégiales RT + RSSI + EF + DIR
+
+  PORTE G0 — FIN DE I0 : « NOUS SAVONS QUI A ACCÈS À QUOI »
+    ☐ L'inventaire exhaustif des comptes actifs est produit et daté.
+    ☐ La matrice réelle des droits actuels, extraite du code et de la base, est documentée.
+    ☐ Les 12 comptes témoins existent en recette et le scénario de fumée est automatisé.
+    ☐ Les tests de caractérisation de l'authentification et des permissions existantes sont écrits
+      et verts : ils figent le comportement actuel, y compris ses bizarreries.
+    ☐ La copie anonymisée de la base de production est disponible et restaurable en moins d'une heure.
+    ☐ La procédure de secours actuelle est testée sur l'environnement de recette.
+    DÉCISION : sans G0, l'itération I1 ne s'ouvre pas. Aucune exception.
+
+  PORTE G1 — FIN DE I2 : « LE MOTEUR DÉCIDE JUSTE, SANS DÉCIDER ENCORE »
+    ☐ Le moteur `est_autorise` implémente les 10 contrôles ordonnés et est couvert à 95 % au moins.
+    ☐ Une décision s'obtient en moins de 5 millisecondes hors premier appel, sans requête N+1.
+    ☐ Le mode observation est actif : le moteur calcule et journalise, il ne bloque rien.
+    ☐ L'endpoint `/api/auth/capacites/` répond et est consommé par au moins un écran pilote.
+    ☐ Avis RSSI favorable sur le moteur.
+    ☐ Zéro écart non expliqué sur 7 jours consécutifs d'observation en recette.
+
+  PORTE G2 — FIN DE I5 : « LE DISPOSITIF EST COMPLET ET UTILISABLE »
+    ☐ Un administrateur crée un compte complet en moins de trois minutes, chronométré.
+    ☐ La modification d'un compte affiche le différentiel de droits avant validation, sans exception.
+    ☐ Les imports en masse sont prévisualisables et réversibles, démontrés sur 100 lignes.
+    ☐ La délégation temporaire fonctionne et s'éteint automatiquement à échéance.
+    ☐ La matrice est validée ligne à ligne par EF et RS, procès-verbal signé.
+    ☐ Quatre semaines d'observation cumulées sans écart non expliqué.
+
+  PORTE G3 — MILIEU DE I7 : « LA BASCULE PEUT COMMENCER »
+    ☐ La commande de migration en simulation produit un rapport de réconciliation à zéro écart sur
+      une copie fraîche de la base de production.
+    ☐ Les six drapeaux existent, sont tous inactifs, et leur bascule est réversible en moins d'une minute.
+    ☐ La procédure de secours administrateur est testée par une personne qui n'est pas l'auteur du code.
+    ☐ Les trois manuels sont livrés et la formation des administrateurs est faite.
+    ☐ Avis RSSI favorable sans réserve.
+    ☐ Autorisation écrite de la direction, avec date et fenêtre de bascule arrêtées.
+
+  PORTE G4 — FIN DE I7 : « CLÔTURE DU PROJET »
+    ☐ Les 27 critères d'acceptation de l'annexe A7 du recueil sont satisfaits et vérifiés un à un.
+    ☐ L'étape de bascule E3 est en production depuis deux semaines sans incident de gravité 1 ou 2.
+    ☐ Le tableau de bord des habilitations est en service et consulté par la direction.
+    ☐ La première campagne de revue des habilitations est planifiée avec ses responsables.
+
+6.2 JALONS DE SÛRETÉ — vérifications ponctuelles, non négociables
+
+  J1 (fin I2) — VÉRIFICATION D'IMMUTABILITÉ DU JOURNAL
+      Tentative documentée de modification et de suppression d'une entrée du journal, par le code et
+      par l'ORM. Les deux doivent échouer. La vérification du chaînage détecte une altération
+      introduite volontairement sur un jeu d'essai.
+
+  J2 (fin I3) — VALIDATION LIGNE À LIGNE DE LA MATRICE
+      EF, RS et les cinq référents de domaine parcourent la matrice rôle par rôle. Chaque ligne est
+      cochée VALIDÉE, À CORRIGER ou À TRANCHER. Aucune ligne ne reste sans statut. Le document signé
+      devient le référentiel opposable de l'institut.
+
+  J3 (fin I6) — EXERCICE D'INTRUSION FONCTIONNELLE
+      Une demi-journée pendant laquelle deux personnes tentent, depuis des comptes de rôles
+      différents, d'obtenir un accès qu'ils ne devraient pas avoir : accès horizontal à un dossier
+      d'un autre secrétariat, modification d'une note validée, auto-attribution d'un rôle, lecture
+      d'un dossier de candidature par un enseignant, contournement par l'API mobile. Chaque tentative
+      est journalisée et doit échouer. Rapport remis au RSSI.
+
+  J4 (pendant I7) — EXERCICE DE PERTE D'ACCÈS ADMINISTRATEUR
+      Simulation en recette : les comptes administrateurs sont volontairement rendus inutilisables.
+      L'équipe doit restaurer un accès par la seule procédure de secours, sans accès à l'interface,
+      en moins de trente minutes, chronométré et documenté.
+
+
+====================================================================================================
+7. FICHES D'EXÉCUTION DÉTAILLÉES — LES 9 UNITÉS DE TRAVAIL
+====================================================================================================
+
+Légende des fiches :
+  IT = itération · Effort = jours-homme · Acteur = rôle principal (cf. §2)
+  Entrée = conditions pour démarrer · Sortie = conditions pour déclarer terminé
+
+----------------------------------------------------------------------------------------------------
+FICHE U0 — AUDIT D'HABILITATION DE L'EXISTANT ET FILET DE SÉCURITÉ
+----------------------------------------------------------------------------------------------------
+IT : I0 (semaines 1-2)             Effort : 5 JH (DB) + 2 JH (RSSI) + 1 JH (RS) + 1 JH (RE)
+Prompt : aucun — unité préalable propre au plan d'exécution
+Dépend de : —                      Bloque : toutes les unités suivantes
+Entrée
+  • Accès en lecture au dépôt, à la CI, et copie anonymisée de la base de production (dépendance D5)
+  • Engagement de disponibilité de EF et RS obtenu (§2.3)
+Déroulé recommandé (5 jours)
+  J1 : extraction exhaustive de la matrice de droits RÉELLE. Lecture croisée de `role_groups.py`,
+       de `utils/roles.js`, des classes de permission DRF, des décorateurs, des `queryset` filtrés
+       et des gardes d'écran React. Production du document « État des droits au 13/09/2026 ».
+  J2 : inventaire des comptes en base : nombre par rôle, comptes actifs, comptes jamais connectés,
+       comptes sans rôle, comptes à rôles multiples, doublons d'identité probables, comptes
+       techniques. Production du tableau de bord de départ.
+  J3 : écriture des tests de caractérisation de l'authentification : connexion, déconnexion,
+       expiration de jeton, changement de mot de passe, restriction mobile de FORMATEUR et AUDITEUR,
+       cloisonnement par secrétariat. On fige le comportement actuel TEL QU'IL EST, y compris ses
+       anomalies, en les signalant sans les corriger.
+  J4 : création des 12 comptes témoins en recette, un par rôle existant, et automatisation du
+       scénario de fumée d'authentification intégré à la CI.
+  J5 : mise en place du socle de comparaison — module de journalisation des décisions qui servira
+       au mode observation ; test de restauration de la base ; test de la procédure de secours
+       actuelle ; revue et fusion.
+Livrables
+  L1 docs/CURP_ETAT_DES_DROITS.md — la matrice réelle actuelle, source de vérité de la comparaison
+  L2 docs/CURP_INVENTAIRE_COMPTES.md — la photographie chiffrée du parc de comptes
+  L3 tests/caracterisation_auth/ — au moins 40 tests figeant le comportement actuel
+  L4 Scénario de fumée d'authentification automatisé en CI
+  L5 Procédure de restauration de base testée et chronométrée
+Sortie
+  ☐ Les 5 livrables produits et fusionnés
+  ☐ Suite complète verte : 943 tests existants + 40 nouveaux
+  ☐ Porte G0 franchie
+Risques spécifiques
+  • Découverte d'incohérences entre la matrice backend et la matrice frontend : c'est attendu, le
+    risque R3 de l'audit l'annonce. Les consigner, ne rien corriger à ce stade, les porter en
+    arbitrage à EF pour l'unité U3.
+  • Découverte de comptes orphelins ou de comptes partagés entre plusieurs agents : les inventorier
+    sans les désactiver. Leur traitement relève de U8.
+Repli : aucun — unité strictement non destructive, sans modification fonctionnelle.
+
+----------------------------------------------------------------------------------------------------
+FICHE U1 — SOCLE DE DONNÉES DE L'HABILITATION (PROMPT PRINCIPAL, PREMIÈRE MOITIÉ)
+----------------------------------------------------------------------------------------------------
+IT : I1 (semaines 3-4)             Effort : 8 JH (DB) + 2 JH (EF) + 1 JH (RT)
+Prompt : Partie II du recueil, sections 3.1 et 3.2 (architecture et modèle de données)
+Dépend de : U0                     Bloque : U2
+Entrée
+  • Porte G0 franchie
+  • Note de conception validée par RT
+Déroulé recommandé (8 jours)
+  J1 : note de conception ; création de l'app `habilitations` ; arborescence des modules ;
+       enregistrement dans INSTALLED_APPS sans aucun effet sur l'existant.
+  J2 : modèle `Personne` — identité métier unique, liens NULLABLES vers Agent, Formateur,
+       Participant, DossierEtudiant, Candidat. Aucune modification des modèles cibles.
+  J3 : modèle `CompteUtilisateur` en extension OneToOne du modèle utilisateur existant. Le modèle
+       existant n'est NI remplacé, NI modifié, NI déplacé. Statuts INVITE, ACTIF, SUSPENDU,
+       DESACTIVE, VERROUILLE, EXPIRE ; canal WEB, MOBILE, LES_DEUX.
+  J4 : modèles `RoleMetier` et `PermissionMetier` — référentiel en base, code stable et libellé
+       configurable, module requis, caractère sensible, incompatibilités déclarées.
+  J5 : modèles `Perimetre`, `AttributionRole`, `PermissionAttribuee` avec dérogations OCTROI/RETRAIT
+       bornées à 90 jours.
+  J6 : modèles `DelegationHabilitation` et `PolitiqueSecurite`.
+  J7 : `JournalHabilitation` append-only chaîné par empreintes ; interdiction de mise à jour et de
+       suppression au niveau du modèle et au niveau de la base ; commande de vérification du chaînage.
+  J8 : administration Django, jeu de données de démonstration, tests de modèle (≥ 35), migrations
+       testées sur base vide ET sur copie peuplée, revue, fusion.
+Livrables
+  L1 App `habilitations` complète, 10 modèles, aucun fichier au-delà de 600 lignes
+  L2 Migrations réversibles, testées dans les deux sens
+  L3 ≥ 35 tests de modèle, dont les tests d'immutabilité du journal
+  L4 docs/CURP_MODELE_DONNEES.md avec le schéma de la chaîne PERSONNE → … → PÉRIMÈTRE
+Sortie
+  ☐ Les 4 livrables produits ☐ Suite verte ☐ Détection de doublons d'identité opérationnelle
+  ☐ Aucune modification d'un modèle existant : vérifié par diff sur les fichiers models.py des
+    20 applications existantes — le diff doit être vide
+Risques
+  • Tentation de « nettoyer » le modèle utilisateur existant au passage. INTERDIT (règle R2).
+  • Détection de doublons trop agressive produisant des faux positifs : la rendre paramétrable et
+    non bloquante, elle SIGNALE, elle ne refuse pas.
+Repli : app strictement additive ; désinstallable par retrait d'INSTALLED_APPS et rollback de
+        migration. Aucune donnée existante n'est touchée.
+
+----------------------------------------------------------------------------------------------------
+FICHE U2 — MOTEUR DE DÉCISION, ENDPOINT DE CAPACITÉS ET API REST
+----------------------------------------------------------------------------------------------------
+IT : I2 (semaines 5-6)             Effort : 9 JH (DB) + 2 JH (RSSI) + 1 JH (RT) + 1 JH (EF)
+Prompt : Partie II du recueil, sections 3.3, 3.4, 3.6, 3.7
+Dépend de : U1                     Bloque : U3, U6, U7
+C'est l'unité la plus critique du chantier. Elle se déroule sans autre travail en parallèle.
+Entrée
+  • U1 fusionnée et stable depuis au moins 3 jours
+  • Note de conception validée par RT ET par le RSSI
+Déroulé recommandé (9 jours)
+  J1 : note de conception détaillée du moteur ; formalisation écrite des 10 contrôles ordonnés et
+       de leur ordre d'évaluation ; validation RSSI avant tout code.
+  J2-J3 : implémentation de `est_autorise(compte, permission_code, objet, contexte) -> Decision`.
+       L'objet Decision porte : autorisé oui/non, motif, règle déclenchante, contrôle ayant tranché.
+       Aucune décision muette : tout refus s'explique.
+  J4 : contrôles 7 et 8 — périmètre et état de l'objet. C'est ici que se joue la protection contre
+       l'accès horizontal ; traitement particulièrement soigné et revue dédiée.
+  J5 : contrôles 9 et 10 — séparation des tâches et double validation des permissions critiques.
+  J6 : cache Redis des décisions, invalidation sur toute modification d'attribution, mesure de
+       performance, élimination des requêtes N+1. Objectif : moins de 5 ms hors premier appel.
+  J7 : MODE OBSERVATION — le moteur calcule, compare sa décision à celle du dispositif existant,
+       journalise l'écart éventuel, et RETOURNE TOUJOURS LA DÉCISION DE L'ANCIEN DISPOSITIF.
+       C'est le mécanisme qui rend la règle S1 mécaniquement vraie et non simplement promise.
+  J8 : endpoint `GET /api/auth/capacites/` ; branchement d'un écran pilote React sur cet endpoint ;
+       début de la résorption de la double matrice.
+  J9 : API REST des comptes et des habilitations, documentation OpenAPI, tests (≥ 45 dont autant de
+       tests de refus que de tests de succès), revue de sécurité, fusion.
+Livrables
+  L1 Moteur d'autorisation couvert à 95 % minimum, avec sa documentation de conception
+  L2 Mode observation opérationnel et activé par défaut
+  L3 Endpoint de capacités et premier écran consommateur
+  L4 API REST documentée dans OpenAPI, test de succès et test de refus par route et par rôle
+  L5 Banc de mesure de la performance de décision, résultats consignés
+Sortie
+  ☐ Porte G1 franchie ☐ Jalon J1 validé ☐ Avis RSSI favorable
+  ☐ 7 jours consécutifs d'observation en recette sans écart non expliqué
+  ☐ Décision en moins de 5 ms, mesurée et consignée
+Risques
+  • Le moteur devient un goulot d'étranglement de performance. Mitigation : banc de mesure dès J6,
+    seuil de dégradation acceptable fixé à 5 % sur les temps de réponse de référence.
+  • Ordre des contrôles mal implémenté produisant une autorisation là où un refus est attendu.
+    Mitigation : un test unitaire dédié PAR CONTRÔLE, plus un test vérifiant l'ordre lui-même.
+  • Dérive de périmètre : l'agent de codage veut « améliorer » les permissions existantes.
+    Mitigation : rappel de la règle R2 dans la reformulation, et diff de comportement systématique.
+Repli : le moteur n'est consommé par aucun chemin bloquant tant que le mode observation est actif ;
+        désactivation par drapeau en moins d'une minute.
+
+----------------------------------------------------------------------------------------------------
+FICHE U3 — RÉFÉRENTIEL DES 33 RÔLES ET MATRICE DE PERMISSIONS (PROMPT C1)
+----------------------------------------------------------------------------------------------------
+IT : I3 (semaines 7-8)             Effort : 7 JH (DB) + 5 JH (EF) + 1 JH (RS) + RF 0,5 j chacun
+Prompt : C1 du recueil · Annexes A1, A2, A3, A4, A6
+Dépend de : U2                     Bloque : U4, U7
+C'est l'unité la plus exigeante en disponibilité fonctionnelle. Le développement y est simple ;
+la validation métier y est longue. Ne pas inverser les proportions dans la planification.
+Entrée
+  • Porte G1 franchie
+  • EF disponible à 50 % sur les deux semaines, référents de domaine convoqués
+Déroulé recommandé (7 jours de développement, étalés sur 2 semaines pour absorber les validations)
+  J1 : migration de données chargeant les 33 rôles de l'annexe A1, avec code, libellé, domaine,
+       niveau par défaut, périmètre par défaut, module requis, caractère sensible.
+  J2 : détection automatique des modules par inspection d'INSTALLED_APPS. Un rôle dont le module est
+       absent est marqué INDISPONIBLE — jamais d'erreur, jamais de plantage. Vérification que les
+       cinq modules conditionnels demandés par la maîtrise d'ouvrage (finances étudiantes, stages,
+       ressources humaines, administrations, patrimoine) sont bien présents dans le dépôt, donc que
+       les rôles correspondants sont actifs dès la livraison.
+  J3 : chargement du catalogue des permissions atomiques de l'annexe A3, module par module, au
+       format `<module>.<ressource>.<action>` sur les 13 actions du modèle fonctionnel.
+  J4 : construction de la matrice rôle × permission × niveau selon l'annexe A2.
+  J5 : déclaration des incompatibilités de séparation des tâches — au minimum les cinq couples
+       identifiés : gestionnaire de notes et responsable de jury · agent d'inscriptions et
+       gestionnaire des finances étudiantes · gestionnaire des finances et validation comptable ·
+       agent de candidature et agent de contrôle des dossiers · responsable de graduation et
+       gestionnaire de notes.
+  J6 : génération de docs/CURP_INJS_MATRICE.md — tableau lisible et imprimable, destiné à être
+       parcouru en réunion par des personnes qui ne lisent pas de code.
+  J7 : tests — un test par rôle couvrant l'intégralité de son périmètre d'autorisation, un test de
+       refus par rôle, un test global de cohérence (aucune permission orpheline, aucun rôle vide,
+       aucune incompatibilité contradictoire). Minimum 40 tests.
+  EN PARALLÈLE, sur les deux semaines : trois ateliers de validation de la matrice avec EF, RS et
+  les référents de domaine. Atelier 1 : Administration, Scolarité, Candidatures. Atelier 2 :
+  Pédagogie, Enseignants, Évaluations, Diplômation. Atelier 3 : Finance, Stages, RH, Patrimoine,
+  Archives, Usagers.
+Livrables
+  L1 Référentiel des 33 rôles chargé en base, avec activation conditionnelle par module
+  L2 Catalogue complet des permissions atomiques des 20 applications
+  L3 Matrice rôle × permission × niveau opérationnelle
+  L4 docs/CURP_INJS_MATRICE.md validé et signé
+  L5 Table de correspondance avec les 12 rôles existants (annexe A6) implémentée et testée
+  L6 ≥ 40 tests
+Sortie
+  ☐ Jalon J2 validé : chaque ligne de la matrice porte un statut, le document est signé
+  ☐ La correspondance des 12 rôles existants produit exactement les mêmes droits qu'aujourd'hui,
+    vérifié par le rapport de réconciliation
+  ☐ Les anciens codes de rôle restent renseignés pour la compatibilité du code existant
+Risques
+  • LE RISQUE MAJEUR DU CHANTIER : indisponibilité de l'expertise fonctionnelle. Sans validation
+    ligne à ligne, la matrice reste une hypothèse et tout l'édifice repose sur elle.
+    Mitigation : ateliers calés au calendrier dès l'itération I0 ; à défaut de validation complète
+    à la fin de I3, on ne poursuit PAS vers la bascule, on poursuit vers U4 en marquant la matrice
+    « provisoire » et on reporte l'échéance de G2.
+  • Désaccord entre domaines sur un périmètre. Mitigation : escalade à DIR sous 5 jours ouvrés,
+    décision tranchée et consignée au registre des arbitrages.
+Repli : la matrice est en base, pas en dur ; une ligne erronée se corrige par migration de données
+        sans redéploiement.
+
+----------------------------------------------------------------------------------------------------
+FICHE U4 — ÉCRANS WEB D'ADMINISTRATION DES COMPTES (PROMPT C2)
+----------------------------------------------------------------------------------------------------
+IT : I4 (semaines 9-10)            Effort : 8 JH (DF) + 2 JH (DB) + 2 JH (EF/RS pour la recette)
+Prompt : C2 du recueil
+Dépend de : U3                     Bloque : U5
+Entrée
+  • Matrice chargée et fonctionnelle, endpoint de capacités stable
+Déroulé recommandé (8 jours)
+  J1 : maquettes rapides des 11 écrans validées avec RS ; conventions d'interface ; aucun fichier
+       au-delà de 400 lignes.
+  J2-J3 : liste des comptes avec filtres et recherche ; fiche détaillée d'un compte.
+  J4-J5 : ASSISTANT DE CRÉATION DE COMPTE en étapes — identité, rattachement, rôles, périmètres,
+       canal, récapitulatif. Objectif chronométré : moins de trois minutes pour un compte complet.
+  J6 : ÉCRAN DE MODIFICATION avec DIFFÉRENTIEL DE DROITS OBLIGATOIRE. L'administrateur voit, avant
+       de valider, la liste de ce que le compte gagne et de ce qu'il perd. Validation impossible
+       sans avoir vu ce différentiel. C'est la garantie d'interface de la règle S2.
+  J7 : écrans de gestion des rôles, des périmètres, des délégations et de consultation du journal.
+  J8 : ergonomie de sûreté — confirmations explicites avec saisie d'un motif sur les actions
+       sensibles, mention visible des rôles sensibles, alerte si l'opération réduirait le nombre
+       d'administrateurs actifs sous deux. Tests Vitest (≥ 25), recette avec RS, fusion.
+Livrables
+  L1 11 écrans sous /administration/comptes, aucun au-delà de 400 lignes
+  L2 Assistant de création, écran de modification avec différentiel obligatoire
+  L3 Alignement automatique de l'affichage sur /api/auth/capacites/
+  L4 ≥ 25 tests Vitest — premiers tests frontend du dépôt, l'audit en signalait zéro
+Sortie
+  ☐ Création chronométrée en moins de 3 minutes, mesurée par RS et non par le développeur
+  ☐ Aucune validation possible sans affichage du différentiel : testé
+  ☐ Aucun warning ESLint nouveau au-delà de la référence de 89
+Risques
+  • L'interface expose une action que le backend refuse, ou l'inverse. Mitigation : l'affichage est
+    entièrement dérivé de l'endpoint de capacités, jamais d'une liste de rôles codée dans le React.
+  • Écrans trop denses, inutilisables par les agents. Mitigation : recette par RS avec deux agents
+    de scolarité réels, pas par l'équipe technique.
+Repli : écrans derrière le drapeau CURP_UI_ADMIN ; désactivation rend la main à l'administration
+        Django existante.
+
+----------------------------------------------------------------------------------------------------
+FICHE U5 — CYCLE DE VIE, PROVISIONNEMENT, IMPORTS ET DÉLÉGATION (PROMPT C3)
+----------------------------------------------------------------------------------------------------
+IT : I5 (semaines 11-12)           Effort : 9 JH (DB) + 1 JH (DF) + 2 JH (EF)
+Prompt : C3 du recueil · Annexe A5 (machine à états du compte)
+Dépend de : U4                     Bloque : U8
+Entrée
+  • Écrans d'administration opérationnels, machine à états validée par EF
+Déroulé recommandé (9 jours)
+  J1 : implémentation stricte de la machine à états de l'annexe A5 ; toute transition non prévue est
+       refusée et journalisée.
+  J2-J3 : provisionnement déclenché par les événements métier — admission d'un candidat, inscription
+       d'un étudiant, recrutement d'un agent, affectation d'un enseignant, désignation d'un jury.
+       CHAQUE déclencheur est activable ou désactivable indépendamment et alimente une FILE DE
+       VALIDATION HUMAINE : rien n'est créé automatiquement sans qu'un responsable l'ait approuvé.
+  J4 : suspension automatique des comptes inactifs au-delà d'une durée paramétrable, avec préavis
+       notifié à l'agent et à son responsable. Jamais de suspension silencieuse.
+  J5 : expiration automatique des attributions temporaires, des dérogations et des délégations,
+       avec notification avant échéance.
+  J6-J7 : import en masse — fichier tabulaire, validation ligne à ligne, prévisualisation complète
+       avant exécution, exécution transactionnelle, rapport détaillé, et RÉVERSIBILITÉ par
+       identifiant d'exécution. Un import raté s'annule d'un seul geste.
+  J8 : délégation — assistant de création, contrôle de cohérence (on ne délègue que ce que l'on
+       détient), durée obligatoirement bornée, extinction automatique, journalisation de chaque
+       action réalisée en vertu d'une délégation.
+  J9 : tests (≥ 30) couvrant chaque déclencheur, la file de validation, l'expiration, l'annulation
+       d'import, la délégation et son extinction. Revue, fusion.
+Livrables
+  L1 Machine à états complète et testée sur ses 6 statuts
+  L2 Provisionnement événementiel avec file de validation humaine
+  L3 Imports en masse prévisualisables et réversibles
+  L4 Délégation temporaire bornée et traçable
+  L5 ≥ 30 tests
+Sortie
+  ☐ Porte G2 franchie
+  ☐ Aucun compte créé, suspendu ou modifié automatiquement sans validation humaine tracée
+  ☐ Annulation d'un import de 100 lignes démontrée devant RS
+Risques
+  • Un déclencheur automatique crée des comptes en masse par erreur lors d'une reprise de données.
+    Mitigation : tous les déclencheurs sont inactifs par défaut, la file de validation est
+    obligatoire, et un plafond quotidien de créations automatiques déclenche une alerte.
+  • Suspension automatique frappant des agents en congé longue durée. Mitigation : durée
+    paramétrable fixée généreusement au départ (180 jours), préavis de 15 jours, exemptions
+    déclarables.
+Repli : chaque automatisme est un drapeau indépendant ; extinction immédiate sans redéploiement.
+
+----------------------------------------------------------------------------------------------------
+FICHE U6 — SÉCURITÉ RENFORCÉE : MFA, SESSIONS, APPAREILS, MOTS DE PASSE (PROMPT C4)
+----------------------------------------------------------------------------------------------------
+IT : I6 (semaines 13-14)           Effort : 8 JH (DB) + 1 JH (DF) + 2 JH (RSSI)
+Prompt : C4 du recueil
+Dépend de : U2                     Bloque : U8          Marge : 2 semaines (hors chemin critique)
+Entrée
+  • Décision de direction sur la liste des rôles soumis au MFA (dépendance D2)
+  • Politique de mot de passe arrêtée (dépendance D3)
+Déroulé recommandé (8 jours)
+  J1 : note de conception validée par le RSSI ; choix de la bibliothèque TOTP ; stratégie de
+       stockage des secrets.
+  J2 : MFA par TOTP — activation guidée avec code QR, vérification, dix codes de secours à usage
+       unique, procédure de réinitialisation par un administrateur avec double validation.
+  J3 : politique de mot de passe — longueur, complexité, historique, expiration, interdiction des
+       mots de passe courants et des variantes du nom de l'agent.
+  J4 : réinitialisation — par l'utilisateur avec lien à durée limitée, ou par un administrateur avec
+       mot de passe temporaire à changer à la première connexion.
+  J5 : sessions — liste des sessions actives avec appareil, adresse, date ; révocation unitaire ou
+       globale ; expiration paramétrable par rôle.
+  J6 : appareils — extension de `presences.DeviceBinding` sans rupture ; demande de changement
+       d'appareil soumise à validation. La règle existante des comptes mobile-only est préservée.
+  J7 : verrouillage progressif après échecs, journalisation de chaque échec, notification à
+       l'utilisateur après un nombre d'échecs paramétrable.
+  J8 : tests de sécurité (≥ 30) — auto-élévation, rejeu, accès horizontal, contournement du MFA,
+       énumération de comptes, fuite d'information dans les messages d'erreur. Revue RSSI, fusion.
+Livrables
+  L1 MFA TOTP complet avec codes de secours
+  L2 Politique de mot de passe applicable et paramétrable
+  L3 Gestion des sessions et des appareils
+  L4 ≥ 30 tests de sécurité
+Sortie
+  ☐ MFA activé pour les 11 rôles sensibles, en mode facultatif d'abord, obligatoire par drapeau
+  ☐ Aucun compte existant bloqué par la nouvelle politique de mot de passe : elle s'applique aux
+    nouveaux mots de passe et au prochain changement, jamais rétroactivement (règle S1)
+  ☐ FORMATEUR et AUDITEUR restent cantonnés au mobile et à la PWA : testé
+Risques
+  • MFA rendu obligatoire trop tôt, verrouillant des agents sans téléphone compatible. Mitigation :
+    déploiement en trois temps — facultatif, recommandé avec accompagnement, puis obligatoire ; et
+    codes de secours imprimés remis en main propre aux membres de la direction.
+  • Politique de mot de passe appliquée rétroactivement à la connexion suivante, provoquant un
+    blocage général un lundi matin. Mitigation : interdiction explicite dans le prompt, test dédié.
+Repli : drapeau CURP_MFA_OBLIGATOIRE ; procédure de désactivation du MFA d'un compte par un
+        administrateur, elle-même journalisée et notifiée.
+
+----------------------------------------------------------------------------------------------------
+FICHE U7 — AUDIT, CONFORMITÉ ET REVUE DES HABILITATIONS (PROMPT C5)
+----------------------------------------------------------------------------------------------------
+IT : I6 (semaines 13-14)           Effort : 7 JH (DB) + 2 JH (RSSI) + 1 JH par référent de domaine
+Prompt : C5 du recueil
+Dépend de : U3                     Bloque : U8          Marge : 2 semaines (hors chemin critique)
+Entrée
+  • Durées légales de conservation confirmées (dépendance D4)
+  • Référents de domaine désignés et informés de leur rôle dans la campagne de revue
+Déroulé recommandé (7 jours)
+  J1 : commande de vérification d'intégrité du journal — contrôle du chaînage des empreintes sur une
+       période donnée, exécutable en tâche planifiée, alerte en cas d'altération.
+  J2-J3 : campagnes de revue des habilitations — périodicité paramétrable, chaque responsable reçoit
+       la liste des droits de son périmètre et doit CONFIRMER, RÉDUIRE ou RETIRER, avec relances et
+       rapport final signé.
+  J4 : tableau de bord des habilitations — comptes par statut et par rôle, comptes dormants, comptes
+       à privilèges élevés, dérogations en cours, délégations actives, anomalies détectées.
+  J5 : détection d'anomalies — cumul de rôles incompatibles, compte à privilèges jamais utilisé,
+       dérogation prolongée, attribution hors périmètre habituel, connexion inhabituelle.
+  J6 : protection des données — registre des traitements pour ce module, durées de conservation,
+       procédure d'anonymisation, droit d'accès de la personne à ses propres données.
+  J7 : exports et documents — attestation d'habilitation d'un agent, fiche de droits par rôle,
+       extrait de journal sur une période. Tests (≥ 25). Revue RSSI, fusion.
+Livrables
+  L1 Vérification d'intégrité automatisée du journal
+  L2 Dispositif de campagne de revue opérationnel, avec sa première campagne paramétrée
+  L3 Tableau de bord des habilitations
+  L4 Registre des traitements et procédure d'anonymisation
+  L5 ≥ 25 tests
+Sortie
+  ☐ Jalon J3 validé — exercice d'intrusion fonctionnelle réalisé, rapport remis
+  ☐ Une altération volontaire du journal sur un jeu d'essai est détectée par la commande
+  ☐ Une campagne de revue complète est jouée de bout en bout en recette
+Risques
+  • La campagne de revue est perçue comme une charge administrative et n'est pas remplie.
+    Mitigation : la première campagne est restreinte à trois domaines, accompagnée, et son rapport
+    est présenté en direction — ce qui lui donne son poids.
+Repli : dispositif purement additif et en lecture ; sans effet sur les accès.
+
+----------------------------------------------------------------------------------------------------
+FICHE U8 — MIGRATION DES COMPTES, BASCULE ET DOCUMENTATION (PROMPT C6)
+----------------------------------------------------------------------------------------------------
+IT : I7 (semaines 15-16)           Effort : 9 JH (DB) + 2 JH (RE) + 1 JH (RSSI) + formation
+Prompt : C6 du recueil
+Dépend de : U5, U6, U7             Bloque : —
+C'est l'unité de vérité. Tout ce qui précède n'a produit aucun effet sur les utilisateurs ;
+ici commence l'effet réel. Aucun autre travail en parallèle.
+Entrée
+  • Porte G2 franchie, U6 et U7 fusionnées
+  • Copie fraîche de la base de production disponible
+  • Liste nominative des agents fournie et à jour (dépendance D1)
+Déroulé recommandé (9 jours)
+  J1 : commande `migrer_comptes_vers_curp --dry-run`, obligatoire avant toute exécution réelle,
+       produisant un rapport complet : comptes traités, rôles déduits, périmètres déduits, écarts
+       de droits avant/après, anomalies, comptes non rattachables.
+  J2 : rattachement des comptes aux Personnes — rapprochement automatique avec les identités
+       existantes, file manuelle pour les cas ambigus, aucun rattachement automatique douteux.
+  J3 : exécution sur copie de production, analyse du rapport de réconciliation, correction jusqu'à
+       ZÉRO ÉCART non expliqué. On recommence autant de fois que nécessaire. C'est ici que se joue
+       la règle S1 ; aucune tolérance.
+  J4 : implémentation des six drapeaux, tous inactifs par défaut (§10), et de leur bascule
+       réversible en moins d'une minute.
+  J5 : procédure de secours `habilitations_secours --creer-admin`, exécutable sur le serveur hors
+       de l'application ; test par une personne qui n'est pas l'auteur du code (jalon J4).
+  J6 : rédaction des trois manuels — administrateur système, gestionnaire de comptes, agent
+       utilisateur — et des fiches mémo par famille de rôles.
+  J7 : formation des administrateurs et des gestionnaires de comptes, en salle, sur l'environnement
+       de recette, avec cas pratiques.
+  J8 : ÉTAPE DE BASCULE E1 en production — activation du mode observation seul. Aucune décision
+       n'est prise par le nouveau moteur ; il observe et journalise. Surveillance quotidienne.
+  J9 : analyse des écarts de production, corrections, préparation de l'étape E2. Revue, fusion,
+       porte G4.
+Livrables
+  L1 Commande de migration avec simulation obligatoire et rapport de réconciliation
+  L2 Six drapeaux de bascule et leur documentation d'exploitation
+  L3 Procédure de secours testée et consignée hors application
+  L4 Trois manuels et les fiches mémo par famille de rôles
+  L5 Session de formation réalisée, avec feuille d'émargement
+Sortie
+  ☐ Portes G3 et G4 franchies, jalon J4 validé
+  ☐ Rapport de réconciliation à zéro écart sur la base de production réelle
+  ☐ Étape E1 active en production depuis au moins une semaine sans écart non expliqué
+Risques
+  • Découverte tardive de comptes non rattachables à une Personne (comptes partagés, comptes
+    historiques). Mitigation : ils restent fonctionnels sous l'ancien dispositif, sont signalés à RS
+    pour régularisation administrative, et ne bloquent pas la bascule des autres.
+  • Bascule déclenchée pendant une période sensible (inscriptions, jurys, examens). Mitigation :
+    la fenêtre de bascule est arrêtée par la direction en tenant compte du calendrier académique ;
+    interdiction de basculer pendant une session de jury ou la première semaine d'inscriptions.
+Repli : les quatre niveaux décrits au §13.4, du drapeau à la restauration de base.
+
+
+====================================================================================================
+8. PLANNING DÉTAILLÉ SEMAINE PAR SEMAINE
+====================================================================================================
+
+SEMAINE 1  — I0 · U0 J1-J3. Extraction de la matrice réelle, inventaire des comptes, tests de
+             caractérisation. Lancement des demandes D1 à D6. Convocation des ateliers de I3.
+SEMAINE 2  — I0 · U0 J4-J5. Comptes témoins, scénario de fumée, test de restauration. PORTE G0.
+SEMAINE 3  — I1 · U1 J1-J4. App habilitations, Personne, CompteUtilisateur, RoleMetier,
+             PermissionMetier. Relance des dépendances non satisfaites.
+SEMAINE 4  — I1 · U1 J5-J8. Périmètres, attributions, délégations, journal chaîné, tests, fusion.
+SEMAINE 5  — I2 · U2 J1-J5. Conception validée RSSI, moteur, contrôles 1 à 10.
+SEMAINE 6  — I2 · U2 J6-J9. Cache, mode observation, endpoint de capacités, API, tests.
+             PORTE G1 + JALON J1. Ouverture de la campagne d'observation en recette.
+SEMAINE 7  — I3 · U3 J1-J4. Chargement des 33 rôles, détection des modules, catalogue de
+             permissions, matrice. ATELIER 1 de validation fonctionnelle.
+SEMAINE 8  — I3 · U3 J5-J7. Séparation des tâches, document de matrice, tests.
+             ATELIERS 2 et 3. JALON J2 — signature de la matrice.
+SEMAINE 9  — I4 · U4 J1-J5. Maquettes, liste, fiche, assistant de création.
+SEMAINE 10 — I4 · U4 J6-J8. Différentiel de droits, écrans de rôles et de journal, ergonomie de
+             sûreté, tests Vitest, recette avec RS.
+SEMAINE 11 — I5 · U5 J1-J5. Machine à états, provisionnement événementiel, file de validation,
+             suspensions et expirations automatiques.
+SEMAINE 12 — I5 · U5 J6-J9. Imports en masse réversibles, délégation, tests. PORTE G2.
+SEMAINE 13 — I6 · U6 J1-J5 et U7 J1-J3 en parallèle (DB sur U6, second exécutant ou DB décalé sur
+             U7 — voir annexe G en mode mono-exécutant).
+SEMAINE 14 — I6 · U6 J6-J8 et U7 J4-J7. Exercice d'intrusion fonctionnelle. JALON J3.
+SEMAINE 15 — I7 · U8 J1-J5. Simulation de migration, réconciliation à zéro écart, drapeaux,
+             procédure de secours. JALON J4. PORTE G3.
+SEMAINE 16 — I7 · U8 J6-J9. Manuels, formation, ÉTAPE E1 en production, surveillance. PORTE G4.
+
+PUIS, HORS PLAN DE DÉVELOPPEMENT — CALENDRIER DE BASCULE (§10.3) :
+SEMAINES 17-20 — Étape E1 prolongée : observation en production, analyse hebdomadaire des écarts.
+SEMAINES 21-24 — Étape E2 : le nouveau moteur décide en LECTURE seule ; l'ancien conserve la main
+             sur les écritures. Surveillance quotidienne.
+SEMAINES 25-30 — Étape E3 : le nouveau moteur décide de tout. Ancien dispositif encore présent,
+             réactivable par drapeau en moins d'une minute.
+SEMAINE 31+ — Étape E4 : après un semestre académique complet sans incident, retrait de la
+             duplication et de l'ancienne matrice frontend. Clôture définitive du risque R3.
+
+
+====================================================================================================
+9. STRATÉGIE DE BRANCHES, DE VERSIONS ET DE LIVRAISON
+====================================================================================================
+
+9.1 BRANCHES
+  • `arena/01a08d49-app-injslmd2026demo` — branche de référence, jamais modifiée directement.
+  • `integration/curp-injs` — branche d'intégration du chantier, créée à partir de la référence.
+  • `feature/curp-injs-u0` … `feature/curp-injs-u8` — une branche par unité.
+  • `hotfix/curp-*` — correctifs urgents, avec revue accélérée mais avis RSSI obligatoire dès lors
+    qu'une règle d'autorisation est touchée.
+
+9.2 RÈGLES DE FUSION
+  • CI verte obligatoire : tests backend, tests frontend, lint, build, `check --deploy`.
+  • Scénario de fumée d'authentification vert.
+  • Rapport de réconciliation à zéro écart joint à la pull request.
+  • Avis RSSI joint pour U2, U6, U8, et pour toute PR touchant une règle d'autorisation.
+  • Deux approbations : RT systématiquement, plus EF pour les unités à contenu métier (U3, U5).
+
+9.3 VERSIONS
+  v0.1 — fin I0 : filet de sécurité en place, aucune fonctionnalité
+  v0.2 — fin I1 : socle de données
+  v0.3 — fin I2 : moteur en observation
+  v0.4 — fin I3 : référentiel et matrice
+  v0.5 — fin I4 : écrans d'administration
+  v0.6 — fin I5 : cycle de vie complet
+  v0.7 — fin I6 : sécurité renforcée et audit
+  v1.0 — fin I7 : migration et étape E1 en production
+  v1.1 — étape E2 · v1.2 — étape E3 · v2.0 — étape E4, retrait de l'ancien dispositif
+
+
+====================================================================================================
+10. DRAPEAUX DE FONCTIONNALITÉ ET PLAN DE BASCULE EN 4 ÉTAPES
+====================================================================================================
+
+10.1 LES SIX DRAPEAUX, DANS L'APP `parametres`, TOUS INACTIFS PAR DÉFAUT
+
+  CURP_ACTIF              Active le module d'habilitation : modèles exploités, API exposée,
+                          journalisation opérationnelle. Sans effet sur les décisions d'accès.
+  CURP_OBSERVATION        Le moteur calcule sa décision, la compare à celle de l'ancien dispositif
+                          et journalise l'écart. LA DÉCISION RENVOYÉE RESTE CELLE DE L'ANCIEN.
+  CURP_DECISION_LECTURE   Le nouveau moteur tranche les accès en LECTURE. Les écritures restent
+                          gouvernées par l'ancien dispositif.
+  CURP_DECISION_COMPLETE  Le nouveau moteur tranche tous les accès, lecture et écriture.
+  CURP_UI_ADMIN           Expose les écrans d'administration des comptes du prompt C2.
+  CURP_MFA_OBLIGATOIRE    Rend le MFA obligatoire pour les rôles marqués sensibles.
+
+  Un septième drapeau technique, CURP_LEGACY_RETRAIT, n'est créé qu'à l'étape E4 : il désactive
+  l'ancienne matrice de rôles et rend le retour en arrière impossible. Il n'est activé qu'après un
+  semestre académique complet sans incident, sur décision écrite de la direction.
+
+10.2 RÈGLE D'OR DE L'EXPLOITATION
+  DÉPLOYER N'EST PAS ACTIVER. Un déploiement met du code en production, drapeaux inactifs, et ne
+  change rien pour les utilisateurs. Une activation de drapeau est une opération distincte, planifiée,
+  annoncée, surveillée, et réversible en moins d'une minute. Les deux ne se font jamais le même jour.
+
+10.3 LES QUATRE ÉTAPES DE BASCULE
+
+  ÉTAPE E1 — OBSERVATION (4 semaines minimum, semaines 16 à 20)
+    Drapeaux : CURP_ACTIF + CURP_OBSERVATION
+    Effet utilisateur : aucun. Strictement aucun.
+    Ce qu'on mesure : le taux d'écart entre l'ancienne et la nouvelle décision, par rôle, par module
+    et par route. Objectif de sortie : zéro écart non expliqué sur deux semaines consécutives.
+    Surveillance : rapport quotidien les 5 premiers jours, puis hebdomadaire.
+    Condition de passage : validation EF + RSSI + RT.
+
+  ÉTAPE E2 — DÉCISION EN LECTURE (4 semaines, semaines 21 à 24)
+    Drapeaux : + CURP_DECISION_LECTURE
+    Effet utilisateur : un refus de lecture peut désormais provenir du nouveau moteur. Le risque est
+    borné : dans le pire des cas, un agent ne VOIT pas une donnée ; il ne peut rien perdre ni casser.
+    C'est précisément pourquoi la lecture précède l'écriture.
+    Surveillance : tout refus de lecture nouveau est remonté en temps réel et analysé sous 4 heures.
+    Condition de passage : moins de 5 refus inattendus sur la période, tous expliqués et corrigés.
+
+  ÉTAPE E3 — DÉCISION COMPLÈTE (6 semaines, semaines 25 à 30)
+    Drapeaux : + CURP_DECISION_COMPLETE
+    Effet utilisateur : le nouveau moteur gouverne tout. L'ancien dispositif reste en place,
+    réactivable par simple extinction du drapeau.
+    Surveillance : astreinte renforcée les 3 premiers jours. Rapport quotidien pendant 2 semaines.
+    Condition de passage : un semestre académique complet, incluant au moins une session de jury et
+    une campagne d'inscriptions, sans incident de gravité 1 ou 2.
+
+  ÉTAPE E4 — RETRAIT DE LA DUPLICATION (semaine 31 et au-delà)
+    Drapeaux : + CURP_LEGACY_RETRAIT
+    Effet : suppression de `utils/roles.js` comme source de vérité, retrait de l'ancienne matrice,
+    nettoyage du code de compatibilité. Le risque R3 de l'audit est définitivement clos.
+    IRRÉVERSIBLE : exige une sauvegarde complète, une fenêtre de maintenance et une décision écrite.
+
+10.4 INTERDICTIONS DE FENÊTRE
+  Aucune activation de drapeau, à aucune étape :
+  • pendant une session de jury ou de délibération ;
+  • pendant la première semaine d'une campagne d'inscriptions ou d'admissions ;
+  • un vendredi, ni la veille d'un jour férié ;
+  • en l'absence du RE et du DB d'astreinte.
+
+
+====================================================================================================
+11. PROTOCOLE DU MODE OBSERVATION — LE CŒUR DE LA NON-RÉGRESSION
+====================================================================================================
+
+11.1 POURQUOI CE PROTOCOLE EXISTE
+La règle S1 interdit toute perte d'accès. Une interdiction sans mécanisme de vérification est une
+intention. Le mode observation est le mécanisme : il transforme la promesse en mesure.
+
+11.2 FONCTIONNEMENT
+À chaque contrôle d'accès, lorsque CURP_OBSERVATION est actif :
+  1. L'ancien dispositif rend sa décision. C'est elle, et elle seule, qui est appliquée.
+  2. Le nouveau moteur calcule sa décision en parallèle, sans effet.
+  3. Si les deux diffèrent, un enregistrement d'écart est produit : compte, rôle, permission visée,
+     objet, décision ancienne, décision nouvelle, contrôle ayant tranché, horodatage.
+  4. Aucun écart n'est ignoré, aucun n'est agrégé silencieusement.
+
+11.3 TYPOLOGIE DES ÉCARTS ET TRAITEMENT
+  ÉCART DE TYPE A — RESTRICTION (l'ancien autorise, le nouveau refuse)
+    C'est le plus grave : en production, il produirait une perte d'accès. Traitement sous 24 heures.
+    Deux issues possibles : soit la matrice est incomplète et on l'élargit ; soit la restriction est
+    légitime et voulue, et elle est alors DÉCIDÉE par EF, DATÉE, SIGNÉE et communiquée à l'agent
+    concerné AVANT d'être rendue effective.
+  ÉCART DE TYPE B — ÉLARGISSEMENT (l'ancien refuse, le nouveau autorise)
+    Aussi grave, au sens de la règle S2. Traitement sous 48 heures. Soit la matrice est trop
+    permissive et on la resserre ; soit l'élargissement est un choix assumé et tracé.
+  ÉCART DE TYPE C — DIVERGENCE DE MOTIF (même décision, motif différent)
+    Sans gravité immédiate, mais signale une règle mal comprise. Analysé en fin d'itération.
+
+11.4 INDICATEUR DE SORTIE D'OBSERVATION
+  Le passage à l'étape suivante exige : zéro écart de type A et zéro écart de type B non décidé,
+  sur deux semaines consécutives, sur un volume d'au moins 10 000 contrôles d'accès observés.
+  En dessous de ce volume, l'observation n'est pas statistiquement significative et se prolonge.
+
+11.5 CHARGE DE L'OBSERVATION
+  Le mode observation double le coût de chaque contrôle d'accès. Mesure obligatoire de son impact :
+  si la dégradation dépasse 5 % sur les temps de réponse de référence, l'observation est appliquée
+  par échantillonnage (1 requête sur 5) sur les routes les plus sollicitées, en conservant
+  l'observation intégrale sur les routes sensibles.
+
+
+====================================================================================================
+12. PLAN DE TESTS ET DE RECETTE PAR ÉTAPE
+====================================================================================================
+
+12.1 OBJECTIFS CHIFFRÉS
+  • 943 tests backend existants : verts en permanence, jamais modifiés.
+  • Tests backend nouveaux : au moins 265 au total, répartis U0 40 · U1 35 · U2 45 · U3 40 · U5 30 ·
+    U6 30 · U7 25 · U8 20.
+  • Tests frontend : au moins 25, tous créés en U4 — ce sont les premiers du dépôt.
+  • Couverture du moteur d'autorisation : 95 % minimum, mesurée et publiée.
+  • Un test de refus pour chaque test de succès sur toute règle d'autorisation.
+
+12.2 BATTERIE DE VÉRIFICATION DE NON-RÉGRESSION — À EXÉCUTER À L'ÉTAPE 6 DE CHAQUE CYCLE
+   1. `python manage.py check`
+   2. `python manage.py check --deploy`
+   3. `python manage.py makemigrations --check --dry-run`
+   4. `python manage.py migrate` sur base vide
+   5. `python manage.py migrate` sur copie de base peuplée
+   6. Rollback de la dernière migration, puis re-migration
+   7. Suite backend complète
+   8. Scénario de fumée d'authentification sur les 12 comptes témoins
+   9. Rapport de réconciliation des droits — zéro écart non expliqué
+  10. `npm run lint` — pas plus de 89 warnings
+  11. `npm run test` (Vitest) à partir de U4
+  12. `npm run build`
+  13. `flutter analyze`
+  14. Banc de performance de décision — dégradation inférieure à 5 %
+
+12.3 RECETTE FONCTIONNELLE — SCÉNARIOS TERRAIN OBLIGATOIRES
+  T1. Un nouvel agent de scolarité arrive : création du compte, attribution du rôle, choix du
+      périmètre de secrétariat, première connexion, accès effectif à ses écrans, et à eux seuls.
+  T2. Un enseignant devient responsable d'UE : ajout du rôle, différentiel de droits affiché,
+      accès nouveau aux ECUE dont il est responsable, aucun accès aux autres.
+  T3. Un agent change de service : retrait de l'ancien rôle, ajout du nouveau, vérification que
+      l'accès à l'ancien périmètre est bien perdu — et que rien d'autre ne l'est.
+  T4. Un agent part en congé : délégation temporaire à un collègue, bornée dans le temps, actions
+      du délégataire tracées comme telles, extinction automatique à l'échéance.
+  T5. Un membre de jury est désigné pour une session : rôle attribué pour la durée de la session,
+      vérification de l'incompatibilité avec le rôle de gestionnaire de notes.
+  T6. Un agent quitte l'institut : désactivation du compte, conservation de l'historique, aucune
+      suppression physique, révocation immédiate des sessions actives.
+  T7. Tentative d'accès horizontal : un agent du secrétariat A tente d'ouvrir un dossier du
+      secrétariat B par son identifiant direct. Refus, journalisation, alerte.
+  T8. Tentative d'auto-élévation : un administrateur tente de s'attribuer un rôle supérieur. Refus,
+      journalisation comme tentative, notification au second administrateur.
+  T9. Tentative de descente sous deux administrateurs : désactivation du seul autre administrateur
+      actif. Refus explicite avec message compréhensible.
+  T10. Perte d'accès administrateur total : récupération par la seule procédure de secours.
+
+12.4 ENVIRONNEMENTS
+  L'audit signale l'ABSENCE D'ENVIRONNEMENT DE RECETTE (risque R6). Pour ce chantier, c'est
+  bloquant : on ne teste pas un dispositif d'habilitation en production. La création d'un
+  environnement de recette avec copie anonymisée de la base est une DÉPENDANCE DE L'ITÉRATION I0,
+  pas une amélioration souhaitable.
+
+
+====================================================================================================
+13. PLAN DE MIGRATION ET DE RÉVERSIBILITÉ DES DONNÉES
+====================================================================================================
+
+13.1 PRINCIPES
+  • Toute migration de schéma est réversible et testée dans les deux sens.
+  • Toute migration de données produit un identifiant d'exécution permettant son annulation.
+  • Aucune donnée existante n'est modifiée en place avant l'étape E3 : le dispositif CURP écrit dans
+    ses propres tables et lit les tables existantes.
+  • Les anciens codes de rôle restent renseignés pendant toute la durée du chantier et jusqu'à E4.
+
+13.2 MIGRATION DES COMPTES — DÉROULÉ EN 5 TEMPS
+  1. Simulation obligatoire (`--dry-run`) sur copie de production, rapport complet.
+  2. Analyse du rapport par EF et RS : validation des rôles déduits pour chaque compte.
+  3. Correction de la table de correspondance et nouvelle simulation. Itérer jusqu'à zéro écart.
+  4. Exécution réelle sur copie de production, vérification, chronométrage.
+  5. Exécution en production dans une fenêtre annoncée, après sauvegarde complète.
+
+13.3 TABLE DE CORRESPONDANCE DES 12 RÔLES EXISTANTS
+  Elle figure en annexe A6 du recueil et constitue le contrat de non-régression. Chaque ligne est
+  validée individuellement par EF et RS avant l'exécution réelle. Les correspondances qui produisent
+  plusieurs rôles nouveaux à partir d'un rôle ancien (CHEF_SECRETARIAT, FINANCE, ENCADRANT) font
+  l'objet d'une attention particulière : c'est là que se logent les élargissements involontaires.
+
+13.4 LES QUATRE NIVEAUX DE REPLI
+  NIVEAU 1 — EXTINCTION DE DRAPEAU · moins d'1 minute
+     Toute étape de bascule E1 à E3 s'annule par extinction du drapeau correspondant. Aucun
+     redéploiement, aucune perte de données. C'est le repli de référence.
+  NIVEAU 2 — REDÉPLOIEMENT DE LA VERSION PRÉCÉDENTE · 5 à 15 minutes
+     En cas de dysfonctionnement du code lui-même. Les données CURP subsistent, inertes.
+  NIVEAU 3 — ANNULATION DE LA MIGRATION DE DONNÉES · 30 à 60 minutes
+     `migrer_comptes_vers_curp --rollback --run-id <identifiant>` défait l'intégralité d'une
+     exécution de migration. Testé en recette avant toute exécution en production.
+  NIVEAU 4 — RESTAURATION DE LA BASE · 1 à 2 heures
+     Dernier recours. Exige une sauvegarde antérieure à l'opération, vérifiée et restaurable. La
+     procédure est testée en I0 et re-testée avant l'unité U8.
+
+13.5 SAUVEGARDES
+  Sauvegarde complète vérifiée avant : toute exécution de migration de données, toute activation
+  de drapeau de décision (E2, E3), et l'étape E4. Une sauvegarde non testée en restauration n'est
+  pas une sauvegarde.
+
+
+====================================================================================================
+14. REGISTRE DES RISQUES ET PLANS DE CONTOURNEMENT
+====================================================================================================
+
++-----+------------------------------------------+------+--------+------------------------------------+
+| Réf | Risque                                   | Prob | Impact | Parade                             |
++-----+------------------------------------------+------+--------+------------------------------------+
+| X1  | Perte d'accès d'un ou plusieurs comptes  | Moy  | MAJEUR | Mode observation obligatoire,      |
+|     | en production                            |      |        | réconciliation à zéro écart,       |
+|     |                                          |      |        | repli niveau 1 en moins d'1 min    |
+| X2  | Élargissement silencieux de droits       | Moy  | MAJEUR | Écarts de type B traités sous 48 h,|
+|     |                                          |      |        | différentiel obligatoire en U4     |
+| X3  | Indisponibilité de l'expertise           | ÉLEV | MAJEUR | Engagement écrit préalable (§2.3), |
+|     | fonctionnelle pour valider la matrice    |      |        | ateliers calés dès I0, matrice     |
+|     |                                          |      |        | « provisoire » et report de G2     |
+| X4  | Absence d'environnement de recette       | ÉLEV | MAJEUR | Dépendance bloquante de I0 ;       |
+|     | (risque R6 de l'audit)                   |      |        | aucune unité ne démarre sans lui   |
+| X5  | Verrouillage total : plus aucun          | Faib | CRITIQ | Règle S7 (deux administrateurs),   |
+|     | administrateur accessible                |      |        | procédure de secours testée en J4  |
+| X6  | Dégradation des performances due au      | Moy  | Moyen  | Banc de mesure dès U2, seuil 5 %,  |
+|     | moteur ou à l'observation                |      |        | cache Redis, échantillonnage       |
+| X7  | Matrice incomplète découverte après      | Moy  | Élevé  | Observation prolongée, correction  |
+|     | la bascule                               |      |        | par données sans redéploiement     |
+| X8  | MFA verrouillant des agents sans         | Moy  | Élevé  | Déploiement en 3 temps, codes de   |
+|     | terminal compatible                      |      |        | secours imprimés, drapeau dédié    |
+| X9  | Bascule pendant une période sensible     | Faib | MAJEUR | Interdictions de fenêtre (§10.4)   |
+| X10 | Comptes partagés entre plusieurs agents  | ÉLEV | Moyen  | Inventoriés en U0, maintenus sous  |
+|     | découverts à la migration                |      |        | l'ancien régime, régularisation    |
+|     |                                          |      |        | administrative par RS              |
+| X11 | Dérive de périmètre : l'agent de codage  | ÉLEV | Moyen  | Reformulation obligatoire avant    |
+|     | « améliore » l'existant                  |      |        | code, diff de comportement, R2     |
+| X12 | Journal d'audit corrompu ou contournable | Faib | Élevé  | Chaînage par empreintes, jalon J1, |
+|     |                                          |      |        | vérification automatisée en U7     |
+| X13 | Campagne de revue non remplie par les    | ÉLEV | Faible | Première campagne restreinte et    |
+|     | responsables                             |      |        | accompagnée, rapport en direction  |
+| X14 | Conflit d'arbitrage entre domaines sur   | Moy  | Moyen  | Escalade DIR sous 5 jours ouvrés,  |
+|     | un périmètre                             |      |        | registre des arbitrages            |
++-----+------------------------------------------+------+--------+------------------------------------+
+
+RÈGLE DE TENUE : le registre est revu à chaque fin d'itération. Un risque réalisé devient un
+incident et sort du registre pour entrer au journal des incidents, avec sa chronologie et son
+retour d'expérience.
+
+
+====================================================================================================
+15. MATRICE RACI DE L'EXÉCUTION
+====================================================================================================
+
+R = Réalise · A = Approuve · C = Consulté · I = Informé
+
++--------------------------------+-----+------+-----+-----+-----+-----+-----+-----+
+| Activité                       | RT  | RSSI | DB  | DF  | EF  | RS  | RE  | DIR |
++--------------------------------+-----+------+-----+-----+-----+-----+-----+-----+
+| Note de conception             | A   | C    | R   | C   | C   | I   | I   | I   |
+| Note de conception U2/U6/U8    | A   | A    | R   | I   | C   | I   | C   | I   |
+| Développement backend          | C   | C    | R   | I   | I   | I   | I   | I   |
+| Développement frontend         | C   | I    | C   | R   | C   | C   | I   | I   |
+| Matrice de permissions         | C   | C    | R   | I   | A   | A   | I   | C   |
+| Validation ligne à ligne (J2)  | I   | C    | C   | I   | R/A | R/A | I   | A   |
+| Revue de sécurité (étape 9)    | C   | R/A  | C   | C   | I   | I   | I   | I   |
+| Exercice d'intrusion (J3)      | C   | R/A  | C   | C   | I   | I   | I   | I   |
+| Portes de qualité G0 à G4      | A   | A    | C   | C   | A   | C   | C   | A   |
+| Migration des comptes          | A   | C    | R   | I   | A   | A   | C   | I   |
+| Activation d'un drapeau        | A   | A    | C   | I   | C   | I   | R   | A   |
+| Étapes E2 et E3                | A   | A    | C   | I   | A   | C   | R   | A   |
+| Étape E4 (irréversible)        | A   | A    | R   | C   | A   | C   | R   | A   |
+| Procédure de secours           | A   | A    | R   | I   | I   | I   | R   | I   |
+| Campagne de revue              | I   | A    | C   | I   | C   | R   | I   | A   |
+| Formation des administrateurs  | C   | C    | R   | C   | R   | A   | C   | I   |
+| Arbitrage de périmètre         | C   | C    | I   | I   | R   | C   | I   | A   |
++--------------------------------+-----+------+-----+-----+-----+-----+-----+-----+
+
+
+====================================================================================================
+16. INDICATEURS DE PILOTAGE ET TABLEAU DE BORD PROJET
+====================================================================================================
+
+16.1 INDICATEURS HEBDOMADAIRES
+  • Avancement : unités terminées / unités planifiées à date
+  • Nombre de tests backend nouveaux, cumulé, contre objectif de 265
+  • Nombre de tests frontend, contre objectif de 25
+  • Couverture du moteur d'autorisation (objectif 95 %)
+  • Temps moyen et p95 d'une décision d'autorisation (objectif < 5 ms)
+  • Nombre d'écarts d'observation de type A, de type B, de type C
+  • Nombre d'écarts non traités au-delà de leur délai (A : 24 h · B : 48 h)
+  • Nombre de lignes de matrice validées / 33 rôles × modules applicables
+  • Dégradation des temps de réponse de référence (seuil d'alerte 5 %)
+  • Nombre de réserves RSSI ouvertes
+
+16.2 INDICATEURS DE BASCULE (à partir de l'étape E1)
+  • Volume de contrôles d'accès observés (objectif : 10 000 minimum avant sortie de E1)
+  • Taux d'écart, global et par rôle
+  • Nombre de refus inattendus signalés par les utilisateurs
+  • Délai moyen de traitement d'un signalement
+  • Nombre de recours à la procédure de secours (objectif : zéro)
+
+16.3 SEUILS D'ALERTE — DÉCLENCHENT UNE REVUE EXCEPTIONNELLE SOUS 48 HEURES
+  • Un seul écart de type A non expliqué en production
+  • Deux itérations consécutives en retard
+  • Une réserve RSSI ouverte depuis plus de 15 jours
+  • Un test existant modifié pour faire passer la CI (violation de R5)
+  • Moins de 50 % de la matrice validée à la fin de l'itération I3
+
+16.4 GRAVITÉS D'INCIDENT
+  G1 CRITIQUE — perte d'accès en production, ou accès obtenu indûment à des données sensibles.
+     Repli niveau 1 immédiat, sans attendre d'analyse. Information de la direction dans l'heure.
+  G2 MAJEUR — fonctionnalité d'administration indisponible, journal en défaut, MFA bloquant.
+     Correction sous 24 heures ou repli.
+  G3 MOYEN — écart d'observation, anomalie d'affichage, lenteur. Correction dans l'itération.
+  G4 MINEUR — libellé, ergonomie, documentation. Consigné, traité au fil de l'eau.
+
+
+====================================================================================================
+17. RITUELS, INSTANCES ET CIRCUIT DE DÉCISION
+====================================================================================================
+
+17.1 RITUELS
+  • Point quotidien de 15 minutes (DB, DF, RT) : avancement, obstacles, écarts d'observation du jour.
+  • Revue de sécurité hebdomadaire de 45 minutes (RT, RSSI, DB) : règles introduites, journal,
+    réserves ouvertes. Obligatoire, même en semaine calme.
+  • Revue fonctionnelle hebdomadaire de 1 heure (EF, RS, RT) : matrice, écarts, arbitrages.
+  • Revue de fin d'itération de 2 heures : démonstration, checklist de l'annexe B, registre des
+    risques, décision de passage de porte le cas échéant.
+  • Comité de pilotage mensuel (DIR, RT, RSSI, EF, RS) : indicateurs, arbitrages, calendrier.
+
+17.2 CIRCUIT DE DÉCISION
+  • Décision technique : RT, immédiate.
+  • Décision de sécurité : RSSI, droit de veto, sous 48 heures.
+  • Décision fonctionnelle sur une ligne de matrice : EF, sous 5 jours ouvrés.
+  • Conflit entre deux domaines : escalade DIR, tranché en comité de pilotage ou en séance
+    exceptionnelle sous 5 jours ouvrés.
+  • Décision d'activation d'un drapeau de décision (E2, E3, E4) : DIR, sur avis conjoint RT + RSSI
+    + EF, par écrit.
+  • Décision d'arrêt du chantier : DIR seule.
+
+17.3 REGISTRE DES ARBITRAGES
+  Tout arbitrage fonctionnel est consigné : date, question, options envisagées, décision, décideur,
+  conséquence sur la matrice. Ce registre est joint au document de matrice signé et devient une
+  pièce du référentiel de l'institut. Il évite de rejouer dix fois le même débat.
+
+
+====================================================================================================
+18. PLAN DE CONDUITE DU CHANGEMENT ET DE FORMATION
+====================================================================================================
+
+18.1 CE QUI CHANGE POUR LES UTILISATEURS — ET CE QUI NE CHANGE PAS
+  Ne change pas : la manière de se connecter, les écrans métier, les habitudes de travail
+  quotidiennes. C'est le message principal à porter : ce chantier est invisible pour 95 % des
+  utilisateurs.
+  Change : pour les administrateurs et les gestionnaires de comptes, un nouvel espace
+  d'administration plus complet. Pour les 11 rôles sensibles, l'activation du MFA. Pour les
+  responsables de service, une campagne périodique de revue des habilitations à remplir.
+
+18.2 CALENDRIER DE COMMUNICATION
+  Semaine 2  : note d'information de la direction annonçant le chantier, son objet et son caractère
+               invisible pour la plupart des agents.
+  Semaine 8  : restitution de la matrice validée aux responsables de service — chacun reçoit la
+               fiche de droits de son domaine.
+  Semaine 13 : information sur le MFA aux 11 rôles sensibles, avec la procédure et le calendrier.
+  Semaine 15 : formation des administrateurs et gestionnaires de comptes.
+  Semaine 16 : note d'information générale avant l'étape E1, avec le canal de signalement.
+  Semaine 21 : rappel avant l'étape E2, avec le canal de signalement mis en avant.
+  Semaine 25 : rappel avant l'étape E3 et permanence d'assistance renforcée pendant 3 jours.
+
+18.3 SUPPORTS
+  • Manuel de l'administrateur système (installation, drapeaux, secours, journal)
+  • Manuel du gestionnaire de comptes (créer, modifier, déléguer, réviser)
+  • Manuel de l'agent utilisateur (mot de passe, MFA, sessions, mes droits)
+  • Fiches mémo d'une page par famille de rôles, plastifiées, distribuées dans les services
+  • Canal de signalement d'un refus inattendu, avec engagement de réponse sous 4 heures ouvrées
+    pendant les étapes E2 et E3
+
+18.4 ACCOMPAGNEMENT DU MFA
+  L'activation du MFA est le seul changement réellement contraignant. Elle est accompagnée :
+  permanence d'aide à l'installation de l'application d'authentification, codes de secours remis en
+  main propre aux membres de la direction, et procédure de déblocage documentée et rapide.
+
+
+====================================================================================================
+19. ARTICULATION AVEC LE CHANTIER EDT-INJS
+====================================================================================================
+
+19.1 LE POINT DE CONTACT
+Le chantier EDT-INJS comporte des prompts qui définissent des permissions : P11 pour les
+permissions d'API des emplois du temps, P14 pour les rôles autorisés à forcer un badgeage. Ces
+prompts consomment une matrice de rôles. Deux ordonnancements sont possibles.
+
+19.2 ORDONNANCEMENT RECOMMANDÉ — CURP D'ABORD, EDT ENSUITE
+  CURP I0 à I3 (semaines 1 à 8) produit la matrice consolidée. EDT démarre en semaine 5, ses
+  premières itérations étant sans enjeu de permission. À partir de l'itération I3 de CURP, EDT
+  dispose du référentiel des 33 rôles et y déclare ses propres permissions au lieu de créer une
+  matrice parallèle. Avantage : une seule matrice, aucune reprise. Inconvénient : EDT décalé d'un
+  mois.
+
+19.3 ORDONNANCEMENT ALTERNATIF — EN PARALLÈLE, AVEC CONVENTION
+  Les deux chantiers avancent ensemble. EDT déclare ses permissions au format
+  `edt_injs.<ressource>.<action>` dès le départ, en respectant la convention de nommage de CURP,
+  et les enregistre dans le référentiel CURP dès que celui-ci existe (fin de l'itération I3 de CURP,
+  soit semaine 8). Une réunion de synchronisation hebdomadaire entre les deux exécutants est
+  obligatoire. Avantage : pas de décalage. Inconvénient : exige une discipline de nommage stricte
+  et une coordination réelle.
+
+19.4 CE QUI EST INTERDIT DANS LES DEUX CAS
+  Qu'EDT crée sa propre table de rôles, sa propre liste de permissions en dur, ou sa propre matrice
+  dans `utils/roles.js`. Ce serait recréer exactement le risque R3 que ce chantier vise à clore.
+
+19.5 RESSOURCES
+  Si un seul développeur backend est disponible, les deux chantiers ne peuvent PAS être menés en
+  parallèle. Dans ce cas, CURP passe en premier : il est plus court, il conditionne EDT, et il clôt
+  un risque d'audit. Voir l'annexe G.
+
+
+====================================================================================================
+20. CONDITIONS DE CLÔTURE DU PROJET
+====================================================================================================
+
+Le chantier CURP-INJS est déclaré clos lorsque les onze conditions suivantes sont réunies :
+   1. Les 27 critères d'acceptation de l'annexe A7 du recueil sont satisfaits, vérifiés un à un et
+      consignés dans un procès-verbal signé par RT, RSSI, EF et DIR.
+   2. L'étape de bascule E3 est en production depuis un semestre académique complet, incluant au
+      moins une session de jury et une campagne d'inscriptions, sans incident de gravité 1 ou 2.
+   3. Le rapport de réconciliation final affiche zéro écart non décidé sur la totalité du parc.
+   4. Les 943 tests existants et les 265 tests nouveaux au minimum sont verts.
+   5. La couverture du moteur d'autorisation est supérieure ou égale à 95 %.
+   6. La matrice est validée, signée, et le registre des arbitrages est archivé.
+   7. Les trois manuels et les fiches mémo sont diffusés ; la formation est réalisée et émargée.
+   8. La procédure de secours a été testée avec succès par deux personnes distinctes.
+   9. La première campagne de revue des habilitations est achevée et son rapport remis à la direction.
+  10. L'étape E4 est exécutée : la double matrice de rôles n'existe plus, le risque R3 de l'audit est
+      officiellement clos.
+  11. Un bilan de fin de chantier est présenté en comité de pilotage : écarts au plan, retours
+      d'expérience, dette résiduelle et recommandations pour le raccordement futur à un fédérateur
+      d'identité.
+
+
+====================================================================================================
+ANNEXE A — CHECKLIST QUOTIDIENNE DE L'EXÉCUTANT
+====================================================================================================
+
+À FAIRE EN DÉBUT DE JOURNÉE
+  ☐ Récupérer la branche d'intégration et rebaser sa branche de travail
+  ☐ Relire l'objectif du jour dans la fiche d'unité du §7
+  ☐ Vérifier qu'aucun écart d'observation de type A n'attend d'être traité
+
+À FAIRE AVANT DE TERMINER LA JOURNÉE — SANS EXCEPTION
+  ☐ La suite backend est verte
+  ☐ Le scénario de fumée d'authentification est vert
+  ☐ Aucun test existant n'a été modifié
+  ☐ `makemigrations --check` ne signale rien
+  ☐ Le build frontend passe et le nombre de warnings n'a pas augmenté
+  ☐ Le travail du jour est poussé sur la branche distante
+  ☐ Le journal d'avancement est mis à jour en trois lignes : fait, en cours, obstacle
+  ☐ Si un doute subsiste sur un droit : il est écrit et adressé à EF, pas gardé pour soi
+
+INTERDITS QUOTIDIENS
+  ✗ Modifier un test existant pour faire passer la CI
+  ✗ Introduire une règle d'autorisation sans son test de refus
+  ✗ Coder une règle d'autorisation uniquement côté interface
+  ✗ Laisser un `print()` dans le code — l'audit en dénombre déjà 288
+  ✗ Activer un drapeau sans décision formelle
+  ✗ Travailler directement sur la branche d'intégration
+
+
+====================================================================================================
+ANNEXE B — CHECKLIST DE FIN D'ITÉRATION
+====================================================================================================
+
+  ☐ Toutes les unités planifiées de l'itération sont fusionnées, ou leur report est décidé et tracé
+  ☐ La batterie complète du §12.2 est passée, ses 14 points, résultats consignés
+  ☐ Les objectifs de tests de l'itération sont atteints
+  ☐ Le rapport de réconciliation des droits est à zéro écart non expliqué
+  ☐ Les écarts d'observation de la période sont tous traités et classés
+  ☐ L'avis RSSI est rendu pour les unités concernées ; les réserves sont suivies
+  ☐ Le registre des risques est revu ; les risques réalisés sont passés au journal des incidents
+  ☐ Le tableau de bord des indicateurs est mis à jour
+  ☐ La démonstration est faite à EF et RS, sur l'environnement de recette
+  ☐ Le compte rendu d'itération est rédigé selon l'annexe F
+  ☐ La porte de qualité, s'il y en a une, est franchie ou explicitement reportée avec ses conditions
+
+
+====================================================================================================
+ANNEXE C — CHECKLIST DE MISE EN PRODUCTION
+====================================================================================================
+
+AVANT (J-2)
+  ☐ Fenêtre validée par la direction, hors périodes interdites du §10.4
+  ☐ Sauvegarde complète effectuée ET restauration testée sur un environnement tiers
+  ☐ Version déployée en recette depuis au moins 5 jours sans incident
+  ☐ Tous les drapeaux de décision sont inactifs dans la configuration de production
+  ☐ Avis RSSI favorable sans réserve
+  ☐ Procédure de repli imprimée et disponible hors ligne
+  ☐ RE et DB d'astreinte confirmés et joignables
+  ☐ Note d'information aux utilisateurs envoyée
+
+PENDANT
+  ☐ Déploiement du code, drapeaux inactifs
+  ☐ Vérification : l'application démarre, les 12 comptes témoins se connectent
+  ☐ Vérification : aucun changement de comportement observable
+  ☐ Surveillance des journaux pendant 60 minutes
+
+APRÈS
+  ☐ Scénario de fumée complet rejoué en production
+  ☐ Indicateurs de performance comparés à la référence
+  ☐ Canal de signalement ouvert et annoncé
+  ☐ Compte rendu de mise en production rédigé dans les 24 heures
+  ☐ ACTIVATION D'UN DRAPEAU : JAMAIS LE MÊME JOUR QUE LE DÉPLOIEMENT
+
+
+====================================================================================================
+ANNEXE D — PROCÉDURE DE REPLI D'URGENCE ET DE RÉCUPÉRATION D'ACCÈS
+====================================================================================================
+
+D.1 UN UTILISATEUR SIGNALE UNE PERTE D'ACCÈS
+  1. NE PAS DÉBATTRE. Éteindre immédiatement le drapeau de décision le plus récemment activé.
+     Moins d'une minute. L'analyse vient après, jamais avant.
+  2. Confirmer avec l'utilisateur que l'accès est rétabli.
+  3. Qualifier l'incident en G1 et informer la direction dans l'heure.
+  4. Analyser l'écart à froid, corriger la matrice, re-tester en recette.
+  5. Ne réactiver le drapeau qu'après une nouvelle période d'observation d'au moins une semaine.
+
+D.2 PLUS AUCUN ADMINISTRATEUR NE PEUT SE CONNECTER
+  1. Accéder au serveur par SSH avec un compte système habilité.
+  2. Exécuter `python manage.py habilitations_secours --creer-admin` et suivre les instructions.
+     La commande crée un compte administrateur temporaire, à durée de vie limitée, et journalise
+     sa création de manière indélébile.
+  3. Se connecter avec ce compte, rétablir au moins deux comptes administrateurs nominatifs.
+  4. Désactiver le compte temporaire.
+  5. Rédiger un rapport d'incident obligatoire, transmis au RSSI et à la direction.
+  6. Analyser la cause racine : toute utilisation de cette procédure est une anomalie, jamais une
+     routine.
+
+D.3 LE JOURNAL D'AUDIT EST DÉTECTÉ COMME ALTÉRÉ
+  1. Ne rien modifier, ne rien supprimer. Le journal est une pièce.
+  2. Isoler la période concernée, exporter les enregistrements, les conserver hors ligne.
+  3. Informer le RSSI immédiatement, la direction sous 4 heures.
+  4. Rechercher la cause : défaut technique du chaînage, ou intervention directe en base.
+  5. Restaurer la cohérence uniquement après analyse, avec une entrée de journal documentant
+     l'opération elle-même.
+
+D.4 DÉGRADATION MAJEURE DES PERFORMANCES APRÈS ACTIVATION
+  1. Éteindre le drapeau d'observation en priorité : c'est lui qui double le coût des contrôles.
+  2. Si insuffisant, éteindre le drapeau de décision et revenir à l'ancien dispositif.
+  3. Mesurer, identifier la requête ou le contrôle coûteux, corriger, re-mesurer en recette.
+
+D.5 ANNULATION D'UNE MIGRATION DE COMPTES
+  1. Identifier l'identifiant d'exécution dans le rapport de migration.
+  2. `python manage.py migrer_comptes_vers_curp --rollback --run-id <identifiant>`
+  3. Vérifier par le rapport de réconciliation que l'état antérieur est exactement rétabli.
+  4. Si le rollback échoue, passer au niveau 4 : restauration de la sauvegarde.
+
+
+====================================================================================================
+ANNEXE E — SCÉNARIOS DE DÉGRADATION ACCEPTABLE ET ARBITRAGES DE PÉRIMÈTRE
+====================================================================================================
+
+Si le calendrier se tend, voici ce qui peut être reporté et ce qui ne peut jamais l'être.
+
+CE QUI PEUT ÊTRE REPORTÉ SANS COMPROMETTRE LA SÛRETÉ
+  • Le tableau de bord des habilitations (U7) : utile, non bloquant. Reportable après la bascule.
+  • La détection automatique d'anomalies (U7) : reportable, la revue manuelle la supplée.
+  • Les imports en masse (U5) : reportables si le parc de comptes est stable ; la création unitaire
+    suffit pour démarrer.
+  • Les exports et attestations (U7) : reportables.
+  • Les écrans de consultation du journal (U4) : l'administration Django y donne accès en attendant.
+  • Le MFA obligatoire (U6) : peut rester facultatif au démarrage, à condition que la décision soit
+    formelle et datée, avec une échéance d'obligation fixée.
+
+CE QUI NE PEUT JAMAIS ÊTRE REPORTÉ NI ALLÉGÉ
+  ✗ L'audit de l'existant U0 et les tests de caractérisation : sans eux, S1 est invérifiable.
+  ✗ Le mode observation : c'est le seul mécanisme qui protège d'une perte d'accès.
+  ✗ Le rapport de réconciliation à zéro écart.
+  ✗ La validation ligne à ligne de la matrice par l'expertise fonctionnelle.
+  ✗ Le journal append-only chaîné et sa vérification d'intégrité.
+  ✗ Le différentiel de droits avant validation d'une modification.
+  ✗ La règle des deux administrateurs actifs.
+  ✗ La procédure de secours et son test.
+  ✗ Les tests de refus.
+  ✗ L'environnement de recette.
+
+ARBITRAGE TYPE : « NOUS N'AVONS PAS LE TEMPS DE VALIDER TOUTE LA MATRICE »
+  Réponse : on ne bascule pas une matrice non validée. On bascule PAR DOMAINE. Les domaines dont la
+  matrice est validée passent en décision effective ; les autres restent en observation. Le
+  découpage par domaine est prévu dans le moteur à cet effet. Une matrice partiellement validée et
+  partiellement basculée est sûre ; une matrice non validée et entièrement basculée ne l'est pas.
+
+
+====================================================================================================
+ANNEXE F — MODÈLE DE COMPTE RENDU D'EXÉCUTION D'UNITÉ
+====================================================================================================
+
+UNITÉ         : U__ — <intitulé>
+PROMPT SOURCE : <prompt principal / C_>
+ITÉRATION     : I__            PÉRIODE : du __/__/____ au __/__/____
+EXÉCUTANT     : ____________   REVUE PAR : ____________   AVIS RSSI : FAV / FAV SOUS RÉSERVE / DÉFAV
+
+1. OBJECTIF DE L'UNITÉ (3 lignes)
+
+2. CE QUI A ÉTÉ LIVRÉ
+   • Fichiers créés : ____   Fichiers modifiés : ____   Fichier le plus long : ____ lignes
+   • Modèles / routes / écrans / commandes ajoutés :
+   • Migrations produites, réversibilité testée : OUI / NON
+
+3. TESTS
+   • Tests nouveaux : ____ (dont tests de refus : ____)
+   • Suite backend : ____ / ____ verts     Suite frontend : ____ / ____ verts
+   • Couverture de la partie livrée : ____ %
+
+4. NON-RÉGRESSION
+   • Batterie du §12.2 : les 14 points passés ? OUI / NON — sinon, lesquels et pourquoi
+   • Scénario de fumée sur les 12 comptes témoins : OK / KO
+   • Rapport de réconciliation : ____ écart(s) — dont ____ expliqué(s) et signé(s)
+   • Tests existants modifiés : AUCUN / lesquels et sur quelle autorisation
+
+5. OBSERVATION
+   • Écarts de type A : ____  type B : ____  type C : ____
+   • Écarts traités : ____   Écarts en attente : ____ (délai dépassé : ____)
+
+6. PERFORMANCE
+   • Temps moyen de décision : ____ ms   p95 : ____ ms
+   • Dégradation sur les temps de réponse de référence : ____ % (seuil 5 %)
+
+7. ÉCARTS AU PLAN
+   • Effort prévu : ____ JH   Effort réel : ____ JH   Cause de l'écart :
+   • Éléments reportés et décision associée :
+
+8. RISQUES ET POINTS D'ATTENTION POUR L'UNITÉ SUIVANTE
+
+9. DÉCISION
+   ☐ Unité acceptée   ☐ Acceptée sous réserve (réserves : ____)   ☐ Refusée (motif : ____)
+   Date : __/__/____   Signatures : RT ______  RSSI ______  EF ______
+
+
+====================================================================================================
+ANNEXE G — MODE MONO-EXÉCUTANT (UNE SEULE PERSONNE DISPONIBLE)
+====================================================================================================
+
+Si l'institut ne dispose que d'un seul développeur, le plan reste valable mais s'étire. Les
+adaptations sont les suivantes.
+
+G.1 DURÉE
+  16 semaines deviennent 26 semaines. Le développeur assure successivement le backend et le
+  frontend ; l'unité U4 s'allonge de 3 jours, et les unités U6 et U7 de l'itération I6 se déroulent
+  en séquence au lieu d'être parallèles, ajoutant 3 semaines.
+
+G.2 CE QUI NE PEUT PAS ÊTRE ASSURÉ PAR LA MÊME PERSONNE
+  • La revue de sécurité : le RSSI est indispensable et ne peut être l'auteur du code.
+  • Le test de la procédure de secours : par construction, il doit être fait par quelqu'un d'autre.
+  • La recette des écrans : par RS avec de vrais agents, jamais par le développeur.
+  • La validation de la matrice : par EF, jamais par la technique.
+  Si l'une de ces quatre conditions n'est pas tenable, le chantier ne doit pas démarrer. Un
+  dispositif d'habilitation conçu, codé, relu et validé par une seule personne est un risque en soi.
+
+G.3 CALENDRIER ADAPTÉ
+  S1-S3    U0 · S4-S6   U1 · S7-S10  U2 · S11-S13 U3 · S14-S17 U4
+  S18-S20  U5 · S21-S23 U6 · S24-S25 U7 · S26-S29 U8
+  Puis les étapes E1 à E4 selon le même rythme qu'au §10.3.
+
+G.4 PRIORITÉS EN CAS DE BLOCAGE TOTAL
+  Si même ce calendrier n'est pas tenable, livrer dans cet ordre et s'arrêter où l'on peut :
+  1. U0 seul — l'audit de l'existant a une valeur propre, indépendamment de la suite : il documente
+     enfin qui a accès à quoi, et il met en place le filet de tests.
+  2. U0 + U1 + U2 en observation — on mesure les écarts sans rien changer. Valeur : on sait
+     exactement ce que coûterait une mise en conformité.
+  3. U3 — la matrice validée est un actif institutionnel, même sans être appliquée par le code.
+  Chacun de ces trois paliers est un livrable utile et cohérent en lui-même. Aucun n'expose
+  l'institut au moindre risque d'accès.
+
+
+====================================================================================================
+RAPPEL FINAL
+====================================================================================================
+
+Ce chantier ne livre aucune fonctionnalité visible pour la grande majorité des utilisateurs. Son
+succès ne se mesure pas à ce qu'il ajoute, mais à ce qu'il n'a pas cassé.
+
+Un module d'habilitation réussi est un module dont personne ne parle : les agents se connectent
+comme avant, voient ce qu'ils voyaient, et ne voient rien de plus. Ce que l'institut y gagne est
+invisible au quotidien et décisif le jour où quelque chose survient — un départ précipité, un
+contrôle, une contestation de note, une fuite. Ce jour-là, la question sera : qui avait accès, quand,
+et qui l'avait décidé. Le journal chaîné et la matrice signée sont la réponse.
+
+Toute décision prise pendant ces 16 semaines se tranche avec une seule question :
+« Est-ce que cela peut faire perdre un accès à quelqu'un sans qu'on l'ait décidé ? »
+Si la réponse n'est pas un non certain, on ne le fait pas aujourd'hui.
+
+====================================================================================================
+FIN DU PLAN D'EXÉCUTION — Plan-exécution-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt
+====================================================================================================

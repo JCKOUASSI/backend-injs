@@ -1,0 +1,1595 @@
+
+
+Voici le prompt que je considère comme le prompt maître d’implémentation.
+
+PROMPT MAÎTRE — MODULE UTILISATEURS / COMPTES / RÔLES / PERMISSIONS
+
+Application INJS-LMD — Gestion institutionnelle des accès
+
+Tu es un architecte logiciel senior spécialisé dans les systèmes d’information universitaires, IAM, RBAC/ABAC, cybersécurité, Django/DRF, React/Vite, PostgreSQL et applications LMD.
+
+Tu travailles sur l’application :
+
+INJS-LMD — Institut National de la Jeunesse et des Sports de Marcory
+
+L’objectif est d’implémenter de manière complète, robuste, sécurisée, testée et maintenable le module :
+
+UTILISATEURS / COMPTES / RÔLES / PERMISSIONS / PÉRIMÈTRES D’ACCÈS
+
+Ce module doit devenir le socle central de gestion des identités et des autorisations de toute l’application INJS-LMD.
+
+⸻
+
+1. RÈGLE ABSOLUE : AUDITER AVANT DE MODIFIER
+
+AVANT toute modification :
+
+1. Inspecte intégralement l’architecture existante.
+2. Identifie le système actuel d’authentification.
+3. Identifie les modèles User / utilisateurs / profils déjà présents.
+4. Identifie les rôles existants.
+5. Identifie les permissions Django existantes.
+6. Identifie les groupes Django existants.
+7. Identifie les endpoints d’authentification.
+8. Identifie les middlewares de sécurité.
+9. Identifie les routes frontend existantes.
+10. Identifie les composants de protection des routes.
+11. Identifie les écrans déjà consacrés aux utilisateurs.
+12. Identifie les relations existantes entre utilisateurs et :
+    * étudiants ;
+    * enseignants ;
+    * personnels administratifs ;
+    * départements ;
+    * services ;
+    * formations ;
+    * établissements ;
+    * autres entités métier.
+13. Identifie les migrations existantes.
+14. Identifie les tests existants.
+15. Identifie les fixtures / données de démonstration.
+16. Identifie les contraintes PostgreSQL.
+17. Identifie les règles de sécurité déjà présentes.
+18. Identifie les éventuelles incompatibilités avec le modèle actuel.
+
+NE SUPPRIME RIEN pendant cette phase.
+
+Ne fais aucune migration destructive.
+
+Ne fais jamais :
+
+* DROP DATABASE ;
+* DROP TABLE ;
+* TRUNCATE ;
+* flush ;
+* suppression du volume PostgreSQL ;
+* suppression de données de démonstration ;
+* réinitialisation arbitraire de la base.
+
+⸻
+
+2. OBJECTIF FONCTIONNEL
+
+Le module doit permettre à l’administration INJS de gérer :
+
+UTILISATEURS
+    ↓
+COMPTES
+    ↓
+PROFILS
+    ↓
+RÔLES
+    ↓
+PERMISSIONS
+    ↓
+PÉRIMÈTRES ORGANISATIONNELS
+    ↓
+PÉRIMÈTRES MÉTIER
+    ↓
+DONNÉES ACCESSIBLES
+
+Il doit être possible de créer un utilisateur et de lui attribuer :
+
+* un ou plusieurs rôles ;
+* des permissions via ses rôles ;
+* éventuellement des permissions exceptionnelles ;
+* un ou plusieurs départements ;
+* un ou plusieurs services ;
+* éventuellement une ou plusieurs formations ;
+* éventuellement un établissement/composante ;
+* un périmètre de données ;
+* une période de validité ;
+* un statut de compte.
+
+⸻
+
+3. NE PAS CONFONDRE LES CONCEPTS
+
+Le système doit distinguer clairement :
+
+Utilisateur
+
+Personne physique utilisant le SI.
+
+Compte
+
+Identité technique permettant l’authentification.
+
+Profil
+
+Informations métier et administratives associées à l’utilisateur.
+
+Rôle
+
+Responsabilité fonctionnelle.
+
+Permission
+
+Action autorisée sur une ressource.
+
+Département
+
+Unité organisationnelle.
+
+Service
+
+Unité fonctionnelle rattachée à un département ou à une direction.
+
+Périmètre
+
+Zone de données sur laquelle les permissions sont applicables.
+
+Exemple :
+
+Utilisateur :
+Jean Dupont
+Rôle :
+RESPONSABLE_FORMATION
+Département :
+Département des Sciences et Techniques
+Service :
+Service Formation
+Périmètre :
+Licence STAPS
+Permissions :
+formations.view
+formations.update
+groups.view
+teacher_assignments.view
+
+⸻
+
+4. ARCHITECTURE ORGANISATIONNELLE À PRÉVOIR
+
+Le système doit pouvoir représenter au minimum :
+
+INJS
+│
+├── Direction Générale
+│
+├── Secrétariat Général
+│
+├── Direction des Études / Pédagogie
+│
+├── Scolarité
+│   ├── Candidatures
+│   ├── Concours / Sélection
+│   ├── Admissions
+│   ├── Inscriptions
+│   ├── Gestion étudiants
+│   └── Diplômation
+│
+├── Évaluations / Jurys
+│
+├── Stages
+│
+├── Recherche / Innovation
+│
+├── Vie Étudiante
+│
+├── Finances
+│
+├── Ressources Humaines
+│
+├── Administration / Moyens Généraux
+│
+├── Patrimoine / Maintenance
+│
+├── Documentation / Archives
+│
+├── Qualité / Audit
+│
+├── Planification / Statistiques
+│
+├── Communication
+│
+└── Informatique / Systèmes d'Information
+
+IMPORTANT :
+
+Cette liste constitue le référentiel fonctionnel cible.
+
+Avant de créer de nouvelles tables, recherche si ces notions existent déjà dans l’application et réutilise l’existant lorsque cela est pertinent.
+
+Ne crée pas de doublons fonctionnels.
+
+⸻
+
+5. MODÈLE DE DONNÉES CIBLE
+
+Conçois une architecture permettant au minimum de gérer :
+
+User
+Account/Profile
+Department
+Service
+Role
+Permission
+UserRole
+RolePermission
+UserPermission
+UserDepartment
+UserService
+AccessScope
+AuditLog
+
+Selon l’architecture existante, tu peux adapter ces noms.
+
+NE CRÉE PAS obligatoirement ces modèles sous ces noms si l’application dispose déjà d’une architecture équivalente.
+
+⸻
+
+6. UTILISATEUR
+
+Le compte utilisateur doit gérer au minimum :
+
+* identifiant ;
+* nom ;
+* prénom ;
+* email ;
+* téléphone ;
+* matricule professionnel ;
+* photo ;
+* fonction ;
+* statut ;
+* département ;
+* service ;
+* date de création ;
+* dernière connexion ;
+* date de désactivation ;
+* compte actif/inactif ;
+* compte verrouillé ;
+* authentification MFA si architecture compatible ;
+* expiration éventuelle ;
+* informations de sécurité.
+
+Statuts possibles :
+
+ACTIVE
+INACTIVE
+SUSPENDED
+LOCKED
+PENDING
+EXPIRED
+
+⸻
+
+7. RÔLES
+
+Implémente un système RBAC robuste.
+
+Les rôles cibles doivent notamment pouvoir inclure :
+
+SUPER_ADMIN
+ADMIN_SI
+DIRECTION
+SECRETARIAT_GENERAL
+QUALITE_MANAGER
+AUDITEUR
+PLANIFICATION_MANAGER
+STATISTICIEN
+PEDAGOGIE_MANAGER
+CHEF_DEPARTEMENT
+RESPONSABLE_FORMATION
+RESPONSABLE_PARCOURS
+ENSEIGNANT
+VACATAIRE
+SCOLARITE_MANAGER
+SCOLARITE_AGENT
+CANDIDATURE_MANAGER
+CANDIDATURE_AGENT
+CONCOURS_MANAGER
+CONCOURS_CORRECTEUR
+CONCOURS_SURVEILLANT
+ADMISSION_MANAGER
+INSCRIPTION_MANAGER
+ETUDIANT_MANAGER
+GROUPE_MANAGER
+EVALUATION_MANAGER
+NOTE_MANAGER
+JURY_PRESIDENT
+JURY_MEMBER
+JURY_SECRETARY
+DIPLOME_MANAGER
+DIPLOME_VALIDATOR
+SIGNATAIRE
+STAGE_MANAGER
+ENCADREUR
+TUTEUR_ENTREPRISE
+RECHERCHE_MANAGER
+CHERCHEUR
+VIE_ETUDIANTE
+BOURSE_MANAGER
+FINANCE_MANAGER
+COMPTABLE
+CAISSIER
+RECOUVREMENT
+CONTROLEUR_FINANCIER
+RH_MANAGER
+RH_AGENT
+PAIE_MANAGER
+ADMIN_MANAGER
+ACHATS_MANAGER
+LOGISTICIEN
+PATRIMOINE_MANAGER
+MAINTENANCE
+ARCHIVISTE
+GED_MANAGER
+COMMUNICATION_MANAGER
+SUPPORT_IT
+SYSADMIN
+NETWORK_ADMIN
+DB_ADMIN
+SECURITY_ADMIN
+DATA_ANALYST
+API_MANAGER
+LECTEUR
+AUDIT_READONLY
+ETUDIANT
+
+Tu peux ajouter les rôles nécessaires après audit.
+
+⸻
+
+8. PERMISSIONS
+
+Les permissions doivent être fines.
+
+NE PAS créer uniquement :
+
+can_access_scolarite
+
+Créer des permissions structurées :
+
+MODULE.OBJET.ACTION
+
+Exemples :
+
+students.view
+students.create
+students.update
+students.delete
+students.archive
+students.restore
+students.export
+candidatures.view
+candidatures.create
+candidatures.update
+candidatures.validate
+candidatures.reject
+candidatures.export
+admissions.view
+admissions.create
+admissions.update
+admissions.validate
+admissions.reject
+admissions.publish
+inscriptions.view
+inscriptions.create
+inscriptions.update
+inscriptions.validate
+inscriptions.cancel
+notes.view
+notes.create
+notes.update
+notes.submit
+notes.validate
+notes.lock
+notes.unlock
+results.view
+results.calculate
+results.validate
+results.publish
+juries.view
+juries.create
+juries.update
+juries.validate
+juries.deliberate
+juries.publish
+diplomas.view
+diplomas.create
+diplomas.validate
+diplomas.sign
+diplomas.publish
+diplomas.revoke
+
+⸻
+
+9. ACTIONS STANDARD
+
+Prévoir lorsque pertinent :
+
+view
+list
+create
+update
+delete
+validate
+reject
+cancel
+archive
+restore
+approve
+publish
+unpublish
+sign
+lock
+unlock
+export
+import
+print
+download
+
+Ne crée pas inutilement toutes les combinaisons.
+
+Chaque permission doit correspondre à une véritable capacité métier.
+
+⸻
+
+10. PERMISSIONS FINANCES
+
+Prévoir notamment :
+
+payments.view
+payments.create
+payments.validate
+payments.cancel
+payments.refund
+invoices.view
+invoices.create
+invoices.update
+invoices.cancel
+fees.view
+fees.create
+fees.update
+fees.validate
+debts.view
+debts.create
+debts.update
+scholarships.view
+scholarships.create
+scholarships.validate
+financial_reports.view
+financial_reports.export
+
+⸻
+
+11. PERMISSIONS RH
+
+employees.view
+employees.create
+employees.update
+employees.archive
+contracts.view
+contracts.create
+contracts.update
+careers.view
+careers.update
+leave_requests.view
+leave_requests.create
+leave_requests.validate
+payroll.view
+payroll.create
+payroll.validate
+payroll.export
+
+⸻
+
+12. PERMISSIONS PÉDAGOGIQUES
+
+formations.view
+formations.create
+formations.update
+formations.delete
+formations.validate
+referentiels.view
+referentiels.create
+referentiels.update
+referentiels.validate
+ues.view
+ues.create
+ues.update
+ues.delete
+ecues.view
+ecues.create
+ecues.update
+ecues.delete
+courses.view
+courses.create
+courses.update
+teacher_assignments.view
+teacher_assignments.create
+teacher_assignments.update
+teacher_assignments.delete
+groups.view
+groups.create
+groups.update
+groups.delete
+
+⸻
+
+13. PERMISSIONS SI
+
+Prévoir notamment :
+
+users.view
+users.create
+users.update
+users.disable
+users.enable
+users.lock
+users.unlock
+users.reset_password
+roles.view
+roles.create
+roles.update
+roles.delete
+permissions.view
+permissions.assign
+audit_logs.view
+system_settings.view
+system_settings.update
+
+Les permissions liées aux comptes doivent elles-mêmes être protégées.
+
+⸻
+
+14. PÉRIMÈTRES D’ACCÈS
+
+Le système doit impérativement supporter le principe :
+
+Un rôle définit ce que l’utilisateur peut faire.
+Un périmètre définit sur quelles données il peut le faire.
+
+Exemples :
+
+Responsable Scolarité
+→ toutes les données de la Scolarité
+Responsable Formation
+→ uniquement sa formation
+Chef de Département
+→ uniquement son département
+Enseignant
+→ uniquement ses cours et groupes
+Agent Finances
+→ uniquement les opérations financières autorisées
+
+⸻
+
+15. HIÉRARCHIE DES PÉRIMÈTRES
+
+Prévoir si compatible avec le modèle :
+
+Établissement
+    ↓
+Direction
+    ↓
+Département
+    ↓
+Service
+    ↓
+Formation
+    ↓
+Parcours
+    ↓
+Groupe
+    ↓
+Cours / ECUE
+
+Le système doit permettre de restreindre l’accès à un ou plusieurs niveaux.
+
+⸻
+
+16. EXEMPLE DE PÉRIMÈTRE
+
+Utilisateur :
+
+Marie K.
+
+Rôle :
+
+CHEF_DEPARTEMENT
+
+Département :
+
+Département des Sciences du Sport
+
+Services :
+
+Service Formation
+Service Pédagogie
+
+Permissions :
+
+formations.view
+courses.view
+groups.view
+teacher_assignments.view
+students.view
+results.view
+
+Périmètre :
+
+Département = Sciences du Sport
+
+Marie ne doit pas pouvoir consulter les données d’un autre département si son rôle ne lui accorde pas ce droit.
+
+⸻
+
+17. SUPER ADMIN
+
+Le SUPER_ADMIN peut administrer le système mais son utilisation doit rester traçable.
+
+Il peut notamment :
+
+* créer des utilisateurs ;
+* modifier des utilisateurs ;
+* désactiver des comptes ;
+* créer des rôles ;
+* gérer les permissions ;
+* gérer les périmètres ;
+* consulter les journaux d’audit ;
+* gérer les paramètres IAM.
+
+Mais :
+
+NE PAS contourner les validations métier sensibles.
+
+Exemples :
+
+* notes ;
+* résultats ;
+* diplômes ;
+* paiements ;
+* procès-verbaux.
+
+Toute intervention exceptionnelle doit être auditée.
+
+⸻
+
+18. SÉPARATION DES RESPONSABILITÉS
+
+Le système doit empêcher autant que possible les conflits de fonctions.
+
+Exemples :
+
+Un enseignant ne doit pas pouvoir :
+
+modifier les notes d'un autre enseignant
+déverrouiller lui-même une note validée
+publier les résultats institutionnels
+modifier un jury
+
+Un agent financier ne doit pas pouvoir :
+
+valider seul ses propres opérations sensibles
+
+Un agent de scolarité ne doit pas pouvoir :
+
+modifier les paramètres globaux de sécurité
+
+Un administrateur technique ne doit pas automatiquement devenir :
+
+Président de Jury
+Responsable Financier
+Responsable Pédagogique
+
+⸻
+
+19. INTERFACE FRONTEND
+
+Créer ou refondre une interface :
+
+Administration → Utilisateurs
+
+Avec :
+
+Tableau principal
+
+Colonnes :
+
+* nom ;
+* prénom ;
+* identifiant ;
+* email ;
+* fonction ;
+* département ;
+* service ;
+* rôles ;
+* statut ;
+* dernière connexion ;
+* actions.
+
+Fonctions :
+
+* rechercher ;
+* filtrer ;
+* trier ;
+* pagination ;
+* créer ;
+* modifier ;
+* désactiver ;
+* réactiver ;
+* verrouiller ;
+* déverrouiller ;
+* réinitialiser accès ;
+* consulter détail ;
+* consulter audit.
+
+⸻
+
+20. FICHE UTILISATEUR
+
+Créer une fiche complète :
+
+Identité
+Compte
+Fonction
+Département
+Services
+Rôles
+Permissions effectives
+Permissions exceptionnelles
+Périmètres
+Historique
+Sécurité
+Journal d'activité
+
+Afficher clairement :
+
+Permissions héritées des rôles
+
+et
+
+Permissions accordées explicitement
+
+et
+
+Permissions refusées / restrictions
+
+si l’architecture le permet.
+
+⸻
+
+21. ÉCRAN RÔLES
+
+Créer :
+
+Administration
+→ Rôles
+
+Fonctions :
+
+* liste ;
+* création ;
+* modification ;
+* duplication ;
+* activation/désactivation ;
+* suppression uniquement si aucun utilisateur ne dépend du rôle ;
+* attribution permissions ;
+* visualisation utilisateurs concernés.
+
+Afficher :
+
+Rôle
+Description
+Nombre utilisateurs
+Nombre permissions
+Statut
+
+⸻
+
+22. ÉCRAN PERMISSIONS
+
+Créer :
+
+Administration
+→ Permissions
+
+Organiser les permissions par module :
+
+Scolarité
+Pédagogie
+Évaluations
+Jurys
+Diplômation
+Stages
+Finances
+RH
+Patrimoine
+Qualité
+Statistiques
+Administration
+SI
+
+Ne pas afficher une liste plate illisible.
+
+Utiliser une organisation :
+
+Module
+  ↓
+Objet
+  ↓
+Actions
+
+⸻
+
+23. MATRICE RÔLES / PERMISSIONS
+
+Créer une interface permettant de visualiser :
+
+                    view create update validate publish
+Étudiants             ✓     ✓      ✓
+Admissions            ✓     ✓      ✓        ✓
+Notes                 ✓     ✓      ✓
+Résultats             ✓
+Jury                  ✓     ✓      ✓        ✓
+Diplômes              ✓     ✓               ✓
+
+Prévoir recherche et filtres.
+
+⸻
+
+24. ÉCRAN DÉPARTEMENTS / SERVICES
+
+Créer si nécessaire :
+
+Administration
+→ Organisation
+→ Départements
+→ Services
+
+Permettre :
+
+* créer département ;
+* modifier ;
+* activer/désactiver ;
+* créer service ;
+* rattacher service à département ;
+* affecter utilisateurs ;
+* consulter utilisateurs d’un département ;
+* consulter utilisateurs d’un service.
+
+⸻
+
+25. AUDIT
+
+Chaque opération sensible doit être enregistrée.
+
+Audit minimal :
+
+acteur
+date/heure
+IP
+action
+objet
+identifiant objet
+ancienne valeur
+nouvelle valeur
+résultat
+raison éventuelle
+
+Exemples :
+
+USER_CREATED
+USER_UPDATED
+USER_DISABLED
+USER_ENABLED
+ROLE_CREATED
+ROLE_UPDATED
+ROLE_ASSIGNED
+ROLE_REMOVED
+PERMISSION_GRANTED
+PERMISSION_REVOKED
+SCOPE_CHANGED
+PASSWORD_RESET
+ACCOUNT_LOCKED
+ACCOUNT_UNLOCKED
+
+Les logs d’audit ne doivent pas être modifiables par les utilisateurs standards.
+
+⸻
+
+26. SÉCURITÉ
+
+Respecter :
+
+* principe du moindre privilège ;
+* deny by default ;
+* séparation des responsabilités ;
+* authentification sécurisée ;
+* gestion des sessions ;
+* expiration des sessions si prévue ;
+* protection CSRF si pertinente ;
+* validation backend obligatoire ;
+* contrôle d’autorisation côté API ;
+* ne jamais faire confiance au frontend ;
+* journalisation des opérations sensibles.
+
+IMPORTANT :
+
+Le frontend peut masquer une fonction.
+
+Mais la sécurité réelle doit toujours être appliquée côté backend.
+
+⸻
+
+27. API
+
+Créer ou compléter les endpoints REST nécessaires.
+
+Exemples :
+
+GET    /api/users/
+POST   /api/users/
+GET    /api/users/{id}/
+PATCH  /api/users/{id}/
+DELETE /api/users/{id}/
+POST   /api/users/{id}/disable/
+POST   /api/users/{id}/enable/
+POST   /api/users/{id}/lock/
+POST   /api/users/{id}/unlock/
+GET    /api/roles/
+POST   /api/roles/
+PATCH  /api/roles/{id}/
+GET    /api/permissions/
+POST   /api/users/{id}/roles/
+DELETE /api/users/{id}/roles/{role_id}/
+GET    /api/users/{id}/effective-permissions/
+GET    /api/users/{id}/scopes/
+GET    /api/audit-logs/
+
+ADAPTE les URLs aux conventions déjà présentes dans le projet.
+
+Ne crée pas de deuxième système d’API parallèle.
+
+⸻
+
+28. BACKEND
+
+Implémenter :
+
+* modèles ;
+* migrations ;
+* serializers ;
+* viewsets ;
+* permissions DRF ;
+* services métier ;
+* validations ;
+* filtres ;
+* pagination ;
+* tests ;
+* audit ;
+* documentation API.
+
+Centraliser la logique d’autorisation.
+
+Éviter de dupliquer les règles dans chaque vue.
+
+⸻
+
+29. FRONTEND
+
+Implémenter :
+
+* pages ;
+* routes ;
+* composants ;
+* formulaires ;
+* filtres ;
+* tableaux ;
+* modales ;
+* confirmations ;
+* messages d’erreur ;
+* gestion des états ;
+* protection des routes ;
+* contrôle des actions selon permissions.
+
+Les contrôles frontend ne remplacent jamais les contrôles backend.
+
+⸻
+
+30. PERMISSIONS EFFECTIVES
+
+Le système doit être capable de calculer :
+
+Permissions effectives =
+permissions des rôles
++
+permissions explicites
+-
+restrictions éventuelles
+
+et d’en déduire :
+
+Modules accessibles
+Écrans accessibles
+Actions autorisées
+Données accessibles
+
+⸻
+
+31. MENU DYNAMIQUE
+
+Le menu INJS-LMD doit pouvoir être construit dynamiquement à partir des permissions.
+
+Exemple :
+
+Utilisateur sans :
+
+finances.view
+
+ne voit pas :
+
+Finances
+
+Utilisateur avec :
+
+students.view
+
+voit :
+
+Scolarité
+→ Étudiants
+
+Utilisateur avec :
+
+students.view
+students.update
+
+voit également :
+
+Modifier
+
+⸻
+
+32. COMPTE ÉTUDIANT
+
+Prévoir le rôle :
+
+ETUDIANT
+
+avec accès uniquement à ses propres données :
+
+profil
+candidature
+admission
+inscription
+cours
+groupes
+emploi du temps
+présences
+notes
+résultats
+relevés
+diplômes
+paiements
+stages
+notifications
+
+Il ne doit jamais pouvoir consulter les données d’un autre étudiant.
+
+⸻
+
+33. COMPTE ENSEIGNANT
+
+Prévoir :
+
+ENSEIGNANT
+
+avec accès à :
+
+profil
+cours affectés
+groupes affectés
+étudiants de ses groupes
+présences
+évaluations
+notes
+jurys auxquels il participe
+stages qu'il encadre
+
+Le périmètre doit être automatiquement limité à ses affectations lorsque cela est pertinent.
+
+⸻
+
+34. TESTS
+
+Créer des tests unitaires et d’intégration couvrant au minimum :
+
+Utilisateurs
+
+* création ;
+* modification ;
+* désactivation ;
+* réactivation ;
+* verrouillage ;
+* déverrouillage.
+
+Rôles
+
+* création ;
+* attribution ;
+* retrait.
+
+Permissions
+
+* permission accordée ;
+* permission refusée ;
+* héritage par rôle ;
+* permission explicite.
+
+Périmètres
+
+* accès autorisé ;
+* accès interdit ;
+* séparation entre départements ;
+* séparation entre services ;
+* séparation entre formations.
+
+Sécurité
+
+Tester explicitement les accès interdits.
+
+Exemple :
+
+Enseignant A
+→ ne peut pas modifier les notes de Enseignant B.
+Chef Département A
+→ ne peut pas modifier les données du Département B.
+Étudiant A
+→ ne peut pas consulter Étudiant B.
+Agent Scolarité
+→ ne peut pas administrer les rôles.
+Administrateur SI
+→ ne doit pas automatiquement disposer des permissions métier sensibles.
+
+⸻
+
+35. TESTS E2E
+
+Créer un scénario complet :
+
+Création utilisateur
+        ↓
+Attribution rôle
+        ↓
+Attribution département
+        ↓
+Attribution service
+        ↓
+Attribution périmètre
+        ↓
+Connexion
+        ↓
+Affichage menu
+        ↓
+Accès autorisé
+        ↓
+Accès interdit
+        ↓
+Modification rôle
+        ↓
+Recalcul permissions
+        ↓
+Audit
+
+⸻
+
+36. DONNÉES DE DÉMONSTRATION
+
+Créer uniquement si le projet possède déjà une stratégie de données démo.
+
+Prévoir des comptes réalistes :
+
+Administrateur SI
+Directeur
+Responsable Scolarité
+Agent Scolarité
+Responsable Formation
+Chef Département
+Enseignant
+Responsable Jury
+Comptable
+Responsable RH
+Responsable Stages
+Étudiant
+Auditeur
+
+Les comptes démo doivent être clairement identifiés.
+
+NE PAS injecter de comptes de démonstration dans une base de production.
+
+⸻
+
+37. COMPATIBILITÉ AVEC L’EXISTANT
+
+Le système doit rester compatible avec :
+
+* étudiants existants ;
+* enseignants existants ;
+* personnels existants ;
+* candidatures ;
+* admissions ;
+* inscriptions ;
+* cours ;
+* groupes ;
+* présences ;
+* notes ;
+* jurys ;
+* diplomation ;
+* finances ;
+* stages ;
+* RH ;
+* autres modules existants.
+
+Si une relation existe déjà :
+
+la réutiliser plutôt que créer un doublon.
+
+⸻
+
+38. MIGRATIONS
+
+Avant toute migration :
+
+1. vérifier l’état des migrations ;
+2. identifier les migrations non appliquées ;
+3. vérifier les dépendances ;
+4. sauvegarder si nécessaire ;
+5. produire une migration réversible ;
+6. vérifier son application sur une base de test.
+
+Ne jamais utiliser :
+
+flush
+reset
+drop
+truncate
+
+pour résoudre un problème de migration.
+
+⸻
+
+39. DONNÉES EXISTANTES
+
+Avant toute opération pouvant modifier des utilisateurs existants :
+
+* détecter les utilisateurs existants ;
+* détecter les doublons ;
+* préserver les identifiants ;
+* préserver les relations ;
+* préserver les données métier ;
+* proposer une stratégie de migration.
+
+NE PAS supprimer les utilisateurs existants pour recréer un nouveau système.
+
+⸻
+
+40. DOCUMENTATION
+
+Créer ou mettre à jour :
+
+docs/
+├── architecture/
+│   └── IAM.md
+├── security/
+│   └── RBAC.md
+├── administration/
+│   └── utilisateurs.md
+└── audit/
+    └── permissions.md
+
+La documentation doit expliquer :
+
+* architecture ;
+* modèles ;
+* rôles ;
+* permissions ;
+* périmètres ;
+* sécurité ;
+* API ;
+* administration ;
+* procédures de maintenance.
+
+Adapter les chemins à la structure réelle du dépôt.
+
+⸻
+
+41. CRITÈRES D’ACCEPTATION
+
+Le module sera considéré comme terminé uniquement si :
+
+A. Utilisateurs
+
+[ ] création
+[ ] modification
+[ ] activation
+[ ] désactivation
+[ ] verrouillage
+[ ] déverrouillage
+[ ] recherche
+[ ] filtrage
+[ ] pagination
+[ ] fiche détaillée
+
+B. Rôles
+
+[ ] création
+[ ] modification
+[ ] attribution
+[ ] retrait
+[ ] activation/désactivation
+
+C. Permissions
+
+[ ] catalogue
+[ ] attribution par rôle
+[ ] permissions explicites
+[ ] calcul des permissions effectives
+
+D. Organisation
+
+[ ] départements
+[ ] services
+[ ] affectations
+[ ] périmètres
+
+E. Sécurité
+
+[ ] backend sécurisé
+[ ] frontend sécurisé
+[ ] moindre privilège
+[ ] séparation des responsabilités
+[ ] audit
+
+F. Tests
+
+[ ] tests unitaires
+[ ] tests API
+[ ] tests permissions
+[ ] tests périmètres
+[ ] tests E2E
+[ ] tests régressions
+
+G. Données
+
+[ ] aucune perte de données
+[ ] aucune suppression destructive
+[ ] migrations propres
+[ ] compatibilité existante
+
+⸻
+
+42. PROCÉDURE D’EXÉCUTION OBLIGATOIRE
+
+Travaille en plusieurs phases.
+
+PHASE 0 — AUDIT
+
+Ne modifier aucun code.
+
+Produire :
+
+État actuel
+Architecture actuelle
+Système d'authentification actuel
+Modèles actuels
+Rôles actuels
+Permissions actuelles
+Écrans actuels
+API actuelles
+Risques
+Doublons
+Écarts
+
+PHASE 1 — ARCHITECTURE
+
+Proposer :
+
+Modèle de données
+Relations
+RBAC
+Périmètres
+API
+Sécurité
+Migration
+
+Attendre une validation si le mode de travail l’exige.
+
+PHASE 2 — BACKEND
+
+Implémenter :
+
+modèles
+migrations
+services
+API
+permissions
+audit
+tests
+
+PHASE 3 — FRONTEND
+
+Implémenter :
+
+Utilisateurs
+Rôles
+Permissions
+Organisation
+Périmètres
+Audit
+
+PHASE 4 — INTÉGRATION
+
+Connecter le module aux autres modules.
+
+PHASE 5 — TESTS
+
+Exécuter :
+
+tests backend
+tests frontend
+tests API
+tests E2E
+
+PHASE 6 — CONTRÔLE FINAL
+
+Produire :
+
+fonctionnalités livrées
+fichiers modifiés
+migrations
+API
+rôles
+permissions
+tests
+résultats
+problèmes restants
+
+⸻
+
+43. RÈGLE DE QUALITÉ
+
+Ne considère jamais une fonctionnalité comme terminée simplement parce que :
+
+* la page s’affiche ;
+* le bouton existe ;
+* l’API répond HTTP 200 ;
+* le test nominal passe.
+
+Vérifie systématiquement :
+
+fonctionnement
++
+sécurité
++
+autorisation
++
+périmètre
++
+audit
++
+régression
++
+données existantes
+
+⸻
+
+44. RÈGLE ABSOLUE CONTRE LES FAUSSES IMPLÉMENTATIONS
+
+NE JAMAIS déclarer :
+
+« module terminé »
+
+si :
+
+* une permission n’est contrôlée que côté frontend ;
+* une API permet de contourner une permission ;
+* les périmètres ne sont pas réellement appliqués ;
+* les comptes existants sont incompatibles ;
+* les tests de refus d’accès manquent ;
+* l’audit est absent pour les opérations sensibles ;
+* les migrations ne sont pas vérifiées ;
+* des données existantes ont été supprimées ;
+* une fonctionnalité est simulée par des données statiques.
+
+⸻
+
+45. LIVRABLE FINAL
+
+À la fin, produire un rapport synthétique contenant :
+
+1. Architecture retenue
+2. État avant implémentation
+3. Modèles créés/modifiés
+4. Migrations
+5. API créées/modifiées
+6. Pages frontend
+7. Rôles
+8. Permissions
+9. Départements
+10. Services
+11. Périmètres
+12. Règles de sécurité
+13. Audit
+14. Tests exécutés
+15. Résultats des tests
+16. Données préservées
+17. Risques résiduels
+18. Recommandations
+
+Fournir également une matrice :
+
+RÔLE
+→ PERMISSIONS
+→ DÉPARTEMENT
+→ SERVICE
+→ PÉRIMÈTRE
+
+et une matrice :
+
+MODULE
+→ PERMISSION
+→ API
+→ ÉCRAN
+→ RÔLES AUTORISÉS
+
+⸻
+
+46. PRINCIPLE FINAL
+
+Le module Utilisateurs doit être conçu comme une infrastructure IAM centrale de l’INJS-LMD, et non comme un simple écran CRUD.
+
+L’architecture finale doit permettre :
+
+UNE PERSONNE
+    ↓
+UN COMPTE
+    ↓
+UNE OU PLUSIEURS FONCTIONS
+    ↓
+UN OU PLUSIEURS RÔLES
+    ↓
+DES PERMISSIONS
+    ↓
+UN OU PLUSIEURS PÉRIMÈTRES
+    ↓
+DES DONNÉES AUTORISÉES
+    ↓
+DES ACTIONS AUTORISÉES
+    ↓
+UNE TRAÇABILITÉ COMPLÈTE
+
+Toute décision d’architecture doit privilégier :
+
+sécurité + maintenabilité + évolutivité + traçabilité + compatibilité avec l’existant + protection des données.
+
+Commence impérativement par l’audit du dépôt réel et ne modifie aucun fichier avant d’avoir établi l’état des lieux.
+
+Recommandation pour Arena Agent Mode
+
+Pour ton projet actuel, je ne lancerais pas ce prompt directement en mode Act sur toute l’application. Il est suffisamment important pour le découper en U0 → architecture IAM → backend → frontend → intégration → E2E.
+
+Le point le plus important est que ce module devienne le socle d’autorisation commun aux modules déjà présents — Scolarité, Candidatures, Admissions, Inscriptions, Étudiants, Enseignants, Cours, Présences, Jurys, Graduation, Finances, Stages, RH, Patrimoine, etc. — plutôt que de créer un nouveau système d’utilisateurs isolé.
+
+Si tu veux, je peux aussi te générer la version “Arena Agent Mode / Cline”, beaucoup plus opérationnelle, découpée en 10 prompts successifs P01 → P10, avec pour chaque prompt : objectif, fichiers à inspecter, modifications autorisées, tests obligatoires, critères de validation et commit checkpoint.

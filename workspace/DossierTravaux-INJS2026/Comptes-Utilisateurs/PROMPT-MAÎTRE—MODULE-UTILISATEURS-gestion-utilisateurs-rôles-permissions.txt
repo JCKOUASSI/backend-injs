@@ -1,0 +1,623 @@
+# PROMPT MAÎTRE — MODULE « UTILISATEURS » (gestion des utilisateurs · rôles · permissions)
+
+> **Projet** : INJS-LMD — dépôt `JCKOUASSI/app-injslmd2026demo`
+> **Chantier** : CURP-INJS, module Utilisateurs (unités **U2 · U3 · U4**, amorce U5)
+> **Nature de ce document** : prompt d'exécution prêt à l'emploi. Il définit *ce qu'il faut
+> faire, dans quel ordre, avec quelles preuves*, à partir de l'état **réel et vérifié** du dépôt
+> au commit `90c93f3` (branche de travail Arena).
+> **Pièces à joindre au prompt** : (1) `ORGANIGRAMME-FONCTIONNEL-GLOBAL-INJS-LMD.txt` ;
+> (2) le recueil CURP-INJS — annexes **A1** (rôles) et **A3** (catalogue de permissions),
+> si disponible hors dépôt ; (3) `docs/curp/*.md` (déjà dans le dépôt).
+
+---
+
+## 0. RÔLE ET MISSION
+
+Tu es l'agent d'implémentation du module **Utilisateurs** d'INJS-LMD. Ta mission :
+
+1. **Gestion des utilisateurs** — administration des comptes (identité, profil d'habilitation,
+   cycle de vie, canaux, périmètres), avec les garde-fous de sécurité.
+2. **Gestion des rôles** — référentiel des rôles métier en base, alimenté depuis l'organigramme
+   fonctionnel et l'annexe A1, administrable sans redéploiement.
+3. **Gestion des permissions** — catalogue des permissions atomiques, matrice rôles × permissions,
+   attributions, dérogations bornées, délégations, et moteur d'autorisation unique côté serveur.
+
+**Doctrine d'exécution** (permanente) : comprendre → décider → exécuter → vérifier → livrer.
+Pas de détour, pas de question dont la réponse est dans le dépôt, modification **minimale et
+additive**, preuve réelle avant toute affirmation. Rapport final factuel (§16).
+
+**Interdits de méthode** : inventer un fichier, un modèle, un endpoint, un test ou un résultat ;
+présenter un test non exécuté comme réussi ; masquer une régression ; refactorer hors périmètre.
+
+---
+
+## 1. HIÉRARCHIE DES SOURCES DE VÉRITÉ (en cas de contradiction, cet ordre s'applique)
+
+1. **Code réel du dépôt** (chemin + ligne) — vérité de fait.
+2. **Tests existants** : `backend/authentication/tests_caracterisation/` (110 tests, comportement gelé)
+   et `backend/habilitations/tests/` (77 tests, socle U1).
+3. **`docs/curp/`** : `00-references-initiales.md`, `01-etat-des-droits.md`, `02-inventaire-comptes.md`,
+   `03-modele-donnees.md`, `U1-note-conception.md` — vérité de conception.
+4. **`docs/GARDE_FOUS.md`**, `docs/ADR/*`, `docs/SECURITE_DONNEES.md`, `.clinerules/INJS-LMD.md`.
+5. **Recueil CURP-INJS (annexes A1 « rôles » et A3 « catalogue de permissions »)** — source métier
+   des libellés et de la matrice. **Hors dépôt** : si l'annexe n'est pas fournie, appliquer §17.3
+   (catalogue provisoire marqué `PROVISOIRE`, jamais présenté comme définitif).
+6. **Organigramme fonctionnel global** (pièce jointe) — vérité de l'organisation : directions,
+   services, postes, domaines. Il sert à **structurer** les rôles (domaine, niveau, périmètre
+   par défaut), pas à créer des comptes.
+
+**Écart à trancher en V0, non inventable** : le nombre de rôles cibles est **ambigu dans le dépôt**
+(« 33 rôles » dans `habilitations/models/role.py`, `habilitations/management/commands/init_habilitations_injs.py`,
+`docs/curp/03-modele-donnees.md`, `docs/curp/U1-note-conception.md` ; « 35 rôles » dans
+`docs/curp/00-references-initiales.md` et `authentication/tests_caracterisation/test_01_referentiel_roles.py`).
+→ **Trancher par la source métier** (annexe A1 / organigramme), écrire la valeur retenue et la
+justification dans `docs/curp/`, et **ne jamais compléter une liste par déduction silencieuse**.
+
+---
+
+## 2. ÉTAT VÉRIFIÉ DU DÉPÔT — À NE PAS RÉ-AUDITER (mais à re-vérifier en 30 s)
+
+**Branche / Git** — travailler **exclusivement** sur la branche de session Arena. Vérifier
+`git status` (arbre attendu : propre) et ne jamais faire de `git reset --hard`, `git clean -fd`,
+ni de réécriture d'historique.
+
+**Socle existant à préserver (ne pas modifier sans décision explicite)** :
+
+| Sujet | Fichiers réels |
+|---|---|
+| Modèle de compte (12 rôles, 10 permissions métier) | `backend/authentication/models.py` |
+| Groupes `ROLE_*`, `ROLE_POLICY`, `get_user_role(s)`, `sync_*`, `validate_role_combination` | `backend/authentication/role_groups.py` (680 l.) |
+| Permissions DRF (`IsSecretariat`, `IsDFRC`, `IsEncadrant`, `IsUserMutationAllowed`, `HasFormationsPerm`…) | `backend/authentication/permissions.py` |
+| Projection UI `compute_capabilities` + `CAPACITES_DESCRIPTEURS` | `backend/authentication/capabilities.py` |
+| Connexion JWT, cookie HttpOnly, appairage appareil, throttling 20/min, `/api/auth/users/` (liste+CRUD) | `backend/authentication/views.py`, `urls.py`, `serializers.py`, `throttles.py` |
+| Cloisonnement par secrétariat (« filtrage à la source ») | `backend/formations/access.py` |
+| Journal d'audit unifié | `backend/core/` + `manage.py audit_integrity_check` |
+| **Socle CURP livré (U1, commit `90c93f3`)** | `backend/habilitations/` : app `habilitations`, 10 modèles (`models/`), services (`services/`), admin, 3 commandes, migrations `0001_initial` + `0002_triggers_immuabilite`, 77 tests |
+| Écran utilisateurs React legacy | `frontend/src/pages/Users.jsx` (+ `Users.test.jsx`), `frontend/src/utils/roles.js` (miroir de rôles, dette E7) |
+| API front | `frontend/src/services/api.js` (`api.get/post/patch/delete`, refresh cookie + fallback) |
+
+**Les 10 modèles U1 déjà en base (aucun second modèle utilisateur ne doit être créé)** :
+`Personne`, `CompteUtilisateur` (OneToOne `authentication.User`, `related_name='profil_habilitation'`,
+6 statuts `INVITE/ACTIF/SUSPENDU/DESACTIVE/VERROUILLE/EXPIRE`, 3 canaux), `RoleMetier`
+(code/libellé/domaine/niveau par défaut/périmètre par défaut/`module_requis`/`disponible`/`sensible`/
+`cumulable`/`incompatible_avec`/`canal_impose`/`ordre`/`actif`), `PermissionMetier`
+(`code = module.ressource.action`, 13 actions, `portee_maximale`, `criticite`,
+`necessite_motif`, `necessite_double_validation`, `journalisee`), `Perimetre` (12 types +
+cible polymorphe `ContentType`), `AttributionRole` (unicité d'une attribution ACTIVE par
+couple compte/rôle, `contraintes()` **pure non bloquante**), `PermissionAttribuee`
+(OCTROI/RETRAIT, OCTROI borné), `DelegationHabilitation`, `PolitiqueSecurite` (singleton),
+`JournalHabilitation` (append-only chaîné SHA-256, écriture par
+`habilitations.services.journalisation.journaliser(...)`, intégrité par `verifier_chaine()`).
+
+**Services U1 réutilisables** : `services/identite.py` (`generer_matricule_personne`,
+`identifier_doublons`, `personnes_sans_compte`), `services/politique.py` (`modifier_politique`),
+`services/validations.py` (`controle_duree_derogation`, `declarer_incompatibilite`,
+`mettre_a_jour_disponibilite_roles`, `modules_installes`).
+
+**Commandes existantes** : `init_habilitations_injs`, `verifier_chaine_habilitations`,
+`habilitations_diag`, plus U0 : `inventaire_habilitation`, `creer_comptes_temoins`,
+`fumee_authentification`, et transversal : `smoke_test_injs`, `check_repo_hygiene`,
+`export_api_contract` / `update_api_contract`, `audit_integrity_check`.
+
+**Environnement d'exécution (sandbox)** :
+
+```bash
+bash arena/bootstrap.sh          # idempotent : venv + deps Python + node_modules + overlay
+bash arena/lancer-api.sh         # API sur 0.0.0.0:8000, settings=arena.settings_sandbox
+bash arena/lancer-front.sh       # front sur 3000
+```
+
+`arena/settings_sandbox.py` = overlay SQLite (`arena.probe.sh` pour diagnostic).
+
+**Ligne de base des tests (à re-mesurer en V0, jamais à supposer)** — valeurs documentées :
+backend ≈ **1242 tests** (1055 avant U0 + 110 caractérisation + 77 U1), **1 échec connu et hors
+périmètre sur SQLite** (`referentiels.test_regle4_doublon_libelle_casse_rejete`, écart de moteur,
+à ne **pas** « réparer » ici), 3 ignorés ; frontend : `npm run lint` 0 erreur,
+`npm run test:coverage` vert avec **seuils de couverture qui ne peuvent que monter**
+(`frontend/vitest.config.js`).
+
+**Garde-fous projet (aucun affaiblissement autorisé, `docs/GARDE_FOUS.md`)** :
+feature flags livrés **éteints** (`parametres/flags.py`, préfixe `flag.`, catalogue
+`parametres/migrations/0004_feature_flags_seed.py`) ; **contrat d'API figé**
+(`manage.py export_api_contract --check`, snapshot `docs/api/contract.snapshot.json`, journal
+`docs/api/CHANGELOG_CONTRAT.md`) ; **smoke** `smoke_test_injs` ; **zéro `print()`** runtime
+(`check_repo_hygiene`, `logger`/`self.stdout.write` uniquement) ; français partout
+(code, commentaires, docs, écrans) ; hygiène des données nominatives (`docs/SECURITE_DONNEES.md`).
+
+---
+
+## 3. PÉRIMÈTRE EXACT — 3 SOUS-MODULES → 5 VAGUES
+
+| Sous-module demandé | Vagues du présent prompt | Unités CURP couvertes |
+|---|---|---|
+| Gestion des **rôles** | V1 | U3a |
+| Gestion des **permissions** (+ matrice) | V2 | U3b |
+| **Moteur d'autorisation** (application des permissions) | V3 | U2 |
+| Gestion des **utilisateurs** (API + écrans) | V4 | U4 (+ amorce U5) |
+| Cadrage / ligne de base | V0 | — |
+
+**Explicitement HORS périmètre** (unités suivantes — ne pas les anticiper) :
+MFA, sessions et appareils (U6) ; campagnes de revue et tableau de bord d'habilitation (U7) ;
+**migration des 12 rôles existants vers les 33/35 rôles et bascule du legacy (U8)** ;
+fusion d'identités ; import massif de comptes. La délégation n'est livrée qu'en **structure +
+API bornée** (V4), sans workflow de validation avancé (U5).
+
+**Règle de coexistence (décisive)** : pendant tout ce chantier, **le dispositif actuel
+(`authentication/role_groups.py`, `ROLE_POLICY`, permissions DRF, JWT, canaux, cloisonnement
+secrétariat) reste la seule autorité effective**. Le nouveau dispositif part en **mode observation**
+(V3) : il calcule, compare, journalise et **ne refuse rien**, jusqu'à une bascule ordonnée par une
+unité ultérieure. Toute divergence constatée est consignée, pas corrigée d'office.
+
+---
+
+## 4. RÈGLES NON NÉGOCIABLES (à respecter dans chaque vague)
+
+- **S3 — le backend est la seule autorité.** Le front projette (`/api/auth/capabilities/`),
+  il ne décide rien. Aucune liste de rôles codée en dur dans une nouvelle page React ;
+  `frontend/src/utils/roles.js` n'est **pas** étendu (dette E7 à résorber, pas à amplifier) —
+  en revanche, **réutiliser** son helper `peut(user, module, action)` (ligne 373, lecture des
+  capacités serveur) est la voie recommandée.
+- **R2 — additif d'abord** : pas de modification destructive d'un modèle/vue/test existant ;
+  toute modification d'un fichier existant doit être justifiée dans la note de conception.
+- **R3 — observation avant refus** : un nouveau contrôle naît en mode « signaler », puis
+  devient bloquant après mesure (V3).
+- **S5 — désactivation, jamais de suppression physique** depuis l'application.
+- **S6 — pas d'auto-élévation** (nul ne s'attribue un rôle/permission) et **S7 — au moins deux
+  administrateurs actifs** : gardes applicatives **testées**, côté serveur.
+- **S8 — secours hors application** : ne jamais casser `createsuperuser` /
+  `create_superuser_from_env` (procédure de déblocage).
+- **Séparation des responsabilités** : rôle sensible ⇒ seconde signature (`valide_par`) ;
+  OCTROI de dérogation **toujours borné** dans le temps (durée lue dans `PolitiqueSecurite`) ;
+  incompatibilités de rôles respectées.
+- **Journalisation obligatoire** : toute écriture d'habilitation (attribution, dérogation,
+  délégation, changement de statut de compte, modification de politique) passe par
+  `habilitations.services.journalisation.journaliser(...)` — jamais d'écriture directe.
+  Le `JournalHabilitation` ne se modifie ni ne se supprime (ORM + triggers PostgreSQL).
+- **Flags** : tout comportement nouveau est branché derrière un flag existant ou nouveau,
+  **livré éteint**, avec test des deux états (ON/OFF). Prévoir au minimum
+  `flag.lot01_socle_referentiels_rbac` (existant, éteint) pour V1/V2 et un flag dédié
+  `flag.curp_module_utilisateurs` pour V3/V4.
+- **Contrat d'API** : ajouts autorisés (régénérer le snapshot : `manage.py export_api_contract`) ;
+  toute rupture ⇒ `manage.py update_api_contract --justification "…"` + entrée dans
+  `docs/api/CHANGELOG_CONTRAT.md` + adaptation front dans **le même** commit.
+  **Ne pas modifier les réponses de `/api/auth/users/` ni `/api/auth/capabilities/`** (ajouts de
+  clés seulement) : ces routes sont consommées par `frontend/src/pages/Users.jsx` et le mobile.
+- **Zéro `print()`**, logs `logger`/`self.stdout.write`, français partout.
+- **Tests existants non modifiés** (règle R5) : les tests de caractérisation
+  `authentication/tests_caracterisation/` sont le **gel** du comportement ; toute résorption
+  d'un écart (E1…E11 de `docs/curp/01-etat-des-droits.md`) se fait **en connaissance de cause**,
+  en modifiant le test de façon explicite et documentée — jamais en silence.
+- **Données de démonstration préservées** : les 15 comptes de la base de démo et les
+  commandes idempotentes U0 ne doivent jamais être réinitialisés. Toute donnée créée par ce
+  chantier est **idempotente**, sans doublon, et documentée (§15).
+- **Migrations** : une migration par unité fonctionnelle, réversibles, avec `RunPython` de
+  données **idempotent** (`update_or_create`, jamais de `delete()` de masse) ; ne jamais
+  supprimer une migration existante ni fusionner sans relecture.
+- **Aucune opération destructive** : ni `DROP`, ni `TRUNCATE`, ni vidage de base, ni
+  `git reset --hard` / `git clean -fd`.
+
+---
+
+## 5. DÉCISIONS D'ARCHITECTURE À APPLIQUER SANS REDISCUSSION
+
+1. **Application dédiée** : tout le nouveau code vit dans `backend/habilitations/`
+   (déjà créée et installée). Aucun nouveau modèle dans l'application `authentication`.
+2. **Namespace d'API** : nouvelles routes sous **`/api/habilitations/…`** ; les routes
+   existantes `/api/auth/users/` restent **inchangées** (compatibilité front/mobile/CI).
+   Raccordement de la nouvelle page au nouvel API **derrière flag**, l'ancienne page
+   `/utilisateurs` restant fonctionnelle jusqu'à U8.
+3. **Un seul moteur de décision** : `habilitations/services/autorisation.py::est_autorise(...)`,
+   seule fonction qui traduit « compte × rôle × permission × périmètre × politique » en décision.
+   Les vues ne réimplémentent jamais la logique (classe DRF unique `ExigePermission`).
+4. **Référentiel en base, jamais figé au code** : les rôles et permissions sont des **données**
+   (migration de données idempotente + commande), modifiables sans redéploiement.
+5. **Périmètre polymorphe** : réutiliser `Perimetre` (`ContentType` + `reference_lisible`) ;
+   `PERIMETRE_SECRETARIAT_MANQUANT` reste une violation signalée pour les rôles relevant
+   d'un secrétariat.
+6. **Nouveaux écrans dans un dossier dédié** : `frontend/src/pages/habilitations/`, routes
+   `/habilitations/...`, entrée de menu conditionnée par `peut(user, 'utilisateurs', 'voir')`
+   (projection `capabilities`), jamais par une liste de rôles locale.
+
+---
+
+## 6. VAGUE 0 — CADRAGE ET LIGNE DE BASE (court, obligatoire)
+
+**Objectif** : sécuriser le point de départ et produire le plan d'exécution des vagues.
+
+**Actions** :
+1. `git status -sb` ; noter branche et commit de départ.
+2. `bash arena/bootstrap.sh` (idempotent).
+3. Relever la **ligne de base réelle** : `python manage.py test --noinput` (backend, SQLite),
+   `npm run lint` et `npm run test:coverage` (frontend) ; consigner nombre de tests,
+   échecs et durée. Comparer aux valeurs documentées (§2) et **signaler tout écart**.
+4. Rejouer le gel U0 : `python manage.py fumee_authentification --tous --creer` (doit rester vert).
+5. Lire l'organigramme joint ; produire la **table de correspondance**
+   « direction / service / poste → domaine `DomaineMetier` → rôle candidat (code + libellé) ».
+   Cette table sert d'entrée à V1 ; les rôles non couverts par l'organigramme sont listés comme
+   **questions métier ouvertes**, pas inventés.
+
+**Livrable** : `docs/curp/U2-note-conception.md` (§1 à §3 : rappel de mission, décisions
+d'architecture §5, plan des vagues, arbre de fichiers cible, ligne de base chiffrée) — note
+**à contresigner** comme celle d'U1.
+
+**Critère de sortie** : ligne de base chiffrée, aucune régression, table organigramme→domaines prête.
+
+---
+
+## 7. VAGUE 1 — RÉFÉRENTIEL DES RÔLES (U3a) — « gestion des rôles »
+
+**Objectif** : peupler `RoleMetier` depuis l'organigramme + annexe A1, rendre les rôles
+administrables et lisibles, sans activer aucun droit.
+
+**Contenu** :
+1. **Source de données versionnée** : catalogue des rôles dans un module de données explicite
+   (ex. `backend/habilitations/donnees/referentiel_roles.py`) — code stable MAJUSCULES, libellé,
+   libellé court, description rédigée pour un non-informaticien, `domaine`, `niveau_defaut`,
+   `perimetre_defaut`, `module_requis` (le cas échéant), `sensible`, `cumulable`,
+   `canal_impose`, `ordre`. **Aucune liste figée ailleurs dans le code.**
+2. **Migration de données idempotente** (`habilitations/migrations/0003_…`) + commande
+   **`peupler_referentiel_habilitations [--dry-run]`** : `update_or_create` sur `code`,
+   **jamais de suppression** ; les rôles portant `module_requis` obtiennent `disponible`
+   calculé via `services/validations.mettre_a_jour_disponibilite_roles()`.
+3. **Incompatibilités** (séparation des tâches) déclarées via
+   `services/validations.declarer_incompatibilite(role_a, role_b)` — relation **réciproque**
+   garantie par le service et testée.
+4. **API en lecture** (ViewSet + serializer, `habilitation_role:view`) :
+   `GET /api/habilitations/roles/` (filtres : `domaine`, `actif`, `disponible`, `sensible`,
+   `canal_impose`, recherche), `GET /api/habilitations/roles/<code>/` (détail + incompatibilités
+   + compteurs d'attributions). **Pas d'écriture** en V1 (l'administration des rôles passe par
+   l'admin Django consultatif et par la commande ; l'écriture d'écran arrive en V4 si elle est
+   justifiée).
+5. **Commande de contrôle** : `habilitations_diag` étendue (rôles sans description, rôles
+   inactifs encore attribués, incohérences de niveau/périmètre par défaut) — **code de sortie 0**
+   en V1 (observation).
+6. **Admin Django** : `RoleMetierAdmin` reste consultatif sauf ajout explicite ; toute écriture
+   admin journalisée.
+
+**Tests** (paquet `habilitations/tests/`, ≥ 15 nouveaux, succès **et** refus) :
+idempotence du peulement (deux exécutions = même état), unicité des codes, refus d'un code
+invalide (minuscules/espaces/duplication), réciprocité des incompatibilités, disponibilité
+calculée (rôle `module_requis` d'une app absente ⇒ `disponible=False`), API lecture 200 pour un
+rôle autorisé / 401 anonyme / 403 rôle non habilité, filtres et recherche, absence d'écriture
+possible via l'API de lecture, non-régression (`fumee_authentification` toujours vert).
+
+**Critère de sortie** : référentiel peuplé, rejouable, documenté ; **aucun droit modifié** ;
+`test_additivite.py` toujours vert.
+
+**Repli** : `peupler_referentiel_habilitations --dry-run` + `migrate habilitations 0002`
+(les tables U1 restent ; aucune donnée métier existante touchée).
+
+---
+
+## 8. VAGUE 2 — CATALOGUE DES PERMISSIONS ET MATRICE (U3b) — « gestion des permissions »
+
+**Objectif** : catalogue `PermissionMetier` (annexe A3) + **matrice rôles × permissions** en base,
+avec les niveaux N0–N4 et les exigences (motif, double validation, journalisation).
+
+**Contenu** :
+1. **Catalogue versionné** `backend/habilitations/donnees/catalogue_permissions.py` :
+   `module.ressource.action` avec les **13 actions** déjà définies dans
+   `PermissionMetier.Action` (`consulter, creer, modifier, soumettre, valider, rejeter,
+   publier, annuler, exporter, imprimer, archiver, supprimer, administrer`), plus
+   `portee_maximale`, `criticite` (NORMALE / SENSIBLE / CRITIQUE), `necessite_motif`,
+   `necessite_double_validation`, `journalisee`. Les permissions relevant du module
+   Utilisateurs lui-même (`habilitation.compte.*`, `habilitation.role.*`,
+   `habilitation.permission.*`, `habilitation.attribution.*`, `habilitation.journal.consulter`)
+   sont **obligatoirement** dans le catalogue.
+2. **Migration de données idempotente + commande** `peupler_catalogue_permissions [--dry-run]`
+   (`update_or_create` sur `code`).
+3. **Matrice rôles × permissions** : modèle **de liaison en base** (nouvelle table
+   `HabilitationRolePermission` : `role`, `permission`, `niveau` N0–N4, `perimetre_impose`
+   (bool), horodatage + auteur) — la matrice est **une donnée**, jamais un dictionnaire Python
+   en dur ; source initiale : annexe A3, **reconciliée** avec l'actuelle `ROLE_POLICY`
+   (`backend/authentication/role_groups.py`) pour les 12 rôles existants.
+   → Livrable obligatoire : `docs/curp/U3-matrice-roles-permissions.md` (matrice lisible,
+   **et** tableau des écarts entre `ROLE_POLICY` et la cible, adossé aux écarts E2/E3/E4).
+4. **API en lecture** : `GET /api/habilitations/permissions/` (filtres `module`, `action`,
+   `criticite`, recherche), `GET /api/habilitations/matrice/` (vue rôles × permissions, filtrable
+   par domaine et par rôle). Lecture seule en V2.
+5. **Commande** `verifier_coherence_habilitations` : rôle actif sans permission, permission
+   attribuée à un rôle inactif, permission CRITIQUE sans double validation, doublon de matrice.
+   Code de sortie **0** en V2 (observation), 1 après la bascule décidée ailleurs.
+
+**Tests** (≥ 15) : idempotence du catalogue, unicité des codes, cohérence
+`code == module.ressource.action`, refus d'une action hors des 13, permissions CRITIQUES
+exigeant motif + double validation, matrice complète pour chaque rôle actif, aucune permission
+hors périmètre du rôle, lecture API autorisée/interdite, régressions
+(`test_capabilities.py`, `test_01_referentiel_roles.py` toujours verts).
+
+**Critère de sortie** : catalogue et matrice disponibles en base et lisibles par API ;
+**les `has_perm` réels des comptes sont inchangés** (à prouver par un test de non-régression
+comparant les permissions effectives avant/après pour les 14 comptes témoins).
+
+---
+
+## 9. VAGUE 3 — MOTEUR D'AUTORISATION EN MODE OBSERVATION (U2)
+
+**Objectif** : une **fonction unique** de décision, en observation, branchable progressivement,
+qui ne refuse encore rien.
+
+**Contenu** :
+1. **`habilitations/services/autorisation.py`**
+   - `est_autorise(utilisateur, permission_code, cible=None, canal=None) -> Decision` où
+     `Decision` porte : `autorise` (bool), `source` (`ROLE`, `DEROGATION_OCTROI`, `RETRAIT`,
+     `DELEGATION`, `REFUS`), `role`, `niveau`, `perimetre`, `motifs` (liste de codes),
+     `journalisee`.
+   - Résolution : compte → profil (`profil_habilitation`, tolérant aux comptes **sans profil**) →
+     attributions ACTIVES et non échues → niveau × périmètre → dérogations (RETRAIT prioritaire
+     sur OCTROI) → délégations valides → politique de sécurité.
+   - **Comptes sans profil** : décision explicitement `source='LEGACY'` / `autorise=None`
+     (« non décidable ») — le moteur ne se prononce pas sur le parc non migré.
+2. **`habilitations/services/observation.py`** + middleware DRF/compat : journalise les
+   **divergences** entre décision CURP et décision legacy (`compute_capabilities`,
+   `ROLE_POLICY`, classes DRF) sans jamais bloquer. Sorties : journalisation
+   `JournalHabilitation` (action `OBSERVATION_DIVERGENCE`) + compteurs exposés par la commande
+   `rapport_observation_habilitations` (attendu / observé / divergents, par route et par rôle).
+3. **Classe DRF unique** `habilitations/permissions.py::ExigePermission(permission_code, canal=None)` :
+   - lit `PolitiqueSecurite.mode_observation` (nouveau champ booléen, **défaut `True`**) ;
+   - en observation : laisse passer, journalise la divergence ;
+   - hors observation : refuse avec un message français explicite et un code stable ;
+   - **jamais** utilisée pour affaiblir un contrôle existant : elle s'ajoute, ne remplace pas.
+4. **Branchement minimal** : appliquer `ExigePermission` en observation à un **périmètre réduit
+   et choisi** (recommandé : le namespace `/api/habilitations/` puis 1 vue de référence
+   en lecture du domaine scolarité), jamais sur le JWT, jamais sur `/api/auth/*`.
+5. **Résolution mesurée des écarts** (règle R3) : E2 (double source finance), E3 (asymétrie
+   `delete_participant`), E5 (`participants_queryset_for_user` permissif), E8 (deux endpoints
+   liste participants), E1 (multi-appartenance involontaire) — pour chacun : mesure en
+   observation, décision écrite dans la note de conception, correction **seulement** si elle est
+   sûre, additive, et couverte par un test dédié (sinon report explicite en U8). Aucun de ces
+   écarts ne peut être corrigé « au passage » sans trace documentaire.
+
+**Tests** (≥ 20) : décision par rôle et par niveau, RETRAIT prioritaire sur OCTROI, octroi expiré
+⇒ refus, délégation hors bornes ⇒ refus, rôle sensible sans seconde signature ⇒ violation,
+incompatibilité de rôles ⇒ violation, périmètre secrétariat respecté (compte A ne voit pas la
+cible B), compte sans profil ⇒ `LEGACY`, compte inactif/suspendu ⇒ refus, canal WEB refusé à un
+compte MOBILE, mode observation ⇒ **aucun 403 nouveau** (test de non-régression sur les routes
+existantes), hors observation ⇒ 403 attendu, journalisation des divergences (présence,
+immuabilité), performance (pas de requête N+1 : `select_related`/`prefetch_related` mesurés).
+
+**Critère de sortie** : aucune décision d'accès modifiée en production ; rapport d'observation
+chiffré produit ; **tous les tests legacy et de caractérisation restent verts**.
+
+---
+
+## 10. VAGUE 4 — ADMINISTRATION DES UTILISATEURS (U4) — « gestion des utilisateurs »
+
+**Objectif** : rendre le module utilisable par les administrateurs (API + écrans), avec les
+garde-fous S6/S7, la traçabilité complète et l'observation de l'usage réel.
+
+### 10.1 API `/api/habilitations/` (derrière `flag.curp_module_utilisateurs`, ajouts seuls)
+
+- **Comptes** : `GET /comptes/` (recherche, filtres statut/canal/rôle/secrétariat, pagination
+  serveur, tri) ; `GET /comptes/<id>/` (fiche 360 : personne, liens d'identité, statut, canal,
+  attributions, dérogations, délégations, dernière connexion, journal du compte) ;
+  `POST /comptes/` (création : `Personne` si absente + `User` + `CompteUtilisateur` + attribution
+  initiale, **motif obligatoire**) ; `POST /comptes/<id>/statut/` (transition de statut conforme
+  à la machine d'états, motif obligatoire, journalisée) ; `POST /comptes/<id>/canal/` ;
+  `POST /comptes/<id>/mot-de-passe-initial/` (génération + `must_change_password=True`,
+  **aucun mot de passe en clair dans les réponses, les logs ou le dépôt**).
+- **Attributions** : `POST /attributions/` (rôle + niveau + périmètres + dates + motif ;
+  seconde signature exigée si `role.sensible` ; refus si incompatibilité), `POST /attributions/<id>/revoquer/`
+  (motif obligatoire), `GET /attributions/?compte=<id>`.
+- **Dérogations** : `POST /derogations/` (OCTROI **borné** — durée max lue dans `PolitiqueSecurite`
+  via `controle_duree_derogation`, RETRAIT ; motif obligatoire), `POST /derogations/<id>/revoquer/`.
+- **Délégations** : `POST /delegations/` (bornées, refus de l'auto-délégation — contrainte SQL
+  existante), `POST /delegations/<id>/revoquer/`, `GET /delegations/?delegant=<id>`.
+- **Politique de sécurité** : `GET /politique/`, `PATCH /politique/` (singleton, via
+  `services/politique.modifier_politique` ⇒ historisé au journal).
+- **Journal** : `GET /journal/` en lecture stricte (filtres acteur / compte / action / période,
+  pagination), **aucune** route d'écriture/modification/suppression.
+- **Droits d'accès** : chaque route est gardée par `ExigePermission(...)` + une classe legacy
+  existante compatible (`IsUserMutationAllowed` / `IsSecretariatOrDFRC` pour la lecture) ;
+  l'administration des rôles, permissions et politique est réservée aux rôles de niveau N4
+  (`ADMIN`, `CHEF_CPFAE_ADMIN`, `CPFAE_ADMIN`) — **jamais** aux rôles de secrétariat.
+
+### 10.2 Garde-fous serveur (obligatoires, testés — E9)
+
+- **S6** : un compte ne peut pas s'attribuer à lui-même un rôle/permission (ni élever son niveau) ;
+  un acteur ne peut pas accorder un droit qu'il ne détient pas (refus explicite).
+- **S7** : refus de **désactiver / suspendre / rétrograder le dernier administrateur actif** ;
+  refus de désactiver son propre compte s'il est le dernier N4 ; message français clair.
+- **Périmètre** : un acteur cloisonné (secrétariat) ne voit et ne mute que les comptes de son
+  périmètre (`Personne`/`CompteUtilisateur` filtrés **à la source**, pas seulement par permission).
+- **E11** : alimenter `CompteUtilisateur.derniere_connexion` (et, si le flux JWT le permet sans
+  casser le contrat, `User.last_login`) pour rendre exploitable la métrique « comptes dormants ».
+- **Idempotence & concurrence** : transitions de statut sous `transaction.atomic()` +
+  `select_for_update` ; rejeu d'une même requête sans double écriture ; unicité d'attribution
+  ACTIVE garantie par la contrainte existante (message d'erreur métier, pas d'erreur SQL brute).
+
+### 10.3 Frontend React (le backend reste la seule autorité)
+
+- **Pages** `frontend/src/pages/habilitations/` :
+  `Comptes.jsx` (liste + filtres + pagination serveur + fiche 360 + création + transitions),
+  `Roles.jsx` (référentiel lisible : domaine, niveau, périmètre, incompatibilités, disponibilité),
+  `Permissions.jsx` (catalogue + matrice rôles × permissions, lecture),
+  `Attributions.jsx` (attributions / dérogations / délégations, avec motifs et bornes visibles),
+  `Journal.jsx` (consultation seule). Réutiliser sans les réécrire : `frontend/src/services/api.js`,
+  les composants de liste/pagination/modale existants, `ProtectedRoute`,
+  `src/components/auth/ProtectedRoute` et le pattern `peut(user, module, action)`.
+- **Navigation** : entrée de menu et routes protégées par
+  `capacite={{ module: 'utilisateurs', action: 'voir' | 'gerer' }}` **et** les capacités
+  nouvelles ajoutées dans `authentication/capabilities.py::CAPACITES_DESCRIPTEURS`
+  (`utilisateurs.gerer_roles`, `utilisateurs.gerer_permissions`, `utilisateurs.consulter_journal`)
+  — **jamais** par une liste de rôles front.
+- **Garde-fou d'affichage ≠ sécurité** : chaque action sensible doit être refusée par le serveur
+  même si elle est appelée directement (test d'API dédié).
+- **Tests Vitest** (`*.test.jsx` à côté des pages) : rendu, filtres, pagination, affichage des
+  refus serveur, masquage des actions non autorisées, message d'erreur métier (S6/S7) ;
+  couverture en hausse (les seuils ne baissent jamais).
+- **Accessibilité et libellés** : français, terminologie INJS-LMD, identité visuelle existante,
+  aucune réintroduction d'interface provenant d'anciennes applications.
+
+**Critère de sortie V4** : un administrateur N4 peut créer un compte, attribuer un rôle avec
+périmètre et motif, poser puis révoquer une dérogation bornée, consulter le journal ; un acteur
+cloisonné ne peut rien faire hors de son périmètre ; S6/S7 prouvés par tests ; le front ne
+contient aucune liste de rôles nouvelle.
+
+---
+
+## 11. SÉCURITÉ — EXIGENCES DE CONTRÔLE À PROUVER (pas à déclarer)
+
+Pour chaque route nouvelle ou modifiée, livrer la **preuve** d'au moins :
+
+1. accès anonyme ⇒ **401** ;
+2. rôle insuffisant ⇒ **403** (test nominatif avec un compte du rôle) ;
+3. rôle autorisé ⇒ **2xx** ;
+4. appel direct à l'API **sans passer par l'interface** ⇒ même décision que via l'interface ;
+5. périmètre : acteur du secrétariat A ⇒ **aucune** donnée du secrétariat B (y compris en
+   devinant l'identifiant) ;
+6. écriture d'habilitation ⇒ **entrée de journal** présente (acteur, compte, motif, ancienne et
+   nouvelle valeur, IP, horodatage) et chaîne d'empreintes vérifiée ensuite par
+   `verifier_chaine_habilitations` ;
+7. aucun secret (mot de passe, jeton, empreinte) dans les réponses, les logs ou le dépôt ;
+8. `check_repo_hygiene` vert (aucune donnée nominative nouvelle versionnée).
+
+---
+
+## 12. TESTS ET VÉRIFICATIONS — COMMANDES EXACTES
+
+```bash
+# 0) Environnement (une fois par session)
+bash arena/bootstrap.sh
+
+# 1) Backend — ciblé d'abord
+cd backend
+python manage.py test habilitations -v 2                       # le nouveau code
+python manage.py test authentication -v 2                      # gel U0 + non-régression
+python manage.py test --noinput                                # suite complète
+
+# 2) Garde-fous projet (les quatre doivent passer)
+python manage.py check_repo_hygiene
+python manage.py export_api_contract --check
+python manage.py smoke_test_injs
+COMPTE_TEMOIN_MOT_DE_PASSE='<mdp jetable>' python manage.py fumee_authentification --tous --creer
+
+# 3) Habilitations — cohérence et intégrité
+python manage.py peupler_referentiel_habilitations --dry-run
+python manage.py peupler_catalogue_permissions --dry-run
+python manage.py verifier_coherence_habilitations
+python manage.py verifier_chaine_habilitations
+python manage.py rapport_observation_habilitations          # sortie 0 en observation
+
+# 4) Base d'exécution sandbox (si PostgreSQL absent)
+USE_SQLITE=1 python manage.py migrate --noinput
+
+# 5) Frontend
+cd ../frontend
+npm ci
+npm run lint
+npm run test:coverage
+npm run build
+```
+
+**Critères de non-régression à rapporter chiffrés** : nombre de tests backend (avant/après),
+0 nouvel échec (l'échec SQLite documenté `referentiels.test_regle4_doublon_libelle_casse_rejete`
+reste le seul, déclaré comme préexistant), lint front 0 erreur, seuils de couverture atteints,
+`export_api_contract --check` vert, `smoke_test_injs` vert, `fumee_authentification` vert.
+
+---
+
+## 13. MIGRATIONS ET DONNÉES
+
+- Une migration par unité fonctionnelle, nommée explicitement, **réversible** (`RunPython`
+  avec `reverse_code` neutre et sans perte).
+- Données : `update_or_create` uniquement ; **jamais** de `delete()`, de `TRUNCATE` ni de
+  réinitialisation ; aucun rôle/permission/compte existant supprimé.
+- Vérifier l'aller **et** le retour sur base de démo peuplée, en plus des tests.
+- Nouveaux champs sur des modèles existants (`PolitiqueSecurite.mode_observation`) : ajout
+  avec valeur par défaut **sûre** (observation = `True`), sans casser les données existantes.
+- Les 15 comptes de démonstration et les 2 secrétariats témoins restent intacts ; toute donnée
+  de démonstration créée est idempotente et documentée (§15).
+
+---
+
+## 14. FLAGS, CONTRAT D'API, CI
+
+- **Flags** : livrés **éteints** ; test explicite ON **et** OFF ; un flag éteint = comportement
+  strictement identique à l'existant (à prouver par test).
+- **Contrat d'API** : régénérer le snapshot après chaque ajout ; brisure ⇒
+  `update_api_contract --justification "…"` + `docs/api/CHANGELOG_CONTRAT.md` + adaptation
+  front/mobile **dans le même commit**.
+- **CI** (`.github/workflows/ci.yml`) : ajouter une étape par commande nouvelle
+  (`peupler_*`, `verifier_coherence_habilitations`, `rapport_observation_habilitations`),
+  **sans modifier ni retirer les étapes existantes**. Toute étape ajoutée doit être idempotente
+  et sans dépendance externe.
+
+---
+
+## 15. LIVRABLES DOCUMENTAIRES (minimaux, opérationnels)
+
+| Fichier | Contenu |
+|---|---|
+| `docs/curp/U2-note-conception.md` | V0 : mission, décisions, plan, ligne de base, écarts à instruire (à contresigner) |
+| `docs/curp/U3-referentiel-roles.md` | V1 : source des rôles (organigramme + A1), nombre retenu et justification (33 vs 35), domaines, niveaux, périmètres |
+| `docs/curp/U3-matrice-roles-permissions.md` | V2 : matrice lisible + écarts avec `ROLE_POLICY` (E2/E3/E4) |
+| `docs/curp/U2-rapport-observation.md` | V3 : divergences mesurées, écarts E1/E2/E3/E5/E8, décision par écart |
+| `docs/curp/U4-manuel-administration-comptes.md` | V4 : procédures d'administration (créer, attribuer, déroger, déléguer, révoquer, S6/S7) |
+| `docs/curp/U-resume-repli.md` | Migrations réversibles, commandes d'annulation, données créées |
+| `docs/api/CHANGELOG_CONTRAT.md` | Toute rupture justifiée |
+| `docs/curp/inventaires/<date>-…md` | Nouveaux inventaires datés si `inventaire_habilitation` est étendu |
+
+Ne pas produire de documentation volumineuse sans valeur opérationnelle.
+
+---
+
+## 16. RAPPORT FINAL OBLIGATOIRE (format imposé, à chaque vague ET en fin de mission)
+
+```
+FAIT      — ce qui a réellement été réalisé
+FICHIERS  — principaux fichiers créés/modifiés (chemins réels)
+TESTS     — commandes réellement exécutées, résultats chiffrés (avant/après),
+            échecs préexistants explicitement distingués des échecs propres
+GIT       — branche, état, commit(s) créés par unité fonctionnelle (message préfixé « U2/U3/U4 … [CURP] »),
+            push réellement effectué (sinon le dire)
+RESTE     — uniquement les points bloquants ou nécessitant un arbitrage métier
+```
+
+Aucune affirmation d'un test, d'un commit ou d'un push non effectué.
+
+---
+
+## 17. ANTI-DÉRIVE — QUOI FAIRE DANS LES CAS AMBIGUS
+
+**17.1 Ce que tu ne fais pas** : réécrire `role_groups.py` ; basculer le legacy (U8) ; toucher au
+JWT, aux canaux mobiles, au cloisonnement secrétariat, à `presences.DeviceBinding` ; modifier les
+tests de caractérisation sans le dire ; créer un second modèle utilisateur ; ajouter des droits
+en dur côté front ; supprimer ou réinitialiser des données ; activer un flag en production.
+
+**17.2 Ce que tu fais sans demander** : ajouter des routes/permissions additivement, créer les
+migrations et commandes idempotentes, choisir la structure de fichiers la plus simple compatible,
+trancher les ambiguïtés de mise en œuvre, corriger une erreur clairement identifiable dans le
+périmètre, ajouter des tests.
+
+**17.3 Si une source métier manque** (annexe A1/A3 absente, organigramme muet sur un poste) :
+ne **jamais** inventer — livrer la structure, le chargeur idempotent et un catalogue
+**explicitement marqué `PROVISOIRE`** (reconstruit depuis `ROLE_POLICY`, l'organigramme joint et le
+modèle fonctionnel), lister les questions métier ouvertes dans le rapport final, et poursuivre les
+vagues non dépendantes. Une donnée provisoire doit être **impossible à confondre** avec une
+donnée validée (champ de traçabilité + documentation).
+
+**17.4 Si une correction révèle une régression** : arrêter, identifier la cause, la localiser,
+déterminer si elle est liée au travail courant ; si oui, corriger et tester ; si non, la déclarer
+problème préexistant. Ne jamais contourner artificiellement.
+
+---
+
+## 18. CHECKLIST DE SORTIE (à cocher avant de rendre)
+
+- [ ] Branche de session respectée ; arbre Git cohérent ; commits par unité fonctionnelle.
+- [ ] `habilitations` étendue sans modifier `authentication` (sauf ajouts `capabilities`/URLs justifiés).
+- [ ] Aucun modèle utilisateur secondaire ; `authentication.User` intact.
+- [ ] Référentiel rôles peuplé et rejouable ; nombre de rôles justifié par la source métier.
+- [ ] Catalogue permissions + matrice en base, aucune liste figée au code.
+- [ ] Moteur `est_autorise` unique, en **observation** ; aucune décision d'accès modifiée.
+- [ ] API `/api/habilitations/` documentée, additifs seuls, contrat d'API vert.
+- [ ] Écrans React sous `pages/habilitations/`, protégés par capacités serveur, testés Vitest.
+- [ ] S6 (auto-élévation) et S7 (dernier administrateur) refusés **et testés** côté serveur.
+- [ ] Toute écriture d'habilitation journalisée ; `verifier_chaine_habilitations` vert.
+- [ ] Migrations réversibles, idempotentes, testées aller/retour.
+- [ ] Tests ciblés puis complets exécutés ; aucune régression ; échec SQLite préexistant isolé.
+- [ ] `check_repo_hygiene`, `export_api_contract --check`, `smoke_test_injs`,
+      `fumee_authentification`, `npm run lint`, `npm run test:coverage` : verts.
+- [ ] Documentation CURP mise à jour ; secrets absents du dépôt ; données de démo préservées.
+- [ ] Rapport final (§16) produit, factuel, chiffré.
