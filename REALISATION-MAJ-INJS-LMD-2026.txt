@@ -177,6 +177,36 @@ Les travaux s'appuient sur l'analyse exhaustive des 16 pièces maîtresses du do
   * Backend Django `check` : **0 issue** (System check identified no issues).
   * Backend Django `makemigrations --check --dry-run` : **No changes detected** (modèles stables).
 
+----------------------------------------------------------------------------------------------------
+[TÂCHE 0.4] — EXÉCUTION DU LOT 0.2 (INTÉGRATION DU MODULE CURP-INJS, RÔLES & PERMISSIONS)
+----------------------------------------------------------------------------------------------------
+- Date : 15/09/2026
+- Statut : SUCCÈS (FEU VERT UTILISATEUR VALIDÉ)
+- Description détaillée des travaux :
+  1. Politique de sécurité singleton :
+     - Exécution de `manage.py init_habilitations_injs` pour armer la politique de sécurité par défaut.
+  2. Rattachement additif et gouvernance des comptes utilisateurs :
+     - Exécution de `manage.py rattacher_comptes_legacy --appliquer` sur la base de données.
+     - Rattachement complet des 20 comptes utilisateurs legacy (`admin`, `jckouassi`, `dfrc`, `injs`,
+       `secretariat`, `superviseur1`, `superviseur2`, `f001` à `f003`, `p001` à `p010`).
+     - Création des profils d'habilitation `CompteUtilisateur` et des attributions actives de `RoleMetier`
+       (notamment `ADMIN_SYSTEME` pour `admin` et `DIRECTION_ETUDES` / `ADMIN_SYSTEME` pour `jckouassi`).
+     - Diagnostic `manage.py habilitations_diag` : **0 compte sans profil CURP**.
+  3. Traçabilité et journalisation d'audit immuable :
+     - Vérification de la chaîne de signatures cryptographiques du journal des habilitations
+       via `manage.py verifier_chaine_habilitations` : **43 événements vérifiés, intégrité parfaite**.
+  4. Activation du drapeau de console et des endpoints d'administration :
+     - Activation du feature flag `flag.curp_ui_admin=true` dans `Parametre`.
+     - Validation de l'API `/api/habilitations/mes-acces/` : compte gouverné (`gouverne: true`, mode `OBSERVATION`,
+       statut `ACTIF`, canal `LES_DEUX`, 1 157 permissions effectives calculées).
+     - Validation de l'API `/api/habilitations/comptes/` : code HTTP 200, liste paginée des 20 comptes
+       avec statuts, canaux, rôles actifs et domaines métier.
+- Résultats des contrôles :
+  * Backend Django `check` : **0 issue**.
+  * Backend Django `makemigrations --check --dry-run` : **0 migration manquante**.
+  * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
+  * Intégrité de la chaîne d'audit : **100% conforme**.
+
 
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
