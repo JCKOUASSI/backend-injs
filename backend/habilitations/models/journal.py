@@ -82,6 +82,9 @@ class JournalHabilitation(models.Model):
         # LOT 3 — organisation administrative (directions/départements/services).
         ORGANISATION_MODIFIEE = 'ORGANISATION_MODIFIEE', \
             'Modification de l’organisation (direction, département, service, rattachement)'
+        # Lot A refonte — organigramme unifié (création/désactivation d'unité).
+        ORGANISATION_CREEE = 'ORGANISATION_CREEE', 'Création d’une unité d’organigramme'
+        ORGANISATION_DESACTIVEE = 'ORGANISATION_DESACTIVEE', 'Désactivation d’une unité d’organigramme'
         AUTRE = 'AUTRE', 'Autre événement'
 
     #: Numéro de séquence, continue et dans l'ordre du chaînage.

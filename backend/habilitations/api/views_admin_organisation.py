@@ -60,6 +60,19 @@ def _ser_direction(direction):
         'description': direction.description,
         'ordre': direction.ordre,
         'actif': direction.actif,
+        'responsable': (
+            {'id': direction.responsable.id,
+             'nom': direction.responsable.get_full_name() or direction.responsable.username}
+            if direction.responsable_id else None
+        ),
+        'adjoint': (
+            {'id': direction.adjoint.id,
+             'nom': direction.adjoint.get_full_name() or direction.adjoint.username}
+            if direction.adjoint_id else None
+        ),
+        'telephone': direction.telephone,
+        'email': direction.email,
+        'localisation': direction.localisation,
         'nb_departements': direction.departements.count(),
     }
 
@@ -77,6 +90,19 @@ def _ser_departement(departement):
         ),
         'ordre': departement.ordre,
         'actif': departement.actif,
+        'responsable': (
+            {'id': departement.responsable.id,
+             'nom': departement.responsable.get_full_name() or departement.responsable.username}
+            if departement.responsable_id else None
+        ),
+        'adjoint': (
+            {'id': departement.adjoint.id,
+             'nom': departement.adjoint.get_full_name() or departement.adjoint.username}
+            if departement.adjoint_id else None
+        ),
+        'telephone': departement.telephone,
+        'email': departement.email,
+        'localisation': departement.localisation,
         'nb_services': departement.services.count(),
         'nb_comptes': departement.comptes.count()
         if hasattr(departement, 'comptes') else 0,
@@ -98,6 +124,20 @@ def _ser_service(service_):
             if service_.departement else None
         ),
         'actif': service_.actif,
+        'responsable': (
+            {'id': service_.responsable.id,
+             'nom': service_.responsable.get_full_name() or service_.responsable.username}
+            if service_.responsable_id else None
+        ),
+        'adjoint': (
+            {'id': service_.adjoint.id,
+             'nom': service_.adjoint.get_full_name() or service_.adjoint.username}
+            if service_.adjoint_id else None
+        ),
+        'telephone': service_.telephone,
+        'email': service_.email,
+        'localisation': service_.localisation,
+        'code': service_.code,
         'nb_comptes': service_.comptes.count()
         if hasattr(service_, 'comptes') else 0,
     }

@@ -1,5 +1,5 @@
 {
- "genere_le": "2026-09-14",
+ "genere_le": "2026-09-15",
  "source": "backend/authentication/capabilities.py · CAPACITES_DESCRIPTEURS",
  "regenerer": "python3 arena/genere-catalogues-menu.py",
  "nombre_modules": 13,

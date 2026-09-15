@@ -27,12 +27,40 @@ class Secretariat(models.Model):
         related_name='secretariats_resp',
         limit_choices_to={'role': 'CHEF_SECRETARIAT'},
     )
+    # Modèle fonctionnel §15 : « un secrétariat est rattaché à une structure » —
+    # le secrétariat devient un service de support de l'organigramme (rattachement
+    # optionnel, au plus un parmi direction/département ; l'entité reste autonome
+    # tant que le rattachement n'est pas posé).
+    direction = models.ForeignKey(
+        'administrations.Direction', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='secretariats', verbose_name='Direction de rattachement',
+    )
+    departement = models.ForeignKey(
+        'administrations.Departement', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='secretariats', verbose_name='Département de rattachement',
+    )
+    adjoint = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='secretariats_adjoint', verbose_name='Adjoint(e)',
+    )
+    telephone = models.CharField(max_length=30, blank=True, default='', verbose_name='Téléphone')
+    email = models.EmailField(blank=True, default='', verbose_name='E-mail')
+    localisation = models.CharField(max_length=150, blank=True, default='',
+                                    verbose_name='Localisation')
+    actif = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['nom']
         verbose_name = 'Secrétariat'
         verbose_name_plural = 'Secrétariats'
+        constraints = [
+            models.CheckConstraint(
+                check=(models.Q(direction__isnull=True) | models.Q(departement__isnull=True)),
+                name='secretariat_rattache_au_plus_un',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.numero:

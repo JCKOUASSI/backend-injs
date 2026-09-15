@@ -21,6 +21,7 @@ import Formateurs from './pages/Formateurs'
 import Users from './pages/Users'
 import ImportExcel from './pages/ImportExcel'
 import Secretariats from './pages/Secretariats'
+import Organigramme from './pages/Organigramme'
 import Referentiels from './pages/Referentiels'
 import Parametres from './pages/Parametres'
 import FeatureFlags from './pages/FeatureFlags'
@@ -431,11 +432,20 @@ function App() {
             <Route path="matrice" element={<MatricePermissions />} />
             <Route path="derogations" element={<Derogations />} />
             <Route path="delegations" element={<Delegations />} />
-            <Route path="organisation" element={<Organisation />} />
+            <Route path="organisation" element={<Organigramme />} />
             <Route path=":id" element={<FicheCompte />} />
             <Route path=":id/modifier" element={<ModificationCompte />} />
           </Route>
-          <Route path="/secretariats" element={
+          <Route path="/organisation" element={
+            <ProtectedRoute>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Directions / Départements / Services</li></>}>
+                <Organigramme />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/secretariats" element={<Navigate to="/organisation?onglet=secretariats" replace />} />
+          {/* Écran historique conservé pour les liens profonds (remplacé par /organisation). */}
+          <Route path="/secretariats/historique" element={
             <ProtectedRoute allowedRoles={ADMIN_LEVEL_ROLES}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Secrétariats</li></>}>
                 <Secretariats />

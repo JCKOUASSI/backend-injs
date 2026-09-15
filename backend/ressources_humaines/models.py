@@ -13,10 +13,26 @@ from django.db import models
 
 
 class Service(models.Model):
-    """Service de l'établissement."""
+    """Service de l'établissement (modèle fonctionnel 13.3 : unit =
+    Direction / Département / Service / Bureau — le Service est l'unité
+    feuille de l'organigramme, rattachée à un département)."""
 
+    code = models.CharField(max_length=30, blank=True, default='', db_index=True,
+                            help_text='Code court du service (ex. SCOL01).')
     nom = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True, default='')
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='services_pilotes', verbose_name='Responsable',
+    )
+    adjoint = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='services_adjointes', verbose_name='Adjoint(e)',
+    )
+    telephone = models.CharField(max_length=30, blank=True, default='', verbose_name='Téléphone')
+    email = models.EmailField(blank=True, default='', verbose_name='E-mail')
+    localisation = models.CharField(max_length=150, blank=True, default='',
+                                    verbose_name='Localisation (bâtiment, étage, porte)')
     departement = models.ForeignKey(
         'administrations.Departement', on_delete=models.PROTECT,
         null=True, blank=True, related_name='services',

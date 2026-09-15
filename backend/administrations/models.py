@@ -204,6 +204,20 @@ class Direction(models.Model):
     description = models.TextField(blank=True, default='')
     ordre = models.PositiveSmallIntegerField(default=0)
     actif = models.BooleanField(default=True)
+    # Modèle fonctionnel 13.3 : la structure porte un responsable, un adjoint,
+    # un contact et une localisation — sinon ces informations restent vides.
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='directions_pilotees', verbose_name='Responsable',
+    )
+    adjoint = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='directions_adjointees', verbose_name='Adjoint(e)',
+    )
+    telephone = models.CharField(max_length=30, blank=True, default='', verbose_name='Téléphone')
+    email = models.EmailField(blank=True, default='', verbose_name='E-mail')
+    localisation = models.CharField(max_length=150, blank=True, default='',
+                                    verbose_name='Localisation (bâtiment, étage, porte)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -229,6 +243,20 @@ class Departement(models.Model):
     )
     ordre = models.PositiveSmallIntegerField(default=0)
     actif = models.BooleanField(default=True)
+    # Modèle fonctionnel 13.3 : la structure porte un responsable, un adjoint,
+    # un contact et une localisation — sinon ces informations restent vides.
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='departements_pilotes', verbose_name='Responsable',
+    )
+    adjoint = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='departements_adjointes', verbose_name='Adjoint(e)',
+    )
+    telephone = models.CharField(max_length=30, blank=True, default='', verbose_name='Téléphone')
+    email = models.EmailField(blank=True, default='', verbose_name='E-mail')
+    localisation = models.CharField(max_length=150, blank=True, default='',
+                                    verbose_name='Localisation (bâtiment, étage, porte)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -164,3 +164,34 @@ Les **ajouts** de routes/clés sont des extensions non cassantes ; les **retrait
   - Route supprimée ou renommée : PUT /api/timetable/creneaux-types/{id}/
   - Route supprimée ou renommée : PUT /api/timetable/emplois/{id}/
 
+## 2026-09-15 03:41 UTC
+
+- **Justification :** Lot A refonte (modèle 13) : ajout de l'API organigramme unifié /api/administrations/organigramme/* (10 routes lecture/écriture, secrétariats rattachés) — aucune route retirée ; /secretariats reste monté (redirect frontend).
+- Routes dans le contrat : 657
+- **Ruptures (retraits/renommages) : 0**
+  - _aucune_
+- Ajouts (extensions non cassantes) : 23
+  - Route supprimée ou renommée : DELETE /api/administrations/organigramme/departements/{id}/
+  - Route supprimée ou renommée : DELETE /api/administrations/organigramme/directions/{id}/
+  - Route supprimée ou renommée : DELETE /api/administrations/organigramme/secretariats/{id}/
+  - Route supprimée ou renommée : DELETE /api/administrations/organigramme/services/{id}/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/arbre/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/departements/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/departements/{id}/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/directions/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/directions/{id}/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/responsables/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/secretariats/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/secretariats/{id}/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/services/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/services/{id}/
+  - Route supprimée ou renommée : GET /api/administrations/organigramme/types-secretariat/
+  - Route supprimée ou renommée : PATCH /api/administrations/organigramme/departements/{id}/
+  - Route supprimée ou renommée : PATCH /api/administrations/organigramme/directions/{id}/
+  - Route supprimée ou renommée : PATCH /api/administrations/organigramme/secretariats/{id}/
+  - Route supprimée ou renommée : PATCH /api/administrations/organigramme/services/{id}/
+  - Route supprimée ou renommée : POST /api/administrations/organigramme/departements/
+  - Route supprimée ou renommée : POST /api/administrations/organigramme/directions/
+  - Route supprimée ou renommée : POST /api/administrations/organigramme/secretariats/
+  - Route supprimée ou renommée : POST /api/administrations/organigramme/services/
+

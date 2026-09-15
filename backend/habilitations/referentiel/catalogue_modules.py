@@ -184,6 +184,8 @@ RESSOURCES = {
     'administrations': {
         'courrier': JOKER, 'document_officiel': JOKER,
         'version_document': JOKER, 'reunion': JOKER, 'mission': JOKER,
+        # Lot A refonte — organigramme unifié (modèle 13).
+        'organigramme': ['consulter', 'gerer'],
     },
     'statistiques': {
         'indicateur': ['consulter'],

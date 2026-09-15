@@ -318,7 +318,7 @@ describe('non-régression : les écrans historiques restent accessibles', () => 
     '/administration/comptes/roles',
     '/administration/comptes/matrice',
     '/users',
-    '/secretariats',
+    '/organisation',
     '/statistiques',
     '/referentiels',
     '/parametres',

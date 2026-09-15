@@ -1,8 +1,8 @@
 {
- "genere_le": "2026-09-14",
+ "genere_le": "2026-09-15",
  "source": "backend/db.sqlite3 · table habilitations_permissionmetier",
  "regenerer": "python3 arena/genere-catalogues-menu.py",
- "nombre": 1155,
+ "nombre": 1157,
  "modules": [
   "administration",
   "administrations",
@@ -184,6 +184,8 @@
   "administrations.mission.soumettre",
   "administrations.mission.supprimer",
   "administrations.mission.valider",
+  "administrations.organigramme.consulter",
+  "administrations.organigramme.gerer",
   "administrations.reunion.administrer",
   "administrations.reunion.annuler",
   "administrations.reunion.archiver",

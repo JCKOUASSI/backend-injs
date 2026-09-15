@@ -902,13 +902,12 @@ export const ARBORESCENCE = [
         },
       },
       {
-        id: 'administration.secretariats',
-        libelle: 'Secrétariats',
-        chemin: '/secretariats',
+        id: 'administration.organisation',
+        libelle: 'Directions / Départements / Services',
+        chemin: '/organisation',
         droit: {
-          curp: ['rh.service.consulter'],
+          curp: ['administrations.organigramme.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
         },
       },
       {

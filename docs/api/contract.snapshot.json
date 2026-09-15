@@ -5,6 +5,42 @@
     "version": 1
   },
   "routes": {
+    "DELETE /api/administrations/organigramme/departements/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/administrations/organigramme/directions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/administrations/organigramme/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/administrations/organigramme/services/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
     "DELETE /api/admissions/ref/{ressource}/{id}/": {
       "parameters": [
         "id",
@@ -375,6 +411,91 @@
       }
     },
     "GET /api/administrations/missions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/arbre/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/departements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/departements/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/directions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/directions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/responsables/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/secretariats/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/services/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/services/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/administrations/organigramme/types-secretariat/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -3313,6 +3434,42 @@
         "200": null
       }
     },
+    "PATCH /api/administrations/organigramme/departements/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/administrations/organigramme/directions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/administrations/organigramme/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/administrations/organigramme/services/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "PATCH /api/admissions/admissions/{id}/": {
       "parameters": [
         "id"
@@ -4212,6 +4369,34 @@
       "parameters": [
         "id"
       ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/administrations/organigramme/departements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/administrations/organigramme/directions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/administrations/organigramme/secretariats/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/administrations/organigramme/services/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null

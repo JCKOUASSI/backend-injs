@@ -33,7 +33,7 @@ const LIENS_FILTRES = {
   '/participants': LIST_STORAGE_KEYS.participants,
   '/formateurs': LIST_STORAGE_KEYS.formateurs,
   '/users': LIST_STORAGE_KEYS.users,
-  '/secretariats': LIST_STORAGE_KEYS.secretariats,
+  '/organisation': LIST_STORAGE_KEYS.secretariats,
   '/referentiels': LIST_STORAGE_KEYS.referentiels,
 }
 
