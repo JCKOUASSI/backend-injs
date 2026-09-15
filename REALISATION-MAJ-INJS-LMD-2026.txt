@@ -420,10 +420,73 @@ Sous-tâches exécutées :
    - Vérification de l'ensemble des suites frontend React (plus de 430 tests passés).
 
 
+----------------------------------------------------------------------------------------------------
+VAGUE 4 / LOT 4.1 : FINANCES ÉTUDIANTES, TARIFICATIONS LMD, ÉCHÉANCIERS,
+                    QUITTANCES SÉCURISÉES & VACATIONS FORMATEURS INJS
+----------------------------------------------------------------------------------------------------
+Date d'exécution : 15 Septembre 2026
+Statut : RÉALISÉ ET CERTIFIÉ (CHECKPOINT GIT ET GESTION COMPLÈTE)
+
+Sous-tâches exécutées :
+1. Configuration de la Grille Tarifaire LMD :
+   - Définition des tarifs officiels pour la Licence 3 STAPS (cycle FAC, parcours Professorat Collège,
+     niveau L3, année académique 2026-2027) :
+     * Frais de dossier : 10 000 XOF
+     * Frais d'inscription administrative : 50 000 XOF
+     * Frais de scolarité pédagogique : 100 000 XOF
+     * Montant total par étudiant : 160 000 XOF.
+2. Échéanciers de Paiement et Facturation Automatique :
+   - Génération automatique des plans de paiement (`Echeancier` et `LigneEcheancier`) pour les 6 étudiants
+     admis (INJS26-0001 à INJS26-0006).
+   - Génération des factures institutionnelles numérotées (`Facture`, préfixe `FAC-X-20260915`), statut `EMISE`.
+3. Encaissement Multi-Canaux et Anti-Doublon Idempotent :
+   - Enregistrement des règlements via `finances_etudiantes.services.enregistrer_paiement_idempotent`
+     avec clé de transaction externe unique (`TX-INJS-2026-INJS26-XXXX-NATURE`).
+   - Couverture des canaux de règlement usuels INJS Marcory :
+     * Mobile Money : Orange Money (ELEPHANT_MONEY), MTN Mobile Money (MTN_MONEY), Moov Money (MOOV_MONEY).
+     * Bancaire et Guichet : Virement bancaire, Caisse régie de recettes de l'INJS.
+   - Attachement systématique de la pièce justificative / reçu de paiement au format PDF.
+4. Confirmation, Émission de Quittances et Lettrage :
+   - Validation des encaissements par l'Agence Comptable (`confirmer_paiement`).
+   - Délivrance de 18 quittances de paiement sécurisées (`Quittance`), identifiées par UUID cryptographique.
+   - Mise à jour des lignes d'échéancier (`statut='PAYE'`) et solde complet des factures (`statut='PAYEE'`).
+   - Échéanciers étudiants certifiés avec `statut_global = 'COMPLETE'`.
+5. Rapprochement Bancaire et Comptable :
+   - Consolidation dans `RapprochementComptable` d'une session de rentrée.
+   - Solde total réconcilié : 960 000.00 XOF pour 18 transactions certifiées sans écart ni doublon.
+6. Charges Pédagogiques LMD et Vacations Formateurs :
+   - Rattachement officiel des 5 formateurs référents aux 6 ECUEs de la Maquette L3 STAPS
+     via `AffectationPedagogique` (statut `VALIDEE`).
+   - Couverture intégrale des 310 heures requises par la maquette :
+     * KOUAME Koffi    : 70.0h validées (Athlétisme & Pratiques Sportives, CM) | Surcharge: Non
+     * TOURE Moussa    : 70.0h validées (Déontologie 35h CM + Droit Administratif 35h TD) | Surcharge: Non
+     * KONÉ Seydou     : 60.0h validées (Didactique et Pédagogie STAPS, TD) | Surcharge: Non
+     * NDIAYE Ibrahima : 60.0h validées (Biomécanique et Physiologie de l'effort, CM) | Surcharge: Non
+     * OUÉDRAOGO Alima : 50.0h validées (Santé, Hygiène et Secourisme, TD) | Surcharge: Non
+   - Contrôle algorithmique des anomalies de charge via `charges_services.anomalies` : 0 anomalie.
+   - Tous les volumes sont en dessous du seuil de surcharge de 192h/an.
+7. Paramétrage Financier des Honoraires et Vacations INJS :
+   - Configuration dans `FinanceSettings` du taux horaire de vacation : 15 000.00 XOF/h.
+   - Personnalisation institutionnelle des états financiers formateurs :
+     * Organisme : Institut National de la Jeunesse et des Sports (INJS) Marcory
+     * Ministère de tutelle : Ministère de la Promotion des Sports et du Cadre de Vie
+     * Ordonnateur : Directeur Général de l'INJS
+     * Mentions légales et visas de l'Agence Comptable Principale.
+   - Extension des droits d'accès au dashboard financier aux rôles administratifs (`ADMIN`).
+8. Commande de Déploiement Idempotente :
+   - Implémentation du script de gestion complet :
+     `backend/formations/management/commands/seed_lot4_1_finances.py`.
+9. Validation par les Tests :
+   - Exécution de 44 tests unitaires et d'intégration réussis sur `finances_etudiantes`,
+     `scolarite.tests.test_charges_pedagogiques`, `jurys` et `graduation`.
+   - Contrôle système Django sans erreurs (0 avertissements, migrations à jour).
+   - Contrôle qualité frontend React (ESLint 0 erreur, build Vite production réussi).
+
+
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2, 2.1 et 3.1, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2, 2.1, 3.1 et 4.1, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -434,7 +497,8 @@ Sous-tâches exécutées :
 |                             | Cycle Admissions / IA (INJS26-XXXX) / IP (30 ECTS)   | 🟢 VERT     |
 |                             | Emplois du Temps (GET-INJS), Conflits (0) & Badgeage QR| 🟢 VERT     |
 |                             | Évaluations, Jurys LMD, PV & Diplômes SHA-256         | 🟢 VERT     |
-|                             | Tests automatisés (201 tests backend passés)         | 🟢 VERT     |
+|                             | Finances Étudiantes, Quittances & Vacations (960k XOF)| 🟢 VERT     |
+|                             | Tests automatisés (245 tests backend cumulés passés)  | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
@@ -452,16 +516,17 @@ Sous-tâches exécutées :
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 4 / LOT 4.1 :
-  Finances Étudiantes, Tarifications LMD, Échéanciers, Quittances Sécurisées & Vacations :
-  * Modélisation de la grille tarifaire LMD pour la Licence STAPS et le cycle FAC (frais d'inscription, scolarité).
-  * Génération des plans de paiement (échéanciers) pour les étudiants inscrits.
-  * Encaissement, émission de quittances numérotées sécurisées et réconciliation des paiements.
-  * Suivi des heures d'enseignement effectuées et calcul des états d'honoraires / vacations formateurs.
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 5 / LOT 5.1 :
+  Domaines Transversaux : Conventions de Stages Professionnels, Administration / GED,
+  Ressources Humaines & Gestion du Patrimoine / Espaces Sportifs INJS Marcory :
+  * Modélisation et suivi des conventions de stage professionnel LMD (tuteurs de stage, conventions signées).
+  * Enregistrement des documents administratifs et GED institutionnelle (notes de service, arrêtés).
+  * Module RH : contrats, congés formateurs et personnels d'encadrement INJS.
+  * Module Patrimoine : inventaire physique, gestion des installations sportives (piscine olympique, piste d'athlétisme, gymnase, terrains omnisports).
+  * Script de seed idempotent `seed_lot5_1_transverse.py` et validation des tests automatisés.
 
-- ÉTAPES ULTÉRIEURES (VAGUES 5 À 6) :
-  * Vague 5 : Domaines transversaux (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
-  * Vague 6 : Statistiques CPFAE 17 colonnes, BI et clôture de refonte.
+- ÉTAPES ULTÉRIEURES (VAGUE 6) :
+  * Vague 6 : Statistiques CPFAE 17 colonnes, BI, bilans institutionnels et clôture générale de mise à niveau.
 
 Ce fichier est mis à jour à chaque lot validé et reste consultable et téléchargeable en permanence.
 ====================================================================================================
