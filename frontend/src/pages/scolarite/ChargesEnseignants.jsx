@@ -36,8 +36,9 @@ export default function ChargesEnseignants() {
   const chargerAnnee = useCallback(async () => {
     try {
       const res = await api.get('/scolarite/annee-courante/')
-      setAnnee(res.data)
-      return res.data
+      const anneeData = res.data?.annee || res.data
+      setAnnee(anneeData)
+      return anneeData
     } catch {
       toast.showToast('Aucune année académique courante.', 'error')
       return null
@@ -70,8 +71,11 @@ export default function ChargesEnseignants() {
       api.get('/formateurs/list/'),
     ])
       .then(([annees, formations, niveaux, semestres, formateurs]) => setOptions({
-        annees: annees.data, formations: formations.data, niveaux: niveaux.data,
-        semestres: semestres.data, formateurs: formateurs.data,
+        annees: Array.isArray(annees.data) ? annees.data : (annees.data?.results || []),
+        formations: Array.isArray(formations.data) ? formations.data : (formations.data?.results || []),
+        niveaux: Array.isArray(niveaux.data) ? niveaux.data : (niveaux.data?.results || []),
+        semestres: Array.isArray(semestres.data) ? semestres.data : (semestres.data?.results || []),
+        formateurs: Array.isArray(formateurs.data) ? formateurs.data : (formateurs.data?.results || []),
       }))
       .catch(() => toast.showToast('Chargement des référentiels impossible.', 'error'))
   }, [peutAgir, toast])

@@ -692,6 +692,29 @@ du garde-fou d'affichage React Suspense sur ScolariteDashboard :
      - Requête HTTP GET `/api/scolarite/reinscriptions/` répond HTTP 200 OK avec format de liste JSON conforme.
 
 ====================================================================================================
+6.5 CORRECTION DES ALERTES « CHARGEMENT DES RÉFÉRENTIELS / CHARGES IMPOSSIBLE » (CHARGES PÉDAGOGIQUES)
+====================================================================================================
+- Symptôme : Toasts d'erreur « Chargement des référentiels impossible. » et « Chargement des charges impossible. »
+  sur la vue des Charges pédagogiques des enseignants (`/scolarite/charges`).
+- Analyse causale :
+  1. L'endpoint `/api/formateurs/list/` n'était pas routé directement (seule `/api/formations/formateurs/list/` existait).
+  2. `/api/scolarite/annee-courante/` retournait un objet imbriqué `{'annee': {'id': 1, ...}}` non dépaqueté par
+     le composant `ChargesEnseignants`, provoquant l'envoi de `annee_id=undefined` et une erreur HTTP 400 sur
+     `/api/enseignants/occupation/` et `/api/enseignants/anomalies/`.
+  3. Le résultat de l'API formateurs était sous forme de dictionnaire paginé `{'results': [...]}` nécessitant une extraction
+     sécurisée pour le rendu des menus déroulants.
+- Actions correctives exécutées :
+  1. `backend/config/urls.py` : Ajout de la route directe `api/formateurs/list/` pointant sur `formateur_list_api`.
+  2. `backend/scolarite/api_views.py` : Enrichissement de la réponse `annee_courante` fournissant à la fois les champs
+     au premier niveau et dans le sous-objet `annee` pour une rétro-compatibilité totale.
+  3. `backend/scolarite/charges_api.py` : Tolérance défensive dans `_get_annee` pour utiliser l'année courante lorsque `annee_id`
+     est absent ou indéfini.
+  4. `frontend/src/pages/scolarite/ChargesEnseignants.jsx` : Dépaquetage défensif `res.data?.annee || res.data` et
+     normalisation des listes d'options (`Array.isArray(x) ? x : x?.results || []`).
+  5. Validation directe : Les 8 requêtes HTTP de la page répondent toutes avec succès (HTTP 200 OK).
+  6. Tests automatisés : 15 tests backend (`test_charges_pedagogiques`) et 23 tests Vitest au vert, build Vite 100% réussi.
+
+====================================================================================================
 7. CONCLUSION GÉNÉRALE ET BILAN DE LIVRAISON DE LA REFONTE INJS 2026
 ====================================================================================================
 L'intégralité du programme de mise à niveau de l'application INJS-LMD 2026 a été exécutée avec succès,

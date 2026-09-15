@@ -175,14 +175,16 @@ def annee_courante(request):
     """Année académique courante, utilisée comme valeur par défaut par le frontend."""
     annee = AnneeAcademique.courante_ou_none()
     if annee is None:
-        return Response({'annee': None})
+        return Response({'annee': None, 'id': None, 'libelle': None})
+    data = {
+        'id': annee.id,
+        'libelle': annee.libelle,
+        'date_debut': annee.date_debut,
+        'date_fin': annee.date_fin,
+    }
     return Response({
-        'annee': {
-            'id': annee.id,
-            'libelle': annee.libelle,
-            'date_debut': annee.date_debut,
-            'date_fin': annee.date_fin,
-        },
+        **data,
+        'annee': data,
     })
 
 
