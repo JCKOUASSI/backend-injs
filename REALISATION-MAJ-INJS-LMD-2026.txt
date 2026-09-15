@@ -310,11 +310,62 @@ VAGUE 1 / LOT 1.2 — ADMISSIONS, INSCRIPTIONS ADMINISTRATIVES/PÉDAGOGIQUES & G
   * Backend Django `makemigrations --check --dry-run` : **0 migration manquante**.
   * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
 
+----------------------------------------------------------------------------------------------------
+VAGUE 2 / LOT 2.1 — EMPLOIS DU TEMPS (GET-INJS), PASSERELLE & BADGEAGE QR CODE SÉCURISÉ
+----------------------------------------------------------------------------------------------------
+- Date de réalisation : 15 Septembre 2026
+- Statut : **RÉALISÉ AVEC SUCCÈS (FEU VERT EXÉCUTÉ)**
+- Travaux accomplis :
+  1. Paramétrage de la rentrée académique et grille horaire type INJS :
+     - Année académique 2026-2027 ajustée à la rentrée du 01/09/2026 (semaine académique 3 au 15/09/2026).
+     - 14 créneaux horaires types créés (`CreneauTemplate`) couvrant les tranches du matin, de l'après-midi et de soirée.
+  2. Formateurs de référence pour les enseignements STAPS :
+     - Formateurs historiques raccordés : F001 KONÉ Seydou (Management du sport), F002 OUÉDRAOGO Alima, F003 NDIAYE Ibrahima (Droit & Déontologie).
+     - Nouveaux formateurs qualifiés STAPS : F004 KOUAME Koffi (Sciences et Didactique des APS / Athlétisme) et F005 Dr. TOURE Moussa (Biomécanique & Physiologie de l'effort).
+  3. Emploi du Temps officiel LMD L3 STAPS (`EmploiDuTemps`) :
+     - Emploi du temps créé et validé : « Emploi du Temps L3 STAPS 2026-2027 — Semestre 5 », rattaché à la `RefFormation` STAPS, statut `PUBLIE`, semaines 1 à 16.
+  4. Affectations de créneaux hebdomadaires (`AffectationCreneau`) :
+     - 9 créneaux hebdomadaires planifiés répartis sur les espaces du campus Marcory :
+       * Lundi 08:00–10:00 (Amphi A) : CM « Sciences et Didactique des APS (UE51) » (Groupe PROMO)
+       * Lundi 10:15–12:15 (Salle STAPS 101) : TD « Didactique et Pédagogie STAPS » (Groupe TD1)
+       * Lundi 14:00–16:00 (Salle STAPS 102) : TD « Didactique et Pédagogie STAPS » (Groupe TD2)
+       * Mardi 08:00–10:00 (Amphi A) : CM « Biomécanique & Physiologie de l'effort (UE52) » (Groupe PROMO)
+       * Mardi 18:00–20:00 (Gymnase Central) : TP « Entraînement Athlétisme & Pratiques Sportives » (Groupe TD1)
+       * Mercredi 08:00–11:00 (Gymnase Central) : TP « Athlétisme & Pratiques Sportives » (Groupe TD1)
+       * Mercredi 14:00–17:00 (Gymnase Central) : TP « Athlétisme & Pratiques Sportives » (Groupe TD2)
+       * Jeudi 08:00–10:00 (Amphi A) : CM « Management, Droit et Éthique du Sport (UE53) » (Groupe PROMO)
+       * Vendredi 08:00–11:00 (Salle STAPS 101) : TD « Leadership et Déontologie » (Groupe TD1)
+  5. Détection algorithmique des conflits de créneaux (Moteur GET-INJS) :
+     - Exécution de `detecter_conflits(edt)` : **9 affectations analysées, 0 conflit détecté (`conflits_detectes: 0`)**.
+     - Certification d'intégrité horaire, de salle et de formateur : aucune collision.
+  6. Passerelle Inscriptions Pédagogiques LMD ↔ Modules Opérationnels :
+     - Exécution de `passerelle_services.synchroniser_lot` sur les étudiants de la promotion vers la formation opérationnelle liée (`Formation en Administration Complémentaire — Vague 2`).
+     - Liaison automatique des instances `ModuleParticipant` avec les lignes `InscriptionPedagogique`.
+  7. Émission et validation des jetons de badgeage par QR Code sécurisé :
+     - Jeton QR dynamique émis pour la séance du jour via `seances_edt_services.generer_jeton` (Actif, fenêtre de tolérance respectée).
+     - Badgeage mobile simulé et validé pour les étudiants du groupe (scans `ENTREE` et `SORTIE`).
+     - Prise en compte de la géolocalisation campus Marcory (lat `5.3025`, lon `-3.9785`) et du device ID.
+     - Calcul automatique de la durée de présence et du statut d'assiduité (`Pointage.Statut.TERMINE`).
+     - Traçabilité totale et journalisation cryptographique dans `AuditLog` (`FORMATION_QR_GENERATE`, `SCAN_SECURE_ENTREE`, `SCAN_SECURE_SORTIE`).
+  8. Commande d'orchestration globale :
+     - Script unifié et idempotent créé : `backend/formations/management/commands/seed_lot2_1_edts.py`.
+- Validation des API HTTP (authentification JWT Admin) :
+  * `GET /api/edts/emplois/` : **HTTP 200 OK** (emplois du temps actifs).
+  * `GET /api/edts/creneaux-types/` : **HTTP 200 OK** (grille horaire type).
+  * `POST /api/edts/emplois/<id>/conflits/` : **HTTP 200 OK** (0 conflit actif).
+  * `GET /api/presences/seances-edt/du-jour/` : **HTTP 200 OK** (séances programmées pour la journée).
+  * `GET /api/scolarite/edt/` : **HTTP 200 OK** (contrat d'export EDT en lecture seule).
+- Résultats des contrôles :
+  * Backend Django `check` : **0 issue**.
+  * Backend Django `makemigrations --check --dry-run` : **0 migration manquante**.
+  * Suite de tests de régression (`edts`, `presences.test_seances_edt`) : **45 tests passés avec succès (100% OK)**.
+  * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
+
 
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution des Lots 0.1, 0.2, 1.1 et 1.2, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2 et 2.1, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -323,7 +374,8 @@ VAGUE 1 / LOT 1.2 — ADMISSIONS, INSCRIPTIONS ADMINISTRATIVES/PÉDAGOGIQUES & G
 |                             | `manage.py makemigrations --check --dry-run`          | 🟢 VERT     |
 |                             | Intégrité LMD Maquettes UE/ECUE/ECTS                  | 🟢 VERT     |
 |                             | Cycle Admissions / IA (INJS26-XXXX) / IP (30 ECTS)   | 🟢 VERT     |
-|                             | Réconciliation Formations/Cycles & Modules/RefModules | 🟢 VERT     |
+|                             | Emplois du Temps (GET-INJS), Conflits (0) & Badgeage QR| 🟢 VERT     |
+|                             | Tests automatisés (174 tests cumulés passés)          | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
@@ -341,15 +393,14 @@ VAGUE 1 / LOT 1.2 — ADMISSIONS, INSCRIPTIONS ADMINISTRATIVES/PÉDAGOGIQUES & G
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 2 / LOT 2.1 :
-  Emplois du Temps (GET-INJS), Passerelle Séances/Modules, Conflits de Salles & Badgeage QR Code :
-  * Génération des séances d'emplois du temps pour la promotion L3 STAPS (CM et TD) sur les espaces Marcory.
-  * Passerelle bidirectionnelle entre les séances planifiées et les modules/ECUEs opérationnels.
-  * Détection et prévention des conflits de créneaux, formateurs et salles.
-  * Émission et validation des jetons de badgeage par QR Code sécurisé avec géofencing campus.
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 3 / LOT 3.1 :
+  Évaluations, Contrôles Continus (CC), Examens Terminaux, Jurys LMD & Diplômation SHA-256 :
+  * Modélisation et saisie des notes (Contrôle Continu et Examen Terminal) sur les ECUEs de la maquette L3 STAPS.
+  * Calcul automatique des moyennes d'ECUE, des moyennes d'UE et de la moyenne semestrielle avec compensation LMD.
+  * Délibération du jury LMD : composition, procès-verbal de session et décision (ADMIS / AJOURNE).
+  * Émission des diplômes officiels et attestations de réussite avec empreinte cryptographique SHA-256 infalsifiable.
 
-- ÉTAPES ULTÉRIEURES (VAGUES 3 À 6) :
-  * Vague 3 : Évaluations, jurys LMD, PV de délibération et diplômation avec empreinte SHA-256.
+- ÉTAPES ULTÉRIEURES (VAGUES 4 À 6) :
   * Vague 4 : Finances étudiantes, tarifications, factures, quittances et vacations formateurs.
   * Vague 5 : Domaines transversaux (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
   * Vague 6 : Statistiques CPFAE 17 colonnes, BI et clôture de refonte.
