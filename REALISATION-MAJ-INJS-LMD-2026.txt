@@ -259,11 +259,62 @@ VAGUE 1 / LOT 1.1 — RÉSORPTION DES DOUBLES REPRÉSENTATIONS & INTÉGRITÉ LMD
   * Suite de tests de régression (`scolarite.tests.test_referentiels`, `test_maquettes_workflow`, `test_passerelle`, `test_charges_pedagogiques`, `test_cours_lmd`, `test_inscriptions`, `test_smoke_command`) : **129 tests passés avec succès (100% OK)**.
   * Frontend React : Vitest exécuté sur 14 suites / 126 tests : **126 passés avec succès**. Lint : **0 erreur, 0 warning**.
 
+----------------------------------------------------------------------------------------------------
+VAGUE 1 / LOT 1.2 — ADMISSIONS, INSCRIPTIONS ADMINISTRATIVES/PÉDAGOGIQUES & GROUPES LMD
+----------------------------------------------------------------------------------------------------
+- Date de réalisation : 15 Septembre 2026
+- Statut : **RÉALISÉ AVEC SUCCÈS (FEU VERT EXÉCUTÉ)**
+- Travaux accomplis :
+  1. Référentiels d'admissions et pièces justificatives INJS :
+     - Voies d'accès (`VoieAcces`) : Concours Direct STAPS (`CONCOURS_DIRECT`).
+     - Types de candidatures (`TypeCandidature`) : Candidature Initiale (`INITIALE`).
+     - Référentiel des pièces justificatives (`TypePiece`) : Diplôme (Bac/Bac+2), Extrait d'acte de naissance, Certificat médical d'aptitude sportive INJS (avec date d'expiration), Photos d'identité récentes, Extrait de casier judiciaire.
+  2. Campagne de concours et épreuves sur site Marcory :
+     - Campagne officielle créée : « Concours d’Entrée STAPS Licence 3 2026-2027 » (fenêtre ouverte du 01/09/2026 au 31/10/2026, statut `OUVERTE`, quotas admissibles 50 / admis 30).
+     - 3 épreuves de sélection créées et localisées sur le campus :
+       * Épreuve Physique et Sportive (Pratique, coef 3.0, Gymnase omnisports).
+       * Épreuve Écrite de Culture Générale et Sportive (coef 2.0, Amphithéâtre A).
+       * Entretien de Motivation & Aptitude Pédagogique (Oral, coef 2.0, Salle STAPS 101).
+  3. Cohorte de candidats et parcours complet de sélection :
+     - 6 candidats réels et qualifiés enregistrés (KOUASSI Yao Emmanuel, TRAORE Fatou Aïcha, KONE Bakary, DIABATE Mariam, N'GUESSAN Koffi Serge, OUATTARA Aminata).
+     - Dépôt et validation stricte de l'intégralité des pièces obligatoires (`PIECES_VALIDEES`).
+     - Transitions de workflow d'admission : `SOUMISE` → `EN_ATTENTE_DE_VERIFICATION` → `PIECES_VALIDEES` → `EN_ETUDE`.
+     - Saisie des notes de concours, verrouillage immuable des 3 épreuves.
+     - Calcul automatique et publication officielle du classement du concours via `concours_services.publier_classement`.
+  4. Admissions et décisions rectorales :
+     - Déclaration d'admissibilité des candidats classés (`ADMISSIBLE`).
+     - Création des dossiers d'admission (`Admission`) et décision rectorale prononcée (`ADMIS`, référence arrêté `ARRETE-INJS-2026-0042`).
+  5. Inscriptions Administratives (IA) & Matricules officiels INJS :
+     - Conversion d'admission en Inscription Administrative validée (`convertir_admission_en_inscription` avec `valider=True`).
+     - Génération des matricules normalisés séquentiels : `INJS26-0001`, `INJS26-0002`, `INJS26-0003`, `INJS26-0004`, `INJS26-0005`, `INJS26-0006`.
+     - Création des `DossierEtudiant` et synchronisation opérationnelle avec `Participant` (nom, prénom, sexe, date de naissance, téléphone, email, catégorie, grade, vague).
+  6. Inscriptions Pédagogiques (IP) LMD :
+     - Génération automatique des IP pour chaque étudiant validé (`pedagogie_services.generer_inscriptions_pedagogiques`).
+     - Raccordement systématique aux 6 ECUEs de la maquette active L3 STAPS (Athlétisme, Didactique, Biomécanique, Santé/Secourisme, Déontologie, Management).
+     - Total semestriel par étudiant : **6 ECUEs, 30 crédits ECTS, 310 heures d'enseignement**.
+  7. Constitution et Affectation des Groupes Pédagogiques :
+     - Groupes créés : `L3-STAPS-PROMO` (capacité 150), `L3-STAPS-TD1` (capacité 30), `L3-STAPS-TD2` (capacité 30).
+     - Affectation des étudiants avec contrôle de capacité : répartition équilibrée de la promotion (3 étudiants en TD1, 3 étudiants en TD2).
+  8. Commande d'orchestration globale :
+     - Script unifié et idempotent créé : `backend/formations/management/commands/seed_lot1_2_inscriptions.py`.
+- Validation des API HTTP (authentification JWT Admin) :
+  * `GET /api/admissions/campagnes/` : **HTTP 200 OK** (1 campagne active).
+  * `GET /api/admissions/candidatures/` : **HTTP 200 OK** (6 candidatures traitées).
+  * `GET /api/admissions/admissions/` : **HTTP 200 OK** (6 admissions prononcées).
+  * `GET /api/scolarite/etudiants/` : **HTTP 200 OK** (6 dossiers étudiants avec matricules `INJS26-XXXX`).
+  * `GET /api/scolarite/inscriptions/` : **HTTP 200 OK** (6 inscriptions administratives `VALIDEE`).
+  * `GET /api/scolarite/inscriptions/<id>/pedagogie/` : **HTTP 200 OK** (6 ECUEs rattachées, récapitulatif 30 ECTS conforme).
+  * `GET /api/scolarite/groupes/effectifs/` : **HTTP 200 OK** (effectifs et capacités des groupes LMD).
+- Résultats des contrôles :
+  * Backend Django `check` : **0 issue**.
+  * Backend Django `makemigrations --check --dry-run` : **0 migration manquante**.
+  * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
+
 
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution des Lots 0.1, 0.2 et 1.1, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2, 1.1 et 1.2, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -271,8 +322,8 @@ VAGUE 1 / LOT 1.1 — RÉSORPTION DES DOUBLES REPRÉSENTATIONS & INTÉGRITÉ LMD
 | FEU 1 : BACKEND DJANGO      | `manage.py check --settings=arena.settings_sandbox`   | 🟢 VERT     |
 |                             | `manage.py makemigrations --check --dry-run`          | 🟢 VERT     |
 |                             | Intégrité LMD Maquettes UE/ECUE/ECTS                  | 🟢 VERT     |
+|                             | Cycle Admissions / IA (INJS26-XXXX) / IP (30 ECTS)   | 🟢 VERT     |
 |                             | Réconciliation Formations/Cycles & Modules/RefModules | 🟢 VERT     |
-|                             | Suite de tests automatisés (129 tests)                | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
@@ -290,15 +341,14 @@ VAGUE 1 / LOT 1.1 — RÉSORPTION DES DOUBLES REPRÉSENTATIONS & INTÉGRITÉ LMD
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 1 / LOT 1.2 :
-  Cycle Inscriptions Administratives (IA), Inscriptions Pédagogiques (IP) & Constitution des Groupes :
-  * Modélisation et vérification des candidatures et admissions (concours STAPS INJS).
-  * Génération des matricules normalisés étudiants INJS (ex: `INJS26-XXXX`).
-  * Inscriptions pédagogiques automatiques et individuelles rattachées aux UEs/ECUEs de la maquette active.
-  * Affectation aux groupes pédagogiques (TD, TP, CM) et vérification des capacités d'accueil.
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 2 / LOT 2.1 :
+  Emplois du Temps (GET-INJS), Passerelle Séances/Modules, Conflits de Salles & Badgeage QR Code :
+  * Génération des séances d'emplois du temps pour la promotion L3 STAPS (CM et TD) sur les espaces Marcory.
+  * Passerelle bidirectionnelle entre les séances planifiées et les modules/ECUEs opérationnels.
+  * Détection et prévention des conflits de créneaux, formateurs et salles.
+  * Émission et validation des jetons de badgeage par QR Code sécurisé avec géofencing campus.
 
-- ÉTAPES ULTÉRIEURES (VAGUES 2 À 6) :
-  * Vague 2 : Emplois du temps (GET-INJS), passerelle séances/modules et badgeage QR Code sécurisé.
+- ÉTAPES ULTÉRIEURES (VAGUES 3 À 6) :
   * Vague 3 : Évaluations, jurys LMD, PV de délibération et diplômation avec empreinte SHA-256.
   * Vague 4 : Finances étudiantes, tarifications, factures, quittances et vacations formateurs.
   * Vague 5 : Domaines transversaux (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
