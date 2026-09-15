@@ -1,0 +1,223 @@
+====================================================================================================
+JOURNAL DE RÉALISATION DES TRAVAUX DE MISE À NIVEAU ET REFONTE
+APPLICATION : APP-INJS-LMD2026 (INJS MARCORY — ABIDJAN, CÔTE D'IVOIRE)
+====================================================================================================
+Fichier          : REALISATION-MAJ-INJS-LMD-2026.txt
+Projet           : INJS-LMD 2026 — Système Intégré de Gestion Universitaire LMD
+Institution      : Institut National de la Jeunesse et des Sports (INJS) — UFR STAPS-JL
+Auteur           : Agent Mode sur Arena.ai (Lead Développeur & Architecte Fullstack LMD)
+Date de début    : 15 Septembre 2026
+Dépôt Git        : JCKOUASSI/app-injslmd2026demo
+Branche active   : arena/01a0a5e5-app-injslmd2026demo
+Ports Figés      : Frontend Web sur Port 3000 · Backend API sur Port 8000 (0.0.0.0)
+Gouvernance      : Interdiction de modifier sans permission préalable · Validation par lots
+====================================================================================================
+
+
+====================================================================================================
+TABLE DES MATIÈRES DU JOURNAL DE RÉALISATION
+====================================================================================================
+ 1. CONTEXTE ET OBJECTIF GÉNÉRAL DE LA REFONTE
+ 2. MÉMOIRE OPÉRATIONNELLE : LES 10 PRINCIPES D'ACTION DIRECTE ET ROBUSTE
+ 3. STATUT DES SERVEURS ET ENVIRONNEMENT D'EXÉCUTION
+ 4. INVENTAIRE DES DOCUMENTS DE RÉFÉRENCE ANALYSÉS (DOSSIERTRAVAUX-INJS2026)
+ 5. JOURNAL CHRONOLOGIQUE DES TÂCHES EXÉCUTÉES
+    - TÂCHE 0.0 : Démarrage des serveurs, initialisation BDD et données de démonstration
+    - TÂCHE 0.1 : Conception et génération du Prompt Maître « Prompt-MiseaNiveau-Appinjslmd2026.txt »
+    - TÂCHE 0.2 : Intégration de la « MÉMOIRE MISE À JOUR » dans la gouvernance du projet
+    - TÂCHE 0.3 : Exécution du Lot 0.1 (Hygiène ESLint, Build Vite, Socle Backend & Iframe)
+ 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
+ 7. PROCHAINES TÂCHES PLANIFIÉES ET FEUILLE DE ROUTE OPÉRATIONNELLE
+====================================================================================================
+
+
+====================================================================================================
+1. CONTEXTE ET OBJECTIF GÉNÉRAL DE LA REFONTE
+====================================================================================================
+L'application « app-injs-lmd2026 » est le Système d'Information Universitaire de l'Institut National
+de la Jeunesse et des Sports (INJS) de Marcory (Abidjan). 
+
+Initialement centrée sur la gestion de formations continues et le badgeage de présence par QR Code
+(héritage CPFAE), elle fait l'objet d'une refonte structurelle majeure pour devenir un ERP Universitaire
+complet conforme aux normes LMD (CAMES et REESAO), couvrant :
+  - 18 domaines fonctionnels interconnectés (Gouvernance, Scolarité, Pédagogie, GET-INJS, Présences QR,
+    Notes, Jurys, Diplômation, Finances Étudiantes, Vacations, RH, Patrimoine, Stages, Statistiques).
+  - 20 applications Django backend hautement testées (943 tests automatisés).
+  - Une application web React 18 / Vite 7 structurée en 6 pôles universitaires.
+  - Une application mobile Flutter pour le badgeage sécurisé et le contrôle anti-fraude.
+
+
+====================================================================================================
+2. MÉMOIRE OPÉRATIONNELLE : LES 10 PRINCIPES D'ACTION DIRECTE ET ROBUSTE
+====================================================================================================
+Toute intervention sur le projet respecte strictement cette charte d'action :
+  1. Comprendre rapidement l’objectif.
+  2. Choisir directement la meilleure méthode.
+  3. Utiliser immédiatement les outils pertinents quand ils sont nécessaires.
+  4. Éviter les questions de clarification inutiles si les informations disponibles permettent d’avancer.
+  5. Exécuter plutôt que commenter : privilégier le résultat concret.
+  6. Ne pas multiplier les étapes intermédiaires sans valeur ajoutée.
+  7. Vérifier uniquement les points critiques : sécurité, données, cohérence, exactitude.
+  8. Donner des commandes / prompts / fichiers directement utilisables lorsque c’est pertinent.
+  9. Signaler clairement les blocages réels, sans inventer de solution.
+ 10. Terminer par la prochaine action, plutôt que par de longues explications.
+
+RÈGLE NON NÉGOCIABLE :
+Rapidité ne signifie JAMAIS prendre le risque de perdre le code, les données, les migrations ou les
+checkpoints Git. Aucune modification n'est réalisée sans permission préalable de l'utilisateur.
+
+
+====================================================================================================
+3. STATUT DES SERVEURS ET ENVIRONNEMENT D'EXÉCUTION
+====================================================================================================
+Conformément à la règle impérative n°18 du projet, les ports sont rigoureusement maintenus actifs :
+
+- SITE WEB INJS (Frontend React 18 / Vite 7) :
+  * Adresse : http://0.0.0.0:3000 (port 3000 figé, strictPort: true).
+  * Reverse proxy actif : Redirection transparente de `/api`, `/admin`, `/static`, `/media` vers le port 8000.
+  * Statut : En cours d'exécution permanente.
+
+- API DJANGO REST FRAMEWORK (Backend) :
+  * Adresse : http://0.0.0.0:8000 (port 8000 figé).
+  * Base de données : SQLite en bac à sable (`db_sandbox.sqlite3`), migrations appliquées, données de démo actives.
+  * Statut : En cours d'exécution permanente.
+
+- APPLICATION MOBILE (Flutter / qr_badge_mobile) :
+  * Statut : Non exécutable dans le sandbox Arena (filtrage réseau Google). Piste mobile tracée et testée en CI.
+
+
+====================================================================================================
+4. INVENTAIRE DES DOCUMENTS DE RÉFÉRENCE ANALYSÉS (DOSSIERTRAVAUX-INJS2026)
+====================================================================================================
+Les travaux s'appuient sur l'analyse exhaustive des 16 pièces maîtresses du dossier officiel :
+  1. `RAPPORT D'AUDIT COMPLET D'ARCHITECTURE LOGICIELLE & SYSTÈME LMD-10092026.txt`
+  2. `DIRECTIVE GLOBALE — MODE D’EXÉCUTION RAPIDE ET ROBUSTE.txt`
+  3. `RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL-DE-RÉFÉRENCE-APP-INJS-LMD2026.txt`
+  4. `Audit-complet-détaillé-app-injs-lmd2026OK.txt`
+  5. `Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt` (& PDF)
+  6. `ORGANIGRAMME-FONCTIONNEL-GLOBAL-INJS-LMD.txt`
+  7. `PROMPT MAÎTRE — IMPLÉMENTATION DE GET-INJS.txt`
+  8. `Mode-opératoire-exécution-EDTINJS-app-injs-lmd2026.txt`
+  9. `Plan-exécution-prompts-EDTINJS-app-injs-lmd2026.txt`
+ 10. `Génération-prompts-EDTINJS-app-injs-lmd2026.txt`
+ 11. `Voici le prompt que je considère comme le prompt maître d’implémentation.txt`
+ 12. `PROMPT-MAÎTRE—MODULE-UTILISATEURS-gestion-utilisateurs-rôles-permissions.txt`
+ 13. `GÉNÉRATION-DE-PROMPTS—MODULE-APPLICATION-EDTINJS.txt`
+ 14. `Mode-opératoire-exécution-COMPTES-UTILISATEURS-app-injs-lmd2026.txt`
+ 15. `Plan-exécution-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt`
+ 16. `Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt`
+
+
+====================================================================================================
+5. JOURNAL CHRONOLOGIQUE DES TÂCHES EXÉCUTÉES
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+[TÂCHE 0.0] — DÉMARRAGE DES SERVEURS, INITIALISATION DE LA BASE ET SEED DE DÉMO
+----------------------------------------------------------------------------------------------------
+- Date : 15/09/2026
+- Statut : SUCCÈS
+- Description :
+  1. Correction du script `arena/bootstrap.sh` pour fiabiliser le calcul du chemin racine avant tout `cd`.
+  2. Exécution du bootstrap, création du venv Python et installation des dépendances.
+  3. Application de l'ensemble des 184 migrations Django sur `db_sandbox.sqlite3`.
+  4. Chargement réussi des données de démonstration via `seed_data.py` (utilisateurs admin, formateurs,
+     participants, formations, séances, pointages et seuils statistiques).
+  5. Démarrage des processus en arrière-plan : API Django sur `0.0.0.0:8000` et Frontend Vite sur `0.0.0.0:3000`.
+- Preuves : Ports 3000 et 8000 en écoute active, retours HTTP 200 sur `/` et `/api/`.
+
+----------------------------------------------------------------------------------------------------
+[TÂCHE 0.1] — CONCEPTION ET GÉNÉRATION DU PROMPT MAÎTRE
+----------------------------------------------------------------------------------------------------
+- Date : 15/09/2026
+- Statut : SUCCÈS
+- Fichier produit : `Prompt-MiseaNiveau-Appinjslmd2026.txt` (486 lignes, ~36 Ko).
+- Description :
+  Synthèse intégrale des 16 documents d'audit et de directives pour guider l'Agent Mode d'Arena :
+  * Règle absolue d'interdiction de modification sans permission préalable.
+  * Cartographie des 18 domaines fonctionnels de l'INJS Marcory.
+  * Programme d'action en 3 axes : Correction des bugs, Modifications de l'existant, Implémentation de l'inexistant.
+  * Matrice des inter-dépendances critiques (ordre logique des flux).
+  * Plan de route en 7 vagues opérationnelles (Vagues 0 à 6).
+  * Gabarits formels de demande d'autorisation préalable et de compte rendu de livraison.
+  * Règle d'or de non-régression des 3 feux verts.
+
+----------------------------------------------------------------------------------------------------
+[TÂCHE 0.2] — INTÉGRATION DE LA « MÉMOIRE MISE À JOUR » DANS LE PROMPT MAÎTRE
+----------------------------------------------------------------------------------------------------
+- Date : 15/09/2026
+- Statut : SUCCÈS
+- Description :
+  Mise à niveau du document `Prompt-MiseaNiveau-Appinjslmd2026.txt` pour y insérer en Section 2
+  la charte opérationnelle des 10 principes directs et robustes requise par l'utilisateur.
+- Alignement : Table des matières et renvois de sections synchronisés (15 sections numérotées).
+
+----------------------------------------------------------------------------------------------------
+[TÂCHE 0.3] — EXÉCUTION DU LOT 0.1 (HYGIÈNE ESLINT, BUILD VITE ET SOCLE TECHNIQUE)
+----------------------------------------------------------------------------------------------------
+- Date : 15/09/2026
+- Statut : SUCCÈS (FEU VERT UTILISATEUR VALIDÉ)
+- Description détaillée des travaux :
+  1. `frontend/src/App.jsx` :
+     - Élimination de l'import orphelin inutilisé `import Organisation from './pages/habilitations/Organisation'`.
+     - Résultat : Suppression du warning ESLint `no-unused-vars`.
+  2. `frontend/src/pages/habilitations/U5CycleVie.test.jsx` :
+     - Remplacement de `import apiMock, { apiController }` par `import { apiController }`.
+     - Résultat : Suppression du warning ESLint sur `apiMock`.
+  3. `frontend/src/pages/Edts.jsx` :
+     - Repositionnement de la directive `eslint-disable-next-line` immédiatement au-dessus du premier `useEffect`.
+     - Ajout de `chargerDetail` dans le tableau des dépendances du second `useEffect` (`[selectedId, semaine, vue, chargerDetail]`).
+     - Résultat : Suppression des 2 warnings ESLint `react-hooks/exhaustive-deps`.
+  4. Backend Django :
+     - Création du répertoire `backend/staticfiles/` avec `.gitkeep` pour satisfaire Whitenoise et éliminer
+       l'avertissement `UserWarning: No directory at: .../backend/staticfiles/`.
+- Résultats des contrôles :
+  * `npm run lint` : **0 erreur, 0 warning** (Score parfait).
+  * `npm run build` : **Build Vite réussi en 5.16s** (279 modules transformés, bundle de production dans `dist/`).
+  * Backend Django `check` : **0 issue** (System check identified no issues).
+  * Backend Django `makemigrations --check --dry-run` : **No changes detected** (modèles stables).
+
+
+====================================================================================================
+6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
+====================================================================================================
+À la suite de l'exécution du Lot 0.1, l'état des contrôles qualité est le suivant :
+
++-----------------------------+-------------------------------------------------------+-------------+
+| Contrôle                    | Commande / Outil                                      | Résultat    |
++-----------------------------+-------------------------------------------------------+-------------+
+| FEU 1 : BACKEND DJANGO      | `manage.py check --settings=arena.settings_sandbox`   | 🟢 VERT     |
+|                             | `manage.py makemigrations --check --dry-run`          | 🟢 VERT     |
+|                             | Intégrité de la base de données et des données démo   | 🟢 VERT     |
++-----------------------------+-------------------------------------------------------+-------------+
+| FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
+|                             | `npm run build` (production Vite)                     | 🟢 VERT     |
++-----------------------------+-------------------------------------------------------+-------------+
+| FEU 3 : MOBILE FLUTTER      | Traçabilité du code Dart                              | 🟡 TRACÉ    |
+|                             | Hors bac à sable (convention de relevé d'audit)       |             |
++-----------------------------+-------------------------------------------------------+-------------+
+| PORTS SERVEURS FIGÉS        | Frontend sur port 3000 / API sur port 8000            | 🟢 ACTIFS   |
++-----------------------------+-------------------------------------------------------+-------------+
+
+
+====================================================================================================
+7. PROCHAINES TÂCHES PLANIFIÉES ET FEUILLE DE ROUTE OPÉRATIONNELLE
+====================================================================================================
+La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
+
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 0 / LOT 0.2 :
+  Finalisation de l'intégration du module CURP-INJS (Comptes Utilisateurs, Rôles & Permissions) :
+  * Contrôle de la matrice des 12 rôles canoniques (N0 à N4) et raccordement complet de l'interface
+    de consultation / édition des comptes utilisateurs dans React (`frontend/src/pages/Users.jsx` et `habilitations/`).
+  * Vérification des endpoints d'attribution de rôle et journalisation immuable d'audit (`AuditLog`).
+
+- ÉTAPES ULTÉRIEURES (VAGUES 1 À 6) :
+  * Vague 1 : Référentiels géographiques et scolarité LMD (maquettes UE/ECUE, crédits ECTS).
+  * Vague 2 : Emplois du temps (GET-INJS) et badgeage par QR Code sécurisé.
+  * Vague 3 : Évaluations, jurys LMD et diplômation.
+  * Vague 4 : Finances étudiantes et vacations formateurs.
+  * Vague 5 : Domaines orphelins (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
+  * Vague 6 : Statistiques CPFAE 17 colonnes, BI et clôture de refonte.
+
+Ce fichier est mis à jour à chaque lot validé et reste consultable et téléchargeable en permanence.
+====================================================================================================
