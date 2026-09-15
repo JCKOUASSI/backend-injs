@@ -650,6 +650,24 @@ du garde-fou d'affichage React Suspense sur ScolariteDashboard :
 - Tests & Validation : `npm run build` réussi sans aucune erreur, rendu fluide et réactif.
 
 ====================================================================================================
+6.3 CORRECTION DE L'ALERTE « CHARGEMENT DES RÉFÉRENTIELS IMPOSSIBLE » (CAMPAGNES D'ADMISSION)
+====================================================================================================
+- Symptôme : Bannière rouge « Chargement des référentiels impossible » sur la vue Campagnes d'admission.
+- Analyse causale :
+  L'endpoint `/api/scolarite/ref/formations/` et `/api/scolarite/ref/salles/` renvoyaient une erreur HTTP 404
+  (« Référentiel inconnu ») car les ressources 'formations' et 'salles' n'étaient pas déclarées dans
+  le dictionnaire `REFERENTIEL_FIELDS` du module `scolarite.api_views`.
+- Actions correctives exécutées :
+  1. `backend/scolarite/api_views.py` : Déclaration explicite des modèles `RefFormation` et `RefSalle`
+     dans `REFERENTIEL_FIELDS` et `REFERENTIEL_FILTERS`.
+  2. `backend/scolarite/tests/test_referentiels.py` : Ajout des tests automatisés `test_liste_formations`
+     et `test_liste_salles` (32 tests exécutés avec succès).
+  3. `frontend/src/pages/scolarite/Campagnes.jsx` : Résolution des libellés conviviaux de formation et
+     d'année académique dans le tableau des campagnes (au lieu des simples identifiants numériques).
+  4. Validation directe : Requêtes HTTP GET `/api/scolarite/ref/formations/` et `/api/scolarite/ref/salles/`
+     retournent désormais le code 200 OK avec la liste complète des cycles et des salles.
+
+====================================================================================================
 7. CONCLUSION GÉNÉRALE ET BILAN DE LIVRAISON DE LA REFONTE INJS 2026
 ====================================================================================================
 L'intégralité du programme de mise à niveau de l'application INJS-LMD 2026 a été exécutée avec succès,
