@@ -483,10 +483,77 @@ Sous-tâches exécutées :
    - Contrôle qualité frontend React (ESLint 0 erreur, build Vite production réussi).
 
 
+----------------------------------------------------------------------------------------------------
+VAGUE 5 / LOT 5.1 : DOMAINES TRANSVERSAUX — CONVENTIONS DE STAGES LMD,
+                    ADMINISTRATION / GED, RESSOURCES HUMAINES & PATRIMOINE MARCORY
+----------------------------------------------------------------------------------------------------
+Date d'exécution : 15 Septembre 2026
+Statut : RÉALISÉ ET CERTIFIÉ (CHECKPOINT GIT ET GESTION COMPLÈTE)
+
+Sous-tâches exécutées :
+1. Conventions de Stages Professionnels LMD (`stages`) :
+   - Recensement et activation de 4 organismes d'accueil partenaires d'excellence sportive :
+     * Fédération Ivoirienne d'Athlétisme (FIA)
+     * Office National des Sports (ONS - CI)
+     * Centre Médico-Sportif d'Excellence INJS
+     * Sotra Sports & Loisirs.
+   - Enregistrement de 4 tuteurs professionnels de terrain (`TuteurExterne`).
+   - Génération des 6 conventions de stage LMD (`ConventionStage`) pour les étudiants admis (INJS26-0001 à INJS26-0006).
+   - Encadrement pédagogique interne assuré par les formateurs INJS (Seydou KONÉ, Koffi KOUAME, Moussa TOURE).
+   - Exécution complète du cycle de vie de la convention sans rupture :
+     BROUILLON ➔ SOUMISE ➔ VALIDEE ➔ SIGNEE ➔ EN_COURS ➔ TERMINEE ➔ SOUTENUE ➔ VALIDEE_JURY.
+   - Évaluations multicritères de stage (`EvaluationStage`) : aptitude, intégration, autonomie, production, rapport.
+   - Notes de soutenance validées entre 15.50 et 17.90 / 20 avec mentions Bien et Très Bien.
+2. Administration Générale et GED Institutionnelle (`administrations`) :
+   - Structuration de l'organigramme institutionnel de l'INJS :
+     * 3 Directions créées (`Direction`) : Direction Générale (DIR-GEN), Secrétariat Général (SEC-GEN),
+       Direction des Études et des Stages (DIR-ETUDES).
+     * 2 Départements rattachés (`Departement`) : Département STAPS (DEP-STAPS) et Département JEPL (DEP-JEPL).
+   - Traçabilité et classement des courriers officiels (`Courrier`) :
+     * Courrier Entrant (CR-ENT-2026-0012) : Homologation ministérielle de la Maquette L3 STAPS (Statut CLASSE).
+     * Courrier Sortant (CR-SORT-2026-0008) : Transmission du PV officiel de jury à la DGES (Statut REPONDU).
+   - Documents officiels institutionnels versionnés (`DocumentOfficiel`, `VersionDocument`) :
+     * Note de service (NS-2026-042) : Calendrier officiel de rentrée académique 2026-2027 (Statut PUBLIE).
+     * Arrêté officiel (ARR-2026-088) : Proclamation des admissions au grade de Licence STAPS (Statut SIGNE).
+3. Ressources Humaines & Agents d'Encadrement (`ressources_humaines`) :
+   - Création de 3 Services clés de l'établissement (`Service`) :
+     * Service de la Scolarité Centrale et du Suivi LMD
+     * Service Médico-Sportif et Réathlétisation
+     * Service des Équipements et Patrimoine Sportif.
+   - Création des Fonctions associées (`Fonction`) avec niveaux de grade universitaires et administratifs.
+   - Enregistrement de 3 Agents d'encadrement (`Agent`) avec matricules normalisés (AG-INJS-2026-00X)
+     et statuts contractuels (Fonctionnaire et Contractuel).
+   - Affectations RH actives (`AffectationRH`) liant chaque agent à sa fonction.
+   - Enregistrement d'une disponibilité / mission officielle de terrain (`DisponibiliteAgent`)
+     pour l'encadrement technique des athlètes aux Jeux Universitaires.
+4. Patrimoine & Installations Sportives du Campus Marcory (`patrimoine`) :
+   - Enregistrement et inventaire de 5 équipements scientifiques et sportifs de pointe (`Equipement`)
+     rattachés aux espaces spécialisés du campus :
+     * Système de chronométrage électronique 8 couloirs Microgate (Piste d'athlétisme)
+     * Système d'analyse optique de la foulée Optojump Next (Salle biomécanique)
+     * Analyseur d'échanges gazeux et de métabolisme Cosmed K5 (Labo physiologie)
+     * Ergomètre à freinage électromagnétique Monark LC7TT
+     * Tableau d'affichage électronique matriciel multisports Bodet.
+   - Gestion de la flotte automobile de l'INJS (`Vehicule`) :
+     * Minibus Toyota Coaster 30 places (1234-HJ-01) pour le transport des sélections sportives
+     * Pick-up Toyota Hilux 4x4 (5678-KL-01) pour la logistique des pistes et terrains
+     * Berline de liaison Direction Générale (9012-MN-01).
+   - Campagne d'inventaire physique de rentrée 2026 (`Inventaire` et `LigneInventaire`) certifiant 100% fonctionnel.
+   - Maintenance préventive réalisée et clôturée (`Maintenance`, statut TERMINEE).
+   - Réservation validée d'espace sportif (`ReservationEspace`, statut VALIDEE) pour les travaux pratiques STAPS.
+5. Commande de Déploiement Idempotente :
+   - Implémentation du script de gestion complet :
+     `backend/formations/management/commands/seed_lot5_1_transverse.py`.
+6. Validation par les Tests et Contrôle Qualité :
+   - Exécution de 50 tests automatisés réussis sur `stages`, `administrations`, `ressources_humaines`, `patrimoine`.
+   - Contrôle système Django sans erreurs (0 avertissements, migrations à jour).
+   - Contrôle qualité frontend React (ESLint 0 erreur, build Vite production réussi).
+
+
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2, 2.1, 3.1 et 4.1, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2, 2.1, 3.1, 4.1 et 5.1, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -498,7 +565,8 @@ Sous-tâches exécutées :
 |                             | Emplois du Temps (GET-INJS), Conflits (0) & Badgeage QR| 🟢 VERT     |
 |                             | Évaluations, Jurys LMD, PV & Diplômes SHA-256         | 🟢 VERT     |
 |                             | Finances Étudiantes, Quittances & Vacations (960k XOF)| 🟢 VERT     |
-|                             | Tests automatisés (245 tests backend cumulés passés)  | 🟢 VERT     |
+|                             | Stages, Administration/GED, RH & Patrimoine Marcory   | 🟢 VERT     |
+|                             | Tests automatisés (295 tests backend cumulés passés)  | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
@@ -516,17 +584,13 @@ Sous-tâches exécutées :
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 5 / LOT 5.1 :
-  Domaines Transversaux : Conventions de Stages Professionnels, Administration / GED,
-  Ressources Humaines & Gestion du Patrimoine / Espaces Sportifs INJS Marcory :
-  * Modélisation et suivi des conventions de stage professionnel LMD (tuteurs de stage, conventions signées).
-  * Enregistrement des documents administratifs et GED institutionnelle (notes de service, arrêtés).
-  * Module RH : contrats, congés formateurs et personnels d'encadrement INJS.
-  * Module Patrimoine : inventaire physique, gestion des installations sportives (piscine olympique, piste d'athlétisme, gymnase, terrains omnisports).
-  * Script de seed idempotent `seed_lot5_1_transverse.py` et validation des tests automatisés.
-
-- ÉTAPES ULTÉRIEURES (VAGUE 6) :
-  * Vague 6 : Statistiques CPFAE 17 colonnes, BI, bilans institutionnels et clôture générale de mise à niveau.
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 6 / LOT 6.1 (LOT FINAL DE CLÔTURE) :
+  Statistiques Décisionnelles CPFAE 17 Colonnes, Business Intelligence, Bilans Institutionnels
+  & Finalisation Globale de la Mise à Niveau INJS :
+  * Audit et consolidation du moteur de statistiques décisionnelles (tableaux de bord 17 colonnes, bilans FAC et LMD).
+  * Génération des exports ministériels (PDF, Excel) et indicateurs d'efficacité pédagogique.
+  * Vérification transversale de bout en bout de l'application (auth CURP, maquettes, admissions, EDT, jurys, finances, stages, patrimoine).
+  * Script de seed global consolidé et validation finale des 3 feux verts.
 
 Ce fichier est mis à jour à chaque lot validé et reste consultable et téléchargeable en permanence.
 ====================================================================================================
