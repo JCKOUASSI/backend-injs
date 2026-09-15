@@ -142,7 +142,36 @@ def ser_service(s, **kw):
         'departement': s.departement_id,
         'departement_libelle': s.departement.libelle if s.departement_id else '',
         'effectif': _effectif_comptes(s),
+        # Modèle 13.4 : unité feuille typée et imbriquable (bureau/unité/cellule
+        # rattachés à un service) — la hiérarchie n'est pas codée en dur.
+        'type_unite': s.type_unite,
+        'parent': s.parent_id,
+        'parent_libelle': s.parent.nom if s.parent_id else '',
+        'nb_sous_unites': s.sous_unites.count(),
     }, **kw)
+
+
+def _valider_parent_service(parent_id, soi=None):
+    """Existence du parent + refus de cycle (aucun niveau n'est figé : la
+    validation borne la profondeur et garantit l'absence de boucle)."""
+    if parent_id in (None, '', 0):
+        return None, None
+    vus = {soi} if soi else set()
+    chaine = set()
+    cur = parent_id
+    for _ in range(30):
+        if cur is None:
+            return None, None
+        if cur in vus:
+            return None, 'Rattachement circulaire refusé : une unité ne peut pas se contenir elle-même.'
+        vus.add(cur)
+        if cur in chaine:
+            return None, 'Rattachement circulaire refusé : une unité ne peut pas se contenir elle-même.'
+        chaine.add(cur)
+        if not Service.objects.filter(pk=cur).exists():
+            return None, 'Unité parente inconnue.'
+        cur = Service.objects.filter(pk=cur).values_list('parent_id', flat=True).first()
+    return None, 'Chaîne de rattachement trop longue (30 niveaux maximum).'
 
 
 def ser_secretariat(s, **kw):
@@ -185,6 +214,17 @@ def arbre(request):
                                    queryset=Departement.objects.filter(etat)
                                    .prefetch_related('services', 'secretariats')),
                           'secretariats'))
+    # Sous-unités (bureaux / unités / cellules) greffées récursivement sous leur
+    # service parent ; seul un service sans parent chapeaute un département.
+    pool = {s.id: s for s in Service.objects.filter(etat)}
+    enfants = {}
+    for s in pool.values():
+        if s.parent_id in pool:
+            enfants.setdefault(s.parent_id, []).append(s)
+
+    def _noeud(s):
+        return {**ser_service(s), 'sous_unites': [_noeud(e) for e in enfants.get(s.id, [])]}
+
     nodes = []
     seen_dep = set()
     for d in directions:
@@ -193,7 +233,7 @@ def arbre(request):
             seen_dep.add(dep.id)
             dep_nodes.append({
                 **ser_departement(dep),
-                'services': [ser_service(s) for s in dep.services.filter(etat)],
+                'services': [_noeud(s) for s in dep.services.filter(etat, parent__isnull=True)],
                 'secretariats': [ser_secretariat(s) for s in dep.secretariats.all()
                                  if show_inactive or s.actif],
             })
@@ -207,8 +247,9 @@ def arbre(request):
         'departements': [ser_departement(dep) for dep in
                          Departement.objects.filter(etat, direction__isnull=True)
                          if dep.id not in seen_dep],
-        'services': [ser_service(s) for s in
-                     Service.objects.filter(etat, departement__isnull=True)],
+        'services': [_noeud(s) for s in
+                     Service.objects.filter(etat, departement__isnull=True,
+                                            parent__isnull=True)],
         'secretariats': [ser_secretariat(s) for s in Secretariat.objects.all()
                          if (show_inactive or s.actif)
                          and s.direction_id is None and s.departement_id is None],
@@ -464,10 +505,17 @@ def services(request):
     adj, err = _valider_fk_utilisateur(data, 'adjoint_id')
     if err:
         return Response({'detail': err}, status=400)
+    type_unite = (data.get('type_unite') or 'SERVICE').upper()
+    if type_unite not in Service.TypeUnite.values:
+        return Response({'detail': 'Type d’unité inconnu (SERVICE, BUREAU, UNITE, CELLULE, AUTRE).'}, status=400)
+    _, err = _valider_parent_service(data.get('parent'))
+    if err:
+        return Response({'detail': err}, status=400)
     obj = Service.objects.create(
         nom=nom, code=(data.get('code') or '').strip()[:30],
         description=data.get('description') or '',
         departement_id=data.get('departement') or None,
+        type_unite=type_unite, parent_id=data.get('parent') or None,
         responsable_id=resp, adjoint_id=adj,
         telephone=(data.get('telephone') or '').strip()[:30],
         email=(data.get('email') or '').strip(),
@@ -499,7 +547,7 @@ def service_detail(request, pk):
         return Response({'detail': 'Seule la direction (DFRC) modifie l’organigramme.'}, status=403)
     avant = {c: getattr(obj, c) for c in
              ('nom', 'code', 'description', 'actif', 'departement_id',
-              'responsable_id', 'adjoint_id') + _UNIT_FIELDS}
+              'type_unite', 'parent_id', 'responsable_id', 'adjoint_id') + _UNIT_FIELDS}
     if 'nom' in data or 'libelle' in data:
         nom = (data.get('nom') or data.get('libelle') or '').strip()
         if not nom:
@@ -507,6 +555,17 @@ def service_detail(request, pk):
         if Service.objects.filter(nom=nom).exclude(pk=obj.pk).exists():
             return Response({'detail': f'Le service « {nom} » existe déjà.'}, status=400)
         obj.nom = nom
+    if 'type_unite' in data:
+        t = (data.get('type_unite') or 'SERVICE').upper()
+        if t not in Service.TypeUnite.values:
+            return Response({'detail': 'Type d’unité inconnu (SERVICE, BUREAU, UNITE, CELLULE, AUTRE).'}, status=400)
+        obj.type_unite = t
+    if 'parent' in data:
+        pid = data.get('parent') or None
+        _, err = _valider_parent_service(pid, soi=obj.pk)
+        if err:
+            return Response({'detail': err}, status=400)
+        obj.parent_id = pid
     for champ in ('description',):
         if champ in data:
             setattr(obj, champ, data.get(champ) or '')

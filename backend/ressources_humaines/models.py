@@ -19,6 +19,23 @@ class Service(models.Model):
 
     code = models.CharField(max_length=30, blank=True, default='', db_index=True,
                             help_text='Code court du service (ex. SCOL01).')
+    # Modèle 13.4 : la feuille de l'organigramme est typée et imbriquable —
+    # un SERVICE peut porter des BUREAUX / UNITÉS / CELLULES sans coder de
+    # niveau fixe (« représenter l'organisation réelle sans la figer »).
+    class TypeUnite(models.TextChoices):
+        SERVICE = 'SERVICE', 'Service'
+        BUREAU = 'BUREAU', 'Bureau'
+        UNITE = 'UNITE', 'Unité'
+        CELLULE = 'CELLULE', 'Cellule'
+        AUTRE = 'AUTRE', 'Autre'
+
+    type_unite = models.CharField(max_length=12, choices=TypeUnite.choices,
+                                  default=TypeUnite.SERVICE, verbose_name='Type d’unité')
+    parent = models.ForeignKey(
+        'self', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='sous_unites', verbose_name='Unité rattachante',
+        help_text='Pour les sous-unités (bureau, unité, cellule) d’un service.',
+    )
     nom = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True, default='')
     responsable = models.ForeignKey(

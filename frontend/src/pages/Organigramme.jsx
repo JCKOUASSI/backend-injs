@@ -32,7 +32,8 @@ const FORM_INITIAL = {
     telephone: '', email: '', localisation: '', actif: true, motif: '',
   }),
   services: () => ({
-    code: '', nom: '', departement: '', description: '', responsable_id: '', adjoint_id: '',
+    code: '', nom: '', type_unite: 'SERVICE', parent: '', departement: '', description: '',
+    responsable_id: '', adjoint_id: '',
     telephone: '', email: '', localisation: '', actif: true, motif: '',
   }),
   secretariats: () => ({
@@ -40,6 +41,21 @@ const FORM_INITIAL = {
     responsable_id: '', adjoint_id: '', telephone: '', email: '', localisation: '',
     actif: true, motif: '',
   }),
+}
+
+// Modèle 13.4 : sous-unités (bureau / unité / cellule) greffées sous leur
+// service parent — la hiérarchie n'a pas de profondeur codée en dur.
+function SousServices({ items }) {
+  if (!items || items.length === 0) return []
+  return items.map((u) => (
+    <NoeudArbre
+      key={`su-${u.id}`}
+      code={u.code}
+      libelle={`${u.type_unite && u.type_unite !== 'SERVICE' ? `${u.type_unite} — ` : ''}${u.nom || u.libelle}`}
+      effectif={u.effectif}
+      sousNoeuds={SousServices({ items: u.sous_unites })}
+    />
+  ))
 }
 
 function ResponsableBadge({ valeur }) {
@@ -221,7 +237,7 @@ export default function Organisation() {
   const colonnes = {
     directions: ['Code', 'Libellé', 'Responsable', 'Contact', 'Localisation', 'Départements', 'Comptes'],
     departements: ['Code', 'Libellé', 'Direction', 'Responsable', 'Contact', 'Services', 'Comptes'],
-    services: ['Code', 'Nom', 'Département', 'Responsable', 'Contact', 'Comptes'],
+    services: ['Code', 'Nom', 'Type', 'Unité parente', 'Département', 'Responsable', 'Contact', 'Comptes'],
     secretariats: ['Numéro', 'Nom', 'Type', 'Rattachement', 'Responsable', 'Participants', 'Modules'],
   }[onglet]
 
@@ -242,9 +258,18 @@ export default function Organisation() {
           <>
             <td><code>{ligne.code}</code></td>
             <td>
-              <strong>{ligne.libelle}</strong>{!ligne.actif && <span className="badge-bg-warning ms-2">inactif</span>}
+              <strong>{onglet === 'services' ? ligne.nom : ligne.libelle}</strong>{!ligne.actif && <span className="badge-bg-warning ms-2">inactif</span>}
               {ligne.description && <><br /><small className="text-muted">{ligne.description}</small></>}
             </td>
+            {onglet === 'services' && (
+              <td>
+                {ligne.type_unite && ligne.type_unite !== 'SERVICE'
+                  ? <span className="badge-bg-secondary">{ligne.type_unite}</span>
+                  : <span className="text-muted">service</span>}
+                {ligne.nb_sous_unites > 0 && <small className="ms-1 text-muted">({ligne.nb_sous_unites})</small>}
+              </td>
+            )}
+            {onglet === 'services' && <td>{ligne.parent_libelle || <span className="text-muted">—</span>}</td>}
             {onglet === 'departements' && <td>{ligne.direction_libelle || <span className="text-muted">autonome</span>}</td>}
             <td><ResponsableBadge valeur={ligne.responsable} /></td>
             <td>
@@ -325,6 +350,19 @@ export default function Organisation() {
                     <select className="input" value={form.direction || ''} onChange={set('direction')}>
                       <option value="">— autonome —</option>
                       {parents.directions.map((d) => <option key={d.id} value={d.id}>{d.libelle}</option>)}
+                    </select>
+                  ))}
+                  {onglet === 'services' && champ('type_unite', 'Type d’unité', (
+                    <select className="input" value={form.type_unite || 'SERVICE'} onChange={set('type_unite')}>
+                      {['SERVICE', 'BUREAU', 'UNITE', 'CELLULE', 'AUTRE'].map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  ))}
+                  {onglet === 'services' && champ('parent', 'Unité rattachante', (
+                    <select className="input" value={form.parent || ''} onChange={set('parent')}>
+                      <option value="">— aucune —</option>
+                      {lignes
+                        .filter((x) => x.id !== modal.editingId && !x.parent)
+                        .map((x) => <option key={x.id} value={x.id}>{x.nom}</option>)}
                     </select>
                   ))}
                   {onglet === 'services' && champ('departement', 'Département', (
@@ -457,7 +495,13 @@ export default function Organisation() {
                           effectif={dep.effectif}
                           sousNoeuds={[
                             ...(dep.services || []).map((s) => (
-                              <NoeudArbre key={`s-${s.id}`} code={s.code} libelle={s.libelle} effectif={s.effectif} />
+                              <NoeudArbre
+                          key={`s-${s.id}`}
+                          code={s.code}
+                          libelle={s.libelle}
+                          effectif={s.effectif}
+                          sousNoeuds={[<SousServices key={`ssv-${s.id}`} items={s.sous_unites} />]}
+                        />
                             )),
                             ...(dep.secretariats || []).map((s) => (
                               <NoeudArbre key={`ss-${s.id}`} code={s.numero} libelle={`Secrétariat — ${s.nom}`} effectif={s.nb_participants} />
@@ -480,7 +524,13 @@ export default function Organisation() {
                         <NoeudArbre key={`nd-${d.id}`} code={d.code} libelle={d.libelle} effectif={d.effectif} />
                       )),
                       ...(arbres.non_rattaches.services || []).map((s) => (
-                        <NoeudArbre key={`ns-${s.id}`} code={s.code} libelle={s.nom} effectif={s.effectif} />
+                        <NoeudArbre
+                          key={`ns-${s.id}`}
+                          code={s.code}
+                          libelle={s.nom}
+                          effectif={s.effectif}
+                          sousNoeuds={[<SousServices key={`ssv-${s.id}`} items={s.sous_unites} />]}
+                        />
                       )),
                       ...(arbres.non_rattaches.secretariats || []).map((s) => (
                         <NoeudArbre key={`nse-${s.id}`} code={s.numero} libelle={`Secrétariat — ${s.nom}`} effectif={s.nb_participants} />

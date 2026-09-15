@@ -131,6 +131,53 @@ class OrganigrammeDirectionCrudTests(APITestCase):
         direction.refresh_from_db()
         self.assertEqual(direction.libelle, 'Directions des Enseignements')
         self.assertEqual(direction.email, 'ep@injs.ci')
+    # --- Modèle 13.4 : unités feuilles typées et imbriquables -------------------
+
+    def test_sous_unite_imbriquee_dans_l_arbre(self):
+        self.client.force_login(self.admin)
+        direction = self.client.post(f'{BASE}/directions/', {'code': 'DP', 'libelle': 'DP'},
+                                     format='json').data
+        dep = self.client.post(f'{BASE}/departements/', {
+            'code': 'DPE', 'libelle': 'Département examens',
+            'direction': direction['id'],
+        }, format='json').data
+        racine = self.client.post(f'{BASE}/services/', {'nom': 'Service des examens',
+                                                         'departement': dep['id']},
+                                  format='json').data
+        bureau = self.client.post(f'{BASE}/services/', {
+            'nom': 'Bureau des délibérations', 'type_unite': 'BUREAU', 'parent': racine['id'],
+        }, format='json').data
+        detail = self.client.get(f'{BASE}/services/{bureau["id"]}/').data
+        self.assertEqual(detail['type_unite'], 'BUREAU')
+        self.assertEqual(detail['parent'], racine['id'])
+        arbre = self.client.get(f'{BASE}/arbre/').data
+        noeud_dep = arbre['directions'][0]['departements'][0]
+        # Seule l'unité racine chapeaute le département ; le bureau est greffé
+        # sous son service parent.
+        self.assertEqual([s['nom'] for s in noeud_dep['services']], ['Service des examens'])
+        self.assertEqual(noeud_dep['services'][0]['nb_sous_unites'], 1)
+        self.assertEqual(noeud_dep['services'][0]['sous_unites'][0]['nom'],
+                         'Bureau des délibérations')
+
+    def test_rattachement_circulaire_refuse(self):
+        self.client.force_login(self.admin)
+        pere = self.client.post(f'{BASE}/services/', {'nom': 'Service parent'},
+                                format='json').data
+        fils = self.client.post(f'{BASE}/services/', {'nom': 'Unité enfant', 'parent': pere['id']},
+                                format='json').data
+        rep = self.client.patch(f'{BASE}/services/{pere["id"]}/', {'parent': fils['id']},
+                                format='json')
+        self.assertEqual(rep.status_code, 400)
+        self.assertIn('circulaire', rep.data['detail'])
+
+    def test_type_inconnu_et_parent_inexistant_refuses(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.post(f'{BASE}/services/',
+                                          {'nom': 'Service bizare', 'type_unite': 'MAGASIN'},
+                                          format='json').status_code, 400)
+        self.assertEqual(self.client.post(f'{BASE}/services/',
+                                          {'nom': 'Service orphelin', 'parent': 999999},
+                                          format='json').status_code, 400)
 
 
 class OrganigrammeSecretariatRattachementTests(APITestCase):

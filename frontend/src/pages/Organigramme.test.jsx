@@ -120,6 +120,32 @@ describe('Écran Organigramme (lot A — refonte « Secrétariats »)', () => {
     await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith(`${BASE}/directions/2/`))
   })
 
+  it('greffe les sous-unités (bureau/unité/cellule) sous leur service dans l’arbre', async () => {
+    // Modèle 13.4 : le service de premier niveau chapeaute le département et
+    // ses sous-unités apparaissent en enfants, typées.
+    const servicesArbre = [{ ...SERVICES[0], nb_sous_unites: 1, sous_unites: [{
+      id: 8, code: 'BD', nom: 'Bureau des délibérations', libelle: 'Bureau des délibérations',
+      type_unite: 'BUREAU', effectif: 0, sous_unites: [],
+    }] }]
+    // Le mock résout au premier enregistrement : on repart d'un contrôleur
+    // vierge et on pose l'arbre enrichi avant les routes par défaut.
+    apiController.reset()
+    apiController.setRoute(`${BASE}/arbre/`, {
+      directions: [{
+        ...DIRECTIONS[0],
+        departements: [{ ...DEPARTEMENTS[0], services: servicesArbre, secretariats: [] }],
+        secretariats: [],
+      }],
+      non_rattaches: { departements: [], services: [], secretariats: [] },
+    })
+    routes()
+    rendre()
+    await waitFor(() => expect(screen.getByText('Direction Générale')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /Arbre/ }))
+    expect(await screen.findByText('Service Scolarité')).toBeInTheDocument()
+    expect(await screen.findByText(/BUREAU — Bureau des délibérations/)).toBeInTheDocument()
+  })
+
   it('masque les boutons d’action aux non-DFRC', async () => {
     rendre({ role: 'SECRETARIAT' })
     await waitFor(() => expect(screen.getByText('Direction Générale')).toBeInTheDocument())

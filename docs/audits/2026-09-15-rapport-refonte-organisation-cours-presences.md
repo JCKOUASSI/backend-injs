@@ -24,8 +24,13 @@ rapport de mise en œuvre (zéro régression, D1-D5), audit du 11/09.
   chaîne immuable `journaliser` (actions `ORGANISATION_CREEE/MODIFIEE/DESACTIVEE`).
 - **Console CURP** : les trois écrans `organisation_*` exposent désormais les nouveaux
   champs (lecture) ; leurs routes sont inchangées.
+- **Unités feuilles typées et imbriquables (13.4)** : un service porte un
+  `type_unite` (SERVICE / BUREAU / UNITÉ / CELLULE / AUTRE) et peut être rattaché à un
+  autre service (`parent`, garde anti-cycle, 30 niveaux max) — l'organisation réelle
+  de l'INJS se modélise sans coder de profondeur en dur ; l'arbre de l'écran greffe
+  récursivement les sous-unités sous leur parent.
 - **Frontend** : nouvel écran `/organisation` à quatre onglets (liste + arbre, CRUD
-  modal, réactivation des unités inactives). L'entrée de menu **« Secrétariats » est
+  modal incluant type et unité rattachante, réactivation des unités inactives). L'entrée de menu **« Secrétariats » est
   remplacée** par « Directions / Départements / Services » ; `/secretariats` redirige
   vers l'onglet secrétariats et l'écran historique reste monté sur
   `/secretariats/historique` (pont de rétrocompatibilité). Catalogue CURP : codes
