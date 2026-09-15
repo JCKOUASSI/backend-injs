@@ -1,6 +1,7 @@
 """API des affectations de groupe, réinscriptions et événements de scolarité."""
 
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -143,10 +144,37 @@ def repartition_automatique(request):
     })
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
 def reinscrire(request):
-    """Réinscrit un étudiant existant pour une nouvelle année académique."""
+    """Réinscrit un étudiant existant pour une nouvelle année académique (POST),
+
+    ou liste les réinscriptions, transferts et réorientations enregistrés (GET).
+    """
+    if request.method == 'GET':
+        from .inscription_api import _inscription_queryset, _serialize_inscription
+
+        queryset = _inscription_queryset()
+        type_param = request.query_params.get('type_inscription')
+        if type_param:
+            queryset = queryset.filter(type_inscription=type_param)
+        else:
+            # Exclut les premières inscriptions simples par défaut
+            queryset = queryset.exclude(type_inscription=InscriptionAdministrative.Type.PREMIERE)
+
+        for champ in ('statut', 'annee_academique_id', 'ref_formation_id', 'niveau_id', 'etudiant_id'):
+            if champ in request.query_params:
+                queryset = queryset.filter(**{champ: request.query_params[champ]})
+
+        recherche = request.query_params.get('search') or request.query_params.get('q')
+        if recherche:
+            queryset = queryset.filter(
+                Q(etudiant__participant__matricule__icontains=recherche)
+                | Q(etudiant__participant__nom__icontains=recherche)
+                | Q(etudiant__participant__prenom__icontains=recherche)
+            )
+        return Response([_serialize_inscription(i) for i in queryset[:500]])
+
     etudiant = DossierEtudiant.objects.select_related('statut', 'participant').filter(
         pk=request.data.get('etudiant_id'),
     ).first()

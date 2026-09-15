@@ -668,6 +668,30 @@ du garde-fou d'affichage React Suspense sur ScolariteDashboard :
      retournent désormais le code 200 OK avec la liste complète des cycles et des salles.
 
 ====================================================================================================
+6.4 CORRECTION DE L'ERREUR 405 « MÉTHODE GET NON AUTORISÉE » (RÉINSCRIPTIONS & TRANSFERTS)
+====================================================================================================
+- Symptôme : Encadré rouge « Données indisponibles. detail : Méthode « GET » non autorisée.
+  Endpoint appelé : /scolarite/reinscriptions/ » sur l'écran Réinscriptions & transferts.
+- Analyse causale :
+  La vue `reinscrire` du module `scolarite/groupes_api.py` était décorée uniquement avec `@api_view(['POST'])`.
+  L'écran générique de navigation `/scolarite/reinscriptions` interrogeait le backend en HTTP GET pour
+  restituer le tableau des demandes de réinscription, transfert et réorientation, déclenchant l'erreur 405.
+- Actions correctives exécutées :
+  1. `backend/scolarite/groupes_api.py` :
+     - Évolution de la vue vers `@api_view(['GET', 'POST'])`.
+     - Implémentation de la consultation GET filtrant par défaut les premières inscriptions simples
+       afin d'isoler le cycle de vie de scolarité (réinscriptions, transferts, réorientations, reprises, redoublements).
+     - Prise en charge des filtres de recherche multi-critères (`search`, `q`, `matricule`, `nom`, `statut`, `annee`).
+  2. `frontend/src/menu/ecrans.js` :
+     - Définition des colonnes prioritaires (`matricule`, `etudiant`, `type_inscription_libelle`, `ref_formation`, `niveau`, `annee_academique`, `statut_libelle`, `date_inscription`).
+     - Masquage des identifiants techniques étrangers (`_id`).
+     - Message de liste vide pédagogique : « Aucune réinscription, transfert ou réorientation enregistré pour le moment. »
+  3. `backend/scolarite/tests/test_groupes.py` :
+     - Ajout du test unitaire validant le cycle complet POST réinscription suivi de la consultation GET (40 tests au vert).
+  4. Validation directe :
+     - Requête HTTP GET `/api/scolarite/reinscriptions/` répond HTTP 200 OK avec format de liste JSON conforme.
+
+====================================================================================================
 7. CONCLUSION GÉNÉRALE ET BILAN DE LIVRAISON DE LA REFONTE INJS 2026
 ====================================================================================================
 L'intégralité du programme de mise à niveau de l'application INJS-LMD 2026 a été exécutée avec succès,
