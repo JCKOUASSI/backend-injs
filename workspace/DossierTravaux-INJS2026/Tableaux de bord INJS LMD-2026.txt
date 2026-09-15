@@ -1,0 +1,782 @@
+Oui. Pour INJS-LMD, je recommande de ne pas avoir un seul « Dashboard », mais une architecture de tableaux de bord par profil, métier et niveau de pilotage. Cela permet de respecter les rôles RBAC tout en donnant à chaque acteur uniquement les informations utiles.
+
+1. Architecture globale des tableaux de bord INJS-LMD
+
+Je propose 14 tableaux de bord principaux, regroupés en 4 niveaux :
+
+Niveau A — Pilotage institutionnel
+
+1. Dashboard Direction Générale / Pilotage INJS
+2. Dashboard Direction des Études / Scolarité
+3. Dashboard Qualité & Audit
+
+Niveau B — Gestion académique LMD
+
+4. Dashboard Scolarité LMD
+5. Dashboard Admissions & Concours
+6. Dashboard Étudiants
+7. Dashboard Enseignants
+8. Dashboard Formations & Référentiels
+9. Dashboard Cours & Groupes
+10. Dashboard Évaluations, Jurys & Diplômation
+
+Niveau C — Gestion opérationnelle
+
+11. Dashboard Emplois du Temps — GET-INJS
+12. Dashboard Présences & QR
+13. Dashboard Stages
+14. Dashboard Finances étudiantes
+
+Et je recommande également des dashboards spécialisés accessibles depuis les modules RH, Administration/Patrimoine et Sécurité, plutôt que de les mélanger au Dashboard académique.
+
+⸻
+
+2. Dashboard Direction Générale / Pilotage INJS
+
+C’est le cockpit stratégique de l’établissement.
+
+KPIs principaux
+
+Indicateur	Exemple
+Étudiants inscrits	1 248
+Candidats	2 436
+Admis	1 420
+Taux d’admission	58,3 %
+Enseignants actifs	126
+Formations	18
+Groupes pédagogiques	64
+Cours actifs	312
+Taux de présence	87,4 %
+Étudiants en stage	428
+Diplômables	186
+Diplômés	174
+
+Visualisations
+
+* évolution des effectifs sur 5 ans ;
+* effectifs par formation ;
+* Licence / Master / Doctorat ;
+* répartition hommes/femmes ;
+* taux de réussite ;
+* taux d’abandon ;
+* taux de diplomation ;
+* performance par promotion ;
+* charge d’enseignement ;
+* occupation des salles ;
+* situation financière ;
+* stages ;
+* alertes institutionnelles.
+
+Bloc « Alertes Direction »
+
+Exemples :
+
+🔴 18 étudiants avec dossier incomplet
+🟠 7 groupes sans enseignant affecté
+🟠 12 cours avec volume horaire incomplet
+🔴 4 jurys non finalisés
+🟢 94 % des inscriptions validées
+
+⸻
+
+3. Dashboard Direction des Études / Scolarité
+
+C’est le centre de pilotage académique.
+
+KPIs
+
+* candidatures ;
+* admissions ;
+* inscriptions ;
+* réinscriptions ;
+* étudiants actifs ;
+* dossiers incomplets ;
+* groupes pédagogiques ;
+* formations ;
+* enseignements ;
+* résultats ;
+* diplômables.
+
+Widgets
+
+Flux étudiant
+
+Candidature → Sélection → Admission → Inscription → Enseignement → Évaluation → Jury → Diplôme
+
+Chaque étape affiche :
+
+* nombre ;
+* pourcentage ;
+* anomalies ;
+* évolution.
+
+Actions rapides
+
+* Nouvelle campagne ;
+* vérifier dossiers ;
+* traiter admissions ;
+* inscrire étudiant ;
+* créer groupe ;
+* affecter enseignant ;
+* ouvrir session ;
+* lancer jury ;
+* préparer diplomation.
+
+⸻
+
+4. Dashboard Qualité & Audit
+
+Il est particulièrement important pour une application institutionnelle.
+
+KPIs
+
+* anomalies ouvertes ;
+* anomalies critiques ;
+* actions correctives ;
+* contrôles réalisés ;
+* conformité RBAC ;
+* événements de sécurité ;
+* actions administratives ;
+* traçabilité.
+
+Blocs
+
+Qualité académique
+
+* taux de réussite ;
+* taux d’abandon ;
+* taux de validation UE ;
+* taux de validation ECUE ;
+* taux de diplomation.
+
+Qualité administrative
+
+* dossiers incomplets ;
+* délais moyens ;
+* opérations rejetées ;
+* corrections.
+
+Audit
+
+* qui a fait quoi ;
+* quand ;
+* sur quelle donnée ;
+* ancienne valeur ;
+* nouvelle valeur.
+
+⸻
+
+5. Dashboard Scolarité LMD
+
+C’est probablement le Dashboard métier le plus utilisé.
+
+KPIs
+
+* Candidatures
+* Admissions
+* Inscriptions
+* Réinscriptions
+* Étudiants actifs
+* Dossiers incomplets
+* Cartes/identifiants
+* Groupes pédagogiques
+* Diplômables
+
+Vue par cycle
+
+LICENCE
+L1 ─── 320
+L2 ─── 287
+L3 ─── 245
+MASTER
+M1 ─── 180
+M2 ─── 156
+DOCTORAT
+D1 ─── 42
+D2 ─── 31
+D3 ─── 18
+
+Alertes
+
+* étudiants non inscrits ;
+* pièces manquantes ;
+* paiements non régularisés ;
+* étudiants sans groupe ;
+* étudiants sans UE ;
+* étudiants potentiellement diplômables.
+
+⸻
+
+6. Dashboard Admissions & Concours
+
+Pipeline
+
+CANDIDATURES
+      ↓
+DOSSIERS CONTRÔLÉS
+      ↓
+CANDIDATS ÉLIGIBLES
+      ↓
+CONCOURS
+      ↓
+RÉSULTATS
+      ↓
+ADMIS
+      ↓
+INSCRIPTION
+
+KPIs
+
+* candidats ;
+* dossiers reçus ;
+* dossiers validés ;
+* dossiers rejetés ;
+* candidats convoqués ;
+* présents ;
+* absents ;
+* admissibles ;
+* admis ;
+* liste principale ;
+* liste d’attente.
+
+Graphiques
+
+* candidats par formation ;
+* candidats par sexe ;
+* candidats par âge ;
+* origine géographique ;
+* taux de sélection ;
+* taux de conversion candidature → inscription.
+
+⸻
+
+7. Dashboard Étudiants
+
+Le tableau de bord de l’étudiant doit être beaucoup plus simple.
+
+Carte principale
+
+Jean Kouassi
+
+Master 1
+Management du Sport
+Année académique 2026–2027
+Groupe : M1-MS-A
+
+KPIs
+
+* crédits obtenus ;
+* crédits restants ;
+* moyenne générale ;
+* assiduité ;
+* UE validées ;
+* UE à valider ;
+* stage ;
+* situation financière.
+
+Timeline LMD
+
+✓ Admission
+✓ Inscription
+✓ Semestre 1
+✓ Semestre 2
+→ Stage
+○ Soutenance
+○ Jury
+○ Diplôme
+
+Actions
+
+* consulter emploi du temps ;
+* consulter notes ;
+* télécharger certificat ;
+* consulter présence ;
+* consulter situation financière ;
+* consulter stage ;
+* documents scolaires.
+
+⸻
+
+8. Dashboard Enseignants
+
+KPIs
+
+* cours affectés ;
+* groupes ;
+* étudiants ;
+* volume horaire ;
+* CM ;
+* TD ;
+* TP ;
+* évaluations ;
+* absences à traiter.
+
+Exemple
+
+ENSEIGNEMENTS
+CM       42 h
+TD       28 h
+TP       16 h
+TOTAL    86 h
+
+Actions
+
+* consulter groupes ;
+* consulter cours ;
+* saisir notes ;
+* consulter présences ;
+* lancer appel ;
+* consulter EDT ;
+* déposer documents ;
+* consulter étudiants.
+
+⚠️ Conformément à ton modèle INJS-LMD, l’enseignant ne doit pas être directement attaché à une salle ou à un module. L’affectation doit passer par l’enseignement/groupe/EDT.
+
+⸻
+
+9. Dashboard Formations & Référentiels
+
+KPIs
+
+* formations ;
+* parcours ;
+* niveaux ;
+* semestres ;
+* UE ;
+* ECUE ;
+* crédits ECTS ;
+* coefficients ;
+* volumes horaires.
+
+Vue LMD
+
+FORMATION
+   │
+   ├── L1
+   │    ├── S1
+   │    └── S2
+   │
+   ├── L2
+   │    ├── S3
+   │    └── S4
+   │
+   └── L3
+        ├── S5
+        └── S6
+
+Contrôles
+
+* UE sans ECUE ;
+* ECUE sans coefficient ;
+* UE sans crédits ;
+* volume horaire incohérent ;
+* formation inactive ;
+* référentiel incomplet.
+
+⸻
+
+10. Dashboard Cours & Groupes
+
+KPIs
+
+* cours actifs ;
+* groupes ;
+* étudiants ;
+* enseignants ;
+* CM ;
+* TD ;
+* TP ;
+* volumes horaires.
+
+Vue groupe
+
+M1 — Management du Sport
+──────────────────────────
+Étudiants       34
+Enseignants      8
+UE              12
+Cours           18
+VH              420 h
+Présence       91 %
+
+Alertes
+
+* groupe sans enseignant ;
+* groupe sans EDT ;
+* cours sans volume horaire ;
+* cours sans enseignant ;
+* étudiant sans groupe.
+
+⸻
+
+11. Dashboard Évaluations → Jurys → Diplômation
+
+Celui-ci doit représenter la fin du cycle LMD.
+
+Pipeline
+
+ÉVALUATIONS
+     ↓
+NOTES
+     ↓
+CALCUL RÉSULTATS
+     ↓
+DÉLIBÉRATION
+     ↓
+JURY
+     ↓
+DIPLÔMABLE
+     ↓
+DIPLÔME
+
+KPIs
+
+* évaluations ;
+* notes saisies ;
+* notes manquantes ;
+* moyennes ;
+* UE validées ;
+* étudiants ajournés ;
+* étudiants admis ;
+* diplômables ;
+* diplômes générés.
+
+Dashboard Jury
+
+* jury ;
+* membres ;
+* session ;
+* étudiants ;
+* moyennes ;
+* décisions ;
+* PV ;
+* signatures ;
+* statut du jury.
+
+⸻
+
+12. Dashboard GET-INJS — Emplois du temps
+
+Je recommande que GET-INJS soit clairement visible dans l’écosystème INJS-LMD, mais comme application spécialisée.
+
+KPIs
+
+* séances aujourd’hui ;
+* cours programmés ;
+* salles occupées ;
+* enseignants programmés ;
+* groupes programmés ;
+* conflits ;
+* heures CM ;
+* heures TD ;
+* heures TP.
+
+Vue « Aujourd’hui »
+
+08:00 ─ CM ─ M1 ─ Salle A
+10:00 ─ TD ─ L3 ─ Salle C
+13:00 ─ TP ─ L2 ─ Salle B
+15:00 ─ CM ─ M2 ─ Salle A
+
+Détection automatique
+
+🔴 Enseignant en conflit
+🔴 Salle en conflit
+🔴 Groupe en conflit
+🟠 Volume horaire dépassé
+
+⸻
+
+13. Dashboard Présences & QR
+
+KPIs
+
+* présence globale ;
+* absences ;
+* retards ;
+* étudiants à risque ;
+* cours aujourd’hui ;
+* séances réalisées.
+
+Exemple
+
+Présence globale       87,4 %
+Présents               1 092
+Absents                   156
+Retards                   38
+
+Analyse
+
+* présence par formation ;
+* présence par groupe ;
+* présence par étudiant ;
+* présence par enseignant ;
+* présence par cours ;
+* évolution hebdomadaire.
+
+Alertes
+
+⚠️ Étudiant ayant dépassé le seuil d’absence.
+
+⸻
+
+14. Dashboard Stages
+
+KPIs
+
+* étudiants en stage ;
+* stages à rechercher ;
+* stages validés ;
+* conventions ;
+* stages en cours ;
+* stages terminés ;
+* rapports reçus ;
+* soutenances.
+
+Pipeline
+
+Recherche
+   ↓
+Affectation
+   ↓
+Convention
+   ↓
+Stage
+   ↓
+Évaluation
+   ↓
+Rapport
+   ↓
+Soutenance
+   ↓
+Validation
+
+⸻
+
+15. Dashboard Finances étudiantes
+
+KPIs
+
+* recettes ;
+* paiements ;
+* impayés ;
+* exonérations ;
+* échéances ;
+* étudiants bloqués ;
+* taux de recouvrement.
+
+Vue étudiant
+
+Frais académiques      500 000 F
+Déjà payé              350 000 F
+Solde                  150 000 F
+Statut : PARTIELLEMENT PAYÉ
+
+Alertes
+
+* échéance dépassée ;
+* paiement incomplet ;
+* anomalie de paiement ;
+* remboursement à traiter.
+
+⸻
+
+16. Dashboards Administration / RH / Patrimoine
+
+Je recommande trois sous-dashboards spécialisés.
+
+RH
+
+* agents ;
+* enseignants ;
+* contrats ;
+* affectations ;
+* absences ;
+* charge horaire ;
+* effectifs par service.
+
+Administration
+
+* courriers ;
+* documents ;
+* décisions ;
+* demandes ;
+* workflows ;
+* dossiers administratifs.
+
+Patrimoine
+
+* salles ;
+* équipements ;
+* matériels ;
+* disponibilités ;
+* incidents ;
+* maintenance.
+
+⸻
+
+17. Design INJS-LMD recommandé
+
+Je recommande une identité visuelle commune à tous les dashboards, plutôt que de créer une interface différente pour chaque module.
+
+Palette
+
+Bleu INJS foncé
+#0B1F3A
+Bleu institutionnel
+#123E6A
+Bleu clair
+#2F80ED
+Bleu très clair
+#EAF4FF
+Fond
+#F4F7FB
+Blanc verre
+rgba(255,255,255,0.65)
+
+Glassmorphism
+
+Les cartes doivent avoir :
+
+background:
+rgba(255,255,255,0.60)
+backdrop-filter:
+blur(18px)
+border:
+1px solid rgba(255,255,255,0.45)
+border-radius:
+18px
+box-shadow:
+0 8px 30px rgba(11,31,58,0.08)
+
+⸻
+
+18. Structure visuelle recommandée
+
+┌──────────────────────────────────────────────────────────────┐
+│  INJS-LMD       🔍 Recherche      🔔      👤 Administrateur │
+├──────────────┬───────────────────────────────────────────────┤
+│              │                                               │
+│  TABLEAU     │  Bonjour, Administrateur                     │
+│  DE BORD     │  Année académique 2026–2027                  │
+│              │                                               │
+│  Scolarité   │ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │
+│  Admissions  │ │1 248   │ │2 436   │ │  126   │ │ 87,4%  │ │
+│  Étudiants   │ │Étudiants│ │Candidats│ │Enseig.│ │Présence│ │
+│  Enseignants │ └────────┘ └────────┘ └────────┘ └────────┘ │
+│  Formations  │                                               │
+│  Cours       │ ┌─────────────────────┐ ┌─────────────────┐ │
+│  EDT         │ │ Évolution effectifs │ │ Alertes         │ │
+│  Présences   │ │                     │ │ 🔴 4 jurys      │ │
+│  Notes       │ │       📈            │ │ 🟠 12 cours     │ │
+│  Jurys       │ │                     │ │ 🟢 94% dossiers │ │
+│  Diplômes    │ └─────────────────────┘ └─────────────────┘ │
+│  Stages      │                                               │
+│  Finances    │ ┌───────────────────────────────────────────┐ │
+│  Rapports    │ │ Parcours LMD                              │ │
+│              │ │ Candidature → Admission → Inscription ... │ │
+└──────────────┴───────────────────────────────────────────────┘
+
+⸻
+
+19. Sidebar INJS-LMD recommandée
+
+🏠  Tableau de bord
+🎓 SCOLARITÉ
+   ├── Candidatures
+   ├── Admissions
+   ├── Étudiants
+   ├── Inscriptions
+   └── Groupes pédagogiques
+📚 ACADÉMIQUE
+   ├── Formations
+   ├── Référentiels
+   ├── Cours
+   ├── Enseignants
+   ├── Évaluations
+   ├── Notes
+   ├── Jurys
+   └── Diplômation
+🗓️ ORGANISATION
+   ├── GET-INJS
+   ├── Emplois du temps
+   ├── Salles
+   └── Volumes horaires
+📍 PRÉSENCES
+   ├── QR Présences
+   ├── Séances
+   ├── Absences
+   └── Statistiques
+🎓 INSERTION
+   └── Stages
+💰 FINANCES
+   ├── Frais étudiants
+   ├── Paiements
+   └── Impayés
+🏢 ADMINISTRATION
+   ├── Administration
+   ├── RH
+   └── Patrimoine
+📊 PILOTAGE
+   ├── Statistiques
+   ├── Rapports
+   └── Qualité & Audit
+⚙️ SYSTÈME
+   ├── Utilisateurs
+   ├── Rôles & permissions
+   ├── Sécurité
+   └── Paramètres
+
+⸻
+
+20. Principe UX essentiel : le dashboard dépend du rôle
+
+Il ne faut pas afficher les 14 dashboards à tout le monde.
+
+Par exemple :
+
+Profil	Dashboard principal
+Direction générale	Pilotage INJS
+Direction des études	Scolarité LMD
+Scolarité	Scolarité LMD
+Admission	Admissions
+Enseignant	Enseignant
+Étudiant	Étudiant
+Responsable formation	Formations
+Responsable pédagogique	Cours & Groupes
+Responsable EDT	GET-INJS
+Responsable présence	Présences
+Responsable stages	Stages
+Finance	Finances
+RH	RH
+Administration	Administration
+Auditeur	Qualité & Audit
+
+Ainsi, le même /dashboard peut charger dynamiquement le bon cockpit selon le rôle RBAC.
+
+⸻
+
+Architecture cible
+
+Je conseille finalement cette organisation :
+
+                    ┌───────────────────────┐
+                    │      INJS-LMD         │
+                    │   DASHBOARD ENGINE    │
+                    └───────────┬───────────┘
+                                │
+          ┌─────────────────────┼─────────────────────┐
+          │                     │                     │
+     PILOTAGE               ACADÉMIQUE           OPÉRATIONNEL
+          │                     │                     │
+      Direction             Scolarité              GET-INJS
+      Statistiques          Admissions              Présences
+      Qualité               Étudiants               Stages
+                            Enseignants              Finances
+                            Formations
+                            Cours
+                            Évaluations
+                            Jurys
+                            Diplômation
+
+Point important pour ton projet actuel : je ferais de cette architecture la référence UX/UI de app-injs-lmd2026, avec un shell unique React/Flutter, des composants DashboardCard, KpiCard, GlassPanel, AlertPanel, TrendChart, ProgressRing, LmdPipeline et RoleDashboard, puis chaque module fournit ses données. Cela évite notamment de reproduire de gros dashboards monolithiques et facilite l’intégration RBAC + API Django.
