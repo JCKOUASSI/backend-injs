@@ -224,6 +224,82 @@ for code, vals in SEUILS_DEMO.items():
     _, c = ConfigAlerteSeuil.objects.get_or_create(indicateur=code, defaults={**vals, 'actif': True})
     if c: print(f"    ✓ Seuil {code}")
 
+# ── 9. GET-INJS — référentiels minimaux pour la démo des emplois du temps ───
+# L'audit du 2026-09-15 a montré que la base de démo ne permettait pas de créer
+# un seul EDT (aucune année académique, aucun créneau type) : l'écran de
+# création renvoyait une erreur de référence. Ce bloc est idempotent.
+print("  Données de démonstration GET-INJS (années, créneaux types, EDT d'exemple)…")
+from datetime import date as _date
+from scolarite.models import AnneeAcademique as _Annee
+from edts.models import (
+    CreneauTemplate as _Creneau, EmploiDuTemps as _EDT, AffectationCreneau as _Aff,
+)
+
+_annee, c = _Annee.objects.get_or_create(
+    libelle='2026-2027',
+    defaults={'date_debut': _date(2026, 10, 1), 'date_fin': _date(2027, 7, 31),
+              'courante': True},
+)
+if c: print("    ✓ Année académique 2026-2027 (courante)")
+
+_CANEVAS = [
+    ('LUNDI', '08:00', '10:00'), ('LUNDI', '10:00', '12:00'),
+    ('LUNDI', '14:00', '16:00'), ('LUNDI', '16:00', '18:00'),
+    ('MARDI', '08:00', '10:00'), ('MARDI', '10:00', '12:00'),
+    ('MARDI', '14:00', '16:00'), ('MARDI', '16:00', '18:00'),
+    ('MERCREDI', '08:00', '10:00'), ('MERCREDI', '10:00', '12:00'),
+    ('MERCREDI', '14:00', '16:00'), ('MERCREDI', '16:00', '18:00'),
+    ('JEUDI', '08:00', '10:00'), ('JEUDI', '10:00', '12:00'),
+    ('JEUDI', '14:00', '16:00'), ('JEUDI', '16:00', '18:00'),
+    ('VENDREDI', '08:00', '10:00'), ('VENDREDI', '10:00', '12:00'),
+    ('VENDREDI', '14:00', '16:00'), ('VENDREDI', '16:00', '18:00'),
+    ('SAMEDI', '08:00', '10:00'), ('SAMEDI', '10:00', '12:00'),
+]
+for jour, debut, fin in _CANEVAS:
+    _, c = _Creneau.objects.get_or_create(
+        jour=jour, heure_debut=debut, heure_fin=fin,
+        defaults={'duree_prevue_minutes': 120},
+    )
+if c: print(f"    ✓ Créneaux types hebdomadaires ({len(_CANEVAS)} positions)")
+
+_sup = User.objects.filter(username='superviseur1').first()
+if _sup:
+    _edt, c = _EDT.objects.get_or_create(
+        annee_academique=_annee, population_type='ENSEIGNANT', population_id=_sup.pk,
+        defaults={'titre': 'EDT démo — Encadrant superviseur1',
+                  'population_denominateur': _sup.get_full_name() or _sup.username,
+                  'semaine_debut': 1, 'semaine_fin': 12,
+                  'rentree': _date(2026, 10, 5)},
+    )
+    if c:
+        print("    ✓ Emploi du temps de démonstration (brouillon)")
+
+        def _creneau(jour, debut):
+            return _Creneau.objects.get(jour=jour, heure_debut=debut)
+
+        for jour, debut, fin, nature, intitule, salle in [
+            ('LUNDI', '08:00', '10:00', 'COURS', 'Méthodologie de l’animation — CM1', 'A101'),
+            ('MARDI', '14:00', '16:00', 'TD', 'Conduite de projet — groupe B', 'B204'),
+            ('JEUDI', '10:00', '12:00', 'TP', 'Terrain : techniques d’expression corporelle', 'GYM1'),
+        ]:
+            _Aff.objects.get_or_create(
+                emploi_du_temps=_edt, creneau_template=_creneau(jour, debut),
+                semaine_debut=1, semaine_fin=12, nature=nature,
+                defaults={'intitule': intitule, 'salle_nom': salle,
+                          'enseignant_id': _sup.pk,
+                          'enseignant_nom': _sup.get_full_name() or _sup.username},
+            )
+        # Deux lignes volontairement en conflit pour démontrer le panneau
+        # « Conflits » (même enseignant, créneau et semaines qui se recouvrent).
+        _Aff.objects.get_or_create(
+            emploi_du_temps=_edt, creneau_template=_creneau('LUNDI', '08:00'),
+            semaine_debut=5, semaine_fin=12, nature='TD',
+            defaults={'intitule': 'Gestion de groupe — TD1 (conflit de démonstration)',
+                      'salle_nom': 'A102', 'enseignant_id': _sup.pk,
+                      'enseignant_nom': _sup.get_full_name() or _sup.username},
+        )
+        print("    ✓ 4 affectations posées (dont un conflit volontaire à détecter)")
+
 print("\n" + "=" * 60)
 print("  SEED TERMINÉ avec succès !")
 print("=" * 60)

@@ -390,8 +390,11 @@ export const ECRANS = {
     titre: 'Disponibilités',
     fil: 'GET-INJS',
     icone: 'bi-calendar-check',
-    introduction: 'Indisponibilités déclarées (enseignants, agents, créneaux) '
-      + 'prises en compte par la génération des emplois du temps.',
+    introduction: 'Indisponibilités déclarées des enseignants (socle scolarité) '
+      + 'et créneaux indisponibles, prises en compte par la génération '
+      + 'automatique des emplois du temps. Les congés/absences du personnel '
+      + 'relèvent du module RH (onglet supprimé ici faute de données '
+      + 'd’indisponibilité exposées par /api/rh/).',
     onglets: [
       {
         id: 'enseignants',
@@ -407,13 +410,6 @@ export const ECRANS = {
         endpoint: '/scolarite/edt/indisponibilites/',
         note: 'Source : /api/scolarite/edt/indisponibilites/',
       },
-      {
-        id: 'agents',
-        libelle: 'Agents',
-        icone: 'bi-person-badge',
-        endpoint: '/rh/agents/',
-        note: 'Source : /api/rh/agents/',
-      },
     ],
   },
 
@@ -423,8 +419,40 @@ export const ECRANS = {
     fil: 'GET-INJS',
     icone: 'bi-exclamation-octagon',
     introduction: 'Conflits détectés sur les emplois du temps (chevauchements '
-      + 'de salles, d\'enseignants ou de groupes) et leur résolution.',
+      + 'd\'enseignants, de groupes ou de salles, y compris entre emplois du '
+      + 'temps distincts). La détection se relance depuis l\'écran '
+      + '« Tableau des emplois du temps ».',
     endpoint: '/edts/conflits/',
+    filtres: [
+      { param: 'actif', libelle: 'Statut', type: 'select', options: [
+        { valeur: 'true', libelle: 'Actifs' },
+        { valeur: 'false', libelle: 'Clôturés' },
+      ] },
+      { param: 'type_conflit', libelle: 'Type', type: 'select', options: [
+        { valeur: 'HORAIRE_ENSEIGNANT', libelle: 'Enseignant' },
+        { valeur: 'HORAIRE_GROUPETUDIANT', libelle: 'Groupe' },
+        { valeur: 'HORAIRE_SALLE', libelle: 'Salle' },
+        { valeur: 'HORAIRE_MODULE', libelle: 'Formation' },
+        { valeur: 'MANUEL', libelle: 'Signalement manuel' },
+      ] },
+    ],
+    colonnes: [
+      { cle: 'type_conflit', libelle: 'Type', format: 'badge', valeurs: {
+        HORAIRE_ENSEIGNANT: 'Enseignant', HORAIRE_GROUPETUDIANT: 'Groupe',
+        HORAIRE_SALLE: 'Salle', HORAIRE_MODULE: 'Formation', MANUEL: 'Manuel',
+      }, couleurs: {
+        HORAIRE_ENSEIGNANT: 'text-bg-danger',
+        HORAIRE_GROUPETUDIANT: 'text-bg-warning',
+        HORAIRE_SALLE: 'text-bg-info',
+        HORAIRE_MODULE: 'text-bg-secondary',
+        MANUEL: 'text-bg-dark',
+      } },
+      { cle: 'emploi_du_temps', libelle: 'Emploi du temps' },
+      { cle: 'description', libelle: 'Explication' },
+      { cle: 'actif', libelle: 'Actif', format: 'booleen' },
+      { cle: 'signale_par', libelle: 'Signalé par' },
+      { cle: 'recalcule_le', libelle: 'Détecté le' },
+    ],
     actions: [
       {
         libelle: 'Résoudre',
@@ -435,6 +463,7 @@ export const ECRANS = {
         confirmation: 'Marquer ce conflit comme résolu ?',
         detail: 'La résolution est enregistrée et tracée côté serveur.',
         succes: 'Conflit résolu.',
+        visible: (l) => l.actif !== false,
       },
     ],
     note: 'Source : /api/edts/conflits/',

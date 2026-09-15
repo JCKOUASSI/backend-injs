@@ -141,6 +141,14 @@ class EmploiDuTemps(models.Model):
         default='BROUILLON',
         db_index=True,
     )
+    semaine_debut = models.PositiveSmallIntegerField(
+        default=1,
+        help_text='Numéro de semaine académique de début (1-based).',
+    )
+    semaine_fin = models.PositiveSmallIntegerField(
+        default=36,
+        help_text='Numéro de semaine académique de fin (bornes de planification).',
+    )
     rentree = models.DateField(
         null=True,
         blank=True,
@@ -165,6 +173,21 @@ class EmploiDuTemps(models.Model):
             models.Index(fields=['statut']),
         ]
         unique_together = ['annee_academique', 'population_type', 'population_id']
+
+    def clean(self):
+        super().clean()
+        erreurs = {}
+        if self.semaine_debut and self.semaine_fin and self.semaine_fin < self.semaine_debut:
+            erreurs['semaine_fin'] = 'La semaine de fin doit être ≥ à la semaine de début.'
+        if self.statut and self.statut not in dict(EDT_STATUT_CHOICES):
+            erreurs['statut'] = 'Statut inconnu.'
+        if erreurs:
+            raise ValidationError(erreurs)
+
+    @property
+    def population_label(self):
+        """Libellé lisible de la population cible (jamais un champ fantôme)."""
+        return (self.population_denominateur or '').strip() or f'{self.get_population_type_display()} #{self.population_id}'
 
     def __str__(self):
         return f"{self.titre or self.population_denominateur} — {self.get_statut_display()}"
@@ -221,6 +244,14 @@ class AffectationCreneau(models.Model):
         db_index=True,
         help_text='ID utilisateur enseignant/encadrant.',
     )
+    formateur = models.ForeignKey(
+        'formations.Formateur',
+        on_delete=models.PROTECT,
+        related_name='edt_affectations',
+        null=True,
+        blank=True,
+        help_text='Formateur de référence (socle INJS-LMD) pour la détection de surcharges.',
+    )
     enseignant_nom = models.CharField(
         max_length=255,
         blank=True,
@@ -260,6 +291,31 @@ class AffectationCreneau(models.Model):
                 name='edts__edt_creneau_semaine_idx',
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        erreurs = {}
+        if self.semaine_debut is None:
+            erreurs['semaine_debut'] = 'La semaine de début est obligatoire.'
+        if self.semaine_fin is None:
+            erreurs['semaine_fin'] = 'La semaine de fin est obligatoire.'
+        if (self.semaine_debut is not None and self.semaine_fin is not None
+                and self.semaine_fin < self.semaine_debut):
+            erreurs['semaine_fin'] = 'La semaine de fin doit être ≥ à la semaine de début.'
+        if self.nature and self.nature not in dict(NATURE_CHOICES):
+            erreurs['nature'] = 'Nature inconnue.'
+        if erreurs:
+            raise ValidationError(erreurs)
+
+    @property
+    def horaire(self):
+        """Résumé lisible du créneau (jour + plage horaire) ou chaîne vide."""
+        ct = self.creneau_template
+        if not ct:
+            return ''
+        jours = dict(JOUR_CHOICES)
+        return (f"{jours.get(ct.jour, ct.jour)} "
+                f"{ct.heure_debut:%H:%M}–{ct.heure_fin:%H:%M}")
 
     def __str__(self):
         return (

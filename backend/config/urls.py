@@ -53,8 +53,10 @@ urlpatterns = [
     path('api/finances-etudiantes/', include('finances_etudiantes.urls')),
     path('api/graduation/', include('graduation.urls')),
     path('api/stages/', include('stages.urls')),
-    # Lot L8 — Emploi du temps
+    # Lot L8 — Emploi du temps (GET-INJS). Alias /api/timetable/ exigé par le
+    # prompt P11 : mêmes vues, mêmes permissions, deux chemins équivalents.
     path('api/edts/', include('edts.urls')),
+    path('api/timetable/', include('edts.urls')),
     # Lot L7 — Administration, RH, Patrimoine
     path('api/administrations/', include('administrations.urls')),
     path('api/rh/', include('ressources_humaines.urls')),

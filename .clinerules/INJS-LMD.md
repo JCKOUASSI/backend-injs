@@ -377,9 +377,10 @@ Frontend Vite (vignette « Site INJS - prévisualisation ») :
 
 http://localhost:3000
 
-RÈGLE IMPÉRATIVE (validée par le commanditaire le 2026-09-13) :
+RÈGLE IMPÉRATIVE (validée par le commanditaire le 2026-09-13, reconfirmée le 2026-09-15) :
 
-* le frontend tourne TOUJOURS sur le port 3000 et l'API Django sur le port 8000,
+* le frontend (Site web INJS) tourne TOUJOURS sur le port 3000 et l'API Django
+  sur le port 8000 — JAMAIS L'INVERSE (ni API sur 3000, ni site sur 8000) —,
   quels que soient les travaux, incidents ou changements jusqu'à la fin du projet ;
 * NE JAMAIS lancer Vite sur un autre port (en particulier plus jamais 5173,
   qui fut un contournement ponctuel d'incident d'aperçu) : aucune option

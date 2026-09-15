@@ -50,6 +50,17 @@ class JournalScolarite(models.Model):
         REINSCRIPTION = 'REINSCRIPTION', 'Réinscription'
         EVENEMENT_SCOLARITE = 'EVENEMENT_SCOLARITE', 'Événement de scolarité'
         SYNCHRONISATION_EDT = 'SYNCHRONISATION_EDT', 'Export vers l’emploi du temps'
+        # Module GET-INJS (lot L8) — journalisation des opérations sensibles EDT
+        EDT_CREE = 'EDT_CREE', 'Emploi du temps créé'
+        EDT_SOUMIS = 'EDT_SOUMIS', 'Emploi du temps soumis à validation'
+        EDT_VALIDE = 'EDT_VALIDE', 'Emploi du temps validé'
+        EDT_PUBLIE = 'EDT_PUBLIE', 'Emploi du temps publié'
+        EDT_DEPUBLIE = 'EDT_DEPUBLIE', 'Emploi du temps dépublié'
+        EDT_ARCHIVE = 'EDT_ARCHIVE', 'Emploi du temps archivé'
+        EDT_SUPPRIME = 'EDT_SUPPRIME', 'Emploi du temps supprimé'
+        EDT_GENERATION = 'EDT_GENERATION', 'Brouillon généré automatiquement'
+        EDT_AFFECTATION_MODIFIEE = 'EDT_AFFECTATION_MODIFIEE', 'Affectation de créneau modifiée'
+        EDT_CONFLIT_RESOLU = 'EDT_CONFLIT_RESOLU', 'Conflit EDT marqué résolu'
         # Lot L3 — Jurys
         JURY_SESSION_CREEE = 'JURY_SESSION_CREEE', 'Session de jury créée'
         JURY_TRANSITION = 'JURY_TRANSITION', 'Changement d’état d’une session de jury'

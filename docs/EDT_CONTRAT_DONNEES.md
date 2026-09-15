@@ -1,5 +1,15 @@
 # Contrat de données EDT — INJS-LMD (v1.1)
 
+> **Addendum 2026-09-15 (audit GET-INJS)** : la phrase ci-dessous (« l'emploi du
+> temps n'est **pas intégré** à l'application ») est l'état de la décision
+> antérieure au lot L8. Depuis, l'application native **GET-INJS** (`backend/edts`,
+> API `/api/edts/` et son alias `/api/timetable/`, écrans React du menu
+> « GET-INJS ») planifie en interne des **brouillons** d'emplois du temps selon
+> l'ADR-003 (moteur natif complémentaire, jamais concurrent du planificateur
+> externe). Ce contrat **demeure strictement en lecture seule** et versionné :
+> il continue d'alimenter `app-ept-injs-lmd 2026` ; le retour par import Excel
+> reste le chemin d'écriture du socle. Détail : `docs/audits/2026-09-15-audit-module-GET-INJS.md`.
+
 **Décision actée** : l'emploi du temps n'est **pas intégré** à l'application.
 Une application externe (`app-ept-injs-lmd 2026`) planifie les cours en
 consommant ce contrat de données **en lecture seule**. Le retour vers la

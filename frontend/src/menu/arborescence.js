@@ -329,7 +329,7 @@ export const ARBORESCENCE = [
       },
       {
         id: 'get_injs.generation',
-        libelle: 'Génération EDT',
+        libelle: 'Créer un emploi du temps',
         chemin: '/edt/nouveau',
         droit: {
           curp: ['edt.emploi_du_temps.generer', 'edt.emploi_du_temps.creer'],

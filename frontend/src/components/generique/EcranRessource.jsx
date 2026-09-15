@@ -470,6 +470,7 @@ export function ListeGenerique({ ecran, cleBase }) {
                   {(ecran.actions || []).length > 0 && (
                     <td className="text-end" onClick={(e) => e.stopPropagation()}>
                       {(ecran.actions || []).map((action) => {
+                        if (action.visible && !action.visible(ligne)) return null
                         const cible = action.vers ? action.vers(ligne) : null
                         return (
                           <button
