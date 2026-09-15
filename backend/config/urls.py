@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/referentiels/', include('referentiels.urls')),
     path('api/equivalences/', include('equivalences.urls')),
     path('api/juries/', include('jurys.urls')),
+    path('api/jurys/', include('jurys.urls')),
     path('api/enseignants/', include('scolarite.charges_urls')),
     path('api/finances-etudiantes/', include('finances_etudiantes.urls')),
     path('api/graduation/', include('graduation.urls')),

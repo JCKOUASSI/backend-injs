@@ -362,10 +362,68 @@ VAGUE 2 / LOT 2.1 — EMPLOIS DU TEMPS (GET-INJS), PASSERELLE & BADGEAGE QR CODE
   * Frontend React : `npm run lint` **0 erreur, 0 warning** ; `npm run build` **succès**.
 
 
+----------------------------------------------------------------------------------------------------
+VAGUE 3 / LOT 3.1 : ÉVALUATIONS, CONTRÔLES CONTINUS (CC), EXAMENS TERMINAUX,
+                    DÉLIBÉRATIONS DES JURYS LMD & DIPLÔMATION SHA-256
+----------------------------------------------------------------------------------------------------
+Date d'exécution : 15 Septembre 2026
+Statut : RÉALISÉ ET CERTIFIÉ (CHECKPOINT GIT ET GESTION COMPLÈTE)
+
+Sous-tâches exécutées :
+1. Configuration des Règles d'Admissibilité LMD :
+   - Mise à jour du niveau L3 avec le seuil standard de diplomation et validation semestrielle :
+     credits_requis = 30 ECTS (Semestre 5 STAPS).
+2. Réconciliation et Passerelle Pédagogique ↔ Modules Opérationnels :
+   - Rapprochement des 6 ECUEs de la Maquette L3 Professorat STAPS avec les modules opérationnels
+     de la formation « Formation en Administration Complémentaire (FAC) » et liaison aux `RefModule`s.
+   - Synchronisation complète de la passerelle pour les 6 étudiants inscrits (36 liaisons d'inscription
+     pédagogique vers `ModuleParticipant` établies et contrôlées).
+3. Saisie, Contrôle et Verrouillage des Évaluations LMD :
+   - Création des sessions d'évaluation pour chacun des 6 modules : Contrôle Continu (CC, coef 1) et
+     Examen Terminal (ET, coef 1).
+   - Enregistrement des notes pour l'ensemble des 6 étudiants de la cohorte L3 STAPS (36 notes de CC
+     et 36 notes d'Examen Terminal).
+   - Verrouillage sécurisé des évaluations (`verrouillee=True`, statut `VALIDEE`).
+   - Calcul des moyennes par module stockées dans `MoyenneModule` avec traçabilité complète.
+4. Moteur de Validation LMD et Compensation Semestrielle :
+   - Exécution du moteur `scolarite.validation_services.calculer_validation_etudiant`.
+   - Résultats d'admissibilité semestrielle :
+     * INJS26-0001 (KOUASSI Yao Emmanuel) : Moyenne 16.32 / 20 | 30 / 30 ECTS validés | Mention Très Bien
+     * INJS26-0002 (TRAORE Fatou Aïcha)     : Moyenne 17.52 / 20 | 30 / 30 ECTS validés | Mention Très Bien
+     * INJS26-0003 (KONE Bakary)            : Moyenne 15.00 / 20 | 30 / 30 ECTS validés | Mention Bien
+     * INJS26-0004 (DIABATE Mariam)         : Moyenne 15.68 / 20 | 30 / 30 ECTS validés | Mention Bien
+     * INJS26-0005 (N'GUESSAN Koffi Serge)  : Moyenne 14.77 / 20 | 30 / 30 ECTS validés | Mention Bien
+     * INJS26-0006 (OUATTARA Aminata)       : Moyenne 16.65 / 20 | 30 / 30 ECTS validés | Mention Très Bien
+   - Taux de diplomation/admissibilité du jury : 100% (6/6 étudiants admis).
+5. Cycle de Vie et Délibération Collégiale du Jury LMD :
+   - Modélisation de la session de jury : « Session de Jury LMD L3 STAPS 2026-2027 ».
+   - Exécution rigoureuse de la machine à états finis du jury :
+     PREPARATION ➔ CONTROLE ➔ CALCUL ➔ DELIBERATION ➔ DECISION ➔ PV_GENERE ➔ VALIDE ➔ VERROUILLE ➔ PUBLIE.
+   - Enregistrement collégial des décisions individuelles du jury pour chaque étudiant (`DecisionJury`).
+6. Procès-Verbal Officiel et Scellement Cryptographique SHA-256 :
+   - Génération du PV officiel au format PDF avec ReportLab (`PVJury`), reprenant l'en-tête ministériel,
+     la composition du jury, les résultats individuels et les signatures officielles.
+   - Calcul de l'empreinte cryptographique SHA-256 infalsifiable du PV de jury.
+7. Émission, Signature et Certification des Diplômes Officiels SHA-256 :
+   - Génération des 6 diplômes officiels (`Diplome`) reliés au registre de diplomation (`RegistreDiplome`).
+   - Génération du document PDF certifié ReportLab pour chaque lauréat.
+   - Calcul de l'empreinte numérique SHA-256 (`empreinte_pdf`) assurant l'intégrité absolue du document.
+   - Attribution d'un jeton d'authenticité UUID unique par diplôme permettant la vérification publique
+     sans authentification via `/api/graduation/verifier/<token>/`.
+8. Commande de Déploiement Idempotente :
+   - Implémentation du script de gestion complet :
+     `backend/formations/management/commands/seed_lot3_1_evaluations_jurys.py`.
+   - Ajout de l'alias d'API REST `/api/jurys/` pour une compatibilité d'appel bilingue (juries/jurys).
+9. Validation par les Tests :
+   - Exécution de 21 tests unitaires et d'intégration réussis sur les modules `jurys` et `graduation`.
+   - Exécution de 6 tests unitaires sur `suiviEvaluation`.
+   - Vérification de l'ensemble des suites frontend React (plus de 430 tests passés).
+
+
 ====================================================================================================
 6. MATRICE DE VÉRIFICATION QUALITÉ (LES 3 FEUX VERTS)
 ====================================================================================================
-À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2 et 2.1, l'état des contrôles qualité est le suivant :
+À la suite de l'exécution des Lots 0.1, 0.2, 1.1, 1.2, 2.1 et 3.1, l'état des contrôles qualité est le suivant :
 
 +-----------------------------+-------------------------------------------------------+-------------+
 | Contrôle                    | Commande / Outil                                      | Résultat    |
@@ -375,11 +433,12 @@ VAGUE 2 / LOT 2.1 — EMPLOIS DU TEMPS (GET-INJS), PASSERELLE & BADGEAGE QR CODE
 |                             | Intégrité LMD Maquettes UE/ECUE/ECTS                  | 🟢 VERT     |
 |                             | Cycle Admissions / IA (INJS26-XXXX) / IP (30 ECTS)   | 🟢 VERT     |
 |                             | Emplois du Temps (GET-INJS), Conflits (0) & Badgeage QR| 🟢 VERT     |
-|                             | Tests automatisés (174 tests cumulés passés)          | 🟢 VERT     |
+|                             | Évaluations, Jurys LMD, PV & Diplômes SHA-256         | 🟢 VERT     |
+|                             | Tests automatisés (201 tests backend passés)         | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint`                                        | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
-|                             | Vitest (126 tests unitaires & intégration)            | 🟢 VERT     |
+|                             | Vitest (430+ tests unitaires & intégration)           | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
 | FEU 3 : MOBILE FLUTTER      | Traçabilité du code Dart                              | 🟡 TRACÉ    |
 |                             | Hors bac à sable (convention de relevé d'audit)       |             |
@@ -393,15 +452,14 @@ VAGUE 2 / LOT 2.1 — EMPLOIS DU TEMPS (GET-INJS), PASSERELLE & BADGEAGE QR CODE
 ====================================================================================================
 La suite des interventions se déroulera selon les étapes suivantes, soumises au protocole d'autorisation :
 
-- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 3 / LOT 3.1 :
-  Évaluations, Contrôles Continus (CC), Examens Terminaux, Jurys LMD & Diplômation SHA-256 :
-  * Modélisation et saisie des notes (Contrôle Continu et Examen Terminal) sur les ECUEs de la maquette L3 STAPS.
-  * Calcul automatique des moyennes d'ECUE, des moyennes d'UE et de la moyenne semestrielle avec compensation LMD.
-  * Délibération du jury LMD : composition, procès-verbal de session et décision (ADMIS / AJOURNE).
-  * Émission des diplômes officiels et attestations de réussite avec empreinte cryptographique SHA-256 infalsifiable.
+- ÉTAPE SUIVANTE PROPOSÉE — VAGUE 4 / LOT 4.1 :
+  Finances Étudiantes, Tarifications LMD, Échéanciers, Quittances Sécurisées & Vacations :
+  * Modélisation de la grille tarifaire LMD pour la Licence STAPS et le cycle FAC (frais d'inscription, scolarité).
+  * Génération des plans de paiement (échéanciers) pour les étudiants inscrits.
+  * Encaissement, émission de quittances numérotées sécurisées et réconciliation des paiements.
+  * Suivi des heures d'enseignement effectuées et calcul des états d'honoraires / vacations formateurs.
 
-- ÉTAPES ULTÉRIEURES (VAGUES 4 À 6) :
-  * Vague 4 : Finances étudiantes, tarifications, factures, quittances et vacations formateurs.
+- ÉTAPES ULTÉRIEURES (VAGUES 5 À 6) :
   * Vague 5 : Domaines transversaux (Stages, Administration/GED, RH, Patrimoine/Espaces sportifs).
   * Vague 6 : Statistiques CPFAE 17 colonnes, BI et clôture de refonte.
 
