@@ -615,6 +615,7 @@ du garde-fou d'affichage React Suspense sur ScolariteDashboard :
 | FEU 2 : FRONTEND REACT/VITE | `npm run lint` (ESLint 0 erreur, 0 avertissement)     | 🟢 VERT (0W)|
 |                             | `npm run build` (production Vite)                     | 🟢 VERT     |
 |                             | Correction Suspense ScolariteDashboard/FicheEtudiant  | 🟢 RÉSOLU   |
+|                             | Alignement pixel-perfect Dashboard Scolarité (1&2.png) | 🟢 CONFORME |
 |                             | Sécurisation fallback API relative (`/api`)           | 🟢 SÉCURISÉ |
 |                             | Vitest (430+ tests unitaires & intégration)           | 🟢 VERT     |
 +-----------------------------+-------------------------------------------------------+-------------+
@@ -624,6 +625,29 @@ du garde-fou d'affichage React Suspense sur ScolariteDashboard :
 | PORTS SERVEURS FIGÉS        | Frontend sur port 3000 / API sur port 8000            | 🟢 ACTIFS   |
 +-----------------------------+-------------------------------------------------------+-------------+
 
+
+====================================================================================================
+6.2 ALIGNEMENT VISUEL ET FONCTIONNEL : TABLEAU DE BORD SCOLARITÉ (RÉFÉRENCE 1.PNG & 2.PNG)
+====================================================================================================
+- Fichiers modifiés / créés :
+  * `frontend/src/pages/scolarite/ScolariteDashboard.jsx` (refonte complète conforme aux maquettes)
+  * `frontend/src/styles/scolariteDashboard.css` (feuille de styles dédiée avec palette moderne)
+- Composants fidèlement reproduits :
+  1. En-tête : Titre « Tableau de bord — Administration », sous-titre « UFR STAPS-JL | Année académique 2025-2026 », bloc boutons export [PDF], [Excel], [Word] et bouton d'action primaire « + Nouvelle inscription ».
+  2. Raccourcis opérationnels (9 boutons pills) : Étudiants, Finances, Notes & Jury, UE / ECUE, Salles, Présences, Rapports, Formations, Admissions.
+  3. 4 Cartes KPI supérieures :
+     - ÉTUDIANTS INSCRITS (icône bleue)
+     - PROFESSEURS & ENCADREURS (icône ardoise)
+     - PRÉSENTS AUJOURD'HUI (icône pêche/rouge)
+     - TAUX PRÉSENCE (JOUR) (icône ambre)
+  4. Carte « Présences du jour » (pleine largeur) : bouton « Ouvrir les présences », métriques temps réel (séances ouvertes, formateurs badgés, absents roster, retards), statut d'inactivité.
+  5. Section médiane en 2 colonnes :
+     - Colonne gauche : « Répartition des étudiants par niveau » avec histogramme SVG dynamique (L1, L2, L3, M1, M2), échelle Y 0..7, boutons d'export intégrés.
+     - Colonne droite : « Spécialités STAPS » avec badges colorés (APAS bleu, EM indigo, ES marine, MS ardoise foncé, TC cyan) et récapitulatif des filières actives.
+  6. Section inférieure en 2 colonnes :
+     - Colonne gauche : « Finance — Frais étudiants » avec lignes pointillées clé-valeur (En attente, Payés, Moyenne générale, Notes en base), bouton « Ouvrir Finances », exports intégrés.
+     - Colonne droite : « Délibérations (Jury) » affichant l'état des sessions et PV.
+- Tests & Validation : `npm run build` réussi sans aucune erreur, rendu fluide et réactif.
 
 ====================================================================================================
 7. CONCLUSION GÉNÉRALE ET BILAN DE LIVRAISON DE LA REFONTE INJS 2026

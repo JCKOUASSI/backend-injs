@@ -1,0 +1,467 @@
+/* ==========================================================================
+   STYLE DÉDIÉ : TABLEAU DE BORD ADMINISTRATION / SCOLARITÉ INJS
+   Conforme aux captures de référence (Design moderne, bleu ardoise, cartes épurées)
+   ========================================================================== */
+
+.scolarite-dashboard-page {
+  padding: 1.25rem 1.5rem;
+  background-color: #f4f6fb;
+  min-height: calc(100vh - 70px);
+  color: #1e293b;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── 1. EN-TÊTE ── */
+.scolarite-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.scolarite-main-title {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.2rem 0;
+  letter-spacing: -0.02em;
+}
+
+.scolarite-sub-title {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 0;
+  font-weight: 400;
+}
+
+.scolarite-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Boutons d'export PDF, Excel, Word */
+.scolarite-export-btn-group {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.export-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #475569;
+  border-right: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.export-pill-btn:last-child {
+  border-right: none;
+}
+
+.export-pill-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* Bouton bleu + Nouvelle inscription */
+.btn-nouvelle-inscription {
+  background-color: #2563eb;
+  color: #ffffff !important;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-nouvelle-inscription:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* ── 2. GRILLE DE RACCOURCIS (PILLS) ── */
+.scolarite-quick-pills-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.quick-pill-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #334155;
+  text-decoration: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+}
+
+.quick-pill-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.quick-pill-btn i {
+  font-size: 1.05rem;
+  color: #64748b;
+}
+
+.quick-pill-admissions {
+  grid-column: span 1;
+}
+
+/* ── 3. LES 4 GRANDES CARTES KPI ── */
+.scolarite-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.kpi-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.kpi-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.icon-box-blue {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+}
+
+.icon-box-slate {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.icon-box-peach {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.icon-box-amber {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+/* ── CARTES DE SECTION STANDARD ── */
+.dashboard-section-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  margin-bottom: 1.25rem;
+}
+
+.section-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* ── 4. PRÉSENCES DU JOUR ── */
+.btn-ouvrir-presences {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 1.15rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-ouvrir-presences:hover {
+  background-color: #1d4ed8;
+}
+
+.presences-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.pres-stat-item strong {
+  font-weight: 700;
+  color: #0f172a;
+  margin-right: 0.25rem;
+}
+
+.presences-empty-note {
+  font-size: 0.88rem;
+  color: #94a3b8;
+}
+
+/* ── 5. GRAPHIQUE NIVEAUX & SPÉCIALITÉS ── */
+.dashboard-charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.barchart-container {
+  width: 100%;
+  height: 240px;
+}
+
+.barchart-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.barchart-rect {
+  transition: opacity 0.2s ease;
+}
+
+.barchart-rect:hover {
+  opacity: 0.85;
+}
+
+/* Spécialités STAPS */
+.specialites-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1.5rem;
+}
+
+.legend-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.legend-color-box {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.color-apas { background-color: #3b82f6; }
+.color-em   { background-color: #4f46e5; }
+.color-es   { background-color: #1e3a8a; }
+.color-ms   { background-color: #0f172a; }
+.color-tc   { background-color: #06b6d4; }
+
+.specialites-body {
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.specialites-footer-note {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-top: 0.5rem;
+}
+
+/* ── 6. LIGNE INFÉRIEURE : FINANCES & DÉLIBÉRATIONS ── */
+.dashboard-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+/* Finance - Frais étudiants */
+.finance-key-values-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.finance-kv-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.finance-kv-label {
+  color: #475569;
+  font-weight: 500;
+}
+
+.finance-kv-dots {
+  flex-grow: 1;
+  border-bottom: 1px dotted #cbd5e1;
+  margin: 0 0.5rem;
+}
+
+.finance-kv-value {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.btn-ouvrir-finances {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.45rem 1.15rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-ouvrir-finances:hover {
+  background-color: #1d4ed8;
+}
+
+/* Délibérations (Jury) */
+.deliberations-body {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.deliberations-empty-text {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.deliberations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.session-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.session-item-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.25rem 0;
+}
+
+.session-meta {
+  display: flex;
+  align-items: center;
+}
+
+/* Loading spinner */
+.scolarite-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+}
+
+/* ── RESPONSIVE DESIGN ── */
+@media (max-width: 1024px) {
+  .scolarite-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-charts-row {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .scolarite-quick-pills-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .scolarite-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .presences-stats-row {
+    gap: 1rem;
+  }
+}
