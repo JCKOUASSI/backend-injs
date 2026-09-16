@@ -103,6 +103,26 @@ class Command(BaseCommand):
         self.stdout.write(f"  {len(modules)} modules rattachés au campus {site.nom}")
 
     def _seed_lmd_maquette(self):
+        ref_form = RefFormation.objects.first()
+        if not ref_form:
+            ref_form, _ = RefFormation.objects.get_or_create(
+                code='L_STAPS',
+                defaults={
+                    'intitule': 'Licence STAPS - Sciences et Techniques des Activités Physiques et Sportives',
+                    'actif': True,
+                    'type_diplome': 'LICENCE',
+                    'duree_annees': 3,
+                    'nb_semestres': 6,
+                    'nb_credites': 180,
+                    'domaine': 'Sciences du Sport',
+                    'mention': 'Entraînement et Professorat',
+                }
+            )
+        Formation.objects.get_or_create(
+            ref_formation=ref_form,
+            defaults={'formation': ref_form.intitule}
+        )
+
         call_command('init_referentiels_lmd', annee='2026-2027', courante=True, avec_parcours_injs=True)
 
         annee = AnneeAcademique.objects.get(libelle='2026-2027')

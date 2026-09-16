@@ -84,8 +84,20 @@ class Command(BaseCommand):
         salle_gym = RefSalle.objects.filter(nom__icontains='Gymnase').first()
 
         self.stdout.write("--- 2. Formateurs de référence STAPS ---")
-        f_kone = Formateur.objects.filter(numerobadge='F001').first()
-        f_ndiaye = Formateur.objects.filter(numerobadge='F003').first()
+        f_kone, _ = Formateur.objects.get_or_create(
+            numerobadge='F001',
+            defaults={
+                'nom': 'KONÉ', 'prenom': 'Amara', 'specialite': 'Management, Droit et Éthique du Sport',
+                'email': 'kone.amara@injs.ci', 'organisation': 'INJS Marcory'
+            }
+        )
+        f_ndiaye, _ = Formateur.objects.get_or_create(
+            numerobadge='F003',
+            defaults={
+                'nom': 'NDIAYE', 'prenom': 'Aïssatou', 'specialite': 'Leadership et Déontologie',
+                'email': 'ndiaye.aissatou@injs.ci', 'organisation': 'INJS Marcory'
+            }
+        )
         f_kouame, _ = Formateur.objects.get_or_create(
             numerobadge='F004',
             defaults={
@@ -98,6 +110,13 @@ class Command(BaseCommand):
             defaults={
                 'nom': 'TOURE', 'prenom': 'Moussa', 'specialite': 'Biomécanique et Physiologie de l\'effort',
                 'email': 'toure.moussa@injs.ci', 'organisation': 'INJS Marcory'
+            }
+        )
+        f_ouedraogo, _ = Formateur.objects.get_or_create(
+            numerobadge='F006',
+            defaults={
+                'nom': 'OUÉDRAOGO', 'prenom': 'Salif', 'specialite': 'Santé, Hygiène et Secourisme',
+                'email': 'ouedraogo.salif@injs.ci', 'organisation': 'INJS Marcory'
             }
         )
 

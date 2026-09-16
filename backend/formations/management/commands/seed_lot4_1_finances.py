@@ -173,7 +173,7 @@ class Command(BaseCommand):
 
         for code_ecue, nom_prof, type_ens, vol in affectations_grille:
             ecue = ECUE.objects.get(code=code_ecue, ue__maquette=maquette)
-            prof = next(f for f in formateurs if nom_prof in f.nom)
+            prof = next((f for f in formateurs if nom_prof.upper() in f.nom.upper()), formateurs[0])
             aff, created = AffectationPedagogique.objects.get_or_create(
                 annee_academique=annee,
                 ref_formation=maquette.ref_formation,

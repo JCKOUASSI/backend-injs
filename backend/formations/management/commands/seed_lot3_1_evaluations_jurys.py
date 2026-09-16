@@ -62,6 +62,11 @@ class Command(BaseCommand):
         parcours = Parcours.objects.get(code='PROF_COLLEGE')
         maquette = Maquette.objects.get(ref_formation=ref_form, niveau=l3, statut=Maquette.Statut.ACTIVE)
         form_op = Formation.objects.filter(ref_formation=ref_form).first()
+        if not form_op:
+            form_op, _ = Formation.objects.get_or_create(
+                ref_formation=ref_form,
+                defaults={'formation': ref_form.intitule}
+            )
         site = RefSite.objects.get(nom='Campus INJS Marcory (Abidjan)')
 
         self.stdout.write("--- 2. Modules opérationnels & Rattachement RefModules ---")
