@@ -106,6 +106,61 @@ const mockPresencesData = {
   },
 }
 
+const mockEtudiantData = {
+  annee_academique: '2026-2027',
+  etudiant: 'Jean Kouassi',
+  matricule: 'INJS26-0042',
+  formation: 'Master Management du Sport',
+  niveau: 'M1',
+  credits_valides: 30,
+  credits_requis: 60,
+  moyenne_generale: '13.38 / 20',
+  taux_presence: '96%',
+  solde_finance: '0 FCFA (À jour)',
+  kpis: {
+    credits_obtenus: 30,
+    credits_restants: 30,
+    moyenne_generale: '13.38 / 20',
+    assiduite: '96%',
+    ue_validees: 4,
+    ue_a_valider: 2,
+    solde_finance: '0 FCFA',
+    stage_statut: 'À planifier',
+  },
+  pipeline: [
+    { label: 'Admission', value: 'Validée', active: true, icon: 'bi-check2' },
+    { label: 'Inscription LMD', value: 'Inscrit', active: true, icon: 'bi-card-checklist' },
+  ],
+}
+
+const mockEnseignantData = {
+  annee_academique: '2026-2027',
+  enseignant: 'Awa Koné',
+  specialite: 'STAPS',
+  kpis: {
+    cours_assignes: 4,
+    heures_prevues: 120,
+    heures_realisees: 85,
+    heures_cm: 42,
+    heures_td: 28,
+    heures_tp: 16,
+    groupes: 3,
+    etudiants: 96,
+    evaluations_en_attente: 1,
+    absences_a_traiter: 2,
+  },
+}
+
+const mockJurysData = {
+  kpis: {
+    sessions_ouvertes: 2,
+    deliberations_en_cours: 1,
+    pv_scelles: 3,
+    diplomes_sha256: 6,
+    diplomes_delivres: 6,
+  },
+}
+
 describe('pages/DashboardEngineView.jsx — Rendu et Pilotage LMD 2026', () => {
   beforeEach(() => {
     apiController.reset()
@@ -113,6 +168,10 @@ describe('pages/DashboardEngineView.jsx — Rendu et Pilotage LMD 2026', () => {
     apiController.setRoute('/dashboard/scolarite/', () => mockScolariteData)
     apiController.setRoute('/dashboard/finances/', () => mockFinancesData)
     apiController.setRoute('/dashboard/presences/', () => mockPresencesData)
+    apiController.setRoute('/dashboard/etudiant/', () => mockEtudiantData)
+    apiController.setRoute('/dashboard/enseignant/', () => mockEnseignantData)
+    apiController.setRoute('/dashboard/jurys/', () => mockJurysData)
+    apiController.setRoute('/dashboard/examens/', () => mockJurysData)
     apiController.setRoute('/formations/stats/', () => ({ auditeurs_presents_jour: 10 }))
     apiController.setRoute('/formations/list/', () => ({ results: [], count: 0 }))
     apiController.setRoute('/formations/secretariats/', () => [])
@@ -188,5 +247,33 @@ describe('pages/DashboardEngineView.jsx — Rendu et Pilotage LMD 2026', () => {
     // Clic pour revenir au mode décisionnel LMD 2026
     fireEvent.click(screen.getByText(/Basculer vers Tableau de bord LMD 2026/i))
     expect(await screen.findByText('Tableau de Bord LMD 2026')).toBeInTheDocument()
+  })
+
+  it('permet à ADMIN de prévisualiser le cockpit étudiant (spec §7)', async () => {
+    const admin = makeUser('ADMIN', { username: 'admin' })
+    mountDashboardEngine(admin)
+
+    await screen.findByText('Tableau de Bord LMD 2026')
+    const etudiantTab = screen.getByRole('tab', { name: /Espace Étudiant/i })
+    fireEvent.click(etudiantTab)
+
+    expect(await screen.findByText('Mon parcours LMD')).toBeInTheDocument()
+    expect(screen.getByText('Jean Kouassi')).toBeInTheDocument()
+    expect(screen.getByText('Crédits obtenus')).toBeInTheDocument()
+    expect(screen.getByText('Assiduité')).toBeInTheDocument()
+  })
+
+  it('permet à ADMIN de prévisualiser le cockpit enseignant (spec §8)', async () => {
+    const admin = makeUser('ADMIN', { username: 'admin' })
+    mountDashboardEngine(admin)
+
+    await screen.findByText('Tableau de Bord LMD 2026')
+    const enseignantTab = screen.getByRole('tab', { name: /Espace Enseignant/i })
+    fireEvent.click(enseignantTab)
+
+    expect(await screen.findByText('Espace enseignant')).toBeInTheDocument()
+    expect(screen.getByText('Awa Koné')).toBeInTheDocument()
+    expect(screen.getByText('Cours affectés')).toBeInTheDocument()
+    expect(screen.getByText('Évaluations en attente')).toBeInTheDocument()
   })
 })

@@ -198,17 +198,32 @@ def get_etudiant_dashboard(user):
     inscription = dossier.inscription_courante if dossier else None
     credits_valides = 30 if inscription else 0
     moyenne = "13.38 / 20"
+    nom = dossier.nom_complet if dossier else 'Étudiant INJS'
+    formation = inscription.ref_formation.intitule if inscription and getattr(inscription, 'ref_formation', None) else 'Licence STAPS'
+    niveau = inscription.niveau.code if inscription and getattr(inscription, 'niveau', None) else 'L3'
 
     return {
-        'etudiant': dossier.nom_complet if dossier else 'Étudiant INJS',
+        'annee_academique': (get_current_academic_year().libelle if get_current_academic_year() else '2026-2027'),
+        'etudiant': nom,
         'matricule': dossier.matricule if dossier else 'INJS26-0001',
-        'formation': inscription.ref_formation.intitule if inscription else 'Licence STAPS',
-        'niveau': inscription.niveau.code if inscription else 'L3',
+        'formation': formation,
+        'niveau': niveau,
         'credits_valides': credits_valides,
         'credits_requis': 60,
         'moyenne_generale': moyenne,
         'taux_presence': '96%',
         'solde_finance': '0 FCFA (À jour)',
+        # KPIs normalisés pour le Dashboard Engine
+        'kpis': {
+            'credits_obtenus': credits_valides,
+            'credits_restants': max(0, 60 - credits_valides),
+            'moyenne_generale': moyenne,
+            'assiduite': '96%',
+            'ue_validees': 4,
+            'ue_a_valider': 2,
+            'solde_finance': '0 FCFA',
+            'stage_statut': 'À planifier',
+        },
         'pipeline': [
             {'label': 'Admission', 'value': 'Validée', 'active': True, 'icon': 'bi-check2'},
             {'label': 'Inscription LMD', 'value': 'Inscrit', 'active': True, 'icon': 'bi-card-checklist'},
@@ -216,6 +231,12 @@ def get_etudiant_dashboard(user):
             {'label': 'Évaluations', 'value': '36 notes', 'active': True, 'icon': 'bi-pencil'},
             {'label': 'Jury', 'value': 'Admis S1', 'active': True, 'icon': 'bi-balance-scale'},
             {'label': 'Diplômation', 'value': 'En attente', 'active': False, 'icon': 'bi-award'},
+        ],
+        'quick_actions': [
+            {'label': 'Mon emploi du temps', 'to': '/edt', 'icon': 'bi-calendar3'},
+            {'label': 'Mes notes', 'to': '/evaluations', 'icon': 'bi-journal-check'},
+            {'label': 'Mes présences', 'to': '/presences', 'icon': 'bi-qr-code'},
+            {'label': 'Situation financière', 'to': '/finance-dashboard', 'icon': 'bi-wallet2'},
         ],
     }
 
@@ -228,15 +249,27 @@ def get_enseignant_dashboard(user):
 
     nb_modules = Module.objects.filter(formateur=formateur).count() if formateur else 0
     return {
+        'annee_academique': (get_current_academic_year().libelle if get_current_academic_year() else '2026-2027'),
         'enseignant': f"{formateur.nom} {formateur.prenom}" if formateur else "Enseignant INJS",
-        'specialite': formateur.specialite if formateur else "STAPS",
+        'specialite': getattr(formateur, 'specialite', None) or "STAPS",
         'kpis': {
-            'cours_assignes': nb_modules,
+            'cours_assignes': nb_modules or 4,
             'heures_prevues': 120,
             'heures_realisees': 85,
+            'heures_cm': 42,
+            'heures_td': 28,
+            'heures_tp': 16,
             'groupes': 3,
+            'etudiants': 96,
             'evaluations_en_attente': 1,
+            'absences_a_traiter': 2,
         },
+        'quick_actions': [
+            {'label': 'Mes groupes', 'to': '/scolarite/groupes', 'icon': 'bi-people'},
+            {'label': 'Saisir notes', 'to': '/evaluations', 'icon': 'bi-pencil-square'},
+            {'label': 'Lancer un appel', 'to': '/presences', 'icon': 'bi-qr-code-scan'},
+            {'label': 'Mon EDT', 'to': '/edt', 'icon': 'bi-calendar3'},
+        ],
     }
 
 
@@ -301,16 +334,26 @@ def get_pedagogie_dashboard():
     for m in modules:
         heures_prevues += m.duree_prevue_heures or 0
 
+    nb_enseignants = enseignants.count()
+    nb_modules = modules.count()
+    nb_ecues = ecues.count()
+    nb_ue = UE.objects.count()
+    vh = heures_prevues or 310
+
     return {
         'annee_academique': annee.libelle if annee else '2026-2027',
         'kpis': {
-            'enseignants_actifs': enseignants.count(),
-            'modules_ouverts': modules.count(),
-            'ecues_maquettes': ecues.count(),
+            'enseignants_actifs': nb_enseignants,
+            'modules_ouverts': nb_modules,
+            'ecues_maquettes': nb_ecues,
             'maquettes_lmd': maquettes.count(),
-            'heures_prevues_totales': heures_prevues or 310,
+            'heures_prevues_totales': vh,
             'heures_executees': 245,
             'taux_realisation_vh': '79.0%',
+            # Clés alignées sur le Dashboard Engine frontend
+            'total_ue': nb_ue,
+            'total_ecue': nb_ecues,
+            'volume_horaire_planifie': vh,
         },
         'charts': {
             'charges_par_enseignant': [
@@ -391,15 +434,30 @@ def get_examens_dashboard():
     total_admis = decisions.filter(decision='ADMIS').count() or diplomes.count()
     total_ajournes = decisions.filter(decision='AJOURNE').count()
 
+    sessions_ouvertes = sessions.filter(
+        statut__in=[SessionJury.Statut.DELIBERATION, SessionJury.Statut.DECISION]
+    ).count() or sessions.count()
+    sessions_cloturees = sessions.filter(statut=SessionJury.Statut.PUBLIE).count()
+    nb_diplomes = diplomes.count()
+    try:
+        pv_scelles = PVJury.objects.count()
+    except Exception:
+        pv_scelles = sessions_cloturees
+
     return {
         'kpis': {
             'sessions_jury': sessions.count(),
-            'sessions_cloturees': sessions.filter(statut=SessionJury.Statut.PUBLIE).count(),
-            'decisions_rendues': decisions.count() or diplomes.count(),
+            'sessions_cloturees': sessions_cloturees,
+            'decisions_rendues': decisions.count() or nb_diplomes,
             'admis_jury': total_admis,
             'ajournes_jury': total_ajournes,
-            'diplomes_sha256': diplomes.count(),
-            'diplomes_certifies': diplomes.filter(statut=Diplome.Statut.VALIDATED).count() or diplomes.count(),
+            'diplomes_sha256': nb_diplomes,
+            'diplomes_certifies': diplomes.filter(statut=Diplome.Statut.VALIDATED).count() or nb_diplomes,
+            # Clés alignées sur le Dashboard Engine frontend (onglet Jurys)
+            'sessions_ouvertes': sessions_ouvertes or 1,
+            'deliberations_en_cours': sessions_ouvertes or 1,
+            'pv_scelles': pv_scelles or 1,
+            'diplomes_delivres': nb_diplomes,
         },
         'charts': {
             'mentions_diplomes': [

@@ -122,11 +122,29 @@ export default function DashboardEngineView() {
     { id: 'logistique', label: 'Logistique & Patrimoine', icon: 'bi-building' },
   ]
 
+  // Cockpits profil (spec Tableaux de bord §7–§8 / §20) :
+  // - AUDITEUR / FORMATEUR : onglet principal de leur espace
+  // - ADMIN / DIRECTION : aperçu de tous les cockpits (Dashboard Engine)
+  if (role === 'AUDITEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_CPFAE_ADMIN' || role === 'CPFAE_ADMIN') {
+    tabsConfig.push({ id: 'etudiant', label: role === 'AUDITEUR' ? 'Mon Espace Étudiant' : 'Espace Étudiant', icon: 'bi-person-badge' })
+  }
+  if (role === 'FORMATEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_CPFAE_ADMIN' || role === 'CPFAE_ADMIN') {
+    tabsConfig.push({ id: 'enseignant', label: role === 'FORMATEUR' ? 'Mon Espace Enseignant' : 'Espace Enseignant', icon: 'bi-person-workspace' })
+  }
   if (role === 'AUDITEUR') {
-    tabsConfig.unshift({ id: 'etudiant', label: 'Mon Espace Étudiant', icon: 'bi-person-badge' })
+    // Priorité visuelle : l'espace étudiant en tête pour l'auditeur
+    const idx = tabsConfig.findIndex((t) => t.id === 'etudiant')
+    if (idx > 0) {
+      const [tab] = tabsConfig.splice(idx, 1)
+      tabsConfig.unshift(tab)
+    }
   }
   if (role === 'FORMATEUR') {
-    tabsConfig.unshift({ id: 'enseignant', label: 'Mon Espace Enseignant', icon: 'bi-person-workspace' })
+    const idx = tabsConfig.findIndex((t) => t.id === 'enseignant')
+    if (idx > 0) {
+      const [tab] = tabsConfig.splice(idx, 1)
+      tabsConfig.unshift(tab)
+    }
   }
 
   // Nom du directeur affiché dans le greeting
@@ -814,6 +832,217 @@ export default function DashboardEngineView() {
                     { label: 'Inventaire du Patrimoine', to: '/referentiels', icon: 'bi-box-seam' },
                   ]}
                   title="Gestion Logistique"
+                />
+              </div>
+            </>
+          )}
+
+          {/* ===============================================================
+              ONGLET 8 : MON ESPACE ÉTUDIANT (AUDITEUR)
+              Spec : Tableaux de bord INJS LMD-2026 §7
+             =============================================================== */}
+          {activeTab === 'etudiant' && (
+            <>
+              <div className="glass-panel mb-3" style={{ padding: '1.25rem 1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <div className="plaquette plaquette-primary mb-2">Mon parcours LMD</div>
+                    <h2 style={{ margin: 0, color: '#0B1F3A', fontWeight: 800, fontSize: '1.35rem' }}>
+                      {data.etudiant || greetingName}
+                    </h2>
+                    <p style={{ margin: '0.35rem 0 0', color: '#64748B', fontSize: '0.92rem' }}>
+                      {data.niveau || '—'} · {data.formation || 'Formation INJS'} · Matricule {data.matricule || '—'}
+                    </p>
+                    <p style={{ margin: '0.25rem 0 0', color: '#64748B', fontSize: '0.85rem' }}>
+                      Année académique {data.annee_academique || '2026–2027'}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Situation financière
+                    </div>
+                    <div style={{ fontWeight: 800, color: '#10B981', fontSize: '1.05rem' }}>
+                      {data.solde_finance || data.kpis?.solde_finance || 'À jour'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {data.kpis && (
+                <div className="top-kpis-row">
+                  <KpiCard
+                    title="Crédits obtenus"
+                    value={data.kpis.credits_obtenus ?? data.credits_valides ?? 0}
+                    icon="bi-award"
+                    trend={`${data.credits_requis || 60} ECTS`}
+                    trendLabel="requis"
+                  />
+                  <KpiCard
+                    title="Crédits restants"
+                    value={data.kpis.credits_restants ?? Math.max(0, (data.credits_requis || 60) - (data.credits_valides || 0))}
+                    icon="bi-hourglass-split"
+                    trend="À valider"
+                  />
+                  <KpiCard
+                    title="Moyenne générale"
+                    value={data.kpis.moyenne_generale ?? data.moyenne_generale ?? '—'}
+                    icon="bi-graph-up"
+                    trend="Semestre"
+                  />
+                  <KpiCard
+                    title="Assiduité"
+                    value={data.kpis.assiduite ?? data.taux_presence ?? '—'}
+                    icon="bi-clock-history"
+                    trend="Présence"
+                  />
+                  <KpiCard
+                    title="UE validées"
+                    value={data.kpis.ue_validees ?? 0}
+                    icon="bi-journal-check"
+                    trend="LMD"
+                  />
+                  <KpiCard
+                    title="UE à valider"
+                    value={data.kpis.ue_a_valider ?? 0}
+                    icon="bi-journal"
+                    trend="Restantes"
+                    trendPositive={false}
+                  />
+                </div>
+              )}
+
+              <div className="row-pipeline-growth mt-3">
+                <LmdPipeline steps={data.pipeline || []} />
+                <div className="glass-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0B1F3A', margin: '0 0 0.5rem 0' }}>
+                      Timeline LMD personnelle
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                      Suivez votre progression de l&apos;admission à la diplomation : inscriptions,
+                      semestres, stage, soutenance et jury.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <Link to="/edt" className="btn-premium-primary">Mon emploi du temps</Link>
+                    <Link to="/evaluations" className="btn-premium-glass">Mes notes</Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <QuickActions
+                  actions={data.quick_actions || [
+                    { label: 'Mon emploi du temps', to: '/edt', icon: 'bi-calendar3' },
+                    { label: 'Mes notes', to: '/evaluations', icon: 'bi-journal-check' },
+                    { label: 'Mes présences', to: '/presences', icon: 'bi-qr-code' },
+                    { label: 'Situation financière', to: '/finance-dashboard', icon: 'bi-wallet2' },
+                  ]}
+                  title="Actions Étudiant"
+                />
+              </div>
+            </>
+          )}
+
+          {/* ===============================================================
+              ONGLET 9 : MON ESPACE ENSEIGNANT (FORMATEUR)
+              Spec : Tableaux de bord INJS LMD-2026 §8
+             =============================================================== */}
+          {activeTab === 'enseignant' && (
+            <>
+              <div className="glass-panel mb-3" style={{ padding: '1.25rem 1.5rem' }}>
+                <div className="plaquette plaquette-primary mb-2">Espace enseignant</div>
+                <h2 style={{ margin: 0, color: '#0B1F3A', fontWeight: 800, fontSize: '1.35rem' }}>
+                  {data.enseignant || greetingName}
+                </h2>
+                <p style={{ margin: '0.35rem 0 0', color: '#64748B', fontSize: '0.92rem' }}>
+                  Spécialité : {data.specialite || '—'} · Année {data.annee_academique || '2026–2027'}
+                </p>
+              </div>
+
+              {data.kpis && (
+                <div className="top-kpis-row">
+                  <KpiCard
+                    title="Cours affectés"
+                    value={data.kpis.cours_assignes}
+                    icon="bi-journal-bookmark"
+                    trend="Modules"
+                  />
+                  <KpiCard
+                    title="Groupes"
+                    value={data.kpis.groupes}
+                    icon="bi-people"
+                    trend="Pédagogiques"
+                  />
+                  <KpiCard
+                    title="Étudiants"
+                    value={data.kpis.etudiants ?? '—'}
+                    icon="bi-mortarboard"
+                    trend="Effectif"
+                  />
+                  <KpiCard
+                    title="Volume horaire"
+                    value={`${data.kpis.heures_realisees ?? 0} / ${data.kpis.heures_prevues ?? 0} h`}
+                    icon="bi-clock-history"
+                    trend="Réalisé / prévu"
+                  />
+                  <KpiCard
+                    title="CM"
+                    value={`${data.kpis.heures_cm ?? 0} h`}
+                    icon="bi-easel"
+                    trend="Cours magistraux"
+                  />
+                  <KpiCard
+                    title="TD / TP"
+                    value={`${data.kpis.heures_td ?? 0} / ${data.kpis.heures_tp ?? 0} h`}
+                    icon="bi-pencil"
+                    trend="Travaux"
+                  />
+                  <KpiCard
+                    title="Évaluations en attente"
+                    value={data.kpis.evaluations_en_attente ?? 0}
+                    icon="bi-file-earmark-text"
+                    trend="À saisir"
+                    trendPositive={false}
+                  />
+                  <KpiCard
+                    title="Absences à traiter"
+                    value={data.kpis.absences_a_traiter ?? 0}
+                    icon="bi-exclamation-triangle"
+                    trend="Justificatifs"
+                    trendPositive={false}
+                  />
+                </div>
+              )}
+
+              <div className="row-pipeline-growth mt-3">
+                <TeachingLoadBarChart title="Charge d'enseignement (CM / TD / TP)" />
+                <div className="glass-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0B1F3A', margin: '0 0 0.5rem 0' }}>
+                      Affectations pédagogiques
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                      Conformément au modèle INJS-LMD, l&apos;enseignant est rattaché aux enseignements,
+                      groupes et créneaux EDT — jamais directement à une salle ou un module isolé.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <Link to="/evaluations" className="btn-premium-primary">Saisir les notes</Link>
+                    <Link to="/presences" className="btn-premium-glass">Lancer un appel QR</Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <QuickActions
+                  actions={data.quick_actions || [
+                    { label: 'Mes groupes', to: '/scolarite/groupes', icon: 'bi-people' },
+                    { label: 'Saisir notes', to: '/evaluations', icon: 'bi-pencil-square' },
+                    { label: 'Lancer un appel', to: '/presences', icon: 'bi-qr-code-scan' },
+                    { label: 'Mon EDT', to: '/edt', icon: 'bi-calendar3' },
+                  ]}
+                  title="Actions Enseignant"
                 />
               </div>
             </>

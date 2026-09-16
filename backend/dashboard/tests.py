@@ -104,6 +104,24 @@ class DashboardEngineAPITests(APITestCase):
         self.assertIn('kpis', res.data)
         self.assertIn('diplomes_sha256', res.data['kpis'])
 
+    def test_jurys_alias_endpoint(self):
+        """Alias frontend : /api/dashboard/jurys/ → examens_dashboard."""
+        res = self.client.get('/api/dashboard/jurys/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('sessions_ouvertes', res.data['kpis'])
+        self.assertIn('diplomes_sha256', res.data['kpis'])
+
+    def test_etudiant_endpoint(self):
+        res = self.client.get('/api/dashboard/etudiant/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+
+    def test_enseignant_endpoint(self):
+        res = self.client.get('/api/dashboard/enseignant/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+
     def test_logistique_endpoint(self):
         res = self.client.get('/api/dashboard/logistique/')
         self.assertEqual(res.status_code, 200)
