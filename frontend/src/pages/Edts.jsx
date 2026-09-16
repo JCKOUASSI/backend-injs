@@ -211,8 +211,8 @@ export default function Edts() {
     return () => { actif = false }
   }, [])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement à la demande (filtres/montée) ;
   // chargerListe n'est pas mémoïsé sur selectedId pour éviter une boucle sélection→liste.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rechargement à la demande (filtres/montée) ;
   useEffect(() => { chargerListe() }, [filtreAnnee, filtreStatut, recherche])
 
   const chargerDetail = useCallback(async (id, semaineChoisie) => {
@@ -240,8 +240,9 @@ export default function Edts() {
     }
   }, [showToast, semaine])
 
-  useEffect(() => { chargerDetail(selectedId, vue === 'grille' ? semaine : null) },
-    [selectedId, semaine, vue])
+  useEffect(() => {
+    chargerDetail(selectedId, vue === 'grille' ? semaine : null)
+  }, [selectedId, semaine, vue, chargerDetail])
 
   const edtsAffiches = edts
   const selectedEdt = useMemo(

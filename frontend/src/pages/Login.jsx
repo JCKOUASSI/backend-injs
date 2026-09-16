@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ADMIN_URL } from '../services/api'
 import logo from '../assets/logo-injs.svg'
+import '../styles/login.css'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -193,8 +194,9 @@ export default function Login() {
           </form>
           )}
 
-          <div className="text-center" style={{ marginTop: '1rem' }}>
-            <a href={ADMIN_URL} className="login-admin-link" title="Interface d'administration">
+          <div className="login-admin-btn-wrap">
+            <a href={ADMIN_URL} className="btn-login-admin" title="Interface d'administration">
+              <i className="bi bi-gear-fill me-1"></i>
               administration
             </a>
           </div>
@@ -211,9 +213,6 @@ export default function Login() {
           </div>
 
           <div className="login-form-footer">
-            <a href={ADMIN_URL} className="login-admin-link" title="Interface d'administration">
-              administration
-            </a>
             <span>Développé par Ophir Technologies</span>
           </div>
         </section>

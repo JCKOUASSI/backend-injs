@@ -41,7 +41,6 @@ import FileProvisionnement from './pages/habilitations/FileProvisionnement'
 import NotificationsHabilitation from './pages/habilitations/NotificationsHabilitation'
 import RevueHabilitations from './pages/habilitations/RevueHabilitations'
 import JournalHabilitations from './pages/habilitations/JournalHabilitations'
-import Organisation from './pages/habilitations/Organisation'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
@@ -101,6 +100,7 @@ const ChargesEnseignants = lazy(() => import('./pages/scolarite/ChargesEnseignan
 const Jurys = lazy(() => import('./pages/scolarite/Jurys'))
 const Graduation = lazy(() => import('./pages/scolarite/Graduation'))
 const FinancesEtudiantes = lazy(() => import('./pages/scolarite/FinancesEtudiantes'))
+const DashboardEngineView = lazy(() => import('./pages/DashboardEngineView'))
 
 
 function App() {
@@ -112,16 +112,16 @@ function App() {
     // DIRECTION peut choisir entre les deux dashboards
     if (user?.role === 'SUPERVISEUR') return <Navigate to="/evaluations" replace />
     return (
-      <Layout breadcrumb={<li>Tableau de bord</li>}>
-        <Dashboard />
+      <Layout breadcrumb={<li>Tableau de bord LMD 2026</li>}>
+        <DashboardEngineView />
       </Layout>
     )
   }
 
   function DashboardRoute() {
     return (
-      <Layout breadcrumb={<li>Tableau de bord</li>}>
-        <Dashboard />
+      <Layout breadcrumb={<li>Tableau de bord LMD 2026</li>}>
+        <DashboardEngineView />
       </Layout>
     )
   }
@@ -234,7 +234,9 @@ function App() {
           <Route path="/scolarite" element={
             <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES} capacite={{ module: 'scolarite', action: 'voir' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Scolarité</li></>}>
-                <ScolariteDashboard />
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <ScolariteDashboard />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />
@@ -268,7 +270,9 @@ function App() {
           <Route path="/scolarite/etudiants/:id" element={
             <ProtectedRoute allowedRoles={SCOLARITE_VIEW_ROLES} capacite={{ module: 'scolarite', action: 'voir' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/scolarite">Scolarité</Link></li><li className="separator">/</li><li>Fiche étudiant</li></>}>
-                <FicheEtudiant />
+                <Suspense fallback={<div className="loading"><div className="spinner"/></div>}>
+                  <FicheEtudiant />
+                </Suspense>
               </Layout>
             </ProtectedRoute>
           } />

@@ -1,0 +1,2464 @@
+====================================================================================================
+MODE OPÉRATOIRE D'EXÉCUTION
+Comment exécuter concrètement le « Plan-exécution-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt »
+Projet CURP-INJS — Comptes utilisateurs, rôles & permissions
+app-injs-lmd2026demo — INJS Marcory, Abidjan, Côte d'Ivoire
+====================================================================================================
+Version            : 1.0
+Date               : 13 septembre 2026
+Nature             : Procédure opérationnelle — document de travail quotidien
+Public             : Exécutant(s) technique(s), responsable technique, RSSI, expert fonctionnel,
+                     référent scolarité, exploitant, référents de domaine
+Documents liés     : [D4] Génération-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt   (LE QUOI)
+                     [D5] Plan-exécution-prompts-COMPTES-UTILISATEURS-app-injs-lmd2026.txt (LE QUAND)
+                     [D6] Le présent mode opératoire                                      (LE COMMENT)
+                     [S1] Audit-complet-détaillé-app-injs-lmd2026OK.txt
+                     [S2] Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt (MODULE 18)
+                     [S3] RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL...txt
+                     [D1][D2][D3] Le triptyque EDT-INJS, pour l'articulation des deux chantiers
+Règle d'usage      : Ce document se lit une fois en entier, puis se consulte chapitre par chapitre
+                     au moment d'agir. Les commandes sont à copier telles quelles.
+Avertissement      : Ce chantier touche les accès. Une erreur ici n'est pas un bogue, c'est un arrêt
+                     d'activité ou une fuite de données. Aucun geste de ce document n'est décoratif.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+ 0.  COMMENT UTILISER CE DOCUMENT — LES TROIS DOCUMENTS ET LEUR ARTICULATION
+ 1.  PHASE 0 — MISE EN PLACE AVANT LA PREMIÈRE UNITÉ (J-15 À J0)
+     1.1 Check-list de démarrage en 28 points
+     1.2 Les quatre conditions sans lesquelles on ne démarre pas
+     1.3 Environnement de développement
+     1.4 Création de l'environnement de recette et anonymisation de la base
+     1.5 Vérification de la sauvegarde et de la restauration
+     1.6 Arborescence documentaire du projet
+     1.7 Recueil des données de référence auprès de l'INJS (D1 à D6)
+     1.8 Configuration du dépôt et de la CI
+     1.9 Constitution des 12 comptes témoins
+ 2.  LE CYCLE D'EXÉCUTION D'UNE UNITÉ — PROCÉDURE PAS À PAS
+     2.1 Vue d'ensemble du cycle en 10 étapes
+     2.2 Étape par étape, gestes et commandes
+     2.3 Ce qui déclenche un ARRÊT immédiat
+ 3.  MODE OPÉRATOIRE DE L'AGENT DE CODAGE
+     3.1 Préparation de la session
+     3.2 Le message d'amorçage à copier
+     3.3 Contrôle de la reformulation
+     3.4 Conduite de la production
+     3.5 Les douze dérives typiques et leur correction
+ 4.  MODE OPÉRATOIRE DES VÉRIFICATIONS
+     4.1 La batterie des 14 points, commande par commande
+     4.2 Le scénario de fumée d'authentification
+     4.3 Le rapport de réconciliation des droits
+     4.4 Le banc de mesure de la décision
+     4.5 Que faire quand une vérification échoue
+ 5.  MODE OPÉRATOIRE DU MODE OBSERVATION
+     5.1 Mise en service
+     5.2 Lecture quotidienne des écarts
+     5.3 Traitement d'un écart de type A, pas à pas
+     5.4 Traitement d'un écart de type B, pas à pas
+     5.5 Décider une restriction volontaire : la procédure en 6 gestes
+ 6.  MODE OPÉRATOIRE DE LA MATRICE DE PERMISSIONS
+     6.1 Préparer les trois ateliers
+     6.2 Conduire un atelier de validation
+     6.3 Statuer sur une ligne
+     6.4 Traiter un désaccord entre domaines
+     6.5 Signer et archiver
+ 7.  MODE OPÉRATOIRE DE LA REVUE DE SÉCURITÉ
+     7.1 Ce que le RSSI examine
+     7.2 Grille de revue en 18 points
+     7.3 Formuler un avis et suivre une réserve
+     7.4 Conduire l'exercice d'intrusion fonctionnelle (jalon J3)
+ 8.  MODE OPÉRATOIRE DES PORTES DE QUALITÉ ET DES JALONS
+ 9.  MODE OPÉRATOIRE DES ITÉRATIONS
+10.  MODE OPÉRATOIRE DE LA RECETTE FONCTIONNELLE
+11.  MODE OPÉRATOIRE DE LA MIGRATION DES COMPTES
+12.  MODE OPÉRATOIRE DES MISES EN PRODUCTION ET DES BASCULES E1 À E4
+13.  MODE OPÉRATOIRE DES INCIDENTS ET DU REPLI
+14.  MODE OPÉRATOIRE DE LA DOCUMENTATION PROJET
+15.  MODE OPÉRATOIRE EN ÉQUIPE RÉDUITE (UN SEUL EXÉCUTANT)
+16.  FICHE RÉFLEXE — L'ESSENTIEL SUR UNE PAGE
+ANNEXE 1 — TOUTES LES COMMANDES DU PROJET, CLASSÉES PAR USAGE
+ANNEXE 2 — GABARITS À COPIER
+ANNEXE 3 — GLOSSAIRE DES SIGLES DU PROJET
+====================================================================================================
+
+
+====================================================================================================
+0. COMMENT UTILISER CE DOCUMENT — LES TROIS DOCUMENTS ET LEUR ARTICULATION
+====================================================================================================
+
+0.1 RÉPARTITION DES RÔLES ENTRE LES TROIS DOCUMENTS
+
+  [D4] Génération-prompts-COMPTES-UTILISATEURS ..... LE QUOI
+       Contient les 8 règles de sûreté S1 à S8, le prompt principal CURP-INJS, les 6 prompts
+       complémentaires C1 à C6 et les 7 annexes de référence A1 à A7. C'est la matière première
+       que l'on soumet à l'agent de codage. On n'y touche pas : c'est la référence figée du
+       périmètre.
+
+  [D5] Plan-exécution-prompts-COMPTES-UTILISATEURS .. LE QUAND ET AVEC QUI
+       Contient l'ordonnancement en 8 itérations, le graphe de dépendances, les fiches des
+       9 unités U0 à U8, les portes G0 à G4, les jalons J1 à J4, le protocole d'observation,
+       le planning, les risques X1 à X14, la RACI.
+       On le consulte pour savoir quoi faire cette semaine et dans quelles conditions.
+
+  [D6] Le présent mode opératoire ................... LE COMMENT
+       Contient les gestes concrets, les commandes, les gabarits, les procédures pas à pas.
+       On l'ouvre au moment d'agir.
+
+0.2 RÈGLE DE PRÉSÉANCE EN CAS DE CONTRADICTION
+  En cas de divergence apparente, l'ordre de préséance est :
+
+      RÈGLES DE SÛRETÉ S1-S8  >  [S2] Modèle fonctionnel  >  [D4] Prompts  >  [D5] Plan  >  [D6] MO
+
+  Noter la différence avec le chantier EDT-INJS : ici, les règles de sûreté priment sur TOUT, y
+  compris sur le modèle fonctionnel. Si une disposition du modèle fonctionnel devait, pour être
+  appliquée, faire perdre un accès à quelqu'un sans décision explicite, on n'applique pas la
+  disposition aujourd'hui : on la décide, on la trace, on la communique, puis on l'applique.
+
+  Toute contradiction constatée est signalée au responsable technique, tranchée, et corrigée dans
+  le document concerné le jour même. On ne laisse jamais deux versions d'une même règle coexister.
+
+0.3 LE RÉFLEXE QUOTIDIEN
+  Chaque matin, l'exécutant se pose quatre questions :
+      1. Quelle unité suis-je en train d'exécuter ?          → [D5] §8, planning hebdomadaire
+      2. Quel est son critère de sortie ?                    → [D5] §7, fiche de l'unité
+      3. Y a-t-il un écart d'observation de type A en attente ? → tableau de bord, §5.2 du présent
+      4. Quelle est ma prochaine action concrète ?           → [D6] §2, cycle d'exécution
+
+0.4 LA QUESTION UNIQUE
+  Devant toute décision, petite ou grande, technique ou fonctionnelle, une seule question tranche :
+
+      « Est-ce que cela peut faire perdre un accès à quelqu'un sans qu'on l'ait décidé ? »
+
+  Si la réponse n'est pas un non certain, on ne le fait pas aujourd'hui. On l'écrit, on le fait
+  trancher, on le trace, et on le fait demain.
+
+
+====================================================================================================
+1. PHASE 0 — MISE EN PLACE AVANT LA PREMIÈRE UNITÉ (J-15 À J0)
+====================================================================================================
+
+La phase 0 dure trois semaines pour ce chantier, contre deux pour EDT-INJS. Elle est plus longue
+parce qu'elle doit produire une chose qu'aucun autre chantier n'exige : un environnement de recette
+avec une copie anonymisée de la base de production. Sans lui, rien ne commence.
+
+1.1 CHECK-LIST DE DÉMARRAGE EN 28 POINTS
+
+  GOUVERNANCE ET PERSONNES
+  ☐  1. Responsable technique (RT) désigné nommément, disponibilité 30 % confirmée
+  ☐  2. RSSI désigné, interne ou prestataire, disponibilité 25 % confirmée, PAS auteur du code
+  ☐  3. Développeur backend (DB) affecté à plein temps
+  ☐  4. Développeur frontend (DF) affecté à 60 % à partir de la semaine 9
+  ☐  5. Expert fonctionnel (EF) désigné, disponibilité 40 % confirmée PAR ÉCRIT par la direction
+  ☐  6. Référent scolarité (RS) désigné, 25 %
+  ☐  7. Les cinq référents de domaine (RF) désignés nommément : candidatures, évaluations,
+        diplômation, finances, RH — et informés de leur rôle
+  ☐  8. Responsable exploitation (RE) désigné, 20 %
+  ☐  9. Interlocuteur direction (DIR) désigné pour les arbitrages et les portes
+  ☐ 10. Deux personnes désignées comme détentrices de la procédure de secours
+
+  DOCUMENTS
+  ☐ 11. [D4], [D5], [D6] imprimés ou accessibles hors ligne par toute l'équipe
+  ☐ 12. [S1] audit, [S2] modèle fonctionnel, [S3] rapport de mise en œuvre lus par RT, DB et RSSI
+  ☐ 13. Les 8 règles de sûreté S1-S8 affichées physiquement dans le bureau de l'équipe
+  ☐ 14. Annexes A1 à A7 de [D4] imprimées pour les ateliers de validation
+
+  TECHNIQUE
+  ☐ 15. Dépôt cloné, branche de référence identifiée, droits d'écriture vérifiés
+  ☐ 16. Environnement de développement fonctionnel : l'application démarre en local
+  ☐ 17. Les 943 tests existants passent en local, chrono relevé
+  ☐ 18. Le build frontend passe, nombre de warnings ESLint relevé (référence : 89)
+  ☐ 19. `flutter analyze` exécuté, sortie relevée comme référence
+  ☐ 20. CI opérationnelle et verte sur la branche de référence
+  ☐ 21. ENVIRONNEMENT DE RECETTE créé, accessible, distinct de la production
+  ☐ 22. Copie ANONYMISÉE de la base de production restaurée en recette
+  ☐ 23. Sauvegarde de production testée EN RESTAURATION, durée chronométrée
+  ☐ 24. Redis disponible en développement et en recette (cache des décisions)
+  ☐ 25. Arborescence documentaire `docs/curp/` créée et versionnée
+
+  DONNÉES DE RÉFÉRENCE
+  ☐ 26. Les six demandes D1 à D6 (§1.7) envoyées par écrit, avec date d'échéance
+  ☐ 27. Calendrier des trois ateliers de validation de la matrice arrêté et invitations envoyées
+  ☐ 28. Fenêtres interdites de bascule recensées auprès de la scolarité (jurys, inscriptions)
+
+1.2 LES QUATRE CONDITIONS SANS LESQUELLES ON NE DÉMARRE PAS
+
+  Ce ne sont pas des points de check-list parmi d'autres. Ce sont des conditions bloquantes.
+
+  C1. L'ENVIRONNEMENT DE RECETTE EXISTE ET CONTIENT UNE COPIE RÉELLE ANONYMISÉE
+      Motif : un dispositif d'habilitation ne se teste pas sur des données inventées. Les cas
+      difficiles — comptes partagés, doublons d'identité, agents à trois fonctions, comptes
+      historiques sans titulaire — n'apparaissent que dans les vraies données. L'audit [S1] signale
+      l'absence d'environnement de recette au risque R6 : pour ce chantier, c'est éliminatoire.
+
+  C2. L'EXPERTISE FONCTIONNELLE EST ENGAGÉE PAR ÉCRIT
+      Motif : la matrice de permissions n'est pas un objet technique. Personne dans l'équipe
+      technique ne sait si un gestionnaire de groupes doit voir les notes. Sans EF disponible,
+      on produit une matrice plausible — c'est-à-dire une matrice fausse dont personne ne sait
+      qu'elle est fausse.
+
+  C3. LE RSSI EST DÉSIGNÉ ET N'EST PAS L'AUTEUR DU CODE
+      Motif : la revue de sécurité est l'étape 9 du cycle. Une relecture par soi-même n'est pas
+      une revue. Si l'institut ne dispose pas de la compétence en interne, une prestation de
+      quelques jours suffit — mais elle n'est pas optionnelle.
+
+  C4. LA RESTAURATION DE SAUVEGARDE A ÉTÉ TESTÉE, PAS SEULEMENT LA SAUVEGARDE
+      Motif : le niveau 4 de repli repose dessus. Une sauvegarde jamais restaurée est une
+      hypothèse. On la teste en phase 0, on chronomètre, on consigne la durée réelle.
+
+  Si l'une de ces quatre conditions n'est pas remplie à J0, le démarrage est reporté et la
+  direction en est informée par écrit avec le motif. Démarrer sans elles n'accélère rien : cela
+  déplace simplement le risque vers le moment où il coûtera le plus cher.
+
+1.3 ENVIRONNEMENT DE DÉVELOPPEMENT
+
+  # Récupération et préparation
+  git clone <url-du-depot> app-injs-lmd2026demo
+  cd app-injs-lmd2026demo
+  git checkout arena/01a08d49-app-injslmd2026demo
+  git pull
+
+  # Backend
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+  python manage.py migrate
+  python manage.py check
+  python manage.py test          # relever la durée et le nombre : référence 943 tests
+
+  # Frontend
+  cd frontend
+  npm ci
+  npm run lint 2>&1 | tail -5    # relever le nombre de warnings : référence 89
+  npm run build
+  cd ..
+
+  # Mobile
+  cd mobile && flutter analyze | tail -20 && cd ..
+
+  # Redis
+  redis-cli ping                 # doit répondre PONG
+
+  CONSIGNER dans docs/curp/00-references-initiales.md : nombre de tests, durée de la suite, nombre
+  de warnings ESLint, sortie de flutter analyze, version de Python, de Node, de PostgreSQL, de
+  Redis. Ces chiffres sont la ligne de base. Toute dégradation ultérieure se mesure contre eux.
+
+1.4 CRÉATION DE L'ENVIRONNEMENT DE RECETTE ET ANONYMISATION DE LA BASE
+
+  ÉTAPE 1 — Obtenir un export de la base de production
+     pg_dump -Fc -h <hote-prod> -U <user> <base> > prod_$(date +%Y%m%d).dump
+     L'export contient des données personnelles réelles. Il est chiffré, transporté de manière
+     sécurisée, et détruit après anonymisation. Consigner qui l'a manipulé et quand.
+
+  ÉTAPE 2 — Restaurer sur le serveur de recette
+     createdb injs_recette
+     pg_restore -d injs_recette prod_$(date +%Y%m%d).dump
+
+  ÉTAPE 3 — Anonymiser AVANT toute ouverture d'accès
+     Écrire une commande `python manage.py anonymiser_recette` qui, au minimum :
+       • remplace les noms et prénoms par des valeurs générées, en conservant la structure
+         (homonymes conservés comme homonymes — ils sont un cas de test précieux) ;
+       • remplace les adresses électroniques par <identifiant>@recette.injs.local ;
+       • remplace les numéros de téléphone et les adresses postales ;
+       • réinitialise TOUS les mots de passe à une valeur connue de l'équipe ;
+       • désactive tout envoi de courriel sortant au niveau de la configuration ;
+       • CONSERVE INTÉGRALEMENT : les rôles, les rattachements, les secrétariats, les dates de
+         création et de dernière connexion, les états des comptes.
+     La dernière ligne est la plus importante. On anonymise l'identité, jamais l'habilitation :
+     c'est l'habilitation que l'on vient étudier.
+
+  ÉTAPE 4 — Vérifier l'anonymisation
+     Requête de contrôle sur un échantillon de 50 comptes : aucun nom réel, aucune adresse réelle.
+     Faire valider par le RSSI avant d'ouvrir l'accès à l'équipe.
+
+  ÉTAPE 5 — Documenter
+     docs/curp/00-environnement-recette.md : procédure complète, date de la copie, nom de la
+     commande d'anonymisation, personnes ayant accès. La copie est rafraîchie avant l'unité U8.
+
+1.5 VÉRIFICATION DE LA SAUVEGARDE ET DE LA RESTAURATION
+
+  On ne vérifie pas qu'une sauvegarde existe. On vérifie qu'on sait la remettre en service.
+
+  1. Choisir une sauvegarde de production datant de moins de 7 jours.
+  2. La restaurer sur un serveur tiers, ni production ni recette. Démarrer le chronomètre.
+  3. Démarrer l'application dessus. Se connecter avec un compte. Ouvrir trois écrans.
+  4. Arrêter le chronomètre. Consigner la durée réelle dans docs/curp/00-restauration.md.
+  5. Détruire l'environnement de test de restauration.
+  6. Si la durée dépasse 2 heures, alerter : le niveau 4 de repli n'est pas tenable, il faut
+     améliorer la procédure avant de démarrer le chantier.
+
+1.6 ARBORESCENCE DOCUMENTAIRE DU PROJET
+
+  docs/curp/
+    00-references-initiales.md ......... chiffres de départ (RT)
+    00-environnement-recette.md ........ procédure de copie et d'anonymisation (RE)
+    00-restauration.md ................. test de restauration, durée réelle (RE)
+    01-etat-des-droits.md .............. la matrice réelle actuelle — livrable L1 de U0 (DB)
+    02-inventaire-comptes.md ........... photographie du parc de comptes — L2 de U0 (DB)
+    03-modele-donnees.md ............... schéma de la chaîne PERSONNE → PÉRIMÈTRE (DB)
+    04-moteur-autorisation.md .......... les 10 contrôles et leur ordre (DB, validé RSSI)
+    05-matrice.md ...................... LA MATRICE — document signé, opposable (EF + RS)
+    06-registre-arbitrages.md .......... chaque décision fonctionnelle tranchée (EF)
+    07-journal-observation.md .......... suivi hebdomadaire des écarts (DB)
+    08-revues-securite.md .............. avis RSSI successifs et suivi des réserves (RSSI)
+    09-migration.md .................... rapports de simulation et d'exécution (DB + RE)
+    10-bascule.md ...................... journal des activations de drapeaux (RE)
+    11-incidents.md .................... journal des incidents et retours d'expérience (RT)
+    12-comptes-rendus/ ................. un compte rendu par unité, gabarit annexe F de [D5]
+    manuels/
+      manuel-administrateur-systeme.md
+      manuel-gestionnaire-comptes.md
+      manuel-agent-utilisateur.md
+      memo-<famille-de-roles>.md ....... une fiche d'une page par famille
+
+  RÈGLE : un document sans responsable nommé n'est pas tenu à jour. Le nom figure en première ligne
+  de chaque fichier, avec la date de dernière mise à jour.
+
+1.7 RECUEIL DES DONNÉES DE RÉFÉRENCE AUPRÈS DE L'INJS
+
+  Les six dépendances du §4.3 de [D5] se demandent PAR ÉCRIT, dès la première semaine, avec une
+  échéance. Gabarit de demande en annexe 2. Récapitulatif :
+
+  +----+------------------------------------------+--------------+-----------+------------------+
+  | Réf| Donnée attendue                          | Demandée à   | Échéance  | Bloque           |
+  +----+------------------------------------------+--------------+-----------+------------------+
+  | D1 | Liste nominative des agents : nom,       | RS           | Semaine 6 | U8 (rattachement |
+  |    | fonction réelle, service, secrétariat,   |              |           | des comptes aux  |
+  |    | adresse professionnelle, statut          |              |           | Personnes)       |
+  | D2 | Décision de direction : liste des rôles  | DIR          | Semaine 10| U6 (MFA)         |
+  |    | soumis au MFA obligatoire                |              |           |                  |
+  | D3 | Politique de mot de passe                | DIR + RSSI   | Semaine 10| U6               |
+  | D4 | Durées légales de conservation des       | Conseil      | Semaine 11| U7 (registre des |
+  |    | journaux applicables en Côte d'Ivoire    | juridique    |           | traitements)      |
+  | D5 | Copie anonymisée de la base             | RE           | Semaine 0 | TOUT             |
+  | D6 | Détenteurs de la procédure de secours et | DIR          | Semaine 12| U8 (jalon J4)    |
+  |    | coffre de conservation                   |              |           |                  |
+  +----+------------------------------------------+--------------+-----------+------------------+
+
+  CONDUITE À TENIR SI UNE DONNÉE N'ARRIVE PAS À L'ÉCHÉANCE
+    • D1 : travailler sur les données de recette, marquer les rattachements « à confirmer », et
+      NE PAS exécuter la migration réelle. La bascule est reportée, pas le développement.
+    • D2 : appliquer la liste des 11 rôles sensibles proposée en annexe A1 de [D4], la marquer
+      « proposition non ratifiée », et la faire ratifier avant l'activation du drapeau MFA.
+    • D3 : appliquer la proposition du prompt C4, marquée « provisoire ».
+    • D4 : appliquer une durée par défaut de 5 ans, marquée « à confirmer », et ne pas purger.
+    • D5 : ARRÊT. Voir §1.2, condition C1.
+    • D6 : la procédure est développée et testée en interne, mais l'étape E2 n'est pas franchie
+      tant que les détenteurs ne sont pas désignés.
+
+1.8 CONFIGURATION DU DÉPÔT ET DE LA CI
+
+  git checkout -b integration/curp-injs arena/01a08d49-app-injslmd2026demo
+  git push -u origin integration/curp-injs
+
+  Protéger la branche d'intégration : pas de poussée directe, pull request obligatoire,
+  deux approbations, CI verte exigée.
+
+  La CI doit exécuter, sur chaque pull request, les 14 points de la batterie du §4.1. Les points 8
+  (fumée d'authentification) et 9 (réconciliation) n'existent qu'à partir de l'unité U0 ; ils sont
+  ajoutés à la CI à la fin de U0 et ne sont plus jamais retirés.
+
+  AJOUTER UN GARDE-FOU DE CI SPÉCIFIQUE À CE CHANTIER : un contrôle qui échoue si un fichier de
+  test existant a été modifié dans la pull request. Techniquement, un simple diff sur les chemins
+  de tests antérieurs au chantier. Ce garde-fou matérialise la règle R5. Il peut être contourné
+  par une étiquette explicite sur la PR, qui déclenche alors une revue RT + RSSI obligatoire.
+
+1.9 CONSTITUTION DES 12 COMPTES TÉMOINS
+
+  Un compte témoin par rôle existant, créé en recette, utilisé pour le scénario de fumée. Les
+  12 rôles existants sont ceux recensés par l'audit et repris en annexe A6 de [D4] :
+
+  +----+---------------------+------------------------------------+-------------------------+
+  | #  | Rôle existant       | Écrans de référence à atteindre    | Particularité à vérifier|
+  +----+---------------------+------------------------------------+-------------------------+
+  |  1 | ADMIN               | administration complète            | accès total             |
+  |  2 | CHEF_CPFAE_ADMIN    | administration + direction études  | double casquette        |
+  |  3 | CPFAE_ADMIN         | scolarité + cours                  |                         |
+  |  4 | DIRECTION           | tableaux de bord de direction      | lecture large           |
+  |  5 | CHEF_SECRETARIAT    | scolarité niveau 3, inscriptions,  | CLOISONNEMENT par       |
+  |    |                     | admissions, étudiants              | secrétariat             |
+  |  6 | SECRETARIAT         | inscriptions, admissions, étudiants| CLOISONNEMENT           |
+  |  7 | FINANCE             | finances étudiantes + vacations    | séparation des tâches   |
+  |  8 | ARCHIVE             | archives                           | lecture seule           |
+  |  9 | ENCADRANT           | groupes + séances                  |                         |
+  | 10 | SUPERVISEUR         | suivi pédagogique                  |                         |
+  | 11 | FORMATEUR           | application mobile / PWA           | MOBILE UNIQUEMENT —     |
+  |    |                     |                                    | doit ÉCHOUER sur le web |
+  | 12 | AUDITEUR            | application mobile / PWA           | MOBILE UNIQUEMENT       |
+  +----+---------------------+------------------------------------+-------------------------+
+
+  Pour les rôles 5 et 6, créer DEUX comptes chacun, rattachés à deux secrétariats différents.
+  Le cloisonnement ne se teste qu'avec deux périmètres distincts : un seul compte ne prouve rien.
+
+  Cela porte le nombre réel de comptes témoins à 14. Les conserver en recette pour toute la durée
+  du chantier, ne jamais leur attribuer de rôle CURP avant l'unité U8, et consigner leurs
+  identifiants dans un gestionnaire de secrets — jamais dans le dépôt.
+
+
+====================================================================================================
+2. LE CYCLE D'EXÉCUTION D'UNE UNITÉ — PROCÉDURE PAS À PAS
+====================================================================================================
+
+2.1 VUE D'ENSEMBLE DU CYCLE EN 10 ÉTAPES
+
+  ÉTAPE 1  Préparation .................................. 0,5 j
+  ÉTAPE 2  Note de conception ........................... 0,5 à 1 j   [obligatoire U1,U2,U3,U5,U6,U8]
+  ÉTAPE 3  Soumission du prompt à l'agent de codage ..... 0,5 j
+  ÉTAPE 4  Production incrémentale ...................... le gros du temps
+  ÉTAPE 5  Tests de succès ET tests de refus ............ intégré à l'étape 4
+  ÉTAPE 6  Batterie de vérification des 14 points ....... 0,5 j
+  ÉTAPE 7  Scénario de fumée d'authentification ......... 15 min
+  ÉTAPE 8  Rapport de réconciliation des droits ......... 30 min
+  ÉTAPE 9  REVUE DE SÉCURITÉ ............................ 0,5 j  [propre à ce chantier]
+  ÉTAPE 10 Revue, fusion, compte rendu .................. 0,5 j
+
+  Les étapes 6, 7 et 8 sont également exécutées CHAQUE SOIR, pas seulement en fin d'unité. Elles
+  prennent moins de dix minutes en local une fois automatisées.
+
+2.2 ÉTAPE PAR ÉTAPE, GESTES ET COMMANDES
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 1 — PRÉPARATION
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Gestes :
+    1. Ouvrir la fiche de l'unité dans [D5] §7. La lire en entier, y compris les risques.
+    2. Ouvrir le prompt correspondant dans [D4]. Le lire en entier.
+    3. Ouvrir les annexes de [D4] citées par le prompt. Les avoir sous la main.
+    4. Vérifier les critères d'entrée de la fiche. Si l'un manque, NE PAS DÉMARRER : le signaler.
+    5. Créer la branche.
+
+  Commandes :
+    git checkout integration/curp-injs && git pull
+    git checkout -b feature/curp-injs-u2
+    mkdir -p docs/curp/12-comptes-rendus
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 2 — NOTE DE CONCEPTION
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Obligatoire pour U1, U2, U3, U5, U6, U8. Une à deux pages, pas davantage. Gabarit en annexe 2.
+
+  Contenu minimal :
+    • Ce que l'unité ajoute, en trois phrases.
+    • Modèles créés ou étendus, avec la mention explicite : aucun modèle existant modifié.
+    • Routes créées, avec leur méthode et la permission exigée.
+    • RÈGLES D'AUTORISATION INTRODUITES — section la plus importante. Pour chacune : qui est
+      autorisé, qui est refusé, et sur quel périmètre.
+    • EFFETS POSSIBLES SUR LES DROITS EXISTANTS. Si la réponse est « aucun », l'écrire et
+      expliquer pourquoi. Si la réponse n'est pas « aucun », détailler lesquels.
+    • Stratégie de test, avec le nombre de tests visé et la proportion de tests de refus.
+    • Stratégie de repli : comment on annule cette unité si elle pose problème.
+
+  Validation : RT pour toutes les unités concernées. RT + RSSI pour U2, U6 et U8.
+  La note validée est archivée dans docs/curp/ avant le premier commit de code.
+
+  Une unité démarrée sans note validée est un incident de pilotage, à consigner au §11 du journal.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 3 — SOUMISSION DU PROMPT À L'AGENT DE CODAGE
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Procédure détaillée au §3. En résumé :
+    1. Ouvrir une session NEUVE, dédiée à cette seule unité.
+    2. Envoyer le message d'amorçage (§3.2).
+    3. Coller le prompt TEL QUEL depuis [D4], sans le résumer ni le raccourcir.
+    4. Exiger la reformulation AVANT tout code. Contrôler la reformulation (§3.3).
+    5. Ne laisser produire du code qu'après validation de la reformulation.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 4 — PRODUCTION INCRÉMENTALE
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Règles de conduite :
+    • Une tranche de travail = un ensemble cohérent qui laisse l'application démarrable.
+    • À la fin de chaque tranche : `python manage.py check` puis les tests de la tranche.
+    • Un commit par tranche, message en français, préfixé par le code de l'unité :
+        git commit -m "U2: moteur d'autorisation, contrôles 1 à 5"
+    • Aucun fichier serveur au-delà de 600 lignes, aucun fichier d'interface au-delà de 400.
+      Vérification : `find . -name "*.py" -path "*habilitations*" | xargs wc -l | sort -rn | head`
+    • Aucun `print()`. L'audit en dénombre déjà 288 dans le dépôt ; on n'en ajoute pas un seul.
+      Vérification : `grep -rn "print(" backend/habilitations/ | grep -v "#"`
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 5 — TESTS DE SUCCÈS ET TESTS DE REFUS
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  La règle : pour chaque règle d'autorisation, deux tests minimum.
+    • un rôle autorisé obtient le succès attendu ;
+    • un rôle non autorisé obtient un refus EXPLICITE, avec le bon code HTTP et un message qui ne
+      révèle pas l'existence de la ressource.
+
+  Convention de nommage adoptée pour ce chantier, à respecter strictement :
+    test_<action>_autorise_pour_<role>
+    test_<action>_refuse_pour_<role>
+    test_<action>_refuse_hors_perimetre
+    test_<action>_refuse_si_objet_verrouille
+
+  Contrôle automatique à ajouter en CI : un script qui compte les tests dont le nom contient
+  `refuse` et échoue si leur nombre est inférieur à celui des tests contenant `autorise`. Grossier,
+  mais efficace : il rend visible l'oubli du test de refus, qui est l'oubli le plus fréquent.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 6 — BATTERIE DE VÉRIFICATION
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Les 14 points du §4.1. Aucune dérogation, aucun point sauté « parce qu'on n'a touché qu'au
+  frontend ». Le script `scripts/verif_curp.sh` de l'annexe 1 les enchaîne.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 7 — SCÉNARIO DE FUMÉE D'AUTHENTIFICATION
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Procédure au §4.2. Les 14 comptes témoins se connectent et atteignent leurs écrans. Un échec
+  bloque la fusion, sans discussion et sans analyse préalable : on corrige d'abord.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 8 — RAPPORT DE RÉCONCILIATION DES DROITS
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Procédure au §4.3. Zéro écart, ou uniquement des écarts décidés, datés et signés par EF.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 9 — REVUE DE SÉCURITÉ
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  Procédure au §7. Le RSSI rend un avis écrit : FAVORABLE, FAVORABLE SOUS RÉSERVE, ou DÉFAVORABLE.
+  Un avis DÉFAVORABLE interdit la fusion. Un avis SOUS RÉSERVE autorise la fusion mais ouvre une
+  réserve à lever avant la porte de qualité suivante.
+
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+  ÉTAPE 10 — REVUE, FUSION ET COMPTE RENDU
+  ───────────────────────────────────────────────────────────────────────────────────────────────
+    1. Ouvrir la pull request. Y joindre : la note de conception, le rapport de réconciliation,
+       l'avis RSSI, et la sortie de la batterie de vérification.
+    2. Revue par RT. Revue supplémentaire par EF pour U3 et U5.
+    3. Fusion en squash ou en merge, selon la convention du dépôt, avec un message explicite.
+    4. Compte rendu selon le gabarit de l'annexe F de [D5], déposé dans docs/curp/12-comptes-rendus/.
+    5. Mise à jour du tableau de bord des indicateurs et du registre des risques.
+    6. Suppression de la branche de travail.
+
+2.3 CE QUI DÉCLENCHE UN ARRÊT IMMÉDIAT
+
+  Un ARRÊT signifie : on cesse de produire du code, on informe RT et RSSI, on analyse, on décide,
+  et on ne reprend qu'après décision écrite. Ce n'est pas une pause, c'est un point de contrôle.
+
+  ARRÊT 1 — UN TEST EXISTANT CASSE
+     Règle R5 de [D5]. On ne modifie JAMAIS le test. On cherche pourquoi le code nouveau change le
+     comportement ancien. Si un test d'authentification ou de permission casse, RSSI est informé
+     immédiatement, dans l'heure.
+
+  ARRÊT 2 — LE RAPPORT DE RÉCONCILIATION AFFICHE UN ÉCART DE TYPE A NON EXPLIQUÉ
+     Un compte perdrait un accès. C'est exactement ce que le chantier s'interdit. On traite l'écart
+     selon la procédure du §5.3 avant toute autre chose.
+
+  ARRÊT 3 — LE SCÉNARIO DE FUMÉE ÉCHOUE POUR UN COMPTE TÉMOIN
+     Un rôle entier ne se connecte plus ou n'atteint plus ses écrans. Correction prioritaire.
+
+  ARRÊT 4 — L'AGENT DE CODAGE A MODIFIÉ UN MODÈLE OU UN FICHIER EXISTANT NON PRÉVU
+     Violation de la règle R2 (additif d'abord). On annule la modification, on comprend pourquoi
+     l'agent l'a jugée nécessaire, et on décide explicitement.
+
+  ARRÊT 5 — UNE RÈGLE D'AUTORISATION A ÉTÉ ÉCRITE UNIQUEMENT CÔTÉ INTERFACE
+     Violation de la règle S3. Le backend est la seule source de vérité. On porte la règle côté
+     serveur avec son test de refus avant de continuer.
+
+  ARRÊT 6 — LA PERFORMANCE DE DÉCISION DÉPASSE 5 MS OU LA DÉGRADATION DÉPASSE 5 %
+     On ne poursuit pas en espérant optimiser plus tard. On mesure, on identifie, on corrige.
+
+  ARRÊT 7 — LE JOURNAL D'HABILITATION N'ENREGISTRE PAS UNE OPÉRATION SENSIBLE
+     Règle R7. Une fonction livrée sans sa journalisation est une fonction non livrée.
+
+  ARRÊT 8 — MOINS DE DEUX ADMINISTRATEURS ACTIFS DANS UN ENVIRONNEMENT QUELCONQUE
+     Y compris en développement. La règle S7 s'applique partout, pour que le réflexe s'installe.
+
+
+====================================================================================================
+3. MODE OPÉRATOIRE DE L'AGENT DE CODAGE
+====================================================================================================
+
+3.1 PRÉPARATION DE LA SESSION
+
+  RÈGLE : une session neuve par unité. On ne poursuit pas l'unité U3 dans la session qui a produit
+  U2. Une session longue dérive : l'agent perd de vue les contraintes initiales et commence à
+  « améliorer » ce qu'il a écrit la veille.
+
+  Avant d'ouvrir la session, rassembler :
+    • le texte intégral du prompt de l'unité, depuis [D4] ;
+    • les annexes de [D4] citées par ce prompt ;
+    • la note de conception validée à l'étape 2 ;
+    • l'état du dépôt : branche, dernier commit, unités déjà fusionnées.
+
+3.2 LE MESSAGE D'AMORÇAGE À COPIER
+
+  À envoyer AVANT le prompt lui-même, dans la même session.
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tu vas intervenir sur le dépôt app-injs-lmd2026demo de l'INJS Marcory (Côte d'Ivoire).      │
+  │ Nous exécutons le chantier CURP-INJS : comptes utilisateurs, rôles et permissions.          │
+  │                                                                                             │
+  │ CONTEXTE D'EXÉCUTION                                                                        │
+  │ • Unité en cours : U__ — <intitulé>                                                         │
+  │ • Unités déjà fusionnées : <liste>                                                          │
+  │ • Branche de travail : feature/curp-injs-u__                                                │
+  │ • Application en production, utilisée quotidiennement par l'institut.                       │
+  │                                                                                             │
+  │ HUIT RÈGLES QUI PRIMENT SUR TOUTE AUTRE CONSIDÉRATION                                       │
+  │ S1 Aucun compte en service ne doit perdre un accès dont il dispose aujourd'hui.             │
+  │ S2 Aucun compte ne doit gagner un accès non explicitement décidé.                           │
+  │ S3 Le backend est la seule source de vérité ; l'interface masque mais ne protège pas.       │
+  │ S4 Double commande et motif obligatoires sur les actions irréversibles.                     │
+  │ S5 Aucune suppression physique de compte : désactivation seulement.                         │
+  │ S6 Aucune auto-élévation : nul ne modifie ses propres droits.                               │
+  │ S7 Toujours au moins deux administrateurs actifs.                                           │
+  │ S8 Une procédure de secours hors application doit exister et rester fonctionnelle.          │
+  │                                                                                             │
+  │ CONTRAINTES TECHNIQUES NON NÉGOCIABLES                                                      │
+  │ • Tu n'as pas le droit de modifier un fichier de test existant. Aucun.                      │
+  │ • Tu n'as pas le droit de modifier un modèle existant. Tu étends, tu ne remplaces pas.      │
+  │ • Les 943 tests existants doivent rester verts. S'ils cassent, c'est ton code qui est faux. │
+  │ • Toute règle d'autorisation s'accompagne d'un test de succès ET d'un test de refus.        │
+  │ • Fichiers : 600 lignes maximum côté Python, 400 côté React.                                │
+  │ • Aucun print(), aucune dépendance CDN, aucun secret dans le code.                          │
+  │ • Tout code, tout commentaire, tout message d'erreur : en français.                         │
+  │ • Chaque opération sensible est journalisée dans le journal append-only.                    │
+  │                                                                                             │
+  │ MÉTHODE IMPOSÉE                                                                             │
+  │ 1. Je te donne ensuite le prompt de l'unité. Tu le lis en entier.                           │
+  │ 2. Tu REFORMULES ta compréhension : objectif, fichiers touchés, règles d'autorisation que   │
+  │    tu vas introduire, effets possibles sur les droits existants, plan en étapes.            │
+  │ 3. Tu ATTENDS ma validation. Tu ne produis aucune ligne de code avant.                      │
+  │ 4. Tu produis ensuite par tranches, en t'arrêtant après chaque tranche pour que je vérifie. │
+  │                                                                                             │
+  │ Si une consigne du prompt te paraît contredire l'une des huit règles ci-dessus, tu ne       │
+  │ tranches pas seul : tu signales la contradiction et tu attends.                             │
+  └─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+3.3 CONTRÔLE DE LA REFORMULATION
+
+  La reformulation est le seul moment où une erreur coûte cinq minutes plutôt que trois jours.
+  On la lit avec attention, pas en diagonale.
+
+  GRILLE DE CONTRÔLE EN 9 POINTS — cocher avant d'autoriser la production
+  ☐ 1. L'objectif reformulé correspond bien à celui du prompt, sans ajout ni retrait.
+  ☐ 2. La liste des fichiers à créer est cohérente avec l'architecture décidée dans la note.
+  ☐ 3. AUCUN fichier existant ne figure dans la liste des fichiers à modifier — ou, s'il y en a,
+       chacun est justifié et je l'ai explicitement accepté.
+  ☐ 4. Les règles d'autorisation annoncées correspondent à celles de la note de conception.
+  ☐ 5. L'agent annonce des tests de refus, pas seulement des tests de succès.
+  ☐ 6. L'agent a compris que le mode observation ne doit bloquer personne.
+  ☐ 7. L'agent n'annonce aucun « nettoyage », « refactorisation » ou « amélioration » de l'existant.
+  ☐ 8. L'agent a prévu la journalisation des opérations sensibles.
+  ☐ 9. Le plan en étapes laisse l'application démarrable après chaque étape.
+
+  SI UN POINT N'EST PAS COCHÉ : on ne corrige pas le code plus tard, on corrige la reformulation
+  maintenant. Réponse type : « Ta reformulation est inexacte sur le point suivant : <…>. Reformule
+  à nouveau en en tenant compte. Ne produis toujours aucun code. »
+
+3.4 CONDUITE DE LA PRODUCTION
+
+  • Demander le code par tranches explicites : « Produis uniquement les modèles Personne et
+    CompteUtilisateur, avec leurs tests. Arrête-toi ensuite. »
+  • Après chaque tranche : lire le code soi-même. La relecture humaine n'est pas facultative sur
+    un module d'habilitation.
+  • Points de vigilance à la relecture, dans l'ordre de fréquence des erreurs constatées :
+      1. Un filtrage de périmètre appliqué dans la vue et non dans le queryset — donc contournable
+         par un accès direct à l'identifiant.
+      2. Un `get_object_or_404` sans filtrage de périmètre préalable.
+      3. Un message d'erreur qui révèle l'existence d'une ressource à qui n'y a pas droit.
+      4. Une permission vérifiée à la création mais pas à la modification.
+      5. Un `queryset = Modele.objects.all()` laissé tel quel en attendant « de voir ».
+      6. Une règle codée en dur au lieu d'être lue depuis le référentiel en base.
+  • Ne jamais accepter un code que l'on ne comprend pas. Demander une explication, ou réécrire.
+
+3.5 LES DOUZE DÉRIVES TYPIQUES ET LEUR CORRECTION
+
+  D1. L'agent modifie un test existant pour le faire passer.
+      → ARRÊT 1. Annuler la modification, analyser la vraie cause.
+      Réponse : « Tu as modifié <fichier de test>. C'est interdit. Restaure-le et explique pourquoi
+      le comportement a changé. »
+
+  D2. L'agent remplace le modèle utilisateur existant au lieu de l'étendre.
+      → ARRÊT 4. Réponse : « Le modèle utilisateur existant ne doit être ni remplacé, ni modifié,
+      ni déplacé. Utilise une relation OneToOne depuis CompteUtilisateur. »
+
+  D3. L'agent code la matrice de rôles en dur dans le Python.
+      → Réponse : « La matrice est un référentiel EN BASE, chargé par migration de données. Une
+      correction de matrice ne doit jamais exiger un redéploiement. »
+
+  D4. L'agent duplique la matrice côté React.
+      → C'est exactement le risque R3 de l'audit, celui que le chantier vient clore.
+      Réponse : « L'interface ne connaît aucun rôle. Elle appelle /api/auth/capacites/ et affiche
+      ce que le serveur lui dit. »
+
+  D5. L'agent implémente le mode observation en bloquant réellement.
+      → Le plus dangereux. Réponse : « En mode observation, la valeur retournée est TOUJOURS celle
+      de l'ancien dispositif. Le nouveau calcul ne sert qu'à journaliser un écart. Montre-moi la
+      ligne de code qui garantit cela. »
+
+  D6. L'agent oublie les tests de refus.
+      → Réponse : « Pour chaque test <nom>_autorise, produis le <nom>_refuse correspondant. »
+
+  D7. L'agent produit des messages d'erreur bavards : « Ce dossier appartient au secrétariat B. »
+      → Fuite d'information. Réponse : « Un refus ne révèle jamais l'existence ni la nature de la
+      ressource. Message générique, détail dans le journal serveur uniquement. »
+
+  D8. L'agent « améliore » au passage une permission existante jugée trop laxiste.
+      → Violation de S2 et de R2. Réponse : « Tu as peut-être raison sur le fond. Ce n'est pas ta
+      décision ni la mienne. Consigne-le, ne le change pas. »
+
+  D9. L'agent implémente la suppression d'un compte.
+      → Violation de S5. Réponse : « Aucune suppression physique. Un compte se désactive. »
+
+  D10. L'agent crée un super-utilisateur ou une porte dérobée « pour les tests ».
+      → Réponse : « Aucun accès non journalisé, même en test. Les tests utilisent des comptes
+      créés par les fixtures, avec des rôles explicites. »
+
+  D11. L'agent charge tout le référentiel à chaque contrôle d'accès.
+      → Problème de performance garanti. Réponse : « Le contrôle doit tenir en moins de 5 ms.
+      Montre-moi le nombre de requêtes SQL déclenchées par un appel à est_autorise. »
+
+  D12. L'agent produit un fichier de 1 200 lignes.
+      → Réponse : « 600 lignes maximum. Découpe par responsabilité, pas arbitrairement au milieu. »
+
+
+====================================================================================================
+4. MODE OPÉRATOIRE DES VÉRIFICATIONS
+====================================================================================================
+
+4.1 LA BATTERIE DES 14 POINTS, COMMANDE PAR COMMANDE
+
+  Le script complet figure en annexe 1. Détail et interprétation :
+
+  POINT 1 — Contrôle de configuration
+     python manage.py check
+     Attendu : « System check identified no issues ».
+
+  POINT 2 — Contrôle de déploiement
+     python manage.py check --deploy
+     Attendu : aucun message de niveau ERROR. Les avertissements préexistants sont tolérés s'ils
+     figurent dans la liste de référence de docs/curp/00-references-initiales.md ; aucun nouveau.
+
+  POINT 3 — Migrations manquantes
+     python manage.py makemigrations --check --dry-run
+     Attendu : « No changes detected ». Sinon, une migration a été oubliée.
+
+  POINT 4 — Migration sur base vide
+     dropdb injs_test_vide 2>/dev/null; createdb injs_test_vide
+     DATABASE_URL=postgres://.../injs_test_vide python manage.py migrate
+     Attendu : aucune erreur. Vérifie qu'une installation neuve fonctionne.
+
+  POINT 5 — Migration sur base peuplée
+     pg_restore -c -d injs_test_peuplee copie_recette.dump
+     DATABASE_URL=postgres://.../injs_test_peuplee python manage.py migrate
+     Attendu : aucune erreur. C'est le test qui compte réellement : la production est peuplée.
+
+  POINT 6 — Réversibilité
+     python manage.py migrate habilitations <migration_precedente>
+     python manage.py migrate habilitations
+     Attendu : les deux sens passent. Une migration irréversible est refusée en revue.
+
+  POINT 7 — Suite backend complète
+     python manage.py test
+     Attendu : 943 tests existants verts + les tests nouveaux. Zéro échec, zéro erreur.
+     Relever la durée : une augmentation de plus de 30 % mérite une analyse.
+
+  POINT 8 — Scénario de fumée d'authentification
+     python manage.py fumee_authentification --tous
+     Détail au §4.2.
+
+  POINT 9 — Rapport de réconciliation
+     python manage.py reconcilier_droits --format=tableau
+     Détail au §4.3.
+
+  POINT 10 — Lint frontend
+     cd frontend && npm run lint 2>&1 | tail -3
+     Attendu : au plus 89 warnings, la référence de l'audit. Zéro erreur.
+
+  POINT 11 — Tests frontend (à partir de U4)
+     cd frontend && npm run test
+     Attendu : tous verts. Au moins 25 tests à la fin de U4.
+
+  POINT 12 — Build frontend
+     cd frontend && npm run build
+     Attendu : build réussi. Relever la taille des bundles : une hausse de plus de 10 % s'explique.
+
+  POINT 13 — Analyse Flutter
+     cd mobile && flutter analyze
+     Attendu : pas de régression par rapport à la sortie de référence.
+
+  POINT 14 — Banc de mesure de la décision
+     python manage.py bench_decision --iterations=1000
+     Détail au §4.4.
+
+4.2 LE SCÉNARIO DE FUMÉE D'AUTHENTIFICATION
+
+  Commande à écrire pendant l'unité U0, jamais retirée ensuite. Ce qu'elle fait :
+
+    Pour chacun des 14 comptes témoins :
+      1. Authentification avec les identifiants du gestionnaire de secrets.
+      2. Vérification que le jeton est obtenu.
+      3. Appel des 3 à 5 routes de référence du rôle.
+      4. Vérification du code HTTP attendu sur chacune.
+      5. Pour FORMATEUR et AUDITEUR : vérification que l'accès WEB est bien REFUSÉ.
+      6. Pour les deux comptes SECRETARIAT de secrétariats différents : vérification croisée que
+         chacun n'accède pas aux dossiers de l'autre.
+      7. Déconnexion.
+
+    Sortie : un tableau de 14 lignes, VERT ou ROUGE, avec le détail des échecs.
+
+  RÈGLE D'INTERPRÉTATION : une seule ligne rouge bloque la fusion. On ne « regarde pas si c'est
+  grave » — on corrige. Le scénario de fumée n'est pas un indicateur, c'est une barrière.
+
+  Il s'exécute : à chaque commit en CI, chaque soir en local, après chaque déploiement, et après
+  chaque activation de drapeau en production.
+
+4.3 LE RAPPORT DE RÉCONCILIATION DES DROITS
+
+  C'est l'instrument central de la non-régression. Il répond à une question : pour chaque compte
+  et chaque permission, l'ancien dispositif et le nouveau disent-ils la même chose ?
+
+  Commande : python manage.py reconcilier_droits [--compte <id>] [--role <code>] [--format=...]
+
+  Ce qu'elle fait :
+    1. Parcourt tous les comptes actifs.
+    2. Pour chacun, parcourt l'ensemble des permissions du catalogue.
+    3. Demande à l'ancien dispositif : ce compte est-il autorisé ?
+    4. Demande au nouveau moteur : ce compte est-il autorisé ?
+    5. Compare et classe : identique, écart de type A, écart de type B.
+    6. Produit un tableau récapitulatif et un fichier détaillé des écarts.
+
+  LECTURE DU RAPPORT
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │ RÉCONCILIATION DES DROITS — <date>                                       │
+    │ Comptes examinés .................... 1 247                              │
+    │ Permissions examinées ............... 312                                │
+    │ Décisions comparées ................. 389 064                            │
+    │ Identiques .......................... 389 064  (100,00 %)                │
+    │ Écarts de type A (restriction) ......       0                            │
+    │ Écarts de type B (élargissement) ....       0                            │
+    │ ÉTAT ................................ CONFORME                           │
+    └──────────────────────────────────────────────────────────────────────────┘
+
+  CRITÈRE : l'état CONFORME exige zéro écart de type A et zéro écart de type B NON DÉCIDÉ. Un
+  écart décidé apparaît dans une section distincte, avec sa référence de décision, sa date et le
+  nom de qui l'a tranché. Un écart décidé mais non référencé compte comme un écart non décidé.
+
+  Le rapport s'exécute à la fin de chaque unité, chaque soir à partir de U2, et en continu pendant
+  les étapes de bascule.
+
+4.4 LE BANC DE MESURE DE LA DÉCISION
+
+  Commande : python manage.py bench_decision --iterations=1000
+
+  Mesure, sur un jeu représentatif de comptes et de permissions :
+    • le temps moyen d'un appel à `est_autorise` ;
+    • le p95 et le p99 ;
+    • le nombre de requêtes SQL déclenchées, à froid et à chaud ;
+    • le taux de succès du cache Redis.
+
+  SEUILS :
+    • Temps moyen à chaud : < 5 ms — au-delà, ARRÊT 6.
+    • Requêtes SQL à chaud : 0 ou 1. Si le nombre croît avec le nombre de rôles du compte, il y a
+      un N+1 : on le corrige avant de continuer.
+    • Taux de succès du cache après 100 appels : > 90 %.
+
+  Mesurer également l'impact sur les temps de réponse de l'application : trois routes de référence
+  (liste des étudiants, fiche d'un étudiant, tableau de bord), avant et après. Dégradation
+  acceptable : 5 %. Au-delà, on optimise avant de poursuivre.
+
+4.5 QUE FAIRE QUAND UNE VÉRIFICATION ÉCHOUE
+
+  RÈGLE GÉNÉRALE : on ne contourne pas, on ne désactive pas, on ne reporte pas. On corrige.
+
+  +---------------------------+--------------------------------------------------------------+
+  | Vérification en échec     | Conduite à tenir                                             |
+  +---------------------------+--------------------------------------------------------------+
+  | Point 3 (migration        | Générer la migration manquante, la relire, ne jamais la      |
+  | manquante)                | générer à l'aveugle en fin de journée                        |
+  | Point 5 (base peuplée)    | Le plus révélateur : une contrainte échoue sur des données   |
+  |                           | réelles. Analyser les données fautives, adapter la migration |
+  |                           | (valeurs par défaut, nettoyage préalable documenté)          |
+  | Point 6 (réversibilité)   | Écrire la fonction de retour arrière. Une migration de       |
+  |                           | données sans rollback est refusée en revue                   |
+  | Point 7 (test existant)   | ARRÊT 1. Ne jamais toucher au test                           |
+  | Point 8 (fumée)           | ARRÊT 3. Priorité absolue                                    |
+  | Point 9 (réconciliation)  | ARRÊT 2 si écart de type A. Procédure §5.3                   |
+  | Point 10 (lint)           | Corriger les warnings nouveaux. Ne pas ajouter d'exclusion   |
+  |                           | dans la configuration ESLint pour les faire taire            |
+  | Point 14 (performance)    | ARRÊT 6. Mesurer avant d'optimiser, jamais l'inverse         |
+  +---------------------------+--------------------------------------------------------------+
+
+
+====================================================================================================
+5. MODE OPÉRATOIRE DU MODE OBSERVATION
+====================================================================================================
+
+Le mode observation est le mécanisme qui rend la règle S1 vérifiable. Ce chapitre décrit comment
+on le met en service, comment on le lit, et comment on traite ce qu'il révèle.
+
+5.1 MISE EN SERVICE
+
+  Le mode observation est développé pendant l'unité U2 (jour J7 de la fiche) et mis en service dès
+  la fin de U2, d'abord en recette.
+
+  ACTIVATION EN RECETTE
+    python manage.py drapeau --activer CURP_ACTIF
+    python manage.py drapeau --activer CURP_OBSERVATION
+    python manage.py drapeau --lister      # vérifier : les deux à ACTIF, les autres à INACTIF
+
+  VÉRIFICATION IMMÉDIATE, DANS CET ORDRE
+    1. Le scénario de fumée passe intégralement. Si un compte témoin est bloqué, le mode
+       observation bloque — ce qui est le défaut D5 du §3.5. Désactiver et corriger.
+    2. Le banc de mesure : la dégradation doit rester sous 5 %. L'observation double le coût de
+       chaque contrôle ; si le surcoût est trop élevé, passer en échantillonnage (§5.6).
+    3. Le journal d'observation se remplit : `python manage.py ecarts --depuis=aujourd-hui`
+
+  GÉNÉRATION DE TRAFIC EN RECETTE
+    L'observation n'a de valeur qu'avec du volume. En recette, le trafic est faible. Deux moyens :
+      • un script de parcours automatisé qui simule les usages courants des 14 comptes témoins,
+        lancé en boucle pendant les nuits ;
+      • une session de recette collective d'une demi-journée avec de vrais agents, en semaine 8,
+        qui produit du trafic réaliste et fait remonter les vrais cas d'usage.
+    Objectif avant la porte G1 : au moins 5 000 contrôles observés en recette.
+
+5.2 LECTURE QUOTIDIENNE DES ÉCARTS
+
+  RITUEL : chaque matin, avant toute autre chose, l'exécutant lance :
+
+    python manage.py ecarts --depuis=hier --resume
+
+  Sortie type :
+    ┌────────────────────────────────────────────────────────────────────────┐
+    │ ÉCARTS D'OBSERVATION — du 12/09 08:00 au 13/09 08:00                   │
+    │ Contrôles observés .................. 4 127                            │
+    │ Écarts type A (restriction) .........     3   ← À TRAITER SOUS 24 H    │
+    │ Écarts type B (élargissement) .......     1   ← À TRAITER SOUS 48 H    │
+    │ Écarts type C (motif divergent) .....    12   ← fin d'itération        │
+    │                                                                        │
+    │ TYPE A — détail                                                        │
+    │  #1 compte 4471 (SECRETARIAT/sec-B) · scolarite.dossier.consulter      │
+    │     ancien: AUTORISÉ · nouveau: REFUSÉ · contrôle 7 (périmètre)        │
+    │     occurrences: 2                                                     │
+    │  #2 compte 118 (ENCADRANT) · edts.seance.modifier                      │
+    │     ancien: AUTORISÉ · nouveau: REFUSÉ · contrôle 5 (attribution)      │
+    │     occurrences: 7                                                     │
+    │  #3 compte 902 (FINANCE) · finances.echeancier.creer                   │
+    │     ancien: AUTORISÉ · nouveau: REFUSÉ · contrôle 9 (séparation)       │
+    │     occurrences: 1                                                     │
+    └────────────────────────────────────────────────────────────────────────┘
+
+  Ce tableau se lit en deux minutes. Il est reporté chaque jour dans
+  docs/curp/07-journal-observation.md et présenté au point quotidien de 15 minutes.
+
+5.3 TRAITEMENT D'UN ÉCART DE TYPE A, PAS À PAS
+
+  Un écart de type A signifie : en production, ce compte perdrait cet accès. Délai : 24 heures.
+
+  ÉTAPE 1 — QUALIFIER (30 minutes)
+    python manage.py ecarts --detail <numero>
+    Relever : quel compte, quel rôle, quelle permission, quel objet, quel contrôle a tranché.
+    Le numéro du contrôle oriente immédiatement le diagnostic :
+      contrôle 1 (statut) ......... le compte n'est pas ACTIF dans le nouveau modèle → migration
+      contrôle 2 (canal) .......... restriction web/mobile mal reprise
+      contrôle 3 (retrait) ........ une dérogation de retrait parasite
+      contrôle 5 (attribution) .... LA MATRICE EST INCOMPLÈTE — cause la plus fréquente
+      contrôle 6 (niveau) ......... niveau par défaut du rôle trop bas
+      contrôle 7 (périmètre) ...... périmètre mal déduit à la migration
+      contrôle 8 (état objet) ..... règle métier nouvelle, peut être légitime
+      contrôle 9 (séparation) ..... incompatibilité déclarée qui mord sur un usage réel
+
+  ÉTAPE 2 — TRANCHER : OMISSION OU DÉCISION ? (à porter à EF)
+    La question posée à EF est simple et se pose en une phrase :
+      « Aujourd'hui, <rôle> peut <action> sur <objet>. Est-ce normal ? »
+    Deux réponses possibles, et deux seulement.
+
+    RÉPONSE « OUI, C'EST NORMAL » → c'est une OMISSION de notre matrice.
+      Conduite : corriger la matrice. Voir étape 3.
+
+    RÉPONSE « NON, CE N'EST PAS NORMAL » → c'est une RESTRICTION VOULUE.
+      Conduite : ce n'est plus un incident technique, c'est une décision de gestion.
+      Appliquer la procédure du §5.5, en six gestes. On ne se contente JAMAIS de laisser la
+      restriction s'appliquer silencieusement au motif qu'elle est « plus correcte ».
+
+  ÉTAPE 3 — CORRIGER LA MATRICE (cas de l'omission)
+    La matrice est en base. La correction est une migration de données, pas un redéploiement.
+      python manage.py matrice --ajouter-permission <role> <permission> --niveau <n>
+      python manage.py matrice --exporter > docs/curp/05-matrice.md
+    Puis : relancer la réconciliation, vérifier que l'écart disparaît, vérifier qu'AUCUN écart de
+    type B n'est apparu en contrepartie — une correction trop large crée un élargissement.
+    Consigner la correction dans docs/curp/06-registre-arbitrages.md.
+
+  ÉTAPE 4 — VÉRIFIER L'ÉTENDUE
+    Un écart sur un compte est rarement isolé. Vérifier systématiquement :
+      python manage.py reconcilier_droits --role <code-du-role>
+    Si le rôle compte 40 titulaires, les 40 étaient probablement concernés.
+
+  ÉTAPE 5 — CLORE
+    Marquer l'écart traité, avec la cause et la correction :
+      python manage.py ecarts --clore <numero> --cause=omission-matrice --reference=<arbitrage>
+
+5.4 TRAITEMENT D'UN ÉCART DE TYPE B, PAS À PAS
+
+  Un écart de type B signifie : en production, ce compte GAGNERAIT un accès. Délai : 48 heures.
+  Il est tentant de le trouver moins grave. Il ne l'est pas : la règle S2 le met au même niveau que
+  la perte d'accès. Un élargissement silencieux est la manière dont une fuite de données commence.
+
+  ÉTAPE 1 — QUALIFIER : même procédure qu'au §5.3.
+
+  ÉTAPE 2 — TRANCHER, avec une question symétrique portée à EF :
+      « Aujourd'hui, <rôle> ne peut PAS <action> sur <objet>. Notre matrice l'autoriserait.
+        Est-ce un besoin réel ou une erreur de notre part ? »
+
+    RÉPONSE « ERREUR » → resserrer la matrice :
+      python manage.py matrice --retirer-permission <role> <permission>
+    Puis re-réconcilier, et vérifier qu'aucun écart de type A n'apparaît en retour. Le resserrement
+    est l'opération la plus risquée : elle peut créer la perte d'accès qu'on cherchait à éviter.
+
+    RÉPONSE « BESOIN RÉEL » → l'élargissement est assumé. Il est alors :
+      • consigné au registre des arbitrages avec sa justification métier ;
+      • soumis au RSSI s'il porte sur une permission marquée CRITIQUE ;
+      • communiqué au responsable du domaine concerné.
+
+  ÉTAPE 3 — CAS PARTICULIER DES ÉLARGISSEMENTS EN CASCADE
+    Si un même écart de type B touche plus de 50 comptes, ne pas corriger dans l'urgence : c'est
+    le signe d'une erreur de conception de la matrice, pas d'une ligne isolée. Porter le sujet en
+    revue fonctionnelle hebdomadaire et traiter la famille de rôles entière.
+
+5.5 DÉCIDER UNE RESTRICTION VOLONTAIRE : LA PROCÉDURE EN SIX GESTES
+
+  Le chantier découvrira des droits actuels excessifs. C'est même l'un de ses apports. Mais la
+  règle S1 interdit de les retirer par effet de bord. Voici comment on retire un droit proprement.
+
+  GESTE 1 — ÉCRIRE LA DÉCISION
+    Une fiche dans docs/curp/06-registre-arbitrages.md :
+      Référence · date · rôle concerné · permission retirée · nombre de comptes touchés ·
+      motif métier · qui a décidé · date d'effet prévue.
+
+  GESTE 2 — LA FAIRE VALIDER
+    Par EF systématiquement. Par DIR si elle touche plus de 20 comptes ou un rôle de direction.
+    Par le RSSI si elle porte sur une permission critique.
+
+  GESTE 3 — IDENTIFIER NOMMÉMENT LES PERSONNES CONCERNÉES
+    python manage.py reconcilier_droits --permission <code> --format=liste-comptes
+    On ne retire pas un droit à « des comptes » : on le retire à des personnes, qui ont un nom et
+    un travail à faire. La liste est remise au responsable de leur service.
+
+  GESTE 4 — PRÉVENIR AVANT, JAMAIS APRÈS
+    Le responsable du service informe les agents concernés, en expliquant ce qui change et
+    pourquoi, et en indiquant la date. Délai minimal entre l'information et l'effet : 15 jours.
+    Si l'agent conteste, la contestation est examinée avant la date d'effet, pas après.
+
+  GESTE 5 — APPLIQUER À DATE
+    La matrice est modifiée à la date prévue, pas avant. L'écart cesse alors d'être un écart : il
+    devient une décision appliquée, et le rapport de réconciliation le classe comme tel.
+
+  GESTE 6 — VÉRIFIER APRÈS
+    Sept jours après l'application, vérifier auprès du responsable de service qu'aucun travail
+    n'est empêché. Si c'est le cas, la décision se révise : la réalité du terrain prime sur la
+    théorie de la matrice.
+
+5.6 ÉCHANTILLONNAGE, SI L'OBSERVATION COÛTE TROP CHER
+
+  L'observation double le coût de chaque contrôle d'accès. Si le banc de mesure révèle une
+  dégradation supérieure à 5 % :
+
+    python manage.py drapeau --regler CURP_OBSERVATION_TAUX=20   # observer 1 requête sur 5
+
+  RÈGLE : l'échantillonnage ne s'applique JAMAIS aux routes sensibles. Les routes portant sur les
+  notes, les jurys, les diplômes, les finances et l'administration des comptes restent observées
+  intégralement, quel que soit le taux global. La liste de ces routes est maintenue dans la
+  configuration et validée par le RSSI.
+
+  Conséquence sur le calendrier : avec un échantillonnage à 20 %, atteindre les 10 000 contrôles
+  observés exigés pour sortir de l'étape E1 prend cinq fois plus longtemps. L'étape E1 se prolonge
+  d'autant. C'est un coût accepté, pas un motif de raccourcir l'exigence.
+
+
+====================================================================================================
+6. MODE OPÉRATOIRE DE LA MATRICE DE PERMISSIONS
+====================================================================================================
+
+La matrice est le seul livrable du chantier que l'équipe technique ne peut pas produire seule. Ce
+chapitre décrit comment on la fait valider par des gens dont ce n'est pas le métier de lire du code.
+
+6.1 PRÉPARER LES TROIS ATELIERS
+
+  CALENDRIER — à caler dès la phase 0, pas à la semaine 7.
+    Atelier 1 — semaine 7, 3 heures : Administration, Scolarité, Candidatures
+                Participants : EF, RS, RF candidatures, RT
+    Atelier 2 — semaine 8, 3 heures : Pédagogie, Enseignants, Évaluations, Diplômation
+                Participants : EF, RF évaluations, RF diplômation, un enseignant, RT
+    Atelier 3 — semaine 8, 2 heures : Finance, Stages, RH, Patrimoine, Archives, Usagers
+                Participants : EF, RF finances, RF RH, RT
+
+  DOCUMENT DE TRAVAIL — préparé 3 jours avant chaque atelier
+    python manage.py matrice --exporter --domaines=administration,scolarite,candidatures \
+                             --format=atelier > atelier1.md
+    Le format « atelier » produit un tableau IMPRIMABLE, une ligne par couple rôle/ressource, avec
+    une colonne vide pour le statut. Pas de code, pas de nom technique : des libellés en français.
+
+    Exemple de ligne telle qu'elle doit apparaître :
+      ┌──────────────────────┬───────────────────────────┬────────┬──────────┬────────────────┐
+      │ Rôle                 │ Ce qu'il peut faire       │ Sur    │ Niveau   │ Statut         │
+      ├──────────────────────┼───────────────────────────┼────────┼──────────┼────────────────┤
+      │ Agent d'inscriptions │ Consulter un dossier      │ son    │ Lecture  │ ☐V ☐C ☐T       │
+      │                      │ étudiant                  │ secré- │          │                │
+      │                      │                           │ tariat │          │                │
+      │ Agent d'inscriptions │ Modifier une inscription  │ son    │ Écriture │ ☐V ☐C ☐T       │
+      │                      │                           │ secré- │          │                │
+      │                      │                           │ tariat │          │                │
+      └──────────────────────┴───────────────────────────┴────────┴──────────┴────────────────┘
+      V = validé · C = à corriger · T = à trancher
+
+  ENVOI PRÉALABLE : le document part 3 jours avant, avec une consigne d'une phrase :
+  « Merci de parcourir ce tableau avant l'atelier et de cocher ce qui vous paraît faux. »
+
+6.2 CONDUIRE UN ATELIER DE VALIDATION
+
+  DURÉE ET RYTHME
+    Trois heures maximum, avec une pause. Au-delà, l'attention tombe et les lignes sont validées
+    machinalement — ce qui est pire que de ne pas les valider du tout.
+    Rythme observé : environ 40 lignes par heure quand la discussion est vive, 80 quand elle ne
+    l'est pas. Prévoir le découpage en conséquence.
+
+  DÉROULÉ
+    1. Rappeler en 5 minutes la règle du jeu : on décrit ce qui DOIT être, pas ce qui est
+       aujourd'hui. Si les deux diffèrent, on le note — c'est précisément l'information utile.
+    2. Parcourir rôle par rôle, pas ressource par ressource. Les participants pensent en métiers,
+       pas en tables de base de données.
+    3. Pour chaque rôle, poser trois questions dans cet ordre :
+         a. « Qui, dans l'institut, occupe ce rôle aujourd'hui ? » — si personne ne sait répondre,
+            le rôle est peut-être à supprimer ou à fusionner.
+         b. « Que doit-il pouvoir faire ? »
+         c. « Sur quoi ? Tout l'institut, sa formation, son secrétariat, ses propres objets ? »
+            C'est la question du périmètre, et c'est la plus souvent bâclée.
+    4. Noter les statuts au fil de l'eau. Ne jamais laisser une ligne sans statut.
+    5. Consigner immédiatement les points « à trancher », avec le nom de qui doit trancher.
+
+  L'ANIMATEUR N'EST PAS LE DÉVELOPPEUR
+    L'atelier est animé par EF ou RT, pas par celui qui a écrit la matrice. L'auteur défend
+    naturellement son travail ; on cherche ici à le mettre en défaut.
+
+  PIÈGE À ÉVITER : LA VALIDATION PAR LASSITUDE
+    Après une heure, les participants ont tendance à tout valider pour finir. Deux parades :
+      • intercaler volontairement deux ou trois lignes manifestement fausses et voir si elles sont
+        relevées — si elles passent, la validation n'est plus fiable et on arrête la séance ;
+      • traiter les domaines les plus sensibles (évaluations, finances, diplômation) EN DÉBUT
+        de séance, jamais à la fin.
+
+6.3 STATUER SUR UNE LIGNE
+
+  Trois statuts possibles, et un seul par ligne.
+
+  VALIDÉ (V)
+    La ligne est correcte telle quelle. Elle est figée. Toute modification ultérieure exige un
+    arbitrage formel.
+
+  À CORRIGER (C)
+    La ligne est fausse et la correction est évidente et consensuelle en séance. On note la
+    correction dans la marge, on l'applique après l'atelier, et la ligne passe en V.
+
+  À TRANCHER (T)
+    Il y a désaccord, ou la question dépasse les participants présents. La ligne part en arbitrage
+    selon le §6.4. Délai : 5 jours ouvrés. Une ligne en T ne bloque pas la suite du chantier, mais
+    elle bloque la bascule du domaine concerné.
+
+  RÈGLE DE COMPTAGE : le jalon J2 exige que 100 % des lignes portent un statut. Il n'exige pas
+  que 100 % soient en V. Une matrice avec 12 lignes en T est une matrice honnête ; une matrice
+  avec 40 lignes sans statut est une matrice non validée.
+
+6.4 TRAITER UN DÉSACCORD ENTRE DOMAINES
+
+  Le cas typique : le responsable pédagogique estime devoir consulter les notes avant validation
+  du jury ; le responsable jury estime que non. Les deux ont des arguments recevables.
+
+  PROCÉDURE
+    1. Écrire le désaccord en une phrase neutre, sans trancher : « Le responsable pédagogique
+       doit-il consulter les notes d'une session avant la délibération du jury ? »
+    2. Recueillir par écrit la position de chaque partie, en trois lignes, avec son motif.
+    3. Vérifier ce que dit le modèle fonctionnel [S2] : il tranche parfois déjà la question.
+    4. Vérifier s'il existe une règle réglementaire LMD applicable.
+    5. Si le modèle et la réglementation ne tranchent pas : escalade à DIR, décision en comité de
+       pilotage ou en séance exceptionnelle sous 5 jours ouvrés.
+    6. Consigner la décision, son motif et son auteur dans le registre des arbitrages.
+
+  RÈGLE : on ne rejoue pas un arbitrage. Si la question revient trois mois plus tard, la réponse
+  est dans le registre. C'est la raison d'être du registre.
+
+  CAS PARTICULIER — LA SÉPARATION DES TÂCHES
+    Cinq couples d'incompatibilités sont déclarés dans le prompt C1. Ils ne sont pas négociables
+    en atelier : ils relèvent du contrôle interne, pas de la convenance des services. Si un agent
+    occupe aujourd'hui deux fonctions incompatibles, ce n'est pas la matrice qu'on assouplit, c'est
+    l'organisation qu'on signale à la direction. La matrice peut prévoir une dérogation nominative,
+    temporaire, motivée et journalisée — jamais une suppression de l'incompatibilité.
+
+6.5 SIGNER ET ARCHIVER
+
+  À l'issue des trois ateliers et du traitement des lignes en T :
+    1. Régénérer le document complet : python manage.py matrice --exporter > docs/curp/05-matrice.md
+    2. Vérifier que chaque ligne porte un statut et que les V correspondent bien à l'état en base.
+    3. Imprimer. Faire signer par EF, RS et RT. Dater.
+    4. Scanner et archiver avec le registre des arbitrages en annexe.
+    5. Diffuser à chaque responsable de service la fiche de droits de son domaine, extraite :
+       python manage.py matrice --exporter --domaine=<x> --format=fiche > fiche-<x>.md
+
+  À PARTIR DE CE MOMENT, la matrice est un document opposable de l'institut. Toute modification
+  ultérieure suit la procédure d'arbitrage et produit une nouvelle version datée. On ne modifie
+  pas une matrice signée en base sans passer par là.
+
+
+====================================================================================================
+7. MODE OPÉRATOIRE DE LA REVUE DE SÉCURITÉ
+====================================================================================================
+
+7.1 CE QUE LE RSSI EXAMINE
+
+  Pas le code ligne à ligne : les points de contrôle. La revue dure une demi-journée par unité et
+  porte sur six objets :
+    1. Les règles d'autorisation introduites, comparées à la note de conception.
+    2. Le journal : ce qui est enregistré, et surtout ce qui ne l'est pas.
+    3. Les messages d'erreur et les codes HTTP de refus, sous l'angle de la fuite d'information.
+    4. Les nouveaux points d'entrée : routes, commandes, tâches planifiées.
+    5. La gestion des secrets et des données personnelles.
+    6. Les tests de refus : leur existence, et leur pertinence.
+
+7.2 GRILLE DE REVUE EN 18 POINTS
+
+  AUTORISATION
+  ☐  1. Chaque route nouvelle exige une permission explicite — aucune route ouverte par défaut.
+  ☐  2. Le filtrage de périmètre est appliqué au niveau du queryset, pas de la vue.
+  ☐  3. Un accès par identifiant direct à un objet hors périmètre est refusé — testé.
+  ☐  4. Les permissions sont vérifiées en lecture ET en écriture, création ET modification.
+  ☐  5. Aucune règle d'autorisation n'existe uniquement côté interface.
+  ☐  6. L'auto-élévation est impossible et journalisée comme tentative.
+  ☐  7. La règle des deux administrateurs actifs est appliquée et testée.
+
+  JOURNALISATION
+  ☐  8. Toute opération sur compte, rôle, permission, périmètre ou délégation est journalisée.
+  ☐  9. Le journal enregistre : qui, quoi, quand, sur qui, depuis où, et le motif si exigé.
+  ☐ 10. Le journal est inaltérable : test de modification et de suppression, tous deux en échec.
+  ☐ 11. Les tentatives refusées sont journalisées, pas seulement les succès.
+
+  FUITE D'INFORMATION
+  ☐ 12. Un refus ne révèle jamais l'existence d'une ressource (404 plutôt que 403 le cas échéant).
+  ☐ 13. Aucun message d'erreur ne contient de donnée personnelle ni d'identifiant technique.
+  ☐ 14. L'énumération de comptes est impossible via les messages d'authentification.
+
+  SECRETS ET DONNÉES
+  ☐ 15. Aucun secret en dur, aucun secret dans le dépôt, aucun secret dans les journaux.
+  ☐ 16. Les données personnelles traitées par le module figurent au registre des traitements.
+
+  TESTS
+  ☐ 17. Chaque règle d'autorisation a son test de refus, et le test échoue si la règle est retirée.
+  ☐ 18. Les tests n'utilisent pas de compte super-utilisateur pour contourner les vérifications.
+
+  MÉTHODE POUR LE POINT 17 : le RSSI choisit trois règles au hasard, retire la règle dans le code
+  en local, et vérifie que le test de refus correspondant échoue. Si le test passe encore, il ne
+  teste rien. C'est le contrôle le plus révélateur de la grille et il prend dix minutes.
+
+7.3 FORMULER UN AVIS ET SUIVRE UNE RÉSERVE
+
+  L'avis est écrit, daté, signé, et déposé dans docs/curp/08-revues-securite.md. Trois formes :
+
+  FAVORABLE
+    Les 18 points sont satisfaits. La fusion est autorisée.
+
+  FAVORABLE SOUS RÉSERVE
+    Un ou plusieurs points ne sont pas satisfaits, mais sans risque immédiat. La fusion est
+    autorisée. Chaque réserve est numérotée, avec un délai de levée et un responsable désigné.
+    Une réserve non levée à la porte de qualité suivante bloque cette porte.
+
+  DÉFAVORABLE
+    Un point critique n'est pas satisfait : accès horizontal possible, journal contournable,
+    secret exposé, auto-élévation possible. La fusion est INTERDITE. Le RSSI précise ce qui doit
+    changer. Aucune dérogation, y compris de la direction : c'est le sens du droit de veto.
+
+  SUIVI DES RÉSERVES — tableau tenu dans docs/curp/08-revues-securite.md
+    ┌─────┬──────────┬────────────────────────────────┬──────────┬────────────┬──────────┐
+    │ Réf │ Unité    │ Réserve                        │ Resp.    │ Échéance   │ État     │
+    ├─────┼──────────┼────────────────────────────────┼──────────┼────────────┼──────────┤
+    │ R01 │ U2       │ Test de refus manquant sur la  │ DB       │ avant G1   │ LEVÉE    │
+    │     │          │ route de révocation de session │          │            │          │
+    │ R02 │ U3       │ Trois permissions du module    │ DB       │ avant G2   │ OUVERTE  │
+    │     │          │ stages sans test               │          │            │          │
+    └─────┴──────────┴────────────────────────────────┴──────────┴────────────┴──────────┘
+
+  SEUIL D'ALERTE : une réserve ouverte depuis plus de 15 jours déclenche une revue exceptionnelle
+  sous 48 heures (§16.3 de [D5]).
+
+7.4 CONDUIRE L'EXERCICE D'INTRUSION FONCTIONNELLE (JALON J3)
+
+  Une demi-journée, en recette, avec deux personnes qui ne sont pas les auteurs du code. Idéalement
+  le RSSI et un agent de scolarité curieux — la combinaison est plus efficace qu'il n'y paraît :
+  le premier connaît les techniques, le second connaît les usages détournés réels.
+
+  PRÉPARATION
+    • Comptes fournis : un par rôle, avec les identifiants, en recette peuplée de données réelles
+      anonymisées.
+    • Aucune information sur l'implémentation. On teste le système, pas le code.
+    • Journal d'observation activé : chaque tentative doit y laisser une trace.
+
+  SCÉNARIOS OBLIGATOIRES — au minimum ces dix
+    I1.  Depuis un compte SECRETARIAT du secrétariat A, ouvrir un dossier du secrétariat B par son
+         identifiant direct dans l'URL.
+    I2.  Depuis un compte ENSEIGNANT, consulter les notes d'un ECUE dont il n'est pas responsable.
+    I3.  Depuis un compte ENSEIGNANT, modifier une note déjà validée par le jury.
+    I4.  Depuis un compte ADMIN, s'attribuer un rôle supplémentaire à soi-même.
+    I5.  Depuis un compte ADMIN, désactiver le seul autre compte administrateur actif.
+    I6.  Depuis un compte FORMATEUR, se connecter à l'interface web.
+    I7.  Depuis un compte quelconque, appeler directement une route d'API d'administration.
+    I8.  Depuis un compte AGENT_CANDIDATURE, contrôler un dossier qu'il a lui-même saisi
+         (séparation des tâches).
+    I9.  Depuis un compte dont une délégation a expiré, utiliser encore le droit délégué.
+    I10. Depuis un compte désactivé, réutiliser un jeton obtenu avant la désactivation.
+
+  RÉSULTAT ATTENDU : les dix échouent, les dix sont journalisées.
+  Toute tentative qui réussit est un incident de gravité 1 : correction immédiate, avis RSSI
+  défavorable jusqu'à correction, et re-test complet.
+
+  RAPPORT : une page, remise au RSSI et à RT, archivée. Elle liste les scénarios, le résultat, les
+  éventuelles réussites d'intrusion, et les corrections apportées.
+
+
+====================================================================================================
+8. MODE OPÉRATOIRE DES PORTES DE QUALITÉ ET DES JALONS
+====================================================================================================
+
+8.1 COMMENT SE TIENT UNE PORTE
+
+  Une porte est une RÉUNION DE DÉCISION, pas une case à cocher par courriel. Durée : 1 h 30.
+  Participants : RT, RSSI, EF, DIR, plus RS pour G2 et G3, plus RE pour G3 et G4.
+
+  DÉROULÉ INVARIANT
+    1. (15 min) L'exécutant démontre le fonctionnement sur l'environnement de recette. Pas de
+       diapositive : le logiciel lui-même.
+    2. (20 min) Revue des critères de la porte, un par un, à voix haute. Chacun est déclaré
+       SATISFAIT ou NON SATISFAIT. Pas de « presque ».
+    3. (15 min) Avis du RSSI et état des réserves ouvertes.
+    4. (15 min) Revue des indicateurs : tests, couverture, performance, écarts d'observation.
+    5. (15 min) Revue du registre des risques.
+    6. (10 min) DÉCISION : FRANCHIE / FRANCHIE SOUS CONDITIONS / NON FRANCHIE.
+
+  LES TROIS DÉCISIONS POSSIBLES
+    FRANCHIE — tous les critères satisfaits. On passe à l'itération suivante.
+    FRANCHIE SOUS CONDITIONS — un ou deux critères non satisfaits, sans risque d'accès. Les
+      conditions sont écrites, datées, avec un responsable, et vérifiées à la porte suivante.
+      Cette modalité est INTERDITE pour G0 et G3 : ces deux portes se franchissent ou non.
+    NON FRANCHIE — l'itération suivante ne démarre pas. On consacre le temps nécessaire à lever
+      les points bloquants. Un report de porte n'est pas un échec de projet : c'est le dispositif
+      qui fonctionne.
+
+  COMPTE RENDU : rédigé le jour même, diffusé sous 24 heures, archivé.
+
+8.2 PARTICULARITÉS DE CHAQUE PORTE
+
+  G0 — fin de semaine 2. Aucune tolérance, aucune condition. La question posée est : « Savons-nous,
+       de manière documentée et testée, qui a accès à quoi aujourd'hui ? » Si la réponse est non,
+       on prolonge U0. Franchir G0 par optimisme est la plus mauvaise décision possible du chantier.
+
+  G1 — fin de semaine 6. Exige 7 jours consécutifs d'observation sans écart non expliqué. Si
+       l'observation a démarré tard et n'a pas 7 jours de recul, la porte est reportée d'une
+       semaine. On ne raccourcit pas la période d'observation.
+
+  G2 — fin de semaine 12. Exige la matrice signée. Si des lignes restent en statut « à trancher »,
+       la porte peut être franchie sous conditions, MAIS les domaines concernés ne basculeront pas
+       en même temps que les autres (voir l'arbitrage type de l'annexe E de [D5]).
+
+  G3 — milieu de semaine 15. Aucune tolérance. C'est la porte qui autorise à toucher aux accès
+       réels. Exige en outre une autorisation ÉCRITE de la direction avec date et fenêtre arrêtées.
+
+  G4 — fin de semaine 16, puis confirmée après l'étape E3. Clôture.
+
+8.3 CONDUITE DES JALONS DE SÛRETÉ
+
+  J1 — VÉRIFICATION D'IMMUTABILITÉ DU JOURNAL (fin U2), 1 heure
+    1. Créer 20 entrées de journal par des opérations réelles.
+    2. Tenter une modification par l'ORM : `JournalHabilitation.objects.filter(...).update(...)`
+       → doit lever une exception.
+    3. Tenter une suppression : `.delete()` → doit lever une exception.
+    4. Tenter une modification directe en SQL sur la base de recette.
+    5. Exécuter `python manage.py verifier_journal --depuis=<date>` → doit DÉTECTER l'altération
+       du point 4 et indiquer l'entrée fautive.
+    6. Restaurer la base de recette. Consigner le procès-verbal.
+
+  J2 — VALIDATION LIGNE À LIGNE DE LA MATRICE (fin U3) : voir §6.
+
+  J3 — EXERCICE D'INTRUSION FONCTIONNELLE (fin U6/U7) : voir §7.4.
+
+  J4 — EXERCICE DE PERTE D'ACCÈS ADMINISTRATEUR (pendant U8), 1 demi-journée
+    1. En recette, désactiver tous les comptes administrateurs, directement en base.
+    2. Vérifier qu'aucune connexion administrative n'est plus possible par l'interface.
+    3. Démarrer le chronomètre.
+    4. Une personne qui n'a PAS écrit la procédure applique la documentation, seule, sans aide.
+    5. Elle doit obtenir un accès administrateur fonctionnel en moins de 30 minutes.
+    6. Arrêter le chronomètre. Consigner la durée réelle et les difficultés rencontrées.
+    7. Corriger la documentation sur la base de ces difficultés. C'est l'objet de l'exercice :
+       la procédure est écrite par quelqu'un qui sait, elle sera appliquée par quelqu'un qui panique.
+    8. Recommencer l'exercice avec la documentation corrigée si la première tentative a échoué.
+
+
+====================================================================================================
+9. MODE OPÉRATOIRE DES ITÉRATIONS
+====================================================================================================
+
+9.1 RYTHME D'UNE ITÉRATION DE DEUX SEMAINES
+
+  LUNDI S1  matin ...... Lancement : objectifs, répartition, critères d'entrée vérifiés
+            après-midi . Étapes 1 et 2 du cycle : préparation, note de conception
+  MARDI S1 ............. Validation de la note, étape 3 : soumission du prompt
+  MER-VEN S1 ........... Étape 4 : production, avec vérification quotidienne du soir
+  LUNDI S2 ............. Point d'avancement ; ajustement du reste à faire
+  MAR-MER S2 ........... Fin de production, étape 5 : complétion des tests
+  JEUDI S2  matin ...... Étapes 6, 7, 8 : batterie, fumée, réconciliation
+            après-midi . Étape 9 : revue de sécurité
+  VENDREDI S2 matin .... Corrections issues de la revue
+            après-midi . Étape 10 : revue, fusion, compte rendu, rétrospective
+
+  RÈGLE DU VENDREDI : aucune fusion après 16 heures, aucun déploiement le vendredi. Un problème
+  découvert le samedi matin n'a personne pour le traiter.
+
+9.2 RITUELS ET LEUR CONDUITE
+
+  POINT QUOTIDIEN — 15 minutes, debout, à heure fixe
+    Trois questions par personne : ce que j'ai fait hier, ce que je fais aujourd'hui, ce qui me
+    bloque. Plus, pour ce chantier, une quatrième : y a-t-il un écart de type A en attente ?
+    On ne résout pas les problèmes pendant le point : on note et on traite après.
+
+  REVUE DE SÉCURITÉ HEBDOMADAIRE — 45 minutes, RT + RSSI + DB
+    Même en semaine calme. Ordre du jour fixe : règles introduites cette semaine, entrées de
+    journal produites, réserves ouvertes, écarts d'observation notables.
+    La tenir même quand « il n'y a rien à dire » : c'est précisément dans ces semaines que les
+    choses passent inaperçues.
+
+  REVUE FONCTIONNELLE HEBDOMADAIRE — 1 heure, EF + RS + RT
+    Ordre du jour : écarts à trancher, lignes de matrice en attente, arbitrages en cours,
+    remontées du terrain.
+
+  REVUE DE FIN D'ITÉRATION — 2 heures
+    Démonstration, checklist de l'annexe B de [D5], registre des risques, indicateurs, décision de
+    porte le cas échéant, rétrospective de 20 minutes.
+
+9.3 LA RÉTROSPECTIVE, EN 20 MINUTES
+
+  Trois questions, chacune limitée à cinq minutes :
+    • Qu'est-ce qui a bien fonctionné et qu'on garde ?
+    • Qu'est-ce qui nous a ralentis ?
+    • Une seule action d'amélioration pour l'itération suivante — une, pas trois.
+  L'action retenue est écrite, avec un responsable, et vérifiée à la rétrospective suivante.
+
+9.4 GESTION DU RETARD
+
+  Si à mi-itération plus de 40 % du travail reste à faire, ne pas attendre la fin : arbitrer.
+  Trois leviers, dans cet ordre de préférence :
+    1. RÉDUIRE LE PÉRIMÈTRE de l'unité en reportant un élément listé comme reportable dans
+       l'annexe E de [D5]. C'est le levier à privilégier.
+    2. DÉCALER l'unité d'une semaine en consommant la marge prévue au §3.2 de [D5].
+    3. RENFORCER l'équipe — le moins efficace à court terme sur un module d'habilitation, où
+       l'appropriation du contexte prend plusieurs jours.
+  Ce qui n'est JAMAIS un levier : réduire les tests, sauter la revue de sécurité, raccourcir
+  l'observation, ou franchir une porte par indulgence.
+
+
+====================================================================================================
+10. MODE OPÉRATOIRE DE LA RECETTE FONCTIONNELLE
+====================================================================================================
+
+10.1 QUI FAIT LA RECETTE
+
+  Pas l'équipe technique. La recette des écrans d'administration est faite par RS avec deux agents
+  de scolarité réels, sur l'environnement de recette, avec des données réalistes. Un développeur
+  qui teste son propre écran vérifie qu'il fonctionne comme il l'a conçu ; un agent vérifie qu'il
+  fonctionne comme il travaille. Ce n'est pas la même chose.
+
+10.2 LES DIX SCÉNARIOS TERRAIN
+
+  Ils figurent au §12.3 de [D5]. Voici comment on les joue concrètement.
+
+  PRÉPARATION D'UNE SESSION DE RECETTE
+    • Restaurer la base de recette à un état connu, pour que la session soit rejouable.
+    • Préparer une fiche par scénario : contexte, gestes à faire, résultat attendu, case OK/KO.
+    • Prévoir 2 heures pour dix scénarios, avec un observateur qui note SANS intervenir.
+
+  T1 — ARRIVÉE D'UN AGENT DE SCOLARITÉ
+    Gestes : créer le compte, choisir la personne ou la créer, attribuer AGENT_INSCRIPTIONS,
+    choisir le secrétariat, envoyer l'invitation, se connecter avec le compte créé.
+    Attendu : accès aux inscriptions de son secrétariat, à rien d'autre.
+    CHRONOMÉTRER : la création doit tenir en moins de trois minutes. C'est un critère de G2.
+
+  T2 — UN ENSEIGNANT DEVIENT RESPONSABLE D'UE
+    Gestes : ouvrir son compte, ajouter le rôle RESPONSABLE_UE, LIRE LE DIFFÉRENTIEL, valider.
+    Attendu : le différentiel affiche précisément ce qu'il gagne. Aucun droit perdu.
+
+  T3 — CHANGEMENT DE SERVICE
+    Gestes : retirer l'ancien rôle, ajouter le nouveau, lire le différentiel, valider.
+    Attendu : le différentiel affiche les pertes ET les gains. Vérifier ensuite en se connectant
+    que l'ancien périmètre n'est plus accessible — et que rien d'autre n'a disparu.
+
+  T4 — DÉLÉGATION POUR CONGÉ
+    Gestes : créer une délégation de 15 jours vers un collègue, avec un périmètre restreint.
+    Attendu : le délégataire accède ; ses actions sont marquées « par délégation » dans le journal ;
+    à l'échéance simulée, l'accès cesse automatiquement.
+
+  T5 — DÉSIGNATION D'UN MEMBRE DE JURY
+    Gestes : attribuer le rôle JURY pour la durée de la session à un agent qui détient déjà
+    GESTIONNAIRE_NOTES.
+    Attendu : REFUS explicite pour incompatibilité, avec un message compréhensible indiquant le
+    conflit. C'est le test de la séparation des tâches.
+
+  T6 — DÉPART D'UN AGENT
+    Gestes : désactiver le compte avec motif.
+    Attendu : sessions révoquées immédiatement, connexion impossible, historique conservé, aucune
+    suppression. Vérifier que ses actions passées restent visibles dans le journal.
+
+  T7 à T10 — les scénarios de sécurité, joués pendant l'exercice d'intrusion du §7.4.
+
+10.3 CONSIGNER UNE ANOMALIE DE RECETTE
+
+  Gabarit en annexe 2. Quatre gravités :
+    A1 BLOQUANT — le scénario est impossible à réaliser, ou un accès indu est obtenu.
+       Correction avant la fin de l'itération, sans négociation.
+    A2 MAJEUR — le scénario est réalisable mais avec un contournement inacceptable en usage réel.
+       Correction dans l'itération suivante au plus tard.
+    A3 MINEUR — gêne d'ergonomie, libellé ambigu. Consigné, traité selon la charge disponible.
+    A4 SUGGESTION — idée d'amélioration. Consignée dans un fichier dédié, traitée hors chantier.
+
+  RÈGLE : une anomalie A1 ou A2 découverte en recette ne se referme que par un nouveau passage du
+  scénario par la MÊME personne qui l'a signalée. Pas par le développeur qui l'a corrigée.
+
+
+====================================================================================================
+11. MODE OPÉRATOIRE DE LA MIGRATION DES COMPTES
+====================================================================================================
+
+La migration est l'opération qui rattache les comptes existants au nouveau dispositif. Elle se
+prépare pendant deux semaines et s'exécute en vingt minutes. Le rapport de ces deux durées est
+normal : tout le travail est dans la préparation.
+
+11.1 PRINCIPE : ON SIMULE JUSQU'À CE QUE CE SOIT PARFAIT, PUIS ON EXÉCUTE
+
+  La commande refuse de s'exécuter sans `--dry-run` préalable réussi. Ce n'est pas une précaution
+  d'usage : c'est une contrainte technique inscrite dans la commande.
+
+11.2 LA BOUCLE DE SIMULATION
+
+  À répéter autant de fois que nécessaire. Trois à six itérations sont normales.
+
+  TOUR DE BOUCLE
+    1. Rafraîchir la copie de production en recette (§1.4).
+    2. python manage.py migrer_comptes_vers_curp --dry-run --rapport=docs/curp/09-migration-t<n>.md
+    3. Lire le rapport. Il comporte cinq sections :
+         • comptes traités et rôles CURP déduits, par rôle d'origine ;
+         • périmètres déduits, avec les cas incertains signalés ;
+         • ÉCARTS DE DROITS avant/après, par type A et B ;
+         • anomalies : doublons d'identité, comptes sans titulaire identifiable, comptes partagés ;
+         • comptes non rattachables à une Personne.
+    4. Traiter chaque écart selon le §5.3 ou §5.4.
+    5. Traiter chaque anomalie selon le §11.3.
+    6. Corriger la table de correspondance ou la matrice.
+    7. Recommencer au point 2.
+
+  CRITÈRE DE SORTIE DE BOUCLE : zéro écart de type A, zéro écart de type B non décidé, et chaque
+  anomalie soit résolue, soit explicitement écartée du périmètre de migration.
+
+11.3 TRAITEMENT DES QUATRE ANOMALIES TYPIQUES
+
+  ANOMALIE 1 — COMPTE PARTAGÉ ENTRE PLUSIEURS AGENTS
+    Fréquent : un compte « secretariat.staps » utilisé par trois personnes. Le nouveau modèle
+    l'interdit conceptuellement, puisqu'un compte se rattache à une Personne.
+    CONDUITE : ne pas le casser. Le compte est marqué COMPTE_PARTAGE_HISTORIQUE, reste fonctionnel
+    sous l'ancien régime, et sort du périmètre de bascule. Une fiche est remise à RS pour
+    régularisation administrative : création de comptes nominatifs, accompagnement des agents,
+    puis désactivation du compte partagé. Cette régularisation est un chantier organisationnel,
+    pas technique, et elle ne bloque pas la migration des 1 200 autres comptes.
+
+  ANOMALIE 2 — DOUBLON D'IDENTITÉ
+    La même personne physique dispose de deux comptes, souvent parce qu'elle est à la fois agent
+    et étudiant en formation continue, ou qu'elle a changé de service.
+    CONDUITE : la détection SIGNALE, elle ne fusionne jamais automatiquement. Chaque cas est
+    soumis à RS, qui confirme ou infirme. Si c'est bien un doublon, on crée UNE Personne rattachée
+    aux DEUX comptes — le modèle le permet. On ne fusionne pas les comptes : on unifie l'identité.
+
+  ANOMALIE 3 — COMPTE SANS TITULAIRE IDENTIFIABLE
+    Compte ancien, adresse générique, jamais connecté depuis deux ans.
+    CONDUITE : ne pas désactiver dans le cadre de la migration — ce serait une perte d'accès non
+    décidée, même si elle paraît évidente. Lister ces comptes, les remettre à RS, et appliquer la
+    procédure du §5.5 (décision, information, délai) s'il est décidé de les désactiver.
+
+  ANOMALIE 4 — AGENT CUMULANT DEUX RÔLES INCOMPATIBLES
+    La séparation des tâches révèle une situation organisationnelle existante.
+    CONDUITE : la migration attribue les deux rôles avec une DÉROGATION nominative, temporaire,
+    motivée « situation antérieure à la mise en place de la séparation des tâches », d'une durée
+    de 90 jours, et journalisée. En parallèle, RS et la direction sont saisis pour régulariser
+    l'organisation. Au bout de 90 jours, la dérogation expire : c'est le mécanisme qui force la
+    régularisation sans bloquer personne du jour au lendemain.
+
+11.4 EXÉCUTION RÉELLE
+
+  PRÉALABLES — tous obligatoires
+    ☐ Boucle de simulation sortie avec zéro écart, sur une copie datant de moins de 48 heures
+    ☐ Porte G3 franchie
+    ☐ Sauvegarde complète de production effectuée ET vérifiée
+    ☐ Fenêtre validée, hors périodes interdites
+    ☐ RE et DB présents et joignables
+    ☐ Procédure de rollback imprimée, sous les yeux
+
+  DÉROULÉ
+    # 1. Sauvegarde
+    pg_dump -Fc -h <prod> -U <user> <base> > avant_migration_$(date +%Y%m%d_%H%M).dump
+
+    # 2. Simulation une dernière fois, EN PRODUCTION, sans écriture
+    python manage.py migrer_comptes_vers_curp --dry-run --rapport=/tmp/derniere_simulation.md
+    # → lire le rapport. Zéro écart. Sinon : ARRÊT, on ne poursuit pas.
+
+    # 3. Exécution
+    python manage.py migrer_comptes_vers_curp --executer --run-id=$(date +%Y%m%d%H%M)
+    # → noter l'identifiant d'exécution. Il est la clé du rollback.
+
+    # 4. Vérification immédiate
+    python manage.py reconcilier_droits --format=tableau
+    python manage.py fumee_authentification --tous
+
+    # 5. Si l'un des deux échoue : rollback immédiat, sans analyse préalable
+    python manage.py migrer_comptes_vers_curp --rollback --run-id=<identifiant>
+
+  APRÈS L'EXÉCUTION
+    • Les drapeaux de décision restent TOUS INACTIFS. La migration a créé des données ; elle n'a
+      changé aucun accès. C'est la distinction essentielle du §12.1.
+    • Consigner dans docs/curp/09-migration.md : identifiant d'exécution, durée, nombre de comptes
+      traités, anomalies restantes, rapport de réconciliation final.
+    • Conserver la sauvegarde préalable au moins six mois.
+
+
+====================================================================================================
+12. MODE OPÉRATOIRE DES MISES EN PRODUCTION ET DES BASCULES E1 À E4
+====================================================================================================
+
+12.1 LA DISTINCTION FONDAMENTALE
+
+  DÉPLOYER n'est pas ACTIVER.
+
+  Un DÉPLOIEMENT met du code en production. Tous les drapeaux restent inactifs. Aucun utilisateur
+  ne voit la moindre différence. C'est une opération technique, à faible risque, qui se fait en
+  journée ouvrée.
+
+  Une ACTIVATION DE DRAPEAU change le comportement du système pour de vrais utilisateurs. C'est une
+  opération à risque, planifiée, annoncée, surveillée, et réversible en moins d'une minute.
+
+  RÈGLE : les deux ne se font jamais le même jour. Un déploiement le mardi, une activation le jeudi
+  au plus tôt. Entre les deux, on vérifie que le déploiement n'a rien cassé — ce qui est
+  précisément impossible à distinguer si l'on fait les deux ensemble.
+
+12.2 PROCÉDURE DE DÉPLOIEMENT
+
+  J-2
+    ☐ Version en recette depuis au moins 5 jours sans incident
+    ☐ Avis RSSI favorable sans réserve bloquante
+    ☐ Sauvegarde de production effectuée et restauration vérifiée
+    ☐ Vérification de la configuration : tous les drapeaux de décision à INACTIF
+    ☐ Procédure de repli imprimée
+    ☐ Astreinte confirmée
+
+  JOUR J
+    1. Annonce aux utilisateurs, même si l'impact attendu est nul.
+    2. Sauvegarde finale.
+    3. Déploiement du code.
+    4. python manage.py migrate
+    5. python manage.py check --deploy
+    6. python manage.py drapeau --lister    → vérifier visuellement que tout est INACTIF
+    7. python manage.py fumee_authentification --tous
+    8. Surveillance des journaux pendant 60 minutes.
+    9. Compte rendu dans les 24 heures.
+
+12.3 PROCÉDURE D'ACTIVATION D'UN DRAPEAU
+
+  AVANT
+    ☐ Condition de passage de l'étape précédente satisfaite et documentée
+    ☐ Décision écrite : qui a décidé, quand, sur quel avis
+    ☐ Fenêtre hors périodes interdites (§12.5)
+    ☐ Canal de signalement ouvert et annoncé aux utilisateurs
+    ☐ Astreinte confirmée sur la durée de surveillance renforcée
+    ☐ La commande de désactivation est préparée, copiée, prête à coller
+
+  ACTIVATION
+    python manage.py drapeau --activer <NOM_DU_DRAPEAU> --motif="<référence de la décision>"
+    python manage.py drapeau --lister
+    python manage.py fumee_authentification --tous
+
+  SURVEILLANCE — intensité décroissante
+    • Première heure : présence continue, lecture des journaux en direct.
+    • Premier jour : vérification toutes les deux heures des écarts et des refus.
+    • Première semaine : rapport quotidien.
+    • Ensuite : rapport hebdomadaire.
+
+  DÉSACTIVATION — le geste à connaître par cœur
+    python manage.py drapeau --desactiver <NOM_DU_DRAPEAU>
+    Aucune autorisation à demander en cas d'incident de gravité 1. On désactive, on prévient
+    ensuite. Le débat a lieu après, jamais pendant.
+
+12.4 LES QUATRE ÉTAPES, CONDUITE DÉTAILLÉE
+
+  ─── ÉTAPE E1 — OBSERVATION (semaines 16 à 20, 4 semaines minimum) ───
+    Drapeaux : CURP_ACTIF + CURP_OBSERVATION
+    Effet utilisateur : aucun, strictement.
+    Ce qu'on fait chaque jour : lire le rapport d'écarts (§5.2), traiter les types A sous 24 h.
+    Ce qu'on mesure : volume de contrôles observés, taux d'écart par rôle et par module.
+    Condition de sortie : zéro écart A, zéro écart B non décidé, sur deux semaines consécutives,
+      avec au moins 10 000 contrôles observés.
+    Si le volume n'est pas atteint : on prolonge. On ne sort pas de E1 sur une observation
+      statistiquement vide.
+
+  ─── ÉTAPE E2 — DÉCISION EN LECTURE (semaines 21 à 24) ───
+    Drapeau ajouté : CURP_DECISION_LECTURE
+    Effet utilisateur : un refus de LECTURE peut désormais venir du nouveau moteur.
+    Pourquoi la lecture d'abord : dans le pire des cas, un agent ne voit pas une donnée qu'il
+      devrait voir. C'est gênant, immédiatement visible, immédiatement réversible. Un refus
+      d'écriture, lui, peut interrompre une chaîne métier en cours — une saisie de notes, une
+      inscription — avec des conséquences bien plus lourdes.
+    Surveillance renforcée : tout refus de lecture nouveau est remonté en temps réel et analysé
+      sous 4 heures ouvrées.
+    Canal de signalement : mis en avant auprès des utilisateurs, avec un engagement de réponse.
+    Condition de sortie : moins de 5 refus inattendus sur la période, tous expliqués et corrigés.
+
+  ─── ÉTAPE E3 — DÉCISION COMPLÈTE (semaines 25 à 30) ───
+    Drapeau ajouté : CURP_DECISION_COMPLETE
+    Effet : le nouveau moteur gouverne tout. L'ancien dispositif reste en place.
+    Précautions particulières :
+      • activation un mardi matin, jamais en fin de semaine ;
+      • présence physique de DB et RE les trois premiers jours ;
+      • rapport quotidien pendant deux semaines ;
+      • permanence d'assistance renforcée annoncée aux services.
+    Condition de sortie : un semestre académique complet, incluant au moins une session de jury et
+      une campagne d'inscriptions, sans incident de gravité 1 ou 2.
+
+  ─── ÉTAPE E4 — RETRAIT DE LA DUPLICATION (semaine 31 et au-delà) ───
+    Drapeau ajouté : CURP_LEGACY_RETRAIT
+    IRRÉVERSIBLE. C'est la seule opération du chantier qui ne se défait pas par un drapeau.
+    Préalables spécifiques :
+      ☐ Décision écrite de la direction, signée
+      ☐ Sauvegarde complète, restauration vérifiée le jour même
+      ☐ Fenêtre de maintenance annoncée une semaine à l'avance
+      ☐ Aucun incident de gravité 1 ou 2 sur les trois mois précédents
+    Contenu : retrait de l'ancienne matrice, suppression de `utils/roles.js` comme source de
+      vérité, nettoyage du code de compatibilité, retrait des anciens codes de rôle devenus inutiles.
+    Après E4, le risque R3 de l'audit est officiellement clos. Le consigner dans le registre des
+      risques et en informer la direction : c'est un résultat qui se voit rarement et qui mérite
+      d'être dit.
+
+12.5 PÉRIODES INTERDITES — À AFFICHER DANS LE BUREAU
+
+  Aucune activation de drapeau, à aucune étape :
+    ✗ pendant une session de jury ou de délibération ;
+    ✗ pendant la première semaine d'une campagne d'inscriptions ou d'admissions ;
+    ✗ pendant une période d'examens ;
+    ✗ un vendredi, ni la veille d'un jour férié ivoirien ;
+    ✗ en l'absence du RE ou du DB d'astreinte ;
+    ✗ dans les 48 heures suivant un déploiement de code.
+
+  La liste des périodes sensibles de l'année académique est obtenue auprès de la scolarité en
+  phase 0 (point 28 de la check-list) et tenue à jour dans docs/curp/10-bascule.md.
+
+
+====================================================================================================
+13. MODE OPÉRATOIRE DES INCIDENTS ET DU REPLI
+====================================================================================================
+
+13.1 QUALIFIER UN INCIDENT EN TRENTE SECONDES
+
+  G1 CRITIQUE — un utilisateur a perdu un accès, ou un accès indu a été obtenu sur des données
+     sensibles. REPLI IMMÉDIAT, sans analyse préalable. Direction informée dans l'heure.
+  G2 MAJEUR — une fonction d'administration est indisponible, le journal est en défaut, le MFA
+     bloque des utilisateurs. Correction sous 24 heures ou repli.
+  G3 MOYEN — écart d'observation, anomalie d'affichage, lenteur. Correction dans l'itération.
+  G4 MINEUR — libellé, ergonomie, documentation. Consigné, traité au fil de l'eau.
+
+  RÈGLE DE QUALIFICATION : en cas de doute entre deux niveaux, on retient le plus grave. Le coût
+  d'un repli injustifié est de quelques heures ; celui d'un incident sous-estimé se compte en jours.
+
+13.2 LES CINQ PROCÉDURES DE REPLI
+
+  ─── PROCÉDURE 1 : UN UTILISATEUR SIGNALE UNE PERTE D'ACCÈS ───
+    GESTE 1, immédiat, sans discuter : éteindre le drapeau de décision le plus récemment activé.
+       python manage.py drapeau --desactiver CURP_DECISION_COMPLETE
+    GESTE 2 : confirmer avec l'utilisateur que l'accès est rétabli. L'appeler, ne pas se contenter
+       d'un courriel.
+    GESTE 3 : qualifier en G1, informer la direction dans l'heure.
+    GESTE 4 : analyser à froid. Quel contrôle a refusé ? Omission de matrice ou restriction non
+       communiquée ?
+    GESTE 5 : corriger, re-tester en recette, re-réconcilier.
+    GESTE 6 : ne réactiver qu'après une nouvelle semaine d'observation sans écart.
+
+    ERREUR À NE PAS COMMETTRE : chercher à comprendre avant de désactiver. Pendant qu'on
+    diagnostique, l'agent ne travaille pas. On rétablit d'abord.
+
+  ─── PROCÉDURE 2 : PLUS AUCUN ADMINISTRATEUR NE PEUT SE CONNECTER ───
+    1. Accès SSH au serveur avec un compte système habilité.
+    2. cd /chemin/application && source .venv/bin/activate
+    3. python manage.py habilitations_secours --creer-admin
+       La commande crée un administrateur temporaire à durée de vie limitée et journalise sa
+       création de manière indélébile.
+    4. Se connecter avec ce compte. Rétablir au moins deux administrateurs nominatifs.
+    5. python manage.py habilitations_secours --revoquer-temporaire
+    6. Rapport d'incident OBLIGATOIRE au RSSI et à la direction.
+    7. Analyse de cause racine : toute utilisation de cette procédure est une anomalie. Si elle
+       sert deux fois, quelque chose est structurellement défaillant.
+
+  ─── PROCÉDURE 3 : LE JOURNAL EST DÉTECTÉ COMME ALTÉRÉ ───
+    1. NE RIEN MODIFIER, NE RIEN SUPPRIMER. Le journal est une pièce, potentiellement probante.
+    2. Isoler la période, exporter les entrées concernées, les conserver hors ligne.
+    3. Informer le RSSI immédiatement, la direction sous 4 heures.
+    4. Chercher la cause : défaut technique du chaînage, ou intervention directe en base ?
+    5. Ne restaurer la cohérence qu'après analyse, avec une entrée de journal documentant
+       l'opération de restauration elle-même.
+
+  ─── PROCÉDURE 4 : DÉGRADATION MAJEURE DES PERFORMANCES ───
+    1. Éteindre CURP_OBSERVATION en priorité : c'est lui qui double le coût des contrôles.
+    2. Mesurer à nouveau. Si c'était la cause, on a gagné du temps pour optimiser.
+    3. Si insuffisant, éteindre le drapeau de décision et revenir à l'ancien dispositif.
+    4. Mesurer, identifier la requête ou le contrôle coûteux, corriger, re-mesurer en recette.
+    5. Ne réactiver qu'après démonstration du gain sur le banc de mesure.
+
+  ─── PROCÉDURE 5 : ANNULER UNE MIGRATION DE COMPTES ───
+    1. Récupérer l'identifiant d'exécution dans docs/curp/09-migration.md.
+    2. python manage.py migrer_comptes_vers_curp --rollback --run-id=<identifiant>
+    3. python manage.py reconcilier_droits --format=tableau → vérifier le retour à l'état antérieur.
+    4. python manage.py fumee_authentification --tous
+    5. Si le rollback échoue : niveau 4, restauration de la sauvegarde préalable.
+
+13.3 LES QUATRE NIVEAUX DE REPLI ET LEUR DURÉE RÉELLE
+
+  NIVEAU 1 — Extinction de drapeau ................. < 1 minute .... repli de référence
+  NIVEAU 2 — Redéploiement version précédente ...... 5 à 15 minutes  défaut du code lui-même
+  NIVEAU 3 — Annulation de migration de données .... 30 à 60 minutes données CURP fautives
+  NIVEAU 4 — Restauration de la base ............... 1 à 2 heures ... dernier recours
+
+  On monte d'un niveau seulement si le précédent a échoué, jamais par précaution.
+
+13.4 APRÈS L'INCIDENT : LE RETOUR D'EXPÉRIENCE
+
+  Sous 5 jours ouvrés, une page dans docs/curp/11-incidents.md :
+    • chronologie factuelle, à la minute ;
+    • ce qui a été détecté, par qui, et comment ;
+    • délai entre la survenue et la détection — souvent l'information la plus utile ;
+    • délai entre la détection et le rétablissement ;
+    • cause racine, et non cause immédiate ;
+    • ce qui a permis de limiter l'impact ;
+    • deux actions correctives maximum, avec responsable et échéance.
+
+  Le retour d'expérience ne cherche pas un responsable. Il cherche pourquoi le dispositif n'a pas
+  empêché l'incident, et ce qu'on y ajoute.
+
+
+====================================================================================================
+14. MODE OPÉRATOIRE DE LA DOCUMENTATION PROJET
+====================================================================================================
+
+14.1 RÈGLE GÉNÉRALE
+
+  La documentation s'écrit AU MOMENT où l'on fait, jamais à la fin. Un module d'habilitation dont
+  la documentation est écrite trois mois après sa mise en service est un module dont personne ne
+  sait plus pourquoi telle règle existe.
+
+14.2 QUI TIENT QUOI
+
+  +------------------------------------------+------------+--------------------------------+
+  | Document                                 | Responsable| Rythme de mise à jour          |
+  +------------------------------------------+------------+--------------------------------+
+  | 00-references-initiales.md               | RT         | une fois, en phase 0           |
+  | 00-environnement-recette.md              | RE         | à chaque rafraîchissement      |
+  | 01-etat-des-droits.md                    | DB         | une fois, en U0 — figé ensuite |
+  | 02-inventaire-comptes.md                 | DB         | U0, puis avant U8              |
+  | 03-modele-donnees.md                     | DB         | à chaque modèle ajouté         |
+  | 04-moteur-autorisation.md                | DB         | à chaque contrôle modifié      |
+  | 05-matrice.md                            | EF + RS    | après chaque atelier, puis figé|
+  | 06-registre-arbitrages.md                | EF         | à chaque arbitrage             |
+  | 07-journal-observation.md                | DB         | QUOTIDIEN dès U2               |
+  | 08-revues-securite.md                    | RSSI       | à chaque revue                 |
+  | 09-migration.md                          | DB + RE    | à chaque simulation            |
+  | 10-bascule.md                            | RE         | à chaque activation            |
+  | 11-incidents.md                          | RT         | à chaque incident              |
+  | 12-comptes-rendus/                       | exécutant  | à chaque fin d'unité           |
+  | manuels/                                 | DB + EF    | U8                             |
+  +------------------------------------------+------------+--------------------------------+
+
+  Chaque fichier porte en première ligne : responsable, date de dernière mise à jour.
+  Un fichier non mis à jour depuis plus de deux semaines alors que son rythme l'exige est signalé
+  en revue de fin d'itération.
+
+14.3 LES TROIS MANUELS — CE QU'ILS CONTIENNENT
+
+  MANUEL DE L'ADMINISTRATEUR SYSTÈME (une quinzaine de pages)
+    • Architecture du module en une page et un schéma
+    • Les six drapeaux : ce que chacun fait, comment l'activer, comment l'éteindre
+    • La procédure de secours, en pas à pas, avec les commandes exactes
+    • La vérification d'intégrité du journal
+    • Les commandes d'exploitation courantes
+    • Que faire en cas d'incident : renvoi vers les cinq procédures du §13.2
+    RÈGLE : ce manuel doit être utilisable par quelqu'un qui n'a pas participé au projet, un
+    dimanche soir, sous pression. Le tester dans ces conditions est l'objet du jalon J4.
+
+  MANUEL DU GESTIONNAIRE DE COMPTES (une dizaine de pages, illustré)
+    • Créer un compte : les six étapes de l'assistant, avec copies d'écran
+    • Modifier un compte : et comment LIRE le différentiel de droits
+    • Les 33 rôles expliqués en langage courant, un paragraphe chacun
+    • Les périmètres : ce que « son secrétariat » veut dire concrètement
+    • Déléguer pendant une absence
+    • Suspendre, désactiver : la différence, et pourquoi on ne supprime jamais
+    • Répondre à une campagne de revue des habilitations
+
+  MANUEL DE L'AGENT UTILISATEUR (quatre pages maximum)
+    • Mon mot de passe : le changer, le récupérer
+    • L'authentification à deux facteurs : l'activer, mes codes de secours, que faire si je perds
+      mon téléphone
+    • Mes sessions : voir où je suis connecté, me déconnecter à distance
+    • Mes droits : les consulter, et à qui m'adresser si l'un me manque
+    RÈGLE : quatre pages. Au-delà, personne ne le lit.
+
+14.4 LES FICHES MÉMO
+
+  Une page recto, par famille de rôles, plastifiée, distribuée dans les services. Contenu :
+    • le nom du rôle en langage courant ;
+    • ce que je peux faire, en cinq puces ;
+    • ce que je ne peux pas faire, en trois puces — souvent plus utile que la liste précédente ;
+    • qui contacter pour une demande de droit.
+  Familles : administration · scolarité · candidatures · pédagogie · enseignants · évaluations ·
+  diplômation · finances · stages · RH · patrimoine · archives.
+
+
+====================================================================================================
+15. MODE OPÉRATOIRE EN ÉQUIPE RÉDUITE (UN SEUL EXÉCUTANT)
+====================================================================================================
+
+15.1 CE QUI CHANGE
+
+  Le calendrier passe de 16 à 26 semaines (annexe G de [D5]). Le cycle en 10 étapes reste identique.
+  Ce qui change, c'est la discipline requise : sans collègue pour relever une inattention, les
+  contrôles automatisés deviennent la seule barrière.
+
+15.2 LES QUATRE CHOSES QUE L'EXÉCUTANT NE PEUT PAS FAIRE SEUL
+
+  Ce ne sont pas des recommandations. Un module d'habilitation conçu, codé, relu et validé par une
+  seule personne présente un risque qui excède celui qu'il est censé réduire.
+
+  1. LA REVUE DE SÉCURITÉ. Le RSSI ne peut pas être l'auteur du code. Si la compétence n'existe
+     pas en interne, une prestation de 8 à 10 jours répartis sur le chantier suffit.
+  2. LE TEST DE LA PROCÉDURE DE SECOURS. Par construction, il doit être fait par quelqu'un qui ne
+     l'a pas écrite.
+  3. LA RECETTE DES ÉCRANS. Par des agents réels, jamais par le développeur.
+  4. LA VALIDATION DE LA MATRICE. Par l'expertise fonctionnelle, jamais par la technique.
+
+  Si l'une de ces quatre conditions n'est pas tenable, le chantier ne démarre pas. C'est un avis
+  ferme et il est préférable de le formuler avant plutôt qu'après.
+
+15.3 ADAPTATIONS PRATIQUES
+
+  • S'imposer la note de conception pour TOUTES les unités, y compris celles où elle est
+    facultative. Seul, écrire est le seul moyen de se relire.
+  • Automatiser la batterie de vérification dès la première semaine et l'exécuter chaque soir
+    sans exception. Elle remplace le regard du collègue.
+  • Le garde-fou de CI sur les tests existants (§1.8) devient indispensable, pas optionnel.
+  • Tenir le journal d'avancement quotidien en trois lignes. Il sert à se retrouver après une
+    interruption de plusieurs jours, ce qui arrive souvent en équipe réduite.
+  • Demander une relecture externe ponctuelle sur les deux unités les plus critiques, U2 et U8 :
+    une demi-journée d'un développeur extérieur au projet, deux fois dans le chantier.
+
+15.4 PRIORITÉS EN CAS DE BLOCAGE TOTAL
+
+  Si même les 26 semaines ne sont pas tenables, livrer dans cet ordre et s'arrêter où l'on peut.
+  Chaque palier est un livrable cohérent et utile en lui-même :
+
+  PALIER 1 — U0 SEUL (3 semaines)
+    L'institut dispose enfin d'un document décrivant qui a accès à quoi, et d'un filet de 40 tests
+    protégeant l'authentification existante. Valeur immédiate, risque nul.
+
+  PALIER 2 — U0 + U1 + U2 EN OBSERVATION (12 semaines)
+    On mesure l'écart entre les droits réels et les droits souhaitables, sans rien changer.
+    L'institut sait alors exactement ce que coûterait une mise en conformité, chiffres à l'appui.
+
+  PALIER 3 — + U3, LA MATRICE VALIDÉE (17 semaines)
+    La matrice signée est un actif institutionnel, opposable, utile en cas de contrôle ou de
+    contentieux, même si le code ne l'applique pas encore.
+
+  Aucun de ces trois paliers n'expose l'institut au moindre risque d'accès.
+
+
+====================================================================================================
+16. FICHE RÉFLEXE — L'ESSENTIEL SUR UNE PAGE
+====================================================================================================
+
+  À IMPRIMER ET AFFICHER AU-DESSUS DU POSTE DE TRAVAIL
+
+  LA QUESTION QUI TRANCHE TOUT
+    « Est-ce que cela peut faire perdre un accès à quelqu'un sans qu'on l'ait décidé ? »
+    Si ce n'est pas un non certain : on ne le fait pas aujourd'hui.
+
+  LES HUIT RÈGLES DE SÛRETÉ
+    S1 aucune perte d'accès · S2 aucun élargissement silencieux · S3 le backend décide ·
+    S4 double commande sur l'irréversible · S5 jamais de suppression · S6 pas d'auto-élévation ·
+    S7 toujours deux administrateurs · S8 une procédure de secours qui marche
+
+  CHAQUE SOIR, TROIS COMMANDES
+    python manage.py test
+    python manage.py fumee_authentification --tous
+    python manage.py reconcilier_droits --format=tableau
+
+  CHAQUE MATIN, UNE COMMANDE
+    python manage.py ecarts --depuis=hier --resume
+
+  LES HUIT ARRÊTS IMMÉDIATS
+    1 un test existant casse · 2 un écart de type A · 3 la fumée échoue ·
+    4 un fichier existant modifié · 5 une règle codée uniquement côté interface ·
+    6 la décision dépasse 5 ms · 7 une opération sensible non journalisée ·
+    8 moins de deux administrateurs actifs
+
+  EN CAS DE PERTE D'ACCÈS SIGNALÉE
+    python manage.py drapeau --desactiver <DERNIER_DRAPEAU_ACTIVÉ>
+    D'ABORD. On analyse ensuite. Toujours dans cet ordre.
+
+  EN CAS DE PERTE D'ACCÈS ADMINISTRATEUR TOTALE
+    ssh serveur → python manage.py habilitations_secours --creer-admin
+
+  CE QUI NE SE NÉGOCIE JAMAIS
+    ✗ modifier un test existant       ✗ sauter la revue de sécurité
+    ✗ une règle sans test de refus    ✗ raccourcir l'observation
+    ✗ déployer et activer le même jour ✗ basculer un vendredi
+    ✗ franchir G0 ou G3 sous conditions ✗ supprimer un compte
+
+  DÉPLOYER N'EST PAS ACTIVER.
+  Un module d'habilitation réussi est un module dont personne ne parle.
+
+
+====================================================================================================
+ANNEXE 1 — TOUTES LES COMMANDES DU PROJET, CLASSÉES PAR USAGE
+====================================================================================================
+
+A1.1 COMMANDES À ÉCRIRE PENDANT LE CHANTIER
+  Ces commandes n'existent pas dans le dépôt : elles sont un livrable du chantier. L'unité qui les
+  produit est indiquée.
+
+  fumee_authentification ......... U0 · scénario de fumée sur les 14 comptes témoins
+  reconcilier_droits ............. U2 · comparaison ancien/nouveau dispositif
+  ecarts ......................... U2 · consultation et traitement des écarts d'observation
+  bench_decision ................. U2 · banc de mesure de la performance de décision
+  drapeau ........................ U2 · activation, désactivation, listage des drapeaux
+  matrice ........................ U3 · export, ajout, retrait de lignes de matrice
+  verifier_journal ............... U7 · contrôle du chaînage des empreintes
+  anonymiser_recette ............. phase 0 · anonymisation de la copie de production
+  migrer_comptes_vers_curp ....... U8 · migration, simulation, rollback
+  habilitations_secours .......... U8 · récupération d'accès administrateur
+
+A1.2 VÉRIFICATION QUOTIDIENNE
+
+  # Backend
+  python manage.py check
+  python manage.py check --deploy
+  python manage.py makemigrations --check --dry-run
+  python manage.py test
+  python manage.py test habilitations                    # tests de l'unité en cours seulement
+
+  # Habilitation
+  python manage.py fumee_authentification --tous
+  python manage.py reconcilier_droits --format=tableau
+  python manage.py ecarts --depuis=hier --resume
+
+  # Frontend
+  cd frontend && npm run lint && npm run test && npm run build && cd ..
+
+  # Mobile
+  cd mobile && flutter analyze && cd ..
+
+A1.3 SCRIPT D'ENCHAÎNEMENT — scripts/verif_curp.sh
+
+  #!/usr/bin/env bash
+  # Batterie de vérification CURP-INJS — les 14 points
+  # Usage : ./scripts/verif_curp.sh [--rapide]
+  set -u
+  ECHECS=0
+  verifier() {
+    echo "── $1"
+    shift
+    if "$@" > /tmp/verif_curp.log 2>&1; then
+      echo "   OK"
+    else
+      echo "   ÉCHEC — voir /tmp/verif_curp.log"
+      tail -20 /tmp/verif_curp.log
+      ECHECS=$((ECHECS+1))
+    fi
+  }
+
+  verifier "1. check"                 python manage.py check
+  verifier "2. check --deploy"        python manage.py check --deploy
+  verifier "3. migrations manquantes" python manage.py makemigrations --check --dry-run
+  if [ "${1:-}" != "--rapide" ]; then
+    verifier "4. migration base vide"    ./scripts/migrer_base_vide.sh
+    verifier "5. migration base peuplee" ./scripts/migrer_base_peuplee.sh
+    verifier "6. reversibilite"          ./scripts/tester_rollback.sh
+  fi
+  verifier "7. tests backend"         python manage.py test
+  verifier "8. fumee auth"            python manage.py fumee_authentification --tous
+  verifier "9. reconciliation"        python manage.py reconcilier_droits --strict
+  verifier "10. lint frontend"        bash -c "cd frontend && npm run lint"
+  verifier "11. tests frontend"       bash -c "cd frontend && npm run test -- --run"
+  verifier "12. build frontend"       bash -c "cd frontend && npm run build"
+  verifier "13. flutter analyze"      bash -c "cd mobile && flutter analyze"
+  verifier "14. bench decision"       python manage.py bench_decision --seuil=5
+
+  echo
+  if [ $ECHECS -eq 0 ]; then
+    echo "BATTERIE COMPLÈTE : 14/14 — la journée peut se terminer."
+  else
+    echo "BATTERIE : $ECHECS ÉCHEC(S) — voir §4.5 du mode opératoire."
+    exit 1
+  fi
+
+A1.4 EXPLOITATION DES DRAPEAUX
+
+  python manage.py drapeau --lister
+  python manage.py drapeau --activer CURP_ACTIF --motif="décision du 12/01, réf. DIR-2027-004"
+  python manage.py drapeau --desactiver CURP_DECISION_COMPLETE
+  python manage.py drapeau --regler CURP_OBSERVATION_TAUX=20
+  python manage.py drapeau --historique CURP_DECISION_LECTURE
+
+A1.5 OBSERVATION ET ÉCARTS
+
+  python manage.py ecarts --depuis=hier --resume
+  python manage.py ecarts --depuis=2027-01-01 --type=A
+  python manage.py ecarts --detail 47
+  python manage.py ecarts --par-role
+  python manage.py ecarts --clore 47 --cause=omission-matrice --reference=ARB-2027-012
+  python manage.py ecarts --exporter --format=csv > ecarts_semaine.csv
+
+A1.6 MATRICE
+
+  python manage.py matrice --exporter > docs/curp/05-matrice.md
+  python manage.py matrice --exporter --domaine=scolarite --format=fiche
+  python manage.py matrice --exporter --domaines=a,b,c --format=atelier > atelier1.md
+  python manage.py matrice --ajouter-permission AGENT_INSCRIPTIONS scolarite.dossier.consulter --niveau=1
+  python manage.py matrice --retirer-permission ENSEIGNANT evaluations.note.valider
+  python manage.py matrice --verifier          # cohérence : orphelines, rôles vides, contradictions
+  python manage.py matrice --comparer <fichier-signé>   # écart entre la base et la version signée
+
+A1.7 MIGRATION
+
+  python manage.py migrer_comptes_vers_curp --dry-run --rapport=/tmp/simulation.md
+  python manage.py migrer_comptes_vers_curp --dry-run --role=SECRETARIAT
+  python manage.py migrer_comptes_vers_curp --executer --run-id=202701151400
+  python manage.py migrer_comptes_vers_curp --rollback --run-id=202701151400
+  python manage.py migrer_comptes_vers_curp --etat --run-id=202701151400
+
+A1.8 SÉCURITÉ ET AUDIT
+
+  python manage.py verifier_journal --depuis=2027-01-01
+  python manage.py verifier_journal --entree=48122 --detail
+  python manage.py habilitations_secours --creer-admin
+  python manage.py habilitations_secours --revoquer-temporaire
+  python manage.py habilitations_secours --lister-admins
+  python manage.py revue --creer --periode=S1-2027 --domaines=tous
+  python manage.py revue --etat --periode=S1-2027
+  python manage.py revue --relancer --periode=S1-2027
+
+A1.9 BASE DE DONNÉES
+
+  # Sauvegarde
+  pg_dump -Fc -h <hote> -U <user> <base> > sauvegarde_$(date +%Y%m%d_%H%M).dump
+
+  # Restauration
+  pg_restore -c -d <base> sauvegarde.dump
+
+  # Copie de recette
+  createdb injs_recette && pg_restore -d injs_recette prod.dump
+  python manage.py anonymiser_recette --confirmer
+
+  # Migrations
+  python manage.py migrate
+  python manage.py migrate habilitations 0007      # retour à une migration précise
+  python manage.py showmigrations habilitations
+  python manage.py sqlmigrate habilitations 0008   # lire le SQL avant de l'appliquer
+
+A1.10 CONTRÔLES DE QUALITÉ PONCTUELS
+
+  # Fichiers trop longs
+  find backend/habilitations -name "*.py" | xargs wc -l | sort -rn | head -10
+  find frontend/src -path "*administration*" -name "*.jsx" | xargs wc -l | sort -rn | head -10
+
+  # print() oubliés
+  grep -rn "print(" backend/habilitations/ | grep -v "#"
+
+  # Tests de refus manquants
+  grep -rc "def test_.*_refuse" backend/habilitations/tests/
+  grep -rc "def test_.*_autorise" backend/habilitations/tests/
+  # le premier nombre doit être supérieur ou égal au second
+
+  # Querysets non filtrés
+  grep -rn "objects.all()" backend/habilitations/ backend/*/views*.py
+
+  # Secrets en dur
+  grep -rniE "(password|secret|token|api_key)\s*=\s*[\"']" backend/habilitations/
+
+
+====================================================================================================
+ANNEXE 2 — GABARITS À COPIER
+====================================================================================================
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 1 — NOTE DE CONCEPTION D'UNE UNITÉ
+────────────────────────────────────────────────────────────────────────────────────────────────
+NOTE DE CONCEPTION — UNITÉ U__ : <intitulé>
+Auteur : ______   Date : __/__/____   Validée par RT le : __/__/____   Par RSSI le : __/__/____
+
+1. CE QUE L'UNITÉ AJOUTE (trois phrases maximum)
+
+2. MODÈLES
+   Créés : ______________________________________________
+   Étendus (par relation, sans modification) : __________
+   Modèles existants modifiés : AUCUN  ☐ confirmé
+   Si ce n'est pas AUCUN, lesquels et pourquoi :
+
+3. ROUTES CRÉÉES
+   ┌──────────┬──────────────────────────┬───────────────────────────┬──────────────┐
+   │ Méthode  │ Chemin                   │ Permission exigée         │ Périmètre    │
+   ├──────────┼──────────────────────────┼───────────────────────────┼──────────────┤
+   │          │                          │                           │              │
+   └──────────┴──────────────────────────┴───────────────────────────┴──────────────┘
+
+4. RÈGLES D'AUTORISATION INTRODUITES  ← section la plus importante
+   Règle 1 : qui est autorisé / qui est refusé / sur quel périmètre / quel contrôle la porte
+   Règle 2 : …
+
+5. EFFETS POSSIBLES SUR LES DROITS EXISTANTS
+   ☐ Aucun — justification :
+   ☐ Les suivants : __________ (chacun devient un écart attendu, à décider selon §5.5)
+
+6. JOURNALISATION
+   Opérations journalisées : ______________________________
+   Opérations volontairement non journalisées et pourquoi : ______
+
+7. STRATÉGIE DE TEST
+   Tests visés : ____ dont ____ tests de refus
+   Cas limites couverts :
+
+8. STRATÉGIE DE REPLI
+   Comment on annule cette unité si elle pose problème :
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 2 — DEMANDE DE DONNÉE DE RÉFÉRENCE
+────────────────────────────────────────────────────────────────────────────────────────────────
+Objet : Projet CURP-INJS — demande de donnée de référence <réf D_>
+
+Destinataire : ____________          Date d'envoi : __/__/____
+ÉCHÉANCE SOUHAITÉE : __/__/____      Bloque : unité U__
+
+CE QUE NOUS DEMANDONS
+  <description précise, avec le format attendu et un exemple de deux lignes>
+
+POURQUOI
+  <en deux phrases, en langage non technique>
+
+CE QU'IL SE PASSE SI NOUS NE L'AVONS PAS À L'ÉCHÉANCE
+  <conséquence concrète, sans dramatiser ni minimiser>
+
+CONTACT : ____________
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 3 — FICHE D'ÉCART D'OBSERVATION
+────────────────────────────────────────────────────────────────────────────────────────────────
+ÉCART N° ____   TYPE : ☐ A restriction  ☐ B élargissement  ☐ C motif
+Détecté le : __/__/____    Délai de traitement : A = 24 h · B = 48 h
+Compte(s) concerné(s) : ______   Rôle : ______   Occurrences : ____
+Permission : ________________________   Objet : ______
+Décision ancienne : ______   Décision nouvelle : ______   Contrôle ayant tranché : n° __
+
+QUESTION POSÉE À L'EXPERT FONCTIONNEL
+  « Aujourd'hui, <rôle> peut / ne peut pas <action> sur <objet>. Est-ce normal ? »
+
+RÉPONSE : ☐ Omission de notre matrice   ☐ Décision volontaire (→ procédure §5.5)
+Répondu par : ______   Le : __/__/____
+
+CORRECTION APPLIQUÉE
+  Commande exécutée : ______________________________________
+  Écart disparu après réconciliation : ☐ oui ☐ non
+  Aucun écart de sens inverse créé : ☐ vérifié
+  Étendue vérifiée sur tout le rôle : ☐ oui — ____ comptes concernés
+
+CLÔTURE : le __/__/____   Référence d'arbitrage : ______
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 4 — DÉCISION DE RESTRICTION VOLONTAIRE (procédure §5.5)
+────────────────────────────────────────────────────────────────────────────────────────────────
+RÉFÉRENCE : ARB-____-___   Date : __/__/____
+
+DROIT RETIRÉ
+  Rôle : ______   Permission : ______   Périmètre : ______
+  Nombre de comptes concernés : ____   (liste nominative jointe)
+
+MOTIF MÉTIER (en langage clair, compréhensible par l'agent concerné)
+
+VALIDATION
+  Expert fonctionnel : ______ le __/__/____
+  Direction (si > 20 comptes ou rôle de direction) : ______ le __/__/____
+  RSSI (si permission critique) : ______ le __/__/____
+
+INFORMATION DES PERSONNES
+  Liste remise au responsable de service le : __/__/____
+  Agents informés le : __/__/____
+  DATE D'EFFET : __/__/____   (minimum 15 jours après l'information)
+  Contestations reçues : ____   Traitées : ____
+
+VÉRIFICATION APRÈS APPLICATION (J+7)
+  Travail empêché signalé : ☐ non ☐ oui — décision révisée le __/__/____
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 5 — AVIS DE REVUE DE SÉCURITÉ
+────────────────────────────────────────────────────────────────────────────────────────────────
+AVIS DE REVUE DE SÉCURITÉ — UNITÉ U__
+RSSI : ____________   Date : __/__/____   Durée de la revue : ____ h
+
+GRILLE DES 18 POINTS : ____ satisfaits / 18
+Points non satisfaits : n° ____, ____, ____
+
+CONTRÔLE PAR RETRAIT DE RÈGLE (point 17)
+  Règles testées : ______, ______, ______
+  Tests de refus qui ont bien échoué : ____ / 3
+
+AVIS : ☐ FAVORABLE   ☐ FAVORABLE SOUS RÉSERVE   ☐ DÉFAVORABLE
+
+RÉSERVES
+  R__ : <description>   Responsable : ____   Échéance : avant la porte G__
+  R__ : …
+
+MOTIF EN CAS D'AVIS DÉFAVORABLE (ce qui doit changer pour obtenir un avis favorable)
+
+Signature : ____________
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 6 — ANOMALIE DE RECETTE
+────────────────────────────────────────────────────────────────────────────────────────────────
+ANOMALIE N° ____   Gravité : ☐ A1 bloquant ☐ A2 majeur ☐ A3 mineur ☐ A4 suggestion
+Scénario : T__   Signalée par : ______ (nom et fonction)   Le : __/__/____
+
+CE QUE J'AI FAIT (gestes, dans l'ordre)
+  1.
+  2.
+
+CE QUE J'ATTENDAIS
+
+CE QUI S'EST PASSÉ
+
+COMPTE UTILISÉ : ______   RÔLE : ______   ÉCRAN : ______
+
+TRAITEMENT
+  Affectée à : ______   Corrigée le : __/__/____
+  RE-TESTÉE PAR LA PERSONNE QUI A SIGNALÉ : ☐ oui, le __/__/____  ☐ non → non clôturable
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 7 — JOURNAL D'ACTIVATION DE DRAPEAU
+────────────────────────────────────────────────────────────────────────────────────────────────
+DRAPEAU : ______________   ÉTAPE DE BASCULE : E__
+Date et heure d'activation : __/__/____ à __h__   Par : ______
+
+DÉCISION AUTORISANT L'ACTIVATION
+  Référence : ______   Décidée par : ______   Le : __/__/____
+  Avis RT : ____   Avis RSSI : ____   Avis EF : ____
+
+PRÉALABLES VÉRIFIÉS
+  ☐ Condition de sortie de l'étape précédente satisfaite — chiffres : ______
+  ☐ Hors période interdite   ☐ Sauvegarde vérifiée   ☐ Astreinte confirmée
+  ☐ Canal de signalement ouvert   ☐ Commande de désactivation prête
+
+APRÈS ACTIVATION
+  Fumée d'authentification : ☐ verte ☐ rouge
+  Première heure : incidents ____   Premier jour : incidents ____
+  Première semaine : signalements utilisateurs ____ dont fondés ____
+
+DÉSACTIVATION ÉVENTUELLE
+  Le __/__/____ à __h__   Motif : ______   Incident associé : ______
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+GABARIT 8 — JOURNAL D'AVANCEMENT QUOTIDIEN (trois lignes, tous les soirs)
+────────────────────────────────────────────────────────────────────────────────────────────────
+__/__/____  U__
+  FAIT     :
+  EN COURS :
+  OBSTACLE :
+  Batterie 14 points : __/14   Écarts type A en attente : __
+
+
+====================================================================================================
+ANNEXE 3 — GLOSSAIRE DES SIGLES DU PROJET
+====================================================================================================
+
+DOCUMENTS
+  [D1][D2][D3] ... Le triptyque EDT-INJS : prompts, plan d'exécution, mode opératoire
+  [D4] ............ Génération-prompts-COMPTES-UTILISATEURS — les prompts (LE QUOI)
+  [D5] ............ Plan-exécution-prompts-COMPTES-UTILISATEURS — le plan (LE QUAND)
+  [D6] ............ Le présent mode opératoire (LE COMMENT)
+  [S1] ............ Audit complet détaillé de l'application
+  [S2] ............ Modèle fonctionnel de référence — MODULE 18 pour ce chantier
+  [S3] ............ Rapport de mise en œuvre du modèle fonctionnel
+
+PERSONNES
+  RT .............. Responsable technique
+  RSSI ............ Responsable de la sécurité des systèmes d'information — veto sur la production
+  DB .............. Développeur backend
+  DF .............. Développeur frontend
+  EF .............. Expert fonctionnel scolarité LMD
+  RS .............. Référent scolarité INJS
+  RF .............. Référent fonctionnel de domaine (5 personnes)
+  RE .............. Responsable exploitation
+  DIR ............. Direction
+
+STRUCTURE DU CHANTIER
+  CURP-INJS ....... Comptes Utilisateurs, Rôles & Permissions — nom du module
+  U0 à U8 ......... Les 9 unités de travail
+  I0 à I7 ......... Les 8 itérations de 2 semaines
+  E1 à E4 ......... Les 4 étapes de bascule
+  G0 à G4 ......... Les 5 portes de qualité
+  J1 à J4 ......... Les 4 jalons de sûreté
+  S1 à S8 ......... Les 8 règles de sûreté
+  R1 à R7 ......... Les 7 règles de pilotage du plan
+  X1 à X14 ........ Les 14 risques du registre
+  A1 à A7 ......... Les 7 annexes de référence de [D4]
+  C1 à C6 ......... Les 6 prompts complémentaires de [D4]
+  T1 à T10 ........ Les 10 scénarios de recette terrain
+  I1 à I10 ........ Les 10 scénarios de l'exercice d'intrusion (§7.4)
+
+NOTIONS DU MODULE
+  Personne ........ Identité métier unique, indépendante des comptes
+  Compte .......... Moyen d'accès, rattaché à une Personne
+  Rôle métier ..... Ensemble cohérent de permissions correspondant à une fonction
+  Permission ...... Droit atomique, au format <module>.<ressource>.<action>
+  Périmètre ....... Étendue sur laquelle un rôle s'exerce (institut, formation, secrétariat, soi)
+  N0 à N4 ......... Niveaux d'habilitation : aucun, lecture, écriture, validation, administration
+  Dérogation ...... Octroi ou retrait ponctuel d'une permission, borné à 90 jours
+  Délégation ...... Transfert temporaire de droits pendant une absence
+  Mode observation  Le nouveau moteur calcule sans décider ; il journalise les écarts
+  Écart type A .... L'ancien autorise, le nouveau refuse → perte d'accès potentielle
+  Écart type B .... L'ancien refuse, le nouveau autorise → élargissement potentiel
+  Écart type C .... Même décision, motif différent
+  Réconciliation .. Comparaison exhaustive ancien/nouveau sur tous les comptes
+  Séparation des tâches — incompatibilité déclarée entre deux rôles, non négociable
+
+RISQUES DE L'AUDIT REPRIS PAR CE CHANTIER
+  R3 .............. Double matrice de rôles backend/frontend — clos à l'étape E4
+  R6 .............. Absence d'environnement de recette — traité en phase 0
+
+
+====================================================================================================
+RAPPEL FINAL
+====================================================================================================
+
+Ce mode opératoire décrit beaucoup de gestes pour un chantier dont le résultat visible sera nul.
+C'est normal, et c'est même le but.
+
+Les seize semaines décrites ici ne livrent aucune fonctionnalité que les agents de l'INJS
+attendaient. Elles livrent une chose plus discrète : la capacité de répondre, un jour où quelqu'un
+le demandera, à la question « qui avait accès à ce dossier, à cette note, à ce diplôme, et qui
+l'avait décidé ? ». Ce jour-là — un départ conflictuel, un contrôle, une contestation de note, une
+fuite — le journal chaîné et la matrice signée seront la seule réponse disponible.
+
+D'ici là, le succès se mesure à l'absence de bruit. Personne ne doit remarquer quoi que ce soit.
+Aucun agent ne doit appeler le support parce qu'un écran a disparu. Aucun responsable ne doit
+découvrir qu'un collaborateur voit ce qu'il ne devrait pas voir.
+
+Le jour où l'on hésite entre aller plus vite et vérifier une fois de plus, la réponse est écrite
+en haut de la fiche réflexe, et elle ne change pas :
+
+    « Est-ce que cela peut faire perdre un accès à quelqu'un sans qu'on l'ait décidé ? »
+    Si ce n'est pas un non certain, on ne le fait pas aujourd'hui.
+
+====================================================================================================
+FIN DU MODE OPÉRATOIRE — Mode-opératoire-exécution-COMPTES-UTILISATEURS-app-injs-lmd2026.txt
+====================================================================================================

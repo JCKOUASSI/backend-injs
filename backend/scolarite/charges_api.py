@@ -22,7 +22,12 @@ from scolarite.models import (
 
 
 def _get_annee(pk):
-    return AnneeAcademique.objects.filter(pk=pk).first()
+    if not pk or str(pk).lower() in ('undefined', 'null'):
+        return AnneeAcademique.courante_ou_none()
+    try:
+        return AnneeAcademique.objects.filter(pk=int(pk)).first()
+    except (ValueError, TypeError):
+        return None
 
 
 def _get_enseignant(pk):

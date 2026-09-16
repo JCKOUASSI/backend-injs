@@ -515,7 +515,7 @@ export const ARBORESCENCE = [
   {
     id: 'jurys',
     libelle: 'Jurys',
-    icone: 'bi-balance-scale',
+    icone: 'bi-mortarboard-fill',
     droit: { legacy: [['scolarite', 'voir']] },
     enfants: [
       {

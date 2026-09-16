@@ -11,17 +11,10 @@ import { financeNavHref } from '../../utils/financePeriod'
 import '../../styles/sidebar.css'
 
 /**
- * Barre latérale **pilotée par les droits** (RBAC).
+ * Barre latérale RBAC — Thème Premium INJS Marcory.
  *
- * Aucune entrée n'est codée en dur ici : l'arborescence déclarative
- * (`src/menu/arborescence.js`) est filtrée par `useMenuAutorise`, qui choisit la
- * source applicable au compte — permissions effectives CURP pour un compte
- * gouverné, capacités projetées (`/api/auth/capabilities/`) sinon. Une section
- * dont plus aucune entrée n'est autorisée disparaît complètement.
- *
- * L'affichage n'accorde rien (règle S3) : chaque route reste gardée côté
- * serveur par ses `permission_classes`, et le garde de route générique refuse
- * une URL saisie à la main vers une entrée non autorisée.
+ * Entièrement pilotée par les droits (CURP pour comptes gouvernés,
+ * capacités projetées pour comptes legacy).
  */
 
 const CLE_ETAT = 'injs.sidebar.sectionsOuvertes'
@@ -58,11 +51,11 @@ function ecrireEtat(etat) {
   try {
     localStorage.setItem(CLE_ETAT, JSON.stringify(etat))
   } catch {
-    // Stockage indisponible (mode privé) : l'état reste en mémoire.
+    // Mode privé
   }
 }
 
-export default function Sidebar({ open = false, onClose = () => {} }) {
+export default function Sidebar({ open = false, collapsed = false, onClose = () => {} }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const chemin = location.pathname
@@ -106,7 +99,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
 
   useEffect(() => {
     if (sectionActive) {
-      setOuverts(( precedent) => (
+      setOuverts((precedent) => (
         precedent[sectionActive] ? precedent : { ...precedent, [sectionActive]: true }
       ))
     }
@@ -123,32 +116,64 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     .map((r) => LIBELLES_ROLES[r] || r)
     .join(', ') || user?.role || ''
 
-  const fermer = () => onClose()
+  // Fermeture lors de la navigation (sur mobile/tablette uniquement pour ne pas replier sur bureau)
+  const fermerNavigation = () => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 992) {
+      onClose()
+    }
+  }
+
+  // Fermeture manuelle explicite (bouton fermer / chevron)
+  const fermerManuel = () => {
+    onClose()
+  }
 
   return (
     <aside className={`sidebar${open ? ' show' : ''}`} id="sidebar" data-source-droits={source}>
+      {/* Brand Header — Inspiré de la maquette INJS */}
       <div className="sidebar-brand">
-        <img src={logo} alt="INJS Abidjan" className="sidebar-logo" />
-        <h5 style={{ marginBottom: '0.1rem' }}>INJS UFR STAPS-JL</h5>
-        <small>Institut National de la Jeunesse et des Sports</small>
+        <div className="sidebar-brand-top">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <img src={logo} alt="INJS Abidjan" className="sidebar-logo" />
+            <div>
+              <div className="sidebar-brand-title">INJS</div>
+              <div className="sidebar-brand-badge">INJS-LMD 2026</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="sidebar-hide-toggle"
+            data-testid="sidebar-hide-toggle"
+            onClick={fermerManuel}
+            title="Masquer la barre latérale"
+            aria-label="Masquer la barre latérale"
+          >
+            <i className="bi bi-chevron-left"></i>
+          </button>
+        </div>
+        <div className="sidebar-brand-subtitle">
+          Institut National de la Jeunesse et des Sports
+        </div>
       </div>
 
       {user && (
         <div className="sidebar-user" data-testid="sidebar-identite">
-          <small>Connecté en tant que</small><br />
-          <span className="user-name">{nomComplet}</span><br />
+          <small>Connecté en tant que</small>
+          <span className="user-name">{nomComplet}</span>
           {libelleRole && <span className="user-role">{libelleRole}</span>}
-          <span
-            className={`user-droits-source${gouverne ? ' curp' : ''}`}
-            title={
-              gouverne
-                ? `Menu filtré sur ${nombreCodes} permissions effectives CURP (compte gouverné).`
-                : 'Menu filtré sur les capacités projetées par le backend (compte non gouverné).'
-            }
-          >
-            <i className={`bi ${gouverne ? 'bi-shield-check' : 'bi-key'}`}></i>
-            {' '}{gouverne ? 'Droits CURP' : 'Droits legacy'}
-          </span>
+          <div>
+            <span
+              className={`user-droits-source${gouverne ? ' curp' : ''}`}
+              title={
+                gouverne
+                  ? `Menu filtré sur ${nombreCodes} permissions effectives CURP (compte gouverné).`
+                  : 'Menu filtré sur les capacités projetées par le backend (compte non gouverné).'
+              }
+            >
+              <i className={`bi ${gouverne ? 'bi-shield-check' : 'bi-key'}`}></i>
+              {' '}{gouverne ? 'Droits CURP' : 'Droits legacy'}
+            </span>
+          </div>
         </div>
       )}
 
@@ -158,8 +183,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
             <i className="bi bi-exclamation-triangle"></i>
             <p>Aucune entrée autorisée pour ce compte.</p>
             <small>
-              Les droits sont accordés par le backend ; contactez un administrateur
-              d'habilitation.
+              Les droits sont accordés par le backend ; contactez un administrateur d'habilitation.
             </small>
           </div>
         )}
@@ -172,12 +196,12 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                 key={section.id}
                 to={resoudreHref(section)}
                 className={`nav-item nav-racine${estActif(section) ? ' active' : ''}`}
-                onClick={fermer}
+                onClick={fermerNavigation}
                 data-testid={`nav-${section.id}`}
                 title={section.libelle}
               >
                 <span>
-                  <i className={`bi ${section.icone || 'bi-dot'}`}></i>
+                  <i className={`bi ${section.icone || 'bi-speedometer2'}`}></i>
                   {' '}<span className="nav-label">{section.libelle}</span>
                 </span>
               </Link>
@@ -196,7 +220,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                 title={section.libelle}
               >
                 <span>
-                  <i className={`bi ${section.icone || 'bi-dot'}`}></i>
+                  <i className={`bi ${section.icone || 'bi-folder'}`}></i>
                   {' '}<span className="nav-label">{section.libelle}</span>
                   {section.sousTitre && (
                     <span className="nav-sous-titre">{section.sousTitre}</span>
@@ -217,7 +241,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                         <Link
                           to={resoudreHref(enfant)}
                           className={`nav-sous-item${estActif(enfant) ? ' active' : ''}`}
-                          onClick={fermer}
+                          onClick={fermerNavigation}
                           data-testid={`nav-${enfant.id}`}
                           title={[
                             enfant.libelle,
@@ -244,7 +268,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
             key={item.id}
             to={item.chemin}
             className={`nav-item${estActif(item) ? ' active' : ''}`}
-            onClick={fermer}
+            onClick={fermerNavigation}
             data-testid={`nav-${item.id}`}
           >
             <span>
@@ -256,7 +280,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
         <Link
           to="/profile"
           className={`nav-item${chemin === '/profile' ? ' active' : ''}`}
-          onClick={fermer}
+          onClick={fermerNavigation}
           data-testid="nav-profil"
         >
           <span><i className="bi bi-person-circle"></i> <span className="nav-label">Profil</span></span>
@@ -264,14 +288,14 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
         <button
           type="button"
           className="nav-item nav-deconnexion"
-          onClick={() => { fermer(); logout() }}
+          onClick={() => { fermerNavigation(); logout() }}
           data-testid="nav-deconnexion"
         >
           <span><i className="bi bi-box-arrow-right"></i> <span className="nav-label">Déconnexion</span></span>
         </button>
         <div className="nav-mention">
-          Développé par<br />
-          <span>Ophir Technologies</span>
+          Institut National de la Jeunesse et des Sports<br />
+          <span>INJS-LMD 2026</span>
         </div>
       </div>
     </aside>

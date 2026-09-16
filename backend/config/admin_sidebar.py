@@ -60,12 +60,12 @@ def get_admin_sidebar_navigation():
       'collapsible': True,
       'items': [
         {
-          'title': _('Auditeurs'),
+          'title': _('Étudiants'),
           'icon': 'groups',
           'link': reverse_lazy('admin:formations_participant_changelist'),
         },
         {
-          'title': _('Formateurs'),
+          'title': _('Enseignants'),
           'icon': 'person',
           'link': reverse_lazy('admin:formations_formateur_changelist'),
         },
@@ -212,11 +212,11 @@ def get_admin_tabs():
       ],
       'items': [
         {
-          'title': _('Auditeurs'),
+          'title': _('Étudiants'),
           'link': reverse_lazy('admin:formations_participant_changelist'),
         },
         {
-          'title': _('Formateurs'),
+          'title': _('Enseignants'),
           'link': reverse_lazy('admin:formations_formateur_changelist'),
         },
       ],

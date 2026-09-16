@@ -46,3 +46,72 @@ class DashboardParticipantDispatchByMatriculeTest(TestCase):
     def test_non_matching_matricule_returns_none(self):
         sec = _resolve_secretariat_from_matricule('ABCD26-001')
         self.assertIsNone(sec)
+
+
+from rest_framework.test import APITestCase
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+class DashboardEngineAPITests(APITestCase):
+    """Tests automatisés du Dashboard Engine INJS-LMD 2026."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='admin_test',
+            password='password123',
+            role=User.Role.ADMIN,
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_overview_endpoint(self):
+        res = self.client.get('/api/dashboard/overview/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('pipeline', res.data)
+        self.assertIn('charts', res.data)
+        self.assertIn('alerts', res.data)
+        self.assertIn('quick_actions', res.data)
+
+    def test_scolarite_endpoint(self):
+        res = self.client.get('/api/dashboard/scolarite/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('total_inscrits', res.data['kpis'])
+
+    def test_pedagogie_endpoint(self):
+        res = self.client.get('/api/dashboard/pedagogie/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('enseignants_actifs', res.data['kpis'])
+
+    def test_presences_endpoint(self):
+        res = self.client.get('/api/dashboard/presences/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+
+    def test_finances_endpoint(self):
+        res = self.client.get('/api/dashboard/finances/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('total_facture_xof', res.data['kpis'])
+
+    def test_examens_endpoint(self):
+        res = self.client.get('/api/dashboard/examens/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('diplomes_sha256', res.data['kpis'])
+
+    def test_logistique_endpoint(self):
+        res = self.client.get('/api/dashboard/logistique/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('kpis', res.data)
+        self.assertIn('equipements_inventories', res.data['kpis'])
+
+    def test_unauthenticated_request_rejected(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.get('/api/dashboard/overview/')
+        self.assertEqual(res.status_code, 401)
+

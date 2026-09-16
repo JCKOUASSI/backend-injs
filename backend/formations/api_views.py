@@ -1099,7 +1099,7 @@ def _finance_taux_realisation_pct(realized_for_taux_total, planned_for_taux_tota
 
 
 def _finance_allowed_roles():
-    return {'FINANCE', 'DIRECTION', 'ARCHIVE'}
+    return {'FINANCE', 'DIRECTION', 'ARCHIVE', 'ADMIN'}
 
 
 def _check_finance_access(request):
