@@ -1,0 +1,40 @@
+---
+description: Mettre à jour manuel, fiche de travaux et docx après chaque évolution du module Statistiques
+globs: backend/statistiques/**/*,frontend/src/pages/Statistiques.jsx
+alwaysApply: false
+---
+
+# Documentation & suivi — Module Statistiques
+
+## Fichiers à maintenir
+
+| Fichier | Rôle |
+|---------|------|
+| `docs/Manuel utilisateur App Statistiques.md` | Manuel utilisateur (source) |
+| `docs/Manuel utilisateur App Statistiques.docx` | Manuel Word (généré) |
+| `Fiche de travaux App - Statistiques.txt` | **Journal des tâches / travaux réalisés** |
+
+## Obligation après chaque tâche sur Statistiques
+
+1. **Fiche de travaux** — `Fiche de travaux App - Statistiques.txt` :
+   - Ajouter une entrée datée dans « TÂCHES RÉALISÉES » (fichiers modifiés, fonctionnalité, corrections)
+   - Mettre à jour « Dernière mise à jour » et « Statut global » si besoin
+   - Ou exécuter : `python scripts/sync_fiche_travaux_statistiques.py --add "Résumé de la tâche"`
+
+2. **Manuel utilisateur** — `docs/Manuel utilisateur App Statistiques.md` :
+   - Documenter le comportement visible pour l'utilisateur final
+   - Incrémenter version + §14 Journal des mises à jour
+
+3. **Régénérer le Word** :
+   ```bash
+   python scripts/generate_manuel_statistiques_docx.py
+   python scripts/sync_fiche_travaux_statistiques.py
+   ```
+
+4. Commiter fiche + manuel (.md + .docx) ensemble.
+
+## Scripts
+
+- `scripts/sync_fiche_travaux_statistiques.py` — horodatage / ajout tâche
+- `scripts/generate_manuel_statistiques_docx.py` — MD → DOCX
+- Hook `.cursor/hooks/sync-statistiques-docs.sh` — sync auto en fin de session

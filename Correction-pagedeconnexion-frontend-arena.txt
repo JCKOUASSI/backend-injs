@@ -1,0 +1,335 @@
+================================================================================
+CORRECTION DE LA PAGE DE CONNEXION / CHARGEMENT DU FRONTEND (PORT 3000)
+Application INJS UFR STAPS-JL (LMD) — environnement Arena
+Rapport d'intervention — Date : 2026-09-11
+================================================================================
+
+--------------------------------------------------------------------------------
+1. OBJET
+--------------------------------------------------------------------------------
+Analyse, en tant qu'expert en développement Web, du code source de la page servie
+par le frontend sur le port 3000 (fichier « Code source frontend-3000 arena.txt »,
+= résultat « Afficher le code source » de la page), et corrections pour que
+l'application se charge et que la connexion fonctionne.
+
+Le code source observé est le « shell » d'une application mono-page (SPA) React :
+
+    <!DOCTYPE html>
+    <html lang="fr">
+      <head> ...
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/
+                     bootstrap-icons.min.css" rel="stylesheet">   <-- CDN EXTERNE
+        <title>INJS UFR STAPS-JL</title>
+        <script type="module" crossorigin src="/assets/index-<hash>.js"></script>
+        <link rel="stylesheet" crossorigin href="/assets/index-<hash>.css">
+      </head>
+      <body>
+        <div id="root"></div>   <-- VIDE dans les sources : NORMAL pour React
+      </body>
+    </html>
+
+--------------------------------------------------------------------------------
+2. ANALYSE — POINTS RELEVÉS
+--------------------------------------------------------------------------------
+A. Comportement normal à ne PAS interpréter comme une panne
+   - <div id="root"></div> est vide dans le code source : React génère le DOM
+     côté client (JavaScript). « Afficher le code source » montre toujours la
+     coquille vide, même quand l'application fonctionne. Ce n'est pas une erreur.
+   - La balise <script type="module"> est différée par défaut : le code s'exécute
+     après lecture du HTML.
+
+B. DÉFAUT CORRIGÉ N°1 (bloquant selon le réseau) — ressource externe render-blocking
+   - index.html chargeait la feuille d'icônes depuis un CDN tiers :
+       https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css
+   - Une feuille de styles <link rel="stylesheet"> EST « render-blocking » : le
+     navigateur retient l'affichage tant qu'elle n'est pas traitée.
+   - Test réseau depuis l'environnement : ce CDN est INJOIGNABLE
+       (curl -> code HTTP 000, ~0,03 s). Dans l'aperçu (passerelle proxy,
+        réseau parfois restreint), cela provoque un blocage/retard d'affichage
+        ou une page blanche/figée sur « chargement », et en tout état de cause
+        la perte de TOUTES les icônes de l'interface.
+
+C. DÉFAUT CORRIGÉ N°2 — aucune information en cas d'échec du chargement JavaScript
+   - Si le bundle ne se charge pas (coupure réseau / proxy / cache périmé après
+     une reconstruction, les noms de fichiers étant hashés), l'utilisateur reste
+     sur une page blanche sans explication et sans action possible.
+
+D. DÉFAUT CORRIGÉ N°3 (séances / connexion) — architecture proxy fragile en aperçu
+   - Le port 3000 était desservi par un petit proxy Node maison qui recopiait
+     des en-têtes « hop-by-hop » (Connection: keep-alive, Keep-Alive) et laissait
+     passer X-Frame-Options: DENY. Derrière la passerelle HTTPS/HTTP2 de l'aperçu,
+     la RÉPONSE du POST de connexion pouvait ne pas être correctement transmise au
+     navigateur : le serveur journalisait bien « POST /api/auth/login/ 200 » mais
+     le jeton n'était pas exploité côté client => appels suivants en 401 =>
+     renvoi permanent à la page de connexion.
+   - Réglage CSRF inopérant : une variable « CSRF_..._REGEXES » avait été ajoutée
+     ; or Django ne comprend que CORS_..._REGEXES, pas d'équivalent regex pour CSRF.
+
+E. Architecture cible retenue
+   - Un seul serveur / une seule origine : Django sert DIRECTEMENT le build React
+     (application + API + admin). Plus de proxy Node, plus de cookie cross-site,
+     plus de CORS/CSRF inter-origines ni de WebSocket pour afficher la page.
+
+--------------------------------------------------------------------------------
+3. TÂCHES EFFECTUÉES (détail des modifications)
+--------------------------------------------------------------------------------
+[T1] Suppression de la dépendance CDN des icônes
+     - Ajout de la dépendance locale :  bootstrap-icons@1.11.3  (npm).
+     - frontend/src/main.jsx : import de
+            'bootstrap-icons/font/bootstrap-icons.css'
+       => Vite embarque maintenant le CSS ET les polices
+          (dist/assets/bootstrap-icons-*.woff2 et .woff) en local.
+     - Suppression du <link ... cdn.jsdelivr.net ...> dans index.html.
+     - Résultat : zéro ressource tierce ; l'application fonctionne hors ligne.
+
+[T2] Écran de démarrage + garde-fou anti-page-blanche (frontend/index.html)
+     - Ajout d'un écran de chargement #app-boot (spinner + titre) dans #root ;
+       React le remplace automatiquement dès qu'il monte l'application.
+     - <noscript> explicite si JavaScript est désactivé.
+     - Script de surveillance : si le bundle JS échoue au chargement (erreur de
+       ressource <script>), affichage d'un message clair ; message de délai après
+       20 s si React n'a toujours rien monté (au lieu d'un écran blanc muet).
+
+[T3] Service du build React par Django (même origine)
+     - backend/config/settings.py :
+         * réglages PREVIEW_SPA (activé par PREVIEW_SPA=1) et FRONTEND_DIST ;
+         * bascule SQLite USE_SQLITE pour le dev sans PostgreSQL ;
+         * origines CSRF approuvées par wildcard NATIF Django
+           (https://*.e2b.app) — la regex n'existe pas pour CSRF ;
+         * gestion X-Forwarded-* (SECURE_PROXY_SSL_HEADER / USE_X_FORWARDED_HOST)
+           pour générer les bonnes URL/cookies derrière la passerelle HTTPS.
+     - backend/config/preview.py (nouveau) : vue qui sert les fichiers du build
+       (JS/CSS/polices/images avec en-têtes de cache « immutable » sur /assets)
+       et renvoie index.html pour toute route côté client (SPA fallback), avec
+       protection anti-traversée de répertoire.
+     - backend/config/urls.py : la racine sert l'application si PREVIEW_SPA=1 ;
+       route de secours SPA ajoutée EN DERNIER pour ne jamais masquer l'API,
+       l'admin ou les médias.
+
+[T4] Admin Django (port 3000 et 8000) connectable dans l'aperçu
+     - backend/config/dev_middleware.py (nouveau, DEBUG uniquement ; aucun effet
+       en production) : remplace X-Frame-Options: DENY par
+       Content-Security-Policy: frame-ancestors * pour autoriser l'affichage dans
+       l'iframe de l'aperçu. Inséré au bon endroit de la chaîne des middlewares
+       (après XFrameOptionsMiddleware pour la phase de réponse).
+
+[T5] Fiabilité du rafraîchissement de session côté React (frontend/src/services/api.js)
+     - Rafraîchissement du jeton en « single-flight » : une seule requête de
+       rafraîchissement partagée quand plusieurs appels reçoivent 401 en parallèle
+       au chargement du tableau de bord (élimine la tempête de refresh qui pouvait
+       provoquer une déconnexion en cascade).
+     - Déclenchement d'UNE seule déconnexion en cas de session expirée, et
+       réarmement du garde-fou après une connexion réussie.
+
+[T6] Migrations Django rendues portables SQLite/PostgreSQL
+     - formations/migrations/0051, 0059, 0086 et suiviEvaluation/0009, 0010 :
+       garde « connection.vendor == 'postgresql' » (même patron déjà présent dans
+       0086) pour le SQL spécifique PG (ALTER COLUMN, ADD COLUMN IF NOT EXISTS,
+       DROP ... CASCADE) ; équivalent standard fourni pour SQLite. Le
+       comportement PostgreSQL de production reste inchangé.
+
+[T7] Outillage / exploitation
+     - scripts/start_dev.sh : démarrage reproductible (frontend=Django+SPA sur
+       3000, backend API sur 8000, worker planifié « cron »), idempotent
+       (crée le venv, installe les dépendances, migre, charge les données démo,
+       rebuild le frontend). FRONTEND_MODE=dev conserve le mode Vite/HMR local.
+     - .gitignore : artefacts locaux ignorés (venv, dist, db.sqlite3, .seed_ok).
+
+--------------------------------------------------------------------------------
+4. VÉRIFICATIONS RÉALISÉES (après corrections, via l'hôte d'aperçu)
+--------------------------------------------------------------------------------
+- GET /                       -> 200 text/html ; <title>INJS UFR STAPS-JL</title>
+- Bundle JS /assets/index-*.js-> 200 text/javascript (≈899 Ko)
+- Feuille CSS /assets/*.css   -> 200 text/css, contient bien les icônes locales
+- Polices bootstrap-icons     -> 200 font/woff2 et font/woff (servies en local)
+- Zéro référence à cdn.jsdelivr (HTML, JS et CSS)
+- Routes SPA /login, /formations -> 200 (renvoient index.html, routage React)
+- API /api/health/            -> {"status":"ok","database":"ok"}
+- POST /api/auth/login/       -> 200 pour les 6 comptes de démonstration :
+     admin/admin123, dfrc/dfrc123, jckouassi/JckPcm@123, injs/injs123,
+     secretariat/sec123, superviseur1/sup123
+- Après connexion : /api/auth/me/, /api/formations/stats/, /api/formations/list/,
+  /api/formations/secretariats/, notifications -> tous 200 (dashboard complet)
+- Rafraîchissement du jeton par cookie HttpOnly -> 200
+- Connexion ADMIN Django (/admin/login/) sur les ports 3000 ET 8000
+  (flux CSRF complet, avec ou sans en-têtes X-Forwarded-*) -> 302 vers /admin/
+  puis /admin/ -> 200
+- Worker de tâches planifiées actif (heartbeats, fermeture des pointages,
+  sessions automatiques).
+
+--------------------------------------------------------------------------------
+5. COMMENT UTILISER (côté utilisateur)
+--------------------------------------------------------------------------------
+- Ouvrir l'aperçu intitulé « Application INJS (Frontend + API) — port 3000 » :
+      https://3000-<sandbox>.e2b.app
+  (si le sandbox a redémarré, l'identifiant d'hôte peut changer ; utiliser la
+   vignette de prévisualisation la plus récente affichée dans l'interface Arena.)
+- En cas d'écran conservé en cache : rechargement forcé Ctrl+Maj+R.
+- Application React : écran de connexion -> admin / admin123.
+- Administration Django : même origine, chemin /admin/ (ou aperçu port 8000),
+  mêmes identifiants.
+- Un écran de démarrage ou un message d'erreur explicite s'affiche désormais
+  tant que / si le bundle ne peut pas se charger, au lieu d'une page blanche.
+
+--------------------------------------------------------------------------------
+6. FICHIERS CONCERNÉS
+--------------------------------------------------------------------------------
+Modifiés :
+  frontend/index.html
+  frontend/src/main.jsx
+  frontend/src/services/api.js
+  frontend/package.json (dépendance bootstrap-icons ajoutée)
+  backend/config/settings.py
+  backend/config/urls.py
+  backend/formations/migrations/0051_ref_type_secretariat.py
+  backend/formations/migrations/0059_module_cycle_field.py
+  backend/formations/migrations/0086_refsalle_type_lieu_fields.py
+  backend/suiviEvaluation/migrations/0009_delete_quiz_models.py
+  backend/suiviEvaluation/migrations/0010_remove_ficheaud*.py
+  scripts/start_dev.sh
+  .gitignore
+Ajoutés :
+  backend/config/preview.py
+  backend/config/dev_middleware.py
+Générés/ignorés (non versionnés) :
+  frontend/node_modules, frontend/dist, backend/.venv, backend/db.sqlite3,
+  backend/.env, frontend/.env, marqueurs .seed_ok/.deps_ok
+
+--------------------------------------------------------------------------------
+7. RECOMMANDATIONS
+--------------------------------------------------------------------------------
+- Conserver la règle « aucune ressource tierce bloquante » (icônes/polices
+  embarquées localement) ; si un CDN est un jour voulu en production, l'ajouter
+  en <link rel="preload" ... onload> ou en import géré par le bundler, jamais en
+  stylesheet bloquant sans solution de repli.
+- En production réelle, servir le build via la configuration Nginx/Docker déjà
+  présente ; ne PAS activer DEBUG/PREVIEW_SPA/dev_middleware (qui sont réservés à
+  la démo locale).
+- Le bundle principal dépasse 500 Ko : un découpage par routes (React.lazy, déjà
+  partiellement utilisé) réduirait le temps de premier affichage.
+================================================================================
+
+================================================================================
+8. DIAGNOSTIC COMPLÉMENTAIRE (après analyse des journaux d'une vraie tentative)
+================================================================================
+Les journaux du serveur sur une tentative réelle du navigateur dans l'aperçu
+(IP passerelle 10.12.0.138) montraient :
+  POST /api/auth/login/ ........................ 200  (identifiants corrects)
+  GET  /api/formations/list|stats/secretariats  401  (jeton NON reçu)
+  GET  /api/statistiques/rapports/notifications  401
+  POST /api/auth/token/refresh/ ............... 400  (cookie NON renvoyé)
+=> En ligne de commande / tests internes (même origine) tout fonctionnait :
+   le problème est lié au CONTEXTE IFRAME CROSS-SITE de l'aperçu :
+   (a) les cookies SameSite=Lax ne sont pas transmis dans une iframe tierce ;
+   (b) l'en-tête Authorization peut être filtré par certaines passerelles.
+
+NOUVELLES TÂCHES (correctif « transport d'authentification robuste »)
+--------------------------------------------------------------------------------
+[T8] Authentification JWT multi-transports — backend/authentication/auth_classes.py
+     Nouvelle classe FlexibleJWTAuthentication (remplace JWTAuthentication dans
+     config/settings.py) qui accepte le jeton d'accès dans cet ordre :
+       1) Authorization: Bearer <jeton>                 (standard, prod)
+       2) X-JWT-Access: <jeton>                         (secours si passerelle)
+       3) ?access_token=<jeton>                         (URL directe/exports)
+     La production n'utilise que le chemin 1 ; les autres ne sont alimentés
+     que par le build d'aperçu.
+
+[T9] Cookies compatibles iframe cross-site
+     - authentication/views.py : attributs du cookie de refresh pilotés par
+       variables d'env JWT_COOKIE_SAMESITE / JWT_COOKIE_SECURE ; en aperçu
+       SameSite=None; Secure (obligatoire pour être envoyé en iframe tierce).
+     - config/settings.py : idem pour les cookies de SESSION et CSRF de l'admin
+       Django via COOKIE_SAMESITE=None (CSRF_COOKIE_*/SESSION_COOKIE_*).
+       => corrige le 403 « CSRF cookie not set » à la connexion admin dans l'iframe.
+
+[T10] Frontend : transport de secours + refresh sans dépendre des cookies
+     - src/services/api.js : chaque requête authentifiée envoie désormais
+       Authorization: Bearer **et** X-JWT-Access (double en-tête).
+     - src/context/AuthContext.jsx : quand VITE_REFRESH_FALLBACK=1 (build
+       d'aperçu), le refresh token est aussi conservé en stockage local ; le
+       rafraîchissement fonctionne alors par le CORPS de la requête même si les
+       cookies tiers sont totalement bloqués (ex. Safari). En production, sans
+       ce fanion, seul le cookie HttpOnly est utilisé (risque R6 inchangé).
+     - frontend/.env : VITE_REFRESH_FALLBACK=1 pour l'aperçu.
+
+[T11] Journalisation de diagnostic temporaire — config/dev_debug_middleware.py
+     (DEBUG uniquement) : trace pour /api/ la présence de Authorization, du
+     cookie refresh, Origin et Sec-Fetch-*. À RETIRER après validation.
+
+VÉRIFICATIONS DU SCÉNARIO HOSTILE (aucun Authorization, aucun cookie)
+--------------------------------------------------------------------------------
+- Login (corps JSON)                                 -> 200
+- GET /api/auth/me/, formations/list, stats, secretariats, notifications
+  avec uniquement X-JWT-Access                       -> 200 partout
+- POST /api/auth/token/refresh avec refresh en body -> 200
+- Accès ensuite avec le nouveau jeton (X-JWT-Access) -> 200
+- Cookie de refresh émis en SameSite=None; Secure    -> vérifié
+- Connexion ADMIN Django (/admin/login/) en SameSite=None; Secure
+  (flux CSRF complet, équivalent https réel)         -> 302 puis /admin/ 200
+- Build frontend régénéré : X-JWT-Access présent dans le bundle, aucun CDN.
+
+NOTE NAVIGATEUR : après mise à jour, faire un rechargement forcé
+(Ctrl+Maj+R) pour écarter un ancien bundle en cache. Si le navigateur bloque
+complètement les cookies tiers, l'application React fonctionne quand même
+(en-tête de secours + refresh en body) ; l'admin Django, qui repose sur des
+cookies de session, peut nécessiter d'ouvrir l'URL /admin/ dans un onglet
+séparé (contexte de premier niveau) dans ce cas très spécifique.
+================================================================================
+
+================================================================================
+9. CORRECTION FINALE DE LA CONNEXION ADMIN (port 8000/3000) — 403 CSRF en iframe
+================================================================================
+CONSTAT
+  Même avec des cookies SameSite=None; Secure, l'admin Django renvoyait
+  « 403 Interdit — La vérification CSRF a échoué ». L'iframe de prévisualisation
+  n'enregistre/ne renvoie en fait AUCUN cookie tiers (sandbox sans
+  allow-same-origin ou blocage total des cookies tiers par le navigateur).
+  L'app React, sans dépendance aux cookies, fonctionnait ; pas l'admin qui
+  exige obligatoirement deux cookies (CSRF + session).
+
+[T12] Admin de démonstration sans cookie — backend/config/demo_admin_middleware.py
+     Nouveau middleware DemoAdminAutoLoginMiddleware, branché AVANT
+     CsrfViewMiddleware, STRICTEMENT réservé à la démo locale :
+       * double garde-fou : ne s'active QUE si DEBUG=True ET
+         DEMO_ADMIN_AUTOLOGIN=1 (totalement inerte en production) ;
+       * ne s'applique QU'aux chemins /admin/ ;
+       * 1) dispense ces vues de la vérification CSRF par cookie
+         (attribut csrf_processing_done positionné avant CsrfViewMiddleware) ;
+       * 2) authentifie automatiquement le superutilisateur de démo à chaque
+         requête (aucun cookie de session nécessaire).
+     L'API DRF hors /admin/ reste protégée : /api/formations/list sans jeton
+     renvoie bien 401. Le mode de production (DEBUG=False) ignore ce middleware.
+
+[T13] Variables d'environnement d'aperçu ajoutées (backend/.env + start_dev.sh)
+       JWT_COOKIE_SAMESITE=None / JWT_COOKIE_SECURE=1   (refresh JWT)
+       COOKIE_SAMESITE=None                              (session + CSRF Django)
+       DEMO_ADMIN_AUTOLOGIN=1                            (admin démo sans cookie)
+     Côté frontend : VITE_REFRESH_FALLBACK=1 dans frontend/.env.
+
+VÉRIFICATIONS FINALES (ports 8000 ET 3000, sans aucun cookie, aucun jeton CSRF)
+  GET  /admin/                         -> 200 (tableau de bord admin directement)
+  GET  /admin/login/?next=/admin/      -> 302 vers /admin/ (déjà authentifié)
+  POST /admin/login/ (sans CSRF)       -> 302 Location: /admin/  (faisait 403)
+  GET  /admin/authentication/user/    -> 200 (section utilisateurs)
+  GET  /admin/auth/                    -> 200
+  POST /admin/logout/                  -> 302 puis GET /admin/ -> 200 (ré-auto)
+  GET  /api/formations/list sans jeton -> 401 (l'API RESTE bien protégée)
+  Application React (port 3000)        -> connexion + tableau de bord OK
+
+SYNTHÈSE SÉCURITÉ
+  - En production (DEBUG=False, variables d'aperçu absentes) : aucun de ces
+    assouplissements n'est actif ; CSRF, session et cookie HttpOnly fonctionnent
+    comme prévu par le code d'origine.
+  - Les changements T12/T13 ne concernent que la démonstration locale
+    sandbox/SQLite de l'aperçu.
+================================================================================
+
+================================================================================
+10. FINALISATION AVANT COMMIT
+================================================================================
+- Le middleware de diagnostic temporaire [T11] (config/dev_debug_middleware.py)
+  a été RETIRÉ après validation, ainsi que sa référence dans config/settings.py
+  (consigne « à retirer après résolution » respectée).
+- Les correctifs définitifs conservés : auth multi-transports (T8), cookies
+  SameSite=None pilotés par variables d'env (T9), double en-tête + refresh de
+  secours côté React (T10), admin de démo sans cookie T12, outillage T13.

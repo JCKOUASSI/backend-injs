@@ -1,0 +1,67 @@
+======================================================================
+ PROBE — 2026-09-11 16:44
+======================================================================
+
+Colonnes : RELEVE  |  AUDIT [S1]  |  ECART
+
+---------------------------------------------------------------------
+ PISTE BACKEND
+---------------------------------------------------------------------
+  Applications Django                        20           20           
+  Modèles (models.Model)                   133          133           
+  Migrations                                184          184           
+  Lignes Python                           96557        88068           
+  Fichiers de tests                          80           76           
+  Méthodes de test                         943          943           
+  print() restants                          271          288           
+  select/prefetch_related                   363          359           
+  Commandes de gestion                       32           31           
+
+  -- versions réellement installées --
+  Django       5.1.4
+  DRF          3.15.2
+  SimpleJWT    5.4.0
+  Python       3.11.2   (le projet vise 3.12)
+
+  -- le plus gros fichier --
+     4980 ./formations/api_views.py
+    (audit : formations/api_views.py 4 980 l.)
+
+---------------------------------------------------------------------
+ PISTE FRONTEND
+---------------------------------------------------------------------
+  Fichiers .jsx/.js (hors node_modules)        106          105           
+  Lignes                                  35549        35495           
+  Fichiers de test                            0            0           
+  Fichiers > 650 lignes                      12            9           
+
+  -- le plus gros fichier --
+     5508 ./src/pages/Statistiques.jsx
+    (audit : Statistiques.jsx 5 508 l.)
+
+---------------------------------------------------------------------
+ PISTE MOBILE
+---------------------------------------------------------------------
+  Fichiers Dart                              43           40           
+  Lignes Dart                              8021         7818           
+  flutter : ABSENT du sandbox -> le 3e feu vert ne peut PAS être levé ici.
+
+---------------------------------------------------------------------
+ CAPACITÉS DU SANDBOX (conditionnent les gates)
+---------------------------------------------------------------------
+  PostgreSQL (client) : ABSENT
+  Docker : ABSENT
+  Node v22.22.3 : présent
+  Git 2.39.5 : présent
+  SQLite : 3.40.1 (base de secours)
+  Réseau : 200 vers pypi.org
+
+---------------------------------------------------------------------
+ VERDICT POUR P00-01 (baseline de non-régression)
+---------------------------------------------------------------------
+  Le backend est présent : P00-01 peut être exécuté.
+  ATTENTION : relevez les écarts ci-dessus AVANT de commencer. Toute
+  différence avec l'audit [S1] doit être tranchée par le pilote, car
+  l'audit fait foi (incohérence J.8).
+
+Rapport écrit dans : /home/user/app-injslmd2026demo/arena/probe-20260911-1644.txt

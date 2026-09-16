@@ -1,0 +1,9 @@
+{
+  "audio": "<chemin-local-machine>/audio.mp3",
+  "start": 16200.0,
+  "duration": 2200.0,
+  "offset": 16200.0,
+  "segments": 168,
+  "chars": 6292,
+  "out": "docs/transcripts/reunion-cpfae-fin.txt"
+}
