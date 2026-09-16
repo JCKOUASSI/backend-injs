@@ -1,0 +1,55 @@
+name: CI/CD INJS
+
+on:
+  push:
+    branches: [main, channel1]
+  workflow_dispatch:
+
+concurrency:
+  group: injs-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (monorepo root)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image (contexte = racine)
+        run: docker build -f injs-be/Dockerfile -t injs-be:ci .
+
+      - name: Build frontend image (contexte = racine)
+        run: docker build -f injs-fe/Dockerfile -t injs-fe:ci .
+
+  deploy:
+    name: Deploy -> injs.badge-qr-code.pro
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://injs.badge-qr-code.pro
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_APP_PATH }}
+            git fetch --all --prune
+            git checkout ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+            docker compose build --pull
+            docker compose up -d --remove-orphans
+            docker compose exec -T backend python manage.py migrate --noinput
+            docker compose exec -T backend python manage.py collectstatic --noinput
+            docker image prune -f
+
+      - name: Smoke test
+        run: |
+          sleep 15
+          curl -fsSIL https://injs.badge-qr-code.pro | head -1

@@ -1,0 +1,15 @@
+.git
+.github
+**/node_modules
+**/__pycache__
+**/venv
+**/.venv
+**/dist
+**/build
+**/*.sqlite3
+**/.env
+**/.env.*
+!**/.env.example
+docs
+*.md
+# IMPORTANT : ne PAS exclure elements/ (nécessaire au build)
