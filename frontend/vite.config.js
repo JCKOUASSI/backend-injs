@@ -45,11 +45,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: { alias },
     server: {
-      // Ports CANONIQUES et figés du projet (jamais de --port de contournement,
-      // jamais le port par défaut de Vite) : le front reste sur 3000, l'API
-      // Django sur 8000. strictPort : si 3000 est occupé, Vite échoue au lieu
-      // de migrer silencieusement vers un autre port (qui casserait les vignettes).
-      port: 3000,
+      // Ports du projet : l'API Django sur 8000, le front sur 3002 (choix
+      // utilisateur du 2026-09-16). strictPort : si 3002 est occupé, Vite
+      // échoue au lieu de migrer silencieusement vers un autre port.
+      port: 3002,
       strictPort: true,
       host: true,
       allowedHosts: ['.e2b.app', 'localhost', '127.0.0.1'],

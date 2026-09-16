@@ -382,9 +382,11 @@ if DEBUG:
     CORS_ALLOWED_ORIGINS.extend([
         'http://localhost:3000',
         'http://localhost:3001',
+        'http://localhost:3002',
         f'http://localhost:{DEV_SERVER_PORT}',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3001',
+        'http://127.0.0.1:3002',
         f'http://127.0.0.1:{DEV_SERVER_PORT}',
         f'http://192.168.1.90:3000',
         f'http://192.168.1.90:{DEV_SERVER_PORT}',
