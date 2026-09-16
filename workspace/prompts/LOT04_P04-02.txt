@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P04-02 — INSCRIPTIONS ADMINISTRATIVES ET PÉDAGOGIQUES : WORKFLOWS COMPLETS
+================================================================================
+P04-02 — INSCRIPTIONS ADMINISTRATIVES ET PÉDAGOGIQUES : WORKFLOWS COMPLETS
+Lot 4 | 2 séances | Dépendances : P04-01 | Module réf. : 03
+Risques couverts : R1 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+scolarite gère InscriptionAdministrative (IA) et InscriptionPedagogique (IP)
+avec workflows d'états. Les écrans Inscriptions existent mais certaines routes
+LMD (maquettes, pédagogie, passerelle) restent imbriquées dans
+Inscriptions/FicheEtudiant [S1 §4.4].
+
+MISSION
+Rendre les deux inscriptions lisibles, complètes et pilotables, avec leurs
+statuts explicites et leurs contrôles.
+
+CONSIGNES
+1. Documente et affiche le cycle de vie complet de l'IA
+   (BROUILLON → SOUMISE → EN_ATTENTE_PAIEMENT → VALIDEE → ANNULEE …) et de
+   l'IP (BROUILLON → VALIDEE → MODIFIEE → CLOTUREE …) avec un STEPPER visuel
+   réutilisable (le même composant servira aux autres workflows).
+2. Écran « Inscriptions administratives » : liste filtrable (année, formation,
+   niveau, statut), actions de transition avec motif et droits, validation en
+   masse avec contrôle préalable et rapport.
+3. Écran « Inscriptions pédagogiques » : inscription selon la maquette ACTIVE
+   du semestre (P02-01 garantit l'immuabilité), en masse par groupe, avec
+   contrôle de prérequis, de capacité et de chevauchement.
+4. Contrôle d'inscription : refuse si l'IA n'est pas validée, si un impayé
+   bloque (paramétrable, branché sur le LOT 9), si l'année académique est
+   clôturée, si la capacité du groupe est atteinte.
+5. Ajoute une commande check_inscriptions_integrity : IP sans IA validée,
+   étudiant inscrit deux fois au même ECUE, groupe surchargé, IP rattachée à
+   une maquette ARCHIVEE.
+6. Ajoute l'export des listes de classe (réutilise l'export existant, ne le
+   duplique pas) avec filtres.
+7. Tests : chaque transition, chaque refus de contrôle, validation en masse
+   avec rapport, non-régression des inscriptions existantes.
+
+DoD
+[ ] cycles de vie IA/IP documentés et affichés (stepper réutilisable)
+[ ] écrans dédiés IA et IP avec validation en masse
+[ ] contrôles d'inscription effectifs et paramétrables
+[ ] check_inscriptions_integrity vert
+[ ] tests verts

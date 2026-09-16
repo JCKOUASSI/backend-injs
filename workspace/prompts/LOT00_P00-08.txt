@@ -1,0 +1,63 @@
+================================================================================
+PROMPT P00-08 — HARNAIS DE NON-RÉGRESSION : FLAGS, SNAPSHOTS D'API, PARCOURS DE FUMÉE
+================================================================================
+P00-08 — HARNAIS DE NON-RÉGRESSION : FLAGS, SNAPSHOTS D'API, PARCOURS DE FUMÉE
+Lot 0 | 2 séances | Dépendances : P00-01, P00-04 | Module réf. : 18
+Risques couverts : R1→R12 (transverse) | Type : Garde-fous — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+La refonte va toucher 18 domaines fonctionnels sur une application en service.
+Il faut un dispositif qui garantisse qu'aucune régression ne passe inaperçue,
+et qui permette d'éteindre en une minute toute nouveauté problématique.
+
+MISSION
+Mettre en place les trois garde-fous de la refonte : feature flags, snapshots
+de contrat d'API, et parcours de fumée bout-en-bout.
+
+CONSIGNES
+1. FEATURE FLAGS
+   - Réutilise l'app parametres (Parametre + ParametreHistorique, piste
+     d'audit existante) pour stocker les flags : namespace « flag.* », valeur
+     booléenne ou liste de rôles habilités.
+   - Crée un helper backend is_enabled(flag, user=None) avec cache Redis et
+     invalidation, et une permission require_flag("flag.xxx").
+   - Crée un hook frontend useFlag("flag.xxx") alimenté par
+     /api/parametres/flags/ (lecture seule, authentifié).
+   - Ajoute un écran d'administration des flags (ADMIN uniquement) avec
+     historique des changements — réutilise le gabarit existant des Paramètres.
+   - Ajoute les flags initiaux (DÉSACTIVÉS) pour chaque lot à venir.
+2. SNAPSHOTS DE CONTRAT D'API
+   - Crée une commande export_api_contract qui fige, pour chaque route, la
+     méthode, le chemin, les paramètres acceptés et les CLÉS de la réponse
+     (schéma, pas les valeurs), dans docs/api/contract.snapshot.json.
+   - Ajoute un test compare_api_contract qui échoue si une clé ou une route
+     existante disparaît. Une clé/route AJOUTÉE est autorisée ; SUPPRIMÉE ou
+     RENOMMÉE est un échec.
+   - Ajoute un renouvellement explicite : commande update_api_contract avec
+     justification obligatoire consignée dans docs/api/CHANGELOG_CONTRAT.md.
+3. PARCOURS DE FUMÉE BOUT-EN-BOUT
+   - Crée une commande de management smoke_test_injs qui, sur une base de
+     démonstration, exécute la chaîne officielle de l'année académique :
+     campagne → candidature → pièces → admissibilité → admission →
+     inscription administrative → dossier étudiant → matricule → inscription
+     pédagogique → groupe → maquette/UE/ECUE → séance → pointage QR → note →
+     moyenne → jury → diplôme → échéancier → paiement → quittance.
+   - Chaque étape produit un code métier lisible et un statut ; la commande
+     affiche un tableau récapitulatif et un code de retour non nul au premier
+     échec.
+   - Branche smoke_test_injs dans la CI (job Backend, après les tests).
+4. Ajoute docs/GARDE_FOUS.md qui explique les 3 dispositifs, comment désactiver
+   un flag en urgence, et comment lire un échec de snapshot.
+
+INTERDITS
+- Ne change aucun comportement métier : les flags sont livrés DÉSACTIVÉS.
+- Ne stocke aucun flag en dur dans le code sans entrée correspondante en base.
+
+DoD
+[ ] flag activable/désactivable par l'admin, effet immédiat, historisé
+[ ] compare_api_contract vert sur l'API actuelle (snapshot initial généré)
+[ ] smoke_test_injs vert de bout en bout sur la base de démo
+[ ] CI verte avec les 3 dispositifs branchés

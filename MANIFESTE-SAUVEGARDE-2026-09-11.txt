@@ -1,0 +1,22 @@
+=== SAUVEGARDE COMPLETE app-injs-lmd2026 du 11/09/2026 ===
+
+Reference : /Users/jckouassi/Backups/INJS-LMD
+Commit Git : 41ea98a5b89a5792866ebbbc743265a3a0e08caa (structure workspace/) — branche restauration-INJS-LMD-2026-08-29
+
+1. BASE DE DONNEES — PostgreSQL injs_lmd_current
+   Fichier : database/injs_lmd_current_2026-09-11_15-40-31.dump (794 Ko, format -Fc, valide)
+   SHA-256 : 535a7bf58e57c4d1ef8cb71382d740be78d519bcc7a8b4b59c326716b4d7e3e9
+
+2. CODE — historique Git COMPLET (toutes branches)
+   Fichier : code/app-injs-lmd2026_git_2026-09-11.bundle (162 Mo, 14 365 objets)
+   SHA-256 : 3f43545bc4a26f15d47def21916df25c580c2ca97292657efac6c0edb9b20106
+   Verifie  : enregistre un historique complet (bundle --all)
+
+3. CODE — arborescence de travail complete
+   Fichier : code/app-injs-lmd2026_arbre_2026-09-11.tar.gz (68 Mo, hors .venv/.git/node_modules/__pycache__/.DS_Store/staticfiles)
+
+=== PROCEDURES DE RESTAURATION ===
+Base : createdb injs_lmd_current -U injs_user -h localhost
+       pg_restore -h localhost -p 5432 -U injs_user -d injs_lmd_current database/injs_lmd_current_2026-09-11_15-40-31.dump
+Git  : git clone code/app-injs-lmd2026_git_2026-09-11.bundle app-restauree
+Arbre: tar -xzf code/app-injs-lmd2026_arbre_2026-09-11.tar.gz -C app-restauree

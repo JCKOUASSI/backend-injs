@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P12-03 — SAUVEGARDES CHIFFRÉES HORS SITE ET EXERCICE DE RESTAURATION
+================================================================================
+P12-03 — SAUVEGARDES CHIFFRÉES HORS SITE ET EXERCICE DE RESTAURATION
+Lot 12 | 1 séance | Dépendances : P00-05 | Module réf. : 18
+Risques couverts : R10 | Type : Exploitation
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+scripts/backup_injs_lmd.sh produit un dump PostgreSQL de injs_lmd_current avec
+horodatage et somme SHA-256 dans ~/Backups/INJS-LMD. L'audit demande : politique
+de rétention, envoi hors site (stockage objet), chiffrement au repos, tests de
+restauration.
+
+MISSION
+Rendre la sauvegarde fiable, chiffrée, externalisée et RÉELLEMENT restaurable.
+
+CONSIGNES
+1. Améliore le script : compression, chiffrement au repos (clé via variable
+   d'environnement ou gestionnaire de secrets, jamais dans le dépôt), somme
+   SHA-256, nom normalisé, journalisation structurée (branchée sur P00-05),
+   notification de succès/échec via le hub (P11-01).
+2. Politique de rétention paramétrable (quotidiennes N jours, hebdomadaires
+   N semaines, mensuelles N mois, annuelles N ans) avec purge automatique et
+   journal de purge.
+3. Envoi hors site : stockage objet configurable (S3 ou compatible) via
+   variable d'environnement ; en l'absence de configuration, la sauvegarde
+   reste locale et le statut est explicitement « non externalisée » (jamais de
+   faux succès).
+4. Sauvegarde des MÉDIAS (pièces justificatives, documents) : procédure dédiée,
+   cohérente avec la base (point de cohérence documenté).
+5. EXERCICE DE RESTAURATION : script restore_injs_lmd.sh testé de bout en bout
+   sur une base vierge, avec vérification post-restauration (migrations
+   appliquées, smoke_test_injs vert, comptes de démonstration présents,
+   intégrité des sommes). Publie le compte rendu de l'exercice avec la durée.
+6. Plan de continuité : docs/PLAN_CONTINUITE.md — scénarios (base corrompue,
+   serveur perdu, erreur humaine, ransomware), objectifs RPO/RTO proposés,
+   rôles et procédure pas à pas.
+7. Planifie la sauvegarde via le service cron Docker existant et surveille son
+   exécution (alerte si aucune sauvegarde réussie depuis 26 h).
+8. Tests : chiffrement/déchiffrement, rétention et purge, restauration complète
+   avec smoke_test_injs vert, alerte de sauvegarde manquante.
+
+DoD
+[ ] sauvegarde chiffrée, externalisée (ou statut explicite), notifiée
+[ ] politique de rétention avec purge journalisée
+[ ] script de restauration testé de bout en bout + compte rendu publié
+[ ] docs/PLAN_CONTINUITE.md écrit, alerte de sauvegarde manquante active
+[ ] tests verts

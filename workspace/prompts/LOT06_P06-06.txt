@@ -1,0 +1,62 @@
+================================================================================
+PROMPT P06-06 — GABARIT D'ÉCRANS GÉNÉRIQUE POUR LES DOMAINES ORPHELINS
+================================================================================
+P06-06 — GABARIT D'ÉCRANS GÉNÉRIQUE POUR LES DOMAINES ORPHELINS
+Lot 6 | 2 séances | Dépendances : P00-04, P00-08 | Module réf. : tous · DA-08
+Risques couverts : R1, R2 | Type : UI — CRITIQUE (prérequis du LOT 10)
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Quatre domaines ont une API complète mais AUCUN écran web : stages, patrimoine,
+ressources humaines, administrations/courriers [S1 §4.4, R1]. L'audit
+recommande explicitement : « Livrer ces 4 domaines avec un GABARIT D'ÉCRANS
+unique (liste filtrable, détail, timeline de statut, pièces jointes, exports)
+pour diviser le coût et homogénéiser l'UX. »
+
+MISSION
+Construire le gabarit d'écrans générique qui servira à livrer rapidement et
+uniformément tous les domaines orphelins, et le valider sur UN domaine pilote.
+
+CONSIGNES
+1. Construis une bibliothèque de composants React réutilisables, dans
+   frontend/src/components/metier/ :
+   - <ResourceList> : table dense, colonnes configurables, tri, recherche
+     débounced, filtres déclaratifs, pagination SERVEUR, sélection multiple,
+     actions en masse, états (chargement, vide, erreur, sans droit) ;
+   - <ResourceDetail> : en-tête avec code métier et statut, sections
+     déclaratives, actions de transition de workflow, onglets ;
+   - <StatusTimeline> : timeline verticale du workflow (états, dates, auteurs,
+     motifs) — le composant de statut normalisé par machine à états ;
+   - <AttachmentPanel> : pièces jointes (dépôt, aperçu, type autorisé, taille,
+     version) branché sur la future GED ;
+   - <WorkflowStepper> : stepper horizontal réutilisable (déjà amorcé en
+     P04-02 : mutualise-le ici) ;
+   - <ExportButton> : export PDF/Excel via les routes d'exports existantes ;
+   - <AuditPanel> : journal des modifications de l'objet.
+2. Crée un DESCRIPTEUR DE RESSOURCE déclaratif (un objet JS par domaine) :
+   endpoint, code métier, colonnes, filtres, formulaire, transitions de
+   workflow, droits requis, exports disponibles. Ajouter un domaine = écrire un
+   descripteur, pas un écran.
+3. Applique l'identité visuelle INJS : bleus, glassmorphism, bootstrap-icons,
+   tableaux denses pour la scolarité, accessibilité (contrastes, focus clavier,
+   ARIA), responsive mobile/tablette.
+4. Accessibilité vérifiée : navigation clavier complète, focus visible,
+   libellés ARIA, contrastes conformes. Fournis la liste des points vérifiés.
+5. Valide le gabarit sur UN domaine pilote : STAGES (organismes, tuteurs,
+   conventions avec workflow et PDF, échéances, évaluations, attestations).
+6. Tests frontend obligatoires (Vitest) : chaque composant du gabarit, chaque
+   état, les droits (un utilisateur sans droit ne voit pas l'action), la
+   pagination serveur, le descripteur de stages.
+
+INTERDITS
+- N'ajoute aucune dépendance lourde de composants UI.
+- Ne réécris pas les pages existantes pour utiliser le gabarit dans ce prompt.
+
+DoD
+[ ] 7 composants réutilisables livrés et testés
+[ ] descripteur déclaratif fonctionnel (ajouter un domaine = un descripteur)
+[ ] identité INJS et accessibilité vérifiées (liste publiée)
+[ ] domaine STAGES livré via le gabarit
+[ ] tests frontend verts, couverture du gabarit ≥ 80 %

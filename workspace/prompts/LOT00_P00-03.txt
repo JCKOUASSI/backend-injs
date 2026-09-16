@@ -1,0 +1,60 @@
+================================================================================
+PROMPT P00-03 — IDENTITÉ DOCUMENTAIRE : README INJS-LMD ET PURGE DES RÉFÉRENCES LEGACY
+================================================================================
+P00-03 — IDENTITÉ DOCUMENTAIRE : README INJS-LMD ET PURGE DES RÉFÉRENCES LEGACY
+Lot 0 | 1 séance | Dépendances : P00-01 | Module réf. : 18
+Risques couverts : R5, R12 | Type : Documentation
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le README racine tient en une ligne (« # sygepcpfae »). backend/README.md,
+resumer.md et plusieurs titres parlent encore de QR Badge / MEMFPMA / DFRC et
+mentionnent « Django 6 » alors que le projet est en Django 5.1.4. Les fichiers
+.clinerules et .cursor contiennent des chemins macOS absolus
+(/Users/jckouassi/Sites/...).
+
+MISSION
+Faire de la documentation la vitrine exacte, actuelle et professionnelle de
+l'application INJS-LMD, sans aucune trace de l'ancienne identité.
+
+CONSIGNES
+1. Écris un README.md racine unique, en français, structuré ainsi :
+   - titre et présentation (INJS Marcory — gestion LMD de A à Z) ;
+   - périmètre fonctionnel (les 18 modules de référence, 1 ligne chacun) ;
+   - architecture réelle (schéma ASCII backend / frontend / mobile / db / redis) ;
+   - prérequis et versions réelles vérifiées ;
+   - démarrage rapide (backend, frontend, mobile, Docker) ;
+   - variables d'environnement (tableau complet : nom, rôle, défaut, obligatoire
+     en production) ;
+   - tests (commandes exactes des 3 suites) ;
+   - déploiement Docker et sauvegarde/restauration ;
+   - rôles et permissions (matrice N0–N4 × 12 rôles) ;
+   - liens vers docs/ (API, cartographie, contrat EDT, manuels).
+2. Corrige TOUTES les mentions erronées : « Django 6 » → version réelle lue
+   dans requirements.txt ; QR Badge / SYGEP-CPFAE / MEMFPMA / DFRC → la
+   terminologie INJS-LMD, sauf dans les documents d'archive explicitement
+   datés (à marquer « Document d'archive — ne pas utiliser »).
+3. Neutralise les chemins macOS absolus de .clinerules et .cursor : remplace-les
+   par des chemins relatifs au dépôt.
+4. Ne renomme AUCUN fichier historique (manuels, rapports, transcriptions).
+   Si tu crées un dossier docs/archives/, marque les documents déplacés
+   « Document d'archive ».
+5. Crée docs/ARCHITECTURE.md : le découpage réel apps ↔ modules de référence
+   et les 12 décisions d'architecture DA-01 → DA-12.
+6. Crée docs/ADR/ avec un ADR par décision sensible :
+   ADR-001 doubles représentations D1–D5 · ADR-002 deux finances ·
+   ADR-003 EDT externe vs moteur natif · ADR-004 démo/iframe et middlewares
+   DEBUG · ADR-005 conservation de l'arborescence Django à plat.
+   Format : Contexte / Décision / Conséquences / Alternatives rejetées.
+
+INTERDITS
+- Ne réintroduis aucune référence visuelle ou textuelle à l'ancien produit.
+- Ne modifie aucun code applicatif.
+
+DoD
+[ ] README racine complet et exact (versions vérifiées contre les fichiers réels)
+[ ] zéro occurrence de SYGEP-CPFAE / QR Badge / MEMFPMA hors docs/archives/
+[ ] zéro chemin absolu macOS
+[ ] docs/ARCHITECTURE.md + 5 ADR présents

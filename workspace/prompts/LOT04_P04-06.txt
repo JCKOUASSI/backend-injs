@@ -1,0 +1,48 @@
+================================================================================
+PROMPT P04-06 — SITUATIONS ACADÉMIQUES : REDOUBLEMENT, TRANSFERT, SUSPENSION, RADIATION
+================================================================================
+P04-06 — SITUATIONS ACADÉMIQUES : REDOUBLEMENT, TRANSFERT, SUSPENSION, RADIATION
+Lot 4 | 2 séances | Dépendances : P04-01 | Module réf. : 03
+Risques couverts : E9 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 03 §14-20) détaille : progression académique,
+redoublement, dette académique, changement de formation, transfert, suspension,
+abandon, radiation. Le dépôt gère StatutEtudiant mais pas l'ensemble de ces
+situations avec leurs workflows.
+
+MISSION
+Modéliser et écrémer les situations académiques avec leurs règles, leurs
+effets et leur traçabilité.
+
+CONSIGNES
+1. Crée le modèle SituationAcademique (etudiant, type [REDOUBLEMENT,
+   DETTE_ACADEMIQUE, CHANGEMENT_FORMATION, TRANSFERT_ENTRANT, TRANSFERT_SORTANT,
+   SUSPENSION, REPRISE, ABANDON, RADIATION, REINSCRIPTION], date_debut,
+   date_fin, motif obligatoire, décision (référence de l'acte administratif),
+   valideur, statut, pièces jointes) — rattaché à l'année académique.
+2. Définis les EFFETS de chaque situation, appliqués une seule fois par un
+   service dédié : suspension → pointage interdit, inscriptions gelées ;
+   radiation → plus aucune opération académique ; redoublement → réinscription
+   au même niveau avec conservation des crédits validés ; transfert → clôture
+   de l'IP d'origine et création de la nouvelle.
+3. Chaque effet est RÉVERSIBLE par une décision inverse (reprise après
+   suspension), et toute application d'effet est journalisée.
+4. Écran « Situations académiques » : liste filtrable, fiche détail avec fil de
+   décision, pièces jointes, export de l'acte.
+5. Ajoute les badges de situation sur la fiche étudiant (P04-01) et les
+   filtres correspondants dans les listes.
+6. Ajoute check_situations_integrity : étudiant suspendu avec un pointage
+   postérieur, étudiant radié avec une inscription active, situation sans date
+   de fin pour un type qui l'exige.
+7. Tests : chaque type de situation, chaque effet, chaque réversibilité,
+   refus d'opération sur un étudiant radié.
+
+DoD
+[ ] 9 types de situations avec effets appliqués par un service unique
+[ ] écrans + badges + filtres
+[ ] check_situations_integrity vert
+[ ] effets testés et réversibles

@@ -1,0 +1,49 @@
+================================================================================
+PROMPT P11-03 — COUCHE BI : INDICATEURS, TABLES DE SYNTHÈSE ET CACHE
+================================================================================
+P11-03 — COUCHE BI : INDICATEURS, TABLES DE SYNTHÈSE ET CACHE
+Lot 11 | 2 séances | Dépendances : LOT 9, P01-07 | Module réf. : 16 · DA-10
+Risques couverts : R4, E3 | Type : Performance
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app statistiques (5 modèles) et dashboard produisent des bilans lourds
+(statistiques/bilans.py 1 224 lignes). L'audit prévient : « les très gros
+écrans Statistiques et les bilans qui agrègent beaucoup de données »
+nécessiteront « des vues SQL ou des tables de synthèse incrémentales » à
+montée en charge ; Redis est déjà disponible.
+
+MISSION
+Mettre en place une couche BI en lecture seule, performante et auditable.
+
+CONSIGNES
+1. Définis le CATALOGUE D'INDICATEURS du modèle de référence (statistiques
+   étudiants, candidatures, admissions, formations, modules, enseignants, EDT,
+   présences, évaluations, résultats, jurys, diplômes, financières, RH,
+   patrimoine, administratives) avec pour chacun : définition exacte, formule,
+   source, granularité, fréquence de rafraîchissement, responsable.
+2. Crée des TABLES DE SYNTHÈSE incrémentales (agrégats pré-calculés par jour /
+   par semestre / par formation), alimentées par des commandes de management
+   planifiées (cron existant) et par signaux pour les agrégats critiques.
+3. Cache Redis : stratégie explicite par indicateur (durée de vie, invalidation
+   sur événement métier), jamais de cache sans invalidation documentée.
+4. Lecture seule stricte : la couche BI ne modifie aucune donnée métier
+   (DA-10). Ajoute un test de garde qui vérifie qu'aucune écriture n'est faite
+   depuis les modules de statistiques.
+5. Mesure de performance : publie les temps de réponse avant/après sur les
+   indicateurs les plus lourds, avec le jeu de données de référence. Cible :
+   tout indicateur de tableau de bord < 500 ms.
+6. Audit des indicateurs : chaque valeur affichée peut être détaillée jusqu'aux
+   données sources (drill-down) — exigence du modèle de référence.
+7. Tests : exactitude de chaque indicateur sur un jeu de référence (comparaison
+   avec un calcul direct), invalidation de cache, incrémentalité (relancer
+   n'altère pas), performance bornée.
+
+DoD
+[ ] catalogue d'indicateurs documenté (définition + formule + source)
+[ ] tables de synthèse incrémentales + cache Redis avec invalidation
+[ ] lecture seule vérifiée par test de garde
+[ ] temps de réponse avant/après publiés, cible < 500 ms atteinte
+[ ] drill-down disponible, tests d'exactitude verts

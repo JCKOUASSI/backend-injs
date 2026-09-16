@@ -1,0 +1,44 @@
+================================================================================
+PROMPT P10-06 — COURRIERS : ENTRANTS, SORTANTS, AFFECTATION ET PARAPHEUR
+================================================================================
+P10-06 — COURRIERS : ENTRANTS, SORTANTS, AFFECTATION ET PARAPHEUR
+Lot 10 | 2 séances | Dépendances : P10-05 | Module réf. : 14
+Risques couverts : E1, E10 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app administrations possède Courrier. Le modèle de référence (Module 14
+§14.10-14.19) exige : courrier entrant, sortant, interne, affectation, visa,
+validation, signature, diffusion, parapheur, notifications.
+
+MISSION
+Livrer le circuit du courrier de bout en bout.
+
+CONSIGNES
+1. Courrier ENTRANT : enregistrement (date de réception, date du document,
+   expéditeur, objet, référence, type, confidentialité, pièces numérisées),
+   numérotation automatique séquentielle par année, affectation à un
+   destinataire/service avec délai de réponse paramétrable, suivi des relances.
+2. Courrier SORTANT : rédaction depuis un modèle, validation, signature,
+   numérotation, envoi, accusé de réception, classement.
+3. Courrier INTERNE : notes de service, circulation, accusé de lecture.
+4. PARAPHEUR électronique : circuit de visa/_signature paramétrable (ordre des
+   viseurs, délégation en cas d'absence, délai), suivi de l'état de signature,
+   relances automatiques.
+5. Diffusion : liste de diffusion paramétrable, accusé de réception,
+   notification à chaque étape.
+6. Statistiques : courriers par type et par service, délais moyens de
+   traitement, courriers en retard, taux de réponse.
+7. Tous les courriers sont indexés dans la GED (P10-05) avec leur numéro et
+   leur empreinte.
+8. Tests : numérotation séquentielle, affectation avec délai, circuit de visa
+   avec délégation, accusé de réception, indexation GED.
+
+DoD
+[ ] circuits entrant / sortant / interne complets
+[ ] parapheur paramétrable avec délégation et relances
+[ ] numérotation séquentielle fiable (test)
+[ ] statistiques de traitement + indexation GED
+[ ] tests verts

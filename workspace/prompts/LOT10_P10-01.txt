@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P10-01 — ORGANISATION ADMINISTRATIVE : DIRECTIONS, SERVICES, POSTES, FONCTIONS
+================================================================================
+P10-01 — ORGANISATION ADMINISTRATIVE : DIRECTIONS, SERVICES, POSTES, FONCTIONS
+Lot 10 | 1 séance | Dépendances : P06-06, P01-05 | Module réf. : 13
+Risques couverts : E1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app ressources_humaines (6 modèles : Service, Fonction, Agent, AffectationRH,
+DisponibiliteAgent, DocumentRH) a une API complète et ZÉRO appel écran. L'app
+administrations (5 modèles : Courrier, DocumentOfficiel, VersionDocument,
+ReunionCommission, Mission) est dans le même cas. Le modèle de référence
+(Module 13) exige de distinguer PERSONNE → DOSSIER ADMINISTRATIF → POSTE →
+AFFECTATION → SERVICE → FONCTION → CARRIÈRE.
+
+MISSION
+Livrer l'organigramme et les référentiels administratifs.
+
+CONSIGNES
+1. Modèles complémentaires si nécessaires : Direction, Departement, Unite,
+   Poste (rattaché à un service, avec effectif autorisé). Vérifie d'abord ce
+   qui existe pour ne pas créer de doublon.
+2. Écrans via gabarit : Directions · Départements · Services · Unités · Postes ·
+   Fonctions.
+3. Organigramme : vue hiérarchique interactive (Direction → Département →
+   Service → Unité → Poste → Agent), export PDF/PNG, impression.
+4. Distinction explicite FONCTION (référentiel) et POSTE (position
+   organisationnelle) et GRADE (RefGrade) — trois informations différentes,
+   affichées séparément.
+5. Effectifs : effectif autorisé vs effectif réel par service et par poste,
+   postes vacants signalés.
+6. Tests : hiérarchie sans cycle, effectif réel cohérent avec les affectations,
+   distinction fonction/poste/grade.
+
+DoD
+[ ] organigramme interactif exportable
+[ ] effectifs autorisés vs réels avec postes vacants
+[ ] fonction / poste / grade distingués
+[ ] tests verts

@@ -1,0 +1,61 @@
+================================================================================
+PROMPT P03-01 — PIÈCES JUSTIFICATIVES : DÉPÔT, CONTRÔLE AUTOMATIQUE ET VÉRIFICATION
+================================================================================
+P03-01 — PIÈCES JUSTIFICATIVES : DÉPÔT, CONTRÔLE AUTOMATIQUE ET VÉRIFICATION
+Lot 3 | 2 séances | Dépendances : LOT 2 | Module réf. : 02
+Risques couverts : R1, E13 | Type : UI + workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app admissions (15 modèles) gère déjà Candidat, Candidature, pièces,
+admissions, campagnes, épreuves, surveillances, convocations, notes et
+classements. Les pièces ont un workflow (manquante → fournie → vérifiée →
+validée/refusée/expirée). Les écrans Admissions, Campagnes, CampagneDetail et
+Candidatures existent, mais la gestion fine des PIÈCES n'a pas d'écran dédié.
+Le modèle de référence impose 6 états par pièce : NON FOURNIE, REÇUE, EN
+VÉRIFICATION, VALIDÉE, REJETÉE, À REMPLACER.
+
+MISSION
+Livrer un écran de gestion des pièces et un contrôle de dossier automatique.
+
+CONSIGNES
+1. Vérifie le modèle de pièce existant et aligne ses états sur les 6 états de
+   référence, SANS supprimer d'état existant (ajoute ce qui manque, mappe ce
+   qui existe).
+2. Écran « Pièces justificatives » : vue par campagne (tableau des candidats ×
+   pièces obligatoires, pastilles de statut), vue par candidat (liste des pièces
+   avec aperçu), actions par pièce (marquer reçue / en vérification / validée /
+   rejetée / à remplacer) avec motif obligatoire pour rejet et remplacement.
+3. Contrôle de dossier AUTOMATIQUE à la soumission : pièces obligatoires
+   (depuis RefTypeDocument, jamais en dur), âge minimum/maximum, diplôme requis,
+   photo, certificat médical si la formation l'exige, paiement éventuel,
+   conditions particulières de la formation. Chaque règle est paramétrable par
+   campagne. Le résultat est une liste de manquements explicite, jamais un
+   simple « dossier incomplet ».
+4. Sécurité des pièces jointes : filtrage strict des types MIME et des
+   extensions, taille maximale, stockage hors MEDIA_PUBLIC, accès par vues
+   authentifiées uniquement, nom de fichier stocké assaini. Ajoute un hook
+   d'analyse antivirus configurable (désactivé si aucun moteur n'est branché)
+   et journalise le résultat.
+5. Tableau de bord Admissions complété : nombre de dossiers par état, pièces
+   manquantes par campagne, délai moyen de traitement, alertes de dossiers
+   bloqués.
+6. Notifications : pièce rejetée / à remplacer → notification au candidat
+   (branche sur le futur hub P11-01 ; en attendant, utilise le mécanisme de
+   notification existant).
+7. Tests : chaque état de pièce, le contrôle automatique avec un dossier
+   complet et un dossier incomplet, le rejet motivé, le refus d'accès d'un
+   utilisateur d'un autre secrétariat, le rejet d'un type de fichier interdit.
+
+INTERDITS
+- Ne supprime aucune pièce ni aucun état existant.
+- Ne stocke aucune pièce dans un dossier servi publiquement.
+
+DoD
+[ ] 6 états de pièce alignés, aucun état existant perdu
+[ ] écran par campagne + par candidat, actions motivées
+[ ] contrôle automatique paramétrable avec liste de manquements explicite
+[ ] filtrage des types de fichiers testé, hook antivirus configurable
+[ ] tableau de bord complété, tests verts

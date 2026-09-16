@@ -1,0 +1,46 @@
+================================================================================
+PROMPT P11-04 — TABLEAUX DE BORD PAR PROFIL
+================================================================================
+P11-04 — TABLEAUX DE BORD PAR PROFIL
+Lot 11 | 2 séances | Dépendances : P11-03, P01-05 | Module réf. : 16, 17
+Risques couverts : R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt possède Dashboard.jsx (806 lignes), FinanceDashboard,
+FinanceDashboard formateurs, ScolariteDashboard, EvaluationDashboard,
+ArchivesDashboard. Le modèle de référence exige des tableaux de bord par
+profil : direction, scolarité, finance, enseignant, étudiant, personnel,
+responsable, administration.
+
+MISSION
+Livrer un système de tableaux de bord par profil, cohérent et strictement
+périmétré.
+
+CONSIGNES
+1. Crée un gabarit de tableau de bord déclaratif : chaque profil est décrit par
+   une liste de CARTES (indicateur, source, granularité, drill-down, seuil
+   d'alerte) et de VUES (graphique, tableau, calendrier).
+2. Profils livrés : DIRECTION (pilotage stratégique : effectifs, admissions,
+   réussite, finances, RH, patrimoine) · SCOLARITÉ (inscriptions, groupes,
+   notes à saisir, jurys à venir) · FINANCE (les deux domaines, séparés) ·
+   ENSEIGNANT (P05-06) · ÉTUDIANT (P11-07) · PERSONNEL · RESPONSABLE DE
+   FORMATION (P05-06) · ADMINISTRATION.
+3. Chaque tableau respecte strictement le périmètre de droits (P01-05) : aucun
+   indicateur n'expose une donnée hors périmètre. Test explicite par profil.
+4. Alertes de seuil affichées en tête de tableau de bord, avec lien vers
+   l'écran de traitement.
+5. Période sélectionnable (jour, semaine, mois, semestre, année) et comparaison
+   avec la période précédente.
+6. Exports PDF/Excel de chaque tableau de bord.
+7. Tests : chaque carte exacte sur un jeu de référence, périmètre par profil,
+   alertes affichées, exports.
+
+DoD
+[ ] gabarit déclaratif de tableau de bord
+[ ] 8 profils livrés
+[ ] périmètre vérifié par test pour chaque profil
+[ ] comparaison de périodes + exports
+[ ] tests verts

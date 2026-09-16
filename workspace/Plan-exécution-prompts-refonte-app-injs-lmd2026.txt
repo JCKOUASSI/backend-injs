@@ -1,0 +1,1124 @@
+================================================================================
+PLAN D'EXÉCUTION DES PROMPTS DE REFONTE — app-injs-lmd2026demo
+INJS MARCORY · ABIDJAN, CÔTE D'IVOIRE · UFR STAPS-JL
+================================================================================
+Objet            : Ordonnancement opérationnel des 92 prompts du livrable
+                   « Génération-prompts-refonte-app-injs-lmd2026.txt »
+Application      : app-injs-lmd2026demo (branche arena/01a08d49-app-injslmd2026demo)
+Date             : 11 septembre 2026 · Version 1.0
+Documents sources:
+  [L] Génération-prompts-refonte-app-injs-lmd2026.txt (92 prompts, 13 lots)
+  [S1] Audit complet et détaillé de l'application (11/09/2026, commit 1ec2515)
+  [S2] Modèle fonctionnel de référence app-injs-lmd2026 (18 modules)
+  [S3] Rapport de mise en œuvre du modèle fonctionnel (10/09/2026)
+Artefacts compagnons :
+  prompts/ ………………… 92 fichiers de prompts + 00-REGLES-MAITRESSES.txt
+  Pilotage-refonte-app-injs-lmd2026.xlsx … classeur de suivi (dont Gantt)
+Méthode          : ordonnancement calculé à partir des dépendances et des
+                   durées déclarées dans chaque cartouche de prompt du [L],
+                   puis vérifié (graphe acyclique, aucune dépendance inversée,
+                   couverture exacte des 92 prompts).
+================================================================================
+
+SOMMAIRE
+================================================================================
+  1.  CHIFFRES CLÉS DE L'ORDONNANCEMENT
+  2.  HYPOTHÈSES ET UNITÉS DE MESURE
+  3.  LES 8 RÈGLES D'ORDONNANCEMENT APPLIQUÉES
+  4.  GOUVERNANCE, RÔLES ET RESPONSABILITÉS
+  5.  STRUCTURE EN 10 VAGUES — VUE D'ENSEMBLE
+  6.  DÉTAIL VAGUE PAR VAGUE (séquences, jalons, critères de sortie)
+  7.  CHEMIN CRITIQUE ET MARGES
+  8.  JALONS DE VALIDATION MÉTIER (GATES HUMAINS)
+  9.  GESTION DES ALÉAS : RETARD, BLOCAGE, RETOUR ARRIÈRE
+  10. RYTHME, CÉRÉMONIES ET DÉMONSTRATIONS
+  11. INDICATEURS DE SUIVI
+  12. CONDITIONS DE MISE EN PRODUCTION
+  13. ANNEXE A — TABLE DES 92 PROMPTS ORDONNANCÉS
+  14. ANNEXE B — GRAPHE DE DÉPENDANCES
+  15. ANNEXE C — SCÉNARIOS DE REPLANIFICATION
+
+================================================================================
+1. CHIFFRES CLÉS DE L'ORDONNANCEMENT
+================================================================================
+  Prompts à exécuter                   92
+  Charge totale de travail             157 séances-hommes
+  Dimensionnement retenu               2 équipes en parallèle (pistes A et B)
+  Durée totale ordonnancée             84 séances
+  Conversion calendaire                84 jours ouvrés ≈ 16.8 semaines ≈ 3.9 mois
+  Avec marges de gouvernance (+20 %)   ≈ 100 jours ouvrés ≈ 20 semaines
+  Borne théorique infranchissable      45 séances (longueur du chemin critique)
+  Taux d'occupation des 2 pistes       93 %
+  Vagues                               10
+  Jalons de validation métier          10 (un par vague)
+  Scénarios de recette finale          18 (un par module de référence)
+
+  Lecture : la charge totale est de 157 séances, mais la chaîne académique
+  (admissions → inscriptions → pédagogie → EDT → présences → notes → jurys →
+  diplômes) est intrinsèquement sérielle. Ajouter une troisième équipe
+  n'accélère pas la livraison : le calcul donne 115 séances à 3 pistes contre
+  84 à 2 pistes, parce que la charge additionnelle tombe sur des pistes
+  déjà inoccupées. Le dimensionnement à 2 équipes est donc le bon compromis.
+
+================================================================================
+2. HYPOTHÈSES ET UNITÉS DE MESURE
+================================================================================
+
+  SÉANCE
+    Une séance = une journée de travail effectif d'un binôme constitué d'un
+    agent de codage et d'un développeur validateur. Les durées proviennent du
+    cartouche de chaque prompt du [L] (« 1 séance », « 2 séances »,
+    « 3 séances ») : 33 prompts à 1 séance, 53 à 2 séances, 6 à 3 séances.
+
+  PISTE
+    Une piste = une équipe qui exécute les prompts en séquence. Deux pistes
+    fonctionnent en parallèle. Un prompt n'est jamais exécuté par deux pistes.
+
+  VAGUE
+    Une vague = un ensemble de prompts exécutés entre deux jalons. Une vague
+    se termine par une démonstration et une validation humaine. Aucune vague
+    ne démarre avant la clôture de la précédente (les amorces autorisées sont
+    explicitement signalées).
+
+  HYPOTHÈSES À CONFIRMER AVANT DÉMARRAGE
+    H1  Le dépôt est accessible en écriture aux deux équipes.
+    H2  Un environnement de démonstration existe dès la VAGUE 1.
+    H3  Un validateur métier est disponible pour chacun des 10 jalons.
+    H4  Les règles comptables et budgétaires de l'INJS sont fournies avant la
+        VAGUE 4 (sinon P09-06 à P09-08 livrent des mécanismes paramétrables
+        vides et la recette REC-12 est reportée).
+    H5  Le mapping des 12 rôles vers N0–N4 est validé avant la VAGUE 2.
+    H6  Aucune fenêtre de gel (période d'examens, campagne de concours réelle)
+        ne traverse le plan ; sinon appliquer l'annexe C.
+    H7  1 séance = 1 jour ouvré. Si une séance vaut une demi-journée, diviser
+        toutes les durées par deux ; l'ordre, lui, ne change pas.
+
+================================================================================
+3. LES 8 RÈGLES D'ORDONNANCEMENT APPLIQUÉES
+================================================================================
+
+  RÈGLE 1 — LA DÉPENDANCE DÉCLARÉE EST UNE CONTRAINTE DURE
+    Chaque prompt du [L] déclare ses prérequis dans son cartouche. Aucune
+    inversion n'est autorisée. Le graphe des 92 prompts a été vérifié :
+    il est acyclique et aucune dépendance ne pointe vers une vague postérieure.
+
+  RÈGLE 2 — LES FILETS AVANT LES TRAVAUX
+    Le LOT 0 (tests frontend, observabilité, feature flags, snapshots d'API,
+    parcours de fumée) précède tout le reste. Sans lui, aucune régression ne
+    serait détectée pendant les 9 vagues suivantes.
+
+  RÈGLE 3 — LE SOCLE AVANT LE MÉTIER
+    Le LOT 1 (socle transversal, 19 référentiels, hiérarchie campus, calendrier
+    académique, RBAC exécutable) précède tout lot métier : il fournit les codes
+    métier, l'audit transversal et la matrice d'autorisation dont tous les
+    autres ont besoin.
+
+  RÈGLE 4 — LES VERROUX AVANT LES FLUX QUI EN DÉPENDENT
+    Le LOT 2 (verrou des maquettes ACTIVES, verrou des notes, journal
+    immuable, pont ECTS) précède les jurys et les diplômes. Inverser cet ordre
+    produirait des délibérations juridiquement fragiles.
+
+  RÈGLE 5 — LA CHAÎNE ACADÉMIQUE OFFICIELLE D'ABORD
+    L'ordre suit le cycle de vie réel d'une année universitaire :
+    admissions → inscriptions → pédagogie → EDT → présences → notes → jurys →
+    diplômes → finances. C'est aussi le chemin critique du projet.
+
+  RÈGLE 6 — LES AMORCES INDÉPENDANTES SONT AVANCÉES
+    Certains prompts n'ont besoin que du socle et sont exécutés en amorce sur
+    la piste libre, pour éviter les temps morts :
+      · P11-01/P11-02 (hub de notifications) dès la VAGUE 3 — prérequis P01-01
+      · P11-05 (découpage des fichiers géants) dès la VAGUE 3 — prérequis P00-04
+      · P09-05 à P09-08 (comptabilité) dès la VAGUE 3 — prérequis P01-01
+      · P10-04/P10-05 (stages, GED) dès la VAGUE 6 — prérequis P06-06
+    Ces amorces sont explicitement validées par le graphe de dépendances.
+
+  RÈGLE 7 — UN SEUL GABARIT, LIVRÉ AVANT SES CLIENTS
+    P06-06 (gabarit d'écrans générique) est exécuté avant P10-01 à P10-08.
+    Quatre domaines orphelins en dépendent : le gabarit divise leur coût.
+
+  RÈGLE 8 — LA CLÔTURE EN DERNIER, ET UN SEUL RETRAIT
+    Le LOT 12 ferme le projet. Le retrait du socle legacy (P12-05) est le tout
+    dernier geste, après une fenêtre d'observation et la recette des 18 modules.
+    Retirer avant de basculer est interdit (décision DA-12 du [L]).
+
+================================================================================
+4. GOUVERNANCE, RÔLES ET RESPONSABILITÉS
+================================================================================
+
+  COMITÉ DE PILOTAGE (mensuel)
+    Direction générale · Direction des études · Direction financière · DSI
+    Rôle : valider les jalons, arbitrer les dérives, débloquer les gates.
+
+  CHEF DE PROJET (permanent)
+    Tient le classeur de pilotage à jour, anime les points hebdomadaires,
+    décide du niveau de retour arrière, publie les indicateurs.
+
+  ÉQUIPE A — « CHAÎNE ACADÉMIQUE » (piste A)
+    Portée : admissions, scolarité, pédagogie, EDT, présences, notes, jurys,
+    diplômes. Profil : connaissance du système LMD et des workflows d'états.
+
+  ÉQUIPE B — « FONCTIONS SUPPORT ET TRANSVERSAL » (piste B)
+    Portée : socle technique, qualité, finances, comptabilité, administration,
+    RH, GED, notifications, BI, portails, sécurité.
+    Profil : Django/DRF, React, exploitation.
+
+  VALIDATEUR MÉTIER (par jalon)
+    Scolarité (V2, V4, V5) · Direction des études (V3, V6, V8) ·
+    Direction financière (V4, V9) · Administration générale (V7) ·
+    DSI (V1, V10). Signe la sortie de vague.
+
+  RÈGLE DE SÉPARATION
+    Celui qui exécute un prompt ne valide pas le jalon de sa propre vague.
+
+================================================================================
+5. STRUCTURE EN 10 VAGUES — VUE D'ENSEMBLE
+================================================================================
+
+  VAGUE  JOUR      PÉRIMÈTRE                              PROMPTS  GATE
+  --------------------------------------------------------------------------------
+  V1     J  1–J5   LOT 0                                    8     G1
+  V2     J  6–J11  LOT 1                                    7     G2
+  V3     J 12–J20  LOT 2 + amorces transverses              9     G3
+  V4     J 21–J31  LOT 3 + chaîne dépense                  10     G4
+  V5     J 32–J42  LOT 4 + LOT 5                           14     G5
+  V6     J 43–J54  LOT 6 + amorce LOT 10                   11     G6
+  V7     J 55–J63  LOT 7 + suite LOT 10                    11     G7
+  V8     J 64–J71  LOT 8 + fin LOT 9B                       8     G8
+  V9     J 72–J78  LOT 9A + LOT 11B                         7     G9
+  V10    J 79–J84  LOT 11D + LOT 12                         7     G10
+  --------------------------------------------------------------------------------
+  TOTAL          J1–J84   92 prompts
+
+  J = jour ouvré cumulé depuis le démarrage.
+
+================================================================================
+6. DÉTAIL VAGUE PAR VAGUE
+================================================================================
+
+================================================================================
+V1 — LOT 0
+Jours ouvrés J1 → J5  ·  5 séances  ·  8 prompts
+================================================================================
+OBJECTIF       Rendre la CI entièrement verte et poser les filets de sécurité. Aucun prompt de cette vague ne modifie un comportement métier.
+PRÉCONDITIONS  Accès au dépôt · environnement de démonstration · aucune donnée de production touchée
+
+SÉQUENCE PISTE A (chaîne académique)
+   J  1–J1   P00-01  [1 s]  RE-AUDIT À CHAUD ET BASELINE DE NON-RÉGRESSION
+          prérequis : aucune
+   J  2–J3   P00-08  [2 s]  HARNAIS DE NON-RÉGRESSION : FLAGS, SNAPSHOTS D'API, PARCOURS D
+          prérequis : P00-01, P00-04
+   J  4–J4   P00-03  [1 s]  IDENTITÉ DOCUMENTAIRE : README INJS-LMD ET PURGE DES RÉFÉRENCE
+          prérequis : P00-01
+   J  5–J5   P00-05  [1 s]  OBSERVABILITÉ : LOGGING STRUCTURÉ, SENTRY ET PURGE DES print()
+          prérequis : P00-01
+
+SÉQUENCE PISTE B (support et transversal)
+   J  1–J2   P00-04  [2 s]  FILET DE SÉCURITÉ FRONTEND : VITEST + TESTING LIBRARY + CI
+          prérequis : P00-01
+   J  3–J3   P00-06  [1 s]  ENDPOINT DE CAPACITÉS : UNE SEULE SOURCE DE VÉRITÉ POUR LES DR
+          prérequis : P00-01
+   J  4–J4   P00-07  [1 s]  CI MOBILE VERT : ASSET app.env ET MISES À JOUR MINEURES
+          prérequis : P00-01
+   J  5–J5   P00-02  [1 s]  HYGIÈNE DU DÉPÔT : SORTIE DES DONNÉES NOMINATIVES ET DES ARTEF
+          prérequis : P00-01
+
+JALON G1 — CRITÈRES DE SORTIE DE VAGUE
+   · CI 3 feux verts · baseline publiée
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : CI verte sur les 3 jobs · désactivation d'un feature flag avec effet immédiat · rapport de smoke_test_injs.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V2 — LOT 1
+Jours ouvrés J6 → J11  ·  6 séances  ·  7 prompts
+================================================================================
+OBJECTIF       Poser la colonne vertébrale : socle transversal (audit, soft delete, codes métier), les 19 référentiels, la hiérarchie campus, le calendrier académique et la matrice RBAC exécutable.
+PRÉCONDITIONS  G1 validé · mapping des 12 rôles vers N0–N4 validé par le commanditaire
+
+SÉQUENCE PISTE A (chaîne académique)
+   J  6–J7   P01-01  [2 s]  SOCLE TRANSVERSAL : AUDIT UNIFIÉ, SOFT DELETE, CODES MÉTIER
+          prérequis : P00-01, P00-02, P00-03, P00-04, P00-05, P00-06, P00-07, P00-08
+   J  8–J9   P01-03  [2 s]  RÉFÉRENTIELS MÉTIER RESTANTS ET PARAMÈTRES ACADÉMIQUES
+          prérequis : P01-01
+   J 10–J11  P01-05  [2 s]  RBAC EXÉCUTABLE : NIVEAU × RÔLE × PERMISSION × MODULE × PÉRIMÈ
+          prérequis : P00-06, P01-01
+
+SÉQUENCE PISTE B (support et transversal)
+   J  6–J7   P01-02  [2 s]  RÉFÉRENTIELS CAMPUS : SITE → ZONE → BÂTIMENT → ÉTAGE → ESPACE
+          prérequis : P01-01
+   J  8–J8   P01-04  [1 s]  ANNÉE ACADÉMIQUE ET CALENDRIER ACADÉMIQUE
+          prérequis : P01-03
+   J  9–J9   P01-06  [1 s]  ADMINISTRATION DES RÉFÉRENTIELS : ÉCRAN UNIFIÉ, IMPORT/EXPORT,
+          prérequis : P01-02, P01-03
+   J 10–J10  P01-07  [1 s]  JUMELAGE DES 18 MODULES DE RÉFÉRENCE AVEC LES APPS DU DÉPÔT
+          prérequis : P00-01, P01-01
+
+JALON G2 — CRITÈRES DE SORTIE DE VAGUE
+   · RBAC exécutable · 19 référentiels · campus complet
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : création d'une année académique, d'une formation et de la hiérarchie Site → Zone → Bâtiment → Étage → Espace (gymnase + piscine) · modification d'un paramètre académique sans redéploiement · simulation d'une autorisation dans la matrice RBAC.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V3 — LOT 2 + AMORCES TRANSVERSES
+Jours ouvrés J12 → J20  ·  9 séances  ·  9 prompts
+================================================================================
+OBJECTIF       Verrouiller le cœur académique (maquettes ACTIVES, notes, ECTS) et amorcer les trois chantiers transverses indépendants.
+PRÉCONDITIONS  G2 validé · règles LMD (compensation, seuils, rattrapage) validées
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 12–J13  P02-01  [2 s]  VERROU DES MAQUETTES ACTIVES ET VERSIONNAGE IMMUABLE
+          prérequis : P01-01, P01-02, P01-03, P01-04, P01-05, P01-06, P01-07
+   J 14–J15  P02-03  [2 s]  CÂBLAGE NoteModule → ECUE ET CALCUL ECTS (DOUBLE REPRÉSENTATIO
+          prérequis : P02-01, P02-02
+   J 16–J17  P09-05  [2 s]  DOMAINE COMPTABLE : EXERCICES, BUDGETS ET LIGNES BUDGÉTAIRES
+          prérequis : P01-01
+   J 18–J18  P11-02  [1 s]  CAMPAGNES DE COMMUNICATION ET ALERTES AUTOMATIQUES
+          prérequis : P11-01
+
+SÉQUENCE PISTE B (support et transversal)
+   J 12–J13  P02-02  [2 s]  VERROU DES NOTES ET JOURNAL IMMUABLE DES CORRECTIONS
+          prérequis : P01-01
+   J 14–J14  P02-05  [1 s]  TRAÇABILITÉ DES ACTES ACADÉMIQUES : TABLEAU DE BORD D'INTÉGRIT
+          prérequis : P02-01, P02-02, P02-03
+   J 15–J15  P02-04  [1 s]  MOTEUR DE VALIDATION LMD PARAMÉTRABLE (COMPENSATION, RATTRAPAG
+          prérequis : P02-03
+   J 16–J17  P11-01  [2 s]  HUB DE NOTIFICATIONS MULTI-CANAL
+          prérequis : P01-01
+   J 18–J20  P11-05  [3 s]  DÉCOUPAGE DES FICHIERS GÉANTS (FRONTEND ET BACKEND)
+          prérequis : P00-04
+
+JALON G3 — CRITÈRES DE SORTIE DE VAGUE
+   · Verrous maquettes/notes · ECTS · hub notifications
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : tentative de modification d'une maquette ACTIVE (échec attendu) puis clonage en version 2 · correction d'une note avec motif · envoi d'une notification par le hub · état « non envoyée — fournisseur absent » en l'absence de passerelle SMS.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V4 — LOT 3 + CHAÎNE DÉPENSE
+Jours ouvrés J21 → J31  ·  11 séances  ·  10 prompts
+================================================================================
+OBJECTIF       Couvrir la chaîne admissions/concours de bout en bout et livrer la chaîne de la dépense (engagement → facture → paiement).
+PRÉCONDITIONS  G3 validé · règles de classement et d'ex æquo validées · règles comptables de l'INJS fournies
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 21–J22  P03-01  [2 s]  PIÈCES JUSTIFICATIVES : DÉPÔT, CONTRÔLE AUTOMATIQUE ET VÉRIFIC
+          prérequis : P02-01, P02-02, P02-03, P02-04, P02-05
+   J 23–J23  P03-03  [1 s]  CONVOCATIONS : GÉNÉRATION, DIFFUSION ET PRÉSENCE AU CONCOURS
+          prérequis : P03-02
+   J 24–J25  P03-05  [2 s]  ADMISSION, LISTE D'ATTENTE ET CONVERSION CANDIDAT → ÉTUDIANT
+          prérequis : P03-04
+   J 26–J26  P03-07  [1 s]  TABLEAU DE BORD ADMISSIONS ET PILOTAGE DE CAMPAGNE
+          prérequis : P03-01, P03-02, P03-03, P03-04, P03-05, P03-06
+   J 27–J28  P09-07  [2 s]  CAISSE, BANQUES, TRÉSORERIE ET PAIEMENTS SORTANTS
+          prérequis : P09-06
+   J 29–J31  P09-08  [3 s]  COMPTABILITÉ : PLAN COMPTABLE, JOURNAUX, ÉCRITURES ET PIÈCES
+          prérequis : P09-06, P09-07
+
+SÉQUENCE PISTE B (support et transversal)
+   J 21–J22  P03-02  [2 s]  CONCOURS : ÉPREUVES, CENTRES, SALLES ET SURVEILLANTS
+          prérequis : P01-02, P03-01
+   J 23–J24  P03-04  [2 s]  NOTES DE CONCOURS, VERROUILLAGE ET CLASSEMENT REPRODUCTIBLE
+          prérequis : P03-03
+   J 25–J25  P03-06  [1 s]  RECOURS, RÉCLAMATIONS ET DOCUMENTS DE CAMPAGNE
+          prérequis : P03-05
+   J 26–J28  P09-06  [3 s]  ENGAGEMENTS, ACHATS, FOURNISSEURS ET FACTURES
+          prérequis : P09-05
+
+JALON G4 — CRITÈRES DE SORTIE DE VAGUE
+   · Concours de bout en bout · chaîne dépense
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : campagne complète (dossier incomplet signalé, épreuve dans un gymnase avec surveillants, convocation numérotée, pointage, notes, classement, admission, conversion en étudiant avec matricule) · demande d'achat avec réservation budgétaire.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V5 — LOT 4 + LOT 5
+Jours ouvrés J32 → J42  ·  11 séances  ·  14 prompts
+================================================================================
+OBJECTIF       Livrer la fiche étudiant 360, les situations académiques, la pédagogie écrantée et la charge des enseignants ; résorber D1, D2, D3.
+PRÉCONDITIONS  G4 validé
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 32–J33  P04-01  [2 s]  FICHE ÉTUDIANT 360° ET HISTORIQUE ACADÉMIQUE
+          prérequis : P03-01, P03-02, P03-03, P03-04, P03-05, P03-06, P03-07
+   J 34–J35  P05-04  [2 s]  CHARGES HORAIRES ENSEIGNANTS, CONTRÔLES ET CONFLITS
+          prérequis : P01-02, P05-03
+   J 36–J37  P04-06  [2 s]  SITUATIONS ACADÉMIQUES : REDOUBLEMENT, TRANSFERT, SUSPENSION, 
+          prérequis : P04-01
+   J 38–J38  P05-02  [1 s]  INSCRIPTIONS PÉDAGOGIQUES EN MASSE ET PASSERELLES
+          prérequis : P04-02, P05-01
+   J 39–J39  P05-05  [1 s]  CALENDRIER PÉDAGOGIQUE ET CONTRÔLE DE COHÉRENCE GLOBALE
+          prérequis : P01-04, P05-01
+   J 40–J41  P04-03  [2 s]  D1 : scolarite.Groupe COMME SOURCE DE VÉRITÉ, TEXTE LEGACY EN 
+          prérequis : P01-01
+   J 42–J42  P04-05  [1 s]  D3 : PONT Formation ↔ RefFormation ET ALIGNEMENT DES STATISTIQ
+          prérequis : P04-04
+
+SÉQUENCE PISTE B (support et transversal)
+   J 32–J32  P04-07  [1 s]  CARTE ÉTUDIANT, ATTESTATIONS ET DOCUMENTS ÉTUDIANTS
+          prérequis : P04-01
+   J 33–J34  P05-03  [2 s]  FICHE ENSEIGNANT, GRADES ET AFFECTATIONS
+          prérequis : P01-03
+   J 35–J36  P04-02  [2 s]  INSCRIPTIONS ADMINISTRATIVES ET PÉDAGOGIQUES : WORKFLOWS COMPL
+          prérequis : P04-01
+   J 37–J38  P05-01  [2 s]  ÉCRANS DÉDIÉS MAQUETTES / UE / ECUE
+          prérequis : P02-01
+   J 39–J39  P05-06  [1 s]  TABLEAUX DE BORD PÉDAGOGIQUE ET RESPONSABLE DE FORMATION
+          prérequis : P05-01, P05-02, P05-03, P05-04, P05-05
+   J 40–J41  P04-04  [2 s]  D2 : MIGRATION DES CHAMPS TEXTE LEGACY VERS LES RÉFÉRENTIELS R
+          prérequis : P04-03
+   J 42–J42  P04-08  [1 s]  GROUPES PÉDAGOGIQUES : CAPACITÉ, AFFECTATION EN MASSE ET CONTR
+          prérequis : P04-03
+
+JALON G5 — CRITÈRES DE SORTIE DE VAGUE
+   · Fiche étudiant 360 · D1/D2/D3 résorbées · charges
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : fiche étudiant 360 · suspension puis reprise · inscription pédagogique en masse · contrôle de cohérence d'une maquette · charge enseignant avec dépassement refusé puis dérogation motivée.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V6 — LOT 6 + AMORCE LOT 10
+Jours ouvrés J43 → J54  ·  12 séances  ·  11 prompts
+================================================================================
+OBJECTIF       Livrer le moteur de planification EDT, les 5 vues, la synchronisation externe, le gabarit d'écrans et le domaine campus/patrimoine.
+PRÉCONDITIONS  G5 validé · référentiel campus complet
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 43–J44  P06-01  [2 s]  MODÈLE DE CONTRAINTES EDT : DURES, SOUPLES ET CALENDRIER
+          prérequis : P01-02, P05-04
+   J 45–J46  P06-03  [2 s]  WORKFLOW EDT, MODIFICATION MANUELLE CONTRÔLÉE ET PUBLICATION
+          prérequis : P06-02
+   J 47–J48  P06-04  [2 s]  VUES EDT : HEBDOMADAIRE, PAR PROFIL ET PAR ESPACE
+          prérequis : P06-03
+   J 49–J50  P06-06  [2 s]  GABARIT D'ÉCRANS GÉNÉRIQUE POUR LES DOMAINES ORPHELINS
+          prérequis : P00-04, P00-08
+   J 51–J52  P06-09  [2 s]  TESTS DU DOMAINE EDT (0 TEST AUJOURD'HUI)
+          prérequis : P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08
+   J 53–J54  P10-04  [2 s]  STAGES : ORGANISMES, CONVENTIONS, SUIVI ET ÉVALUATIONS
+          prérequis : P06-06
+
+SÉQUENCE PISTE B (support et transversal)
+   J 43–J45  P06-02  [3 s]  MOTEUR DE GÉNÉRATION AUTOMATIQUE AVEC EXPLICATION DES ÉCHECS
+          prérequis : P06-01
+   J 46–J46  P06-08  [1 s]  EXAMENS, SURVEILLANCE ET OCCUPATION DES ESPACES
+          prérequis : P03-02, P06-03
+   J 47–J48  P06-05  [2 s]  CONTRAT EDT v1.1 ET INGESTION DU PLANIFICATEUR EXTERNE
+          prérequis : P06-03
+   J 49–J50  P06-07  [2 s]  DOMAINES CAMPUS ET PATRIMOINE : ÉCRANS COMPLETS
+          prérequis : P01-02, P06-06
+   J 51–J53  P10-05  [3 s]  GED CENTRALE : DOCUMENTS, VERSIONS, CLASSIFICATION ET INDEXATI
+          prérequis : P01-03, P06-06
+
+JALON G6 — CRITÈRES DE SORTIE DE VAGUE
+   · EDT généré/validé/publié · gabarit · campus écranté
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : génération automatique d'un EDT, explication argumentée d'une séance non planifiée, correction, régénération, déplacement manuel, publication, modification post-publication tracée · maintenance d'un gymnase rendant l'espace indisponible pour l'EDT.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V7 — LOT 7 + SUITE LOT 10
+Jours ouvrés J55 → J63  ·  9 séances  ·  11 prompts
+================================================================================
+OBJECTIF       Consolider le badgeage QR et sa chaîne anti-fraude ; livrer l'administration, les RH et la GED.
+PRÉCONDITIONS  G6 validé · gabarit d'écrans disponible
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 55–J56  P07-01  [2 s]  CYCLE DE VIE COMPLET DU POINTAGE ET CLÔTURE AUTOMATIQUE
+          prérequis : P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08, P06-09
+   J 57–J58  P07-04  [2 s]  EXPÉRIENCE MOBILE DU POINTAGE ET HORS-LIGNE
+          prérequis : P07-02
+   J 59–J60  P10-06  [2 s]  COURRIERS : ENTRANTS, SORTANTS, AFFECTATION ET PARAPHEUR
+          prérequis : P10-05
+   J 61–J61  P10-01  [1 s]  ORGANISATION ADMINISTRATIVE : DIRECTIONS, SERVICES, POSTES, FO
+          prérequis : P01-05, P06-06
+   J 62–J63  P10-03  [2 s]  CONGÉS, ABSENCES, MISSIONS ET ÉVALUATIONS DU PERSONNEL
+          prérequis : P05-04, P10-02
+
+SÉQUENCE PISTE B (support et transversal)
+   J 55–J56  P07-02  [2 s]  PILIERS ANTI-FRAUDE : APPAREIL, GÉOLOCALISATION, HEARTBEAT, AU
+          prérequis : P07-01
+   J 57–J57  P07-03  [1 s]  RETARDS, ABSENCES, JUSTIFICATIONS ET RATTRAPAGES
+          prérequis : P07-01
+   J 58–J58  P07-05  [1 s]  ISOLEMENT DU SOCLE HTML LEGACY DE BADGEAGE
+          prérequis : P07-01, P07-02, P07-03, P07-04
+   J 59–J59  P10-07  [1 s]  RÉUNIONS, COMMISSIONS, DÉCISIONS ET ACTES ADMINISTRATIFS
+          prérequis : P10-05, P10-06
+   J 60–J60  P10-08  [1 s]  ARCHIVES, NUMÉROTATION CENTRALE ET VÉRIFICATION PUBLIQUE
+          prérequis : P10-05, P10-06, P10-07
+   J 61–J62  P10-02  [2 s]  RESSOURCES HUMAINES : AGENTS, CONTRATS, CARRIÈRES
+          prérequis : P10-01
+
+JALON G7 — CRITÈRES DE SORTIE DE VAGUE
+   · Badgeage anti-fraude testé · RH · GED
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : cycle complet de pointage (entrée, heartbeat, sortie, clôture automatique) · refus hors périmètre avec message explicite · tableau de bord anti-fraude · circuit du courrier entrant avec parapheur et délégation.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V8 — LOT 8 + FIN LOT 9B
+Jours ouvrés J64 → J71  ·  8 séances  ·  8 prompts
+================================================================================
+OBJECTIF       Compléter la chaîne évaluations → notes → jurys → diplômes et fermer le volet comptable (immobilisations, clôture).
+PRÉCONDITIONS  G7 validé · plan comptable fourni
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 64–J65  P08-01  [2 s]  ÉVALUATIONS : TYPES, CALENDRIER, CONVOCATIONS ET SURVEILLANCE
+          prérequis : P01-03, P06-08
+   J 66–J66  P08-03  [1 s]  MOYENNES, ECTS, VALIDATION ET RELEVÉS DE NOTES
+          prérequis : P02-03, P02-04, P08-02
+   J 67–J68  P08-06  [2 s]  DIPLÔMES, REGISTRE, RÉÉDITIONS ET ÉQUIVALENCES
+          prérequis : P04-07, P08-04
+   J 69–J69  P08-05  [1 s]  PROCÈS-VERBAUX IMMUABLES ET ARCHIVAGE
+          prérequis : P08-04
+   J 70–J71  P09-10  [2 s]  CLÔTURES, ÉTATS FINANCIERS ET TABLEAU DE BORD DIRECTION FINANC
+          prérequis : P09-05, P09-06, P09-07, P09-08, P09-09
+
+SÉQUENCE PISTE B (support et transversal)
+   J 64–J65  P08-02  [2 s]  SAISIE DES NOTES SÉCURISÉE, IMPORT ET CONTRÔLE
+          prérequis : P02-02, P08-01
+   J 66–J68  P08-04  [3 s]  JURYS LMD : SESSIONS, DÉLIBÉRATIONS ET DÉCISIONS
+          prérequis : P02-04, P08-03
+   J 69–J70  P09-09  [2 s]  IMMOBILISATIONS, AMORTISSEMENTS ET RAPPROCHEMENT BANCAIRE
+          prérequis : P06-07, P09-08
+
+JALON G8 — CRITÈRES DE SORTIE DE VAGUE
+   · Notes → jurys → diplômes immuables
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : session de jury complète (9 états), PV inaltérable avec rectificatif référencé, édition de diplômes en masse, vérification publique d'un diplôme · clôture d'un exercice comptable.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V9 — LOT 9A + LOT 11B
+Jours ouvrés J72 → J78  ·  7 séances  ·  7 prompts
+================================================================================
+OBJECTIF       Finaliser les finances étudiantes et livrer la couche décisionnelle (BI, tableaux de bord par profil).
+PRÉCONDITIONS  G8 validé
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 72–J73  P09-01  [2 s]  FINANCES ÉTUDIANTES : TARIFS, ÉCHÉANCIERS ET FACTURES
+          prérequis : P08-01, P08-02, P08-03, P08-04, P08-05, P08-06
+   J 74–J74  P09-03  [1 s]  RELANCES, RECOUVREMENT ET RAPPROCHEMENT ÉTUDIANT
+          prérequis : P09-02
+   J 75–J76  P11-03  [2 s]  COUCHE BI : INDICATEURS, TABLES DE SYNTHÈSE ET CACHE
+          prérequis : P01-07, P09-01, P09-02, P09-03, P09-04, P09-05, P09-06, P09-07, P09-08, P09-09, P09-10
+   J 77–J78  P11-08  [2 s]  STATISTIQUES LMD, RAPPORTS OFFICIELS ET EXPORTS
+          prérequis : P11-03, P11-04
+
+SÉQUENCE PISTE B (support et transversal)
+   J 72–J73  P09-02  [2 s]  PAIEMENTS, QUITTANCES ET REMBOURSEMENTS
+          prérequis : P09-01
+   J 74–J74  P09-04  [1 s]  TABLEAU DE BORD FINANCE ÉTUDIANTE
+          prérequis : P09-01, P09-02, P09-03
+   J 75–J76  P11-04  [2 s]  TABLEAUX DE BORD PAR PROFIL
+          prérequis : P01-05, P11-03
+
+JALON G9 — CRITÈRES DE SORTIE DE VAGUE
+   · Finances complètes (2 domaines) · BI
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : échéancier, encaissement partiel, quittance numérotée, relance, blocage d'inscription pour impayé, quitus · tableau de bord par profil avec drill-down jusqu'aux données sources.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+V10 — LOT 11D + LOT 12
+Jours ouvrés J79 → J84  ·  6 séances  ·  7 prompts
+================================================================================
+OBJECTIF       Livrer les portails, durcir la sécurité, industrialiser l'exploitation, retirer le legacy et conduire la recette des 18 modules.
+PRÉCONDITIONS  G9 validé · fenêtre d'observation du legacy écoulée
+
+SÉQUENCE PISTE A (chaîne académique)
+   J 79–J80  P11-06  [2 s]  PORTAIL PUBLIC ET PORTAIL CANDIDAT
+          prérequis : P03-01, P10-08
+   J 81–J82  P12-01  [2 s]  DURCISSEMENT DE L'AUTHENTIFICATION : 2FA, MOTS DE PASSE, SESSI
+          prérequis : P01-05
+   J 83–J84  P12-04  [2 s]  ENVIRONNEMENT DE RECETTE, CD ET MIGRATIONS ZÉRO TEMPS D'ARRÊT
+          prérequis : P12-03
+
+SÉQUENCE PISTE B (support et transversal)
+   J 79–J80  P11-07  [2 s]  PORTAILS ÉTUDIANT, ENSEIGNANT ET PERSONNEL
+          prérequis : P11-04, P11-06
+   J 81–J81  P12-02  [1 s]  CSP STRICTE, PIÈCES JOINTES ET SURFACE D'ATTAQUE
+          prérequis : P07-05, P12-01
+   J 82–J82  P12-03  [1 s]  SAUVEGARDES CHIFFRÉES HORS SITE ET EXERCICE DE RESTAURATION
+          prérequis : P00-05
+   J 83–J84  P12-05  [2 s]  RETRAIT DU LEGACY, RECETTE GÉNÉRALE ET DOSSIER DE LIVRAISON
+          prérequis : P00-01, P00-02, P00-03, P00-04, P00-05, P00-06, P00-07, P00-08, P01-01, P01-02, P01-03, P01-04, P01-05, P01-06, P01-07, P02-01, P02-02, P02-03, P02-04, P02-05, P03-01, P03-02, P03-03, P03-04, P03-05, P03-06, P03-07, P04-01, P04-02, P04-03, P04-04, P04-05, P04-06, P04-07, P04-08, P05-01, P05-02, P05-03, P05-04, P05-05, P05-06, P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08, P06-09, P07-01, P07-02, P07-03, P07-04, P07-05, P08-01, P08-02, P08-03, P08-04, P08-05, P08-06, P09-01, P09-02, P09-03, P09-04, P09-05, P09-06, P09-07, P09-08, P09-09, P09-10, P10-01, P10-02, P10-03, P10-04, P10-05, P10-06, P10-07, P10-08, P11-01, P11-02, P11-03, P11-04, P11-05, P11-06, P11-07, P11-08, P12-01, P12-02, P12-03, P12-04
+
+JALON G10 — CRITÈRES DE SORTIE DE VAGUE
+   · Portails · sécurité · recette des 18 modules
+   · Tous les prompts de la vague cochés selon la grille DoD du [L], PARTIE G.1
+   · Les 3 feux verts (backend, frontend, mobile)
+   · smoke_test_injs vert · compare_api_contract vert
+   · Baseline mise à jour dans le classeur de pilotage (onglet Baseline)
+   · Démonstration réalisée et signée par le validateur métier
+
+DÉMONSTRATION
+   Démontrer : portail public sans authentification et vérification d'un document · portail candidat · 2FA · désactivation d'un flag · restauration d'une sauvegarde sur base vierge · recette des 18 scénarios.
+
+SI LE JALON ÉCHOUE
+   La vague suivante ne démarre pas. On corrige dans la vague courante,
+   ou on désactive le feature flag concerné et on reporte le prompt en
+   fin de vague suivante (procédure d'annexe C).
+
+================================================================================
+7. CHEMIN CRITIQUE ET MARGES
+================================================================================
+
+  Il faut distinguer deux notions, que le calcul sépare nettement :
+
+  · LE CHEMIN CRITIQUE au sens strict est la plus longue chaîne de dépendances :
+    45 séances, 27 prompts. C'est la borne théorique infranchissable du projet,
+    toutes ressources confondues.
+  · 41 prompts ont une MARGE NULLE : ils appartiennent à une chaîne critique.
+    Il existe en effet plusieurs chaînes de longueur égale ; les 27 prompts du
+    chemin le plus long sont inclus dans ces 41.
+  · Le MAKESPAN réel à 2 pistes est de 84 jours ouvrés, soit nettement plus que
+    la borne de 45 : l'écart vient de la contrainte de ressource (deux équipes
+    seulement), pas des dépendances. C'est pourquoi ajouter une troisième
+    équipe n'accélère pas la livraison.
+
+  CHEMIN CRITIQUE AU SENS STRICT (plus longue chaîne, séquence calculée)
+  --------------------------------------------------------------------------------
+    1. P00-01  [1 s]  RE-AUDIT À CHAUD ET BASELINE DE NON-RÉGRESSION
+    2. P00-04  [2 s]  FILET DE SÉCURITÉ FRONTEND : VITEST + TESTING LIBRARY + CI
+    3. P00-08  [2 s]  HARNAIS DE NON-RÉGRESSION : FLAGS, SNAPSHOTS D'API, PARCOU
+    4. P01-01  [2 s]  SOCLE TRANSVERSAL : AUDIT UNIFIÉ, SOFT DELETE, CODES MÉTIE
+    5. P01-03  [2 s]  RÉFÉRENTIELS MÉTIER RESTANTS ET PARAMÈTRES ACADÉMIQUES
+    6. P01-04  [1 s]  ANNÉE ACADÉMIQUE ET CALENDRIER ACADÉMIQUE
+    7. P02-01  [2 s]  VERROU DES MAQUETTES ACTIVES ET VERSIONNAGE IMMUABLE
+    8. P02-03  [2 s]  CÂBLAGE NoteModule → ECUE ET CALCUL ECTS (DOUBLE REPRÉSENT
+    9. P02-04  [1 s]  MOTEUR DE VALIDATION LMD PARAMÉTRABLE (COMPENSATION, RATTR
+   10. P03-01  [2 s]  PIÈCES JUSTIFICATIVES : DÉPÔT, CONTRÔLE AUTOMATIQUE ET VÉR
+   11. P03-02  [2 s]  CONCOURS : ÉPREUVES, CENTRES, SALLES ET SURVEILLANTS
+   12. P03-03  [1 s]  CONVOCATIONS : GÉNÉRATION, DIFFUSION ET PRÉSENCE AU CONCOU
+   13. P03-04  [2 s]  NOTES DE CONCOURS, VERROUILLAGE ET CLASSEMENT REPRODUCTIBL
+   14. P03-05  [2 s]  ADMISSION, LISTE D'ATTENTE ET CONVERSION CANDIDAT → ÉTUDIA
+   15. P03-06  [1 s]  RECOURS, RÉCLAMATIONS ET DOCUMENTS DE CAMPAGNE
+   16. P03-07  [1 s]  TABLEAU DE BORD ADMISSIONS ET PILOTAGE DE CAMPAGNE
+   17. P04-01  [2 s]  FICHE ÉTUDIANT 360° ET HISTORIQUE ACADÉMIQUE
+   18. P04-07  [1 s]  CARTE ÉTUDIANT, ATTESTATIONS ET DOCUMENTS ÉTUDIANTS
+   19. P08-06  [2 s]  DIPLÔMES, REGISTRE, RÉÉDITIONS ET ÉQUIVALENCES
+   20. P09-01  [2 s]  FINANCES ÉTUDIANTES : TARIFS, ÉCHÉANCIERS ET FACTURES
+   21. P09-02  [2 s]  PAIEMENTS, QUITTANCES ET REMBOURSEMENTS
+   22. P09-03  [1 s]  RELANCES, RECOUVREMENT ET RAPPROCHEMENT ÉTUDIANT
+   23. P09-04  [1 s]  TABLEAU DE BORD FINANCE ÉTUDIANTE
+   24. P11-03  [2 s]  COUCHE BI : INDICATEURS, TABLES DE SYNTHÈSE ET CACHE
+   25. P11-04  [2 s]  TABLEAUX DE BORD PAR PROFIL
+   26. P11-07  [2 s]  PORTAILS ÉTUDIANT, ENSEIGNANT ET PERSONNEL
+   27. P12-05  [2 s]  RETRAIT DU LEGACY, RECETTE GÉNÉRALE ET DOSSIER DE LIVRAISO
+  --------------------------------------------------------------------------------
+   Total : 45 séances sur le chemin critique.
+
+  MARGES (flottement autorisé sans impact sur la date de fin)
+  --------------------------------------------------------------------------------
+   marge nulle (chaîne critique)     41 prompts
+   marge de 1 à 5 séances               9 prompts
+   marge de 6 à 20 séances             19 prompts
+   marge supérieure à 20 séances       23 prompts
+  --------------------------------------------------------------------------------
+
+  CONSÉQUENCE OPÉRATIONNELLE
+   · Les prompts à marge nulle ne se négocient pas : ils sont protégés en
+     priorité (revue renforcée, pas de réaffectation d'équipe).
+   · Les prompts à forte marge sont la variable d'ajustement : en cas
+     d'aléa, ce sont eux qu'on décale, jamais un prompt du chemin critique.
+
+================================================================================
+8. JALONS DE VALIDATION MÉTIER (GATES HUMAINS)
+================================================================================
+
+  Ces validations ne sont pas délégables à l'agent de codage. Chacune bloque
+  le démarrage du prompt concerné tant qu'elle n'est pas obtenue.
+
+  AVANT  DÉCISION À OBTENIR                                  DÉCIDEUR
+  ---------------------------------------------------------------------------
+  V2     Mapping des 12 rôles existants vers N0–N4           Direction + DFRC
+  V3     Politique de verrou des maquettes ACTIVES et        Direction des
+         exceptions admises (coquilles non pédagogiques)     études
+  V3     Règles LMD : compensation semestrielle/annuelle,    Direction des
+         seuils de validation, rattrapage, arrondi           études
+  V4     Règles de classement et de départage des ex æquo    Direction des études
+  V4     Plan comptable, seuils d'approbation, règles de     Direction financière
+         comptabilisation applicables à l'INJS
+  V5     Correspondances référentiels ambigües (D2)          Scolarité
+         validées une à une
+  V6     Validation du moteur EDT sur un cas réel de         Direction des
+         l'INJS (poids des contraintes souples)              études
+  V9     Grilles tarifaires et politique de blocage          Direction financière
+         pour impayé
+  V10    Prestataire e-mail transactionnel et passerelle SMS Direction + DSI
+  V10    Politique de secrets et fenêtre de déploiement      DSI + Direction
+  V10    Fin de la fenêtre d'observation avant retrait       DSI
+         du socle legacy
+  ---------------------------------------------------------------------------
+
+================================================================================
+9. GESTION DES ALÉAS : RETARD, BLOCAGE, RETOUR ARRIÈRE
+================================================================================
+
+  9.1 UN PROMPT DÉPASSE SA DURÉE PRÉVUE
+    Jusqu'à +50 % de la durée : on absorbe sur la piste, sans toucher au
+    chemin critique. Au-delà : le chef de projet découpe le prompt en deux
+    sous-lots et reporte la seconde moitié en fin de vague suivante. Le DoD
+    du [L] reste la référence : on ne réduit jamais le périmètre de test.
+
+  9.2 UN PROMPT EST BLOQUÉ PAR UNE DÉPENDANCE MÉTIER MANQUANTE
+    On applique la règle 20 des règles maîtresses : ne pas inventer. Le prompt
+    est suspendu, l'information manquante est consignée dans le classeur, et la
+    piste bascule sur le prompt à plus forte marge de la même vague. Le prompt
+    suspendu est replanifié dès obtention de la réponse.
+
+  9.3 UNE RÉGRESSION APPARAÎT EN PRODUCTION DE DÉMONSTRATION
+    Niveau 1 — désactiver le feature flag concerné (< 1 minute, écran
+             d'administration des flags).
+    Niveau 2 — redéployer l'image précédente + rollback de migration (< 15 min).
+    Niveau 3 — restaurer une sauvegarde (< 2 h, exceptionnel).
+    Règle : ne jamais choisir le niveau 3 quand le niveau 1 suffit. Chaque
+    retour arrière est consigné dans docs/INCIDENTS.md (cause, niveau, durée,
+    correctif).
+
+  9.4 LES 3 FEUX VERTS PASSENT AU ROUGE
+    Arrêt immédiat de toute nouvelle implémentation. La vague ne progresse plus
+    tant que la CI n'est pas revenue au vert. C'est la règle des 3 feux verts
+    du [L], PARTIE A.4 : elle prime sur le planning.
+
+  9.5 UNE VAGUE PREND DU RETARD
+    On ne comprime jamais les tests ni la recette. On réduit le périmètre de la
+    vague en déplaçant les prompts à forte marge vers la vague suivante, et on
+    le signale au comité de pilotage. Une vague se termine toujours par un
+    jalon validé.
+
+  9.6 UN GEL EST IMPOSÉ (examens, campagne de concours réelle)
+    Voir annexe C, scénario 3.
+
+================================================================================
+10. RYTHME, CÉRÉMONIES ET DÉMONSTRATIONS
+================================================================================
+
+  QUOTIDIEN (15 min, par piste)
+    Point d'avancement : prompt en cours, blocage, besoin de validation.
+
+  HEBDOMADAIRE (1 h, les deux pistes)
+    Avancement par vague · flags activés · incidents et retours arrière ·
+    dette restante · indicateurs publiés.
+
+  FIN DE VAGUE (2 h)
+    Démonstration au validateur métier · signature du jalon · mise à jour de
+    la baseline et de la table de maturité des 18 modules.
+
+  MENSUEL (comité de pilotage)
+    Avancement global, arbitrages, risques remontés, préparation du jalon
+    suivant.
+
+  RÈGLE DE COMMIT
+    Un prompt = un commit (ou une petite série cohérente). Aucun commit
+    automatique. Chaque commit référence l'identifiant du prompt
+    (ex. « P06-02 — moteur de génération EDT »).
+
+================================================================================
+11. INDICATEURS DE SUIVI
+================================================================================
+
+  À publier après chaque vague dans le classeur de pilotage :
+
+  AVANCEMENT
+    · nombre de prompts terminés / 92
+    · nombre de vagues closes / 10
+    · jours ouvrés consommés / 84
+    · écart au chemin critique (jours de retard sur les prompts à marge nulle)
+
+  QUALITÉ
+    · tests backend (plancher : 943 méthodes, jamais en baisse)
+    · couverture frontend (départ : 0 %)
+    · avertissements ESLint (départ : 89)
+    · print() runtime (départ : 288, cible 0)
+    · fichiers > 800 lignes côté frontend (départ : 9)
+
+  COUVERTURE FONCTIONNELLE
+    · domaines avec 0 écran web (départ : 4, cible 0)
+    · finances étudiantes exploitées en UI (départ : 25 %, cible 100 %)
+    · maturité par module de référence, de 0 à 3 (18 modules)
+
+  EXPLOITATION
+    · jobs CI verts (départ : 2 sur 3)
+    · feature flags actifs / désactivés
+    · incidents et retours arrière par niveau
+
+================================================================================
+12. CONDITIONS DE MISE EN PRODUCTION
+================================================================================
+
+  La mise en production n'est prononcée que si TOUTES les conditions suivantes
+  sont remplies. Elles sont cumulatives.
+
+  [ ] Les 10 jalons de vague sont signés.
+  [ ] Les 18 scénarios de recette de la PARTIE H du [L] sont exécutés,
+      documentés et conformes.
+  [ ] Les 3 feux verts en CI, plus smoke_test_injs et compare_api_contract.
+  [ ] Toutes les commandes d'intégrité sont vertes (le tableau de bord
+      d'intégrité académique du prompt P02-05).
+  [ ] La checklist de production est appliquée : assouplissements de démo
+      inertes hors DEBUG, SECRET_KEY obligatoire, ALLOWED_HOSTS restreint,
+      HSTS, CSP stricte sans CDN tiers.
+  [ ] La 2FA est effective pour les rôles de niveau N4.
+  [ ] Une sauvegarde chiffrée externalisée a été produite ET un exercice de
+      restauration a été mené à bien sur une base vierge.
+  [ ] L'environnement de recette existe et la procédure de retour arrière a
+      été exercée.
+  [ ] Les manuels utilisateur sont à jour et ne décrivent aucune
+      fonctionnalité inexistante.
+  [ ] La liste explicite de ce qui reste à faire est publiée et acceptée.
+  [ ] Le socle legacy est retiré par commits distincts et réversibles, et
+      l'application a été revérifiée après retrait.
+
+================================================================================
+13. ANNEXE A — TABLE DES 92 PROMPTS ORDONNANCÉS
+================================================================================
+
+  ID       VAGUE PISTE CRÉNEAU   SÉ.  MARGE  PRÉREQUIS                    TITRE
+  --------------------------------------------------------------------------------
+  P00-01  V1    A     J  1–J1     1      0   —                            RE-AUDIT À CHAUD ET BASELINE DE NON-RÉGR
+  P00-04  V1    B     J  1–J2     2      0   P00-01                       FILET DE SÉCURITÉ FRONTEND : VITEST + TE
+  P00-08  V1    A     J  2–J3     2      0   P00-01,P00-04                HARNAIS DE NON-RÉGRESSION : FLAGS, SNAPS
+  P00-06  V1    B     J  3–J3     1      3   P00-01                       ENDPOINT DE CAPACITÉS : UNE SEULE SOURCE
+  P00-03  V1    A     J  4–J4     1      3   P00-01                       IDENTITÉ DOCUMENTAIRE : README INJS-LMD 
+  P00-07  V1    B     J  4–J4     1      3   P00-01                       CI MOBILE VERT : ASSET app.env ET MISES 
+  P00-05  V1    A     J  5–J5     1      3   P00-01                       OBSERVABILITÉ : LOGGING STRUCTURÉ, SENTR
+  P00-02  V1    B     J  5–J5     1      3   P00-01                       HYGIÈNE DU DÉPÔT : SORTIE DES DONNÉES NO
+  P01-01  V2    A     J  6–J7     2      0   P00-01,P00-02,P00-03,P00-04,P00-05,P00-06,P00-07,P00-08 SOCLE TRANSVERSAL : AUDIT UNIFIÉ, SOFT D
+  P01-02  V2    B     J  6–J7     2      0   P01-01                       RÉFÉRENTIELS CAMPUS : SITE → ZONE → BÂTI
+  P01-03  V2    A     J  8–J9     2      0   P01-01                       RÉFÉRENTIELS MÉTIER RESTANTS ET PARAMÈTR
+  P01-04  V2    B     J  8–J8     1      0   P01-03                       ANNÉE ACADÉMIQUE ET CALENDRIER ACADÉMIQU
+  P01-06  V2    B     J  9–J9     1      0   P01-02,P01-03                ADMINISTRATION DES RÉFÉRENTIELS : ÉCRAN 
+  P01-05  V2    A     J 10–J11    2      1   P00-06,P01-01                RBAC EXÉCUTABLE : NIVEAU × RÔLE × PERMIS
+  P01-07  V2    B     J 10–J10    1      2   P00-01,P01-01                JUMELAGE DES 18 MODULES DE RÉFÉRENCE AVE
+  P02-01  V3    A     J 12–J13    2      0   P01-01,P01-02,P01-03,P01-04,P01-05,P01-06,P01-07 VERROU DES MAQUETTES ACTIVES ET VERSIONN
+  P02-02  V3    B     J 12–J13    2      3   P01-01                       VERROU DES NOTES ET JOURNAL IMMUABLE DES
+  P02-03  V3    A     J 14–J15    2      0   P02-01,P02-02                CÂBLAGE NoteModule → ECUE ET CALCUL ECTS
+  P02-05  V3    B     J 14–J14    1      0   P02-01,P02-02,P02-03         TRAÇABILITÉ DES ACTES ACADÉMIQUES : TABL
+  P02-04  V3    B     J 15–J15    1      0   P02-03                       MOTEUR DE VALIDATION LMD PARAMÉTRABLE (C
+  P09-05  V3    A     J 16–J17    2     16   P01-01                       DOMAINE COMPTABLE : EXERCICES, BUDGETS E
+  P11-01  V3    B     J 16–J17    2     33   P01-01                       HUB DE NOTIFICATIONS MULTI-CANAL
+  P11-02  V3    A     J 18–J18    1     33   P11-01                       CAMPAGNES DE COMMUNICATION ET ALERTES AU
+  P11-05  V3    B     J 18–J20    3     37   P00-04                       DÉCOUPAGE DES FICHIERS GÉANTS (FRONTEND 
+  P03-01  V4    A     J 21–J22    2      0   P02-01,P02-02,P02-03,P02-04,P02-05 PIÈCES JUSTIFICATIVES : DÉPÔT, CONTRÔLE 
+  P03-02  V4    B     J 21–J22    2      0   P01-02,P03-01                CONCOURS : ÉPREUVES, CENTRES, SALLES ET 
+  P03-03  V4    A     J 23–J23    1      0   P03-02                       CONVOCATIONS : GÉNÉRATION, DIFFUSION ET 
+  P03-04  V4    B     J 23–J24    2      0   P03-03                       NOTES DE CONCOURS, VERROUILLAGE ET CLASS
+  P03-05  V4    A     J 24–J25    2      0   P03-04                       ADMISSION, LISTE D'ATTENTE ET CONVERSION
+  P03-06  V4    B     J 25–J25    1      0   P03-05                       RECOURS, RÉCLAMATIONS ET DOCUMENTS DE CA
+  P03-07  V4    A     J 26–J26    1      0   P03-01,P03-02,P03-03,P03-04,P03-05,P03-06 TABLEAU DE BORD ADMISSIONS ET PILOTAGE D
+  P09-06  V4    B     J 26–J28    3     16   P09-05                       ENGAGEMENTS, ACHATS, FOURNISSEURS ET FAC
+  P09-07  V4    A     J 27–J28    2     16   P09-06                       CAISSE, BANQUES, TRÉSORERIE ET PAIEMENTS
+  P09-08  V4    A     J 29–J31    3     16   P09-06,P09-07                COMPTABILITÉ : PLAN COMPTABLE, JOURNAUX,
+  P04-01  V5    A     J 32–J33    2      0   P03-01,P03-02,P03-03,P03-04,P03-05,P03-06,P03-07 FICHE ÉTUDIANT 360° ET HISTORIQUE ACADÉM
+  P04-07  V5    B     J 32–J32    1      0   P04-01                       CARTE ÉTUDIANT, ATTESTATIONS ET DOCUMENT
+  P05-03  V5    B     J 33–J34    2      0   P01-03                       FICHE ENSEIGNANT, GRADES ET AFFECTATIONS
+  P05-04  V5    A     J 34–J35    2      0   P01-02,P05-03                CHARGES HORAIRES ENSEIGNANTS, CONTRÔLES 
+  P04-02  V5    B     J 35–J36    2     11   P04-01                       INSCRIPTIONS ADMINISTRATIVES ET PÉDAGOGI
+  P04-06  V5    A     J 36–J37    2     13   P04-01                       SITUATIONS ACADÉMIQUES : REDOUBLEMENT, T
+  P05-01  V5    B     J 37–J38    2     27   P02-01                       ÉCRANS DÉDIÉS MAQUETTES / UE / ECUE
+  P05-02  V5    A     J 38–J38    1     11   P04-02,P05-01                INSCRIPTIONS PÉDAGOGIQUES EN MASSE ET PA
+  P05-05  V5    A     J 39–J39    1     27   P01-04,P05-01                CALENDRIER PÉDAGOGIQUE ET CONTRÔLE DE CO
+  P05-06  V5    B     J 39–J39    1     11   P05-01,P05-02,P05-03,P05-04,P05-05 TABLEAUX DE BORD PÉDAGOGIQUE ET RESPONSA
+  P04-03  V5    A     J 40–J41    2     31   P01-01                       D1 : scolarite.Groupe COMME SOURCE DE VÉ
+  P04-04  V5    B     J 40–J41    2     31   P04-03                       D2 : MIGRATION DES CHAMPS TEXTE LEGACY V
+  P04-05  V5    A     J 42–J42    1     31   P04-04                       D3 : PONT Formation ↔ RefFormation ET AL
+  P04-08  V5    B     J 42–J42    1     33   P04-03                       GROUPES PÉDAGOGIQUES : CAPACITÉ, AFFECTA
+  P06-01  V6    A     J 43–J44    2      0   P01-02,P05-04                MODÈLE DE CONTRAINTES EDT : DURES, SOUPL
+  P06-02  V6    B     J 43–J45    3      0   P06-01                       MOTEUR DE GÉNÉRATION AUTOMATIQUE AVEC EX
+  P06-03  V6    A     J 45–J46    2      0   P06-02                       WORKFLOW EDT, MODIFICATION MANUELLE CONT
+  P06-08  V6    B     J 46–J46    1      0   P03-02,P06-03                EXAMENS, SURVEILLANCE ET OCCUPATION DES 
+  P06-04  V6    A     J 47–J48    2     11   P06-03                       VUES EDT : HEBDOMADAIRE, PAR PROFIL ET P
+  P06-05  V6    B     J 47–J48    2     11   P06-03                       CONTRAT EDT v1.1 ET INGESTION DU PLANIFI
+  P06-06  V6    A     J 49–J50    2     24   P00-04,P00-08                GABARIT D'ÉCRANS GÉNÉRIQUE POUR LES DOMA
+  P06-07  V6    B     J 49–J50    2     22   P01-02,P06-06                DOMAINES CAMPUS ET PATRIMOINE : ÉCRANS C
+  P06-09  V6    A     J 51–J52    2     11   P06-01,P06-02,P06-03,P06-04,P06-05,P06-06,P06-07,P06-08 TESTS DU DOMAINE EDT (0 TEST AUJOURD'HUI
+  P10-05  V6    B     J 51–J53    3     23   P01-03,P06-06                GED CENTRALE : DOCUMENTS, VERSIONS, CLAS
+  P10-04  V6    A     J 53–J54    2     34   P06-06                       STAGES : ORGANISMES, CONVENTIONS, SUIVI 
+  P07-01  V7    A     J 55–J56    2     11   P06-01,P06-02,P06-03,P06-04,P06-05,P06-06,P06-07,P06-08,P06-09 CYCLE DE VIE COMPLET DU POINTAGE ET CLÔT
+  P07-02  V7    B     J 55–J56    2     11   P07-01                       PILIERS ANTI-FRAUDE : APPAREIL, GÉOLOCAL
+  P07-04  V7    A     J 57–J58    2     11   P07-02                       EXPÉRIENCE MOBILE DU POINTAGE ET HORS-LI
+  P07-03  V7    B     J 57–J57    1     14   P07-01                       RETARDS, ABSENCES, JUSTIFICATIONS ET RAT
+  P07-05  V7    B     J 58–J58    1     11   P07-01,P07-02,P07-03,P07-04  ISOLEMENT DU SOCLE HTML LEGACY DE BADGEA
+  P10-06  V7    A     J 59–J60    2     23   P10-05                       COURRIERS : ENTRANTS, SORTANTS, AFFECTAT
+  P10-07  V7    B     J 59–J59    1     23   P10-05,P10-06                RÉUNIONS, COMMISSIONS, DÉCISIONS ET ACTE
+  P10-08  V7    B     J 60–J60    1     23   P10-05,P10-06,P10-07         ARCHIVES, NUMÉROTATION CENTRALE ET VÉRIF
+  P10-01  V7    A     J 61–J61    1     29   P01-05,P06-06                ORGANISATION ADMINISTRATIVE : DIRECTIONS
+  P10-02  V7    B     J 61–J62    2     29   P10-01                       RESSOURCES HUMAINES : AGENTS, CONTRATS, 
+  P10-03  V7    A     J 62–J63    2     28   P05-04,P10-02                CONGÉS, ABSENCES, MISSIONS ET ÉVALUATION
+  P08-01  V8    A     J 64–J65    2      0   P01-03,P06-08                ÉVALUATIONS : TYPES, CALENDRIER, CONVOCA
+  P08-02  V8    B     J 64–J65    2      0   P02-02,P08-01                SAISIE DES NOTES SÉCURISÉE, IMPORT ET CO
+  P08-03  V8    A     J 66–J66    1      0   P02-03,P02-04,P08-02         MOYENNES, ECTS, VALIDATION ET RELEVÉS DE
+  P08-04  V8    B     J 66–J68    3      0   P02-04,P08-03                JURYS LMD : SESSIONS, DÉLIBÉRATIONS ET D
+  P08-06  V8    A     J 67–J68    2      0   P04-07,P08-04                DIPLÔMES, REGISTRE, RÉÉDITIONS ET ÉQUIVA
+  P08-05  V8    A     J 69–J69    1      1   P08-04                       PROCÈS-VERBAUX IMMUABLES ET ARCHIVAGE
+  P09-09  V8    B     J 69–J70    2     16   P06-07,P09-08                IMMOBILISATIONS, AMORTISSEMENTS ET RAPPR
+  P09-10  V8    A     J 70–J71    2     16   P09-05,P09-06,P09-07,P09-08,P09-09 CLÔTURES, ÉTATS FINANCIERS ET TABLEAU DE
+  P09-01  V9    A     J 72–J73    2      0   P08-01,P08-02,P08-03,P08-04,P08-05,P08-06 FINANCES ÉTUDIANTES : TARIFS, ÉCHÉANCIER
+  P09-02  V9    B     J 72–J73    2      0   P09-01                       PAIEMENTS, QUITTANCES ET REMBOURSEMENTS
+  P09-03  V9    A     J 74–J74    1      0   P09-02                       RELANCES, RECOUVREMENT ET RAPPROCHEMENT 
+  P09-04  V9    B     J 74–J74    1      0   P09-01,P09-02,P09-03         TABLEAU DE BORD FINANCE ÉTUDIANTE
+  P11-03  V9    A     J 75–J76    2      0   P01-07,P09-01,P09-02,P09-03,P09-04,P09-05,P09-06,P09-07,P09-08,P09-09,P09-10 COUCHE BI : INDICATEURS, TABLES DE SYNTH
+  P11-04  V9    B     J 75–J76    2      0   P01-05,P11-03                TABLEAUX DE BORD PAR PROFIL
+  P11-08  V9    A     J 77–J78    2      0   P11-03,P11-04                STATISTIQUES LMD, RAPPORTS OFFICIELS ET 
+  P11-06  V10   A     J 79–J80    2     22   P03-01,P10-08                PORTAIL PUBLIC ET PORTAIL CANDIDAT
+  P11-07  V10   B     J 79–J80    2      0   P11-04,P11-06                PORTAILS ÉTUDIANT, ENSEIGNANT ET PERSONN
+  P12-01  V10   A     J 81–J82    2     31   P01-05                       DURCISSEMENT DE L'AUTHENTIFICATION : 2FA
+  P12-02  V10   B     J 81–J81    1     11   P07-05,P12-01                CSP STRICTE, PIÈCES JOINTES ET SURFACE D
+  P12-03  V10   B     J 82–J82    1     38   P00-05                       SAUVEGARDES CHIFFRÉES HORS SITE ET EXERC
+  P12-04  V10   A     J 83–J84    2     38   P12-03                       ENVIRONNEMENT DE RECETTE, CD ET MIGRATIO
+  P12-05  V10   B     J 83–J84    2      0   P00-01,P00-02,P00-03,P00-04,P00-05,P00-06,P00-07,P00-08,P01-01,P01-02,P01-03,P01-04,P01-05,P01-06,P01-07,P02-01,P02-02,P02-03,P02-04,P02-05,P03-01,P03-02,P03-03,P03-04,P03-05,P03-06,P03-07,P04-01,P04-02,P04-03,P04-04,P04-05,P04-06,P04-07,P04-08,P05-01,P05-02,P05-03,P05-04,P05-05,P05-06,P06-01,P06-02,P06-03,P06-04,P06-05,P06-06,P06-07,P06-08,P06-09,P07-01,P07-02,P07-03,P07-04,P07-05,P08-01,P08-02,P08-03,P08-04,P08-05,P08-06,P09-01,P09-02,P09-03,P09-04,P09-05,P09-06,P09-07,P09-08,P09-09,P09-10,P10-01,P10-02,P10-03,P10-04,P10-05,P10-06,P10-07,P10-08,P11-01,P11-02,P11-03,P11-04,P11-05,P11-06,P11-07,P11-08,P12-01,P12-02,P12-03,P12-04 RETRAIT DU LEGACY, RECETTE GÉNÉRALE ET D
+  --------------------------------------------------------------------------------
+  92 prompts · 157 séances · makespan 84 jours ouvrés à 2 pistes
+
+================================================================================
+14. ANNEXE B — GRAPHE DE DÉPENDANCES
+================================================================================
+
+  Chaque ligne indique les prérequis directs d'un prompt. Les prérequis
+  exprimés par lot dans le [L] ont été développés en liste explicite.
+  --------------------------------------------------------------------------------
+  LOT 0
+    P00-01  <-  (aucun)
+    P00-02  <-  P00-01
+    P00-03  <-  P00-01
+    P00-04  <-  P00-01
+    P00-05  <-  P00-01
+    P00-06  <-  P00-01
+    P00-07  <-  P00-01
+    P00-08  <-  P00-01, P00-04
+  LOT 1
+    P01-01  <-  P00-01, P00-02, P00-03, P00-04, P00-05, P00-06, P00-07, P00-08
+    P01-02  <-  P01-01
+    P01-03  <-  P01-01
+    P01-04  <-  P01-03
+    P01-05  <-  P00-06, P01-01
+    P01-06  <-  P01-02, P01-03
+    P01-07  <-  P00-01, P01-01
+  LOT 2
+    P02-01  <-  P01-01, P01-02, P01-03, P01-04, P01-05, P01-06, P01-07
+    P02-02  <-  P01-01
+    P02-03  <-  P02-01, P02-02
+    P02-04  <-  P02-03
+    P02-05  <-  P02-01, P02-02, P02-03
+  LOT 3
+    P03-01  <-  P02-01, P02-02, P02-03, P02-04, P02-05
+    P03-02  <-  P01-02, P03-01
+    P03-03  <-  P03-02
+    P03-04  <-  P03-03
+    P03-05  <-  P03-04
+    P03-06  <-  P03-05
+    P03-07  <-  P03-01, P03-02, P03-03, P03-04, P03-05, P03-06
+  LOT 4
+    P04-01  <-  P03-01, P03-02, P03-03, P03-04, P03-05, P03-06, P03-07
+    P04-02  <-  P04-01
+    P04-03  <-  P01-01
+    P04-04  <-  P04-03
+    P04-05  <-  P04-04
+    P04-06  <-  P04-01
+    P04-07  <-  P04-01
+    P04-08  <-  P04-03
+  LOT 5
+    P05-01  <-  P02-01
+    P05-02  <-  P04-02, P05-01
+    P05-03  <-  P01-03
+    P05-04  <-  P01-02, P05-03
+    P05-05  <-  P01-04, P05-01
+    P05-06  <-  P05-01, P05-02, P05-03, P05-04, P05-05
+  LOT 6
+    P06-01  <-  P01-02, P05-04
+    P06-02  <-  P06-01
+    P06-03  <-  P06-02
+    P06-04  <-  P06-03
+    P06-05  <-  P06-03
+    P06-06  <-  P00-04, P00-08
+    P06-07  <-  P01-02, P06-06
+    P06-08  <-  P03-02, P06-03
+    P06-09  <-  P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08
+  LOT 7
+    P07-01  <-  P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08, P06-09
+    P07-02  <-  P07-01
+    P07-03  <-  P07-01
+    P07-04  <-  P07-02
+    P07-05  <-  P07-01, P07-02, P07-03, P07-04
+  LOT 8
+    P08-01  <-  P01-03, P06-08
+    P08-02  <-  P02-02, P08-01
+    P08-03  <-  P02-03, P02-04, P08-02
+    P08-04  <-  P02-04, P08-03
+    P08-05  <-  P08-04
+    P08-06  <-  P04-07, P08-04
+  LOT 9
+    P09-01  <-  P08-01, P08-02, P08-03, P08-04, P08-05, P08-06
+    P09-02  <-  P09-01
+    P09-03  <-  P09-02
+    P09-04  <-  P09-01, P09-02, P09-03
+    P09-05  <-  P01-01
+    P09-06  <-  P09-05
+    P09-07  <-  P09-06
+    P09-08  <-  P09-06, P09-07
+    P09-09  <-  P06-07, P09-08
+    P09-10  <-  P09-05, P09-06, P09-07, P09-08, P09-09
+  LOT 10
+    P10-01  <-  P01-05, P06-06
+    P10-02  <-  P10-01
+    P10-03  <-  P05-04, P10-02
+    P10-04  <-  P06-06
+    P10-05  <-  P01-03, P06-06
+    P10-06  <-  P10-05
+    P10-07  <-  P10-05, P10-06
+    P10-08  <-  P10-05, P10-06, P10-07
+  LOT 11
+    P11-01  <-  P01-01
+    P11-02  <-  P11-01
+    P11-03  <-  P01-07, P09-01, P09-02, P09-03, P09-04, P09-05, P09-06, P09-07, P09-08, P09-09, P09-10
+    P11-04  <-  P01-05, P11-03
+    P11-05  <-  P00-04
+    P11-06  <-  P03-01, P10-08
+    P11-07  <-  P11-04, P11-06
+    P11-08  <-  P11-03, P11-04
+  LOT 12
+    P12-01  <-  P01-05
+    P12-02  <-  P07-05, P12-01
+    P12-03  <-  P00-05
+    P12-04  <-  P12-03
+    P12-05  <-  P00-01, P00-02, P00-03, P00-04, P00-05, P00-06, P00-07, P00-08, P01-01, P01-02, P01-03, P01-04, P01-05, P01-06, P01-07, P02-01, P02-02, P02-03, P02-04, P02-05, P03-01, P03-02, P03-03, P03-04, P03-05, P03-06, P03-07, P04-01, P04-02, P04-03, P04-04, P04-05, P04-06, P04-07, P04-08, P05-01, P05-02, P05-03, P05-04, P05-05, P05-06, P06-01, P06-02, P06-03, P06-04, P06-05, P06-06, P06-07, P06-08, P06-09, P07-01, P07-02, P07-03, P07-04, P07-05, P08-01, P08-02, P08-03, P08-04, P08-05, P08-06, P09-01, P09-02, P09-03, P09-04, P09-05, P09-06, P09-07, P09-08, P09-09, P09-10, P10-01, P10-02, P10-03, P10-04, P10-05, P10-06, P10-07, P10-08, P11-01, P11-02, P11-03, P11-04, P11-05, P11-06, P11-07, P11-08, P12-01, P12-02, P12-03, P12-04
+  --------------------------------------------------------------------------------
+
+  PROPRIÉTÉS VÉRIFIÉES DU GRAPHE
+   · 92 nœuds, graphe acyclique (ordre topologique complet obtenu)
+   · aucune dépendance vers un prompt inexistant
+   · aucune dépendance pointant vers une vague postérieure
+   · racine unique : P00-01 (audit à chaud, lecture seule)
+   · puits unique : P12-05 (clôture, dépend de tous les lots)
+
+================================================================================
+15. ANNEXE C — SCÉNARIOS DE REPLANIFICATION
+================================================================================
+
+  SCÉNARIO 1 — UNE SEULE ÉQUIPE DISPONIBLE
+    L'ordonnancement à 1 piste donne 157 séances contre 84 à 2 pistes.
+    L'ordre des vagues ne change pas ; seules les séquences A et B de chaque
+    vague se fusionnent, en respectant les prérequis. Durée ≈ 31 semaines.
+
+  SCÉNARIO 2 — TROIS ÉQUIPES OU PLUS
+    Sans effet sur la date de fin : le calcul donne 115 séances à 3 pistes
+    (contre 84 à 2), parce que la chaîne académique est sérielle et que la
+    charge additionnelle tombe sur des pistes inoccupées. Mieux vaut affecter
+    la troisième ressource à la validation métier et à la recette qu'à
+    l'implémentation.
+
+  SCÉNARIO 3 — GEL IMPOSÉ (examens, campagne de concours réelle)
+    Deux cas :
+      · gel avant la fin de la VAGUE 6 : le projet peut être suspendu, la
+        chaîne académique reste cohérente ; reprendre à la vague en cours.
+      · gel après la VAGUE 6 : activer les feature flags des fonctions non
+        stabilisées et figer le périmètre. Ne jamais retirer un flag pendant
+        un gel.
+
+  SCÉNARIO 4 — LIVRAISON PARTIELLE DEMANDÉE À MI-PARCOURS
+    La fin de la VAGUE 6 est le premier point de livraison démontrable
+    « de A à Z » sur la chaîne académique : admissions, inscriptions,
+    pédagogie, EDT, campus. Les fonctions support (finances étudiantes
+    complètes, comptabilité, portails) arrivent en vagues 9 et 10.
+
+  SCÉNARIO 5 — LES RÈGLES COMPTABLES DE L'INJS NE SONT PAS FOURNIES
+    Les prompts P09-05 à P09-10 livrent des mécanismes paramétrables
+    (plan comptable importable, règles de comptabilisation administrables).
+    Le projet continue ; seule la recette REC-12 est reportée jusqu'à
+    fourniture des règles par la Direction financière.
+
+
+================================================================================
+FIN DU PLAN D'EXÉCUTION
+================================================================================

@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P11-06 — PORTAIL PUBLIC ET PORTAIL CANDIDAT
+================================================================================
+P11-06 — PORTAIL PUBLIC ET PORTAIL CANDIDAT
+Lot 11 | 2 séances | Dépendances : P03-01, P10-08 | Module réf. : 17 · DA-11
+Risques couverts : E7 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 17) prévoit 8 portails. Le dépôt n'a ni portail
+public (sans authentification) ni portail candidat en libre-service.
+Règle DA-11 : un portail ne recrée aucun métier, il expose les API existantes
+selon les droits.
+
+MISSION
+Livrer le portail public et le portail candidat.
+
+CONSIGNES
+1. PORTAIL PUBLIC (sans authentification) : accueil et présentation de l'INJS,
+   formations (depuis les référentiels, jamais en dur), conditions d'admission,
+   campagnes ouvertes, calendrier académique, actualités et communiqués, avis et
+   résultats publiés, documents publics, contacts et localisation, FAQ,
+   vérification de document (P10-08).
+   Sécurité : endpoints publics en LECTURE SEULE, données volontairement
+   publiées uniquement (un flag de publication par objet), throttling strict,
+   aucune donnée nominative, CSP adaptée.
+2. PORTAIL CANDIDAT : création de compte (e-mail + validation), activation,
+   profil candidat, choix de campagne et de formation, constitution du dossier,
+   dépôt des pièces, soumission, suivi de l'état du dossier, convocation,
+   résultat. Le rôle CANDIDAT (créé en P01-05) a un périmètre strictement
+   PROPRE_COMPTE.
+3. Le portail candidat réutilise les API admissions existantes : NE CRÉE AUCUN
+   MODÈLE MÉTIER dans la couche portail. Vérifie-le par un test de garde.
+4. Sécurité renforcée du portail candidat : limitation de débit, vérification
+   d'e-mail, verrouillage après tentatives abusives, aucun accès aux données
+   d'un autre candidat (test croisé systématique), pièces déposées stockées
+   hors accès public.
+5. Identité INJS : mêmes couleurs, même logo, glassmorphism ; responsive
+   mobile en priorité (les candidats sont majoritairement sur mobile).
+6. Tests : endpoints publics sans donnée nominative, throttling, création et
+   activation de compte, dépôt de pièces, soumission, isolement strict entre
+   candidats (test croisé), absence de modèle métier dans le portail.
+
+DoD
+[ ] portail public en lecture seule avec données publiées par flag
+[ ] portail candidat complet (compte → résultat)
+[ ] aucun modèle métier dans la couche portail (test de garde)
+[ ] isolement entre candidats vérifié par test croisé
+[ ] responsive mobile, identité INJS, tests verts

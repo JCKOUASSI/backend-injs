@@ -1,0 +1,50 @@
+================================================================================
+PROMPT P03-05 — ADMISSION, LISTE D'ATTENTE ET CONVERSION CANDIDAT → ÉTUDIANT
+================================================================================
+P03-05 — ADMISSION, LISTE D'ATTENTE ET CONVERSION CANDIDAT → ÉTUDIANT
+Lot 3 | 2 séances | Dépendances : P03-04 | Module réf. : 02, 03
+Risques couverts : R1 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence distingue clairement : « Un candidat admis ne devient
+étudiant qu'au moment défini par le workflow d'inscription. » La conversion
+doit créer le DossierEtudiant et attribuer un matricule unique pérenne.
+
+MISSION
+Sécuriser et automatiser la conversion admission → inscription administrative →
+dossier étudiant → matricule, avec liste d'attente exploitable.
+
+CONSIGNES
+1. Écran « Admissions » : décision par candidat (admis, refusé, liste
+   d'attente) avec motif, validation à deux niveaux (saisie N2, validation N3),
+   publication de la liste.
+2. Liste d'attente : classement, capacité de la formation, appel automatique
+   des premiers de liste quand une place se libère (désistement, non-
+   inscription dans le délai), avec délai paramétrable et notification.
+3. Conversion Candidat → Étudiant : opération ATOMIQUE qui crée
+   InscriptionAdministrative + DossierEtudiant + matricule (format pérenne,
+   généré par le BusinessCodeMixin de P01-01), rattache à l'année académique,
+   à la formation, au parcours et au niveau, et reporte les données
+   d'identité sans double saisie.
+4. Garde-fous : conversion refusée si le dossier est incomplet, si la capacité
+   est atteinte (sauf dérogation motivée N4), ou si l'année académique est
+   clôturée. Un candidat ne peut être converti qu'une seule fois : contrôle
+   d'unicité et de doublon d'identité (même pièce d'identité, mêmes
+   nom/prénoms/date de naissance).
+5. Traçabilité complète : chaque conversion journalisée (utilisateur, date,
+   campagne, candidature d'origine, matricule attribué).
+6. Écran de suivi : taux de conversion par campagne, places restantes,
+   désistements, candidats non convertis dans le délai.
+7. Tests : conversion atomique (échec partiel = rollback complet), doublon
+   refusé, capacité atteinte, année clôturée, appel de liste d'attente,
+   matricule unique.
+
+DoD
+[ ] admissions avec validation à deux niveaux et motifs
+[ ] liste d'attente avec appel automatique paramétrable
+[ ] conversion atomique, matricule unique, doublons refusés
+[ ] écran de suivi de conversion
+[ ] tests verts, dont rollback partiel

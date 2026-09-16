@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P06-01 — MODÈLE DE CONTRAINTES EDT : DURES, SOUPLES ET CALENDRIER
+================================================================================
+P06-01 — MODÈLE DE CONTRAINTES EDT : DURES, SOUPLES ET CALENDRIER
+Lot 6 | 2 séances | Dépendances : P05-04, P01-02 | Module réf. : 06
+Risques couverts : E4 | Type : Socle métier
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app edts contient CreneauTemplate, EmploiDuTemps, AffectationCreneau et
+ConflitCreneau. Le modèle de référence (Module 06 §15) distingue explicitement
+CONTRAINTES DURES (jamais violables : enseignant disponible, groupe disponible,
+salle disponible, salle compatible, capacité suffisante, pas de chevauchement,
+date dans la période autorisée) et CONTRAINTES SOUPLES (violables avec
+pénalité : préférence enseignant, préférence salle, éviter les cours très tôt,
+éviter les trous dans l'EDT, limiter les déplacements, répartir les cours).
+
+MISSION
+Modéliser les contraintes et les rendre administrables, préalable indispensable
+au moteur de génération.
+
+CONSIGNES
+1. Inventorie edts (4 modèles) et formations.SessionModule : champs, usages,
+   détection de conflits existante. Publie le constat.
+2. Crée ContrainteEDT (emploi_du_temps ou portée globale, type, dureté
+   [DURE, SOUPLE], paramètres en JSON, poids de pénalité, actif, commentaire)
+   couvrant les 7 contraintes dures et les 6 contraintes souples de référence,
+   extensible sans modification de code.
+3. Crée PreferenceEDT (enseignant ou groupe, type de préférence, créneaux
+   préférés/évités, salles préférées) — alimente les contraintes souples.
+4. Crée la notion de CRÉNEAU HORAIRE administrable (grille horaire de
+   l'établissement : jours, heures de début/fin, durée standard d'une séance,
+   pauses) — jamais en dur.
+5. Ajoute un validateur unique verifie_contraintes(seance) qui évalue toutes
+   les contraintes dures et retourne la liste explicite des violations, et qui
+   calcule la pénalité des contraintes souples violées. Ce validateur est
+   utilisé par le moteur (P06-02), par la modification manuelle (P06-03) et par
+   l'ingestion externe (P06-05).
+6. Écran « Contraintes et préférences » : administration des contraintes, des
+   poids de pénalité, de la grille horaire, des préférences enseignants.
+7. Tests : chaque contrainte dure (violation détectée), chaque contrainte
+   souple (pénalité calculée), grille horaire paramétrable, extensibilité.
+
+DoD
+[ ] 7 contraintes dures + 6 souples modélisées et administrables
+[ ] grille horaire paramétrable, aucune constante en dur
+[ ] validateur unique verifie_contraintes réutilisable
+[ ] écran d'administration
+[ ] tests par contrainte verts

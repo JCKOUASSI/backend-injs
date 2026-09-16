@@ -1,0 +1,127 @@
+{% load i18n static %}<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}{% get_current_language_bidi as LANGUAGE_BIDI %}
+<html lang="{{ LANGUAGE_CODE|default:"en-us" }}" dir="{{ LANGUAGE_BIDI|yesno:'rtl,ltr,auto' }}">
+<head>
+<title>{% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="{% block stylesheet %}{% static "admin/css/base.css" %}{% endblock %}">
+{% block dark-mode-vars %}{% endblock %}
+{% block extrastyle %}{% endblock %}
+{% if LANGUAGE_BIDI %}<link rel="stylesheet" href="{% block stylesheet_rtl %}{% static "admin/css/rtl.css" %}{% endblock %}">{% endif %}
+{% block extrahead %}
+<link rel="icon" type="image/png" href="{% static 'img/logo-injs.png' %}">
+{% endblock %}
+{% block responsive %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static "admin/css/responsive.css" %}">
+    {% if LANGUAGE_BIDI %}<link rel="stylesheet" href="{% static "admin/css/responsive_rtl.css" %}">{% endif %}
+{% endblock %}
+{% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE">{% endblock %}
+</head>
+
+<body class="sygep-admin sygep-layout-active {% if is_popup %}popup {% endif %}{% block bodyclass %}{% endblock %}"
+  data-admin-utc-offset="{% now "Z" %}">
+<a href="#content-start" class="skip-to-content-link">{% translate 'Skip to main content' %}</a>
+
+{% if not is_popup and user.is_authenticated %}
+<div class="sygep-layout">
+  <aside class="sygep-sidebar" id="sygep-sidebar">
+    <div class="sygep-sidebar-brand">
+      <a href="{% url 'admin:index' %}" class="sygep-brand-link">
+        <img src="{% static 'img/logo-injs.png' %}" alt="INJS Abidjan" class="sygep-brand-icon">
+        <span class="sygep-brand-text">{{ site_header|default:"INJS LMD" }}</span>
+      </a>
+    </div>
+    {% if admin_sidebar_navigation %}
+      {% include "admin/includes/sidebar.html" %}
+    {% endif %}
+  </aside>
+
+  <div class="sygep-main">
+    <header class="sygep-topbar">
+      <button type="button" class="sygep-menu-toggle" id="sygep-menu-toggle" aria-label="{% trans 'Menu' %}">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+
+      <form class="sygep-search" action="{% url 'admin:index' %}" method="get" role="search">
+        <span class="material-symbols-outlined sygep-search-icon">search</span>
+        <input type="search" name="q" placeholder="{% trans 'Rechercher dans l’admin…' %}" aria-label="{% trans 'Rechercher' %}">
+      </form>
+
+      <div class="sygep-topbar-actions">
+        {% if site_url %}
+          <a href="{{ site_url }}" class="sygep-topbar-link" title="{% trans 'Dashboard web' %}">
+            <span class="material-symbols-outlined">open_in_new</span>
+          </a>
+        {% endif %}
+        {% if user.has_usable_password %}
+          <a href="{% url 'admin:password_change' %}" class="sygep-topbar-link" title="{% trans 'Changer le mot de passe' %}">
+            <span class="material-symbols-outlined">lock</span>
+          </a>
+        {% endif %}
+        <form class="sygep-logout-form" method="post" action="{% url 'admin:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="sygep-topbar-link" title="{% trans 'Déconnexion' %}">
+            <span class="material-symbols-outlined">logout</span>
+          </button>
+        </form>
+        <div class="sygep-user-chip">
+          <span class="sygep-user-avatar">{{ user.get_short_name|default:user.get_username|slice:":1"|upper }}</span>
+          <span class="sygep-user-name">{% firstof user.get_short_name user.get_username %}</span>
+        </div>
+      </div>
+    </header>
+
+    {% block nav-breadcrumbs %}
+      <nav class="sygep-breadcrumbs" aria-label="{% translate 'Breadcrumbs' %}">
+        {% block breadcrumbs %}
+          <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+          {% if title %}<span class="sygep-breadcrumb-sep">›</span><span>{{ title }}</span>{% endif %}
+        {% endblock %}
+      </nav>
+    {% endblock %}
+{% else %}
+<div id="container">
+{% endif %}
+
+    <main id="content-start" class="{% if not is_popup and user.is_authenticated %}sygep-content{% else %}content{% endif %}" tabindex="-1">
+      {% block messages %}
+        {% if messages %}
+          <ul class="messagelist">{% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+          {% endfor %}</ul>
+        {% endif %}
+      {% endblock messages %}
+
+      <div id="content" class="{% block coltype %}colM{% endblock %}">
+        {% block pretitle %}{% endblock %}
+        {% block content_title %}{% if title %}<h1 class="sygep-page-title">{{ title }}</h1>{% endif %}{% endblock %}
+        {% block content_subtitle %}{% if subtitle %}<h2 class="sygep-page-subtitle">{{ subtitle }}</h2>{% endif %}{% endblock %}
+        {% block content %}
+          {% block object-tools %}{% endblock %}
+          {{ content }}
+        {% endblock %}
+        {% block sidebar %}{% endblock %}
+      </div>
+    </main>
+
+{% if not is_popup and user.is_authenticated %}
+  </div>
+</div>
+{% else %}
+</div>
+{% endif %}
+
+<footer id="footer">{% block footer %}{% endblock %}</footer>
+<script>
+(function () {
+  var toggle = document.getElementById('sygep-menu-toggle');
+  var sidebar = document.getElementById('sygep-sidebar');
+  if (toggle && sidebar) {
+    toggle.addEventListener('click', function () {
+      document.body.classList.toggle('sygep-sidebar-open');
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+================================================================================
+PROMPT P07-02 — PILIERS ANTI-FRAUDE : APPAREIL, GÉOLOCALISATION, HEARTBEAT, AUDIT
+================================================================================
+P07-02 — PILIERS ANTI-FRAUDE : APPAREIL, GÉOLOCALISATION, HEARTBEAT, AUDIT
+Lot 7 | 2 séances | Dépendances : P07-01 | Module réf. : 08 · RACI
+Risques couverts : R1, R7 | Type : Sécurité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le rapport de mise en œuvre décrit 4 piliers anti-fraude :
+1. Verrouillage matériel (DeviceBinding) : un compte est associé au device_id
+   de son téléphone ;
+2. Délimitation géographique : RefSite porte geofence_latitude,
+   geofence_longitude, geofence_radius_m ;
+3. Détection de sortie anticipée (heartbeat) toutes les X secondes
+   (MOBILE_HEARTBEAT_INTERVAL_SECONDS) ;
+4. Journal d'audit immuable (AuditLog) pour tout forçage manuel ou rattrapage.
+L'audit note que les appareils Web (préfixe FLUTTER_PWA_) sont exclus des
+sanctions de heartbeat.
+
+MISSION
+Vérifier, durcir et TESTER les 4 piliers, sans casser le fonctionnement
+multi-transports (navigateur, iframe, mobile, PWA).
+
+CONSIGNES
+1. DeviceBinding : vérifie la liaison d'appareil, la révocation, le refus de
+   connexion sur un appareil non lié, et la procédure de changement d'appareil
+   (motivée, tracée, limitée en fréquence pour éviter l'abus). Ajoute un écran
+   « Mes appareils » pour l'étudiant et un écran d'administration des appareils
+   (ADMIN/ENCADRANT).
+2. Geofencing : vérifie le calcul de distance et le refus hors périmètre, avec
+   tolérance paramétrable et message explicite à l'utilisateur (« Vous êtes à
+   X m du site, le périmètre autorisé est de Y m »). Gère proprement le cas
+   « géolocalisation refusée » (refus de pointage + message, jamais de
+   pointage silencieux).
+3. Heartbeat : vérifie l'intervalle paramétrable, le traitement par
+   process_mobile_heartbeats, la détection de sortie anticipée, l'alerte
+   « suspect », et l'exclusion correcte des appareils Web (FLUTTER_PWA_).
+   Vérifie que l'exclusion ne crée pas de faille (un appareil Web ne doit pas
+   pouvoir être utilisé pour badger à la place d'un autre).
+4. Audit : tout forçage manuel, toute régularisation (Rattrapage), toute
+   révocation d'appareil est consigné avec motif, auteur, date, valeur avant/
+   après. Rend ces entrées immuables (réutilise le socle P01-01).
+5. Ajoute un tableau de bord anti-fraude : pointages suspects, appareils
+   multiples par compte, pointages hors périmètre, heartbeats interrompus,
+   rattrapages par étudiant et par encadrant (détection des abus).
+6. Tests dédiés (fichier test_anti_fraude.py) : chaque pilier, chaque refus,
+   chaque exclusion, chaque cas d'abus détecté. Ces tests deviennent la
+   référence de non-régression du dispositif.
+7. Respect de la vie privée : la localisation n'est collectée que pendant la
+   séance, n'est pas historisée au-delà du besoin, et les documents légaux
+   (docs/legal) sont mis à jour si nécessaire.
+
+DoD
+[ ] 4 piliers vérifiés, durcis et testés (test_anti_fraude.py)
+[ ] écrans « Mes appareils » et administration des appareils
+[ ] messages utilisateur explicites (distance, géoloc refusée)
+[ ] tableau de bord anti-fraude avec détection d'abus
+[ ] conformité vie privée documentée

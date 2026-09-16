@@ -1,0 +1,45 @@
+================================================================================
+PROMPT P09-03 — RELANCES, RECOUVREMENT ET RAPPROCHEMENT ÉTUDIANT
+================================================================================
+P09-03 — RELANCES, RECOUVREMENT ET RAPPROCHEMENT ÉTUDIANT
+Lot 9 | 1 séance | Dépendances : P09-02 | Module réf. : 11, 15
+Risques couverts : E2, R11 | Type : Workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les relances et rapprochements comptables existent en backend sans écran.
+L'audit note que les SMS sont modélisés dans les relances mais qu'aucun
+fournisseur n'est branché, et que l'e-mail passe par SMTP Gmail par défaut.
+
+MISSION
+Livrer le recouvrement et le rapprochement étudiant, en préparant le
+branchement des canaux de notification.
+
+CONSIGNES
+1. Écran « Relances » : détection automatique des impayés (échéance dépassée),
+   niveaux de relance paramétrables (J+7, J+30, J+60, mise en demeure),
+   génération des courriers/courriels depuis des modèles, envoi groupé,
+   historique par étudiant.
+2. Canaux : l'envoi passe par une couche d'abstraction (canal interne, e-mail,
+   SMS) avec fournisseur CONFIGURABLE par variable d'environnement. En
+   l'absence de fournisseur SMS, la relance SMS est mise en file et signalée
+   « non envoyée — fournisseur absent » (jamais de faux succès). Prépare
+   l'interface pour le hub de notifications (P11-01).
+3. Écran « Rapprochement comptable étudiant » : rapprochement des paiements
+   déclarés avec les écritures bancaires/caisse, écarts identifiés,
+   régularisations motivées.
+4. Suivi du recouvrement : taux de recouvrement par promotion, ancienneté des
+   impayés (balance âgée), top des débiteurs, prévisions d'encaissement.
+5. Notifications : échéance à venir, impayé, relance, mise en demeure,
+   régularisation.
+6. Tests : détection des impayés, niveaux de relance, file SMS sans
+   fournisseur (statut correct), rapprochement avec écart, balance âgée exacte.
+
+DoD
+[ ] relances automatiques multi-niveaux avec modèles
+[ ] couche d'abstraction de canaux, fournisseur configurable
+[ ] rapprochement comptable avec écarts et régularisations
+[ ] balance âgée + taux de recouvrement
+[ ] tests verts

@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P05-02 — INSCRIPTIONS PÉDAGOGIQUES EN MASSE ET PASSERELLES
+================================================================================
+P05-02 — INSCRIPTIONS PÉDAGOGIQUES EN MASSE ET PASSERELLES
+Lot 5 | 1 séance | Dépendances : P04-02, P05-01 | Module réf. : 03, 04
+Risques couverts : R1 | Type : UI + workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'inscription pédagogique (IP) existe et le dépôt mentionne une route
+« passerelle » imbriquée. Le modèle de référence prévoit l'IP automatique selon
+la maquette active du semestre, la répartition en groupes pédagogiques, la
+dette académique et les passerelles entre formations.
+
+MISSION
+Industrialiser l'IP en masse et formaliser les passerelles.
+
+CONSIGNES
+1. IP en masse : depuis un groupe ou une promotion, inscription automatique à
+   tous les ECUE de la maquette ACTIVE du semestre, avec rapport (inscrits,
+   ignorés et pourquoi, erreurs).
+2. IP individuelle : inscription/désinscription à un ECUE précis, avec
+   contrôle de prérequis et de chevauchement, motivée et tracée.
+3. Dette académique : affichage des ECUE non validés des semestres antérieurs,
+   réinscription automatique aux ECUE dus selon les règles paramétrables,
+   plafond de dette paramétrable avec alerte.
+4. Passerelles : procédure formalisée de changement de formation/parcours avec
+   équivalences (réutilise l'app equivalences, ne crée pas de doublon),
+   validation à deux niveaux, conservation de l'historique.
+5. Vue « Suivi des IP » par groupe et par semestre : taux d'inscription,
+   ECUE non pourvus, étudiants sans IP complète.
+6. Tests : IP en masse avec rapport, dette paramétrée, passerelle avec
+   équivalences, refus de chevauchement.
+
+DoD
+[ ] IP en masse avec rapport motivé
+[ ] dette académique paramétrable et affichée
+[ ] passerelles formalisées via equivalences (aucun doublon)
+[ ] suivi des IP par groupe/semestre
+[ ] tests verts

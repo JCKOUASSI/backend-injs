@@ -1,0 +1,72 @@
+================================================================================
+PROMPT P01-02 — RÉFÉRENTIELS CAMPUS : SITE → ZONE → BÂTIMENT → ÉTAGE → ESPACE
+================================================================================
+P01-02 — RÉFÉRENTIELS CAMPUS : SITE → ZONE → BÂTIMENT → ÉTAGE → ESPACE
+Lot 1 | 2 séances | Dépendances : P01-01 | Module réf. : 01, 07 · DA-02
+Risques couverts : E5 | Type : Référentiel
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt possède déjà RefSite, RefSalle et RefBatiment dans l'app formations,
+avec geofence_latitude / geofence_longitude / geofence_radius_m sur les sites.
+Le modèle de référence exige une hiérarchie complète
+SITE → ZONE → BÂTIMENT → ÉTAGE → ESPACE avec un TypeEspace extensible couvrant
+aussi les infrastructures sportives (gymnase, terrains, piscine, piste
+d'athlétisme, stade, salle de musculation, salle de combat, salle polyvalente),
+une capacité normale ET maximale, une surface, et des équipements comme objets
+indépendants.
+RÈGLE DE RÉFÉRENCE : ne PAS créer une table Django par type d'infrastructure
+(pas de table Piscine, Gymnase, Terrain…). Un seul objet ESPACE typé.
+
+MISSION
+Compléter la hiérarchie campus sans casser RefSalle ni le geofencing existant.
+
+CONSIGNES
+1. Inventorie RefSite, RefSalle, RefBatiment : champs exacts, relations, usages
+   (recherche dans backend et frontend), et ce qui est déjà conforme.
+2. Crée les objets manquants :
+   - RefZone (code, libellé, type [administrative, pédagogique, sportive,
+     résidentielle, technique], site, surface, description, statut) ;
+   - Etage (code [RDC, R+1, R-1…], ordre, bâtiment, description, statut) ;
+   - RefTypeEspace (code, libellé, famille [enseignement, sport,
+     administration, technique], caractéristiques spécialisées en JSON :
+     éclairage, vestiaires, gradins, audiovisuel, informatique, matériel
+     sportif, lignes de terrain, chronométrage) ;
+   - Étends RefSalle (ou introduis Espace comme vue unifiée si c'est moins
+     risqué) avec : zone, etage, type_espace, capacite_normale,
+     capacite_maximale, surface, statut [DISPONIBLE, OCCUPE, MAINTENANCE,
+     HORS_SERVICE, FERME], geofence éventuel au niveau de l'espace.
+   DÉCISION À DOCUMENTER : justifie par écrit (ADR-006) le choix entre
+   « étendre RefSalle » et « créer Espace + vue de compatibilité ». Critère :
+   zéro régression sur les prefetch existants et sur le geofencing.
+3. Les ÉQUIPEMENTS restent gérés par patrimoine.Equipement, rattaché à
+   l'espace par clé étrangère nullable. Ne crée pas de doublon.
+4. Assure la compatibilité ascendante : tout code qui filtrait sur RefSalle
+   continue de fonctionner ; ajoute des propriétés d'alias si nécessaire.
+5. Migration de données : rattache les salles existantes à un bâtiment/étage/
+   type par défaut, en mode DRY-RUN d'abord, puis application, puis contrôle.
+   Fournis un rapport de migration (avant/après, orphelins).
+6. Ajoute les commandes init_referentiels_campus (graines des types d'espace et
+   des zones types, paramétrables) et check_campus_integrity (orphelins,
+   cycles, capacités incohérentes, salle sans type).
+7. Admin Django : inlines hiérarchiques Site → Zone → Bâtiment → Étage → Espace.
+8. API REST : /api/referentiels/campus/… (lecture/écriture selon droits),
+   filtres par site/zone/bâtiment/étage/type, occupation d'un espace sur une
+   période (réutilise le contrat EDT existant).
+9. Écran React « Référentiels → Campus » : arbre navigable + fiche détail +
+   capacités + équipements + occupation. Identité visuelle INJS conservée.
+
+INTERDITS
+- Ne crée aucune table par type d'infrastructure.
+- Ne casse ni RefSalle ni le geofencing des sites.
+- Ne code en dur aucune salle, zone ni bâtiment de l'INJS : données
+  administrables uniquement.
+
+DoD
+[ ] hiérarchie complète en place, ADR-006 écrit
+[ ] migration dry-run + application + contrôle, rapport produit
+[ ] init_referentiels_campus et check_campus_integrity verts
+[ ] API + écran arbre campus fonctionnels
+[ ] smoke_test_injs toujours vert

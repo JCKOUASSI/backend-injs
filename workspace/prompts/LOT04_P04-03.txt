@@ -1,0 +1,57 @@
+================================================================================
+PROMPT P04-03 — D1 : scolarite.Groupe COMME SOURCE DE VÉRITÉ, TEXTE LEGACY EN LECTURE
+================================================================================
+P04-03 — D1 : scolarite.Groupe COMME SOURCE DE VÉRITÉ, TEXTE LEGACY EN LECTURE
+Lot 4 | 2 séances | Dépendances : P01-01 | Module réf. : 03 · D1
+Risques couverts : R3 | Type : Données
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Double représentation D1 : scolarite.Groupe + AffectationGroupe (LMD) coexistent
+avec Participant.groupe et Module.groupe en texte libre (formation continue
+legacy). Le rapport de mise en œuvre tranche : « scolarite.Groupe +
+AffectationGroupe est la source de vérité LMD exclusive. Les colonnes legacy
+Participant.groupe et Module.groupe sont maintenues synchronisées en LECTURE
+SEULE pour les anciens modules de formation continue. »
+
+MISSION
+Faire de scolarite.Groupe la source unique, mettre les champs texte en lecture
+seule synchronisée, sans casser les écrans de formation continue.
+
+CONSIGNES
+1. Cartographie tous les usages de Participant.groupe et Module.groupe
+   (backend, frontend, exports, imports, statistiques). Publie la liste.
+2. Ajoute la clé étrangère nullable Participant.groupe_lmd → scolarite.Groupe
+   et Module.groupe_lmd → scolarite.Groupe. Migration réversible.
+3. Commande backfill_groupes_lmd (--dry-run / --auto / --interactive) : crée
+   les Groupes LMD manquants à partir des valeurs texte (avec rattachement à
+   l'année académique, la formation, le niveau), puis affecte. Rapport
+   obligatoire avant écriture.
+4. SYNCHRONISATION À SENS UNIQUE : toute affectation passe par AffectationGroupe
+   ; un signal maintient Participant.groupe (texte) à jour en lecture seule.
+   L'écriture directe sur le champ texte est refusée (validation au niveau du
+   modèle) avec un message explicite renvoyant vers l'affectation LMD.
+5. AFFICHAGE DUAL : les écrans affichent le groupe LMD (source) et, en
+   secondaire et visuellement distinct, la valeur texte legacy jusqu'à la fin
+   de la transition. Un indicateur signale les divergences.
+6. Ajoute check_groupes_integrity : Participant avec texte sans groupe LMD,
+   divergence texte/LMD, étudiant affecté à deux groupes LMD pour le même
+   semestre, groupe LMD sans formation ni niveau.
+7. Ajoute un indicateur de couverture (% de participants rattachés à un groupe
+   LMD) sur le tableau de bord.
+8. Tests : refus d'écriture directe sur le champ texte, synchronisation
+   correcte, divergence détectée, non-régression des exports et statistiques
+   qui lisaient le champ texte.
+
+INTERDITS
+- Ne supprime pas les champs texte : ils restent, en lecture seule.
+- Ne casse aucun export ni aucune statistique existante.
+
+DoD
+[ ] FK nullable + backfill dry-run/auto/interactive + rapport
+[ ] écriture directe sur le texte refusée, synchronisation à sens unique
+[ ] affichage dual avec indicateur de divergence
+[ ] check_groupes_integrity vert, indicateur de couverture affiché
+[ ] exports et statistiques existants inchangés (tests)

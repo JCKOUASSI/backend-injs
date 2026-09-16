@@ -1,0 +1,40 @@
+================================================================================
+PROMPT P02-05 — TRAÇABILITÉ DES ACTES ACADÉMIQUES : TABLEAU DE BORD D'INTÉGRITÉ
+================================================================================
+P02-05 — TRAÇABILITÉ DES ACTES ACADÉMIQUES : TABLEAU DE BORD D'INTÉGRITÉ
+Lot 2 | 1 séance | Dépendances : P02-01 à P02-03 | Module réf. : 18
+Risques couverts : R8, R3 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Les prompts P02-01 à P02-04 ont ajouté des verrous, des journaux immuables, des
+ponts de données et un moteur de validation. La direction doit pouvoir vérifier
+en un coup d'œil que l'intégrité académique tient.
+
+MISSION
+Livrer un tableau de bord d'intégrité académique qui agrège tous les contrôles.
+
+CONSIGNES
+1. Crée un endpoint /api/core/integrite/ (ADMIN, DIRECTION) qui exécute et
+   agrège : check_maquettes_integrity, verify_notes_chain, check_ects_integrity,
+   check_parametres_academiques, audit_integrity_check, check_campus_integrity.
+2. Chaque contrôle retourne : nom, statut (OK / ATTENTION / ERREUR), nombre
+   d'éléments concernés, liste limitée des premiers éléments, lien vers
+   l'écran de correction.
+3. Ajoute un écran « Intégrité académique » (ADMIN/DIRECTION) : pastilles de
+   statut, horodatage de la dernière exécution, bouton « relancer les
+   contrôles », export PDF du rapport.
+4. Ajoute une exécution planifiée (service cron Docker déjà en place)
+   quotidienne, avec notification aux ADMIN en cas d'erreur.
+5. Ajoute ces contrôles à la CI en mode non bloquant d'abord, puis bloquant
+   après stabilisation.
+6. Tests : chaque contrôle est testé avec un jeu de données volontairement
+   corrompu (le contrôle doit le détecter) et avec un jeu sain (il doit passer).
+
+DoD
+[ ] /api/core/integrite/ agrège les 6 contrôles
+[ ] écran + export PDF + exécution planifiée
+[ ] chaque contrôle testé sur données saines ET corrompues
+[ ] notifications en cas d'erreur

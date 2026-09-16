@@ -1,0 +1,41 @@
+================================================================================
+PROMPT P04-08 — GROUPES PÉDAGOGIQUES : CAPACITÉ, AFFECTATION EN MASSE ET CONTRÔLES
+================================================================================
+P04-08 — GROUPES PÉDAGOGIQUES : CAPACITÉ, AFFECTATION EN MASSE ET CONTRÔLES
+Lot 4 | 1 séance | Dépendances : P04-03 | Module réf. : 03, 04
+Risques couverts : R3 | Type : UI + règles
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'écran Groupes.jsx existe, scolarite.Groupe et AffectationGroupe sont en place,
+et D1 vient d'être résorbé (P04-03). Le modèle de référence exige capacité,
+effectif réel, saturation et affectation en masse.
+
+MISSION
+Fiabiliser la gestion des groupes : capacité, effectifs, affectations en masse,
+contrôles et alertes.
+
+CONSIGNES
+1. Vérifie et complète Groupe : code métier, année académique, formation,
+   parcours, niveau, semestre, capacite_maximale, effectif_reel (calculé, jamais
+   saisi), responsable, statut.
+2. Affectation en masse : depuis une liste d'étudiants (filtres, sélection
+   multiple, import Excel dry-run), avec contrôle de capacité, de prérequis et
+   de double affectation. Rapport de résultat obligatoire (affectés, refusés et
+   pourquoi).
+3. Mouvements : changement de groupe motivé et tracé, avec conservation de
+   l'historique (un étudiant peut avoir changé de groupe en cours de semestre).
+4. Alertes : groupe saturé, groupe sous-effectif (seuil paramétrable), groupe
+   sans responsable.
+5. Vues : effectifs par formation/niveau/semestre, répartition, groupes
+   surchargés. Export des listes de classe (réutilise l'export existant).
+6. Tests : capacité refusée, double affectation refusée, mouvement tracé,
+   effectif_reel toujours cohérent avec AffectationGroupe.
+
+DoD
+[ ] capacité + effectif calculé + responsable + statut
+[ ] affectation en masse avec rapport motivé
+[ ] mouvements tracés, alertes paramétrables
+[ ] effectif_reel cohérent (test d'invariant)

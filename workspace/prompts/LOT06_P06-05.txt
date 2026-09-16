@@ -1,0 +1,56 @@
+================================================================================
+PROMPT P06-05 — CONTRAT EDT v1.1 ET INGESTION DU PLANIFICATEUR EXTERNE
+================================================================================
+P06-05 — CONTRAT EDT v1.1 ET INGESTION DU PLANIFICATEUR EXTERNE
+Lot 6 | 2 séances | Dépendances : P06-03 | Module réf. : 06 · DA-09
+Risques couverts : E4, E15 | Type : Intégration
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt expose un contrat de données en lecture seule /api/scolarite/edt/
+(documenté dans docs/EDT_CONTRAT_DONNEES.md) vers le planificateur externe
+app-ept-injs-lmd 2026, avec les routes : contrat, groupes, enseignements,
+etudiants, indisponibilites, creneaux, affectations, espaces/<id>/occupation.
+Le rapport de mise en œuvre prévoit l'ingestion du planning planifié en
+instances SessionModule et AffectationCreneau avec contrôles d'intégrité.
+
+MISSION
+Versionner et compléter le contrat sortant, et livrer l'ingestion entrante avec
+contrôles automatiques.
+
+CONSIGNES
+1. Vérifie l'existant : routes réelles, schémas de réponse, authentification,
+   pagination. Compare au contrat documenté et publie les écarts.
+2. Versionne le contrat (v1.1) : en-tête de version sur chaque réponse,
+   route /api/scolarite/edt/contrat décrivant la version, la volumétrie et les
+   garanties. Ajoute le calendrier académique (P01-04) et les contraintes
+   (P06-01) au contrat, car le planificateur en a besoin.
+3. Ne casse JAMAIS le contrat existant : le test compare_api_contract (P00-08)
+   garantit qu'aucune clé ni route ne disparaît. Toute évolution est additive.
+4. INGESTION ENTRANTE : endpoint et commande ingest_planning_edt qui reçoit un
+   planning (format documenté), le valide, et crée les SessionModule et
+   AffectationCreneau correspondants. Contrôles d'intégrité automatiques :
+   - collision de salle (espace occupé sur le même créneau) ;
+   - collision d'enseignant (affecté simultanément sur deux cours) ;
+   - chevauchement de groupe (deux créneaux en parallèle) ;
+   - capacité insuffisante ;
+   - enseignant indisponible ;
+   - date hors période autorisée.
+   Chaque rejet est expliqué et le lot est traité de façon ATOMIQUE
+   (tout ou rien), avec rapport détaillé.
+5. Deux modes : --dry-run (rapport sans écriture) et application. Idempotence :
+   ré-ingérer le même planning ne crée pas de doublons (clé d'identité de
+   séance documentée).
+6. Une séance ingérée est immédiatement disponible pour la génération du QR
+   Code de présence (lien avec le LOT 7) : vérifie ce point explicitement.
+7. Tests : chaque contrôle d'intégrité, atomicité du lot, idempotence,
+   compatibilité ascendante du contrat, disponibilité du QR après ingestion.
+
+DoD
+[ ] contrat v1.1 versionné, additif, test de contrat vert
+[ ] ingestion avec 6 contrôles d'intégrité expliqués
+[ ] atomicité + idempotence + mode dry-run
+[ ] séance ingérée immédiatement badgeable (test)
+[ ] docs/EDT_CONTRAT_DONNEES.md mis à jour

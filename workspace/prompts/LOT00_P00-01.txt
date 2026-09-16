@@ -1,0 +1,95 @@
+================================================================================
+PROMPT P00-01 — RE-AUDIT À CHAUD ET BASELINE DE NON-RÉGRESSION
+================================================================================
+P00-01 — RE-AUDIT À CHAUD ET BASELINE DE NON-RÉGRESSION
+Lot 0 | 1 séance | Dépendances : aucune | Module réf. : ÉTAPE 0
+Risques couverts : R4, R5 | Type : LECTURE SEULE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+Tu travailles sur le projet INJS-LMD 2026 (app-injs-lmd2026demo).
+
+IMPORTANT : cette tâche est UNIQUEMENT une tâche d'audit et de lecture.
+NE MODIFIE AUCUN FICHIER. NE CRÉE AUCUN FICHIER SAUF LE RAPPORT DEMANDÉ.
+NE SUPPRIME RIEN. NE LANCE AUCUNE MIGRATION. NE MODIFIE PAS LA BASE DE DONNÉES.
+NE FAIS AUCUN COMMIT GIT.
+
+CONTEXTE
+Un audit daté du 11/09/2026 (commit de référence 1ec2515) décrit l'état du
+dépôt. Cet audit est ton HYPOTHÈSE DE TRAVAIL, pas une vérité : tu dois la
+vérifier ligne par ligne, car le dépôt a pu évoluer depuis.
+
+MISSION
+Établir l'état RÉEL et ACTUEL de l'application, et produire une baseline de
+non-régression chiffrée qui servira de référence à toute la refonte.
+
+CONSIGNES
+1. Affiche : répertoire courant, arborescence principale (2 niveaux), branche
+   Git, git status, 10 derniers commits.
+2. Identifie et VÉRIFIE les versions réelles : Python, Django, DRF, Node,
+   React, Vite, Flutter, PostgreSQL/SQLite, Redis. Cite le fichier source de
+   chaque version.
+3. Compte et liste les applications Django (INSTALLED_APPS), le nombre de
+   modèles, le nombre de fichiers de migrations. Compare à l'audit
+   (20 apps / 133 modèles / 184 migrations) et SIGNALE TOUT ÉCART.
+4. Compte et liste les routes API racines et le nombre total de routes.
+   Vérifie /api/health/ et /api/docs/.
+5. Identifie les modèles Django concernant : utilisateurs, rôles, permissions,
+   formations, modules, étudiants, enseignants, emplois du temps, présences,
+   notes, finances, campus, documents.
+6. Identifie les écrans frontend existants (pages/) et les routes de App.jsx.
+   Compte réellement les routes (l'audit en annonce 53) et SIGNALE tout écart.
+7. Identifie le système de navigation existant (menu latéral) et le système de
+   rôles/permissions existant, notamment le mapping N0–N4 et les 12 rôles.
+8. Identifie les variables d'environnement utilisées (fichiers .env.example,
+   settings.py, docker-compose, CI).
+9. Vérifie s'il existe des références à SYGEP-CPFAE, QR Badge, MEMFPMA, DFRC,
+   anciens logos, anciennes routes, anciennes API. Liste chaque occurrence avec
+   fichier et numéro de ligne.
+10. Vérifie les migrations non appliquées SANS les exécuter
+    (makemigrations --check --dry-run, showmigrations).
+11. Compte les tests existants (fichiers, méthodes, lignes) par app Django.
+    Exécute la suite complète et DONNE LE NOMBRE EXACT de tests passés/échoués.
+12. Vérifie les scripts npm disponibles et les commandes de démarrage
+    backend/frontend/mobile.
+13. Lance npm run lint et flutter analyze et DONNE les chiffres exacts
+    (erreurs, avertissements, lignes).
+14. Repère les 10 fichiers les plus volumineux du dépôt (backend, frontend,
+    mobile) avec leur nombre de lignes exact.
+15. Liste les fichiers de données versionnés (xlsx, csv, .numbers, dossiers
+    de données nominatives, staticfiles/) avec leur taille.
+16. NE CORRIGE RIEN.
+
+LIVRABLES
+Un unique fichier docs/audits/BASELINE_2026-09.md contenant le rapport
+structuré en sections :
+  A. Architecture réelle
+  B. Backend (apps, modèles, migrations, routes, admin)
+  C. Frontend (pages, routes, services, hooks, CSS)
+  D. Mobile (lib/, tests, assets)
+  E. Base de données (moteur, migrations appliquées)
+  F. Authentification et permissions N0–N4 (matrice réelle)
+  G. API (index des routes par domaine)
+  H. Modules déjà présents (table de maturité 0→3 par domaine)
+  I. Écrans déjà présents (liste + nombre d'appels API par domaine)
+  J. Problèmes détectés
+  K. Risques
+  L. Éléments manquants par rapport au modèle fonctionnel de référence
+  M. BASELINE CHIFFRÉE (tableau à mettre à jour après chaque lot)
+  N. Recommandation pour la prochaine étape
+
+DoD
+[ ] AUCUN fichier modifié, créé (hors le rapport), supprimé ; aucune migration
+    exécutée ; aucun commit Git (preuve : git status et git diff vides)
+[ ] docs/audits/BASELINE_2026-09.md créé avec les 14 sections A → N
+[ ] Chiffres réels publiés : nombre d'apps, de modèles, de migrations, de
+    routes, de tests passés/échoués, d'avertissements lint
+[ ] Écarts entre l'audit du 11/09/2026 et la réalité listés explicitement
+[ ] Les 10 incohérences de la PARTIE J vérifiées une par une (J.1 → J.10)
+
+RAPPORT
+Restitue : les écarts constatés entre l'audit et la réalité (liste exhaustive),
+les 3 chiffres clés de la baseline (tests, lint, fichiers géants), et la
+prochaine étape unique recommandée. Ne propose aucune modification automatique.
+ATTENDS MA VALIDATION AVANT TOUTE MODIFICATION.

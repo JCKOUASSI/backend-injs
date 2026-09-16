@@ -1,0 +1,653 @@
+================================================================================
+MODE OPÉRATOIRE — EXÉCUTER LA REFONTE « app-injs-lmd2026 » DANS ARENA MODE
+================================================================================
+INJS Marcory — Côte d'Ivoire · LMD 2026
+Document d'exploitation : comment transformer les 92 prompts en application
+réellement refondue, session Arena par session Arena.
+
+Règle d'or, rappelée en tête de tout : l'application existante reste
+fonctionnelle, opérationnelle et performante pendant toute la refonte.
+Aucun big-bang. Chaque prompt est un incrément validé ou n'est pas.
+
+================================================================================
+SOMMAIRE
+================================================================================
+   0. Constat de l'environnement Arena (vérifié le 11/09/2026)
+   1. Les artefacts et leur rôle dans la boucle
+   2. ÉTAPE 0 — Amener le code dans le workspace
+   3. ÉTAPE 1 — Bootstrap de session
+   4. ÉTAPE 2 — Probe et baseline de non-régression (P00-01)
+   5. ÉTAPE 3 — La boucle unitaire : un prompt = une session
+   6. ÉTAPE 4 — Les gates de vague
+   7. ÉTAPE 5 — Déroulé des 10 vagues, session par session
+   8. Les serveurs de développement sous Arena
+   9. Aléas propres à Arena et leurs parades
+  10. Recette et mise en production
+  11. Pilotage du classeur
+  12. Checklist de démarrage
+  ANNEXE — Les 4 scripts livrés avec ce mode opératoire
+
+
+================================================================================
+0. CONSTAT DE L'ENVIRONNEMENT ARENA (vérifié le 11/09/2026)
+================================================================================
+
+0.1 CE QUI EST MESURÉ, PAS SUPPOSÉ
+---------------------------------------------------------------------------
+Relevé exécuté dans le sandbox avant la rédaction de ce document :
+
+  git ............... 2.47.3              présent
+  python3 ........... 3.13.14             présent   <-- le projet vise 3.12
+  pip ............... 26.1.2              présent
+  node .............. v20.20.2            présent
+  npm ............... 10.8.2              présent
+  SQLite ............ 3.46.1 (module)     présent   (pas de client sqlite3)
+  Espace disque ..... 20 Go libres        suffisant
+  Réseau pypi.org ... HTTP 200            présent
+  Réseau github.com . HTTP 200            présent
+
+  Django, djangorestframework, psycopg2 ..... ABSENTS (installables via pip)
+  PostgreSQL (psql) ......................... ABSENT
+  Docker .................................... ABSENT
+  Flutter ................................... ABSENT
+  python3.12 / uv / pyenv / virtualenv ...... ABSENTS
+  pnpm / yarn ............................... ABSENTS
+
+Le workspace ne contient QUE de la documentation. Aucun code applicatif.
+
+0.2 LES QUATRE CONSÉQUENCES OPÉRATIONNELLES
+---------------------------------------------------------------------------
+Ces contraintes ne sont pas des détails : elles changent la façon de travailler.
+
+(a) AUCUN SERVEUR POSTGRESQL, AUCUN DOCKER.
+    La suite de tests Django ne peut pas s'exécuter sur la base de production.
+    Parade : un overlay de réglages bascule sur SQLite en mémoire pour les
+    tests (généré par le bootstrap). LIMITES À CONNAÎTRE : si le projet active
+    django.contrib.postgres, ou s'il emploie des recherches vectorielles, des
+    opérateurs JSONB ou des expressions SQL propres à PostgreSQL, ces tests
+    échoueront sur SQLite. L'overlay émet un avertissement explicite dans ce
+    cas. Les pistes concernées (LOT 9 finances, LOT 11 BI) doivent être
+    revalidées contre un PostgreSQL réel avant leur gate.
+
+(b) FLUTTER ABSENT.
+    Le troisième feu vert (flutter analyze) ne peut PAS être levé dans Arena.
+    Le script ne le simule jamais : il affiche « NON LEVABLE ». La piste
+    mobile est donc développée ici mais validée sur un poste équipé.
+    Conséquence de pilotage : prévoir ce contrôle hors sandbox à chaque gate
+    de vague, sinon on accumule de la dette invisible sur 20 semaines.
+
+(c) PYTHON 3.13 AU LIEU DE 3.12.
+    Certaines dépendances épinglées pour 3.12 peuvent refuser de s'installer
+    ou changer de comportement. Le bootstrap installe d'abord le
+    requirements.txt tel quel ; en cas d'échec il retente sans psycopg2 et
+    journalise tout dans arena/.bootstrap.log. Tout écart de version doit
+    être inscrit au registre des écarts (onglet « Écarts E »), pas corrigé
+    en silence.
+
+(d) LE SNAPSHOT NE CONSERVE PAS L'ENVIRONNEMENT D'EXÉCUTION.
+    Les fichiers sous /home/user persistent entre les sessions. Les dossiers
+    .venv, node_modules, dist, build, __pycache__ ne persistent PAS.
+    Conséquence : le code survit, l'environnement non. D'où le bootstrap
+    idempotent à relancer en début de chaque session (étape 1).
+    Autre limite : le snapshot est plafonné autour de 128 Mo et 10 000
+    fichiers. Ne jamais commiter node_modules ni les médias lourds.
+
+
+================================================================================
+1. LES ARTEFACTS ET LEUR RÔLE DANS LA BOUCLE
+================================================================================
+
+  Génération-prompts-refonte-app-injs-lmd2026.txt
+      LE RÉFÉRENTIEL. 5 626 lignes, parties A→J, 92 prompts.
+      On n'y touche pas pendant l'exécution : il fait foi. On le consulte
+      pour les règles maîtresses (B), les décisions d'architecture (C),
+      les 18 modules de référence (D), les écarts (E), la grille de
+      contrôle (G) et les incohérences tranchées (J).
+
+  prompts/LOTnn_Pxx-yy.txt  (92 fichiers)
+      LA MATIÈRE PREMIÈRE. Un prompt = un fichier = une session.
+      prompts/00-REGLES-MAITRESSES.txt se colle EN TÊTE de chaque session.
+
+  Plan-exécution-prompts-refonte-app-injs-lmd2026.txt
+      L'ORDONNANCEMENT. Dit quel prompt ouvrir, quand, sur quelle piste,
+      avec quels prérequis, et quelle gate ferme la vague.
+
+  Pilotage-refonte-app-injs-lmd2026.xlsx  (10 onglets)
+      LE TABLEAU DE BORD. Gantt, Prompts, Recette, Baseline, Décisions DA,
+      Risques R, Écarts E, Incohérences J, Synchronisations.
+      C'est le seul endroit où l'on écrit l'état d'avancement.
+
+  arena/  (livré avec ce mode opératoire)
+      bootstrap.sh ....... prépare l'environnement (idempotent)
+      probe.sh ........... mesure l'état réel du projet vs audit [S1]
+      feux-verts.sh ...... lève ou refuse les 3 feux verts d'un prompt
+      settings_sandbox.py  overlay SQLite/SMTP/broker (généré au bootstrap)
+
+  Principe de circulation : le livrable et le plan sont en LECTURE SEULE.
+  Le classeur est le seul document en ÉCRITURE. Un prompt ne se déclare
+  terminé que lorsque le classeur le dit.
+
+
+================================================================================
+2. ÉTAPE 0 — AMENER LE CODE DANS LE WORKSPACE
+================================================================================
+
+C'est l'étape bloquante : sans code, aucun des 92 prompts ne peut être
+exécuté. Trois voies, par ordre de préférence.
+
+VOIE A — CLONAGE GIT (recommandée)
+---------------------------------------------------------------------------
+Le réseau sortant fonctionne (github.com répond 200). Dans une session Arena :
+
+    cd /home/user
+    git clone <URL_DU_DEPOT> app-injs-lmd2026
+
+Puis, immédiatement, vérifier que la configuration et les secrets ne sont
+pas venus avec :
+
+    cd app-injs-lmd2026
+    ls -A | head -30
+    cat .gitignore
+
+Si le dépôt contient un fichier .env avec des identifiants réels, le sortir
+du workspace : le snapshot conserve les fichiers sous /home/user, et un
+secret commité par inadvertance serait un incident.
+
+VOIE B — ARCHIVE TÉLÉVERSÉE
+---------------------------------------------------------------------------
+Déposer l'archive dans la conversation. Elle arrive dans uploads/.
+ATTENTION SPÉCIFIQUE À CE WORKSPACE : les noms de fichiers accentués y sont
+encodés en NFD (accents décomposés), ce qui casse les citations shell.
+Ne jamais écrire le nom accentué entre guillemets dans une commande. Faire :
+
+    cd /home/user/uploads
+    for f in *.zip; do mv "$f" /home/user/projet.zip; done
+    cd /home/user && unzip -q projet.zip
+
+VOIE C — DÉPÔT VIDE, PROJET À RECONSTRUIRE
+---------------------------------------------------------------------------
+Si le code n'est pas récupérable, la refonte commence par la reconstruction
+du socle. Dans ce cas P00-01 change de nature : il ne mesure plus une
+baseline, il initialise le dépôt. Le signaler au pilote avant de commencer,
+car cela invalide une partie des chiffres de l'audit [S1].
+
+VÉRIFICATION OBLIGATOIRE APRÈS L'UNE OU L'AUTRE VOIE
+---------------------------------------------------------------------------
+    cd /home/user && bash arena/probe.sh
+
+Le rapport attendu doit montrer trois pistes détectées. Sur l'état actuel
+du workspace (documentation seule), il répond exactement :
+
+    backend  : manage.py introuvable — le code n'est pas dans le workspace
+    frontend : package.json introuvable
+    mobile   : pubspec.yaml introuvable (piste Flutter absente)
+    VERDICT : BLOQUANT — amenez d'abord le code dans le workspace.
+
+Tant que ce verdict est bloquant, ne pas ouvrir P00-01.
+
+
+================================================================================
+3. ÉTAPE 1 — BOOTSTRAP DE SESSION (à chaque ouverture de session)
+================================================================================
+
+    cd /home/user && bash arena/bootstrap.sh
+
+Ce que fait le script, dans l'ordre :
+
+  1. Localise les trois pistes (manage.py, package.json, pubspec.yaml).
+  2. Compare l'interpréteur à la cible 3.12 et signale l'écart.
+  3. Crée le venv s'il manque, met pip à jour, installe requirements.txt.
+     En cas d'échec, retente sans psycopg2 et journalise.
+  4. Installe les dépendances frontend (npm ci si package-lock.json existe,
+     npm install sinon).
+  5. Génère arena/settings_sandbox.py, overlay qui réimporte TOUS les
+     réglages réels du projet puis ne remplace que PostgreSQL, le SMTP et
+     le broker de tâches.
+  6. Écrit .gitignore-arena.
+
+Sortie attendue sur un projet sain :
+
+  == 1. Localisation des pistes
+    [ok] backend  : /home/user/<projet>/backend
+    [ok] frontend : /home/user/<projet>/frontend
+    [attention] mobile : pubspec.yaml introuvable (piste Flutter absente)
+  == 2. Interpréteur Python
+    [attention] Python 3.13 — le projet vise 3.12...
+  == 3. Dépendances Python
+    [ok] requirements installés
+    Django 5.1.4 sur Python 3.13.14
+  == 5. Réglages de sandbox (non invasifs)
+    [ok] arena/settings_sandbox.py écrit (overlay de <module>.settings)
+  PRÊT — Django (5, 1)
+
+L'overlay a été testé : il conserve bien INSTALLED_APPS du projet
+(vérifié : ['django.contrib.contenttypes', 'django.contrib.auth',
+'rest_framework', 'demo']) tout en imposant SQLite, ALLOWED_HOSTS=['*'],
+CSRF_TRUSTED_ORIGINS=['https://*.e2b.app'] et le backend courriel en mémoire.
+
+DURÉE : 2 à 5 minutes la première fois, quelques secondes ensuite.
+
+
+================================================================================
+4. ÉTAPE 2 — PROBE ET BASELINE DE NON-RÉGRESSION (P00-01)
+================================================================================
+
+    cd /home/user && bash arena/probe.sh
+
+Le probe compare le relevé réel à l'audit [S1]. Colonnes : RELEVÉ | AUDIT |
+ÉCART. Les mesures excluent .venv, node_modules et .git — sans cette
+exclusion on compte les sources de Django au lieu de celles du projet (un
+premier jet du script remontait 25 modèles sur une fixture qui n'en contient
+qu'un ; corrigé et revérifié).
+
+Points de comparaison utiles :
+
+  Applications Django ..................... 20
+  Modèles ................................. 133
+  Migrations .............................. 184
+  Lignes Python ........................... 88 068
+  Fichiers de tests ....................... 76
+  Méthodes de test ........................ 943
+  print() restants ........................ 288
+  select_related / prefetch_related ....... 359
+  Commandes de gestion .................... 31
+  Fichiers frontend ....................... 105  (~35 495 l.)
+  Fichiers de test frontend ............... 0
+  Fichiers > 650 lignes ................... 9  (max Statistiques.jsx 5 508)
+  Fichiers Dart ........................... 40  (7 818 l.)
+
+TRAITEMENT DES ÉCARTS. Tout écart entre le relevé et l'audit est un fait,
+pas une erreur du script. L'audit fait foi (incohérence J.8 tranchée : le
+rapport [S3] annonçant « 100 % opérationnel » ne prévaut pas). Chaque écart
+est inscrit à l'onglet « Écarts E » du classeur avec sa date et son arbitrage.
+
+Le probe écrit son rapport dans arena/probe-AAAAMMJJ-HHMM.txt. Ce fichier
+EST la baseline de P00-01 : le conserver, il servira de point de comparaison
+à chaque gate.
+
+
+================================================================================
+5. ÉTAPE 3 — LA BOUCLE UNITAIRE : UN PROMPT = UNE SESSION
+================================================================================
+
+C'est le cœur du dispositif. 92 fois, dans l'ordre du plan.
+
+5.1 OUVRIR LE BON PROMPT
+---------------------------------------------------------------------------
+Consulter le plan, section 6 (déroulé des vagues) ou l'onglet « Gantt » du
+classeur. Identifier le prompt du jour et VÉRIFIER SES PRÉREQUIS : annexe B
+du plan donne les dépendances de chacun des 92 prompts. Un prompt dont un
+prérequis n'est pas terminé ne s'ouvre pas.
+
+5.2 LE MESSAGE À ENVOYER DANS ARENA
+---------------------------------------------------------------------------
+Une session, un prompt, rien d'autre. Composer le message ainsi :
+
+    [1] Coller prompts/00-REGLES-MAITRESSES.txt          (les 22 règles)
+    [2] Coller prompts/LOTnn_Pxx-yy.txt                  (le prompt du jour)
+    [3] Ajouter le contexte de session, par exemple :
+
+        « Le code est dans /home/user/<projet>. L'environnement vient
+         d'être bootstrappé. Précédent prompt terminé : P0x-0y.
+         Exécute ce prompt dans le respect des 22 règles maîtresses.
+         Ne touche à aucun autre module. Termine par les 3 feux verts
+         via bash arena/feux-verts.sh P0x-0y et présente-moi le diff. »
+
+Pourquoi un seul prompt par session : la fenêtre de contexte d'une session
+n'absorbe pas plusieurs lots, et mélanger deux prompts produit des
+régressions croisées impossibles à attribuer.
+
+5.3 CE QUE LA SESSION DOIT PRODUIRE
+---------------------------------------------------------------------------
+  · du code, sur la piste concernée uniquement ;
+  · les migrations correspondantes, générées et nommées ;
+  · des tests : un prompt sans test n'est pas terminé ;
+  · le diff, présenté avant validation ;
+  · aucune modification hors périmètre du prompt.
+
+5.4 LES 3 FEUX VERTS
+---------------------------------------------------------------------------
+    bash arena/feux-verts.sh P0x-0y
+
+  FEU 1 — BACKEND : makemigrations --check --dry-run · check · test
+  FEU 2 — FRONTEND : lint · build · test
+  FEU 3 — MOBILE : flutter analyze  →  NON LEVABLE dans Arena
+
+Sortie réelle observée sur projet de test, cas passant :
+
+    FEU 1 backend  : VERT
+    FEU 2 frontend : VERT
+    FEU 3 mobile   : NON LEVABLE
+    contrôles verts : 6   rouges : 0   non levables : 1
+    VERDICT : GATE PASSÉE pour ce qui est vérifiable dans Arena.
+    [code de retour 0]
+
+Cas refusant, réellement observé :
+
+    [KO] tests Vitest — voir arena/feux-verts.log
+    FEU 2 frontend : ROUGE
+    VERDICT : GATE NON PASSÉE — corriger avant d'ouvrir le prompt suivant.
+    [code de retour 1]
+
+Règle absolue : code de retour 1 = le prompt n'est PAS terminé. On corrige
+dans la même session. On n'ouvre jamais le prompt suivant sur un rouge.
+
+Exception documentée : avant P00-04 (filet de sécurité Vitest), le feu 2
+« test » est rouge faute de tests existants. C'est attendu, et le script le
+dit. Ce n'est pas une dérogation silencieuse.
+
+5.5 COMMIT ET TRAÇABILITÉ
+---------------------------------------------------------------------------
+    cd /home/user/<projet>
+    git add -A
+    git status                      # vérifier : ni .venv, ni node_modules
+    git commit -m "P0x-0y — <titre du prompt> [LOT n]"
+
+Un commit par prompt. Le message porte l'identifiant du prompt : c'est ce
+qui permet de rejouer le rollback niveau 2 (revert du commit) décrit dans
+la partie G du livrable.
+
+Puis mettre à jour le classeur, onglet « Prompts » : statut, date, commit,
+et le jalon éventuellement atteint.
+
+
+================================================================================
+6. ÉTAPE 4 — LES GATES DE VAGUE
+================================================================================
+
+Dix gates, G1 à G10, une par vague. Une gate ne se franchit pas au
+pourcentage d'avancement : elle se franchit sur des preuves.
+
+À CHAQUE GATE
+---------------------------------------------------------------------------
+  1. Tous les prompts de la vague sont au statut « terminé » dans le classeur.
+  2. bash arena/feux-verts.sh G<n> — vert sur les feux levables.
+  3. bash arena/probe.sh — comparaison avec la baseline : aucune régression
+     non expliquée. Une hausse du nombre de print() ou une baisse du nombre
+     de tests est une régression.
+  4. Les scénarios de recette de la vague (onglet « Recette », REC-01→REC-18)
+     sont joués et cochés.
+  5. Le feu 3 (Flutter) est validé hors sandbox — sinon la gate est
+     « passée sous réserve » et la réserve est inscrite au classeur.
+  6. Les risques R concernés sont re-cotés.
+  7. Le pilote signe. Sans signature, la vague suivante ne démarre pas.
+
+CE QUI BLOQUE UNE GATE
+---------------------------------------------------------------------------
+  · un feu rouge non traité ;
+  · une migration manquante (makemigrations --check non vide) ;
+  · un test désactivé pour passer ;
+  · une régression de la baseline non arbitrée ;
+  · une décision d'architecture (DA-01→DA-12) contredite par le code livré.
+
+
+================================================================================
+7. ÉTAPE 5 — DÉROULÉ DES 10 VAGUES, SESSION PAR SESSION
+================================================================================
+
+Rappel des chiffres : 92 prompts, 157 séances, 2 pistes, 84 jours ouvrés
+(environ 16,8 semaines ; compter 20 semaines avec 20 % de marges). Borne
+théorique infranchissable : 45 séances (chemin critique de dépendances).
+L'écart entre 45 et 84 vient de la contrainte de ressource — deux équipes
+seulement — pas des dépendances. Ajouter une troisième équipe n'accélère
+donc pas la livraison ; mieux vaut l'affecter à la recette.
+
+  V1  LOT 0 — Stabilisation et CI              J1 → J5    8 prompts
+      P00-01 probe/baseline, puis le filet de sécurité. NE RIEN RÉÉCRIRE.
+      Cette vague ne produit presque pas de fonctionnel : elle produit la
+      capacité à prouver qu'on ne casse rien. Ne pas la raccourcir.
+
+  V2  LOT 1 — core, référentiels, RBAC         J5 → J11   7 prompts
+      Fondation de tout le reste. DA-01 (20 apps conservées, création de
+      core/comptabilite/notifications uniquement) s'applique ici.
+
+  V3  LOT 2 — maquettes, notes, ECTS           J11 → J20  9 prompts
+      Verrou des maquettes actives (risque R8) et câblage NoteModule → ECUE
+      (double représentation D4).
+
+  V4  LOT 3 — admissions et concours           J20 → J31  10 prompts
+      Chaîne dépense. Risque R9 : concours partiellement écrantés.
+
+  V5  LOT 4 + LOT 5 — étudiants, pédagogie     J31 → J42  14 prompts
+      Plus grosse vague. Risque R3 (doubles représentations D1-D5) actif.
+
+  V6  LOT 6 + amorce LOT 10 — EDT, gabarit     J42 → J54  11 prompts
+      Contrat EDT v1.1 conservé en lecture seule (DA-09). Gabarit d'écrans
+      unique P06-06 : DA-08. Découpage de Statistiques.jsx (risque R4).
+
+  V7  LOT 7 + suite LOT 10 — présences, QR     J54 → J63  11 prompts
+      Chaîne anti-fraude : QRToken 24 h, DeviceBinding, geofencing.
+
+  V8  LOT 8 + fin LOT 9B — évaluations, jurys  J63 → J71  8 prompts
+      9 états de jury, PV immuables.
+
+  V9  LOT 9A + LOT 11B — finances, BI          J71 → J78  7 prompts
+      ATTENTION : les deux finances ne sont JAMAIS fusionnées (DA-07).
+      La BI est en lecture seule (DA-10). C'est la vague la plus exposée
+      à la limite PostgreSQL du sandbox : prévoir une revalidation sur
+      base réelle.
+
+  V10 LOT 11D + LOT 12 — portails, sécurité    J78 → J84  7 prompts
+      2FA/CSP, sauvegardes chiffrées, staging/CD, retrait du legacy.
+      Le retrait du legacy vient EN DERNIER (DA-12).
+
+AMORCES INDÉPENDANTES
+---------------------------------------------------------------------------
+Le graphe autorise à avancer certains prompts sur une piste libre, ce qui
+explique l'occupation de 93 % des pistes :
+  P09-05 → P09-10   (prérequis P01-01, P06-06, P06-07)
+  P11-01, P11-02    (prérequis P01-01)
+  P11-05            (prérequis P00-04)
+  P10-04, P10-05    (prérequis P06-06)
+
+MARGES
+---------------------------------------------------------------------------
+  41 prompts à marge nulle ....... tout retard retarde la livraison
+  44 prompts à marge ≤ 2 séances
+  23 prompts à marge > 20 ....... variables d'ajustement en cas d'aléa
+
+Quand un aléa survient, on absorbe d'abord sur les 23 prompts à forte marge.
+On ne touche aux 41 à marge nulle qu'en dernier recours, et en le décidant
+explicitement.
+
+
+================================================================================
+8. LES SERVEURS DE DÉVELOPPEMENT SOUS ARENA
+================================================================================
+
+Pour voir l'application tourner, deux règles impératives.
+
+RÈGLE 1 — UTILISER UN PROCESSUS D'ARRIÈRE-PLAN, PAS UNE COMMANDE
+---------------------------------------------------------------------------
+Une commande shell est tuée à la fin de son exécution : un serveur lancé
+ainsi meurt aussitôt. Les serveurs se lancent en processus d'arrière-plan
+persistant (start_process). Ne JAMAIS lancer `npm run dev` ou `runserver`
+via une commande simple.
+
+RÈGLE 2 — ÉCOUTER SUR 0.0.0.0 ET AUTORISER L'HÔTE DE PRÉVISUALISATION
+---------------------------------------------------------------------------
+La prévisualisation est servie sur un hôte dynamique de la forme
+https://{port}-{sandboxId}.e2b.app. Un serveur lié à 127.0.0.1 est
+invisible ; un serveur qui refuse cet hôte renvoie une erreur.
+
+  Backend Django — l'overlay le fait déjà (ALLOWED_HOSTS = ["*"],
+  CSRF_TRUSTED_ORIGINS = ["https://*.e2b.app"]). Lancement :
+
+      python manage.py runserver 0.0.0.0:8000 --settings=arena.settings_sandbox
+
+  Frontend Vite — ajouter dans vite.config.js :
+
+      server: {
+        host: true,          // écoute sur 0.0.0.0
+        port: 5173,
+        allowedHosts: ['.e2b.app'],
+        proxy: { '/api': 'http://localhost:8000' }   // proxy côté serveur
+      }
+
+  Point essentiel : le navigateur de l'utilisateur N'EST PAS le sandbox.
+  Le code côté navigateur ne doit jamais appeler localhost ou 127.0.0.1
+  pour joindre l'API. Utiliser des chemins relatifs (/api/...) et laisser
+  le serveur de dev proxyfier vers le backend.
+
+RÈGLE 3 — VÉRIFIER QUE LA PRÉVISUALISATION RÉPOND
+---------------------------------------------------------------------------
+Après lancement, interroger le port et contrôler le code HTTP. Une réponse
+de refus d'hôte ou un blocage d'iframe se corrige immédiatement, pas à la
+fin de la session.
+
+
+================================================================================
+9. ALÉAS PROPRES À ARENA ET LEURS PARADES
+================================================================================
+
+  ALÉA                                      PARADE
+  -----------------------------------------------------------------------
+  Environnement perdu entre sessions        bash arena/bootstrap.sh en
+  (.venv, node_modules non persistés)       tête de chaque session
+
+  Commande shell refusée pour taille        ne jamais coller un gros
+  (limite de 64 000 caractères)             contenu en heredoc : passer
+                                            par un fichier
+
+  Serveur tué en fin de commande            processus d'arrière-plan
+                                            persistant, port sur 0.0.0.0
+
+  Noms de fichiers accentués (NFD)          ne pas citer le nom ; itérer
+  qui cassent les commandes shell           (for f in *.zip) ou renommer
+
+  Tests PostgreSQL en échec sur SQLite      l'overlay avertit ; inscrire
+                                            l'écart ; revalider la piste
+                                            sur base réelle avant la gate
+
+  Flutter absent                            feu 3 « NON LEVABLE » : ne
+                                            jamais le présumer vert
+
+  Snapshot plafonné (~128 Mo, 10 000        ne pas commiter node_modules,
+  fichiers)                                 .venv, médias lourds, dumps
+
+  Processus d'arrière-plan non conservés    relancer les serveurs à chaque
+  entre les sessions                        session
+
+  Contexte de session saturé                un prompt par session, jamais
+                                            deux lots mélangés
+
+  Dépendance qui refuse de s'installer      lire arena/.bootstrap.log ;
+  sur Python 3.13                           inscrire l'écart ; ne pas
+                                            modifier le requirements.txt
+                                            sans arbitrage
+
+
+================================================================================
+10. RECETTE ET MISE EN PRODUCTION
+================================================================================
+
+10.1 RECETTE FONCTIONNELLE
+---------------------------------------------------------------------------
+18 scénarios, REC-01 à REC-18, onglet « Recette » du classeur. Chacun est
+joué à la gate de sa vague, puis rejoué intégralement avant la mise en
+production. Un scénario se joue avec des données réalistes et un compte du
+rôle concerné — le RBAC de référence va de N0 (consultation très limitée) à
+N4 (administration), sur des périmètres allant de INJS_ENTIER à
+PROPRE_COMPTE.
+
+10.2 CONDITIONS DE MISE EN PRODUCTION
+---------------------------------------------------------------------------
+Ne pas déployer tant qu'un seul de ces points manque :
+
+  [ ] 92 prompts terminés, 10 gates signées
+  [ ] 18 scénarios de recette verts, rejoués
+  [ ] Feu 3 (Flutter) validé sur poste équipé
+  [ ] Piste LOT 9 et LOT 11 revalidées sur PostgreSQL réel
+  [ ] Restauration de sauvegarde TESTÉE (risque R10 : non testée à l'audit)
+  [ ] Staging et CD en place (risque R10 : absents à l'audit)
+  [ ] Sentry branché (risque R7 : absent à l'audit)
+  [ ] SMS branchés, SMTP de production en place (risque R11 : SMTP Gmail)
+  [ ] 2FA et CSP actifs (LOT 12)
+  [ ] Legacy retiré EN DERNIER, et seulement après bascule vérifiée (DA-12)
+  [ ] Feature flags tous désactivables en moins d'une minute (DA-06)
+
+10.3 ROLLBACK — TROIS NIVEAUX
+---------------------------------------------------------------------------
+  N1  Feature flag : désactivation en moins d'une minute. Premier réflexe.
+  N2  git revert du commit du prompt. C'est pourquoi un commit par prompt.
+  N3  Restauration de sauvegarde. scripts/backup_injs_lmd.sh, PostgreSQL
+      injs_lmd_current, empreinte SHA-256, ~/Backups/INJS-LMD. À tester
+      AVANT d'en avoir besoin.
+
+
+================================================================================
+11. PILOTAGE DU CLASSEUR
+================================================================================
+
+10 onglets, et qui écrit quoi :
+
+  Lisez-moi ......... mode d'emploi du classeur
+  Gantt ............. 92 barres sur 84 jours · 41 en rouge (marge nulle) ·
+                      amorces en ambre · fins de vague surlignées
+  Prompts ........... statut, dates, commit, prompt par prompt  ← À METTRE À JOUR
+  Recette ........... 18 scénarios, cochés à chaque gate
+  Baseline .......... 25 indicateurs relevés au probe
+  Décisions DA ...... 12 décisions, et leur application effective
+  Risques R ......... 12 risques, re-cotés à chaque gate
+  Écarts E .......... 17 écarts + ceux découverts en cours de route
+  Incohérences J .... 10 incohérences tranchées
+  Synchronisations .. 10 points où les deux pistes doivent se retrouver
+
+Rythme : mise à jour à chaque prompt terminé, relecture complète à chaque
+gate. Le classeur est la seule source d'état : si un prompt est fait mais
+non coché, il n'est pas fait.
+
+
+================================================================================
+12. CHECKLIST DE DÉMARRAGE
+================================================================================
+
+  [ ] Le code est dans le workspace
+  [ ] bash arena/probe.sh → trois pistes détectées, plus de verdict bloquant
+  [ ] Les écarts relevés vs audit [S1] sont inscrits à l'onglet « Écarts E »
+  [ ] bash arena/bootstrap.sh → « PRÊT »
+  [ ] Le dépôt git est initialisé et .gitignore-arena appliqué
+  [ ] Le pilote a signé le lancement de la V1
+  [ ] prompts/00-REGLES-MAITRESSES.txt est sous la main pour chaque session
+  [ ] On ouvre P00-01, et rien d'autre
+
+Première session type, en cinq commandes :
+
+    cd /home/user && bash arena/bootstrap.sh
+    bash arena/probe.sh
+    bash arena/feux-verts.sh P00-01
+    cd <projet> && git add -A && git commit -m "P00-01 — baseline [LOT 0]"
+    # puis mise à jour de l'onglet « Prompts » du classeur
+
+
+================================================================================
+ANNEXE — LES 4 SCRIPTS LIVRÉS AVEC CE MODE OPÉRATOIRE
+================================================================================
+
+  arena/bootstrap.sh ....... préparation d'environnement, idempotent
+  arena/probe.sh ........... mesure de l'état réel vs audit [S1]
+  arena/feux-verts.sh ...... les 3 feux verts ; code de retour 0 ou 1
+  arena/settings_sandbox.py  n'existe qu'APRÈS le premier bootstrap : il est
+                             généré par bootstrap.sh, car il doit réimporter
+                             le module de réglages réel du projet, découvert
+                             dans manage.py. Tant que le code n'est pas dans
+                             le workspace, ce fichier n'est pas produit.
+
+Les trois scripts shell ont été exécutés et vérifiés, y compris contre un
+projet Django réel de test : bootstrap installe les dépendances et génère
+l'overlay ; l'overlay conserve INSTALLED_APPS du projet (relevé :
+['django.contrib.contenttypes', 'django.contrib.auth', 'rest_framework',
+'demo']) tout en imposant SQLite, ALLOWED_HOSTS=['*'] et le courriel en
+mémoire ; probe compte juste une fois les exclusions en place (1 modèle,
+1 migration, 2 méthodes de test sur une fixture qui en contient exactement
+autant) ; feux-verts retourne 1 sur un feu rouge et 0 quand tout est vert,
+et affiche « NON LEVABLE » pour Flutter au lieu de simuler un succès.
+
+Ce qui n'a PAS pu être vérifié ici, faute de code applicatif dans le
+workspace : le comportement de ces scripts sur le vrai dépôt
+app-injs-lmd2026, en particulier la compatibilité de sa suite de tests avec
+SQLite. C'est précisément l'objet de P00-01.
+
+================================================================================
+FIN DU MODE OPÉRATOIRE
+================================================================================

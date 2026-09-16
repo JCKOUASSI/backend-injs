@@ -1,0 +1,66 @@
+================================================================================
+PROMPT P01-03 — RÉFÉRENTIELS MÉTIER RESTANTS ET PARAMÈTRES ACADÉMIQUES
+================================================================================
+P01-03 — RÉFÉRENTIELS MÉTIER RESTANTS ET PARAMÈTRES ACADÉMIQUES
+Lot 1 | 2 séances | Dépendances : P01-01 | Module réf. : 01
+Risques couverts : E16, R3 | Type : Référentiel
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence définit 19 référentiels. Le dépôt en couvre une partie
+(RefFormation, RefModule, RefGrade, RefVague, RefCategorie, RefSite, RefSalle,
+RefBatiment, RefTypeSecretariat, TypeFormation, Niveau, Parcours, Semestre,
+RegimeEtudes, StatutEtudiant, AnneeAcademique). Il manque ou il faut
+consolider : TypeEnseignement, TypeEvaluation, TypeDocument, Catégorie
+d'enseignement (CM/TD/TP/STAGE), et surtout les PARAMÈTRES ACADÉMIQUES qui
+doivent sortir les règles métier du code.
+
+MISSION
+Compléter les référentiels manquants et externaliser TOUTES les règles
+académiques paramétrables.
+
+CONSIGNES
+1. Inventorie précisément ce qui existe déjà (modèle, champs, usages) pour
+   chacun des 19 référentiels de référence. Produis un tableau
+   référentiel / modèle existant / écart / action.
+2. Crée ou complète :
+   - RefCategorieEnseignement : CM, TD, TP, STAGE (+ VH comme volume calculé,
+     PAS comme catégorie) ;
+   - RefTypeEnseignement : présentiel, distanciel, hybride, terrain,
+     laboratoire, pratique sportive, stage (distinct de la catégorie) ;
+   - RefTypeEvaluation : CC, CT, TP, EXAMEN, RATTRAPAGE, ORAL, PROJET, STAGE
+     avec coefficient, poids, durée, mode, note_max ;
+   - RefTypeDocument : PIECE_IDENTITE, DIPLOME_ANTERIEUR, CERTIFICAT,
+     CONVOCATION, ATTESTATION, RELEVE_NOTES, PV_JURY, DIPLOME, QUITTANCE,
+     CERTIFICAT_SCOLARITE… avec obligatoire, signature_requise, cachet_requis,
+     numerotation, duree_validite.
+3. Étends l'app parametres (Parametre + ParametreHistorique, déjà historisé)
+   avec un typage fort des paramètres académiques et des graines :
+   credits_licence (180), credits_master (120), credits_par_semestre (30),
+   note_minimale, seuil_validation_ue, regles_compensation
+   (semestrielle/annuelle), nb_tentatives, seuil_presence, regles_rattrapage,
+   delai_cloture_pointage, intervalle_heartbeat, duree_validite_qr.
+   Chaque valeur est un DÉFAUT documenté, modifiable par l'administration sans
+   toucher au code, avec historique.
+4. Ajoute une validation croisée des paramètres (cohérence crédits, bornes) et
+   une commande check_parametres_academiques.
+5. Remplace dans le code les constantes académiques codées en dur par la
+   lecture des paramètres. Liste chaque remplacement (fichier/ligne).
+6. Écrans : complète l'écran Paramètres existant (ne crée pas de doublon) avec
+   un onglet « Paramètres académiques » groupé, édition contrôlée par droits,
+   historique des modifications visible.
+7. Tests : chaque règle paramétrable a un test qui vérifie que le changement de
+   paramètre change le comportement (paramétrage → résultat attendu).
+
+INTERDITS
+- Ne code en dur aucune règle académique.
+- Ne crée pas de doublon de référentiel.
+
+DoD
+[ ] tableau des 19 référentiels complété et publié
+[ ] 4 référentiels manquants créés, graines chargées
+[ ] paramètres académiques typés, historisés, éditables par l'admin
+[ ] au moins 10 règles sorties du code, liste publiée
+[ ] tests paramétriques verts

@@ -1,0 +1,39 @@
+================================================================================
+PROMPT P09-04 — TABLEAU DE BORD FINANCE ÉTUDIANTE
+================================================================================
+P09-04 — TABLEAU DE BORD FINANCE ÉTUDIANTE
+Lot 9 | 1 séance | Dépendances : P09-01 à P09-03 | Module réf. : 11, 16
+Risques couverts : E2 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt possède FinanceDashboard.jsx pour la finance des FORMATEURS. Il
+n'existe pas de tableau de bord pour la finance ÉTUDIANTE. Les deux doivent
+rester distincts (D5).
+
+MISSION
+Livrer un tableau de bord dédié à la finance étudiante, strictement séparé du
+tableau de bord formateurs.
+
+CONSIGNES
+1. Indicateurs : montant facturé, encaissé, restant à recouvrer, taux de
+   recouvrement, impayés par ancienneté, avances, remboursements, nombre
+   d'étudiants à jour / en retard, prévisions d'encaissement.
+2. Vues par année académique, formation, niveau, catégorie d'étudiant, agent
+   de caisse.
+3. Alertes de seuil (réutilise statistiques.ConfigAlerteSeuil) : taux de
+   recouvrement sous le seuil, impayés critiques, clôture de caisse non faite.
+4. Exports PDF/Excel pour la direction financière et la comptabilité.
+5. Vérifie que ce tableau de bord n'affiche AUCUNE donnée de la finance
+   formateurs, et réciproquement : les deux écrans restent séparés, avec des
+   libellés sans ambiguïté.
+6. Tests : exactitude des indicateurs sur un jeu de référence, séparation
+   stricte des deux domaines (test explicite), alertes déclenchées.
+
+DoD
+[ ] tableau de bord finance étudiante livré
+[ ] séparation stricte avec la finance formateurs (test)
+[ ] alertes de seuil + exports
+[ ] indicateurs exacts sur jeu de référence

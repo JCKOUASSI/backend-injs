@@ -62,3 +62,10 @@ backend/.requirements-sans-pg.txt
 
 # Arena
 /.gitignore-arena
+
+# Artefacts de merge / caches locaux
+frontend/.vite/
+workspace/.pycache/
+**/.pycache/
+**/__pycache__/
+*.pyc

@@ -1,0 +1,47 @@
+================================================================================
+PROMPT P11-08 — STATISTIQUES LMD, RAPPORTS OFFICIELS ET EXPORTS
+================================================================================
+P11-08 — STATISTIQUES LMD, RAPPORTS OFFICIELS ET EXPORTS
+Lot 11 | 2 séances | Dépendances : P11-03, P11-04 | Module réf. : 16
+Risques couverts : R1 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt dispose d'un moteur d'exports (14 routes PDF/Excel) et de bilans
+existants (point journalier, bilan de fin de semestre, bilan FAC). Le modèle de
+référence exige des rapports périodiques, personnalisés, planifiés et
+comparables, ainsi que les statistiques officielles.
+
+MISSION
+Livrer le catalogue de rapports et les statistiques LMD manquantes.
+
+CONSIGNES
+1. Étends les statistiques aux indicateurs LMD : réussite par UE et par ECUE,
+   effectifs par niveau/parcours/groupe, taux d'abandon, taux de redoublement,
+   suivi des impayés, capacité et occupation des espaces, charges enseignants,
+   taux de présence, délai de traitement des dossiers.
+2. Rapports existants CONSERVÉS et branchés sur la couche BI (P11-03) : point
+   journalier, bilan de fin de semestre, bilan FAC. Aucune régression : les
+   valeurs produites doivent être identiques à celles d'aujourd'hui (test de
+   comparaison).
+3. Nouveaux rapports : bilan académique annuel, rapport de jury, rapport
+   financier annuel, rapport RH, rapport patrimoine, rapport d'activité
+   administratif.
+4. Rapports personnalisés : sélection de dimensions et de mesures (dans la
+   limite du catalogue), sauvegarde du modèle de rapport, réutilisation.
+5. Planification : génération automatique périodique avec envoi aux rôles
+   habilités (via le hub P11-01) et archivage GED (P10-05).
+6. Comparaisons : année N vs N-1, semestre vs semestre, formation vs formation.
+7. Tous les exports réutilisent le moteur existant (reportlab/openpyxl) : ne
+   crée pas un second moteur.
+8. Tests : comparaison des bilans existants (identiques), exactitude des
+   nouveaux rapports sur un jeu de référence, planification, comparaisons.
+
+DoD
+[ ] indicateurs LMD ajoutés au catalogue
+[ ] bilans existants inchangés (test de comparaison)
+[ ] 6 nouveaux rapports + rapports personnalisés
+[ ] planification + archivage GED
+[ ] tests verts

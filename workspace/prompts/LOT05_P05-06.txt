@@ -1,0 +1,35 @@
+================================================================================
+PROMPT P05-06 — TABLEAUX DE BORD PÉDAGOGIQUE ET RESPONSABLE DE FORMATION
+================================================================================
+P05-06 — TABLEAUX DE BORD PÉDAGOGIQUE ET RESPONSABLE DE FORMATION
+Lot 5 | 1 séance | Dépendances : P05-01 à P05-05 | Module réf. : 05, 16
+Risques couverts : R1 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 05 §21-22) prévoit un tableau de bord enseignant
+et un tableau de bord responsable pédagogique.
+
+MISSION
+Livrer les deux tableaux de bord pédagogiques, alimentés par les données réelles.
+
+CONSIGNES
+1. Tableau de bord ENSEIGNANT : mes affectations du semestre, ma charge
+   (prévue/réalisée), mes séances à venir, mes notes à saisir, mes
+   indisponibilités, mes encadrements, mes évaluations de satisfaction.
+2. Tableau de bord RESPONSABLE PÉDAGOGIQUE : effectifs par groupe, ECUE sans
+   enseignant, charges déséquilibrées, taux de saisie des notes, taux de
+   présence par ECUE, alertes de seuil.
+3. Les deux tableaux respectent strictement le périmètre de droits : un
+   enseignant ne voit que ses propres données (périmètre PROPRE_COMPTE /
+   MODULE).
+4. Indicateurs exportables (PDF/Excel) pour les conseils pédagogiques.
+5. Tests : périmètre de données par rôle (un enseignant n'accède pas aux
+   données d'un autre), exactitude des indicateurs sur un jeu de référence.
+
+DoD
+[ ] 2 tableaux de bord livrés
+[ ] périmètre de droits vérifié par test
+[ ] indicateurs exacts sur jeu de référence + exports

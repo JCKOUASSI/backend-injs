@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P09-10 — CLÔTURES, ÉTATS FINANCIERS ET TABLEAU DE BORD DIRECTION FINANCIÈRE
+================================================================================
+P09-10 — CLÔTURES, ÉTATS FINANCIERS ET TABLEAU DE BORD DIRECTION FINANCIÈRE
+Lot 9 | 2 séances | Dépendances : P09-05 à P09-09 | Module réf. : 12, 16
+Risques couverts : E3 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le Module 12 prévoit : contrôles, clôtures, rapports financiers, états
+financiers, archivage, audit, et un tableau de bord de la Direction financière
+présentant budget, recettes, dépenses, trésorerie, fournisseurs et étudiants.
+
+MISSION
+Livrer la clôture comptable, les états financiers et le tableau de bord de la
+direction financière.
+
+CONSIGNES
+1. Clôture d'exercice : procédure contrôlée et atomique avec checklist
+   obligatoire (toutes les factures traitées, toutes les écritures validées,
+   rapprochements faits, amortissements calculés, caisse clôturée), rapport de
+   pré-clôture listant les blocages, puis clôture N4 motivée et irréversible
+   (sauf réouverture exceptionnelle motivée et tracée).
+2. États financiers : balance générale, compte de résultat, bilan simplifié —
+   générés depuis les écritures validées, exportables PDF/Excel, avec empreinte
+   et date de génération.
+3. Tableau de bord Direction financière conforme au modèle de référence :
+   Budget (initial, révisé, engagé, liquidé, ordonnancé, payé, disponible, taux
+   d'exécution) · Recettes (prévues, constatées, encaissées, restant à
+   recouvrer) · Dépenses (engagées, réalisées, payées, en attente) · Trésorerie
+   (solde caisse, solde bancaire, total, mouvements récents, prévisions) ·
+   Fournisseurs (factures reçues, validées, en attente, échues, montant dû) ·
+   Étudiants (facturé, encaissé, impayés, avances, remboursements — remontée
+   analytique du Module 11).
+4. Rapports périodiques planifiés (mensuel, trimestriel, annuel) avec envoi aux
+   rôles habilités.
+5. Séparation stricte : ce tableau de bord CONSOLIDE analytiquement les deux
+   domaines financiers mais ne permet aucune écriture dans finances_etudiantes
+   ni dans formations.Finance* (lecture analytique, DA-07).
+6. Tests : checklist de pré-clôture, clôture irréversible, états financiers
+   exacts sur un jeu de référence, tableau de bord consolidé, absence
+   d'écriture croisée entre domaines.
+
+DoD
+[ ] clôture contrôlée, atomique, irréversible avec réouverture exceptionnelle
+[ ] 3 états financiers exportables avec empreinte
+[ ] tableau de bord complet (6 blocs du modèle de référence)
+[ ] rapports périodiques planifiés
+[ ] consolidation en lecture seule (test), tests verts

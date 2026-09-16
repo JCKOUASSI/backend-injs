@@ -1,0 +1,44 @@
+================================================================================
+PROMPT P10-08 — ARCHIVES, NUMÉROTATION CENTRALE ET VÉRIFICATION PUBLIQUE
+================================================================================
+P10-08 — ARCHIVES, NUMÉROTATION CENTRALE ET VÉRIFICATION PUBLIQUE
+Lot 10 | 1 séance | Dépendances : P10-05 à P10-07 | Module réf. : 14, 17
+Risques couverts : E10 | Type : Transverse
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Plusieurs modules produisent désormais des documents numérotés (convocations,
+diplômes, PV, quittances, ordres de mission, courriers, conventions,
+attestations). Le modèle de référence exige une numérotation cohérente et une
+vérification publique par QR.
+
+MISSION
+Centraliser la numérotation et la vérification publique de tous les documents.
+
+CONSIGNES
+1. Centralise la numérotation dans le BusinessCodeMixin (P01-01) : séquences
+   par type de document et par année, règles de format paramétrables
+   (RefTypeDocument.numerotation), atomicité, aucun trou ni doublon. Vérifie
+   que TOUS les modules l'utilisent et liste les exceptions à corriger.
+2. Vérification publique unique : un seul endpoint /api/public/verifier/
+   acceptant un numéro ou un QR, retournant le minimum d'information (existence,
+   type, date, titulaire si public) — aucune donnée sensible, avec limitation de
+   débit (throttling) pour empêcher l'énumération.
+3. Écran public de vérification (accessible sans authentification, préparé pour
+   le portail public P11-06) : saisie du numéro ou scan du QR, réponse claire
+   (document authentique / introuvable / révoqué).
+4. Archives : vue consolidée de tous les documents archivés avec recherche,
+   filtres par type/période/service, export d'inventaire.
+5. Statistiques documentaires : volume par type, par période, par service,
+   documents en attente de destruction.
+6. Tests : atomicité de la numérotation sous concurrence, vérification publique
+   sans fuite de données, throttling effectif, document révoqué signalé.
+
+DoD
+[ ] numérotation centralisée, atomique, sans trou ni doublon
+[ ] endpoint public unique avec throttling et sans donnée sensible
+[ ] écran public de vérification
+[ ] archives consolidées + statistiques
+[ ] tests verts

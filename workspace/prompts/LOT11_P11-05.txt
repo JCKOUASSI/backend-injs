@@ -1,0 +1,55 @@
+================================================================================
+PROMPT P11-05 — DÉCOUPAGE DES FICHIERS GÉANTS (FRONTEND ET BACKEND)
+================================================================================
+P11-05 — DÉCOUPAGE DES FICHIERS GÉANTS (FRONTEND ET BACKEND)
+Lot 11 | 3 séances | Dépendances : P00-04 | Module réf. : — · R4
+Risques couverts : R4 | Type : Dette technique
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Fichiers les plus volumineux identifiés par l'audit :
+  frontend  Statistiques.jsx 5 508 · ModuleDetail.jsx 1 937 ·
+            FormationDetail.jsx 1 818 · Dashboard.jsx 806 · Modules.jsx 795 ·
+            Formateurs.jsx 754 · Referentiels.jsx 747 ·
+            AnalyseQualitative.jsx 736
+  backend   formations/api_views.py 4 980 · exports/views.py 3 455 ·
+            presences/views.py 3 368 · statistiques/views.py 2 084 ·
+            dashboard/views_legacy.py 1 951 · import_excel.py 1 747 ·
+            formations/models.py 1 366 · scolarite/models.py 1 279
+Ces fichiers fragilisent la maintenance et la revue de code [S1 R4].
+
+MISSION
+Réduire la taille des fichiers géants SANS changer aucun comportement, en
+s'appuyant sur les tests comme filet.
+
+CONSIGNES
+1. Ordre de traitement : commence par les fichiers déjà couverts par des tests
+   (Vitest depuis P00-04), puis les autres. Ne découpe JAMAIS un fichier sans
+   filet de test préalable : si le test manque, écris-le d'abord.
+2. Frontend : extrais par responsabilité (hooks de données, sous-composants de
+   section, utilitaires de formatage, colonnes de tableaux) vers des dossiers
+   dédiés. La page devient un conteneur mince. Aucun changement de rendu.
+3. Backend : découpe les gros fichiers de vues en modules par ressource
+   (un fichier par domaine fonctionnel), SANS modifier les chemins d'URL ni les
+   noms de fonctions exposés. Les imports publics restent stables.
+4. Ne touche PAS aux fichiers de modèles dans ce prompt (les découper exige une
+   vigilance particulière sur les migrations) : documente le plan dans
+   docs/DECOUPAGE_MODELES.md pour un traitement ultérieur.
+5. dashboard/views_legacy.py : ne le découpe pas, il est isolé derrière un flag
+   (P07-05) et destiné au retrait (P12-05).
+6. À chaque étape : la suite complète des tests (backend + frontend) reste
+   verte, et le rendu est vérifié visuellement (captures avant/après).
+7. Publie le tableau avant/après : nombre de fichiers, lignes du plus gros
+   fichier, nombre de fichiers > 800 lignes.
+
+INTERDITS
+- Ne change aucun comportement, aucune URL, aucun nom de fonction publique.
+- Ne découpe pas un fichier non testé sans avoir écrit le test d'abord.
+
+DoD
+[ ] plus aucun fichier frontend > 800 lignes
+[ ] plus aucun fichier de vues backend > 1 000 lignes
+[ ] tests verts à chaque étape, captures avant/après
+[ ] tableau avant/après publié, docs/DECOUPAGE_MODELES.md écrit

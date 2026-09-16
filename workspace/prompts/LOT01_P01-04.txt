@@ -1,0 +1,53 @@
+================================================================================
+PROMPT P01-04 — ANNÉE ACADÉMIQUE ET CALENDRIER ACADÉMIQUE
+================================================================================
+P01-04 — ANNÉE ACADÉMIQUE ET CALENDRIER ACADÉMIQUE
+Lot 1 | 1 séance | Dépendances : P01-03 | Module réf. : 01, 04, 06 · DA-04
+Risques couverts : R3 | Type : Socle métier
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+scolarite.AnneeAcademique existe avec la contrainte « une seule année active »
+(testée). Le modèle de référence exige en plus : statut BROUILLON / OUVERTE /
+CLOTUREE, interdiction de modifier les résultats académiques définitifs sur une
+année clôturée, et un CALENDRIER ACADÉMIQUE (périodes d'inscription,
+d'enseignements, d'examens, de jurys, de vacances) qui alimente le moteur EDT
+et les échéances.
+
+MISSION
+Durcir le cycle de vie de l'année académique et introduire le calendrier
+académique comme objet de référence.
+
+CONSIGNES
+1. Vérifie l'existant AnneeAcademique : champs, statut, contrainte d'unicité,
+   usages. Ne casse rien.
+2. Ajoute/consolide le cycle de vie BROUILLON → OUVERTE → CLOTUREE → ARCHIVEE
+   avec transitions explicites, droits associés (clôture = N4 uniquement),
+   motif obligatoire et audit.
+3. Ajoute un garde-fou transversal : sur une année CLOTUREE ou ARCHIVEE, toute
+   modification de note validée, de décision de jury, de diplôme ou
+   d'inscription validée est REFUSÉE avec un message explicite. Implémente-le
+   une seule fois (mixin/helper) et applique-le aux modèles concernés.
+4. Crée le modèle PeriodeAcademique (annee_academique, type [INSCRIPTION,
+   ENSEIGNEMENT, EXAMEN, JURY, VACANCES, RATTRAPAGE, STAGE, CLOTURE], libellé,
+   date_debut, date_fin, semestre, statut) avec contrainte de non-chevauchement
+   pour un même type et un même semestre.
+5. Ajoute des endpoints de lecture /api/scolarite/calendrier/ avec filtre par
+   année, semestre et type, exposés au contrat EDT (le planificateur externe en
+   a besoin).
+6. Ajoute un écran « Calendrier académique » : vue annuelle et vue semestrielle,
+   création/édition selon droits, export PDF/Excel réutilisant le moteur
+   d'exports existant.
+7. Branche le calendrier sur les alertes de seuil existantes
+   (statistiques.ConfigAlerteSeuil) : alerte à l'approche d'une échéance.
+8. Tests : unicité d'année active, transitions interdites, verrou sur année
+   clôturée (test explicite par type d'objet), non-chevauchement des périodes.
+
+DoD
+[ ] cycle de vie année académique testé, verrou de clôture effectif
+[ ] PeriodeAcademique en place avec contraintes
+[ ] API calendrier exposée et incluse dans le contrat EDT
+[ ] écran calendrier fonctionnel + export
+[ ] aucune régression (smoke_test_injs vert)

@@ -1,0 +1,63 @@
+================================================================================
+PROMPT P10-05 — GED CENTRALE : DOCUMENTS, VERSIONS, CLASSIFICATION ET INDEXATION
+================================================================================
+P10-05 — GED CENTRALE : DOCUMENTS, VERSIONS, CLASSIFICATION ET INDEXATION
+Lot 10 | 3 séances | Dépendances : P01-03, P06-06 | Module réf. : 14
+Risques couverts : E10 | Type : Nouveau domaine
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app administrations gère DocumentOfficiel et VersionDocument. Le modèle de
+référence (Module 14) exige une GED CENTRALE utilisée par tous les autres
+modules : DOCUMENT → CLASSIFICATION → VERSION → VALIDATION → SIGNATURE/VISA →
+DIFFUSION → ARCHIVAGE, avec indexation, recherche, conservation et destruction
+contrôlée.
+
+MISSION
+Transformer la gestion documentaire existante en GED centrale, sans casser les
+documents déjà produits par les autres modules.
+
+CONSIGNES
+1. Inventorie tous les documents produits par l'application (convocations,
+   certificats, attestations, relevés, PV, diplômes, quittances, ordres de
+   mission, bons de commande, conventions de stage…) et la façon dont chacun
+   est stocké aujourd'hui. Publie la carte.
+2. Crée/étends le modèle Document central : code métier unique, type
+   (RefTypeDocument), catégorie documentaire, classification (arborescence
+   administrable), titre, objet lié (contenu générique : modèle + identifiant),
+   version, statut [BROUILLON, EN_VALIDATION, VALIDÉ, SIGNÉ, DIFFUSÉ, ARCHIVÉ,
+   DÉTRUIT], empreinte, dates, droits de consultation.
+3. NE CASSE PAS l'existant : les documents déjà produits par les modules
+   (Diplome, PVJury, Quittance, ConventionStage…) restent dans leurs modèles ;
+   la GED les INDEXE par référence (modèle + identifiant + empreinte) plutôt
+   que de les déplacer. Documente ce choix (ADR-007).
+4. Versions : toute nouvelle version conserve les précédentes ; seule la
+   dernière est « courante » ; comparaison de versions.
+5. Indexation et recherche : recherche par numéro, titre, type, catégorie,
+   période, objet lié, mots-clés ; recherche plein texte sur les métadonnées ;
+   filtres combinables ; résultats paginés.
+6. Conservation et destruction contrôlée : durée de conservation paramétrable
+   par type de document, alerte d'échéance, destruction UNIQUEMENT sur
+   autorisation motivée N4 avec certificat de destruction (jamais de
+   suppression silencieuse).
+7. Pièces jointes : stockage sécurisé hors accès public, filtrage des types,
+   taille limitée, empreinte, aperçu.
+8. Écrans : Bibliothèque documentaire (arborescence + recherche) · Fiche
+   document (métadonnées, versions, objet lié, historique) · Administration de
+   la classification.
+9. Tests : indexation d'un document produit par un autre module, versionnage,
+   recherche, durée de conservation, destruction contrôlée, contrôle d'accès
+   par type.
+
+INTERDITS
+- Ne déplace ni ne supprime aucun document existant.
+- Ne crée pas un second stockage pour un document déjà stocké.
+
+DoD
+[ ] carte des documents existants publiée
+[ ] GED par INDEXATION (ADR-007), aucun document déplacé
+[ ] versions, recherche, classification administrable
+[ ] conservation paramétrable et destruction contrôlée
+[ ] tests verts

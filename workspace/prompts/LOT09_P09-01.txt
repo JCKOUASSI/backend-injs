@@ -1,0 +1,50 @@
+================================================================================
+PROMPT P09-01 — FINANCES ÉTUDIANTES : TARIFS, ÉCHÉANCIERS ET FACTURES
+================================================================================
+P09-01 — FINANCES ÉTUDIANTES : TARIFS, ÉCHÉANCIERS ET FACTURES
+Lot 9 | 2 séances | Dépendances : LOT 8 | Module réf. : 11 · DA-07
+Risques couverts : R1, E2 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app finances_etudiantes (9 modèles) couvre tarification, échéanciers/lignes,
+factures, paiements, quittances, remboursements, relances et rapprochements.
+Côté UI, seuls échéanciers, paiements et confirmation sont câblés ; factures,
+lignes d'échéancier, quittances, remboursements, relances et rapprochements
+comptables n'ont PAS d'écran [S1 §4.4]. Le domaine est noté maturité 1
+(UI 25 %).
+
+MISSION
+Livrer les écrans manquants de la facturation étudiante.
+
+CONSIGNES
+1. Écran « Tarification » : grilles tarifaires par année académique, formation,
+   parcours, niveau, régime d'études et catégorie d'étudiant ; période de
+   validité ; historique des versions (aucune modification rétroactive d'une
+   grille appliquée).
+2. Écran « Échéanciers » : génération automatique selon la grille applicable
+   (paramétrable : nombre d'échéances, dates, montants, acompte), modification
+   motivée et tracée, échéancier par étudiant avec lignes (libellé, montant,
+   échéance, statut, montant payé, solde).
+3. Écran « Factures » : génération depuis l'échéancier, numérotation séquentielle
+   unique par exercice (règle comptable paramétrable), statut
+   [BROUILLON, EMISE, PARTIELLEMENT_PAYEE, PAYEE, ANNULEE], envoi, avoir en cas
+   d'annulation (jamais de suppression physique).
+4. Génération en masse par promotion avec dry-run et rapport (étudiants sans
+   tarif applicable, sans échéancier, doublons).
+5. Blocage d'inscription pour impayés : paramétrable (seuil, nombre d'échéances
+   en retard), appliqué au contrôle d'inscription (P04-02) et au contrôle de fin
+   de cycle (P08-06). Dérogation motivée N4, tracée.
+6. Attestation de solde (quitus financier) : générée si le solde est nul ou si
+   dérogation, utilisée comme condition d'édition du diplôme.
+7. Tests : grille applicable correcte, génération d'échéancier, numérotation
+   séquentielle sans trou ni doublon, avoir sur annulation, blocage paramétrable.
+
+DoD
+[ ] écrans tarification, échéanciers, factures livrés
+[ ] génération en masse avec dry-run et rapport
+[ ] numérotation séquentielle fiable (test)
+[ ] blocage d'inscription paramétrable + quitus financier
+[ ] aucune suppression physique (avoir uniquement)

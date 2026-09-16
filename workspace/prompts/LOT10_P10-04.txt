@@ -1,0 +1,49 @@
+================================================================================
+PROMPT P10-04 — STAGES : ORGANISMES, CONVENTIONS, SUIVI ET ÉVALUATIONS
+================================================================================
+P10-04 — STAGES : ORGANISMES, CONVENTIONS, SUIVI ET ÉVALUATIONS
+Lot 10 | 2 séances | Dépendances : P06-06 | Module réf. : 04, 13
+Risques couverts : E1, R1 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app stages (4 modèles : OrganismeAccueil, TuteurExterne, ConventionStage,
+EvaluationStage) a une API complète et ZÉRO appel écran. Le domaine stages a
+été livré comme PILOTE du gabarit en P06-06 : ce prompt le complète.
+Le modèle de référence rattache les stages à la pédagogie (ils comptent dans la
+maquette et les crédits) et aux enseignants (encadrement).
+
+MISSION
+Compléter le domaine stages jusqu'à la couverture fonctionnelle complète.
+
+CONSIGNES
+1. Complète les écrans pilotes : Organismes d'accueil (fiche, contacts,
+   historique des conventions, agrément) · Tuteurs externes · Conventions ·
+   Évaluations de stage.
+2. Convention de stage : workflow complet (proposition → instruction →
+   validation pédagogique → signature étudiant → signature organisme →
+   signature INJS → en cours → terminée → évaluée), génération PDF numérotée
+   avec QR de vérification, échéances et alertes de fin de stage.
+3. Articulation pédagogique : un stage est rattaché à un ECUE de type STAGE de
+   la maquette (P01-03), donc il génère une note et des crédits comme les
+   autres ECUE. Contrôle : un étudiant ne peut être en stage que s'il est
+   inscrit pédagogiquement à l'ECUE correspondant.
+4. Encadrement : tuteur pédagogique interne (enseignant, visible dans sa fiche
+   P05-03) et tuteur externe ; visites de stage planifiées et comptes rendus.
+5. Évaluations : grille paramétrable (critères, pondération), évaluation par le
+   tuteur externe et par le tuteur interne, note finale selon pondération
+   paramétrable.
+6. Attestations : attestation de stage générée à la fin, numérotée, vérifiable.
+7. Statistiques : taux de stages signés par promotion, organismes partenaires,
+   taux d'encadrement, notes de stage.
+8. Tests : workflow complet, contrôle d'inscription pédagogique, génération
+   PDF numérotée, note de stage pondérée, attestation conditionnée.
+
+DoD
+[ ] 4 écrans complets via gabarit
+[ ] convention avec workflow 8 états, PDF numéroté et QR
+[ ] stage rattaché à un ECUE (note + crédits) avec contrôle
+[ ] encadrement double, évaluations pondérées, attestations
+[ ] tests verts

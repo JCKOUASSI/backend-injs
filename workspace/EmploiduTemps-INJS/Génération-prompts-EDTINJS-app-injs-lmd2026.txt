@@ -1,0 +1,1833 @@
+====================================================================================================
+GÉNÉRATION DE PROMPTS DE MISE EN ŒUVRE
+MODULE / APPLICATION « EDT-INJS »
+GESTION DES EMPLOIS DU TEMPS + PRÉSENCES QR CODE (AUTOMATIQUE & MANUELLE / FORÇAGE MOTIVÉ)
+À INTÉGRER DANS « app-injs-lmd2026demo »
+====================================================================================================
+Institution        : Institut National de la Jeunesse et des Sports (INJS) — Marcory, Abidjan, Côte d'Ivoire
+Unité              : UFR STAPS-JL (Sciences et Technologies des Activités Physiques et Sportives – Jeunesse et Loisirs)
+Application cible  : app-injs-lmd2026demo (Django 5.1.4 + DRF / React 18 + Vite 7 / Flutter + PWA / PostgreSQL 15-16 / Redis)
+Module à livrer    : EDT-INJS — Emplois du temps, planification académique, espaces, présences QR
+Date de génération : 13 septembre 2026
+Documents sources  : 1) Audit-complet-détaillé-app-injs-lmd2026OK.txt
+                     2) Modèle-fonctionnel-de-référence-app-injs-lmd2026.txt (Modules 06, 07, 08 notamment)
+                     3) RAPPORT-DE-MISE-EN-OEUVRE-DU-MODÈLE-FONCTIONNEL-DE-RÉFÉRENCE-APP-INJS-LMD2026.txt
+Nature du fichier  : Recueil de prompts opérationnels, séquencés, autoportants, destinés à un agent
+                     de codage (Arena Agent Mode / Cline / Ollama / Copilot Workspace) travaillant
+                     directement sur le dépôt app-injs-lmd2026demo.
+Règle cardinale    : ZÉRO RÉGRESSION. L'application doit rester fonctionnelle, opérationnelle et
+                     performante après CHAQUE prompt exécuté.
+====================================================================================================
+
+
+====================================================================================================
+SOMMAIRE
+====================================================================================================
+PARTIE A — MODE D'EMPLOI DU RECUEIL
+PARTIE B — PROMPT MAÎTRE (CONTEXTE PERMANENT À REPRENDRE EN TÊTE DE CHAQUE SESSION)
+PARTIE C — LES 22 PROMPTS D'EXÉCUTION
+   LOT 0 — CADRAGE, SÉCURISATION ET NON-RÉGRESSION
+      P00  Audit de l'existant EDT/présences et plan de non-régression
+   LOT 1 — SOCLE DE DONNÉES EDT-INJS
+      P01  Application Django « edt_injs » : calendrier académique, périodes, créneaux, jours
+      P02  Référentiel des espaces (Campus/Patrimoine) et compatibilité espace ↔ activité
+      P03  Besoins d'enseignement à planifier (maquette → volumes → séances théoriques)
+      P04  Disponibilités, indisponibilités et contraintes dures / souples
+      P05  Séances, emplois du temps, versions et workflow BROUILLON→…→ACTIF
+   LOT 2 — MOTEUR DE PLANIFICATION
+      P06  Service de planification et solveur de contraintes (génération automatique)
+      P07  Détection de conflits, explication des échecs, optimisation pondérée
+      P08  Planification manuelle, glisser-déposer, déplacement contrôlé
+      P09  Annulations, rattrapages, remplacements d'enseignants, notifications
+      P10  Planification des examens et réservations d'espaces multi-usages
+   LOT 3 — API ET CONTRATS
+      P11  API REST /api/timetable/ complète + compatibilité /api/scolarite/edt/ v1.1
+   LOT 4 — PRÉSENCES ET BADGEAGE QR
+      P12  AttendanceSession : ouverture/clôture de séance et listes d'émargement
+      P13  QR dynamique sécurisé, scan étudiant/enseignant, anti-fraude multi-niveaux
+      P14  Émargement manuel, forçage motivé, justificatifs d'absence, audit immuable
+      P15  Présence des enseignants, formateurs et encadrants ; VH prévue / planifiée / réalisée
+      P16  Seuils d'absence configurables, alertes, statistiques et incidences académiques
+   LOT 5 — INTERFACES
+      P17  Frontend React : écrans EDT (grilles, planning, conflits, publication)
+      P18  Frontend React : écrans Présences, émargement, forçage et tableaux de bord
+      P19  Mobile Flutter + PWA : Mon EDT, scan QR, émargement enseignant, hors-ligne
+   LOT 6 — RESTITUTION, QUALITÉ ET MISE EN PRODUCTION
+      P20  Exports PDF/Excel, impressions officielles et documents d'émargement
+      P21  Tests automatisés (backend, frontend, mobile), performance et observabilité
+      P22  Migration des données, déploiement progressif, recette et documentation
+PARTIE D — ANNEXES
+   D1 Matrice rôles × permissions EDT-INJS
+   D2 Dictionnaire des statuts et machines à états
+   D3 Paramètres configurables (aucune valeur métier en dur)
+   D4 Critères d'acceptation globaux (Definition of Done)
+   D5 Journal de bord à tenir par l'agent
+====================================================================================================
+
+
+====================================================================================================
+PARTIE A — MODE D'EMPLOI DU RECUEIL
+====================================================================================================
+1. Les prompts se lisent et s'exécutent DANS L'ORDRE (P00 → P22). Chaque prompt est conçu pour être
+   copié-collé tel quel à l'agent de codage, précédé du PROMPT MAÎTRE (Partie B).
+
+2. Chaque prompt respecte la même structure :
+      • CONTEXTE      — ce que l'agent doit savoir de l'existant
+      • OBJECTIF      — le résultat attendu, sans ambiguïté
+      • À FAIRE       — la liste exhaustive des travaux
+      • À NE PAS FAIRE— les interdits de non-régression
+      • LIVRABLES     — fichiers créés/modifiés attendus
+      • VÉRIFICATION  — commandes et critères de recette du prompt
+
+3. RÈGLE D'OR : à la fin de chaque prompt, l'application doit démarrer, les migrations doivent
+   passer, la suite de tests backend (≈943 tests) doit rester 100 % verte, `npm run lint` et
+   `npm run build` doivent rester OK, et `flutter analyze` ne doit pas régresser.
+
+4. Si un prompt ne peut pas être terminé intégralement, l'agent doit livrer un sous-ensemble
+   COHÉRENT ET DÉPLOYABLE, et consigner le reste dans docs/EDT_INJS_RESTE_A_FAIRE.md. Jamais de
+   « big-bang », jamais de branche laissée cassée.
+
+5. Nommage de branche recommandé : feature/edt-injs-P00 … feature/edt-injs-P22, une PR par prompt,
+   revue et fusion dans main après CI verte.
+====================================================================================================
+
+
+====================================================================================================
+PARTIE B — PROMPT MAÎTRE (CONTEXTE PERMANENT)
+====================================================================================================
+--- DÉBUT DU PROMPT MAÎTRE — À COLLER EN TÊTE DE CHAQUE SESSION DE TRAVAIL ---
+
+Tu es un ingénieur logiciel senior (30+ ans) spécialiste des systèmes d'information universitaires
+LMD, travaillant sur le dépôt « app-injs-lmd2026demo » de l'Institut National de la Jeunesse et des
+Sports (INJS) de Marcory, Abidjan, Côte d'Ivoire. Tu interviens en équipe avec un expert fonctionnel
+scolarité LMD, un expert UX/UI universitaire et un développeur frontend React/Vite senior : tu
+produis un code de qualité production, testé, documenté et sans régression.
+
+CONTEXTE TECHNIQUE DE L'EXISTANT (issu de l'audit du 11/09/2026, commit de référence 1ec2515) :
+• Backend : Django 5.1.4 + DRF 3.15.2, Python 3.12, SimpleJWT 5.4.0, drf-spectacular 0.28.0,
+  20 applications métier, 133 modèles, ~88 000 lignes de Python hors migrations, 184 migrations,
+  ~396 routes, 943 méthodes de test réparties dans 76 fichiers, 108 enregistrements dans l'admin.
+• Applications existantes clés : authentication (12 rôles), formations (27 modèles : Secretariat,
+  Ref*, Formation, Participant, Formateur, Module, SessionModule, QRToken, notes, finances
+  formateurs), presences (5 modèles : Pointage, AuditLog, DeviceBinding, Rattrapage,
+  NotificationAbsence), scolarite (21 modèles : AnneeAcademique, Niveau, Parcours, Semestre,
+  Groupe, DossierEtudiant, InscriptionAdministrative, InscriptionPedagogique, Maquette/UE/ECUE,
+  AffectationGroupe/Pedagogique, indisponibilités…), admissions (15), jurys (6), graduation (4),
+  finances_etudiantes (9), stages (4), administrations (5), ressources_humaines (6),
+  patrimoine (7 : Equipement, Vehicule, Inventaire, Maintenance, ReservationEspace,
+  MouvementPatrimonial), edts (4 : créneau template, EmploiDuTemps, AffectationCreneau,
+  ConflitCreneau), exports, dashboard, statistiques (5), suiviEvaluation (8), referentiels,
+  parametres, equivalences.
+• Frontend : React 18.2 + Vite 7, react-router-dom 6.22, @tanstack/react-query 5.101, 105 fichiers
+  JS/JSX, ~35 495 lignes, 53 routes, contextes AuthContext et ToastContext, services/api.js
+  (axios + intercepteurs JWT), utils/roles.js (miroir UI de role_groups.py), CSS maison
+  (index.css + styles/finance.css), identité visuelle INJS (bleu nuit, bleu clair, glassmorphism,
+  logo-injs.svg). Écrans EDT existants : Edts.jsx, EdtNew.jsx, AffectationNew.jsx.
+• Mobile : Flutter (40 fichiers Dart, ~7 818 lignes), mobile_scanner 7.x, geolocator,
+  device_info_plus, flutter_secure_storage, flutter_foreground_task, cible PWA ; Flutter 3.41.7
+  en CI, `--enforce-lockfile` + `flutter analyze`.
+• Infra : Docker (python:3.12-slim, Gunicorn 2-10 workers, utilisateur non-root appuser),
+  compose.yml (app, cron, db postgres:15, redis), Nginx en amont, whitenoise, Redis cache,
+  CI GitHub Actions ci.yml (jobs Backend / Frontend / Mobile), sauvegarde
+  scripts/backup_injs_lmd.sh (dump + SHA-256).
+• Sécurité : JWT multi-transports (Authorization Bearer, X-JWT-Access, ?access_token=, cookie
+  HttpOnly), throttling (login 20/min, scan 60/min, offline 60/min), DeviceBinding, AuditLog,
+  médias non publics, HSTS en production, middlewares de démo strictement gardés par DEBUG.
+• Contrat EDT v1.1 déjà exposé en lecture seule : GET /api/scolarite/edt/contrat, /groupes/,
+  /enseignements/, /etudiants/, /indisponibilites/, /creneaux/, /affectations/,
+  /espaces/<salle_id>/occupation/ — documenté dans docs/EDT_CONTRAT_DONNEES.md.
+
+FAIBLESSES CONNUES À NE PAS AGGRAVER (et à corriger quand le prompt le demande) :
+  R1 Écart backend/frontend : stages, patrimoine, RH, administrations sans écran.
+  R2 Aucun test frontend, 89 avertissements ESLint.
+  R3 Doubles représentations D1-D5 (groupes, nomenclatures étudiants, niveaux, notes/ECUE,
+     deux finances) à ne jamais dupliquer davantage.
+  R4 Fichiers géants (Statistiques.jsx 5 508 lignes, formations/api_views.py 4 980 lignes) :
+     tout nouveau fichier doit rester < 600 lignes.
+  R5 Hygiène dépôt (données Excel versionnées, vestiges « sygepcpfae / MEMFPMA », sw.js
+     « qr-badge-v3 », CDN tiers).
+  R6 CI mobile fragile (asset assets/app.env ignoré par Git).
+  R7 Observabilité faible : 288 print() runtime, pas de Sentry/APM, 0 test sur le domaine edts.
+  R8 Maquettes ACTIVES modifiables sans verrou, notes sans piste d'audit immuable.
+
+OBJECTIF GÉNÉRAL DE LA MISSION :
+Concevoir et intégrer « EDT-INJS », module/application complet de gestion des emplois du temps
+ET des présences par QR Code (automatique et manuelle, avec forçage motivé), couvrant étudiants,
+enseignants, formateurs et encadrants, conforme au Module 06 (Emplois du temps & planification),
+au Module 07 (Campus, patrimoine & espaces) et au Module 08 (Présences & suivi des enseignements)
+du Modèle fonctionnel de référence, afin que app-injs-lmd2026demo gère l'INJS Marcory de A à Z de
+façon efficiente, et reflète fidèlement le modèle fonctionnel de référence.
+
+RÈGLES D'OR NON NÉGOCIABLES :
+ 1. CONSERVATION DE L'EXISTANT : aucun modèle, endpoint, route, écran ou commande existant n'est
+    supprimé ni renommé sans pont de rétrocompatibilité documenté et testé. Les données historiques
+    (formations continues CPFAE, anciens matricules, pointages passés) restent exploitables.
+ 2. ADDITIF D'ABORD : on ajoute (nouvelle app `edt_injs`, nouveaux endpoints, nouveaux écrans) ;
+    on n'altère l'existant que par extension (champs nullables, FK nullable, valeurs par défaut).
+ 3. MIGRATIONS SÛRES : chaque migration est réversible, testée sur base vide ET sur base peuplée,
+    sans verrou long sur PostgreSQL ; aucune migration destructive.
+ 4. SÉCURITÉ AVANT TOUT : toute nouvelle route est protégée par une classe de permission explicite ;
+    la matrice de rôles backend (role_groups.py) reste la source de vérité, utils/roles.js n'est
+    qu'un miroir d'affichage. Throttling systématique sur les endpoints de scan.
+ 5. TRAÇABILITÉ : toute action sensible (création/déplacement/annulation de séance, publication
+    d'EDT, forçage de présence, modification de statut de présence) écrit dans un journal d'audit
+    immuable (auteur, date, ancienne valeur, nouvelle valeur, motif).
+ 6. PARAMÉTRAGE, PAS DE CODE EN DUR : créneaux horaires, fenêtres d'émargement, seuils de retard,
+    seuil d'absence (référence 25 %), poids d'optimisation, durées de validité des QR — tout est
+    configurable en base et par année académique / formation / module / type d'enseignement.
+ 7. PERFORMANCE : select_related/prefetch_related systématiques, index sur toutes les colonnes de
+    filtre et de tri, pagination obligatoire, cache Redis sur les vues de consultation d'EDT,
+    aucune requête N+1 introduite. Objectif : affichage d'une grille hebdomadaire < 400 ms côté API.
+ 8. QUALITÉ : aucun `print()` ajouté (utiliser `logging`), aucun fichier > 600 lignes, tests
+    fournis avec le code, docstrings en français, typage Python quand utile.
+ 9. IDENTITÉ VISUELLE : bleu nuit + bleu clair INJS, effet glassmorphism, logo-injs.svg ; aucune
+    référence résiduelle à « sygepcpfae », « MEMFPMA » ou « QR Badge » dans le nouveau code.
+10. LANGUE : toute l'interface, les libellés, les messages d'erreur et la documentation sont en
+    FRANÇAIS (français de Côte d'Ivoire, terminologie LMD/REESAO/CAMES).
+11. FUSEAU ET CALENDRIER : Africa/Abidjan (UTC+0), semaine du lundi au samedi, jours fériés
+    ivoiriens paramétrables.
+12. À CHAQUE FIN DE PROMPT : exécuter les vérifications, produire un rapport court
+    (fichiers touchés, migrations, tests ajoutés, risques) et mettre à jour docs/EDT_INJS_*.md.
+
+--- FIN DU PROMPT MAÎTRE ---
+====================================================================================================
+
+
+====================================================================================================
+PARTIE C — LES 22 PROMPTS D'EXÉCUTION
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 0 — CADRAGE, SÉCURISATION ET NON-RÉGRESSION
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P00 — AUDIT DE L'EXISTANT EDT/PRÉSENCES ET PLAN DE NON-RÉGRESSION
+====================================================================================================
+CONTEXTE
+L'application possède déjà : l'app `edts` (4 modèles : créneau template, EmploiDuTemps,
+AffectationCreneau, ConflitCreneau) SANS AUCUN TEST, l'app `presences` (Pointage, AuditLog,
+DeviceBinding, Rattrapage, NotificationAbsence) bien testée, `formations.SessionModule` et
+`formations.QRToken` qui portent le badgeage historique, le contrat lecture seule
+/api/scolarite/edt/ v1.1, les écrans Edts.jsx / EdtNew.jsx / AffectationNew.jsx, et les commandes
+auto_sessions, auto_close_sessions, auto_close_pointages, process_mobile_heartbeats,
+recalc_durees_pointages.
+
+OBJECTIF
+Établir la cartographie exacte de tout ce qui existe en matière d'emploi du temps, de séances et de
+présences, et geler un filet de sécurité de non-régression AVANT toute modification.
+
+À FAIRE
+ 1. Produire docs/EDT_INJS_ETAT_DES_LIEUX.md contenant :
+    a) l'inventaire exhaustif des modèles, champs, contraintes, index et migrations des apps
+       `edts`, `presences`, `formations` (SessionModule, QRToken), `scolarite` (Groupe,
+       AffectationGroupe, AffectationPedagogique, indisponibilités), `patrimoine`
+       (ReservationEspace, Maintenance), `referentiels` (RefSite, RefSalle) ;
+    b) la liste de TOUTES les routes existantes touchant EDT, séances, scan, pointage ;
+    c) la liste des écrans React et des écrans Flutter concernés ;
+    d) la liste des commandes cron et de leur planification effective ;
+    e) le schéma des flux actuels : SessionModule → QRToken → scan → Pointage → statistiques.
+ 2. Écrire une suite de tests de CARACTÉRISATION (golden tests) qui capture le comportement ACTUEL,
+    sans le juger : backend/edts/tests/test_caracterisation_edts.py,
+    backend/presences/tests/test_caracterisation_pointage.py. Ces tests devront rester verts jusqu'à
+    la fin du projet ; toute rupture volontaire devra être justifiée dans la PR.
+ 3. Combler le trou identifié par l'audit : écrire les premiers tests du domaine `edts` (0 test
+    aujourd'hui) — CRUD, permissions par rôle, détection de conflit existante, sérialisation.
+ 4. Mesurer et consigner une baseline de performance : temps de réponse des endpoints
+    /api/scolarite/edt/* et du listing des pointages sur un jeu de données réaliste
+    (12 groupes, 25 enseignants, 35 espaces, 400 séances, 1 250 étudiants) ; script
+    scripts/edt_injs_bench.py.
+ 5. Créer le fichier de suivi docs/EDT_INJS_JOURNAL.md (cf. Annexe D5).
+ 6. Ajouter un job CI « edt-injs » qui exécute spécifiquement ces tests de caractérisation.
+
+À NE PAS FAIRE
+ • Ne modifier AUCUN modèle, AUCUNE route, AUCUN écran à ce stade.
+ • Ne pas supprimer les commandes de maintenance, même celles jugées « rustines ».
+
+LIVRABLES
+ docs/EDT_INJS_ETAT_DES_LIEUX.md, docs/EDT_INJS_JOURNAL.md,
+ backend/edts/tests/test_caracterisation_edts.py,
+ backend/presences/tests/test_caracterisation_pointage.py,
+ scripts/edt_injs_bench.py, mise à jour de .github/workflows/ci.yml.
+
+VÉRIFICATION
+ `python manage.py test` : 943 tests existants + nouveaux tests, 100 % verts.
+ `python manage.py makemigrations --check --dry-run` : aucune migration en attente.
+ `npm run lint && npm run build` : inchangés.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 1 — SOCLE DE DONNÉES EDT-INJS
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P01 — APPLICATION DJANGO « edt_injs » : CALENDRIER ACADÉMIQUE, PÉRIODES, CRÉNEAUX, JOURS
+====================================================================================================
+CONTEXTE
+Le Modèle fonctionnel de référence (Module 06, sous-modules 06.01 à 06.05) impose que le calendrier
+académique soit la PREMIÈRE contrainte de planification : périodes de cours, vacances, jours fériés,
+examens, stages, interruptions, rattrapages, périodes administratives. Les créneaux horaires doivent
+être entièrement configurables (08:00-10:00 comme 09:00-10:30 ou 14:30-17:30) et jamais codés en dur.
+
+OBJECTIF
+Créer l'application Django `edt_injs` et son socle temporel, adossé à `scolarite.AnneeAcademique` et
+`scolarite.Semestre` existants, sans dupliquer ces référentiels.
+
+À FAIRE
+ 1. Créer backend/edt_injs/ (apps.py, models/, serializers/, api/, services/, permissions.py,
+    admin.py, tests/) et l'enregistrer dans INSTALLED_APPS + urls racine sous /api/timetable/.
+    Découper les modèles en plusieurs fichiers dans models/ (aucun fichier > 600 lignes).
+ 2. Modèles à créer (verbose_name en français, __str__ explicite, index et contraintes) :
+    • CalendrierAcademique  : FK AnneeAcademique (unique), libellé, date_debut, date_fin, statut
+                              (BROUILLON/ACTIF/CLOS), commentaire, timestamps, auteur.
+    • PeriodePedagogique    : FK CalendrierAcademique, FK Semestre (nullable), type
+                              (COURS, EVALUATIONS, EXAMENS, RATTRAPAGES, STAGES, VACANCES,
+                              JOURS_FERIES, INTERRUPTION, ADMINISTRATIF, JURY), libellé,
+                              date_debut, date_fin, planifiable (bool), couleur d'affichage.
+                              Contrainte : pas de chevauchement de deux périodes de même type.
+    • JourFerie             : date, libellé, récurrent (bool), pays/Institution, actif.
+                              Pré-charger les fêtes légales ivoiriennes via une data migration
+                              idempotente et désactivable.
+    • JourOuvrable          : FK CalendrierAcademique, jour de semaine (LUNDI..DIMANCHE),
+                              ouvrable (bool), heure_ouverture, heure_fermeture.
+                              Défaut : lundi→samedi ouvrables, 07:00-20:00, paramétrable.
+    • SemainePedagogique    : FK CalendrierAcademique, numéro, date_debut, date_fin, type
+                              (NORMALE, IMPAIRE, PAIRE, BLOQUEE, EXAMENS), libellé, planifiable.
+                              Génération automatique depuis les dates de la période de cours.
+    • CreneauHoraire        : code, libellé, heure_debut, heure_fin, durée calculée (property),
+                              ordre d'affichage, actif, FK CalendrierAcademique (nullable = global),
+                              type (STANDARD, MATIN, SOIR, SPORTIF, EXAMEN).
+                              Contrainte : heure_fin > heure_debut ; unicité (calendrier, code).
+    • GrilleCreneaux        : regroupement nommé de créneaux applicable à une formation, un niveau
+                              ou un type d'espace (M2M vers CreneauHoraire avec ordre).
+ 3. Services utilitaires dans services/calendrier.py :
+    est_jour_planifiable(date), creneaux_disponibles(date, grille), jours_planifiables(periode),
+    prochaine_occurrence(jour_semaine, apres_date), nombre_semaines_utiles(periode).
+    Toutes ces fonctions sont pures, testées, sans accès réseau, en timezone Africa/Abidjan.
+ 4. Admin Django : enregistrement des 7 modèles avec list_display, list_filter, search_fields,
+    actions « dupliquer le calendrier vers l'année suivante » et « générer les semaines ».
+ 5. Commande de management : `python manage.py init_calendrier_injs --annee 2026-2027`
+    (idempotente, --dry-run supporté) créant calendrier, périodes types, jours ouvrables,
+    semaines et grille de créneaux par défaut INJS (08-10, 10-12, 13-15, 15-17, 17-19).
+ 6. Tests : au moins 25 tests couvrant contraintes, chevauchements, génération de semaines,
+    jours fériés, fonctions de service, idempotence de la commande.
+
+À NE PAS FAIRE
+ • Ne pas recréer AnneeAcademique, Semestre, Niveau, Parcours : réutiliser scolarite.
+ • Ne pas coder de créneau ni de jour férié en dur dans la logique métier.
+ • Ne pas toucher à l'app `edts` historique dans ce prompt.
+
+LIVRABLES
+ backend/edt_injs/** (app complète), migration 0001, commande init_calendrier_injs,
+ docs/EDT_INJS_MODELE_DONNEES.md (première section : socle temporel).
+
+VÉRIFICATION
+ Migrations appliquées sur base vide et sur copie de base peuplée ; suite complète verte ;
+ `init_calendrier_injs` exécutée deux fois de suite produit exactement le même état.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P02 — RÉFÉRENTIEL DES ESPACES ET COMPATIBILITÉ ESPACE ↔ ACTIVITÉ
+====================================================================================================
+CONTEXTE
+Le Module 07 du Modèle de référence impose la hiérarchie SITE → ZONE → BÂTIMENT → NIVEAU → ESPACE →
+ÉQUIPEMENTS, avec rattachement direct possible d'espaces extérieurs à une zone (terrain, piscine,
+piste). L'INJS étant un institut de sport, l'EDT doit savoir qu'un cours de natation exige une
+piscine, un TP de biomécanique un laboratoire, une séance d'athlétisme une piste. L'existant possède
+déjà `referentiels.RefSite` / `RefSalle` et l'app `patrimoine` (Equipement, ReservationEspace,
+Maintenance) : il faut les ÉTENDRE et les fédérer, non les remplacer.
+
+OBJECTIF
+Doter EDT-INJS d'un référentiel physique complet et exploitable par le moteur de planification, en
+préservant RefSite/RefSalle comme identités pivot.
+
+À FAIRE
+ 1. Modèles (backend/edt_injs/models/espaces.py) :
+    • Zone     : FK RefSite, code, libellé, type (PEDAGOGIQUE, SPORTIVE, ADMINISTRATIVE, EXTERIEURE,
+                 TECHNIQUE), surface, statut, description.
+    • Batiment : FK Zone, code, nom, type, nombre_etages, surface_totale, année_construction, statut.
+    • Niveau   : FK Batiment, code (RDC, R+1, …), libellé, ordre.
+    • TypeEspace : code, libellé, famille (ENSEIGNEMENT, SPORT, ADMINISTRATION, TECHNIQUE),
+                 icône, actif. Pré-charger : salle de cours, salle TD, salle TP, amphithéâtre,
+                 laboratoire, salle informatique, salle spécialisée, gymnase, terrain football,
+                 terrain basketball, terrain volleyball, terrain handball, court de tennis,
+                 piscine, piste d'athlétisme, salle de musculation, salle de combat, salle
+                 polyvalente, bureau, secrétariat, salle de réunion, salle du conseil, archives.
+    • Espace   : OneToOne NULLABLE vers referentiels.RefSalle (pont de rétrocompatibilité),
+                 FK TypeEspace, FK Zone, FK Batiment (nullable), FK Niveau (nullable),
+                 code unique, nom, surface_utile, surface_totale, capacite_normale,
+                 capacite_maximale, statut (DISPONIBLE, OCCUPE, RESERVE, EN_MAINTENANCE, FERME,
+                 HORS_SERVICE, EN_RENOVATION), accessibilité PMR, géolocalisation
+                 (latitude, longitude, rayon_geofence_m), description, actif.
+    • EquipementEspace : FK Espace, FK patrimoine.Equipement (nullable), libellé, quantité, état.
+                 Les équipements « caractéristiques » (vidéoprojecteur, tableau, climatisation,
+                 wifi, gradins, éclairage, vestiaires, sol spécialisé, chronométrage, paillasses)
+                 sont des objets, pas des booléens.
+    • RegleCompatibilite : (TypeEspace × type d'activité CM/TD/TP/EXAMEN/SPORT/STAGE/REUNION)
+                 → compatible (bool), obligatoire (bool), priorité, équipements requis (M2M),
+                 capacité minimale, commentaire. Entièrement configurable en base et en admin.
+    • IndisponibiliteEspace : FK Espace, date_debut, date_fin, motif (MAINTENANCE, TRAVAUX,
+                 EVENEMENT, FERMETURE, AUTRE), commentaire, auteur. Un espace en maintenance est
+                 AUTOMATIQUEMENT exclu de la génération EDT.
+ 2. Service services/espaces.py :
+    espaces_compatibles(activite, effectif, equipements_requis, date, creneau) →
+    liste ordonnée par score (capacité ajustée, priorité de règle, proximité, taux d'usage) avec,
+    pour chaque exclusion, un MOTIF EXPLICITE (« capacité 40 < effectif 65 »,
+    « type incompatible : TP laboratoire », « occupé par CR-2026-000451 », « en maintenance »).
+ 3. Pont de données : commande `python manage.py migrer_salles_vers_espaces --dry-run` qui crée un
+    Espace pour chaque RefSalle existante (type déduit du libellé, capacité reprise) sans jamais
+    modifier RefSalle. RefSalle reste exploitable par tout le code existant.
+ 4. Unifier l'occupation : une vue de service `occupation_espace(espace, date_debut, date_fin)`
+    qui agrège séances EDT + patrimoine.ReservationEspace + IndisponibiliteEspace +
+    maintenances, afin qu'une salle ne puisse JAMAIS être réservée deux fois par deux services.
+ 5. Admin, serializers et 30+ tests (dont compatibilité piscine/natation, laboratoire/TP,
+    refus de sur-capacité, exclusion des espaces en maintenance).
+
+À NE PAS FAIRE
+ • Ne pas supprimer ni modifier RefSalle/RefSite ; ne pas casser patrimoine.ReservationEspace.
+ • Ne pas dupliquer la table des équipements : réutiliser patrimoine.Equipement quand il existe.
+
+LIVRABLES
+ backend/edt_injs/models/espaces.py, services/espaces.py, migrations, commande de pont,
+ data migration des TypeEspace, tests, section « Espaces » de docs/EDT_INJS_MODELE_DONNEES.md.
+
+VÉRIFICATION
+ Le bench P00 ne régresse pas ; `occupation_espace` détecte un conflit entre une séance EDT et une
+ ReservationEspace patrimoine existante.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P03 — BESOINS D'ENSEIGNEMENT À PLANIFIER (MAQUETTE → VOLUMES → SÉANCES THÉORIQUES)
+====================================================================================================
+CONTEXTE
+Le Module 06 §5-6 distingue clairement ENSEIGNEMENT et SÉANCE : « Biomécanique / CM / 20 h »
+se décompose en « 10 séances × 2 h ». Le moteur doit dériver les besoins depuis les maquettes LMD
+(`scolarite.Maquette`, UE, ECUE, volumes CM/TD/TP), les affectations pédagogiques
+(`scolarite.AffectationPedagogique`) et les groupes (`scolarite.Groupe` + `AffectationGroupe`,
+source de vérité D1). Un CM peut réunir tous les groupes, un TD les sépare, un TP travaille en
+sous-groupes.
+
+OBJECTIF
+Modéliser le « besoin à planifier » comme objet de premier rang, calculé et réconciliable, jamais
+saisi à la main de façon redondante.
+
+À FAIRE
+ 1. Modèle BesoinEnseignement : FK AnneeAcademique, FK Semestre, FK ECUE (scolarite), FK Module
+    (formations, nullable pour la formation continue), type_activite (CM, TD, TP, TPE, STAGE,
+    EXAMEN, SORTIE_TERRAIN, ACTIVITE_SPORTIVE), volume_horaire_total, duree_seance_minutes,
+    nombre_seances_theorique (calculé), FK enseignant principal (formations.Formateur ou
+    ressources_humaines.Agent selon le cas — passer par une référence unifiée),
+    enseignants_secondaires (M2M), cible (GROUPE, PROMOTION, SOUS_GROUPE), groupes concernés (M2M
+    scolarite.Groupe), effectif_previsionnel (calculé depuis AffectationGroupe),
+    contraintes_espace (FK TypeEspace préféré, équipements requis), statut (A_PLANIFIER,
+    PARTIELLEMENT_PLANIFIE, PLANIFIE, SUSPENDU), priorité.
+ 2. Service services/besoins.py :
+    • generer_besoins(annee, semestre, formation|parcours) : dérive les besoins depuis la maquette
+      ACTIVE et les affectations pédagogiques, en mode idempotent (re-exécution = mise à jour, pas
+      de doublon), avec rapport détaillé des créations/mises à jour/anomalies.
+    • controler_couverture(besoin) : compare volume prévu / planifié / réalisé et renvoie l'écart.
+    • anomalies() : ECUE sans enseignant, ECUE sans groupe, volume nul, effectif > capacité de tous
+      les espaces compatibles, enseignant en surcharge.
+ 3. Charge enseignante : service qui agrège les besoins par enseignant et détecte surcharge /
+    sous-charge / double affectation par rapport aux volumes statutaires, en réutilisant les
+    données existantes de « Charges enseignants ».
+ 4. Endpoint de prévisualisation (lecture seule) des besoins avant génération d'EDT.
+ 5. Tests (≥ 25) : idempotence, CM promotion vs TD groupe vs TP sous-groupe, arrondis du nombre de
+    séances (20 h / 2 h = 10 ; 25 h / 2 h = 12 séances de 2 h + 1 de 1 h, règle paramétrable),
+    détection d'anomalies.
+
+À NE PAS FAIRE
+ • Ne pas écrire dans les maquettes ni dans les inscriptions pédagogiques.
+ • Ne pas créer un second référentiel de groupes (respect strict de D1).
+
+LIVRABLES
+ models/besoins.py, services/besoins.py, services/charges.py, migrations, tests, documentation.
+
+VÉRIFICATION
+ Sur un jeu de démonstration (Licence Éducation & Motricité, L1/L2/L3, S1-S6), `generer_besoins`
+ produit une liste cohérente, ré-exécutable, dont la somme des volumes = somme des volumes maquette.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P04 — DISPONIBILITÉS, INDISPONIBILITÉS ET CONTRAINTES DURES / SOUPLES
+====================================================================================================
+CONTEXTE
+Module 06 §12-15 : le moteur doit connaître disponibilités et indisponibilités des enseignants,
+des groupes et des espaces, et distinguer CONTRAINTES DURES (jamais violables : enseignant libre,
+groupe libre, salle libre, salle compatible, capacité suffisante, pas de chevauchement, date dans
+période autorisée) et CONTRAINTES SOUPLES (violables avec pénalité : préférences enseignant,
+préférence de salle, éviter les cours très tôt, éviter les trous, limiter les déplacements,
+répartir les cours). L'app `scolarite` possède déjà un embryon d'indisponibilités enseignants et le
+contrat v1.1 expose /api/scolarite/edt/indisponibilites/.
+
+OBJECTIF
+Offrir un système de contraintes DÉCLARATIF, configurable, pondéré, lisible par un humain et
+consommable par le solveur.
+
+À FAIRE
+ 1. Modèles :
+    • DisponibiliteEnseignant : FK enseignant, FK CalendrierAcademique, récurrence
+      (jour_semaine + créneau) OU plage datée, type (DISPONIBLE, PREFERE, EVITER, INDISPONIBLE),
+      motif, priorité, source (DECLARE_PAR_ENSEIGNANT, IMPOSE_PAR_ADMIN, IMPORTE), validé (bool).
+      Réutiliser/étendre l'existant scolarite plutôt que de le doubler ; si un modèle existe déjà,
+      l'enrichir par migration additive et exposer une vue unifiée.
+    • IndisponibiliteGroupe : FK Groupe, plage, motif (STAGE, SORTIE, EXAMEN, EVENEMENT, AUTRE).
+    • TypeContrainte : code, libellé, nature (DURE|SOUPLE), portée (GLOBALE, FORMATION, NIVEAU,
+      GROUPE, ENSEIGNANT, ESPACE, ECUE), paramètres JSON schématisés, poids par défaut, actif,
+      description fonctionnelle en français affichée dans l'UI.
+    • ContrainteEDT : instance paramétrée d'un TypeContrainte sur une portée donnée, avec poids,
+      actif, période de validité, auteur, commentaire.
+ 2. Catalogue initial de contraintes (data migration, toutes désactivables) :
+    DURES : enseignant_non_chevauchant, groupe_non_chevauchant, espace_non_chevauchant,
+            espace_compatible, capacite_suffisante, hors_jour_ferie, dans_periode_planifiable,
+            respect_indisponibilite_enseignant, respect_indisponibilite_espace,
+            respect_indisponibilite_groupe, duree_max_journaliere_groupe,
+            duree_max_journaliere_enseignant, pause_meridienne_obligatoire.
+    SOUPLES : preference_creneau_enseignant, preference_espace, eviter_premier_creneau,
+            eviter_dernier_creneau, minimiser_trous_groupe, minimiser_trous_enseignant,
+            minimiser_deplacements_inter_zones, regrouper_seances_ecue,
+            repartir_charge_sur_la_semaine, equilibrer_occupation_espaces,
+            eviter_samedi, respecter_rythme_sportif (récupération après séance intense).
+ 3. Service services/contraintes.py : chargement, validation JSON-schema des paramètres, évaluation
+    unitaire `evaluer(contrainte, affectation_candidate, contexte) -> (respectee: bool,
+    penalite: float, message_fr: str)`. Chaque contrainte sait EXPLIQUER pourquoi elle échoue.
+ 4. Écran d'administration (backend admin pour l'instant) permettant d'activer/désactiver et de
+    pondérer chaque contrainte sans déploiement.
+ 5. Tests (≥ 30) : une contrainte = au moins un test passant et un test échouant avec message.
+
+À NE PAS FAIRE
+ • Ne pas coder les contraintes en if/else dispersés dans le moteur : un registre, une classe par
+   contrainte, une inscription déclarative.
+ • Ne pas casser /api/scolarite/edt/indisponibilites/.
+
+LIVRABLES
+ models/contraintes.py, services/contraintes.py, registre de contraintes, data migration,
+ tests, docs/EDT_INJS_CONTRAINTES.md (catalogue lisible par un fonctionnel).
+
+VÉRIFICATION
+ Désactiver une contrainte souple change le score sans casser la génération ; désactiver une
+ contrainte dure émet un avertissement explicite dans les journaux et dans l'UI.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P05 — SÉANCES, EMPLOIS DU TEMPS, VERSIONS ET WORKFLOW BROUILLON → ACTIF
+====================================================================================================
+CONTEXTE
+Module 06 §5, §21, §22 : la séance est l'unité de planification (date, heure début, heure fin,
+module, type, enseignant, groupe, espace, statut) ; l'emploi du temps suit le workflow
+BROUILLON → GÉNÉRÉ → À CONTRÔLER → VALIDÉ → PUBLIÉ → ACTIF, et toute modification après publication
+doit produire un événement tracé (ancienne séance, modification, nouvelle séance, motif, auteur,
+date) avec notification des étudiants et enseignants concernés.
+
+OBJECTIF
+Créer le cœur de données de l'EDT avec versionnement, workflow d'états, verrouillage après
+publication et journal de modifications immuable.
+
+À FAIRE
+ 1. Modèles :
+    • EmploiDuTempsINJS : FK CalendrierAcademique, FK Semestre, portée (FORMATION, PARCOURS,
+      NIVEAU, GROUPE, ENSEIGNANT, ESPACE), références de portée, libellé, version (entier),
+      statut (BROUILLON, GENERE, A_CONTROLER, VALIDE, PUBLIE, ACTIF, ARCHIVE),
+      date_publication, publié_par, verrouillé (bool), commentaire, timestamps.
+      Contrainte : une seule version ACTIVE par (portée, semestre) ; les versions précédentes
+      passent en ARCHIVE, jamais supprimées.
+    • Seance : FK EmploiDuTempsINJS, FK BesoinEnseignement, FK ECUE/Module, type_activite,
+      date, heure_debut, heure_fin, FK CreneauHoraire (nullable si horaire libre),
+      FK enseignant, enseignants_supplémentaires (M2M), FK Espace, groupes (M2M),
+      effectif_attendu, statut (PLANIFIEE, CONFIRMEE, OUVERTE, EN_COURS, REALISEE, ANNULEE,
+      REPORTEE, NON_REALISEE, A_RATTRAPER), origine (AUTOMATIQUE, MANUELLE, IMPORTEE,
+      RATTRAPAGE, REMPLACEMENT), FK seance_origine (nullable, pour rattrapage/report),
+      code unique lisible type CR-2026-000451, observations, timestamps, auteur.
+      OneToOne NULLABLE vers formations.SessionModule (pont de rétrocompatibilité : toute Seance
+      publiée crée ou met à jour la SessionModule correspondante, afin que le badgeage historique,
+      les exports et les statistiques existants continuent de fonctionner sans modification).
+    • ModificationSeance : FK Seance, type (CREATION, DEPLACEMENT, CHANGEMENT_ESPACE,
+      CHANGEMENT_ENSEIGNANT, ANNULATION, REPORT, SUPPRESSION_LOGIQUE, REOUVERTURE),
+      ancienne_valeur JSON, nouvelle_valeur JSON, motif OBLIGATOIRE, auteur, horodatage,
+      notifications_envoyees. Enregistrement en append-only (pas d'update, pas de delete).
+    • VersionEDT : instantané JSON compressé d'une version d'EDT au moment de la publication,
+      empreinte SHA-256, auteur, permettant comparaison et restauration.
+ 2. Machine à états : implémenter les transitions autorisées dans services/workflow_edt.py, avec
+    contrôle de permission par rôle, contrôle de complétude (on ne valide pas un EDT comportant des
+    conflits DURS non résolus), et effets de bord (publication → génération des SessionModule,
+    ouverture des listes d'émargement, notifications).
+ 3. Verrouillage : après PUBLIE, toute modification exige un motif et passe par une procédure
+    « modification tracée » ; l'EDT ACTIF ne peut être modifié que par les rôles habilités.
+ 4. Signaux et intégrité : contrainte d'unicité (espace, date, plage horaire) et (enseignant, date,
+    plage), avec exclusion des séances ANNULEE/REPORTEE ; index composites pour les grilles
+    hebdomadaires.
+ 5. Suppression logique uniquement (champ actif/archivé) : aucune séance historique n'est effacée.
+ 6. Tests (≥ 40) : transitions valides/invalides, unicité, pont SessionModule, append-only du
+    journal, restauration d'une version, non-régression des exports existants.
+
+À NE PAS FAIRE
+ • Ne pas remplacer ni supprimer l'app `edts` historique : elle reste en place et un adaptateur
+   lit/écrit vers edt_injs (voir P11). Sa suppression éventuelle interviendra bien après la recette.
+ • Ne jamais faire de DELETE physique sur Seance ou ModificationSeance.
+
+LIVRABLES
+ models/edt.py, models/seances.py, services/workflow_edt.py, migrations, admin, tests,
+ docs/EDT_INJS_WORKFLOW.md (diagramme d'états + matrice rôles/transitions).
+
+VÉRIFICATION
+ Publier un EDT crée les SessionModule attendues et n'altère aucun pointage existant ;
+ les tests de caractérisation de P00 restent verts.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 2 — MOTEUR DE PLANIFICATION
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P06 — SERVICE DE PLANIFICATION ET SOLVEUR DE CONTRAINTES (GÉNÉRATION AUTOMATIQUE)
+====================================================================================================
+CONTEXTE
+Module 06 §16-17 et §34 : le moteur doit charger enseignements, groupes, enseignants, espaces,
+disponibilités, calendrier et contraintes, générer les possibilités, éliminer les conflits,
+optimiser, produire une proposition, contrôler, soumettre à validation, publier. Le Modèle de
+référence recommande explicitement de SÉPARER le moteur de planification du CRUD Django et
+d'utiliser un solveur de contraintes plutôt qu'une accumulation de if/else. Ordre de grandeur
+attendu : 150 enseignements, 400 à 520 séances, 25 enseignants, 12 groupes, 35 espaces.
+
+OBJECTIF
+Livrer un moteur de génération automatique d'emploi du temps, déterministe, interruptible,
+explicable et exécuté en tâche de fond.
+
+À FAIRE
+ 1. Architecture en couches, strictement isolée du CRUD :
+      backend/edt_injs/planification/
+        ├── contexte.py        (chargement en mémoire : dataclasses immuables, 1 seule série de
+        │                       requêtes optimisées, aucun accès ORM pendant la résolution)
+        ├── modele.py          (variables de décision : séance × créneau × jour × espace)
+        ├── contraintes_solveur.py (traduction du registre P04 en contraintes du solveur)
+        ├── objectif.py        (fonction de score pondérée, poids issus de la base)
+        ├── solveur.py         (interface abstraite + implémentation OR-Tools CP-SAT si
+        │                       disponible, sinon repli sur heuristique gloutonne + recherche
+        │                       locale ; le choix est configurable et testé dans les deux modes)
+        ├── resultat.py        (proposition, séances non planifiées, motifs, métriques)
+        └── rapport.py         (rapport lisible en français)
+ 2. Dépendance : ajouter `ortools` en dépendance OPTIONNELLE (extras_require / requirements-opt),
+    avec détection à l'exécution et repli automatique documenté. L'application doit démarrer et
+    fonctionner même sans ortools installé.
+ 3. Modèle PlanificationRun : FK EmploiDuTempsINJS, paramètres (JSON), statut (EN_ATTENTE,
+    EN_COURS, TERMINEE, ECHEC, ANNULEE), progression %, date_debut, date_fin, durée,
+    nb_seances_planifiees, nb_non_planifiees, score, journal texte, auteur, solveur utilisé,
+    graine aléatoire (pour reproductibilité).
+ 4. Exécution asynchrone : lancer la génération en tâche de fond (thread borné + verrou Redis, ou
+    Celery/RQ si déjà présent ; sinon commande de management + conteneur cron existant). Budget de
+    temps configurable (défaut 120 s), arrêt propre, reprise de la meilleure solution trouvée.
+    Verrou empêchant deux générations simultanées sur la même portée.
+ 5. Mode « simulation » (dry-run) : produit la proposition SANS écrire de Seance, retourne le
+    diff prévisionnel.
+ 6. Mode « incrémental » : replanifier uniquement les besoins non planifiés ou une plage de dates,
+    en figeant (verrouillant) les séances déjà validées/publiées.
+ 7. Reproductibilité : même contexte + même graine = même résultat (test dédié).
+ 8. Tests (≥ 30) : petit cas jouet résolu optimalement, cas insoluble détecté proprement, respect
+    de toutes les contraintes dures, absence d'accès ORM pendant la résolution (compteur de
+    requêtes), performance sur jeu réaliste (400 séances < 120 s), reproductibilité.
+
+À NE PAS FAIRE
+ • Ne pas bloquer une requête HTTP pendant la résolution.
+ • Ne pas écrire en base pendant la résolution : la persistance se fait en une transaction finale.
+ • Ne pas rendre ortools obligatoire.
+
+LIVRABLES
+ backend/edt_injs/planification/**, models/planification.py, migrations, tests,
+ docs/EDT_INJS_MOTEUR.md (algorithme, paramètres, limites connues, guide de réglage des poids).
+
+VÉRIFICATION
+ `python manage.py generer_edt --edt <id> --dry-run` produit un rapport ; la version réelle produit
+ des séances conformes ; aucune contrainte dure violée sur 10 exécutions aléatoires.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P07 — DÉTECTION DE CONFLITS, EXPLICATION DES ÉCHECS, OPTIMISATION PONDÉRÉE
+====================================================================================================
+CONTEXTE
+Module 06 §13-14, §18-19 : le système ne doit JAMAIS afficher « Génération impossible ». Il doit
+dire précisément : « TD Module X – Groupe L2-A → aucun espace disponible de capacité ≥ 45 ;
+aucun créneau compatible entre 14 h et 18 h ». L'app `edts` possède déjà un modèle ConflitCreneau
+à réutiliser/étendre.
+
+OBJECTIF
+Rendre le moteur totalement explicable et fournir un centre de résolution des conflits utilisable
+par un agent de scolarité non informaticien.
+
+À FAIRE
+ 1. Modèle Conflit (étendre ConflitCreneau ou créer ConflitEDT avec pont) : type (ENSEIGNANT,
+    GROUPE, ESPACE, CAPACITE, COMPATIBILITE, CALENDRIER, INDISPONIBILITE, CHARGE, AUTRE),
+    gravité (BLOQUANT, MAJEUR, MINEUR, INFORMATIF), séances impliquées (M2M), description FR,
+    suggestions de résolution (JSON), statut (OUVERT, EN_COURS, RESOLU, IGNORE_JUSTIFIE),
+    résolu_par, motif_ignorance, horodatages.
+ 2. Détecteur services/conflits.py : fonction `detecter(edt|seances)` exécutable
+    (a) à la volée lors d'une modification manuelle,
+    (b) en lot après génération,
+    (c) périodiquement par cron sur l'EDT ACTIF (détection de dérive).
+ 3. Explicateur : pour chaque besoin non planifié, produire une CHAÎNE DE CAUSES ordonnée
+    (« 42 créneaux candidats → 18 éliminés par indisponibilité enseignant → 20 éliminés par
+    occupation d'espace compatible → 4 éliminés par capacité → 0 restant ») avec, pour chaque
+    étape, le nombre d'options éliminées et un exemple concret.
+ 4. Suggestions automatiques : proposer 3 alternatives classées (autre créneau, autre espace,
+    division du groupe si la règle l'autorise, autre enseignant compatible, déplacement d'une
+    séance souple existante) avec l'impact estimé sur le score global.
+ 5. Métriques d'optimisation exposées : nombre de conflits, trous étudiants, trous enseignants,
+    taux d'occupation des espaces, charge par enseignant, déplacements inter-zones, équilibre
+    hebdomadaire ; formule de score documentée et poids réglables.
+ 6. Tests (≥ 25) : chaque type de conflit détecté, message contenant les données concrètes,
+    suggestion effectivement applicable et conduisant à un état sans conflit.
+
+À NE PAS FAIRE
+ • Aucun message d'erreur générique, aucune trace technique exposée à l'utilisateur final.
+ • Ne pas résoudre automatiquement un conflit BLOQUANT sans validation humaine.
+
+LIVRABLES
+ services/conflits.py, services/explications.py, models/conflits.py, migrations, tests,
+ section « Conflits » de docs/EDT_INJS_MOTEUR.md.
+
+VÉRIFICATION
+ Sur un scénario volontairement insoluble (groupe de 65 étudiants, seules salles de 40), le système
+ renvoie l'explication exacte et propose l'amphithéâtre ou la division du groupe.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P08 — PLANIFICATION MANUELLE, GLISSER-DÉPOSER, DÉPLACEMENT CONTRÔLÉ
+====================================================================================================
+CONTEXTE
+Module 06 §15 et §20 : la génération automatique ne doit jamais empêcher l'intervention humaine.
+Le responsable doit pouvoir déplacer « Cours A, lundi 08 h, salle 101 » vers « mardi 10 h,
+salle 204 », le système vérifiant immédiatement enseignant, groupe, salle, capacité et calendrier.
+
+OBJECTIF
+Fournir l'API transactionnelle de planification manuelle avec validation temps réel, prévisualisation
+d'impact et annulation possible.
+
+À FAIRE
+ 1. Endpoints (détaillés en P11) : création manuelle de séance, déplacement, changement d'espace,
+    changement d'enseignant, duplication sur plusieurs semaines (récurrence), suppression logique.
+ 2. Service services/planification_manuelle.py :
+    • `valider_placement(seance, nouvelle_position)` → liste de violations dures et souples AVANT
+      écriture, en < 150 ms, sans écrire en base.
+    • `appliquer(seance, nouvelle_position, motif, auteur)` → transaction atomique : contrôle,
+      écriture, journal ModificationSeance, recalcul des conflits impactés, invalidation du cache,
+      notifications si l'EDT est PUBLIÉ.
+    • `annuler_derniere_modification(seance, auteur, motif)` → rétablissement depuis le journal.
+ 3. Récurrence : appliquer une séance à un motif hebdomadaire/bihebdomadaire sur une plage de
+    semaines pédagogiques, avec exclusion automatique des jours fériés et des périodes non
+    planifiables, et rapport des occurrences créées/écartées.
+ 4. Verrouillage optimiste : champ `version` sur Seance, rejet HTTP 409 en cas de modification
+    concurrente, message clair « la séance a été modifiée par X à HH:MM, veuillez recharger ».
+ 5. Mode « forçage administrateur » : un rôle habilité peut passer outre une contrainte SOUPLE
+    (jamais une contrainte DURE) en fournissant un motif obligatoire, tracé et visible dans l'UI.
+ 6. Tests (≥ 25) : placement valide, placement refusé pour chaque contrainte dure, concurrence,
+    récurrence avec jour férié, annulation, forçage tracé.
+
+À NE PAS FAIRE
+ • Ne jamais autoriser la violation d'une contrainte DURE, même par un administrateur.
+ • Ne pas écrire partiellement : tout est atomique.
+
+LIVRABLES
+ services/planification_manuelle.py, API associée, tests, documentation d'usage.
+
+VÉRIFICATION
+ Deux utilisateurs déplaçant la même séance simultanément : le second reçoit un 409 explicite ;
+ aucune donnée incohérente en base.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P09 — ANNULATIONS, RATTRAPAGES, REMPLACEMENTS D'ENSEIGNANTS, NOTIFICATIONS
+====================================================================================================
+CONTEXTE
+Module 06 §23-25 et Module 08 §19 : une séance peut être ANNULÉE (motif, auteur, date), une séance
+annulée peut générer un rattrapage lié à la séance originale, et l'indisponibilité d'un enseignant
+doit déclencher détection → recherche d'enseignants compatibles → proposition → validation →
+notification, le tout historisé. L'app `presences` possède déjà Rattrapage et NotificationAbsence,
+et l'écran Rattrapages.jsx existe : il faut les fédérer, pas les dupliquer.
+
+OBJECTIF
+Couvrir tout le cycle de vie perturbé d'une séance, avec traçabilité et information des personnes.
+
+À FAIRE
+ 1. Annulation : action dédiée exigeant un motif codifié (ENSEIGNANT_INDISPONIBLE, ESPACE
+    INDISPONIBLE, INTEMPERIES, GREVE, FERIE_TARDIF, EFFECTIF_INSUFFISANT, DECISION_ADMINISTRATIVE,
+    AUTRE) + commentaire libre ; statut → ANNULEE ; création automatique d'une obligation de
+    rattrapage si le volume horaire de l'ECUE devient déficitaire (règle paramétrable).
+ 2. Rattrapage : modèle SeanceRattrapage (ou réemploi étendu de presences.Rattrapage) reliant
+    séance_origine ↔ séance_rattrapage, statut (A_PROGRAMMER, PROPOSEE, VALIDEE, REALISEE,
+    ABANDONNEE), échéance, responsable. Le moteur P06 doit pouvoir planifier automatiquement les
+    rattrapages dans les créneaux libres et les semaines de rattrapage du calendrier.
+ 3. Remplacement : modèle RemplacementEnseignant (séance, enseignant_initial, enseignant_remplaçant,
+    motif, statut PROPOSE/ACCEPTE/REFUSE/ANNULE, proposé_par, validé_par, dates). Service de
+    recherche d'enseignants compatibles (même ECUE ou même spécialité, disponible sur le créneau,
+    non surchargé), classés par pertinence.
+ 4. Notifications : service unifié services/notifications_edt.py, multi-canal et tolérant aux
+    pannes (in-app obligatoire, e-mail si configuré, push mobile si disponible, SMS en option),
+    avec préférences par utilisateur, file d'attente, et modèles de messages en français :
+      – étudiant : cours annulé, salle modifiée, horaire modifié, rattrapage programmé,
+        absence enregistrée, justificatif accepté/refusé, seuil d'absence approché/dépassé ;
+      – enseignant : séance imminente (J-1 et H-1), salle modifiée, cours annulé, remplacement
+        proposé/validé, liste d'émargement ouverte/à clôturer ;
+      – responsable : taux d'absence élevé, séances non réalisées, volume horaire insuffisant,
+        conflits détectés sur l'EDT actif.
+    Aucune notification ne doit être envoyée pour un EDT non publié.
+ 5. Anti-spam : agrégation des notifications (une seule notification pour N modifications d'une même
+    séance en moins de X minutes), désactivation globale par paramètre, journal des envois.
+ 6. Tests (≥ 25) : annulation → rattrapage obligatoire, planification automatique du rattrapage,
+    recherche de remplaçant, absence de notification en mode brouillon, agrégation anti-spam.
+
+À NE PAS FAIRE
+ • Ne pas dupliquer presences.NotificationAbsence : l'étendre ou l'encapsuler.
+ • Ne pas envoyer d'e-mail réel dans les tests (backend locmem obligatoire).
+
+LIVRABLES
+ models/perturbations.py, services/rattrapages.py, services/remplacements.py,
+ services/notifications_edt.py, migrations, tests, documentation.
+
+VÉRIFICATION
+ Annuler une séance publiée d'un groupe de 45 étudiants génère 45 notifications in-app + 1 pour
+ l'enseignant + 1 obligation de rattrapage, en une transaction, en moins de 2 s.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P10 — PLANIFICATION DES EXAMENS ET RÉSERVATIONS D'ESPACES MULTI-USAGES
+====================================================================================================
+CONTEXTE
+Module 06 §30-32 : toutes les réservations (COURS, EXAMEN, RÉUNION, CONCOURS, STAGE, ÉVÉNEMENT,
+MAINTENANCE, AUTRE) doivent passer par le MÊME moteur de ressources afin qu'une salle ne soit jamais
+réservée deux fois par deux services. Les examens doivent produire planification, convocations,
+listes de salles, listes d'étudiants, surveillants et émargements. L'app `admissions` gère déjà
+épreuves/surveillants/convocations de CONCOURS, et `patrimoine` gère ReservationEspace : ces
+briques doivent être fédérées, pas réécrites.
+
+OBJECTIF
+Étendre le moteur aux examens académiques et unifier toutes les réservations d'espaces.
+
+À FAIRE
+ 1. Modèle SessionExamen : FK Semestre, FK ECUE/Module, type (CC, PARTIEL, EXAMEN_FINAL,
+    RATTRAPAGE, SOUTENANCE, EPREUVE_PRATIQUE, EPREUVE_SPORTIVE), date, heure, durée,
+    groupes/promotions concernés, effectif, régime d'anonymat, statut (PLANIFIEE, CONFIRMEE,
+    EN_COURS, TERMINEE, ANNULEE), consignes.
+ 2. Répartition en salles : service qui ventile N candidats dans M espaces selon capacité d'examen
+    (capacité réduite paramétrable, p. ex. 60 % de la capacité normale), produit des listes
+    nominatives ordonnées, attribue des numéros de place, et affecte les surveillants requis
+    (ratio paramétrable, p. ex. 1 surveillant / 30 candidats).
+ 3. Convocations et émargements : génération PDF des convocations (avec QR de vérification) et des
+    procès-verbaux d'émargement par salle, en réutilisant le moteur d'exports existant
+    (reportlab/openpyxl). Réutiliser la mécanique de convocation de `admissions` si compatible.
+ 4. Réservation unifiée : modèle ReservationEDT (ou extension de patrimoine.ReservationEspace) avec
+    workflow DEMANDE → INSTRUCTION → VALIDEE → CONFIRMEE → UTILISEE / REFUSEE / ANNULEE,
+    demandeur, service, motif, type d'usage, pièces jointes. TOUTES les sources d'occupation
+    (séance EDT, examen, concours, réunion, maintenance, événement) alimentent une VUE UNIQUE
+    d'occupation des espaces, requêtable par un seul service.
+ 5. Priorité et arbitrage : règles configurables de priorité entre usages (examen > cours >
+    réunion > événement), avec proposition de déplacement automatique de l'usage le moins
+    prioritaire et validation humaine obligatoire.
+ 6. Tests (≥ 25) : double réservation impossible quelle que soit la source, ventilation en salles,
+    ratio de surveillants, génération PDF non vide et conforme, arbitrage de priorité.
+
+À NE PAS FAIRE
+ • Ne pas créer une deuxième table de réservation concurrente de patrimoine.ReservationEspace sans
+   pont bidirectionnel testé.
+ • Ne pas toucher au moteur de concours existant d'admissions au-delà de la lecture/fédération.
+
+LIVRABLES
+ models/examens.py, models/reservations.py, services/examens.py, services/occupation.py,
+ templates PDF, migrations, tests, docs/EDT_INJS_EXAMENS.md.
+
+VÉRIFICATION
+ Une réservation patrimoine sur la salle A101 rend ce créneau indisponible pour le moteur EDT, et
+ réciproquement, sans aucune modification du code de patrimoine.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 3 — API ET CONTRATS
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P11 — API REST /api/timetable/ COMPLÈTE + COMPATIBILITÉ /api/scolarite/edt/ v1.1
+====================================================================================================
+CONTEXTE
+Le Modèle de référence (Module 06 §33 et Module 08 §31) définit une arborescence d'API cible sous
+/api/timetable/ et /api/attendance/. L'existant expose déjà /api/scolarite/edt/ v1.1 en lecture seule
+(contrat destiné au planificateur externe app-ept-injs-lmd2026) et des routes `edts` historiques.
+L'API est documentée par drf-spectacular (/api/docs/, /api/schema/).
+
+OBJECTIF
+Exposer l'intégralité des fonctions EDT-INJS via une API REST cohérente, documentée, performante et
+rétrocompatible, sans casser un seul consommateur existant.
+
+À FAIRE
+ 1. Routes à créer sous /api/timetable/ (ViewSets DRF, pagination, filtres, tri, recherche) :
+      calendars/            periods/             weeks/              holidays/
+      slots/                slot-grids/          working-days/
+      spaces/               spaces/{id}/occupation/   space-types/   space-rules/
+      space-unavailability/ equipments/
+      teachings/ (besoins)  teaching-loads/      groups/ (proxy scolarite)  teachers/ (proxy)
+      availability/         unavailability/      constraints/        constraint-types/
+      timetables/           timetables/{id}/generate/    (POST, asynchrone → renvoie run_id)
+      timetables/{id}/simulate/   timetables/{id}/validate/   timetables/{id}/publish/
+      timetables/{id}/activate/   timetables/{id}/archive/    timetables/{id}/versions/
+      runs/{id}/  (progression, journal, résultat)
+      sessions/             sessions/{id}/move/  sessions/{id}/cancel/  sessions/{id}/duplicate/
+      sessions/{id}/replace-teacher/   sessions/{id}/history/
+      conflicts/            conflicts/{id}/resolve/   conflicts/{id}/ignore/
+      makeups/              replacements/        cancellations/
+      exams/                exams/{id}/rooms/    exams/{id}/convocations/
+      reservations/         reservations/{id}/validate/
+      views/student/{id}/   views/teacher/{id}/  views/group/{id}/   views/space/{id}/
+      views/formation/{id}/ views/week/          views/day/
+      dashboard/            statistics/
+ 2. Vues « grille » optimisées : un seul appel renvoie la semaine complète d'un groupe, d'un
+    enseignant, d'une formation ou d'un espace, sous une forme directement affichable
+    (jours × créneaux), avec ETag, Last-Modified et cache Redis invalidé par signal. Objectif
+    ferme : < 400 ms, < 15 requêtes SQL, quelle que soit la taille du groupe.
+ 3. Sérialisation : serializers explicites dans serializers/ (pas de sérialisation manuelle
+    dispersée), versions « light » pour les listes et « detail » pour les fiches, champs calculés
+    documentés, formats de date ISO 8601 avec fuseau Africa/Abidjan.
+ 4. Permissions : une classe par famille de ressource dans permissions.py, adossée à role_groups.py.
+    Règles : un étudiant (AUDITEUR) ne voit QUE son EDT et ses présences ; un enseignant
+    (FORMATEUR) ne voit que ses séances et ses groupes ; SECRETARIAT/CHEF_SECRETARIAT sont confinés
+    à leur secrétariat ; DIRECTION voit tout en lecture ; ADMIN/CPFAE_ADMIN administrent.
+    Écrire des tests d'accès croisés pour CHAQUE route et CHAQUE rôle (12 rôles).
+ 5. Rétrocompatibilité :
+    • /api/scolarite/edt/ v1.1 reste STRICTEMENT inchangé dans sa forme, mais peut être alimenté
+      par edt_injs ; ajouter une v1.2 additive (nouveaux champs facultatifs, jamais de suppression)
+      et mettre à jour docs/EDT_CONTRAT_DONNEES.md avec la table de correspondance v1.1 → v1.2.
+    • Les routes de l'app `edts` historique restent actives et délèguent vers edt_injs via un
+      adaptateur, avec en-tête `Deprecation` et `Sunset` documenté.
+ 6. Documentation OpenAPI : toutes les routes décrites (summary, description, exemples de requête et
+    de réponse, codes d'erreur), tags cohérents « EDT-INJS », schéma validé sans avertissement.
+ 7. Throttling et robustesse : throttle dédié sur generate/ (p. ex. 5/heure/utilisateur), idempotency
+    key sur les POST sensibles, réponses d'erreur normalisées {code, message_fr, details}.
+ 8. Tests (≥ 60) : un test par route (succès + refus), tests de pagination, de filtres, de cache,
+    de rétrocompatibilité du contrat v1.1 (comparaison octet à octet du schéma de réponse).
+
+À NE PAS FAIRE
+ • Ne pas modifier la forme des réponses existantes de /api/scolarite/edt/ (v1.1 figée).
+ • Ne pas créer un fichier api_views.py monolithique : un module par domaine, < 600 lignes.
+
+LIVRABLES
+ backend/edt_injs/api/**, serializers/**, permissions.py, urls.py, adaptateur `edts`,
+ mise à jour docs/EDT_CONTRAT_DONNEES.md, tests, collection d'exemples (docs/EDT_INJS_API.md).
+
+VÉRIFICATION
+ `/api/docs/` affiche l'ensemble des routes ; le planificateur externe app-ept-injs-lmd2026
+ continue de fonctionner sans modification ; bench < 400 ms sur la grille hebdomadaire.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 4 — PRÉSENCES ET BADGEAGE QR (AUTOMATIQUE ET MANUEL, AVEC FORÇAGE MOTIVÉ)
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P12 — ATTENDANCE SESSION : OUVERTURE/CLÔTURE DE SÉANCE ET LISTES D'ÉMARGEMENT
+====================================================================================================
+CONTEXTE
+Module 08 §3-4 : la présence ne doit JAMAIS exister indépendamment d'une séance. La chaîne est
+TimetableSession → AttendanceSession → StudentAttendance / TeacherAttendance. Les statuts de séance
+d'émargement sont PLANIFIÉE → OUVERTE → EN COURS → CLÔTURÉE. L'existant possède `presences.Pointage`
+(entrée/sortie, durée, heartbeats mobiles), `formations.QRToken`, et les commandes
+auto_close_sessions / auto_close_pointages / process_mobile_heartbeats / recalc_durees_pointages.
+
+OBJECTIF
+Créer la couche « séance d'émargement » qui relie l'EDT au pointage, pour les ÉTUDIANTS comme pour
+les ENSEIGNANTS, FORMATEURS et ENCADRANTS, sans casser le dispositif de pointage existant.
+
+À FAIRE
+ 1. Modèle SeanceEmargement (AttendanceSession) : OneToOne vers Seance (edt_injs) et lien nullable
+    vers formations.SessionModule pour la continuité historique ; statut (PLANIFIEE, OUVERTE,
+    EN_COURS, CLOTUREE, ANNULEE, NON_TENUE) ; ouverte_le/par, clôturée_le/par ;
+    fenêtre d'émargement effective (ouverture_effective, fermeture_effective) calculée depuis les
+    paramètres ; mode d'émargement autorisé (QR, MANUEL_ENSEIGNANT, MANUEL_ADMIN, MIXTE) ;
+    effectif_attendu, effectif_présent, effectif_absent, effectif_retard, effectif_excusé,
+    taux_présence (calculés et dénormalisés pour la performance) ; observations ; verrouillée (bool).
+ 2. Modèle LigneEmargement (StudentAttendance) : FK SeanceEmargement, FK étudiant
+    (scolarite.DossierEtudiant ou formations.Participant selon l'origine — passer par une
+    référence unifiée « PersonnePresente »), statut (ATTENDU, PRESENT, ABSENT, RETARD,
+    ABSENCE_JUSTIFIEE, DISPENSE, PARTIELLEMENT_PRESENT, PRESENCE_FORCEE, EXCLU),
+    heure_arrivee, heure_depart, duree_minutes, retard_minutes, méthode
+    (QR_AUTO, QR_ENSEIGNANT, MANUEL_ENSEIGNANT, MANUEL_ADMIN, FORCAGE, IMPORT, HEARTBEAT),
+    FK Pointage existant (nullable, pont), appareil utilisé, géolocalisation si fournie,
+    commentaire, timestamps. Contrainte d'unicité (séance, personne).
+ 3. Génération de la liste d'émargement : à l'ouverture, la liste est construite depuis les
+    inscriptions pédagogiques et les affectations de groupe ACTIVES (source de vérité D1), avec
+    gel de l'effectif attendu (snapshot) pour que les mouvements ultérieurs d'étudiants ne
+    réécrivent pas l'histoire.
+ 4. Ouverture/clôture :
+    • ouverture manuelle par l'enseignant ou l'administration ;
+    • ouverture automatique X minutes avant l'heure de début (paramétrable, défaut 10) ;
+    • clôture manuelle, ou automatique Y minutes après la fin (paramétrable, défaut 15) ;
+    • à la clôture : les ATTENDU non pointés deviennent ABSENT (règle paramétrable), les présences
+      sans scan de sortie sont traitées en SORTIE_AUTO ou ABSENT_NON_BADGE selon paramètre,
+      les durées sont recalculées, les compteurs figés, la séance passe en REALISEE.
+ 5. Intégrer ces traitements aux commandes cron existantes (les étendre, ne pas les dupliquer) et
+    garantir l'idempotence et la reprise après incident.
+ 6. Performance : traitement de la clôture d'une séance de 300 étudiants en < 3 s ; opérations en
+    bulk_create/bulk_update ; index sur (séance, statut) et (personne, date).
+ 7. Tests (≥ 35) : cycle complet, ouverture anticipée, clôture automatique, snapshot d'effectif,
+    idempotence des crons, non-régression des Pointage existants.
+
+À NE PAS FAIRE
+ • Ne pas modifier la structure de presences.Pointage ; s'y relier.
+ • Ne pas créer de présence sans séance d'émargement.
+
+LIVRABLES
+ backend/edt_injs/models/presences.py (ou nouvelle app `emargement` si plus propre — décision à
+ documenter), services/emargement.py, extensions de commandes cron, migrations, tests, docs.
+
+VÉRIFICATION
+ Les tests de caractérisation P00 du pointage restent verts ; un pointage historique reste lisible
+ et rattaché à sa nouvelle ligne d'émargement.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P13 — QR DYNAMIQUE SÉCURISÉ, SCAN ÉTUDIANT/ENSEIGNANT, ANTI-FRAUDE MULTI-NIVEAUX
+====================================================================================================
+CONTEXTE
+Module 08 §6, §33-34 : le QR ne doit jamais être statique ni contenir un identifiant permanent
+(student_id=123). Il doit être lié à la SÉANCE, avec token temporaire renouvelé périodiquement.
+Le serveur vérifie : étudiant authentifié, séance active, token valide, période autorisée, étudiant
+inscrit au groupe, présence non déjà enregistrée. Le Rapport de mise en œuvre décrit en outre le
+cycle scan entrée → heartbeat → scan sortie → clôture automatique, et quatre piliers anti-fraude :
+DeviceBinding, geofencing (RefSite avec geofence_latitude/longitude), throttling, audit.
+L'existant possède déjà formations.QRToken, presences.DeviceBinding, le throttle scan 60/min et
+l'app Flutter avec mobile_scanner.
+
+OBJECTIF
+Livrer un dispositif de badgeage QR de niveau institutionnel, infalsifiable en pratique, utilisable
+par les étudiants ET par les enseignants/formateurs/encadrants, en ligne et en mode dégradé.
+
+À FAIRE
+ 1. Modèle JetonEmargement (AttendanceToken) : FK SeanceEmargement, jeton opaque (UUIDv4 + HMAC
+    signé avec une clé dédiée, JAMAIS la SECRET_KEY), numéro de rotation, créé_le, expire_le,
+    statut (ACTIF, EXPIRE, REVOQUE, CONSOMME), portée (ENTREE, SORTIE, MIXTE), nb_utilisations,
+    max_utilisations (illimité par défaut pour un QR de séance projeté). Rotation automatique
+    toutes les N secondes (paramétrable, défaut 30 s pour l'affichage projeté ; validité longue
+    jusqu'à 24 h pour les usages dégradés, comme dans l'existant, mais paramétrable).
+ 2. Endpoints :
+    • POST /api/attendance/sessions/{id}/qr/          → génère/rafraîchit le QR de la séance
+    • GET  /api/attendance/sessions/{id}/qr/current/  → jeton courant + TTL restant (pour affichage)
+    • POST /api/attendance/scan/                      → scan par la personne (entrée ou sortie)
+    • POST /api/attendance/scan/offline-sync/         → synchronisation de scans hors-ligne
+    • POST /api/attendance/heartbeat/                 → battement de présence mobile
+    • POST /api/attendance/badge-personne/            → scan INVERSE : l'enseignant scanne le badge
+                                                        (carte étudiant QR) d'un étudiant
+ 3. Deux sens de scan supportés :
+    a) QR DE SÉANCE affiché (vidéoprojecteur / écran de l'enseignant), scanné par les étudiants ;
+    b) QR DE PERSONNE (carte étudiant / badge agent, contenant un identifiant opaque non
+       réversible), scanné par l'enseignant ou l'encadrant — indispensable quand les étudiants
+       n'ont pas de smartphone. Les deux alimentent la même LigneEmargement.
+ 4. Contrôles serveur obligatoires à chaque scan, dans cet ordre, avec message d'erreur FR précis :
+    authentification → jeton connu et non expiré/révoqué → séance OUVERTE/EN_COURS → personne
+    inscrite au groupe de la séance → fenêtre d'émargement respectée → pas de double émargement →
+    DeviceBinding conforme → geofence respectée (si activée pour le site/espace) → throttle.
+    Chaque refus est journalisé avec son code (ERR_TOKEN_EXPIRE, ERR_HORS_GROUPE,
+    ERR_HORS_FENETRE, ERR_DEJA_EMARGE, ERR_APPAREIL_NON_AUTORISE, ERR_HORS_ZONE, ERR_SEANCE_FERMEE).
+ 5. Anti-fraude :
+    • DeviceBinding : un compte AUDITEUR/FORMATEUR est lié à un device_id ; changement d'appareil
+      soumis à demande + validation administrative tracée ; révocation possible.
+    • Geofencing : rayon paramétrable par site ET par espace (P02) ; tolérance configurable ;
+      désactivable globalement ; jamais bloquant si la précision GPS déclarée est insuffisante
+      (seuil paramétrable) — dans ce cas, marquage « présence à vérifier » plutôt que rejet.
+    • Détection de comportements suspects : N scans du même appareil pour des comptes différents,
+      scans simultanés géographiquement incompatibles, réutilisation de jeton, rafale anormale.
+      Ces événements créent un IncidentEmargement (gravité, description, statut d'instruction)
+      visible par l'administration, sans bloquer automatiquement l'étudiant.
+    • Rejeu impossible : jeton + personne + séance = signature unique conservée.
+ 6. Mode hors-ligne : l'application mobile met en file les scans (jeton + horodatage local signé) et
+    les synchronise ; le serveur valide a posteriori la cohérence temporelle (horodatage dans la
+    fenêtre, dérive d'horloge tolérée paramétrable) et marque la méthode SYNC_OFFLINE.
+ 7. Heartbeat : réutiliser et étendre le mécanisme existant (process_mobile_heartbeats), y compris
+    l'exclusion documentée des appareils FLUTTER_PWA_ ; produire une durée de présence réelle.
+ 8. Sécurité : throttling dédié (scan 60/min conservé, QR generate 30/min), pas de fuite
+    d'identifiant interne dans le QR, jetons non devinables, logs sans données personnelles
+    inutiles, conformité RGPD (docs/legal à compléter).
+ 9. Tests (≥ 45) : chacun des codes d'erreur, rejeu, double scan, scan hors fenêtre, hors groupe,
+    hors zone, appareil non lié, synchronisation hors-ligne, rotation de jeton, scan inverse,
+    charge (200 scans en 60 s sans erreur ni verrou).
+
+À NE PAS FAIRE
+ • Ne pas supprimer formations.QRToken ni casser le flux de badgeage actuel : le nouveau dispositif
+   coexiste et reprend la main progressivement (drapeau de fonctionnalité).
+ • Ne pas rendre la géolocalisation obligatoire par défaut (le Modèle de référence met en garde).
+
+LIVRABLES
+ models/jetons.py, services/scan.py, services/antifraude.py, api/attendance*.py, throttles,
+ migrations, tests, docs/EDT_INJS_PRESENCES_QR.md (dont schéma de sécurité et codes d'erreur).
+
+VÉRIFICATION
+ Un jeton expiré, un étudiant hors groupe et un appareil non lié sont refusés avec trois messages
+ distincts ; aucun scan valide n'est perdu lors d'un test de coupure réseau simulée.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P14 — ÉMARGEMENT MANUEL, FORÇAGE MOTIVÉ, JUSTIFICATIFS D'ABSENCE, AUDIT IMMUABLE
+====================================================================================================
+CONTEXTE
+Module 08 §5, §11-15 : l'émargement peut être fait par l'enseignant (cases à cocher sur la liste),
+par un administratif habilité, et le FORÇAGE doit être « extrêmement contrôlé » — exemple donné :
+« l'étudiant était présent mais son téléphone n'a pas permis le scan » → PRÉSENCE FORCÉE avec
+auteur, date, motif, ancienne valeur, nouvelle valeur. Aucune modification importante ne doit
+disparaître. C'est une exigence explicite de la demande : possibilité de forcer un badgeage avec
+motif(s).
+
+OBJECTIF
+Offrir un émargement manuel ergonomique et un forçage strictement tracé, avec gestion complète des
+justificatifs d'absence.
+
+À FAIRE
+ 1. Émargement manuel par l'enseignant : endpoint de mise à jour en lot de la liste
+    (POST /api/attendance/sessions/{id}/bulk-mark/) acceptant jusqu'à 500 lignes, transactionnel,
+    avec statut par ligne, commentaire facultatif, et calcul automatique des retards.
+    Fonctions « tout présent », « tout absent », inversion, recherche par nom/matricule.
+ 2. FORÇAGE DE BADGEAGE (exigence centrale) :
+    • Endpoint POST /api/attendance/overrides/ : {ligne_id | (seance_id, personne_id)}, nouveau
+      statut, MOTIF OBLIGATOIRE (code + commentaire libre), pièce justificative facultative.
+    • Référentiel MotifForcage configurable en base, pré-chargé avec : QR_DEFAILLANT,
+      TELEPHONE_NON_DISPONIBLE, BATTERIE_EPUISEE, PANNE_RESEAU, APPAREIL_NON_LIE,
+      ARRIVEE_TARDIVE_JUSTIFIEE, SORTIE_ANTICIPEE_AUTORISEE, ERREUR_DE_SAISIE,
+      ETUDIANT_HORS_ZONE_JUSTIFIE, DECISION_ADMINISTRATIVE, SEANCE_DELOCALISEE,
+      MISSION_OFFICIELLE, RAISON_MEDICALE, AUTRE (commentaire alors obligatoire).
+      Chaque motif porte : libellé FR, nécessite_commentaire (bool), nécessite_piece (bool),
+      rôles autorisés, statut cible autorisé, actif.
+    • Possibilité de MOTIFS MULTIPLES sur un même forçage (M2M) + commentaire de synthèse.
+    • Forçage possible en lot (ex. panne réseau générale sur une séance : forcer 45 présences avec
+      le même motif), avec confirmation explicite et journal individuel par ligne.
+    • Limites : un forçage ne peut pas viser une séance ANNULEE ; au-delà d'un délai paramétrable
+      après la clôture (défaut 72 h), le forçage exige un rôle supérieur (CHEF_SECRETARIAT,
+      DIRECTION ou ADMIN) ; compteur de forçages par agent et par séance exposé en statistiques
+      (indicateur de contrôle interne).
+ 3. Journal immuable JournalEmargement : append-only, une écriture par changement d'état de ligne
+    (ancien statut, nouveau statut, méthode, motif(s), commentaire, auteur, rôle, adresse IP,
+    horodatage serveur, identifiant de corrélation). Aucun UPDATE, aucun DELETE : protection par
+    surcharge de save()/delete() et test dédié. Empreinte de chaînage (hash du précédent) pour
+    détecter toute altération en base.
+ 4. Justificatifs d'absence : modèle JustificatifAbsence (FK ligne(s) d'émargement — un justificatif
+    peut couvrir plusieurs séances, type MEDICAL/FAMILIAL/ADMINISTRATIF/SPORTIF/TRANSPORT/AUTRE,
+    pièce jointe PDF ou image stockée en média NON PUBLIC, date de dépôt, déposant, statut
+    DEPOSE → EN_EXAMEN → ACCEPTE / REFUSE / COMPLEMENT_DEMANDE, examinateur, motif de décision,
+    date limite de dépôt paramétrable). L'acceptation bascule automatiquement les lignes en
+    ABSENCE_JUSTIFIEE et recalcule les statistiques et les alertes de seuil.
+ 5. Contrôle des accès : matrice précise (Annexe D1) — l'enseignant émarge ses séances du jour ;
+    le secrétariat émarge et force dans son périmètre ; la direction consulte ; l'étudiant dépose
+    un justificatif et consulte ; personne ne modifie une séance verrouillée sans rôle habilité.
+ 6. Tests (≥ 40) : forçage sans motif refusé (400 avec message FR), motif exigeant commentaire,
+    forçage tardif refusé pour un rôle insuffisant, forçage en lot, immuabilité du journal
+    (tentative d'UPDATE/DELETE rejetée), chaînage de hash vérifiable, cycle complet de justificatif.
+
+À NE PAS FAIRE
+ • Ne jamais permettre un forçage anonyme, sans motif, ou non journalisé.
+ • Ne pas exposer les pièces justificatives en média public.
+
+LIVRABLES
+ models/forcage.py, models/justificatifs.py, services/emargement_manuel.py,
+ services/journal.py, data migration des motifs, API, migrations, tests,
+ docs/EDT_INJS_FORCAGE_ET_JUSTIFICATIFS.md (procédure pour les agents).
+
+VÉRIFICATION
+ Un forçage produit exactement une entrée de journal chaînée ; la suppression d'une entrée est
+ impossible même via l'admin Django ; un rapport « forçages du mois » est extractible.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P15 — PRÉSENCE DES ENSEIGNANTS, FORMATEURS ET ENCADRANTS ; VH PRÉVUE / PLANIFIÉE / RÉALISÉE
+====================================================================================================
+CONTEXTE
+Module 08 §16-18 : le système doit suivre la présence de l'enseignant (heure d'arrivée, heure de
+départ) et comparer VH planifiée / VH réalisée / VH effectivement assurée ; l'écart déclenche un
+besoin de rattrapage. Le Rapport de mise en œuvre précise que les vacations des formateurs
+(FinanceSettings, finances formateurs existantes) doivent s'appuyer sur les POINTAGES CERTIFIÉS.
+La demande vise explicitement étudiants, enseignants, formateurs ET encadrants.
+
+OBJECTIF
+Traiter la présence des personnels enseignants et d'encadrement comme un objet de premier rang,
+et fiabiliser la chaîne VH → rémunération.
+
+À FAIRE
+ 1. Modèle PresenceIntervenant (TeacherAttendance) : FK SeanceEmargement, FK intervenant (formateur,
+    enseignant, encadrant, superviseur — référence unifiée avec le rôle tenu sur la séance :
+    TITULAIRE, REMPLACANT, CO_INTERVENANT, ENCADRANT, SURVEILLANT, ASSISTANT),
+    statut (ATTENDU, PRESENT, ABSENT, RETARD, ABSENCE_JUSTIFIEE, REMPLACE, PRESENCE_FORCEE),
+    heure_arrivee, heure_depart, duree_effective_minutes, méthode (QR, MANUEL, FORCAGE, AUTO),
+    signature électronique de la feuille (hash + horodatage + consentement), observations,
+    contenu_seance_realise (texte libre : thème traité, alimentant le cahier de texte).
+ 2. Cahier de texte numérique : pour chaque séance réalisée, l'intervenant saisit le contenu traité,
+    les documents remis et le travail demandé ; consultable par les étudiants du groupe et par la
+    direction pédagogique ; horodaté et non modifiable au-delà d'un délai paramétrable.
+ 3. Suivi des volumes horaires : service services/volumes.py calculant par ECUE, par enseignant,
+    par groupe, par formation et par semestre : VH_prévue (maquette), VH_planifiée (séances
+    planifiées), VH_réalisée (séances REALISEE avec présence intervenant confirmée), écart,
+    taux de réalisation, séances annulées, rattrapages programmés/réalisés. Alerte automatique
+    dès qu'un écart dépasse un seuil paramétrable.
+ 4. Pont finance formateurs : exposer un service et un endpoint « heures certifiées »
+    (période, intervenant, détail par séance, statut de certification VALIDEE_PAR_RESPONSABLE)
+    consommable par le module de finances formateurs EXISTANT, sans modifier son modèle.
+    Aucune écriture automatique dans la finance : le module finance reste maître de ses données.
+ 5. Workflow de certification : séances réalisées → contrôle par le responsable pédagogique →
+    certification (ou contestation motivée) → période verrouillée. Traçabilité complète.
+ 6. Tableau de bord intervenant : mes séances du jour / de la semaine, mes émargements à ouvrir ou
+    à clôturer, mon cahier de texte à compléter, mes heures du mois, mes écarts.
+ 7. Tests (≥ 30) : calcul des trois volumes, écart déclenchant un rattrapage, certification,
+    verrouillage de période, restitution des heures certifiées, cas du remplacement (les heures
+    vont au remplaçant), cas du co-enseignement (répartition paramétrable).
+
+À NE PAS FAIRE
+ • Ne pas écrire dans les tables de finances formateurs.
+ • Ne pas confondre présence de l'intervenant et réalisation de la séance : une séance peut être
+   REALISEE avec un intervenant en retard, et NON_REALISEE malgré un émargement ouvert.
+
+LIVRABLES
+ models/intervenants.py, models/cahier_texte.py, services/volumes.py, services/certification.py,
+ API, migrations, tests, docs/EDT_INJS_VOLUMES_HORAIRES.md.
+
+VÉRIFICATION
+ Pour une ECUE de 30 h dont 26 h réalisées, le tableau de bord affiche « Écart : −4 h ⚠ rattrapage
+ nécessaire » et propose la programmation du rattrapage (chaînage avec P09).
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P16 — SEUILS D'ABSENCE CONFIGURABLES, ALERTES, STATISTIQUES ET INCIDENCES ACADÉMIQUES
+====================================================================================================
+CONTEXTE
+Module 08 §20-29 : taux de présence = présences / séances attendues × 100 ; statistiques par module,
+par étudiant, par groupe ; seuil de référence du projet = 25 % d'absence, MAIS il doit être
+configurable par formation, module, année académique et type d'enseignement — « il faut éviter de
+coder 25 % en dur dans Django ». Le dépassement déclenche une ALERTE, jamais une sanction
+automatique. L'app `statistiques` existe déjà (ConfigAlerteSeuil, Rapport, bilans, point journalier,
+bilan FAC) et doit être réutilisée.
+
+OBJECTIF
+Produire une chaîne statistique de présence fiable, performante, alertante et branchée sur
+l'existant, sans inventer de sanction.
+
+À FAIRE
+ 1. Modèle SeuilAbsence : portée (GLOBALE, ANNEE, FORMATION, PARCOURS, NIVEAU, ECUE/MODULE,
+    TYPE_ACTIVITE), valeur_alerte_% (défaut 20), valeur_critique_% (défaut 25), base de calcul
+    (SEANCES_ATTENDUES | HEURES), prise en compte des absences justifiées (bool),
+    période d'évaluation, actif, auteur. Résolution en cascade du plus spécifique au plus général.
+ 2. Agrégats dénormalisés : StatistiquePresence (par étudiant × ECUE × semestre) et
+    StatistiquePresenceSeance, recalculés (a) à la clôture d'une séance, (b) après acceptation d'un
+    justificatif, (c) par tâche nocturne de réconciliation complète. Recalcul incrémental, jamais de
+    recalcul complet synchrone dans une requête HTTP.
+ 3. Indicateurs exposés :
+    • étudiant : total séances, présences, absences, absences justifiées, retards, taux de présence,
+      taux par ECUE, tendance, alertes actives ;
+    • ECUE/module : taux de présence, d'absence, de retard, séances réalisées/annulées ;
+    • groupe, niveau, formation, promotion : taux global, classement, évolution hebdomadaire ;
+    • institution : étudiants attendus / présents / absents du jour, taux global, par site ;
+    • pédagogie : VH planifiée, VH réalisée, écart, séances prévues/réalisées/annulées/rattrapées.
+ 4. Alertes : réutiliser statistiques.ConfigAlerteSeuil ; générer des alertes typées
+    (SEUIL_APPROCHE, SEUIL_DEPASSE, ABSENCES_CONSECUTIVES, DECROCHAGE, SEANCES_NON_REALISEES,
+    ENSEIGNANT_SURCHARGE, SALLE_SATUREE), avec destinataires par rôle, accusé de lecture,
+    et clôture manuelle motivée.
+ 5. Incidence académique : exposer un service `eligibilite_evaluation(etudiant, ecue)` qui renvoie
+    un AVIS (ELIGIBLE, ALERTE, NON_ELIGIBLE_PROPOSE) et sa justification, consommable par les
+    modules d'évaluation et de jury. Le système NE prononce PAS de sanction : il propose, une
+    décision humaine tracée est requise.
+ 6. Restitutions : intégrer les indicateurs EDT/présences aux bilans existants (point journalier,
+    bilan de fin de semestre, bilan FAC) et aux tableaux de bord par rôle, sans réécrire l'app
+    statistiques (extension par enregistrement de fournisseurs d'indicateurs).
+ 7. Performance : toutes les vues statistiques servies depuis les agrégats, cache Redis avec TTL
+    court, < 500 ms sur 1 250 étudiants × 120 séances.
+ 8. Tests (≥ 30) : cascade de résolution des seuils, recalcul après justificatif, alerte émise une
+    seule fois, avis d'éligibilité, non-régression des bilans existants.
+
+À NE PAS FAIRE
+ • Ne jamais coder 25 % en dur.
+ • Ne pas transformer une alerte en exclusion automatique.
+
+LIVRABLES
+ models/statistiques_presence.py, services/statistiques_presence.py, services/alertes.py,
+ fournisseurs d'indicateurs pour l'app statistiques, migrations, tests, documentation.
+
+VÉRIFICATION
+ Modifier le seuil d'une formation de 25 % à 30 % change immédiatement les alertes sans
+ redéploiement ; les bilans existants continuent de se générer à l'identique.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 5 — INTERFACES
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P17 — FRONTEND REACT : ÉCRANS EDT (GRILLES, PLANNING, CONFLITS, PUBLICATION)
+====================================================================================================
+CONTEXTE
+Le frontend React 18/Vite 7 comporte 53 routes, AuthContext, ToastContext, react-query, un CSS maison
+et l'identité INJS (bleu nuit, bleu clair, glassmorphism, logo-injs.svg). Il possède déjà Edts.jsx,
+EdtNew.jsx, AffectationNew.jsx. L'audit alerte sur les fichiers géants (Statistiques.jsx : 5 508
+lignes) et l'absence totale de tests frontend.
+
+OBJECTIF
+Livrer l'interface web complète de gestion des emplois du temps, ergonomique, rapide, accessible et
+strictement conforme à l'identité INJS, en composants de taille maîtrisée et testés.
+
+À FAIRE
+ 1. Arborescence : frontend/src/pages/edt/ + frontend/src/components/edt/ + hooks/edt/ +
+    services/edt.js. AUCUN fichier > 400 lignes ; un composant = une responsabilité.
+ 2. Écrans à livrer (routes sous /edt) :
+    • TableauBordEDT       : séances à planifier / planifiées / non planifiées, conflits,
+                             taux d'occupation des espaces, charge enseignants, alertes
+                             (reproduire le tableau de bord du Modèle §35).
+    • CalendrierAcademique : gestion des périodes, semaines, jours fériés, jours ouvrables.
+    • Creneaux             : grilles de créneaux, création, réordonnancement.
+    • Espaces              : liste filtrable (site/zone/bâtiment/type/capacité/statut), fiche
+                             espace avec équipements, règles de compatibilité, planning
+                             d'occupation, indisponibilités.
+    • Besoins              : enseignements à planifier, couverture, anomalies, génération des
+                             besoins depuis la maquette.
+    • Contraintes          : activation/désactivation, pondération, description fonctionnelle.
+    • GenerationEDT        : assistant en 5 étapes (portée → besoins → ressources → contraintes →
+                             lancement), suivi de progression en temps réel (polling ou SSE),
+                             rapport de génération, comparaison avec la version précédente.
+    • PlanningHebdomadaire : GRILLE INTERACTIVE jours × créneaux, glisser-déposer, redimensionnement,
+                             code couleur par type d'activité, badges de conflit, panneau latéral
+                             de détail de séance, validation temps réel avant dépôt (appel
+                             valider_placement), annulation (Ctrl+Z), impression.
+    • VuesEDT              : bascule instantanée entre vue GROUPE / ENSEIGNANT / FORMATION /
+                             ESPACE / JOUR / SEMAINE / MOIS, avec filtres persistés.
+    • Conflits             : centre de résolution — liste priorisée, explication en clair,
+                             suggestions applicables en un clic, résolution ou ignorance motivée.
+    • Publication          : contrôle de complétude, aperçu des impacts, publication avec
+                             confirmation, historique des versions, comparateur de versions.
+    • Perturbations        : annulations, rattrapages, remplacements, avec workflow visuel.
+    • Examens              : planification, répartition en salles, surveillants, convocations.
+    • Reservations         : demandes, instruction, validation, planning unifié des espaces.
+ 3. Qualité d'interface :
+    • États de chargement (squelettes), états vides explicites, gestion d'erreur avec message FR et
+      action de reprise ; jamais d'écran blanc ni de trace technique.
+    • Accessibilité : navigation clavier complète sur la grille, rôles ARIA, contrastes AA,
+      libellés explicites ; le glisser-déposer a TOUJOURS une alternative clavier/formulaire.
+    • Responsive : utilisable sur tablette (usage terrain) et lisible sur mobile.
+    • Impression : feuille de style dédiée pour imprimer une grille hebdomadaire propre.
+    • Performance : react-query avec clés normalisées, invalidations ciblées, virtualisation des
+      longues listes, mémoïsation ; rendu d'une semaine complète < 200 ms après réception.
+ 4. Rôles : masquer ET désactiver les actions non autorisées selon utils/roles.js, en rappelant que
+    la sécurité réelle est côté API ; afficher un message explicite en cas de 403.
+ 5. Introduire le socle de TESTS FRONTEND (comble la faiblesse R2 de l'audit) : Vitest +
+    @testing-library/react + msw, configuration, script `npm run test`, intégration au job Frontend
+    de la CI, et au moins 25 tests couvrant la grille, le glisser-déposer, les conflits, la
+    publication et les permissions d'affichage.
+ 6. Corriger au passage les avertissements ESLint introduits et ne pas augmenter le compteur global
+    des 89 avertissements existants (objectif : le réduire).
+
+À NE PAS FAIRE
+ • Ne pas supprimer Edts.jsx / EdtNew.jsx / AffectationNew.jsx : les conserver et les rediriger
+   progressivement vers les nouveaux écrans (drapeau de fonctionnalité).
+ • Ne pas introduire de dépendance CDN externe (l'aperçu applicatif est en iframe sans réseau) ;
+   toute bibliothèque doit être installée en local via npm.
+ • Ne pas créer de fichier monolithique.
+
+LIVRABLES
+ frontend/src/pages/edt/**, components/edt/**, hooks/edt/**, services/edt.js, styles/edt.css,
+ nouvelles routes dans App.jsx, entrées de menu, configuration Vitest, tests, captures pour manuels.
+
+VÉRIFICATION
+ `npm run lint` (avertissements ≤ baseline), `npm run build`, `npm run test` verts ; parcours
+ complet « générer → contrôler → corriger → valider → publier » réalisable sans recharger la page.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P18 — FRONTEND REACT : ÉCRANS PRÉSENCES, ÉMARGEMENT, FORÇAGE ET TABLEAUX DE BORD
+====================================================================================================
+CONTEXTE
+Module 08 §26-28 définit trois tableaux de bord : enseignant (mes séances du jour avec présents /
+absents / retards), étudiant (ma présence globale et par module avec alerte), administration
+(étudiants attendus / présents / absents, taux global). L'exigence utilisateur impose un émargement
+manuel et un forçage motivé accessibles depuis l'interface web.
+
+OBJECTIF
+Livrer l'interface web de gestion des présences, utilisable en salle, en temps réel, y compris en
+connexion dégradée.
+
+À FAIRE
+ 1. Écrans (routes sous /presences) :
+    • FeuilleEmargement    : écran principal en salle — liste des étudiants attendus avec photo si
+                             disponible, matricule, statut, heure d'arrivée ; marquage en un clic ;
+                             recherche instantanée ; actions de masse ; compteur temps réel
+                             présents/absents/retards ; rafraîchissement automatique pendant que
+                             le QR est scanné (polling court ou SSE) ; bouton d'ouverture et de
+                             clôture de séance ; minuteur de fenêtre d'émargement.
+    • AffichageQR          : page plein écran destinée au vidéoprojecteur — QR de séance très
+                             lisible, rotation automatique du jeton avec compte à rebours,
+                             nom du cours, groupe, salle, compteur de scans en direct,
+                             identité visuelle INJS.
+    • ScanBadge            : scan inverse par webcam (enseignant scannant les cartes étudiants),
+                             avec retour sonore et visuel immédiat, file de scans, mode continu.
+    • ForcageBadgeage      : formulaire dédié — sélection de la ou des personnes, statut cible,
+                             sélection d'un ou plusieurs MOTIFS dans le référentiel, commentaire
+                             (obligatoire selon le motif), pièce jointe facultative, récapitulatif
+                             avant confirmation, avertissement clair « action tracée et auditée »,
+                             puis affichage de la trace créée.
+    • Justificatifs        : dépôt (côté étudiant), instruction (côté scolarité), file de
+                             traitement, aperçu du document, décision motivée, historique.
+    • PresencesIntervenants: émargement des enseignants/formateurs/encadrants, cahier de texte,
+                             certification des heures, contestation.
+    • TableauBordEtudiant  : ma présence globale, par ECUE, alertes de seuil, mes justificatifs,
+                             mon EDT de la semaine.
+    • TableauBordEnseignant: mes séances du jour, à ouvrir / à clôturer, présents-absents-retards
+                             par séance, cahier de texte à compléter, mes heures.
+    • TableauBordAdmin     : temps réel institutionnel (attendus/présents/absents, taux global,
+                             par site, par formation), séances ouvertes, séances non tenues,
+                             incidents d'émargement, forçages du jour (contrôle interne).
+    • HistoriqueAudit      : consultation du journal immuable, filtres (séance, personne, auteur,
+                             motif, période), export, vérification de l'intégrité du chaînage.
+ 2. Ergonomie de terrain : gros boutons, contraste élevé, utilisable d'une main sur tablette,
+    fonctionnement correct sur réseau lent (optimistic UI avec réconciliation, file locale en cas
+    d'échec, indicateur de synchronisation).
+ 3. Sécurité d'affichage : ne jamais afficher un jeton QR à un rôle non habilité ; masquer les
+    données personnelles inutiles ; respect strict du périmètre de secrétariat.
+ 4. Tests frontend (≥ 25) : marquage unitaire et de masse, refus de forçage sans motif, affichage
+    des erreurs API en français, rafraîchissement temps réel, permissions par rôle.
+
+À NE PAS FAIRE
+ • Ne pas casser la page de badgeage HTML legacy tant qu'elle n'est pas officiellement retirée ;
+   prévoir un bandeau de redirection vers la nouvelle interface.
+ • Ne pas charger html5-qrcode ou Bootstrap depuis un CDN : dépendances locales uniquement.
+
+LIVRABLES
+ frontend/src/pages/presences/**, components/presences/**, hooks, services/presences.js,
+ styles dédiés, routes, tests, captures pour le manuel utilisateur.
+
+VÉRIFICATION
+ Un enseignant peut ouvrir une séance, projeter le QR, voir les scans arriver en direct, forcer
+ deux présences avec motif, clôturer, et consulter la trace — en moins de 2 minutes.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P19 — MOBILE FLUTTER + PWA : MON EDT, SCAN QR, ÉMARGEMENT ENSEIGNANT, HORS-LIGNE
+====================================================================================================
+CONTEXTE
+L'application Flutter (40 fichiers Dart, ~7 818 lignes, 3 tests seulement) sert les AUDITEURS
+(étudiants) et les FORMATEURS : connexion, tableau de bord, scan QR (mobile_scanner 7.x),
+historique des pointages, questionnaires, profil, télémétrie d'appareil, keepalive en avant-plan.
+La CI échoue sur l'asset assets/app.env ignoré par Git (R6). Le Modèle de référence (Module 06 §36)
+décrit un module EDT complet côté mobile, et le Module 08 un tableau de bord étudiant/enseignant.
+
+OBJECTIF
+Porter EDT-INJS sur mobile et PWA : consultation d'emploi du temps, badgeage fiable y compris
+hors-ligne, et émargement par l'enseignant depuis son téléphone.
+
+À FAIRE
+ 1. Corriger d'abord la CI mobile (R6) : versionner assets/app.env.example, le déclarer dans
+    pubspec.yaml, générer un app.env vide en étape CI, conserver le chargement défensif de
+    lib/main.dart. `flutter analyze` doit repasser à 0 problème bloquant.
+ 2. Écrans étudiant :
+    • Mon EDT : vue jour / semaine, prochaine séance mise en avant avec compte à rebours, détail
+      (module, enseignant, salle avec indication de localisation, type), rappel des changements
+      (salle modifiée, cours annulé, rattrapage) ;
+    • Badger : bouton unique contextuel (« Badger l'entrée » / « Badger la sortie »), scan du QR de
+      séance, retour immédiat (succès, retard de X minutes, erreur explicite) ;
+    • Mon badge : QR de personne (identifiant opaque, régénéré) pour le scan inverse par
+      l'enseignant ;
+    • Mes présences : taux global et par module, alertes de seuil, historique, dépôt de
+      justificatif (photo ou PDF) avec suivi de décision ;
+    • Notifications : cours annulé, salle modifiée, rattrapage, justificatif traité, seuil approché.
+ 3. Écrans enseignant/formateur/encadrant :
+    • Mes séances du jour, ouverture et clôture de séance ;
+    • Affichage du QR de séance sur le téléphone (si pas de vidéoprojecteur) ;
+    • Scan des badges étudiants en mode continu ;
+    • Feuille d'émargement manuelle avec marquage rapide et FORÇAGE MOTIVÉ (mêmes motifs que le
+      web, formulaire adapté au mobile, motif obligatoire) ;
+    • Saisie du cahier de texte ;
+    • Mon EDT et mes heures.
+ 4. Hors-ligne robuste : base locale chiffrée (secure storage + base embarquée), mise en file des
+    scans et des marquages, synchronisation automatique au retour du réseau avec résolution de
+    conflits côté serveur, indicateur clair de l'état de synchronisation, aucune perte de donnée.
+ 5. Sécurité mobile : DeviceBinding conservé, demande explicite de consentement pour la
+    géolocalisation, dégradation propre si refusée (marquage « à vérifier », jamais de blocage
+    silencieux), pas de stockage de données personnelles au-delà du nécessaire, purge à la
+    déconnexion.
+ 6. PWA : même parcours, avec les limites documentées (pas de heartbeat en arrière-plan hors onglet
+    actif, préfixe FLUTTER_PWA_ conservé) ; retirer les vestiges du service worker « qr-badge-v3 »
+    et des CDN tiers au profit d'un service worker propre « edt-injs ».
+ 7. Tests : porter la couverture mobile de 3 fichiers à au moins 20 tests (widgets critiques, file
+    hors-ligne, parsing des réponses API, gestion des erreurs de scan).
+ 8. Montées de version mineures sûres des plugins (mobile_scanner, geolocator, permission_handler)
+    uniquement si `flutter analyze` et les tests restent verts ; sinon, consigner et reporter.
+
+À NE PAS FAIRE
+ • Ne pas casser le flux de scan actuel des auditeurs en production.
+ • Ne pas rendre l'application inutilisable sans GPS.
+
+LIVRABLES
+ qr_badge_mobile/lib/** (modules edt/ et emargement/), assets/app.env.example, tests,
+ mise à jour de la CI mobile, docs/EDT_INJS_MOBILE.md.
+
+VÉRIFICATION
+ Job Mobile de la CI vert ; scénario avion : 10 scans hors-ligne puis reconnexion → 10 présences
+ enregistrées, aucun doublon.
+====================================================================================================
+
+
+----------------------------------------------------------------------------------------------------
+LOT 6 — RESTITUTION, QUALITÉ ET MISE EN PRODUCTION
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+PROMPT P20 — EXPORTS PDF/EXCEL, IMPRESSIONS OFFICIELLES ET DOCUMENTS D'ÉMARGEMENT
+====================================================================================================
+CONTEXTE
+L'application dispose d'un moteur d'exports réutilisable (reportlab 4.2.5 + openpyxl 3.1.5, app
+`exports` avec 14 routes, 39 fichiers concernés) — mais l'audit signale 0 test sur les exports.
+L'INJS a besoin de documents officiels imprimables, à en-tête institutionnel.
+
+OBJECTIF
+Produire tous les documents officiels liés à l'EDT et aux présences, au standard INJS, testés.
+
+À FAIRE
+ 1. Documents EDT :
+    • Emploi du temps hebdomadaire par groupe / enseignant / formation / espace (PDF paysage A4 et
+      A3, Excel) ;
+    • Emploi du temps semestriel condensé ;
+    • Planning d'occupation des espaces (par site, par semaine) ;
+    • Liste des séances d'une période avec statuts ;
+    • Rapport de génération d'EDT (paramètres, résultats, conflits, non planifiés) ;
+    • Planning des examens, listes de salles, convocations individuelles avec QR de vérification.
+ 2. Documents Présences :
+    • Feuille d'émargement vierge (pour secours papier) avec liste nominative, colonnes signature,
+      en-tête de séance et QR de la séance ;
+    • Feuille d'émargement renseignée (PV de séance) avec statuts, heures, méthode et mentions de
+      forçage ;
+    • Registre d'assiduité par étudiant (relevé de présence officiel) ;
+    • État des absences par groupe / ECUE / période, avec justificatifs ;
+    • Rapport de forçages (contrôle interne) et extrait du journal d'audit ;
+    • État des heures certifiées par intervenant (support de vacation) ;
+    • Bilan de suivi des enseignements : VH prévue / planifiée / réalisée / écart.
+ 3. Charte documentaire commune : en-tête République de Côte d'Ivoire / Ministère de tutelle / INJS
+    Marcory / UFR STAPS-JL, logo INJS, pied de page avec date d'édition, éditeur, numéro de page et
+    QR de vérification d'authenticité ; paramétrable (les mentions institutionnelles ne sont pas
+    codées en dur).
+ 4. Implémentation : étendre l'app `exports` (générateurs réutilisables, pas de copier-coller),
+    génération asynchrone au-delà d'un volume paramétrable avec téléchargement différé,
+    nommage de fichier normalisé (EDT_L2-EM-G2_S3_2026-2027_semaine-07.pdf).
+ 5. Tests (≥ 20, comblant un trou de l'audit) : chaque document est généré, non vide, contient les
+    champs attendus (extraction texte du PDF), respecte la pagination, et ne fuit aucune donnée
+    hors périmètre de rôle.
+
+À NE PAS FAIRE
+ • Ne pas dupliquer le moteur d'export existant.
+ • Ne pas inclure de logo hérité (logo-sygepcpfae.png) dans un document neuf.
+
+LIVRABLES
+ backend/exports/edt_injs/** (générateurs), routes, tests, modèles de documents,
+ docs/EDT_INJS_DOCUMENTS.md avec un exemple de chaque document.
+
+VÉRIFICATION
+ Les 14 exports existants fonctionnent toujours à l'identique ; les nouveaux documents s'impriment
+ correctement en A4 et A3.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P21 — TESTS AUTOMATISÉS, PERFORMANCE ET OBSERVABILITÉ
+====================================================================================================
+CONTEXTE
+Audit : 943 tests backend (bonne base) mais 0 test sur `edts`, `exports` et `dashboard` ; 0 test
+frontend ; 3 fichiers de tests mobiles ; 288 print() runtime ; pas de Sentry/APM (R2, R7).
+L'exigence est que l'application reste « fonctionnelle, opérationnelle et performante ».
+
+OBJECTIF
+Industrialiser la qualité du module EDT-INJS et améliorer l'observabilité globale, sans alourdir la
+CI de façon déraisonnable.
+
+À FAIRE
+ 1. Couverture cible : ≥ 85 % de couverture de lignes sur backend/edt_injs et sur les nouveaux
+    modules de présences ; mesurer avec coverage et publier le rapport dans la CI ; échouer le job
+    sous le seuil.
+ 2. Types de tests à fournir :
+    • unitaires (services, contraintes, calculs de volumes, seuils) ;
+    • d'intégration (workflow complet : besoins → génération → conflits → validation → publication →
+      séance → émargement → statistiques) ;
+    • de permissions : matrice 12 rôles × routes EDT-INJS, en succès ET en refus ;
+    • de non-régression : les tests de caractérisation de P00 restent verts ;
+    • de performance : assertions sur le nombre de requêtes SQL (assertNumQueries) pour les vues
+      critiques, et budget de temps sur le bench P00 ;
+    • de sécurité : rejeu de jeton, élévation de privilège, accès inter-secrétariats, injection
+      dans les filtres, exposition de médias ;
+    • frontend (Vitest + Testing Library + msw) et mobile (widget tests + tests de file hors-ligne).
+ 3. Jeu de données de démonstration réaliste : commande
+    `python manage.py seed_edt_injs --profil injs-marcory` créant une année académique complète
+    (2 formations, 3 niveaux, 12 groupes, 1 250 étudiants, 25 enseignants, 35 espaces dont piscine,
+    gymnase, piste et laboratoire, 150 enseignements, 520 séances, présences simulées sur 4 semaines).
+    Idempotente, réservée à DEBUG ou à un profil explicite, jamais exécutable par erreur en prod.
+ 4. Observabilité :
+    • remplacer TOUS les print() introduits ou touchés par `logging` structuré (logger par module,
+      niveaux cohérents, identifiant de corrélation de requête) ; réduire le compteur global des
+      288 print() d'au moins 30 % en priorisant les fichiers du périmètre EDT/présences ;
+    • journal métier dédié (ouverture/clôture de séance, génération d'EDT, publication, scan refusé,
+      forçage) avec rotation ;
+    • point de santé enrichi /api/health/ (base, cache, cron, dernière génération, dernière clôture
+      automatique, retard de file hors-ligne) ;
+    • métriques applicatives exposées (compteurs de scans, de refus par code, durées de génération,
+      taux de présence du jour) sous une route protégée ;
+    • intégration optionnelle et désactivée par défaut d'un APM/Sentry via variable d'environnement,
+      sans dépendance obligatoire.
+ 5. Performance : profilage des 10 requêtes les plus coûteuses du périmètre, ajout d'index manquants,
+    cache Redis sur les grilles et les statistiques avec invalidation par signal, pagination
+    obligatoire partout, `only()/defer()` sur les grosses listes. Budgets : grille hebdo < 400 ms,
+    feuille d'émargement de 300 étudiants < 600 ms, scan < 200 ms au 95e centile, génération de
+    520 séances < 120 s.
+ 6. CI : job `edt-injs` (tests + couverture + bench non bloquant), cache des dépendances, durée
+    totale de CI maîtrisée (< 20 min), annulation des exécutions obsolètes conservée.
+
+À NE PAS FAIRE
+ • Ne pas désactiver de test existant pour faire passer la CI.
+ • Ne pas ajouter de dépendance obligatoire lourde (APM, Celery) sans repli.
+
+LIVRABLES
+ tests/** (backend, frontend, mobile), commande seed_edt_injs, configuration coverage,
+ configuration logging, route de métriques, mise à jour de ci.yml,
+ docs/EDT_INJS_QUALITE.md (stratégie de test, budgets de performance, procédure de diagnostic).
+
+VÉRIFICATION
+ CI complète verte ; couverture ≥ 85 % sur le périmètre ; budgets de performance respectés sur le
+ jeu de démonstration.
+====================================================================================================
+
+
+====================================================================================================
+PROMPT P22 — MIGRATION DES DONNÉES, DÉPLOIEMENT PROGRESSIF, RECETTE ET DOCUMENTATION
+====================================================================================================
+CONTEXTE
+L'application doit rester opérationnelle pendant toute l'intégration. Le Rapport de mise en œuvre
+impose la résorption des doubles représentations D1-D5 sans rupture de service, la préservation des
+890+ tests, et une sauvegarde chiffrée quotidienne (scripts/backup_injs_lmd.sh, SHA-256). Il n'existe
+ni environnement de recette ni CD documenté (§6.3 de l'audit).
+
+OBJECTIF
+Basculer l'INJS sur EDT-INJS de façon progressive, réversible et vérifiée, et livrer la documentation
+d'exploitation et de formation.
+
+À FAIRE
+ 1. Migration des données existantes :
+    • Commande `python manage.py migrer_edt_vers_edt_injs --dry-run` important les EmploiDuTemps /
+      AffectationCreneau / ConflitCreneau de l'app `edts` et les SessionModule planifiées vers les
+      structures edt_injs, avec rapport détaillé, contrôle d'intégrité et réversibilité.
+    • Rattachement des Pointage historiques aux SeanceEmargement reconstituées, sans modification
+      des pointages.
+    • Respect des règles D1 à D5 : Groupe LMD source de vérité, FK Ref* pour les nomenclatures,
+      Formation.ref_formation, notes rattachées à l'ECUE, cloisonnement des deux finances.
+      Aucune double écriture : les champs legacy deviennent lecture seule et synchronisés.
+    • Rapport de réconciliation : effectifs, volumes horaires, taux de présence AVANT et APRÈS
+      migration doivent être identiques (tolérance zéro sur les totaux).
+ 2. Déploiement progressif par drapeaux de fonctionnalité (table Parametre existante ou variables
+    d'environnement) : EDT_INJS_ACTIF, EDT_INJS_MOTEUR_AUTO, EDT_INJS_QR_V2,
+    EDT_INJS_UI_NOUVELLE, EDT_INJS_MOBILE. Chaque drapeau est activable par secrétariat/formation
+    pour un pilote restreint, et désactivable INSTANTANÉMENT (procédure de repli documentée et
+    testée).
+ 3. Plan de bascule en 4 vagues :
+    V1 pilote : 1 formation, 2 groupes, 4 semaines, double saisie de contrôle.
+    V2 extension : toutes les formations d'un niveau.
+    V3 généralisation : tout l'UFR STAPS-JL.
+    V4 retrait du legacy : après 2 semestres sans incident, retrait documenté de la page de badgeage
+       HTML legacy, du service worker qr-badge-v3, des CDN tiers et des routes `edts` dépréciées.
+ 4. Exploitation :
+    • étendre scripts/backup_injs_lmd.sh (rétention, envoi hors site chiffré, test de restauration
+      automatisé mensuel) ;
+    • runbook d'incident : séance bloquée, QR non généré, scans non synchronisés, génération qui
+      n'aboutit pas, cron non exécuté, cache incohérent — avec commande de diagnostic pour chacun ;
+    • commandes de réconciliation : `edt_injs_diag`, `edt_injs_reconcilier_presences`,
+      `edt_injs_recalculer_statistiques`, toutes idempotentes et avec --dry-run ;
+    • checklist de mise en production (dont vérification que les middlewares de démo sont INERTES,
+      DEBUG=0, SECRET_KEY, ALLOWED_HOSTS, HSTS, throttles, médias non publics).
+ 5. Recette fonctionnelle : cahier de recette de 60 scénarios couvrant les 26 sous-modules du
+    Module 06 et les 17 du Module 08, avec, pour chacun : acteur, préconditions, étapes, résultat
+    attendu, statut. À faire valider par la Direction, la scolarité, un enseignant et un étudiant.
+ 6. Documentation et formation :
+    • docs/EDT_INJS_MANUEL_ADMINISTRATEUR.md (paramétrage, calendrier, espaces, contraintes,
+      génération, publication, incidents) ;
+    • docs/EDT_INJS_MANUEL_SCOLARITE.md (planification quotidienne, conflits, forçages,
+      justificatifs, exports) ;
+    • docs/EDT_INJS_MANUEL_ENSEIGNANT.md (mes séances, émargement, QR, cahier de texte, heures) ;
+    • docs/EDT_INJS_MANUEL_ETUDIANT.md (mon EDT, badger, mes présences, justificatifs) ;
+    • fiches mémo imprimables A4 recto pour la salle de cours ;
+    • mise à jour du README racine pour supprimer les mentions héritées « sygepcpfae / MEMFPMA »
+      (R5) et présenter EDT-INJS.
+ 7. Matrice RACI de l'exploitation courante (DFRC, Direction, Secrétariats, Développeur, Enseignants,
+    Auditeurs) reprise et adaptée du Rapport de mise en œuvre.
+
+À NE PAS FAIRE
+ • Aucune bascule big-bang, aucune migration irréversible, aucune suppression de données
+   historiques.
+ • Ne pas retirer le legacy avant la fin de la vague V4.
+
+LIVRABLES
+ commandes de migration et de diagnostic, drapeaux de fonctionnalité, scripts d'exploitation,
+ cahier de recette, 4 manuels, runbook, checklist de production, README mis à jour,
+ docs/EDT_INJS_PLAN_DE_BASCULE.md.
+
+VÉRIFICATION
+ Migration exécutée sur une copie de la base de production : rapport de réconciliation à zéro écart,
+ application fonctionnelle, suite de tests verte, désactivation d'un drapeau restaurant
+ immédiatement le comportement antérieur.
+====================================================================================================
+
+
+====================================================================================================
+PARTIE D — ANNEXES
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+D1 — MATRICE RÔLES × PERMISSIONS EDT-INJS (à implémenter dans permissions.py et refléter dans roles.js)
+----------------------------------------------------------------------------------------------------
+Rôles existants : ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN, DIRECTION, CHEF_SECRETARIAT, SECRETARIAT,
+FINANCE, ARCHIVE, ENCADRANT, SUPERVISEUR, FORMATEUR, AUDITEUR.
+
+Fonction                                  ADMIN CHEF_CPFAE CPFAE DIR CHEF_SEC SEC FIN ARCH ENC SUP FORM AUD
+Paramétrer calendrier/créneaux              ✔      ✔        ✔    L     ✔      –   –   –   –   –   –    –
+Gérer espaces & compatibilités              ✔      ✔        ✔    L     ✔      L   –   –   L   L   –    –
+Générer/simuler un EDT                      ✔      ✔        ✔    L     ✔      –   –   –   –   L   –    –
+Planifier/déplacer manuellement             ✔      ✔        ✔    L     ✔      ✔*  –   –   –   L   –    –
+Résoudre/ignorer un conflit                 ✔      ✔        ✔    L     ✔      –   –   –   –   –   –    –
+Valider / Publier / Activer un EDT          ✔      ✔        ✔    A     ✔*     –   –   –   –   –   –    –
+Annuler une séance                          ✔      ✔        ✔    L     ✔      ✔*  –   –   L   ✔*  D    –
+Programmer un rattrapage                    ✔      ✔        ✔    L     ✔      ✔*  –   –   L   ✔   D    –
+Valider un remplacement                     ✔      ✔        ✔    L     ✔      –   –   –   –   ✔   D    –
+Ouvrir / clôturer une séance d'émargement   ✔      ✔        ✔    L     ✔      ✔*  –   –   ✔   ✔   ✔S   –
+Afficher le QR de séance                    ✔      ✔        ✔    L     ✔      ✔*  –   –   ✔   ✔   ✔S   –
+Scanner (badger)                            –      –        –    –     –      –   –   –   ✔   ✔   ✔    ✔
+Émarger manuellement                        ✔      ✔        ✔    L     ✔      ✔*  –   –   ✔S  ✔S  ✔S   –
+FORCER un badgeage (motif obligatoire)      ✔      ✔        ✔    –     ✔      ✔*  –   –   –   ✔S  ✔S†  –
+Forcer au-delà du délai de 72 h             ✔      ✔        –    –     ✔      –   –   –   –   –   –    –
+Instruire un justificatif                   ✔      ✔        ✔    L     ✔      ✔*  –   –   –   –   –    –
+Déposer un justificatif                     –      –        –    –     –      –   –   –   –   –   ✔    ✔
+Certifier les heures d'un intervenant       ✔      ✔        ✔    A     ✔      –   L   –   –   ✔   –    –
+Consulter les heures certifiées (finance)   ✔      ✔        ✔    ✔     L      L   ✔   –   –   –   D    –
+Consulter le journal d'audit                ✔      ✔        ✔    ✔     ✔      L*  –   ✔   –   –   –    –
+Consulter son propre EDT / ses présences    ✔      ✔        ✔    ✔     ✔      ✔   ✔   ✔   ✔   ✔   ✔    ✔
+Exporter documents officiels                ✔      ✔        ✔    ✔     ✔      ✔*  L   ✔   L   L   D    D
+
+Légende : ✔ autorisé · A approbation finale · L lecture seule · D données propres uniquement ·
+S limité à ses propres séances · * limité au périmètre de son secrétariat · † motif restreint,
+délai court, contrôle a posteriori · – interdit.
+Rappel : FORMATEUR et AUDITEUR sont réservés au mobile/PWA côté connexion web (comportement
+existant à préserver).
+
+----------------------------------------------------------------------------------------------------
+D2 — DICTIONNAIRE DES STATUTS ET MACHINES À ÉTATS
+----------------------------------------------------------------------------------------------------
+EmploiDuTempsINJS : BROUILLON → GENERE → A_CONTROLER → VALIDE → PUBLIE → ACTIF → ARCHIVE
+                    (retours autorisés : A_CONTROLER→GENERE, VALIDE→A_CONTROLER ; après PUBLIE,
+                     uniquement modification tracée ou nouvelle version)
+Seance            : PLANIFIEE → CONFIRMEE → OUVERTE → EN_COURS → REALISEE
+                    dérivations : ANNULEE, REPORTEE, NON_REALISEE, A_RATTRAPER
+SeanceEmargement  : PLANIFIEE → OUVERTE → EN_COURS → CLOTUREE (ou ANNULEE, NON_TENUE)
+LigneEmargement   : ATTENDU → PRESENT | ABSENT | RETARD | ABSENCE_JUSTIFIEE | DISPENSE |
+                    PARTIELLEMENT_PRESENT | PRESENCE_FORCEE | EXCLU
+PresenceIntervenant: ATTENDU → PRESENT | ABSENT | RETARD | ABSENCE_JUSTIFIEE | REMPLACE |
+                    PRESENCE_FORCEE
+JetonEmargement   : ACTIF → EXPIRE | REVOQUE | CONSOMME
+JustificatifAbsence: DEPOSE → EN_EXAMEN → ACCEPTE | REFUSE | COMPLEMENT_DEMANDE
+Conflit           : OUVERT → EN_COURS → RESOLU | IGNORE_JUSTIFIE
+Rattrapage        : A_PROGRAMMER → PROPOSEE → VALIDEE → REALISEE | ABANDONNEE
+Remplacement      : PROPOSE → ACCEPTE | REFUSE | ANNULE
+Reservation       : DEMANDE → INSTRUCTION → VALIDEE → CONFIRMEE → UTILISEE | REFUSEE | ANNULEE
+Espace            : DISPONIBLE | OCCUPE | RESERVE | EN_MAINTENANCE | FERME | HORS_SERVICE |
+                    EN_RENOVATION
+Règle générale : toute transition est contrôlée par permission, journalisée, et refusée avec un
+message explicite en français si elle n'est pas autorisée.
+
+----------------------------------------------------------------------------------------------------
+D3 — PARAMÈTRES CONFIGURABLES (AUCUNE VALEUR MÉTIER EN DUR)
+----------------------------------------------------------------------------------------------------
+Temporels        : créneaux horaires, grilles, jours ouvrables, heures d'ouverture du campus,
+                   jours fériés, semaines pédagogiques, durée standard de séance, pause méridienne.
+Émargement       : minutes d'ouverture anticipée (défaut 10), minutes de fermeture après début
+                   (défaut 15), clôture automatique après fin (défaut 15), seuils de retard
+                   (0-10 présent / 11-30 retard / >30 absent), traitement des sorties non badgées
+                   (SORTIE_AUTO | ABSENT_NON_BADGE), délai de forçage sans rôle supérieur (72 h).
+QR & sécurité    : durée de rotation du jeton (30 s), durée de validité maximale (24 h),
+                   geofencing actif (oui/non par site et par espace), rayon, précision GPS minimale,
+                   DeviceBinding strict (oui/non), throttles, tolérance de dérive d'horloge.
+Assiduité        : seuil d'alerte (20 %), seuil critique (25 %), base de calcul, prise en compte
+                   des absences justifiées, périodicité de recalcul.
+Moteur           : budget de temps de génération, graine, poids de chaque contrainte souple,
+                   activation de chaque contrainte, capacité d'examen (% de la capacité normale),
+                   ratio surveillants/candidats, priorité entre usages d'espaces.
+Notifications    : canaux actifs, fenêtre d'agrégation, préavis de séance (J-1, H-1), destinataires.
+Institution      : mentions d'en-tête, logos, libellés officiels, fuseau, langue, format de matricule.
+Tous ces paramètres sont stockés en base (app `parametres` existante à réutiliser), historisés
+(ParametreHistorique), modifiables sans redéploiement, et exposés dans un écran d'administration.
+
+----------------------------------------------------------------------------------------------------
+D4 — CRITÈRES D'ACCEPTATION GLOBAUX (DEFINITION OF DONE DU MODULE EDT-INJS)
+----------------------------------------------------------------------------------------------------
+Fonctionnel
+ 1. Les 26 sous-modules du Module 06 et les 17 sous-modules du Module 08 du Modèle de référence
+    sont couverts, ou explicitement listés comme hors périmètre avec justification écrite.
+ 2. Un responsable peut enchaîner sans assistance : sélectionner l'année → la formation → le
+    semestre → charger les enseignements → vérifier enseignants, groupes et espaces → définir les
+    contraintes → générer → examiner les conflits → corriger → valider → publier.
+ 3. Immédiatement après publication : l'étudiant voit son EDT, l'enseignant voit le sien, le
+    responsable voit l'EDT global, le gestionnaire d'espaces voit l'occupation, l'administration
+    voit les réservations.
+ 4. Le badgeage fonctionne dans les deux sens (QR de séance scanné par l'étudiant, badge étudiant
+    scanné par l'enseignant), en ligne et hors-ligne, pour étudiants, enseignants, formateurs et
+    encadrants.
+ 5. L'émargement manuel et le forçage motivé sont disponibles sur web et mobile, toujours tracés.
+ 6. Les statistiques, alertes, exports et documents officiels sont produits et exacts.
+Technique
+ 7. Zéro régression : suite backend 100 % verte (943 tests + nouveaux), lint et build frontend OK,
+    flutter analyze OK, tests de caractérisation P00 verts.
+ 8. Couverture ≥ 85 % sur le périmètre EDT-INJS ; tests frontend et mobile en place.
+ 9. Budgets de performance respectés (grille < 400 ms, émargement < 600 ms, scan < 200 ms p95,
+    génération de 520 séances < 120 s).
+10. Aucun fichier nouveau > 600 lignes ; aucun print() ajouté ; aucune dépendance CDN ajoutée.
+11. Toutes les routes documentées dans OpenAPI ; contrat /api/scolarite/edt/ v1.1 intact.
+12. Journal d'audit immuable et vérifiable ; aucune suppression physique de donnée historique.
+Organisationnel
+13. Les 4 manuels et le cahier de recette (60 scénarios) sont livrés et validés.
+14. Le plan de bascule en 4 vagues est exécutable, chaque drapeau est réversible en une minute.
+15. La documentation ne contient plus de référence héritée « sygepcpfae / MEMFPMA / QR Badge »
+    dans le périmètre livré.
+
+----------------------------------------------------------------------------------------------------
+D5 — JOURNAL DE BORD À TENIR PAR L'AGENT (docs/EDT_INJS_JOURNAL.md)
+----------------------------------------------------------------------------------------------------
+Pour CHAQUE prompt exécuté, consigner :
+  • Identifiant du prompt et date d'exécution
+  • Branche et commits produits
+  • Fichiers créés / modifiés / supprimés (avec nombre de lignes)
+  • Migrations générées (numéro, réversibilité vérifiée oui/non)
+  • Tests ajoutés (nombre) et résultat de la suite complète
+  • Mesures de performance avant / après
+  • Écarts par rapport au prompt et justification
+  • Risques identifiés et dettes créées
+  • Reste à faire reporté dans docs/EDT_INJS_RESTE_A_FAIRE.md
+  • Validation fonctionnelle : qui, quand, verdict
+
+====================================================================================================
+RAPPEL FINAL À L'AGENT DE CODAGE
+====================================================================================================
+L'objectif n'est pas de réécrire app-injs-lmd2026demo mais de L'ALIGNER sur le Modèle fonctionnel de
+référence en y intégrant EDT-INJS. Le socle backend existant est mature et éprouvé : il se complète,
+il ne se remplace pas. L'emploi du temps et le badgeage QR constituent la colonne vertébrale
+opérationnelle de l'INJS Marcory : ils alimentent en amont la scolarité et en aval les évaluations,
+les jurys, la diplômation et les finances. Chaque livraison doit être démontrable devant la
+Direction de l'INJS, utilisable dès le lendemain par un agent de scolarité, un enseignant sur un
+terrain d'athlétisme et un étudiant avec un téléphone d'entrée de gamme sur un réseau instable.
+
+Qualité, traçabilité, performance, zéro régression — dans cet ordre, toujours.
+====================================================================================================
+FIN DU FICHIER — Génération-prompts-EDTINJS-app-injs-lmd2026.txt
+====================================================================================================

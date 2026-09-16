@@ -1,0 +1,59 @@
+================================================================================
+PROMPT P08-04 — JURYS LMD : SESSIONS, DÉLIBÉRATIONS ET DÉCISIONS
+================================================================================
+P08-04 — JURYS LMD : SESSIONS, DÉLIBÉRATIONS ET DÉCISIONS
+Lot 8 | 3 séances | Dépendances : P08-03, P02-04 | Module réf. : 10
+Risques couverts : R8, R1 | Type : Workflow — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+L'app jurys (6 modèles : SessionJury, membres, propositions, décisions, PV,
+notifications) existe avec une machine à états :
+PREPARATION → CONTROLE → CALCUL → DELIBERATION → DECISION → PV → VALIDE →
+VERROUILLE → PUBLIE. L'audit note une « UI légère » (maturité 2). Le verrou de
+masse des notes à l'entrée en CONTROLE/CALCUL a été livré en P02-02.
+
+MISSION
+Livrer l'interface complète du déroulé d'une session de jury, branchée sur le
+moteur de validation reproductible.
+
+CONSIGNES
+1. Écran « Sessions de jury » : liste filtrable (année, formation, niveau,
+   semestre, type [semestriel, annuel, final], état), création avec périmètre
+   (formation/parcours/niveau/semestre) et composition.
+2. Composition du jury : membres avec rôle (président, membres, rapporteur),
+   quorum paramétrable, contrôle de conflit d'intérêts paramétrable (ex. un
+   enseignant ne délibère pas sur un module dont il est responsable — règle
+   activable), convocation des membres.
+3. Déroulé par état, chacun avec son écran :
+   - PREPARATION : vérification de la complétude (toutes les notes saisies ?
+     toutes les évaluations verrouillées ?) avec liste explicite des manques ;
+   - CONTROLE : contrôle d'intégrité (notes sans ECUE, crédits incohérents,
+     étudiants sans IP) — verrou de masse des notes appliqué ;
+   - CALCUL : exécution du moteur de validation (P02-04) avec les règles
+     versionnées, résultat détaillé et reproductible ;
+   - DELIBERATION : revue étudiant par étudiant, propositions (validation,
+     compensation, rattrapage, redoublement, ajournement) avec motif
+     obligatoire ;
+   - DECISION : vote/decision actée par le président, quorum vérifié ;
+   - PV : génération du procès-verbal ;
+   - VALIDE / VERROUILLE / PUBLIE : transitions avec droits N4.
+4. Toute transition est motivée, tracée et notifiée. Aucune transition
+   régressive sans motif et sans droits.
+5. Simulation avant décision : le jury peut rejouer le calcul avec des règles
+   différentes (via le simulateur P02-04) SANS affecter les résultats
+   enregistrés, la simulation étant explicitement marquée comme telle.
+6. Réouverture d'une session : procédure exceptionnelle, motivée, N4, avec
+   déverrouillage des notes tracé et notification.
+7. Tests : chaque état, quorum, complétude, verrou de masse, reproductibilité
+   du calcul en session, immuabilité des décisions après VERROUILLE,
+   réouverture motivée.
+
+DoD
+[ ] 9 états du jury avec écran et actions dédiés
+[ ] composition, quorum et conflit d'intérêts paramétrables
+[ ] calcul via le moteur versionné et reproductible
+[ ] simulation sans effet sur les résultats enregistrés
+[ ] tests verts, dont immuabilité après verrouillage

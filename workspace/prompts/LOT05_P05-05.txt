@@ -1,0 +1,39 @@
+================================================================================
+PROMPT P05-05 — CALENDRIER PÉDAGOGIQUE ET CONTRÔLE DE COHÉRENCE GLOBALE
+================================================================================
+P05-05 — CALENDRIER PÉDAGOGIQUE ET CONTRÔLE DE COHÉRENCE GLOBALE
+Lot 5 | 1 séance | Dépendances : P01-04, P05-01 | Module réf. : 04
+Risques couverts : R3 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 04 §26) prévoit un calendrier pédagogique propre
+à la formation (début/fin des enseignements, périodes d'évaluation, stages,
+jurys), distinct du calendrier académique général de l'établissement.
+
+MISSION
+Ajouter le calendrier pédagogique par formation et un contrôle de cohérence
+global de la chaîne pédagogique.
+
+CONSIGNES
+1. Crée PeriodePedagogique (formation, parcours, niveau, semestre, type
+   [ENSEIGNEMENT, EVALUATION, STAGE, JURY, RATTRAPAGE], date_debut, date_fin,
+   statut) avec contrôle de cohérence avec PeriodeAcademique (P01-04) : une
+   période pédagogique doit être contenue dans la période académique
+   correspondante.
+2. Écran « Calendrier pédagogique » par formation : vue semestrielle,
+   comparaison entre formations, export.
+3. Contrôle de cohérence GLOBAL de la chaîne : maquette active → ECUE →
+   affectations pédagogiques → charge enseignant → périodes → séances → notes
+   → jurys. Produis un rapport qui signale chaque rupture de chaîne (ex. ECUE
+   sans affectation, affectation sans séance, séance sans note).
+4. Ajoute ce rapport au tableau de bord d'intégrité (P02-05).
+5. Tests : cohérence des périodes, détection de chaque type de rupture.
+
+DoD
+[ ] PeriodePedagogique avec contrôle de contenance
+[ ] écran calendrier par formation + export
+[ ] rapport de cohérence de chaîne intégré au tableau d'intégrité
+[ ] tests verts

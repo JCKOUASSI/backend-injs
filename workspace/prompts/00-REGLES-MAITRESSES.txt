@@ -1,0 +1,147 @@
+================================================================================
+RÈGLES MAÎTRESSES PERMANENTES — PROJET INJS-LMD 2026 (app-injs-lmd2026demo)
+================================================================================
+Ce bloc est à coller INTÉGRALEMENT en tête de CHAQUE session de travail,
+AVANT le prompt choisi.
+Source : PARTIE B de « Génération-prompts-refonte-app-injs-lmd2026.txt ».
+================================================================================
+RÈGLES MAÎTRESSES — PROJET INJS-LMD 2026 (app-injs-lmd2026demo)
+
+Tu travailles sur l'application INJS-LMD 2026 de l'INJS Marcory (Abidjan, CI).
+L'application est EN SERVICE. Elle doit le rester en permanence.
+
+1. RÈGLE PRIORITAIRE
+NE JAMAIS modifier, supprimer, déplacer ou remplacer massivement du code sans
+avoir d'abord inspecté le projet existant. Avant toute intervention :
+  1. identifier le répertoire courant ;
+  2. inspecter l'arborescence (backend/, frontend/, qr_badge_mobile/, docs/,
+     scripts/, .github/workflows/) ;
+  3. identifier les frameworks et leurs versions RÉELLES (Django 5.1.4,
+     DRF 3.15.2, React 18.2, Vite 7, Flutter — lire les fichiers de config) ;
+  4. lire les fichiers de configuration concernés ;
+  5. vérifier Git (branche, statut, derniers commits) ;
+  6. comprendre l'architecture déjà présente.
+
+2. NE PAS DÉTRUIRE L'EXISTANT
+Ne jamais :
+  - supprimer une application Django existante sans justification écrite ;
+  - supprimer, réordonner ou réécrire des migrations existantes ;
+  - supprimer une base de données ;
+  - réinitialiser Git ; exécuter git reset --hard ; exécuter git clean -fd ;
+  - supprimer massivement des fichiers ;
+  - remplacer l'application existante par une nouvelle application ;
+  - écraser le frontend existant ;
+  - modifier le logo ou l'identité visuelle sans demande explicite ;
+  - réintroduire l'ancienne application SYGEP-CPFAE / QR Badge / MEMFPMA.
+
+3. GIT
+Avant une modification importante : git status ; git branch --show-current ;
+git log -5 --oneline. Après modification : git diff ; git status.
+Ne jamais committer automatiquement sauf demande explicite.
+
+4. MODIFICATIONS PAR PETITES ÉTAPES
+Une tâche est découpée en petites étapes. Pour chaque étape : analyser,
+modifier le minimum nécessaire, tester, vérifier les erreurs, présenter le
+résultat, attendre la validation si l'opération est importante.
+
+5. BASE DE DONNÉES
+Ne jamais supprimer ou recréer la base sans confirmation explicite. Ne jamais
+supprimer des migrations existantes pour « résoudre » un problème. Avant une
+migration : makemigrations puis INSPECTER le résultat, ensuite seulement
+migrate. Toute migration doit être réversible (fournir la marche arrière).
+
+6. DONNÉES
+Ne jamais supprimer les données de démonstration existantes sans confirmation.
+Les données de démonstration sont séparables du code. Les identifiants internes
+Django/PostgreSQL ne sont jamais utilisés comme identifiants métier visibles.
+
+7. API
+Le frontend web (React) et mobile (Flutter) communiquent UNIQUEMENT avec
+Django/DRF. Jamais d'accès direct à PostgreSQL depuis le frontend. Toutes les
+permissions sont vérifiées côté backend : l'UI ne masque jamais, elle filtre.
+
+8. SÉCURITÉ
+Ne jamais placer mot de passe, SECRET_KEY, clé JWT, clé API, clé de paiement,
+identifiant SMTP ou secret SMS dans Flutter, Git ou le code frontend. Variables
+d'environnement ou gestion de secrets uniquement.
+
+9. PERMISSIONS
+Conserver le système de droits N0–N4 existant et les 12 rôles métier existants
+(ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN, DIRECTION, CHEF_SECRETARIAT, SECRETARIAT,
+FINANCE, ARCHIVE, ENCADRANT, SUPERVISEUR, FORMATEUR, AUDITEUR). Ne pas
+remplacer arbitrairement le système de permissions. Toute évolution doit être
+rétrocompatible avec les rôles, permissions et périmètres existants.
+La matrice UI (frontend/src/utils/roles.js) doit rester alignée sur
+role_groups.py — et, à partir du prompt P00-06, dériver de l'endpoint de
+capacités du backend.
+
+10. IDENTIFIANTS MÉTIER
+Les interfaces et exports affichent des codes et libellés métier
+(MAT-2026-00125, EM-LIC, EM-L2, EM101, CAND-2026-000154), jamais
+student_id=125 / formation_id=7 / module_id=43.
+
+11. RÉFÉRENTIELS
+Ne jamais coder en dur dans React ou Flutter les formations, modules, niveaux,
+salles, types, catégories, grades, années ou autres référentiels. Ces données
+proviennent de l'API.
+
+12. NOTES
+Une note validée ou publiée n'est JAMAIS modifiée silencieusement. Toute
+correction passe par un objet de correction traçable (motif, auteur, date,
+valeur avant, valeur après).
+
+13. FINANCES
+Une opération financière validée n'est JAMAIS supprimée physiquement.
+Utiliser annulation, régularisation ou remboursement selon le workflow prévu.
+Les deux domaines financiers (finances étudiantes / rémunération des
+formateurs) restent STRICTEMENT séparés : modèles, écrans et droits distincts.
+
+14. DOCUMENTS
+Les documents validés/signés sont immuables. Utiliser la gestion de versions.
+
+15. AUDIT
+Les opérations sensibles sont journalisées : utilisateur, date, action, objet,
+ancienne valeur, nouvelle valeur, justification, résultat.
+
+16. AVANT TOUTE NOUVELLE FONCTIONNALITÉ
+Répondre d'abord : où cette fonctionnalité existe-t-elle déjà ? Quel module
+métier ? Quel modèle Django ? Quelle API existe déjà ? Quel écran existe déjà ?
+Quel rôle est autorisé ? Quel workflow existe déjà ? NE PAS CRÉER DE DOUBLON.
+
+17. PAS DE REFACTORING MASSIF
+Si une fonctionnalité peut être ajoutée avec une modification locale,
+privilégier cette solution. Ne pas refactoriser toute l'application pour
+résoudre un problème local.
+
+18. TESTS
+Après toute modification : lancer les tests concernés ; vérifier les imports ;
+vérifier les migrations ; vérifier l'API ; vérifier le frontend concerné ;
+vérifier la console ; vérifier git diff.
+
+19. RAPPORT FINAL
+Après chaque tâche, fournir :
+  - Modifications : liste précise des fichiers modifiés ;
+  - Fonctionnalités : ce qui a été ajouté ou corrigé ;
+  - Tests : tests effectués et résultats chiffrés ;
+  - Risques : problèmes éventuels restant à traiter ;
+  - Prochaine étape : UNE seule prochaine étape recommandée.
+
+20. INTERDICTION DE DEVINER
+Si une information fonctionnelle ou technique manque : NE PAS INVENTER.
+Identifier l'information manquante et demander confirmation.
+
+21. IDENTITÉ VISUELLE — À CONSERVER OBLIGATOIREMENT
+  - Bleus foncés : #001a33, #0a2a4d, #16365a, dégradé radial jusqu'à #000d1a ;
+  - Bleus clairs : #2277C1, #1A68AC, #1565C0, #1976D2, #f0f7ff ;
+  - Accent fonctionnel jaune/ambre : #F5B100 / #E69700 ;
+  - Erreur : #C62828 ;
+  - Glassmorphism : backdrop-filter blur(12 à 28 px) saturate(160 %), cartes et
+    panneaux translucides, fond d'écran clair #d4deec ;
+  - Logo : frontend/src/assets/logo-injs.svg (barre latérale + page de connexion).
+  Le logo résiduel backend/static/img/logo-sygepcpfae.png ne doit plus
+  apparaître sur aucun écran.
+
+22. PRINCIPE CENTRAL
+Préserver l'existant. Ajouter progressivement. Tester constamment. Tracer les
+modifications. Ne jamais sacrifier les données ou la stabilité pour aller plus
+vite.

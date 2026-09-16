@@ -1,0 +1,39 @@
+================================================================================
+PROMPT P03-07 — TABLEAU DE BORD ADMISSIONS ET PILOTAGE DE CAMPAGNE
+================================================================================
+P03-07 — TABLEAU DE BORD ADMISSIONS ET PILOTAGE DE CAMPAGNE
+Lot 3 | 1 séance | Dépendances : P03-01 à P03-06 | Module réf. : 02, 16
+Risques couverts : R1 | Type : Pilotage
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+La chaîne admissions/concours est désormais entièrement écrantée. Il manque un
+poste de pilotage unique pour le secrétariat et la direction.
+
+MISSION
+Livrer un tableau de bord admissions qui suit une campagne de l'ouverture à la
+clôture, avec alertes.
+
+CONSIGNES
+1. Indicateurs : candidatures déposées, dossiers complets/incomplets, pièces
+   manquantes, admissibles, présents au concours, notes saisies, classement
+   publié, admis, inscrits, places restantes, liste d'attente, recours.
+2. Vue par campagne avec un STEPPER de workflow visuel (ouverture → dépôt →
+   contrôle → admissibilité → concours → notes → classement → admission →
+   inscription → clôture) indiquant l'étape courante et les blocages.
+3. Alertes de seuil (réutilise statistiques.ConfigAlerteSeuil) : campagne
+   fermant dans moins de N jours avec dossiers incomplets, capacité atteinte,
+   épreuve sans surveillant affecté, classement non publié après la date
+   prévue.
+4. Comparaison entre campagnes (évolution des effectifs par formation).
+5. Exports : synthèse de campagne (PDF/Excel).
+6. Tests : indicateurs corrects sur un jeu de données de référence, alertes
+   déclenchées.
+
+DoD
+[ ] tableau de bord avec stepper de campagne
+[ ] alertes de seuil branchées
+[ ] comparaison inter-campagnes + export
+[ ] tests verts

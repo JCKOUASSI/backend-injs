@@ -1,0 +1,62 @@
+================================================================================
+PROMPT P02-02 — VERROU DES NOTES ET JOURNAL IMMUABLE DES CORRECTIONS
+================================================================================
+P02-02 — VERROU DES NOTES ET JOURNAL IMMUABLE DES CORRECTIONS
+Lot 2 | 2 séances | Dépendances : P01-01 | Module réf. : 09, 18 · DA-03
+Risques couverts : R8 | Type : Intégrité — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt possède NoteModule, NoteModuleColonne (CC, TP, Examen) et
+CorrectionNoteModule. Constat de l'audit (R8) : la piste d'audit des notes
+n'est pas immuable, et les notes ne sont pas verrouillées avant délibération.
+Le modèle de référence est sans ambiguïté : « Il doit être impossible de
+modifier silencieusement une note déjà validée. »
+
+MISSION
+Garantir qu'aucune note validée ou publiée ne peut être modifiée autrement que
+par une correction motivée, tracée et irréversible dans l'historique.
+
+CONSIGNES
+1. Inventorie tous les chemins d'écriture d'une note : API, admin Django,
+   import Excel, écran NotesModule.jsx, commandes de management, recalculs.
+   Liste-les dans le rapport.
+2. Définis le cycle de vie explicite de la note :
+   SAISIE → SOUMISE → VERROUILLÉE → VALIDÉE → PUBLIÉE → ARCHIVÉE
+   avec transitions, droits et effets. Un état ne peut jamais régresser sans
+   une procédure de correction.
+3. Implémente le verrou au niveau du modèle (save() refuse la modification
+   directe d'une note VALIDÉE/PUBLIÉE) + garde API + garde admin + garde
+   import. La modification passe OBLIGATOIREMENT par CorrectionNoteModule
+   enrichi : motif obligatoire (liste de motifs paramétrable), auteur, date,
+   valeur avant, valeur après, justificatif joint, valideur (N3/N4).
+4. Rends l'historique IMMUABLE : les entrées de correction ne sont ni
+   modifiables ni supprimables (pas de delete, pas d'update), avec contrôle
+   d'intégrité par empreinte chaînée (chaque entrée contient l'empreinte de la
+   précédente). Fournis une commande verify_notes_chain qui détecte toute
+   altération.
+5. Verrou automatique avant délibération : dès qu'une SessionJury passe à
+   l'état CONTROLE ou CALCUL, toutes les notes du périmètre sont verrouillées
+   en masse (opération atomique, journalisée, réversible uniquement par une
+   réouverture motivée de la session de jury).
+6. Ajoute un écran « Historique des corrections » (Scolarité et Jurys) :
+   recherche par étudiant, module, période, auteur, motif, avec avant/après.
+7. Ajoute l'export PDF de l'historique des corrections (réutilise le moteur
+   d'exports existant) pour les recours.
+8. Tests — obligatoires : modification directe refusée sur chaque chemin ;
+   correction complète avec motif/valideur ; immuabilité de l'historique ;
+   détection d'altération par verify_notes_chain ; verrou de masse par session
+   de jury ; réouverture motivée ; non-régression de la saisie normale.
+
+INTERDITS
+- Ne supprime aucune note ni aucune correction existante.
+- Ne permets aucune correction sans motif.
+
+DoD
+[ ] cycle de vie de la note en place, verrou effectif sur tous les chemins
+[ ] corrections motivées, validées, immuables, chaînées
+[ ] verify_notes_chain vert
+[ ] verrou de masse par session de jury testé
+[ ] écran d'historique + export PDF

@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P07-05 — ISOLEMENT DU SOCLE HTML LEGACY DE BADGEAGE
+================================================================================
+P07-05 — ISOLEMENT DU SOCLE HTML LEGACY DE BADGEAGE
+Lot 7 | 1 séance | Dépendances : P07-01 à P07-04 | Module réf. : 18 · DA-12
+Risques couverts : R12 | Type : Dette technique
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt conserve un socle HTML legacy : dashboard/views_legacy.py (1 951
+lignes), des templates de badgeage, backend/static/sw.js (« qr-badge-v3 ») qui
+pré-cache des CDN Bootstrap 5.3 et html5-qrcode. L'audit recommande de l'isoler
+derrière un feature flag puis de le retirer après bascule [S1 §10.3, R12].
+
+MISSION
+Isoler le legacy derrière un flag, sans le supprimer, et préparer son retrait.
+
+CONSIGNES
+1. Cartographie précisément ce qui est encore utilisé : routes legacy,
+   templates, service worker, appels CDN. Publie la liste avec, pour chacun,
+   l'usage réel constaté (traffic, dépendance d'un autre module, ou aucun).
+2. Isole chaque élément derrière un feature flag (P00-08), DÉSACTIVÉ par défaut
+   en production, ACTIVÉ uniquement si un besoin démontré subsiste.
+3. Retire les pré-caches de CDN tiers du service worker (Bootstrap, html5-qrcode)
+   : ils imposent des sources externes à la CSP et créent une surface de
+   sécurité. Vérifie que rien ne dépend de ces CDN côté React actuel.
+4. Prépare la procédure de retrait définitif dans docs/LEGACY_RETRAIT.md :
+   conditions de bascule, fenêtre d'observation, sauvegarde des templates,
+   étapes de suppression, test de non-régression.
+5. NE SUPPRIME RIEN dans ce prompt : l'isolation et la documentation seulement.
+   Le retrait définitif est l'objet de P12-05.
+6. Tests : le flag désactivé rend les routes legacy inaccessibles (404 ou
+   redirection explicite) sans affecter l'application ; le flag activé restaure
+   le comportement.
+
+DoD
+[ ] cartographie du legacy publiée
+[ ] chaque élément derrière un flag désactivé par défaut
+[ ] CDN tiers retirés du service worker
+[ ] docs/LEGACY_RETRAIT.md écrit
+[ ] tests de flag verts, application inchangée

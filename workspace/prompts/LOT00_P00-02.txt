@@ -1,0 +1,59 @@
+================================================================================
+PROMPT P00-02 — HYGIÈNE DU DÉPÔT : SORTIE DES DONNÉES NOMINATIVES ET DES ARTEFACTS
+================================================================================
+P00-02 — HYGIÈNE DU DÉPÔT : SORTIE DES DONNÉES NOMINATIVES ET DES ARTEFACTS
+Lot 0 | 1 séance | Dépendances : P00-01 | Module réf. : —
+Risques couverts : R5 | Type : Hygiène
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le dépôt contient des jeux de données Excel/CSV/.numbers versionnés
+(import_*.xlsx, *.csv, « LISTE DES FORMATEURS FAB 2026.numbers », dossier
+importverif/ avec données nominatives, test_*.xlsx) ainsi qu'un dossier
+staticfiles/ partiellement suivi par Git. Les données nominatives (noms de
+participants, formateurs, étudiants) ne doivent pas rester dans Git.
+
+MISSION
+Sortir du versionnage tout ce qui ne doit pas y être, sans casser aucun build
+ni aucune commande d'import existante.
+
+CONSIGNES
+1. Inventorie exhaustivement les fichiers de données versionnés (chemin, taille,
+   caractère nominatif OUI/NON, usage réel dans le code).
+2. Classe en 3 catégories : (a) MODÈLES VIDES à conserver, (b) données
+   nominatives à sortir, (c) artefacts de build à ignorer.
+3. Crée docs/modeles/ et déplace-y les seuls MODÈLES VIDES d'import
+   (en-têtes + 1 ligne d'exemple fictive non nominative), documentés par un
+   docs/modeles/README.md.
+4. Sort du suivi Git (git rm --cached, SANS supprimer les fichiers locaux)
+   toutes les données nominatives et tout le dossier staticfiles/.
+5. Mets à jour .gitignore : staticfiles/, *.xlsx sauf docs/modeles/, *.csv sauf
+   docs/modeles/, *.numbers, importverif/, .env, *.sqlite3, assets/app.env.
+6. Vérifie qu'aucun code n'importe un fichier désormais hors dépôt :
+   recherche systématique des noms de fichiers dans le code. Corrige les
+   références en pointant vers docs/modeles/ ou vers un paramètre de chemin.
+7. Ajoute une commande de management check_repo_hygiene qui échoue si un
+   fichier nominatif ou staticfiles/ réapparaît dans le suivi Git.
+8. Ajoute cette commande à la CI (job Backend, avant les tests).
+9. NE RÉÉCRIS PAS L'HISTORIQUE GIT : un nettoyage d'historique (filter-repo)
+   est une opération distincte qui sera planifiée avec l'équipe. Documente-la
+   dans docs/SECURITE_DONNEES.md avec la procédure, les risques et les
+   prérequis (sauvegarde, coordination, invalidation des clones).
+
+INTERDITS
+- Ne supprime aucun fichier du disque de travail sans confirmation.
+- Ne modifie aucune migration.
+- Ne touche pas à l'historique Git.
+
+LIVRABLES
+.gitignore mis à jour · docs/modeles/ + README · docs/SECURITE_DONNEES.md ·
+commande check_repo_hygiene + test · CI mise à jour.
+
+DoD
+[ ] git status propre après un build complet
+[ ] npm run build OK, docker build OK (collectstatic généré au build)
+[ ] check_repo_hygiene vert
+[ ] suite de tests backend 100 % vert
+[ ] aucun fichier nominatif suivi par Git (preuve : git ls-files | grep)

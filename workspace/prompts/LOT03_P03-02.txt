@@ -1,0 +1,51 @@
+================================================================================
+PROMPT P03-02 — CONCOURS : ÉPREUVES, CENTRES, SALLES ET SURVEILLANTS
+================================================================================
+P03-02 — CONCOURS : ÉPREUVES, CENTRES, SALLES ET SURVEILLANTS
+Lot 3 | 2 séances | Dépendances : P03-01, P01-02 | Module réf. : 02, 07
+Risques couverts : R9 | Type : UI
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+La chaîne campagnes/épreuves/classement/notes est partiellement écrantée dans
+Campagnes/CampagneDetail. Les convocations et la surveillance n'ont pas d'écran
+dédié [S1 §4.4]. Le modèle de référence exige, pour chaque épreuve : matière,
+date, heure, centre, bâtiment, salle, terrain, gymnase, piscine, piste,
+surveillants — donc un rattachement aux ESPACES du référentiel campus (P01-02),
+y compris sportifs.
+
+MISSION
+Livrer les écrans concours manquants : épreuves, centres d'examen, affectation
+des espaces et des surveillants.
+
+CONSIGNES
+1. Écran « Épreuves » : liste par campagne, création/édition (matière, type
+   [écrite, physique, pratique, orale, visite médicale], date, heure, durée,
+   coefficient, note_max, centre, espace affecté, effectif attendu, effectif
+   inscrit, statut).
+2. L'affectation d'espace utilise le référentiel campus : un seul sélecteur
+   d'ESPACE filtré par type compatible avec le type d'épreuve (une épreuve de
+   natation ne peut pas être affectée à une salle de cours) et par capacité
+   suffisante. Contrôle de collision dans le temps (même espace, même
+   créneau) avec message explicite.
+3. Écran « Centres d'examen » : centres, bâtiments, espaces disponibles,
+   capacité cumulée, taux d'occupation.
+4. Écran « Surveillants » : affectation des surveillants par épreuve, contrôle
+   de double affectation (même personne, même créneau), ratio
+   surveillants/candidats paramétrable avec alerte si le ratio n'est pas
+   respecté.
+5. Ajoute la vue « Planning du concours » : vue calendrier multi-épreuves
+   (jours × créneaux × espaces) avec détection visuelle des collisions.
+6. Exports : liste des épreuves, listes d'émargement par épreuve (PDF/Excel,
+   réutilise le moteur d'exports existant), planning du concours.
+7. Tests : collision d'espace refusée, double affectation de surveillant
+   refusée, filtre de compatibilité d'espace, export d'émargement.
+
+DoD
+[ ] écrans épreuves / centres / surveillants / planning livrés
+[ ] affectation d'espace typée et contrôlée (collisions refusées)
+[ ] ratio de surveillance paramétrable et alerté
+[ ] exports PDF/Excel fonctionnels
+[ ] tests verts

@@ -1,0 +1,45 @@
+================================================================================
+PROMPT P10-02 — RESSOURCES HUMAINES : AGENTS, CONTRATS, CARRIÈRES
+================================================================================
+P10-02 — RESSOURCES HUMAINES : AGENTS, CONTRATS, CARRIÈRES
+Lot 10 | 2 séances | Dépendances : P10-01 | Module réf. : 13, 05
+Risques couverts : E1 | Type : UI + workflow
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Suite du Module 13 : personnel, dossiers administratifs, contrats,
+affectations, carrières, grades/situations administratives.
+
+MISSION
+Livrer le dossier agent complet et la gestion des contrats et carrières.
+
+CONSIGNES
+1. Écran « Agents » : liste filtrable (service, fonction, grade, statut,
+   type de contrat), fiche agent en onglets : Identité · Dossier administratif
+   · Contrats · Affectations · Carrière · Congés et absences · Missions ·
+   Formations · Évaluations · Documents · Journal.
+2. Contrats : type (CDI, CDD, vacation, stage, convention), période,
+   renouvellements, avenants (versionnés, jamais écrasés), statut, pièces.
+   Un contrat expiré déclenche une alerte paramétrable.
+3. Carrière : historique des situations administratives (nomination,
+   avancement, reclassement, détachement, disponibilité), chaque événement
+   daté, motivé et lié à un acte administratif (rattaché à la GED, P10-05).
+4. Affectations RH : affectation à un poste avec période, historique conservé,
+   contrôle de non-double-affectation sur une même période.
+5. Lien avec les enseignants (P05-03) : un agent peut avoir un dossier
+   enseignant ; les deux vues se renvoient l'une à l'autre sans duplication de
+   données.
+6. Données sensibles : coordonnées, références bancaires et documents
+   personnels protégés par droits, accès journalisé (réutilise le mécanisme
+   « données sensibles / RGPD » existant).
+7. Tests : avenant versionné, alerte de contrat expiré, double affectation
+   refusée, contrôle d'accès aux données sensibles.
+
+DoD
+[ ] fiche agent complète en onglets
+[ ] contrats avec avenants versionnés et alertes
+[ ] carrière historique liée aux actes administratifs
+[ ] données sensibles protégées et journalisées
+[ ] tests verts

@@ -1,0 +1,42 @@
+================================================================================
+PROMPT P01-07 — JUMELAGE DES 18 MODULES DE RÉFÉRENCE AVEC LES APPS DU DÉPÔT
+================================================================================
+P01-07 — JUMELAGE DES 18 MODULES DE RÉFÉRENCE AVEC LES APPS DU DÉPÔT
+Lot 1 | 1 séance | Dépendances : P00-01, P01-01 | Module réf. : tous
+Risques couverts : R1, R4 | Type : Gouvernance
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence décrit 18 modules. Le dépôt contient 20 apps Django,
+53 routes React et 14 routes d'exports. Sans carte officielle, chaque nouvelle
+fonctionnalité risque d'être créée au mauvais endroit ou en doublon.
+
+MISSION
+Produire et ANCRER DANS LE CODE la carte officielle modules ↔ apps ↔ écrans ↔
+endpoints, et un dispositif qui empêche la création de doublons.
+
+CONSIGNES
+1. Génère automatiquement l'inventaire réel : liste des apps et de leurs
+   modèles, liste des routes API par app, liste des pages React et de leurs
+   appels API. Aucune liste écrite à la main.
+2. Croise cet inventaire avec les 18 modules de référence et produis
+   docs/MODULES_INJS_LMD.md : pour chaque module, les apps Django, les modèles,
+   les endpoints, les écrans, la maturité (0→3), l'écart restant et le prompt
+   qui le traite.
+3. Crée un registre de domaine dans le code : backend/core/domain_registry.py
+   qui associe chaque modèle à son module de référence et à son périmètre de
+   droits. Un modèle non déclaré fait échouer un test de garde.
+4. Ajoute un test anti-doublon : tout nouveau modèle dont le nom ou les champs
+   ressemblent à un modèle existant d'un AUTRE module doit être explicitement
+   justifié dans un ADR, sinon le test échoue.
+5. Mets à jour la baseline (docs/audits/BASELINE_2026-09.md, section M) avec
+   les chiffres réels après le LOT 1.
+6. Publie la table de maturité mise à jour et la liste des écarts restants.
+
+DoD
+[ ] docs/MODULES_INJS_LMD.md généré à partir du code réel
+[ ] domain_registry en place, test de garde vert
+[ ] test anti-doublon vert
+[ ] baseline mise à jour avec les chiffres du lot

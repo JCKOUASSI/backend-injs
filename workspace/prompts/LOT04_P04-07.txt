@@ -1,0 +1,47 @@
+================================================================================
+PROMPT P04-07 — CARTE ÉTUDIANT, ATTESTATIONS ET DOCUMENTS ÉTUDIANTS
+================================================================================
+P04-07 — CARTE ÉTUDIANT, ATTESTATIONS ET DOCUMENTS ÉTUDIANTS
+Lot 4 | 1 séance | Dépendances : P04-01 | Module réf. : 03, 14
+Risques couverts : E9 | Type : Documents
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 03 §22-24) prévoit la carte étudiant, les
+documents étudiants et les attestations. Le dépôt dispose d'un moteur d'exports
+PDF/Excel (reportlab/openpyxl) et de graduation.ModeleDocument.
+
+MISSION
+Centraliser les documents étudiants avec modèles paramétrables, numérotation et
+QR de vérification.
+
+CONSIGNES
+1. Inventorie les documents déjà produits (certificat de scolarité, relevés,
+   attestations) et les modèles existants. Ne duplique rien.
+2. Crée le modèle DocumentEtudiant (etudiant, type_de_document, periode,
+   numero unique, fichier, statut [BROUILLON, EMIS, ANNULE], date d'émission,
+   émetteur, empreinte, QR de vérification) rattaché à RefTypeDocument.
+3. Modèles de documents paramétrables : mise en page administrable (logo INJS,
+   mentions obligatoires, champs), sans modification de code.
+4. Génération : certificat de scolarité, attestation d'inscription, attestation
+   de présence, attestation de réussite, relevé de notes — chacun avec
+   conditions d'émission contrôlées (ex. attestation de réussite uniquement si
+   le semestre est validé par décision de jury).
+5. Carte étudiant : génération avec photo, matricule, QR de vérification,
+   validité (année académique), export en lot pour impression.
+6. Vérification publique : endpoint de vérification d'un document par son
+   numéro ou son QR, ne révélant que le minimum (existence, type, période,
+   titulaire) — aucune donnée sensible.
+7. Immuabilité : un document ÉMIS n'est jamais modifié ; l'annulation crée un
+   nouvel état, l'original reste consultable.
+8. Tests : numérotation unique, conditions d'émission, vérification publique
+   sans fuite de données, immuabilité.
+
+DoD
+[ ] DocumentEtudiant avec numérotation, empreinte et QR
+[ ] modèles paramétrables sans modification de code
+[ ] 5 types de documents avec conditions d'émission
+[ ] vérification publique sans exposition de données sensibles
+[ ] immuabilité testée

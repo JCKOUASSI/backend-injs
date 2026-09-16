@@ -1,0 +1,67 @@
+================================================================================
+PROMPT P06-02 — MOTEUR DE GÉNÉRATION AUTOMATIQUE AVEC EXPLICATION DES ÉCHECS
+================================================================================
+P06-02 — MOTEUR DE GÉNÉRATION AUTOMATIQUE AVEC EXPLICATION DES ÉCHECS
+Lot 6 | 3 séances | Dépendances : P06-01 | Module réf. : 06 §16-19
+Risques couverts : E4 | Type : Moteur — CRITIQUE
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence décrit précisément le moteur attendu :
+« 1. Charger les enseignements 2. les groupes 3. les enseignants 4. les espaces
+5. les disponibilités 6. le calendrier 7. les contraintes 8. Générer les
+possibilités 9. Éliminer les conflits 10. Optimiser 11. Générer une proposition
+12. Contrôler 13. Soumettre à validation 14. Publier ».
+Et surtout : « Le système ne doit jamais simplement afficher "Génération
+impossible". Il doit expliquer : 3 séances non planifiées : TD Module X –
+Groupe L2-A → Aucun espace disponible de capacité ≥ 45 → Aucun créneau
+compatible entre 14h et 18h. »
+
+MISSION
+Livrer un moteur de génération native qui produit une proposition contrôlée,
+optimisée et EXPLIQUÉE, sans jamais échouer silencieusement.
+
+CONSIGNES
+1. Implémente le moteur en 14 étapes distinctes et testables unitairement,
+   conformément à la séquence de référence. Chaque étape est une fonction pure
+   avec entrée/sortie typée.
+2. Étape d'élimination des conflits : utilise le validateur unique
+   verifie_contraintes (P06-01). Aucune contrainte dure violée dans la
+   proposition.
+3. Fonction d'objectif configurable :
+   Score = w1·pénalité_conflits + w2·pénalité_trous_étudiants +
+           w3·pénalité_trous_enseignants + w4·pénalité_espaces_inutilisés +
+           w5·pénalité_déplacements + w6·pénalité_déséquilibre
+   Les poids sont PARAMÉTRABLES (pas de constantes en dur) et versionnés avec
+   la proposition.
+4. EXPLICATION DES ÉCHECS — exigence non négociable : pour chaque séance non
+   planifiée, le moteur produit un objet d'explication structuré : séance,
+   groupe, contraintes bloquantes, créneaux testés, raisons précises
+   (« aucun espace de capacité ≥ 45 », « enseignant indisponible », « tous les
+   créneaux 14h-18h occupés »), et SUGGESTIONS d'action (libérer un espace,
+   augmenter la capacité, déplacer l'indisponibilité, scinder le groupe).
+   Ces explications sont affichées à l'utilisateur et exportables.
+5. Performance : le moteur doit traiter un jeu réaliste INJS (150
+   enseignements, 400 séances, 25 enseignants, 12 groupes, 35 espaces) en moins
+   de 5 minutes. Exécute-le en tâche de fond (pas dans la requête HTTP) avec
+   statut consultable (EN_ATTENTE, EN_COURS, TERMINE, ECHEC) et progression.
+6. Reproductibilité : mêmes entrées + mêmes contraintes + même graine aléatoire
+   → même proposition. La graine est stockée avec la proposition.
+7. La proposition est créée en BROUILLON : rien n'est publié, rien n'affecte
+   l'existant tant que la validation n'est pas faite (P06-03).
+8. Tests : chaque étape, chaque contrainte dure (aucune violation possible),
+   explication des échecs (structure et contenu), reproductibilité, borne de
+   performance mesurée.
+
+INTERDITS
+- Ne publie jamais automatiquement une proposition.
+- N'écrase jamais un EDT existant : une proposition est un objet distinct.
+
+DoD
+[ ] moteur en 14 étapes testables, contraintes dures jamais violées
+[ ] fonction d'objectif paramétrable et versionnée
+[ ] explication structurée des échecs + suggestions
+[ ] exécution en arrière-plan avec statut et progression
+[ ] reproductibilité testée, performance mesurée et publiée

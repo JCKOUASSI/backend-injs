@@ -1,0 +1,33 @@
+# Artefacts frontend locaux (mono-repo)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+credentials_mobile.txt
+backend/credentials_mobile.txt
+backend/.local/
+backend/staticfiles/
+backend/media/
+backend/cache/
+
+# Doublons locaux (sources canoniques dans docs/)
+**/.DS_Store
+
+# Doublons locaux (sources canoniques dans docs/)
+/Manuel utilisateur App Statistiques.md
+/Manuel utilisateur App Statistiques.docx
+/Sauvegardes tâches réalisées.txt
+
+# Sauvegardes de bases de données - NE PAS VERSIONNER
+*.dump
+*.dump.sql
+backups/
+
+# Environnements locaux / générés - NE PAS VERSIONNER
+backend/.venv-python39-backup/
+backend/logs/
+.vscode/
+project_structure.txt
+/Save taches app-injs-lmd 2026.txt

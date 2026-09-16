@@ -1,0 +1,54 @@
+================================================================================
+PROMPT P00-06 — ENDPOINT DE CAPACITÉS : UNE SEULE SOURCE DE VÉRITÉ POUR LES DROITS UI
+================================================================================
+P00-06 — ENDPOINT DE CAPACITÉS : UNE SEULE SOURCE DE VÉRITÉ POUR LES DROITS UI
+Lot 0 | 1 séance | Dépendances : P00-01 | Module réf. : 18 · DA-05
+Risques couverts : R3 (cohérence) | Type : Sécurité
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+La matrice de rôles est tenue à DEUX endroits : backend (role_groups.py /
+permissions.py dans 11 apps) et frontend (frontend/src/utils/roles.js). Cette
+duplication est une source de divergence : l'UI peut afficher une action que
+l'API refuse, ou masquer une action autorisée. /auth/me expose déjà un
+role_context.
+
+MISSION
+Faire dériver les capacités de l'UI du backend, sans jamais faire reposer la
+sécurité sur l'UI.
+
+CONSIGNES
+1. Crée un endpoint GET /api/auth/capabilities/ (authentifié) qui retourne,
+   pour l'utilisateur courant, la liste explicite des capacités
+   ({ "module": ["action", …] }) + le niveau N0–N4 + les périmètres
+   (INJS_ENTIER, DIRECTION, SERVICE, FORMATION, PARCOURS, NIVEAU, GROUPE,
+   MODULE, ETUDIANT, PROPRE_COMPTE) + les identifiants de périmètre concrets
+   (secrétariats, formations, groupes accessibles).
+2. Le calcul DOIT réutiliser les classes de permission existantes : il n'y a
+   pas deux logiques d'autorisation. Implémente une fonction unique
+   compute_capabilities(user) appelée par l'endpoint et, autant que possible,
+   par les classes de permission.
+3. Ajoute un cache côté client (React Query) avec invalidation à la connexion,
+   à la déconnexion et au changement de rôle.
+4. Refactore frontend/src/utils/roles.js en une couche fine : elle consulte les
+   capacités du backend et conserve un repli statique strictement identique
+   pour le rendu hors-ligne / avant chargement.
+5. Ajoute un test backend de CONTRAT : pour chacun des 12 rôles, les capacités
+   retournées correspondent exactement à la matrice attendue (matrice écrite
+   dans le test, donc exécutable).
+6. Ajoute un test frontend qui vérifie que l'UI n'affiche aucune action absente
+   des capacités reçues.
+7. Ne retire PAS les vérifications de permission côté API : elles restent la
+   seule autorité.
+
+INTERDITS
+- Ne remplace pas le système de permissions N0–N4 ni les 12 rôles.
+- N'affaiblis aucun contrôle backend.
+
+DoD
+[ ] /api/auth/capabilities/ en ligne, documenté dans l'OpenAPI
+[ ] test de contrat par rôle vert (12 rôles)
+[ ] roles.js dérive du backend, repli statique identique
+[ ] aucune régression d'accès (test croisé par rôle)

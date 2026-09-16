@@ -1,0 +1,43 @@
+================================================================================
+PROMPT P06-08 — EXAMENS, SURVEILLANCE ET OCCUPATION DES ESPACES
+================================================================================
+P06-08 — EXAMENS, SURVEILLANCE ET OCCUPATION DES ESPACES
+Lot 6 | 1 séance | Dépendances : P06-03, P03-02 | Module réf. : 06 §32, 09
+Risques couverts : R9 | Type : UI + règles
+--------------------------------------------------------------------------------
+Rappel : coller d'abord 00-REGLES-MAITRESSES.txt, puis ce prompt.
+================================================================================
+
+CONTEXTE
+Le modèle de référence (Module 06 §32) prévoit la planification des EXAMENS
+dans le moteur EDT (ils occupent des espaces, mobilisent des surveillants et
+bloquent les cours), et le Module 09 prévoit convocations, listes d'étudiants
+et surveillance pour les évaluations.
+
+MISSION
+Unifier la planification des examens et des évaluations dans l'EDT, avec
+affectation des espaces et des surveillants.
+
+CONSIGNES
+1. Modélise la session d'examen/évaluation comme une occupation d'espace de
+   premier ordre : date, créneau, durée, ECUE concerné, groupes convoqués,
+   espaces affectés (avec capacité), surveillants, centre.
+2. Contrôle : une session d'examen bloque les cours sur les espaces et pour les
+   groupes concernés ; un étudiant ne peut être convoqué à deux sessions
+   simultanées ; un espace ne peut accueillir plus que sa capacité.
+3. Répartition automatique des étudiants dans les espaces disponibles, avec
+   rapport et ajustement manuel.
+4. Convocations : génération PDF numérotée avec QR de vérification (réutilise
+   le mécanisme de P03-03, ne crée pas de doublon), envoi, suivi de présence.
+5. Surveillance : affectation des surveillants avec ratio paramétrable,
+   contrôle de double affectation, feuilles d'émargement.
+6. Vue « Planning des examens » : calendrier dédié, occupation des espaces,
+   export.
+7. Tests : blocage des cours pendant un examen, double convocation refusée,
+   capacité respectée, répartition automatique correcte.
+
+DoD
+[ ] session d'examen comme occupation d'espace de premier ordre
+[ ] blocages et collisions contrôlés
+[ ] répartition automatique + convocations numérotées avec QR
+[ ] planning des examens + tests verts
