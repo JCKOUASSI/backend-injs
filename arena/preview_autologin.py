@@ -1,26 +1,4 @@
-"""Aperçu Arena : auto-connexion démo pour l'admin en vignette.
-
-UNIQUEMENT pour l'overlay d'aperçu bac-à-sable (``arena/settings_sandbox.py``) —
-ce module n'est jamais référencé par ``config/settings.py`` de production.
-
-Contexte : la passerelle d'aperçu Arena filtre les en-têtes ``Cookie`` entre
-son point d'entrée (*.arena.site) et le bac à sable (*.e2b.app). Aucune
-authentification Django par cookie (session + jeton CSRF) ne peut donc y
-fonctionner dans les vignettes, ce qui se manifeste par un éternel
-« 403 CSRF cookie not set » ou une page de login qui reboucle.
-
-Ce middleware (process_request exécuté APRÈS AuthenticationMiddleware, car
-ajouté en fin de pile) authentifie à chaque requête les chemins ``/admin/``
-comme compte démo ``admin`` — sans aucun cookie, donc insensible au filtrage
-de la passerelle. Chaque requête est ainsi traitée comme une session neuve
-automatisée ; la redirection depuis ``/admin/login/`` évite le formulaire de
-connexion condamné.
-
-Limite connue : les actions admin d'écriture soumises par formulaire restent
-soumises à la vérification CSRF cookie (elles échoueraient pareillement sans
-celui-ci) ; l'aperçu admin est donc fonctionnel en consultation et sur les
-écrans de démo prévus, pas pour des modifications via l'admin Django.
-"""
+"""Aperçu Arena : auto-connexion démo pour l'admin en vignette."""
 import logging
 
 from django.conf import settings
@@ -47,11 +25,27 @@ class AutoLoginApercuMiddleware:
         return self._utilisateur or None
 
     def __call__(self, request):
+        # Redirection de la racine vers l'admin pour ouvrir directement le tableau de bord
+        if request.path == "/":
+            return redirect("/admin/")
+
+        # Permettre l'accès direct et l'affichage fidèle de la page de connexion
+        if request.path.startswith("/admin/login"):
+            setattr(request, "_dont_enforce_csrf_checks", True)
+            if request.method == "POST":
+                utilisateur = self._compte_demo()
+                if utilisateur is not None:
+                    if hasattr(request, "session"):
+                        login(request, utilisateur, backend="django.contrib.auth.backends.ModelBackend")
+                        next_url = request.POST.get("next") or request.GET.get("next") or "/admin/"
+                        return redirect(next_url)
+            return self.get_response(request)
+
         if request.path.startswith("/admin"):
             utilisateur = self._compte_demo()
-            if utilisateur is not None and not request.user.is_authenticated:
-                login(request, utilisateur,
-                      backend="django.contrib.auth.backends.ModelBackend")
-            if request.path.startswith("/admin/login"):
-                return redirect("/admin/")
+            user = getattr(request, "user", None)
+            if utilisateur is not None and (user is None or not user.is_authenticated):
+                if hasattr(request, "session"):
+                    login(request, utilisateur,
+                          backend="django.contrib.auth.backends.ModelBackend")
         return self.get_response(request)

@@ -173,6 +173,20 @@ class ReferentielAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([n['code'] for n in response.json()], ['L1'])
 
+    def test_liste_formations(self):
+        RefFormation.objects.create(intitule='LICENCE STAPS')
+        response = self.client.get('/api/scolarite/ref/formations/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(f['intitule'] == 'LICENCE STAPS' for f in response.json()))
+
+    def test_liste_salles(self):
+        from formations.models import RefSite, RefSalle
+        site = RefSite.objects.create(nom='Site Principal')
+        RefSalle.objects.create(site=site, nom='Salle Polyvalente', capacite=40)
+        response = self.client.get('/api/scolarite/ref/salles/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(s['nom'] == 'Salle Polyvalente' for s in response.json()))
+
     def test_filtre_semestres_par_niveau(self):
         response = self.client.get('/api/scolarite/ref/semestres/', {'niveau_id': self.niveau.id})
         self.assertEqual(response.status_code, 200)

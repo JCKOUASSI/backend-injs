@@ -1,21 +1,29 @@
-/* Console CURP d'administration des comptes (U4) — styles dédiés. */
+/* ==========================================================================
+   CONSOLE CURP D'ADMINISTRATION DES HABILITATIONS — DESIGN SYSTEM INJS 2026
+   Thème Glassmorphism institutionnel, cartes dépolies et navigation latérale
+   ========================================================================== */
 
 .hab-bandeau {
-  background: #7b1fa2;
+  background: linear-gradient(135deg, #1E62D0 0%, #0B1F3A 100%);
   color: #fff;
-  font-size: 0.82rem;
-  padding: 0.4rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 14px rgba(11, 31, 58, 0.12);
 }
 
 .hab-layout {
   display: grid;
-  grid-template-columns: 230px 1fr;
-  gap: 1rem;
+  grid-template-columns: 240px 1fr;
+  gap: 1.25rem;
   align-items: start;
 }
+
 @media (max-width: 900px) {
   .hab-layout { grid-template-columns: 1fr; }
 }
@@ -23,154 +31,191 @@
 .hab-nav {
   position: sticky;
   top: 1rem;
-  background: var(--ci-white, #fff);
-  border: 1px solid var(--ci-light, #dce6f2);
-  border-radius: 8px;
-  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 18px;
+  padding: 0.75rem;
+  box-shadow: 0 10px 30px -5px rgba(11, 31, 58, 0.05);
 }
+
 .hab-nav a {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 6px;
-  color: #233;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
+  color: #475569;
   text-decoration: none;
   font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  margin-bottom: 0.25rem;
 }
-.hab-nav a:hover { background: #f1f5fa; }
+
+.hab-nav a:hover {
+  background: rgba(241, 245, 249, 0.9);
+  color: #0B1F3A;
+}
+
 .hab-nav a.active {
-  background: var(--ci-success, #2277c1);
-  color: #fff;
+  background: linear-gradient(90deg, #1E70EB 0%, #2F80ED 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(30, 112, 235, 0.35);
 }
 
 .hab-carte {
-  background: var(--ci-white, #fff);
-  border: 1px solid var(--ci-light, #dce6f2);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 18px;
+  padding: 1.4rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 10px 30px -5px rgba(11, 31, 58, 0.05);
 }
-.hab-carte h2, .hab-carte h3 { margin-top: 0; }
+
+.hab-carte h2, .hab-carte h3 {
+  margin-top: 0;
+  color: #0B1F3A;
+  font-weight: 800;
+}
 
 .hab-badge-sensible {
-  background: #c62828;
-  color: #fff;
-  font-size: 0.7rem;
-  border-radius: 4px;
-  padding: 0.05rem 0.4rem;
-  margin-left: 0.35rem;
-  white-space: nowrap;
-}
-.hab-badge-canal {
-  background: #e8eef6;
-  color: #1a3a5c;
+  background: #FEE2E2;
+  color: #DC2626;
   font-size: 0.72rem;
-  border-radius: 4px;
-  padding: 0.05rem 0.4rem;
-}
-.hab-statut {
-  border-radius: 999px;
-  padding: 0.1rem 0.6rem;
-  font-size: 0.74rem;
-  background: #e8eef6;
-}
-.hab-statut-ACTIF { background: #d8f0dd; color: #1d6b35; }
-.hab-statut-SUSPENDU { background: #fdeccd; color: #8a5a00; }
-.hab-statut-DESACTIVE, .hab-statut-VERROUILLE, .hab-statut-EXPIRE {
-  background: #f8d9d9; color: #8b1c1c;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 0.2em 0.6em;
+  border: 1px solid #FECACA;
 }
 
-.hab-diff-gagne { color: #1d6b35; }
-.hab-diff-perdu { color: #8b1c1c; }
-.hab-diff-liste {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.74rem;
-  max-height: 220px;
-  overflow: auto;
-  background: #f8fafc;
-  border: 1px solid #e3e9f0;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  margin: 0.4rem 0;
+.hab-badge-statut {
+  display: inline-block;
+  padding: 0.2em 0.55em;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
-.hab-avertissement {
-  border-left: 4px solid var(--ci-warning, #f5b100);
-  background: #fdf6e3;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  margin: 0.35rem 0;
-  font-size: 0.85rem;
-}
-.hab-avertissement.bloquant {
-  border-left-color: var(--ci-danger, #c62828);
-  background: #fbe7e7;
-}
+.hab-badge-statut.ACTIF { background: #D1FAE5; color: #059669; border: 1px solid #A7F3D0; }
+.hab-badge-statut.SUSPENDU { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+.hab-badge-statut.REVOQUE { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
 
 .hab-etapes {
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   flex-wrap: wrap;
 }
+
 .hab-etape {
   flex: 1;
   min-width: 130px;
-  border: 1px solid var(--ci-light, #dce6f2);
-  border-radius: 6px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.8rem;
-  color: #667;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  color: #64748B;
+  transition: all 0.2s;
 }
-.hab-etape.active { border-color: var(--ci-success, #2277c1); color: #14466f; font-weight: 600; }
-.hab-etape.terminee { background: #eef6ff; }
 
-.hab-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.hab-table th, .hab-table td {
-  padding: 0.45rem 0.55rem;
-  border-bottom: 1px solid #edf1f6;
-  text-align: left;
-  vertical-align: top;
+.hab-etape.active {
+  border-color: #2F80ED;
+  background: #EBF3FF;
+  color: #1E62D0;
+  font-weight: 700;
 }
+
+.hab-etape.terminee {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #059669;
+}
+
+.hab-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.86rem;
+}
+
+.hab-table th, .hab-table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  text-align: left;
+  vertical-align: middle;
+}
+
 .hab-table thead th {
-  background: #f4f7fb;
+  background: #0B1F3A;
+  color: #FFFFFF;
   position: sticky;
   top: 0;
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #5a6b7d;
+  letter-spacing: 0.04em;
+  font-weight: 700;
 }
-.hab-matrice { font-size: 0.72rem; border-collapse: collapse; }
+.hab-table thead th:first-child { border-radius: 10px 0 0 0; }
+.hab-table thead th:last-child { border-radius: 0 10px 0 0; }
+
+.hab-matrice {
+  font-size: 0.74rem;
+  border-collapse: collapse;
+}
+
 .hab-matrice th, .hab-matrice td {
-  border: 1px solid #e6ebf1;
-  padding: 0.18rem 0.35rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 0.25rem 0.45rem;
   text-align: center;
   white-space: nowrap;
 }
-.hab-matrice th { background: #f4f7fb; }
-.hab-niveau-N4 { background: #c62828; color: #fff; font-weight: 700; }
-.hab-niveau-N3 { background: #e69700; color: #fff; font-weight: 600; }
-.hab-niveau-N2 { background: #2277c1; color: #fff; }
-.hab-niveau-N1 { background: #d6e7f6; }
-.hab-niveau-N0 { background: #eef1f5; color: #556; }
+
+.hab-matrice th {
+  background: rgba(241, 245, 249, 0.9);
+  font-weight: 700;
+  color: #334155;
+}
+
+.hab-niveau-N4 { background: #FEE2E2; color: #DC2626; font-weight: 700; }
+.hab-niveau-N3 { background: #FEF3C7; color: #D97706; font-weight: 600; }
+.hab-niveau-N2 { background: #DBEAFE; color: #2563EB; font-weight: 600; }
+.hab-niveau-N1 { background: #E0F2FE; color: #0284C7; }
+.hab-niveau-N0 { background: #F8FAFC; color: #94A3B8; }
 .hab-provisoire { position: relative; outline: 1px dashed #7b1fa2; }
 
 .hab-filtres {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 0.8rem;
+  margin-bottom: 1rem;
 }
-.hab-filtres input, .hab-filtres select { max-width: 220px; }
+.hab-filtres input, .hab-filtres select {
+  max-width: 240px;
+}
 
-.hab-recap { line-height: 1.7; }
-.hab-recap .libelle { color: #5a6b7d; display: inline-block; min-width: 11rem; }
-.hab-403 {
-  border: 1px solid #f0c9c9;
-  background: #fbeaea;
-  color: #7c1d1d;
-  border-radius: 8px;
-  padding: 1.2rem;
-  margin: 1.5rem 0;
+.hab-recap { line-height: 1.8; }
+.hab-recap .libelle {
+  color: #64748B;
+  display: inline-block;
+  min-width: 11rem;
+  font-weight: 600;
 }
-.hab-muted { color: #78889a; font-size: 0.84rem; }
+
+.hab-403 {
+  border: 1px solid #FECACA;
+  background: rgba(254, 242, 242, 0.85);
+  color: #991B1B;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  backdrop-filter: blur(8px);
+}
+
+.hab-muted {
+  color: #64748B;
+  font-size: 0.84rem;
+}

@@ -1,0 +1,1028 @@
+PROMPT MAÎTRE — IMPLÉMENTATION DE GET-INJS
+
+Gestion des Emplois du Temps + Présences INJS
+
+Projet cible : app-injs-lmd2026
+
+Environnement : Arena Agent Mode
+
+Priorité : LIVRAISON OPÉRATIONNELLE EN MOINS DE 6 HEURES
+
+⸻
+
+0. ORDRE D’EXÉCUTION
+
+Tu es autorisé à exécuter directement l’intégralité des travaux nécessaires, sans me demander une confirmation intermédiaire pour les décisions techniques normales.
+
+Je te donne mon FEU VERT GLOBAL pour :
+
+* analyser ;
+* concevoir ;
+* implémenter ;
+* modifier ;
+* créer les fichiers nécessaires ;
+* créer/modifier les modèles ;
+* créer les migrations ;
+* créer/modifier les API ;
+* créer/modifier les composants React ;
+* intégrer GET-INJS dans la sidebar ;
+* créer les écrans ;
+* créer les services ;
+* créer les permissions ;
+* créer les tests ;
+* créer les données de démonstration nécessaires ;
+* corriger les bugs rencontrés ;
+* effectuer les validations ;
+* créer les commits/checkpoints nécessaires.
+
+Tu dois choisir toi-même les meilleures options techniques lorsqu’elles sont évidentes.
+
+NE PAS interrompre l’exécution pour demander mon accord sur une décision technique ordinaire.
+
+Ne demander mon intervention que lorsqu’une décision métier réellement ambiguë ou une opération potentiellement destructive ne peut absolument pas être résolue autrement.
+
+⸻
+
+1. OBJECTIF FINAL
+
+Transformer l’application existante :
+
+app-injs-lmd2026
+
+en une seule application INJS-LMD intégrant nativement le module :
+
+GET-INJS
+
+Gestion des Emplois du Temps et des Présences
+
+GET-INJS ne doit PAS devenir une deuxième application indépendante.
+
+Il doit être intégré comme un module fonctionnel de app-injs-lmd2026, accessible depuis la sidebar et utilisant l’architecture, l’authentification, les utilisateurs, les étudiants, les enseignants, les formations, les cours, les groupes, les années académiques et les autres référentiels déjà existants lorsque cela est pertinent.
+
+À terme :
+
+une seule application = app-injs-lmd2026
+
+avec notamment :
+
+* Scolarité ;
+* Candidatures ;
+* Admissions ;
+* Inscriptions ;
+* Étudiants ;
+* Enseignants ;
+* Cours ;
+* Statistiques ;
+* Jurys ;
+* Diplomation ;
+* Finances ;
+* Stages ;
+* RH ;
+* Administration ;
+* Patrimoine ;
+* GET-INJS ;
+* et les autres modules déjà présents.
+
+⸻
+
+2. DOCUMENTS DE RÉFÉRENCE À LIRE IMPÉRATIVEMENT
+
+Avant toute implémentation, inspecter le dépôt et lire intégralement les trois documents situés dans :
+
+workspace/EmploiduTemps-INJS/
+
+Documents :
+
+1. Génération-prompts-EDTINJS-app-injs-lmd2026.txt
+2. Mode-opératoire-exécution-EDTINJS-app-injs-lmd2026.txt
+3. Plan-exécution-prompts-EDTINJS-app-injs-lmd2026.txt
+
+Le dépôt de référence indiqué est :
+
+https://github.com/JCKOUASSI/app-injslmd2026demo/
+
+Le répertoire de référence est :
+
+workspace/EmploiduTemps-INJS
+
+La branche de travail Arena est :
+
+arena/01a09e35-app-injslmd2026demo
+
+IMPORTANT :
+
+Les documents présents dans workspace/EmploiduTemps-INJS constituent la documentation fonctionnelle et opérationnelle de référence pour GET-INJS.
+
+Ne pas les ignorer.
+
+Ne pas recréer arbitrairement un autre processus de conception si ces documents définissent déjà le processus attendu.
+
+Si une information des documents est obsolète par rapport au code actuel, privilégier :
+
+1. le code réel actuel ;
+2. l’architecture actuelle ;
+3. les règles métier explicites ;
+4. puis adapter le contenu des documents si nécessaire.
+
+⸻
+
+3. PREMIÈRE ACTION : ÉTAT DES LIEUX CIBLÉ
+
+Avant d’écrire du code, effectuer un audit RAPIDE et CIBLÉ du projet.
+
+Identifier :
+
+Backend
+
+* architecture Django/DRF ;
+* applications existantes ;
+* modèles liés aux étudiants ;
+* enseignants ;
+* formateurs ;
+* encadrants ;
+* cours ;
+* ECUE ;
+* groupes pédagogiques ;
+* années académiques ;
+* salles/espaces ;
+* séances ;
+* présences ;
+* utilisateurs ;
+* rôles/permissions ;
+* API existantes.
+
+Frontend
+
+Identifier :
+
+* architecture React/Vite ;
+* sidebar ;
+* routing ;
+* layout ;
+* composants réutilisables ;
+* écrans existants ;
+* gestion de l’authentification ;
+* gestion des permissions ;
+* services API ;
+* système de notifications ;
+* tableaux/formulaires existants.
+
+Existant EDT / présence
+
+Chercher particulièrement :
+
+* emploi
+* emploi_du_temps
+* EDT
+* planning
+* seance
+* cours
+* ecue
+* presence
+* badge
+* QR
+* qrcode
+* enseignant
+* formateur
+* encadrant
+* salle
+* groupe
+
+NE PAS créer de doublons si une fonctionnalité équivalente existe déjà.
+
+Réutiliser et étendre l’existant lorsque cela est techniquement pertinent.
+
+⸻
+
+4. ARCHITECTURE CIBLE
+
+GET-INJS doit être un module intégré.
+
+Exemple de navigation cible :
+
+app-injs-lmd2026
+│
+├── Dashboard
+├── Scolarité
+├── Étudiants
+├── Enseignants
+├── Cours
+├── ...
+│
+└── GET-INJS
+     ├── Tableau de bord
+     ├── Emplois du temps
+     ├── Séances
+     ├── Groupes
+     ├── Enseignants / Formateurs / Encadrants
+     ├── Salles / Espaces
+     ├── Présences
+     ├── Badgeage QR
+     ├── Badgeage manuel
+     ├── Justifications / motifs
+     ├── États / rapports
+     └── Paramètres
+
+Adapter cette structure à l’architecture réellement existante.
+
+Ne pas imposer artificiellement cette structure si le projet possède déjà une organisation meilleure.
+
+⸻
+
+5. FONCTIONNALITÉ PRINCIPALE : EMPLOI DU TEMPS
+
+GET-INJS doit permettre la gestion complète des emplois du temps.
+
+Le système doit notamment gérer, selon les possibilités du projet existant :
+
+* année académique ;
+* formation ;
+* niveau ;
+* parcours ;
+* groupe pédagogique ;
+* cours ;
+* ECUE ;
+* enseignant ;
+* formateur ;
+* encadrant ;
+* salle/espace ;
+* date ;
+* heure de début ;
+* heure de fin ;
+* type d’activité ;
+* volume horaire ;
+* séance ;
+* statut ;
+* observations.
+
+Les types d’activités LMD doivent pouvoir être gérés lorsqu’ils sont nécessaires :
+
+* CM ;
+* TD ;
+* TP ;
+* STAGE ;
+* autres activités pertinentes.
+
+⸻
+
+6. CONTRAINTES DE COHÉRENCE EDT
+
+Mettre en place les contrôles pertinents pour empêcher les incohérences évidentes :
+
+Enseignant
+
+Éviter qu’un même enseignant soit affecté simultanément à deux séances incompatibles.
+
+Groupe
+
+Éviter qu’un même groupe soit programmé simultanément sur deux séances.
+
+Salle
+
+Éviter qu’une même salle soit occupée simultanément par deux séances.
+
+Horaires
+
+Vérifier :
+
+* date ;
+* heure début ;
+* heure fin ;
+* chevauchements ;
+* durée valide.
+
+Ressources
+
+Contrôler les ressources nécessaires lorsque les données existantes permettent de le faire.
+
+Ne pas construire un moteur excessivement complexe si une validation robuste et simple suffit.
+
+⸻
+
+7. VUES EDT
+
+Prévoir des vues adaptées aux différents utilisateurs.
+
+Au minimum, lorsqu’elles sont pertinentes :
+
+Vue calendrier
+
+* jour ;
+* semaine ;
+* mois.
+
+Vue groupe
+
+Afficher l’emploi du temps d’un groupe.
+
+Vue enseignant
+
+Afficher l’emploi du temps d’un enseignant/formateur/encadrant.
+
+Vue salle
+
+Afficher l’occupation d’une salle.
+
+Vue formation
+
+Afficher l’emploi du temps d’une formation.
+
+Vue globale
+
+Permettre aux utilisateurs autorisés de consulter l’ensemble des séances.
+
+⸻
+
+8. PRÉSENCES — FONCTIONNALITÉ CRITIQUE
+
+GET-INJS doit intégrer la gestion des présences.
+
+Elle concerne :
+
+* étudiants ;
+* enseignants ;
+* formateurs ;
+* encadrants.
+
+La présence doit être liée autant que possible à une séance réelle de l’emploi du temps.
+
+⸻
+
+9. BADGEAGE QR CODE AUTOMATIQUE
+
+Implémenter le badgeage QR Code.
+
+Le système doit permettre, selon l’architecture existante :
+
+1. identifier l’utilisateur ;
+2. identifier la séance ;
+3. vérifier que la séance est active/pertinente ;
+4. enregistrer le badgeage ;
+5. déterminer la présence ;
+6. empêcher les doublons ;
+7. enregistrer la date/heure ;
+8. conserver une trace exploitable.
+
+Prévoir les cas :
+
+* badge valide ;
+* QR invalide ;
+* QR expiré ;
+* utilisateur inconnu ;
+* séance inexistante ;
+* badge déjà enregistré ;
+* utilisateur non autorisé ;
+* séance non ouverte.
+
+⸻
+
+10. BADGEAGE MANUEL
+
+Le système doit également permettre un badgeage manuel par un utilisateur autorisé.
+
+Le badgeage manuel doit être contrôlé.
+
+Il doit permettre :
+
+* sélectionner la séance ;
+* sélectionner la personne ;
+* enregistrer présence/absence/retard selon le modèle retenu ;
+* enregistrer l’utilisateur ayant effectué l’opération ;
+* enregistrer date/heure ;
+* conserver une trace de la modification.
+
+⸻
+
+11. FORÇAGE DU BADGEAGE
+
+Fonction essentielle :
+
+Un utilisateur autorisé doit pouvoir forcer un badgeage.
+
+Un forçage doit obligatoirement comporter un motif.
+
+Prévoir une liste de motifs configurables ou structurés, par exemple :
+
+* QR Code indisponible ;
+* téléphone indisponible ;
+* problème réseau ;
+* oubli de badge ;
+* correction administrative ;
+* erreur de badgeage ;
+* autorisation exceptionnelle ;
+* autre.
+
+Prévoir également :
+
+* commentaire libre lorsque nécessaire ;
+* utilisateur ayant forcé l’opération ;
+* date/heure ;
+* ancienne valeur ;
+* nouvelle valeur lorsque pertinent.
+
+Le forçage doit être auditable.
+
+⸻
+
+12. TRAÇABILITÉ
+
+Les opérations sensibles doivent être traçables.
+
+En particulier :
+
+* création d’une séance ;
+* modification d’une séance ;
+* suppression logique si applicable ;
+* badgeage QR ;
+* badgeage manuel ;
+* forçage ;
+* modification d’une présence ;
+* annulation/correction.
+
+Utiliser l’infrastructure d’audit existante si elle existe.
+
+Ne pas créer un deuxième système d’audit sans nécessité.
+
+⸻
+
+13. STATUTS DE PRÉSENCE
+
+Concevoir une gestion claire des statuts.
+
+Au minimum envisager :
+
+* présent ;
+* absent ;
+* retard ;
+* excusé/justifié ;
+* non renseigné.
+
+Adapter les statuts au modèle métier réellement présent dans le projet.
+
+⸻
+
+14. TABLEAU DE BORD GET-INJS
+
+Créer un tableau de bord opérationnel.
+
+Il doit permettre de voir rapidement :
+
+* séances du jour ;
+* séances en cours ;
+* prochaines séances ;
+* présences du jour ;
+* absences ;
+* retards ;
+* statistiques essentielles ;
+* alertes ou anomalies EDT.
+
+Ne pas surcharger l’écran.
+
+Privilégier les informations utiles à l’exploitation quotidienne.
+
+⸻
+
+15. RECHERCHE ET FILTRES
+
+Prévoir des filtres efficaces :
+
+* année académique ;
+* date ;
+* formation ;
+* niveau ;
+* groupe ;
+* enseignant ;
+* salle ;
+* type d’activité ;
+* statut.
+
+La recherche doit être suffisamment rapide pour une utilisation quotidienne.
+
+⸻
+
+16. PERMISSIONS ET SÉCURITÉ
+
+GET-INJS doit respecter le système d’authentification et de permissions déjà présent dans app-injs-lmd2026.
+
+Ne pas créer un système parallèle de comptes.
+
+Prévoir des droits distincts selon les responsabilités.
+
+Exemples :
+
+* consultation EDT ;
+* création EDT ;
+* modification EDT ;
+* suppression/annulation ;
+* gestion des séances ;
+* consultation présences ;
+* badgeage ;
+* badgeage manuel ;
+* forçage ;
+* correction présence ;
+* consultation rapports ;
+* administration GET-INJS.
+
+Les permissions doivent être contrôlées côté backend.
+
+Le frontend ne doit jamais être considéré comme une barrière de sécurité.
+
+⸻
+
+17. INTÉGRATION AUX DONNÉES EXISTANTES
+
+Priorité absolue à la réutilisation des référentiels déjà présents.
+
+Ne pas créer une deuxième table :
+
+* étudiant ;
+* enseignant ;
+* cours ;
+* groupe ;
+* année académique ;
+* utilisateur ;
+
+si ces entités existent déjà et peuvent être réutilisées.
+
+GET-INJS doit s’intégrer à l’écosystème de données existant.
+
+⸻
+
+18. IMPORT EDT
+
+Si les documents de référence prévoient un import Excel ou un mécanisme d’import :
+
+l’implémenter conformément au processus documenté.
+
+Prévoir, lorsque pertinent :
+
+* validation ;
+* prévisualisation ;
+* détection des doublons ;
+* détection des conflits ;
+* rapport d’erreurs ;
+* import transactionnel ;
+* résultat détaillé.
+
+Ne jamais importer aveuglément des données invalides.
+
+⸻
+
+19. API
+
+Créer ou compléter les API nécessaires.
+
+Les API doivent couvrir notamment :
+
+* emplois du temps ;
+* séances ;
+* calendrier ;
+* groupes ;
+* ressources ;
+* présences ;
+* badgeage QR ;
+* badgeage manuel ;
+* forçage ;
+* statistiques.
+
+Respecter les conventions API déjà utilisées par le projet.
+
+Ne pas créer une architecture API parallèle.
+
+⸻
+
+20. FRONTEND
+
+Créer une interface professionnelle cohérente avec app-injs-lmd2026.
+
+Réutiliser :
+
+* layout ;
+* sidebar ;
+* composants ;
+* tableaux ;
+* modales ;
+* formulaires ;
+* notifications ;
+* gestion des erreurs ;
+* système de thème.
+
+GET-INJS doit donner l’impression d’être une partie native de l’application, pas une application externe incorporée artificiellement.
+
+⸻
+
+21. RESPONSIVE
+
+L’interface doit fonctionner correctement sur :
+
+* ordinateur ;
+* tablette ;
+* écran plus petit lorsque pertinent.
+
+Le badgeage QR doit être particulièrement pratique sur mobile/tablette si le frontend web le permet.
+
+⸻
+
+22. QR CODE
+
+Choisir une bibliothèque fiable compatible avec la stack existante.
+
+Le QR doit être :
+
+* sécurisé ;
+* identifiable ;
+* suffisamment difficile à deviner ;
+* associé au bon utilisateur ou contexte ;
+* contrôlé côté serveur.
+
+Ne jamais faire confiance uniquement aux données envoyées par le navigateur.
+
+Si le projet possède déjà une solution QR fonctionnelle, la réutiliser plutôt que d’en créer une deuxième.
+
+⸻
+
+23. PERFORMANCE
+
+Compte tenu du délai inférieur à 6 heures :
+
+priorité aux fonctionnalités réellement opérationnelles.
+
+Ne pas consacrer du temps à des optimisations prématurées.
+
+Mais éviter les erreurs évidentes :
+
+* N+1 queries ;
+* chargements inutiles ;
+* appels API répétés ;
+* absence de pagination sur de gros volumes ;
+* calculs inutiles côté frontend.
+
+⸻
+
+24. TESTS
+
+Créer des tests backend et frontend adaptés.
+
+Tester au minimum :
+
+EDT
+
+* création ;
+* modification ;
+* consultation ;
+* conflit enseignant ;
+* conflit groupe ;
+* conflit salle ;
+* horaires invalides.
+
+Présences
+
+* présence valide ;
+* absence ;
+* retard ;
+* badge QR ;
+* badge QR invalide ;
+* doublon ;
+* badge manuel ;
+* forçage ;
+* motif obligatoire ;
+* utilisateur non autorisé.
+
+Sécurité
+
+* utilisateur autorisé ;
+* utilisateur non autorisé ;
+* permissions backend.
+
+Intégration
+
+* navigation sidebar ;
+* routing ;
+* API ;
+* affichage des données ;
+* gestion des erreurs.
+
+⸻
+
+25. TEST E2E RÉEL
+
+À la fin, effectuer un parcours complet représentatif :
+
+Connexion
+   ↓
+GET-INJS
+   ↓
+Sélection année académique
+   ↓
+Consultation/création EDT
+   ↓
+Création séance
+   ↓
+Identification groupe
+   ↓
+Identification enseignant/formateur
+   ↓
+Séance active
+   ↓
+Badgeage étudiant par QR
+   ↓
+Enregistrement présence
+   ↓
+Badgeage enseignant/formateur
+   ↓
+Correction/forçage manuel
+   ↓
+Motif obligatoire
+   ↓
+Consultation des présences
+   ↓
+Tableau de bord
+
+Le parcours doit fonctionner avec les données réellement présentes dans l’environnement de test.
+
+⸻
+
+26. DONNÉES DE DÉMONSTRATION
+
+Si les données nécessaires n’existent pas :
+
+créer un jeu de données minimal et réaliste pour permettre de démontrer GET-INJS.
+
+Utiliser autant que possible les référentiels existants.
+
+Créer uniquement les données manquantes.
+
+NE PAS supprimer les données existantes.
+
+⸻
+
+27. DONNÉES ET BASE DE DONNÉES : RÈGLES ABSOLUES
+
+INTERDICTION de :
+
+* flush ;
+* DROP DATABASE ;
+* DROP TABLE ;
+* TRUNCATE ;
+* suppression des volumes Docker ;
+* réinitialisation globale ;
+* suppression des données existantes.
+
+Avant toute migration importante :
+
+* vérifier l’état de la base ;
+* générer la migration ;
+* tester ;
+* conserver les données.
+
+⸻
+
+28. GIT ET CHECKPOINTS
+
+Avant les changements importants :
+
+git status
+
+Créer des checkpoints logiques.
+
+Exemple de découpage :
+
+GET-INJS-01 — modèle/backend
+GET-INJS-02 — API
+GET-INJS-03 — frontend/navigation
+GET-INJS-04 — EDT
+GET-INJS-05 — présences/QR
+GET-INJS-06 — tests/intégration
+
+Adapter le découpage si un meilleur découpage est évident.
+
+Ne jamais faire de reset destructif pour résoudre un problème.
+
+⸻
+
+29. PRIORITÉ ABSOLUE EN CAS DE MANQUE DE TEMPS
+
+Le délai disponible est inférieur à 6 heures.
+
+Si le temps devient critique, appliquer cette priorité :
+
+P0 — OBLIGATOIRE
+
+1. intégration sidebar ;
+2. routing GET-INJS ;
+3. données EDT ;
+4. séances ;
+5. consultation EDT ;
+6. présence ;
+7. QR ;
+8. badgeage manuel ;
+9. forçage avec motif ;
+10. permissions essentielles ;
+11. tests critiques.
+
+P1
+
+* calendrier avancé ;
+* statistiques ;
+* filtres avancés ;
+* rapports ;
+* import Excel amélioré.
+
+P2
+
+* fonctionnalités de confort ;
+* raffinements UX ;
+* optimisations secondaires.
+
+Ne jamais sacrifier P0 pour une fonctionnalité esthétique ou secondaire.
+
+⸻
+
+30. RÈGLE DE DÉCISION AUTONOME
+
+Tu disposes de mon feu vert pour prendre toute décision technique raisonnable.
+
+Lorsque plusieurs solutions sont possibles :
+
+choisir celle qui maximise :
+
+1. compatibilité avec l’existant ;
+2. fiabilité ;
+3. rapidité d’implémentation ;
+4. maintenabilité ;
+5. sécurité ;
+6. performance.
+
+Ne pas me présenter les alternatives sauf si elles entraînent une différence métier ou une conséquence importante.
+
+⸻
+
+31. RÈGLE « PAS DE DEUXIÈME APPLICATION »
+
+C’est une contrainte fondamentale.
+
+NE PAS créer :
+
+* un deuxième frontend indépendant ;
+* un deuxième système d’authentification ;
+* une deuxième sidebar ;
+* une deuxième application utilisateur ;
+* une deuxième base de données ;
+* une deuxième gestion des étudiants ;
+* une deuxième gestion des enseignants.
+
+GET-INJS doit être un module intégré de app-injs-lmd2026.
+
+⸻
+
+32. RÈGLE « NE PAS RÉINVENTER »
+
+Avant de créer quelque chose :
+
+chercher si cela existe déjà.
+
+Priorité :
+
+EXISTANT
+   ↓
+EXTENSION
+   ↓
+RÉUTILISATION
+   ↓
+NOUVELLE IMPLÉMENTATION uniquement si nécessaire
+
+⸻
+
+33. RÈGLE « EXÉCUTER, NE PAS SIMULER »
+
+Ne pas considérer GET-INJS comme terminé parce que :
+
+* les fichiers existent ;
+* les composants compilent ;
+* les endpoints existent ;
+* les tests unitaires passent.
+
+GET-INJS est considéré comme opérationnel uniquement après validation d’un parcours fonctionnel réel de bout en bout.
+
+⸻
+
+34. RAPPORT FINAL
+
+À la fin de l’exécution, fournir un rapport COURT mais précis :
+
+1. État
+
+GET-INJS : OPÉRATIONNEL / PARTIEL / BLOQUÉ
+
+2. Fonctionnalités livrées
+
+Liste concrète.
+
+3. Fichiers principaux modifiés
+
+Liste.
+
+4. Base de données
+
+* modèles ;
+* migrations ;
+* données créées.
+
+5. API
+
+Liste des endpoints principaux.
+
+6. Frontend
+
+* routes ;
+* sidebar ;
+* écrans.
+
+7. Présences
+
+* QR ;
+* manuel ;
+* forçage ;
+* motifs ;
+* audit.
+
+8. Tests
+
+Indiquer uniquement les tests réellement exécutés et leur résultat.
+
+9. Git
+
+Indiquer les commits/checkpoints réellement créés.
+
+10. Restant
+
+Uniquement les problèmes réels empêchant la livraison ou les améliorations P1/P2.
+
+⸻
+
+35. CRITÈRE FINAL DE RÉUSSITE
+
+À la fin de cette mission, je veux une seule application :
+
+app-injs-lmd2026
+
+dans laquelle l’utilisateur peut ouvrir :
+
+GET-INJS
+
+depuis la sidebar et réellement :
+
+* consulter/gérer les emplois du temps ;
+* gérer les séances ;
+* gérer les groupes et ressources ;
+* consulter les emplois du temps par groupe/enseignant/salle ;
+* gérer les présences ;
+* badger par QR Code ;
+* badger manuellement ;
+* forcer un badgeage ;
+* imposer un motif au forçage ;
+* tracer les opérations ;
+* consulter les résultats ;
+* utiliser le système avec les données existantes de l’application.
+
+⸻
+
+36. DIRECTIVE FINALE
+
+COMMENCE MAINTENANT.
+
+1. Inspecte le dépôt réel.
+2. Lis les trois documents de workspace/EmploiduTemps-INJS.
+3. Analyse rapidement l’existant.
+4. Détermine l’architecture optimale.
+5. Implémente GET-INJS.
+6. Intègre-le à la sidebar de app-injs-lmd2026.
+7. Implémente l’EDT.
+8. Implémente les présences.
+9. Implémente QR + manuel + forçage avec motif.
+10. Implémente les permissions.
+11. Crée les migrations nécessaires.
+12. Crée les tests.
+13. Exécute les tests.
+14. Corrige les problèmes rencontrés.
+15. Effectue un parcours E2E.
+16. Crée les checkpoints Git nécessaires.
+17. Livre un GET-INJS réellement exploitable.
+
+Ne t’arrête pas après l’analyse.
+
+Ne me demande pas de valider chaque étape.
+
+Tu as mon feu vert pour l’ensemble du chantier.
+
+Choisis les meilleures options techniques et avance jusqu’à obtenir le meilleur résultat opérationnel possible dans le temps disponible.
+
+PRIORITÉ ABSOLUE
+
+Fonctionnel > intégré > sécurisé > testé > performant > esthétique.
+
+Et surtout :
+
+Une seule application app-injs-lmd2026. GET-INJS est un module intégré, pas une application séparée.
+
+Conseil immédiat : donne ce prompt directement à Arena Agent Mode sur votre branche arena/01a09e35-app-injslmd2026demo. Ne lancez pas plusieurs agents simultanément sur les mêmes fichiers pendant ces 6 heures : un seul agent maître avec ce périmètre réduira fortement les conflits et les régressions.

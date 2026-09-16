@@ -8,6 +8,7 @@ from config.views import api_root
 from config.health import health_view
 from config.preview import spa
 from config.static_views import service_worker, favicon
+from formations.api_views import formateur_list_api
 
 setup_admin_site()
 
@@ -39,7 +40,9 @@ urlpatterns = [
     path('api/habilitations/', include('habilitations.api.urls')),
     path('api/auth/', include('authentication.urls')),
     path('api/formations/', include('formations.urls')),
+    path('api/formateurs/list/', formateur_list_api, name='api-formateur-list-alias'),
     path('api/', include('presences.urls')),
+    path('api/dashboard/', include('dashboard.api_urls')),
     path('api/exports/', include('exports.urls')),
     path('api/statistiques/', include('statistiques.urls')),
     path('api/evaluations/', include('suiviEvaluation.urls')),
@@ -49,6 +52,7 @@ urlpatterns = [
     path('api/referentiels/', include('referentiels.urls')),
     path('api/equivalences/', include('equivalences.urls')),
     path('api/juries/', include('jurys.urls')),
+    path('api/jurys/', include('jurys.urls')),
     path('api/enseignants/', include('scolarite.charges_urls')),
     path('api/finances-etudiantes/', include('finances_etudiantes.urls')),
     path('api/graduation/', include('graduation.urls')),

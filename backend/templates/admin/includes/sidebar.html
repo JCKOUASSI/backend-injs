@@ -7,16 +7,16 @@
 
       <details class="sygep-sidebar-group"{% if has_active %} open{% endif %}>
         {% if group.title %}
-          <summary class="sygep-sidebar-group-toggle">
+          <summary class="sygep-sidebar-group-toggle" style="list-style: none;">
             <span class="sygep-sidebar-group-label">{{ group.title }}</span>
             <span class="material-symbols-outlined sygep-sidebar-chevron">chevron_right</span>
           </summary>
         {% endif %}
 
-        <ul class="sygep-sidebar-list">
+        <ul class="sygep-sidebar-list" style="list-style: none; margin: 0; padding: 0 4px;">
           {% for item in group.items %}
             {% nav_item_is_current item as is_current %}
-            <li>
+            <li style="list-style: none; margin: 0; padding: 0;">
               <a
                 href="{% if item.link_callback %}{{ item.link_callback }}{% else %}{{ item.link }}{% endif %}"
                 class="sygep-sidebar-link{% if is_current %} is-active{% endif %}"

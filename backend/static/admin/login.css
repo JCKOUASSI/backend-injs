@@ -2,6 +2,8 @@ body.login.sygep-admin,
 body.sygep-admin:not(.sygep-layout-active) {
     background: #ffffff !important;
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
 }
 
 body.login.sygep-admin #container {
@@ -45,8 +47,8 @@ body.login.sygep-admin #content {
     background: #fff;
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
-    padding: 32px 28px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    padding: 36px 32px;
 }
 
 .sygep-login-brand {
@@ -54,28 +56,38 @@ body.login.sygep-admin #content {
     margin-bottom: 24px;
 }
 
-.sygep-login-icon {
-    display: inline-block;
+.sygep-login-icon-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 72px;
     height: 72px;
-    object-fit: contain;
     border-radius: 16px;
     background: #001a33;
-    padding: 8px;
     margin-bottom: 12px;
+    box-sizing: border-box;
+}
+
+.sygep-login-icon {
+    display: block;
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
 }
 
 .sygep-login-brand h1 {
     margin: 0;
-    font-size: 1.4rem;
+    font-size: 1.45rem;
     font-weight: 800;
     color: #0b478a;
+    letter-spacing: -0.01em;
 }
 
 .sygep-login-brand p {
     margin: 6px 0 0;
     color: #64748b;
     font-size: 14px;
+    font-weight: 500;
 }
 
 .sygep-login-card .form-row {
@@ -96,11 +108,32 @@ body.login.sygep-admin #content {
     box-sizing: border-box;
     border-radius: 12px;
     border: 1px solid rgba(15, 23, 42, 0.12);
-    padding: 10px 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.sygep-login-card input[type="text"] {
+    border: 1.5px solid #ea9d0c;
+    box-shadow: 0 0 0 3px rgba(234, 157, 12, 0.18);
+    background: #ffffff;
+}
+
+.sygep-login-card input[type="password"] {
+    background-color: #ebf3fb;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.sygep-login-card input[type="text"]:focus,
+.sygep-login-card input[type="password"]:focus {
+    border-color: #ea9d0c;
+    box-shadow: 0 0 0 3px rgba(234, 157, 12, 0.25);
 }
 
 .sygep-login-card .submit-row {
-    margin-top: 20px;
+    margin-top: 24px;
     padding: 0;
     background: transparent;
     border: none;
@@ -114,16 +147,12 @@ body.login.sygep-admin #content {
     padding: 12px 20px;
     border-radius: 999px;
     font-weight: 700;
+    font-size: 15px;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(234, 157, 12, 0.3);
+    transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .sygep-login-card .submit-row input:hover {
-    background: #c2410c;
-}
-
-.sygep-login-card input[type="text"]:focus,
-.sygep-login-card input[type="password"]:focus {
-    border-color: #ea9d0c;
-    box-shadow: 0 0 0 3px rgba(249,177,22, 0.2);
-    outline: none;
+    background: #d48b0a;
 }

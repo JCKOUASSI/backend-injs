@@ -28,7 +28,7 @@ from .models import (
     TypeFormation,
     UE,
 )
-from formations.models import RefModule
+from formations.models import RefFormation, RefModule, RefSalle
 
 # Champs exposés et acceptés en écriture pour chaque référentiel simple.
 REFERENTIEL_FIELDS = {
@@ -43,6 +43,8 @@ REFERENTIEL_FIELDS = {
         'id', 'annee_academique_id', 'ref_formation_id', 'parcours_id', 'niveau_id',
         'vague_id', 'site_id', 'nom', 'capacite_max', 'actif',
     ]),
+    'formations': (RefFormation, ['id', 'code', 'intitule', 'type_diplome', 'domaine', 'mention', 'actif']),
+    'salles': (RefSalle, ['id', 'site_id', 'nom', 'capacite', 'type_lieu', 'actif']),
 }
 
 # Filtres exacts autorisés par référentiel, pour éviter toute injection de lookup.
@@ -58,6 +60,8 @@ REFERENTIEL_FILTERS = {
     'types-formation': ['actif'],
     'regimes': ['actif'],
     'statuts-etudiant': ['actif'],
+    'formations': ['actif'],
+    'salles': ['actif'],
 }
 
 _BOOLEAN_TRUE = {'1', 'true', 'True', 'oui'}
@@ -171,14 +175,16 @@ def annee_courante(request):
     """Année académique courante, utilisée comme valeur par défaut par le frontend."""
     annee = AnneeAcademique.courante_ou_none()
     if annee is None:
-        return Response({'annee': None})
+        return Response({'annee': None, 'id': None, 'libelle': None})
+    data = {
+        'id': annee.id,
+        'libelle': annee.libelle,
+        'date_debut': annee.date_debut,
+        'date_fin': annee.date_fin,
+    }
     return Response({
-        'annee': {
-            'id': annee.id,
-            'libelle': annee.libelle,
-            'date_debut': annee.date_debut,
-            'date_fin': annee.date_fin,
-        },
+        **data,
+        'annee': data,
     })
 
 

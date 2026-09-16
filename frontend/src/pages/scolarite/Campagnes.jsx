@@ -154,8 +154,8 @@ export default function Campagnes() {
               ) : campagnes.map((c) => (
                 <tr key={c.id}>
                   <td><Link to={`/scolarite/campagnes/${c.id}`}>{c.libelle}</Link></td>
-                  <td>{c.ref_formation_id}</td>
-                  <td>{c.annee_academique_id}</td>
+                  <td>{options.formations.find((f) => f.id === c.ref_formation_id)?.intitule || c.ref_formation_id}</td>
+                  <td>{options.annees.find((a) => a.id === c.annee_academique_id)?.libelle || c.annee_academique_id}</td>
                   <td>{c.date_ouverture || '—'}</td>
                   <td>{c.date_fermeture || '—'}</td>
                   <td><span className={`badge text-bg-${BADGE_STATUT[c.statut] || 'secondary'}`}>{c.statut}</span></td>

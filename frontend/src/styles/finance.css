@@ -718,3 +718,28 @@
   background: #f1f5f9;
   color: #64748b;
 }
+
+/* ═══ Glassmorphism Premium INJS 2026 pour le module Finance ═══ */
+.finance-filter-panel {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 10px 30px -5px rgba(11, 31, 58, 0.05) !important;
+}
+
+.finance-kpi-card {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 4px 18px rgba(11, 31, 58, 0.04) !important;
+}
+
+.finance-table-card {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 10px 30px -5px rgba(11, 31, 58, 0.05) !important;
+}

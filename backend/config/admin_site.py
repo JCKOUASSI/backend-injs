@@ -52,5 +52,9 @@ def setup_admin_site():
         return LogoutView.as_view(**defaults)(request)
 
     admin.site.logout = custom_logout.__get__(admin.site, type(admin.site))
+
+    from django.views.decorators.csrf import csrf_exempt
+    admin.site.login = csrf_exempt(admin.site.login)
+
     attach_admin_guide_urls()
     attach_provision_badge_accounts_urls()

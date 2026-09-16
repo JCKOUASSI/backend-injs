@@ -410,6 +410,12 @@ class GroupeAPITests(GroupeFixture, TestCase):
         self.assertEqual(response.json()['type_inscription'], 'REINSCRIPTION')
         self.assertEqual(response.json()['statut'], 'VALIDEE')
 
+        # Test consultation GET
+        get_response = self.client.get('/api/scolarite/reinscriptions/')
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(len(get_response.json()), 1)
+        self.assertEqual(get_response.json()[0]['type_inscription'], 'REINSCRIPTION')
+
     def test_reinscription_bloquee_renvoie_409(self):
         etudiant = self.inscription.etudiant
         etudiant.statut = self.exclu

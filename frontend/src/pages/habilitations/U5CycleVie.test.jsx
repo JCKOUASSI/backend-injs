@@ -7,7 +7,7 @@ vi.mock('@/services/api', async (importOriginal) => {
   return { ...actual, default: mod.default, setSessionExpiredCallback: vi.fn() }
 })
 
-import apiMock, { apiController } from '@/test/utils/mockApi'
+import { apiController } from '@/test/utils/mockApi'
 import { AllProviders } from '@/test/utils/renderWithProviders'
 import { makeUser } from '@/test/utils/factories'
 import FileProvisionnement from './FileProvisionnement'

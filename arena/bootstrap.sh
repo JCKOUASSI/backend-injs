@@ -14,6 +14,7 @@
 # =============================================================================
 set -uo pipefail
 
+_BDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RACINE="${RACINE:-/home/user}"
 LOG="$RACINE/arena/.bootstrap.log"
 mkdir -p "$RACINE/arena"
@@ -193,7 +194,6 @@ ok "arena/settings_sandbox.py écrit (overlay de $SET_MOD)"
 
 # Modules compagnons de l'overlay (middlewares d'aperçu), recopiés du dépôt
 # afin de survivre aux réinitialisations du snapshot.
-_BDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for _module in partitioned_cookies.py preview_autologin.py; do
   if [ -f "$_BDIR/$_module" ]; then
     cp "$_BDIR/$_module" "$RACINE/arena/$_module"
