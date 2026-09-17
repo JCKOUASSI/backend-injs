@@ -1,0 +1,160 @@
+# ============================================================
+# Sync INJS-LMD — app-injslmd2026demo -> Tobi-nw/injs-app
+# ============================================================
+# Maillon « sync/push » de la chaîne de déploiement INJS :
+#
+#   JCKOUASSI/app-injslmd2026demo @ SYNC_SOURCE_REF
+#        -> ce workflow (scripts/sync-injs-app.sh) -> Tobi-nw/injs-app @ main
+#        -> Actions Docker Hub du dépôt cible -> images ophirdesire/*
+#        -> VPS -> https://injs.badge-qr-code.pro/
+#
+# Ce workflow ne construit AUCUNE image : il déplace l'arbre de la branche
+# source vers la branche principale du dépôt de prod. Le build & push Docker Hub
+# est déclenché par les Actions DU DÉPÔT CIBLE, sur ce push.
+#
+# Sécurité :
+#   - mode par défaut « fastforward » : push jamais forcé, l'historique et les
+#     branches de injs-app ne sont pas réécrits (le mode mirror exige
+#     SYNC_ALLOW_MIRROR=1 côté script, donc n'est pas atteignable ici) ;
+#   - garde-fous du script : G1 (cible publique refusée), G2 (arbre contenant
+#     des secrets refusé) ;
+#   - le harnais du script (--self-test, 53 assertions hors ligne) s'exécute
+#     avant toute écriture : s'il est rouge, rien n'est poussé ;
+#   - un déclenchement manuel est en dry-run par défaut ; un run « push » est
+#     un vrai push, encadré par l'environment « sync-injs-app ».
+#
+# Secret à créer (dépot source : Settings → Secrets and variables → Actions) :
+#   INJS_APP_SYNC_TOKEN — PAT fine-grained, un seul repository
+#                         (Tobi-nw/injs-app), permissions « Contents: Read and
+#                         write » (+ « Actions: Read and write » si
+#                         SYNC_TRIGGER_DISPATCH=1).
+#
+# Variables optionnelles (mêmes Settings, onglet Variables) :
+#   SYNC_SOURCE_REF        branche source    (défaut : arena/01a0a27f-app-injslmd2026demo)
+#   SYNC_TARGET_REPO       owner/repo cible  (défaut : Tobi-nw/injs-app)
+#   SYNC_TARGET_BRANCH     branche cible     (défaut : main)
+#   SYNC_MODE              fastforward | mirror (défaut : fastforward)
+#   SYNC_KEEP_PATHS        chemins propres à la cible à préserver, séparés par des
+#                          virgules. A remplir depuis le releve, pas a dire d'avance :
+#                          `bash scripts/sync-injs-app.sh --suggest-keep`
+#   SYNC_EXCLUDE_PATHS     chemins à retirer de l'arbre poussé (dépôts de build
+#                          suivis par erreur dans la branche source)
+#   SYNC_DRY_RUN           « 0 » pour ARMER le push automatique sur `push` ;
+#                          toute autre valeur (variable absente incluse) = mode sec
+#   SYNC_TRIGGER_DISPATCH  « 1 » pour émettre aussi un repository_dispatch vers la cible
+#
+# Docs : docs/DEPLOIEMENT_INJS.md (§3 règles, §6 recette de première exécution)
+# ============================================================
+
+name: Sync (app-injslmd2026demo -> injs-app)
+
+on:
+  push:
+    branches:
+      # Branche de travail référencée par la chaîne INJS. Y ajouter « main »
+      # revient à déployer chaque fusion en production : à faire exprès.
+      - arena/01a0a27f-app-injslmd2026demo
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branche ou commit source (vide = variable SYNC_SOURCE_REF)"
+        required: false
+        type: string
+        default: ""
+      target_branch:
+        description: "Branche cible dans le dépôt de prod (vide = SYNC_TARGET_BRANCH)"
+        required: false
+        type: string
+        default: ""
+      mode:
+        description: "fastforward = sans --force (recommandé) ; mirror = historique remplacé"
+        required: false
+        type: choice
+        options: [fastforward, mirror]
+        default: fastforward
+      dry_run:
+        description: "Simuler seulement (recommandé pour une première exécution)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # cancel-in-progress=false volontairement : un push interrompu à mi-chemin est
+  # pire qu'une file d'attente.
+  group: sync-injs-app-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync vers ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
+    runs-on: ubuntu-latest
+    # `environment` est une cle de NIVEAU JOB (ignorée au niveau workflow). Cree
+    # l'environment a la premiere execution ; y ajouter « Required reviewers » et
+    # « Deployment branches: production branches only » transforme la sync en
+    # deploiement valide par un humain.
+    environment: sync-injs-app
+    timeout-minutes: 15
+    if: github.repository == 'JCKOUASSI/app-injslmd2026demo'
+    env:
+      # Sur push : on synchronise exactement ce qui vient d'être poussé.
+      # Sur dispatch : l'input, sinon la variable de dépôt, sinon la branche INJS.
+      SYNC_SOURCE_REF: ${{ github.event_name == 'push' && github.ref_name || (github.event.inputs.source_ref != '' && github.event.inputs.source_ref || vars.SYNC_SOURCE_REF || 'arena/01a0a27f-app-injslmd2026demo') }}
+      SYNC_TARGET_REPO: ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
+      SYNC_TARGET_BRANCH: ${{ github.event.inputs.target_branch != '' && github.event.inputs.target_branch || vars.SYNC_TARGET_BRANCH || 'main' }}
+      SYNC_MODE: ${{ github.event.inputs.mode != '' && github.event.inputs.mode || vars.SYNC_MODE || 'fastforward' }}
+      SYNC_KEEP_PATHS: ${{ vars.SYNC_KEEP_PATHS }}
+      SYNC_EXCLUDE_PATHS: ${{ vars.SYNC_EXCLUDE_PATHS }}
+      SYNC_TOKEN: ${{ secrets.INJS_APP_SYNC_TOKEN }}
+      # Defaut SUR : SEC. Un declenchement par `push` ne pousse reellement que si le
+      # depot est ARME explicitement (vars.SYNC_DRY_RUN == '0'). Le 2026-09-16, la
+      # version « pousser par defaut sur push » a ete relevee par la grille de verite
+      # des expressions : elle envoyait en prod le premier push venu (dont celui qui
+      # amene ce fichier sur la branche de chaine). Manuel : la caseche dry_run fait foi.
+      SYNC_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.dry_run == 'true' && '1' || '0') || (vars.SYNC_DRY_RUN == '0' && '0' || '1') }}
+      SYNC_TRIGGER_DISPATCH: ${{ vars.SYNC_TRIGGER_DISPATCH }}
+    steps:
+      - name: Checkout (le script utilisé est celui de la branche source)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref != '' && github.event.inputs.source_ref || github.ref_name }}
+
+      - name: Harnais du script (53 assertions, hors ligne)
+        run: bash scripts/sync-injs-app.sh --self-test
+
+      - name: Contrôle du secret de sync
+        env:
+          TOKEN: ${{ secrets.INJS_APP_SYNC_TOKEN }}
+        run: |
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::Secret INJS_APP_SYNC_TOKEN absent. Cree un PAT fine-grained limite a ${SYNC_TARGET_REPO} (Contents: Read and write), puis ajoute-le dans Settings -> Secrets and variables -> Actions -> Repository secrets."
+            exit 1
+          fi
+          echo "  token present (${#TOKEN} caracteres, valeur jamais affichee)"
+
+      - name: Sync — simulation (dry-run)
+        if: env.SYNC_DRY_RUN == '1'
+        run: |
+          echo "Mode sec : aucun push sur ${SYNC_TARGET_REPO}@${SYNC_TARGET_BRANCH}."
+          bash scripts/sync-injs-app.sh --dry-run
+
+      - name: Sync — push réel
+        if: env.SYNC_DRY_RUN != '1'
+        run: bash scripts/sync-injs-app.sh
+
+      - name: Rappel de l'aval de la chaîne
+        if: always()
+        run: |
+          {
+            echo "### Chaine INJS — etapes suivantes"
+            echo ""
+            echo "- source \`${SYNC_SOURCE_REF}\` → \`${SYNC_TARGET_REPO}@${SYNC_TARGET_BRANCH}\` (mode \`${SYNC_MODE}\`, dry-run \`${SYNC_DRY_RUN}\`)"
+            echo "- le depot cible construit et pousse \`ophirdesire/qrcode-badge\` + \`ophirdesire/qr-badge-frontend\`"
+            echo "- le VPS relance les conteneurs, puis sert https://injs.badge-qr-code.pro/"
+            echo ""
+            echo "Suivi cible : \`gh run list -R ${SYNC_TARGET_REPO} -L 5\`"
+            echo "Documentation : \`docs/DEPLOIEMENT_INJS.md\`"
+          } >> "$GITHUB_STEP_SUMMARY"
