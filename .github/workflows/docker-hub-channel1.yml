@@ -5,10 +5,10 @@
 # self-hosted AlmaLinux, remplace runs-on ci-dessous par tes labels.
 #
 # Équivalent local :
-#   backend  : docker buildx build --platform linux/amd64 -t ophirdesire/qrcode-badge:<tag> --push ./backend
+#   backend  : docker buildx build --platform linux/amd64 -t jckouassi/injs-be:<tag> --push ./backend
 #   frontend : docker buildx build --platform linux/amd64 --build-arg VITE_API_URL=... --push ./frontend
 #
-# Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (compte ophirdesire)
+# Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (compte jckouassi)
 #
 # Variables optionnelles (Actions → Variables) pour surcharger les tags / URLs :
 #   DOCKER_VERSION_PREFIX (défaut 1.1), DOCKER_BACKEND_TAG, DOCKER_FRONTEND_TAG
@@ -51,8 +51,8 @@ jobs:
     name: Build & push (linux/amd64)
     runs-on: ubuntu-latest
     env:
-      BACKEND_IMAGE: ophirdesire/qrcode-badge
-      FRONTEND_IMAGE: ophirdesire/qr-badge-frontend
+      BACKEND_IMAGE: jckouassi/injs-be
+      FRONTEND_IMAGE: jckouassi/injs-fe
     steps:
       - name: Checkout
         uses: actions/checkout@v4

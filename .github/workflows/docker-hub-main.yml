@@ -3,11 +3,11 @@
 # Cible d’exécution : AlmaLinux x86_64 (--platform linux/amd64).
 #
 # Équivalent local :
-#   backend  : docker buildx build --platform linux/amd64 -t ophirdesire/qrcode-badge:v1.1.40-amd64 --push ./backend
+#   backend  : docker buildx build --platform linux/amd64 -t jckouassi/injs-be:v1.1.40-amd64 --push ./backend
 #   frontend : docker buildx build --platform linux/amd64 \
 #                --build-arg VITE_API_URL=https://api.sygepcpfae.org/api \
 #                --build-arg VITE_BADGE_BASE_URL=https://api.sygepcpfae.org \
-#                -t ophirdesire/qr-badge-frontend:1.0.44-amd64 --push ./frontend
+#                -t jckouassi/injs-fe:1.0.44-amd64 --push ./frontend
 #
 # Secrets : DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #
@@ -52,8 +52,8 @@ jobs:
     name: Build & push prod (linux/amd64)
     runs-on: ubuntu-latest
     env:
-      BACKEND_IMAGE: ophirdesire/qrcode-badge
-      FRONTEND_IMAGE: ophirdesire/qr-badge-frontend
+      BACKEND_IMAGE: jckouassi/injs-be
+      FRONTEND_IMAGE: jckouassi/injs-fe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
