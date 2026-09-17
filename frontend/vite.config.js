@@ -45,10 +45,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: { alias },
     server: {
-      // Ports du projet : l'API Django sur 8000, le front sur 3002 (choix
-      // utilisateur du 2026-09-16). strictPort : si 3002 est occupé, Vite
-      // échoue au lieu de migrer silencieusement vers un autre port.
-      port: 3002,
+      // Ports du projet : l'API Django sur 8000, le front sur 3000 (règle projet).
+      port: 3000,
       strictPort: true,
       host: true,
       allowedHosts: ['.e2b.app', 'localhost', '127.0.0.1'],

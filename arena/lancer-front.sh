@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# LANCEUR FRONT VITE — port FIGÉ 3002 (choix utilisateur du 2026-09-16)
+# LANCEUR FRONT VITE — port FIGÉ 3000 (règle projet, ne jamais changer)
 # -----------------------------------------------------------------------------
 # Usage : bash arena/lancer-front.sh
-# Le port 3002 est inscrit dans frontend/vite.config.js avec strictPort:true :
-# Vite échoue si 3002 est pris, il ne bascule JAMAIS sur un autre port
+# Le port 3000 est inscrit dans frontend/vite.config.js avec strictPort:true :
+# Vite échoue si 3000 est pris, il ne bascule JAMAIS sur un autre port
 # (notamment plus jamais 5173). Prérequis : bash arena/bootstrap.sh.
 # =============================================================================
 set -uo pipefail
 RACINE="${RACINE:-/home/user}"
 FRONTEND="$(find "$RACINE" -maxdepth 4 -name package.json -not -path '*/node_modules/*' 2>/dev/null | head -1)"
 FRONTEND="$(dirname "$FRONTEND")"
-PORT=3002
+PORT=3000
 
 if [ ! -d "$FRONTEND/node_modules" ]; then
   echo ">> [bloquant] dépendances absentes : lancez d'abord  bash arena/bootstrap.sh"
@@ -33,5 +33,5 @@ if ss -tln 2>/dev/null | grep -q ":$PORT "; then
 fi
 
 cd "$FRONTEND" || exit 2
-# Pas de --port : c'est vite.config.js qui fait foi (3002, strictPort).
+# Pas de --port : c'est vite.config.js qui fait foi (3000, strictPort).
 exec env VITE_HMR_PROTOCOL=wss npm run dev -- --host 0.0.0.0
