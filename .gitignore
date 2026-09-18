@@ -69,3 +69,12 @@ workspace/.pycache/
 **/.pycache/
 **/__pycache__/
 *.pyc
+
+# Compléments sécurité 2026-09-18 (n'affecte pas les fichiers déjà suivis)
+*.log
+/.next/
+/vendor/
+/var/
+/storage/
+/.kilo/
+/.cursor/
