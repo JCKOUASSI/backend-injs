@@ -6,18 +6,31 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+# Compatibilité prod: supporte DEBUG et DJANGO_DEBUG (0/1, true/false)
+def _get_bool_env(*names, default=True):
+    for n in names:
+        v = os.environ.get(n)
+        if v is not None:
+            return v.lower() in ('true', '1', 'yes')
+    return default
+
+DEBUG = _get_bool_env('DEBUG', 'DJANGO_DEBUG', default=True)
 
 # Port HTTP du serveur Django en développement local (runserver / gunicorn dev)
 DEV_SERVER_PORT = os.environ.get('DJANGO_DEV_PORT', '8001')
 
-_SECRET_KEY_ENV = os.environ.get('SECRET_KEY', '')
+# Compatibilité prod: SECRET_KEY ou DJANGO_SECRET_KEY ou DJANGO_SECRET_KEY (root .env)
+_SECRET_KEY_ENV = (
+    os.environ.get('SECRET_KEY', '') or
+    os.environ.get('DJANGO_SECRET_KEY', '') or
+    os.environ.get('DJANGO_SECRET', '')
+)
 if not _SECRET_KEY_ENV:
     if DEBUG:
         _SECRET_KEY_ENV = 'django-insecure-dev-only-do-not-use-in-production'
     else:
         raise RuntimeError(
-            'SECRET_KEY environment variable is not set. '
+            'SECRET_KEY / DJANGO_SECRET_KEY environment variable is not set. '
             'Set it before starting the server in production.'
         )
 SECRET_KEY = _SECRET_KEY_ENV
@@ -196,8 +209,22 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database — PostgreSQL par défaut.
+# Compatibilité prod: supporte POSTGRES_* (backend/.env) et DB_* (root .env VPS)
 # Bascules SQLite pour le développement local sans serveur PostgreSQL : USE_SQLITE=1
-_postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
+def _get_db_env(*names, default=''):
+    for n in names:
+        v = os.environ.get(n)
+        if v:
+            return v
+    return default
+
+_postgres_db = _get_db_env('POSTGRES_DB', 'DB_NAME', default='qr_badge')
+_db_user = _get_db_env('POSTGRES_USER', 'DB_USER', default='postgres')
+_db_password = _get_db_env('POSTGRES_PASSWORD', 'DB_PASSWORD', default='')
+_db_host = _get_db_env('POSTGRES_HOST', 'DB_HOST', default='localhost')
+_db_port = _get_db_env('POSTGRES_PORT', 'DB_PORT', default='5432')
+_db_engine = _get_db_env('DB_ENGINE', default='django.db.backends.postgresql')
+
 if os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes'):
     DATABASES = {
         'default': {
@@ -208,12 +235,12 @@ if os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes'):
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
+            'ENGINE': _db_engine,
             'NAME': _postgres_db,
-            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'USER': _db_user,
+            'PASSWORD': _db_password,
+            'HOST': _db_host,
+            'PORT': _db_port,
             # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
             'TEST': {
                 'NAME': f'test_{_postgres_db}',

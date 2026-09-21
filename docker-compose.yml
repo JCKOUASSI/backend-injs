@@ -1,47 +1,84 @@
+# Production Docker Compose pour injs.badge-qr-code.pro (VPS 152.228.233.123)
+# Compatible avec backend/config/settings.py (supporte DB_* et POSTGRES_*, DEBUG/DJANGO_DEBUG)
+# Usage: cp .env.example .env && docker compose up -d --build
+# Puis: docker compose exec backend python manage.py createsuperuser (si besoin)
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: .env
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes: [pgdata:/var/lib/postgresql/data]
+      POSTGRES_DB: ${DB_NAME:-injs}
+      POSTGRES_USER: ${DB_USER:-injs}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-injs} -d ${DB_NAME:-injs}"]
       interval: 10s
+      timeout: 5s
       retries: 5
 
   backend:
     build:
-      context: .                       # build depuis la RACINE du monorepo
-      dockerfile: injs-be/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Compatibilité: backend lit POSTGRES_* et DB_*
+      POSTGRES_DB: ${DB_NAME:-injs}
+      POSTGRES_USER: ${DB_USER:-injs}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      # Django prod - supporte DEBUG et DJANGO_DEBUG, SECRET_KEY et DJANGO_SECRET_KEY
+      DEBUG: ${DJANGO_DEBUG:-0}
+      SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY manquant}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-injs.badge-qr-code.pro,localhost,127.0.0.1}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://injs.badge-qr-code.pro}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://injs.badge-qr-code.pro}
+      # Superuser auto (post_migrate) - pour admin/admin123
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@injs.local}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-admin123}
+      # Proxy TLS
+      TRUST_FORWARDED_PROTO: 1
+      USE_X_FORWARDED_HOST: 1
+      # URLs publiques
+      FRONTEND_URL: https://injs.badge-qr-code.pro
+      PUBLIC_APP_URL: https://injs.badge-qr-code.pro
+      BADGE_BASE_URL: https://injs.badge-qr-code.pro
     depends_on:
-      db: { condition: service_healthy }
+      db:
+        condition: service_healthy
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-    expose: ["8000"]
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD-SHELL", "python manage.py check --deploy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
     build:
-      context: .
-      dockerfile: injs-fe/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://injs.badge-qr-code.pro/api
+        VITE_API_URL: ${VITE_API_URL:-https://injs.badge-qr-code.pro/api}
+        VITE_BADGE_BASE_URL: ${VITE_BADGE_BASE_URL:-https://injs.badge-qr-code.pro}
     restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    depends_on: [backend, frontend]
-    ports: ["80:80"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
     volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - frontend_build:/usr/share/nginx/html:ro
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
 
@@ -49,4 +86,3 @@ volumes:
   pgdata:
   static_volume:
   media_volume:
-  frontend_build:
