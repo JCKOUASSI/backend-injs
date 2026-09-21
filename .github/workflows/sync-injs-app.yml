@@ -1,9 +1,9 @@
 # ============================================================
-# Sync INJS-LMD — app-injslmd2026demo -> Tobi-nw/injs-app
+# Sync INJS-LMD — backend-injs -> Tobi-nw/injs-app
 # ============================================================
 # Maillon « sync/push » de la chaîne de déploiement INJS :
 #
-#   JCKOUASSI/app-injslmd2026demo @ SYNC_SOURCE_REF
+#   JCKOUASSI/backend-injs @ SYNC_SOURCE_REF
 #        -> ce workflow (scripts/sync-injs-app.sh) -> Tobi-nw/injs-app @ main
 #        -> Actions Docker Hub du dépôt cible -> images ophirdesire/*
 #        -> VPS -> https://injs.badge-qr-code.pro/
@@ -30,7 +30,7 @@
 #                         SYNC_TRIGGER_DISPATCH=1).
 #
 # Variables optionnelles (mêmes Settings, onglet Variables) :
-#   SYNC_SOURCE_REF        branche source    (défaut : arena/01a0a27f-app-injslmd2026demo)
+#   SYNC_SOURCE_REF        branche source    (défaut : main)
 #   SYNC_TARGET_REPO       owner/repo cible  (défaut : Tobi-nw/injs-app)
 #   SYNC_TARGET_BRANCH     branche cible     (défaut : main)
 #   SYNC_MODE              fastforward | mirror (défaut : fastforward)
@@ -46,14 +46,15 @@
 # Docs : docs/DEPLOIEMENT_INJS.md (§3 règles, §6 recette de première exécution)
 # ============================================================
 
-name: Sync (app-injslmd2026demo -> injs-app)
+name: Sync (backend-injs -> injs-app)
 
 on:
   push:
     branches:
-      # Branche de travail référencée par la chaîne INJS. Y ajouter « main »
-      # revient à déployer chaque fusion en production : à faire exprès.
-      - arena/01a0a27f-app-injslmd2026demo
+      # Option A (docs/DEPLOIEMENT_INJS.md §6.0) : la chaîne part de `main`.
+      # Chaque fusion sur main part donc en prod — à faire exprès, et seulement
+      # quand le maillon « Actions Docker Hub » de la cible est vert (§9.3).
+      - main
   workflow_dispatch:
     inputs:
       source_ref:
@@ -97,11 +98,11 @@ jobs:
     # deploiement valide par un humain.
     environment: sync-injs-app
     timeout-minutes: 15
-    if: github.repository == 'JCKOUASSI/app-injslmd2026demo'
+    if: github.repository == 'JCKOUASSI/backend-injs'
     env:
       # Sur push : on synchronise exactement ce qui vient d'être poussé.
       # Sur dispatch : l'input, sinon la variable de dépôt, sinon la branche INJS.
-      SYNC_SOURCE_REF: ${{ github.event_name == 'push' && github.ref_name || (github.event.inputs.source_ref != '' && github.event.inputs.source_ref || vars.SYNC_SOURCE_REF || 'arena/01a0a27f-app-injslmd2026demo') }}
+      SYNC_SOURCE_REF: ${{ github.event_name == 'push' && github.ref_name || (github.event.inputs.source_ref != '' && github.event.inputs.source_ref || vars.SYNC_SOURCE_REF || 'main') }}
       SYNC_TARGET_REPO: ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
       SYNC_TARGET_BRANCH: ${{ github.event.inputs.target_branch != '' && github.event.inputs.target_branch || vars.SYNC_TARGET_BRANCH || 'main' }}
       SYNC_MODE: ${{ github.event.inputs.mode != '' && github.event.inputs.mode || vars.SYNC_MODE || 'fastforward' }}

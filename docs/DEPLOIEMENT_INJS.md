@@ -1,6 +1,11 @@
-# Déploiement INJS — chaîne `app-injslmd2026demo` → `injs-app` → Docker Hub → VPS
+# Déploiement INJS — chaîne `backend-injs` → `injs-app` → Docker Hub → VPS
 
 > Document d'exploitation du maillon **sync/push** ajouté le 2026-09-16.
+> **Mise à jour 2026-09-21** : le dépôt de dev a été renommé
+> `app-injslmd2026demo` → `backend-injs` (les mentions historiques ci-dessous
+> désignent le même dépôt). L'**option A** (§6.0) est appliquée : la branche
+> source de la chaîne est désormais **`main`** ; l'ancienne branche de chaîne
+> `arena/01a0a27f-…` n'existe plus.
 > Il décrit la chaîne réelle d'après l'état du dépôt, et signale explicitement ce
 > qui **n'a pas pu être vérifié** depuis le bac à sable (réseau sortant filtré).
 > Le code de la sync vit dans [`scripts/sync-injs-app.sh`](../scripts/sync-injs-app.sh),
@@ -11,7 +16,7 @@
 ## 1. La chaîne, maillon par maillon
 
 ```
-JCKOUASSI/app-injslmd2026demo @ <branche source>
+JCKOUASSI/backend-injs @ main
         │  (1) sync/push  — ce dépôt : workflow Sync + scripts/sync-injs-app.sh
         ▼
 Tobi-nw/injs-app @ main
@@ -42,7 +47,7 @@ domaines `sygepcpfae.org` (prod historique) et `badge-qr-code.pro` (channel1).
 
 | Constat | Mesure | Conséquence |
 |---------|--------|-------------|
-| La branche de chaîne `arena/01a0a27f-app-injslmd2026demo` = `872e2668` (fusion PR #6) | `git merge-base --is-ancestor 872e2668 origin/main` → **non** ; `main` = `23499208` | **Cette branche est en retard sur `main`** : la pousser en prod déployerait un état antérieur (sans le lot « Dashboard Engine aligné sur Tableaux de bord INJS LMD-2026 »). À corriger avant toute exécution (voir §6.0). |
+| La branche de chaîne `arena/01a0a27f-backend-injs` = `872e2668` (fusion PR #6) | `git merge-base --is-ancestor 872e2668 origin/main` → **non** ; `main` = `23499208` | **Cette branche est en retard sur `main`** : la pousser en prod déployerait un état antérieur (sans le lot « Dashboard Engine aligné sur Tableaux de bord INJS LMD-2026 »). À corriger avant toute exécution (voir §6.0). |
 | `Tobi-nw/injs-app` | API GitHub → `404`, `git ls-remote` → `Repository not found` avec le compte du bac à sable | Le dépôt est **privé et hors de portée** de l'agent, ou inexistant. Rien n'a pu être lu de ses workflows : la configuration du maillon 2 est à vérifier sur place (§4.1). |
 | `https://injs.badge-qr-code.pro/` | DNS → `152.228.233.123` ; TLS sortant du bac à sable bloqué (`SSL_ERROR_SYSCALL`, y compris sur `tobi-nw.github.io`) | **Site non vérifiable depuis l'agent.** Les vérifications §6.4 sont à faire depuis un navigateur ou le VPS. |
 | `api.badge-qr-code.pro` | DNS → `57.128.215.210` (autre hôte que `injs.`) | L'API de l'instance INJS n'est **pas** le même serveur que le front `injs.` : le `VITE_API_URL` embarqué dans l'image de prod doit être décidé, pas deviné (§5). |
@@ -107,7 +112,7 @@ domaines `sygepcpfae.org` (prod historique) et `badge-qr-code.pro` (channel1).
   `appuser` » déjà présent ici ;
 - [ ] `VITE_APP_TITLE=INJS-LMD — INJS Marcory` si la cible doit se démarquer de la prod historique.
 
-### 4.2 Dépôt source `JCKOUASSI/app-injslmd2026demo`
+### 4.2 Dépôt source `JCKOUASSI/backend-injs`
 
 - [ ] secret `INJS_APP_SYNC_TOKEN` : PAT fine-grained, **un seul repository**
   (`Tobi-nw/injs-app`), `Contents: Read and write` (+ `Actions: Read and write`
@@ -165,7 +170,7 @@ l'image frontend.
 
 ### 6.0 D'abord : décider ce qui est déployé
 
-`arena/01a0a27f-app-injslmd2026demo` est en retard sur `main` (§2). Deux options,
+`arena/01a0a27f-backend-injs` est en retard sur `main` (§2). Deux options,
 à valoir explicitement :
 
 - **A (recommandé)** — synchroniser `main` : `SYNC_SOURCE_REF=main`, et ajouter
@@ -177,8 +182,8 @@ l'image frontend.
   échoue en `pathspec … did not match any file(s)` :
 
 ```bash
-OUTIL=arena/01a0a87d-app-injslmd2026demo     # ref QUI CONTIENT l'outillage (ou main, une fois fusionne)
-git fetch origin arena/01a0a27f-app-injslmd2026demo "$OUTIL"
+OUTIL=arena/01a0a87d-backend-injs     # ref QUI CONTIENT l'outillage (ou main, une fois fusionne)
+git fetch origin arena/01a0a27f-backend-injs "$OUTIL"
 git switch -c outillage-sync 872e266828db6eac4733c6582bd64a37abd6b708
 git checkout "$OUTIL" -- .github/workflows/sync-injs-app.yml scripts/sync-injs-app.sh docs/DEPLOIEMENT_INJS.md
 git commit -m "chore(deploy): outillage de sync vers injs-app sur la branche de chaine"
@@ -187,7 +192,7 @@ git commit -m "chore(deploy): outillage de sync vers injs-app sur la branche de 
 bash scripts/sync-injs-app.sh --self-test | tail -1
 git merge-base --is-ancestor 872e266828db6eac4733c6582bd64a37abd6b708 HEAD && echo "fast-forward OK"
 
-git push origin HEAD:refs/heads/arena/01a0a27f-app-injslmd2026demo
+git push origin HEAD:refs/heads/arena/01a0a27f-backend-injs
 ```
 
 > **Ce push déclenche lui-même le workflow — en mode sec.** Le défaut d'un run par
@@ -197,7 +202,7 @@ git push origin HEAD:refs/heads/arena/01a0a27f-app-injslmd2026demo
 > ```bash
 > # armement du push automatique sur push (volontaire, et seulement quand le
 > # maillon « Actions Docker Hub » de la cible est vert) :
-> gh variable set SYNC_DRY_RUN --repo JCKOUASSI/app-injslmd2026demo --body 0
+> gh variable set SYNC_DRY_RUN --repo JCKOUASSI/backend-injs --body 0
 > # toute autre valeur (variable absente, '1', 'true') = mode sec
 > ```
 >
@@ -211,7 +216,7 @@ git push origin HEAD:refs/heads/arena/01a0a27f-app-injslmd2026demo
 ### 6.1 Sécheresse d'abord (aucune écriture)
 
 ```bash
-cd app-injslmd2026demo
+cd backend-injs
 SYNC_OFFLINE=1 bash scripts/sync-injs-app.sh --self-test   # 53 assertions (14 cas), vert attendu
 bash scripts/sync-injs-app.sh --suggest-keep                # ce que la cible PERDRAIT -> remplit SYNC_KEEP_PATHS
 bash scripts/sync-injs-app.sh --dry-run                     # lit la cible, ne pousse pas
@@ -223,11 +228,11 @@ l'agent n'a pas de portée Actions : `403 Resource not accessible by integration
 
 ```bash
 # variable d'Actions
-gh api -X PUT repos/JCKOUASSI/app-injslmd2026demo/actions/variables/SYNC_EXCLUDE_PATHS \
+gh api -X PUT repos/JCKOUASSI/backend-injs/actions/variables/SYNC_EXCLUDE_PATHS \
   -f name=SYNC_EXCLUDE_PATHS -f value=.pycache
-gh api repos/JCKOUASSI/app-injslmd2026demo/actions/variables | jq -r '.variables[]|"\(.name)=\(.value)"'
+gh api repos/JCKOUASSI/backend-injs/actions/variables | jq -r '.variables[]|"\(.name)=\(.value)"'
 # secret d'Actions (la valeur transite par stdin, jamais par l'historique de shell)
-gh api -X PUT repos/JCKOUASSI/app-injslmd2026demo/actions/secrets/INJS_APP_SYNC_TOKEN \
+gh api -X PUT repos/JCKOUASSI/backend-injs/actions/secrets/INJS_APP_SYNC_TOKEN \
   --input <(jq -n --arg v "$(cat pat.txt)" '{name:"INJS_APP_SYNC_TOKEN", encrypted_value:$v}')   # via `gh secret set` : preferred
 ```
 
@@ -241,7 +246,7 @@ propres à la cible seraient-ils supprimés (⇒ à ajouter à `SYNC_KEEP_PATHS`
 
 ### 6.2 Via Actions (voie normale)
 
-`Actions → Sync (app-injslmd2026demo -> injs-app) → Run workflow`, `dry_run`
+`Actions → Sync (backend-injs -> injs-app) → Run workflow`, `dry_run`
 coché, puis re-déclencher `dry_run` décoché. Le run d'essai doit montrer :
 harnais vert, dry-run, et le détail de l'effet sur la cible.
 
@@ -250,7 +255,7 @@ harnais vert, dry-run, et le détail de l'effet sur la cible.
 ```bash
 export SYNC_TOKEN=ghp_…            # PAT fine-grained, cible uniquement
 export SYNC_TARGET_REPO=Tobi-nw/injs-app SYNC_TARGET_BRANCH=main
-export SYNC_SOURCE_REF=arena/01a0a27f-app-injslmd2026demo
+export SYNC_SOURCE_REF=main
 bash scripts/sync-injs-app.sh --dry-run && bash scripts/sync-injs-app.sh
 ```
 
