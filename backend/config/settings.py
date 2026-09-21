@@ -146,6 +146,8 @@ INSTALLED_APPS = [
     # Refonte CURP-INJS (unité U1) : socle additif de données d'habilitation.
     # Aucun contrôle d'accès n'est branché depuis cette application en U1.
     'habilitations.apps.HabilitationsConfig',
+    # Phase 1 — référentiel métier INJS (départements/services).
+    'referentiel_injs.apps.ReferentielInjsConfig',
 ]
 
 MIDDLEWARE = [
