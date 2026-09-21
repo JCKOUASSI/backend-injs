@@ -370,7 +370,18 @@ do_sync() {
   log "1/5 Clone de la cible ${TARGET} @ ${TARGET_BRANCH}"
   local clone_url branch_exists=""
   clone_url=$(with_cred "$TARGET_URL")
-  branch_exists=$(GIT_ASKPASS="$ASKPASS" git ls-remote --heads "$clone_url" "$TARGET_BRANCH" 2>/dev/null | head -1 || true)
+  # `git ls-remote` part du repertoire courant. Dans une CI, ce repertoire est le
+  # checkout de la source, ou `actions/checkout` a pose l'entete
+  # `http.https://github.com/.extraheader` (jeton du workflow). Cet entete prime
+  # sur GIT_ASKPASS : la cible privee repond 404, la sortie est vide et la branche
+  # passe pour inexistante -> commit RACINE au lieu d'un fast-forward, et les
+  # chemins de SYNC_KEEP_PATHS resolus dans la SOURCE au lieu de la cible
+  # (constate le 2026-09-20, runs 35491761808 et 35494860699). On neutralise donc
+  # explicitement cet entete pour n'interroger la cible qu'avec SYNC_TOKEN.
+  # (La variante generique `-c http.extraheader=` laisse l'entete URL passer :
+  # verifie inoperante. Le clone est insensible a ce piege : verifie.)
+  branch_exists=$(GIT_ASKPASS="$ASKPASS" git -c http.https://github.com/.extraheader= \
+    ls-remote --heads "$clone_url" "$TARGET_BRANCH" 2>/dev/null | head -1 || true)
   if [ -n "$branch_exists" ]; then
     GIT_ASKPASS="$ASKPASS" git clone --quiet --no-tags --single-branch --branch "$TARGET_BRANCH" \
       "$clone_url" "$WORK/repo" 2>"$WORK/clone.err" || die "clone de la cible en échec : $(sed -n '1p' "$WORK/clone.err")"
