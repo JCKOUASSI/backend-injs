@@ -4,7 +4,11 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:  # python-dotenv optionnel en développement local
+    def load_dotenv(_path):
+        return False
 
 load_dotenv(Path(__file__).resolve().parent / '.env')
 

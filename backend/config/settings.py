@@ -1,7 +1,11 @@
 import os
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:  # python-dotenv optionnel en développement local
+    def load_dotenv(_path):
+        return False
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')

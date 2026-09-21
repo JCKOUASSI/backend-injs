@@ -2,7 +2,10 @@
 
 from pathlib import Path
 
-import markdown
+try:
+    import markdown
+except ImportError:  # markdown optionnel en développement local
+    markdown = None
 from django.contrib import admin
 from django.urls import path
 from django.views.generic import TemplateView
@@ -11,6 +14,9 @@ _GUIDE_PATH = Path(__file__).resolve().parent.parent / 'docs' / 'GUIDE_ADMIN_ACT
 
 
 def _render_guide_html(text: str) -> str:
+    if markdown is None:
+        # Rendu dégradé (texte brut) si le paquet markdown n'est pas installé.
+        return '<pre>' + text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') + '</pre>'
     return markdown.markdown(
         text,
         extensions=['tables', 'fenced_code', 'sane_lists', 'nl2br'],
