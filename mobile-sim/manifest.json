@@ -1,11 +1,11 @@
 {
   "name": "QR Badge Mobile - INJS LMD",
   "short_name": "QR Badge",
-  "description": "Application de badgeage sécurisé INJS Marcory",
+  "description": "Application de badgeage sécurisé INJS Marcory - Institut National de la Jeunesse et des Sports",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#388E3C",
-  "theme_color": "#388E3C",
+  "background_color": "#0B1F3A",
+  "theme_color": "#0B1F3A",
   "icons": [
     {
       "src": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f393.png",
