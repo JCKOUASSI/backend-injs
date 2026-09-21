@@ -18,5 +18,5 @@ class DepartementService(models.Model):
         ordering = ['nom']
 
     def __str__(self):
-        return f"{self.nom} ({self.get_type_display())}"
+        return f"{self.nom} ({self.get_type_display()})"
 
