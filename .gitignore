@@ -36,6 +36,7 @@ backend/logs/
 !.vscode/launch.json
 !.vscode/settings.json
 !.vscode/tasks.json
+!.vscode/DEPLOIEMENT_GUIDE_VSCODE.md
 project_structure.txt
 /Save taches app-injs-lmd 2026.txt
 
