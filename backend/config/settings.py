@@ -310,6 +310,24 @@ MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS = int(
     os.environ.get('MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)
 )
 
+# ── Moteur d'habilitation — interrupteurs d'exploitation (app ``habilitations``) ──
+# Trois modes, résolus par ``habilitations.services.moteur.mode_moteur()`` :
+#   APPLICATION > OBSERVATION > OFF.
+# ``HABILITATIONS_APPLICATION`` est livré à ``False`` (règle R3) : tant qu'il
+# n'est pas activé volontairement, le moteur ne refuse jamais un accès — il se
+# contente de compter ce qu'il aurait décidé (mode OBSERVATION, qui ne modifie
+# aucune réponse). Ces deux valeurs DOIVENT exister dans ce module : elles sont
+# calculées à l'import depuis l'environnement, ce qui les rend observables et
+# vérifiables par les tests (``override_settings`` ne change pas le défaut livré).
+HABILITATIONS_APPLICATION = os.environ.get(
+    'HABILITATIONS_APPLICATION',
+    'False',
+).lower() in ('true', '1', 'yes')
+HABILITATIONS_OBSERVATION = os.environ.get(
+    'HABILITATIONS_OBSERVATION',
+    'True',
+).lower() in ('true', '1', 'yes')
+
 # CORS — liste stricte d'origines (ou vide = rien)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
