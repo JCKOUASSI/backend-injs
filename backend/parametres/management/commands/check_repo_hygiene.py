@@ -56,6 +56,7 @@ RUNTIME_EXCLUDED_ROOT_SCRIPTS = (
     "backend/generate_import_files.py",
     "backend/generate_import_formateurs.py",
     "backend/seed_data.py",
+    "backend/tests_e2e_injs_2026_2027.py",
     "backend/verify_import_files.py",
 )
 

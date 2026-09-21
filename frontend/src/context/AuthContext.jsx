@@ -9,6 +9,7 @@ import {
   // ne doit pas traverser les sessions, au même titre que les capacités.
   MES_ACCES_QUERY_KEY,
 } from '../lib/queryClient'
+import { safeLocalStorage } from '../utils/safeStorage'
 
 const AuthContext = createContext(null)
 
@@ -38,8 +39,8 @@ export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
 
   const _clearSession = useCallback(() => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    safeLocalStorage.removeItem('access_token')
+    safeLocalStorage.removeItem('refresh_token')
     setUser(null)
     // Purge des droits dérivés du backend (P00-06) : une autre session ne doit
     // jamais hériter des capacités du compte précédent. removeQueries détruit
@@ -64,7 +65,7 @@ export function AuthProvider({ children }) {
   }, [_clearSession])
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token')
+    const token = safeLocalStorage.getItem('access_token')
     if (token) {
       api.get('/auth/me/')
         .then(res => {
@@ -92,7 +93,7 @@ export function AuthProvider({ children }) {
       throw err
     }
 
-    localStorage.setItem('access_token', access)
+    safeLocalStorage.setItem('access_token', access)
     // En aperçu intégré (iframe cross-site), les cookies tiers peuvent être
     // bloqués : on conserve alors aussi le refresh en stockage local pour que
     // le rafraîchissement fonctionne par le corps de la requête. Activé par
@@ -100,11 +101,11 @@ export function AuthProvider({ children }) {
     // HttpOnly reste la voie unique (risque R6).
     const refreshFallback = import.meta.env.VITE_REFRESH_FALLBACK === '1'
     if (refresh && (refreshFallback || !refreshInCookie)) {
-      localStorage.setItem('refresh_token', refresh)
+      safeLocalStorage.setItem('refresh_token', refresh)
     } else if (refreshInCookie && !refreshFallback) {
       // Risque R6 : le refresh vit dans un cookie HttpOnly — on ne le stocke
       // plus en localStorage et on purge un éventuel résidu d'ancienne session.
-      localStorage.removeItem('refresh_token')
+      safeLocalStorage.removeItem('refresh_token')
     }
     setUser(normalizeUser({
       ...userData,

@@ -30,6 +30,7 @@ import { usePersistedListQuery } from '../hooks/usePersistedListQuery'
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { canMutateFormations, FINANCE_MODULE_ROLES } from '../utils/roles'
+import { safeLocalStorage } from '../utils/safeStorage'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', observations: '', secretariats: [] }
 
@@ -105,7 +106,7 @@ export default function Formateurs() {
     if (!canViewFinanceData) return
     api.get('/formations/finance/settings/')
       .then((res) => {
-        if (localStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY) === null) {
+        if (safeLocalStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY) === null) {
           setExportAfficherMontants(res.data?.afficher_montants_exports !== false)
         }
       })

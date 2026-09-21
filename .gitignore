@@ -30,7 +30,12 @@ backups/
 # Environnements locaux / générés - NE PAS VERSIONNER
 backend/.venv-python39-backup/
 backend/logs/
-.vscode/
+# VS Code : la configuration partagée du projet est versionnée, le reste est local.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
 project_structure.txt
 /Save taches app-injs-lmd 2026.txt
 

@@ -1,3 +1,4 @@
+import { safeLocalStorage } from '../utils/safeStorage'
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 /** URL admin Django : VITE_ADMIN_URL ou dérivée de VITE_API_URL (…/api → …/admin/). */
@@ -20,8 +21,8 @@ function _onSessionExpired() {
   // échouent en parallèle avec une session réellement expirée.
   if (_sessionExpiredFired) return
   _sessionExpiredFired = true
-  localStorage.removeItem('access_token')
-  localStorage.removeItem('refresh_token')
+  safeLocalStorage.removeItem('access_token')
+  safeLocalStorage.removeItem('refresh_token')
   // Best-effort : invalide le cookie HttpOnly du refresh côté serveur.
   fetch(`${API_BASE_URL}/auth/logout/`, { method: 'POST', credentials: 'include' }).catch(() => {})
   if (_sessionExpiredCallback) {
@@ -32,7 +33,7 @@ function _onSessionExpired() {
 }
 
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('access_token')
+  const token = safeLocalStorage.getItem('access_token')
   if (!token) return {}
   return {
     Authorization: `Bearer ${token}`,
@@ -56,14 +57,14 @@ const _doRefreshAccessToken = async () => {
     })
     if (cookieRes.ok) {
       const data = await cookieRes.json()
-      localStorage.setItem('access_token', data.access)
+      safeLocalStorage.setItem('access_token', data.access)
       return data.access
     }
   } catch {
     // cookie indisponible → fallback ci-dessous
   }
   // 2) Fallback de transition : refresh en localStorage (ancien comportement).
-  const refreshToken = localStorage.getItem('refresh_token')
+  const refreshToken = safeLocalStorage.getItem('refresh_token')
   if (!refreshToken) throw new Error('No refresh token')
   const res = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
     method: 'POST',
@@ -73,7 +74,7 @@ const _doRefreshAccessToken = async () => {
   })
   if (!res.ok) throw new Error('Refresh failed')
   const data = await res.json()
-  localStorage.setItem('access_token', data.access)
+  safeLocalStorage.setItem('access_token', data.access)
   return data.access
 }
 

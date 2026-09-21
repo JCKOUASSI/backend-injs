@@ -98,7 +98,7 @@ jobs:
         # Une seule ligne rouge rend le build rouge (sortie 1).
         run: python manage.py fumee_authentification --tous --creer
 
-      - name: Socle CURP habilitations : politique et intégrité du journal (U1)
+      - name: "Socle CURP habilitations : politique et intégrité du journal (U1)"
         working-directory: backend
         env:
           SECRET_KEY: ci-secret-key-not-for-production
@@ -111,7 +111,7 @@ jobs:
           python manage.py init_habilitations_injs
           python manage.py verifier_chaine_habilitations
 
-      - name: CURP U2 : moteur d'habilitation en mode observation
+      - name: "CURP U2 : moteur d'habilitation en mode observation"
         working-directory: backend
         env:
           SECRET_KEY: ci-secret-key-not-for-production

@@ -1,3 +1,4 @@
+import { safeLocalStorage } from './safeStorage'
 const STORAGE_KEY = 'finance_period'
 const STORAGE_FILTERS_KEY = 'finance_filters'
 
@@ -203,7 +204,7 @@ export const FINANCE_EXPORT_MONTANTS_KEY = 'finance_export_afficher_montants'
 
 export const loadFinanceExportMontants = (defaultValue = true) => {
   try {
-    const v = localStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY)
+    const v = safeLocalStorage.getItem(FINANCE_EXPORT_MONTANTS_KEY)
     if (v === null) return defaultValue
     return v === '1' || v === 'true'
   } catch {
@@ -213,7 +214,7 @@ export const loadFinanceExportMontants = (defaultValue = true) => {
 
 export const saveFinanceExportMontants = (value) => {
   try {
-    localStorage.setItem(FINANCE_EXPORT_MONTANTS_KEY, value ? '1' : '0')
+    safeLocalStorage.setItem(FINANCE_EXPORT_MONTANTS_KEY, value ? '1' : '0')
   } catch {
     /* ignore */
   }
