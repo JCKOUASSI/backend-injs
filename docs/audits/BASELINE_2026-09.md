@@ -274,9 +274,46 @@ Les 17 écarts nets E1→E17 de la PARTIE E restent valides dans leur principe ;
 | 2026-09-13 | P00-08 | Garde-fous ajoutés : 13 feature flags OFF (`/api/parametres/flags/`), contrat d'API figé (`export_api_contract --check`, 529 routes au gel), parcours de fumée `smoke_test_injs` (23 étapes, rollback par défaut) — voir `docs/GARDE_FOUS.md`. |
 | 2026-09-13 | P00-06 | CI « Frontend tests (Vitest) » : seuils de couverture respectés (le job était rouge depuis la mise en place du framework de test front ; 100 % branches sur `utils/roles.js`). |
 
+### Mises à jour du 2026-09-21 (correctifs hors lot, branche `arena/01a0c45d-backend-injs`)
+
+| Date | Objet | Indicateur / évolution |
+|---|---|---|
+| 2026-09-21 | Interrupteurs `HABILITATIONS_*` | **Feu 1 revenu au vert.** `config/settings.py` ne déclarait ni `HABILITATIONS_APPLICATION` ni `HABILITATIONS_OBSERVATION`, alors que `habilitations/services/moteur.py:mode_moteur()` les lit par `getattr(..., False)` : le mode retombait sur `OFF` au lieu du défaut livré `OBSERVATION`, `observation.enregistrer_decision()` devenait un no-op et **7 tests `habilitations` échouaient** (`Ran 1695 tests — FAILED (failures=6, errors=1)`). Les deux interrupteurs sont déclarés à l'import depuis l'environnement (`APPLICATION=False` règle R3, `OBSERVATION=True`). Suite backend : **1695 tests OK**. |
+| 2026-09-21 | `operationId` OpenAPI | **39 collisions corrigées.** `AutoSchema._tokenize_path()` retire les variables de chemin, donc `/api/statistiques/rapports/` et `/api/statistiques/rapports/{rapport_id}/` partageaient le même identifiant ; drf-spectacular les départageait par un suffixe `_2` dépendant de l'ordre des routes. Nouvelle classe `config/api_schema.AutoSchemaINJS` (7 tests dans `config/tests/test_api_schema.py`). Collisions 39 → **0**, identifiants à suffixe numérique 39 → **0**, avertissements 501 → **462**, opérations 689 → **689**. Contrat figé inchangé (`build_contract` n'indexe pas les `operationId`). |
+| 2026-09-21 | Modèles `.env` et compose racine | **3 fichiers morts supprimés.** `docker-compose.yml` (racine) référençait `injs-be/Dockerfile` et `injs-fe/Dockerfile`, inexistants (les seuls sont `backend/Dockerfile` et `frontend/Dockerfile`), montait `./docker/nginx/default.conf`, absent, et exposait le backend sur 8000 contre `EXPOSE 8001`. `.env.example` (racine) : **9 de ses 12 variables lues par rien** (`DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DB_ENGINE`, `DB_NAME/USER/PASSWORD/HOST/PORT`). `backend/env.exemple` : doublon non référencé. Modèle unique désormais `backend/.env.example`. |
+| 2026-09-21 | Gate Arena | `arena/feux-verts.sh` : **GATE PASSÉE** — 6 contrôles verts, 0 rouge. Feu 1 backend VERT, feu 2 frontend VERT (ESLint 0 erreur, build Vite, **1747 tests Vitest**), feu 3 mobile **NON LEVABLE** (`flutter` absent du sandbox). Suite backend complète : **1702 tests OK** (5 sautés). `check_repo_hygiene` CONFORME (3056 fichiers suivis). |
+| 2026-09-21 | Relevés à corriger dans ce rapport | Le snapshot de contrat d'API compte **667 routes** (`docs/api/contract.snapshot.json`), et non 529 comme indiqué à la ligne P00-08 ci-dessus. Les incohérences **J1** et **J2** sont levées : `formations/migrations/0092_refsalle_sqlite_columns.py` existe, `arena/bootstrap.sh` pose `ALLOWED_HOSTS` borné, et les 4 tests de cache passent — les 7 échecs restants avaient pour cause les interrupteurs `HABILITATIONS_*`, pas le cache ni `test_regle4`. |
+| 2026-09-21 | Découpage de `Statistiques.jsx` | **5 498 → 2 432 lignes (−3 066, −56 %)**, réparti en 13 modules sous `frontend/src/pages/statistiques/` (aucun ne dépasse 634 lignes) : constantes, graphiques, composants, alertes, bilan-fac, justificatifs, taux-pedagogie et les six panneaux d'onglets. `BilanPeriodeFormationTable` reste exportée depuis `pages/Statistiques` par ré-export, le test §10.7 LOT 6 est inchangé. Vérifications : ESLint 0 erreur, lint `no-undef` sans référence indéfinie, `Statistiques.test.jsx` 126 tests OK, suite frontend 89 fichiers / **1 747 tests OK**, `npm run build` succès, gate `feux-verts.sh` PASSÉE. |
+| 2026-09-21 | Garde-fou G.1 — état réel, à ne pas surévaluer | Le découpage ci-dessus **ne fait sortir aucun fichier du seuil** : le nombre de fichiers sources > 800 lignes reste **9** (`Statistiques.jsx` 2 432, `ModuleDetail.jsx` 1 944, `FormationDetail.jsx` 1 825, `menu/ecrans.js` 1 779, `menu/arborescence.js` 1 578, `ParticipantDetailModal.jsx` 1 134, `DashboardEngineView.jsx` 1 054, `Dashboard.jsx` 822, `Modules.jsx` 811) et celui des > 650 lignes reste **16**, décompte fait hors fichiers `.test.`. La cible « 0 > 800 » est donc encore loin : elle exige de traiter les huit autres fichiers, pas seulement le plus gros. |
+| 2026-09-21 | Limite de l'outillage de contrôle | Le lint `no-undef` lancé avec `--env browser` ne signale **pas** un hook React non importé (il le traite comme une globale) : c'est ainsi qu'un `useState` manquant dans `bilans.jsx` est passé au contrôle et n'a été vu que par les tests. Sans `--env browser`, il signale en revanche `Intl` à tort. Pour un découpage de module, la suite de tests est le seul garde-fou fiable. |
+| 2026-09-21 | État réel de P00-02 « Hygiène du dépôt » | Déjà largement réalisé, contrairement au relevé J5 : `git ls-files backend/staticfiles` renvoie **0 fichier** (les 18 Mo ne sont plus versionnés) et les binaires/données nominatives cités (`import_formateurs.xlsx`, `import_formations.xlsx`, `import_participants.{csv,xlsx}`, `import_seances.xlsx`, `importverif/*.xlsx`, la liste `.numbers`) **ne sont plus suivis**. Reste suivi : `backend/test_import_formations_seances.xlsx` (1 binaire, artefact de test) et les 4 gabarits `docs/modeles/modele_*.csv`, qui sont des modèles destinés aux utilisateurs. `check_repo_hygiene` est CONFORME. |
+
+
 ---
 
 ## N. Recommandation pour la prochaine étape
+
+> **Actualisation du 2026-09-21.** La recommandation ci-dessous est conservée
+> telle quelle pour trace, mais deux de ses trois préalables sont levés et le
+> troisième est largement réalisé — voir le tableau « Mises à jour du
+> 2026-09-21 » ci-dessus. État vérifié ce jour :
+>
+> - **J1** : levé — `formations/migrations/0092_refsalle_sqlite_columns.py`
+>   existe, `makemigrations --check` est propre, le feu 1 est vert dans Arena.
+> - **J2** : levé — `ALLOWED_HOSTS` est borné par `arena/bootstrap.sh`, les 4
+>   tests de cache et `test_regle4` passent. Les 7 échecs qui subsistaient
+>   venaient des interrupteurs `HABILITATIONS_*` manquants, désormais déclarés.
+> - **J3/J4/J5** : l'essentiel de P00-02 est fait (`staticfiles/` et les
+>   binaires nominatifs ne sont plus versionnés). Reste à trancher :
+>   `backend/test_import_formations_seances.xlsx`, et la confirmation que la
+>   refonte s'appuie sur l'arbre `1ec2515` — cet arbre est bien présent dans le
+>   dépôt (les fichiers qui le caractérisent y sont), mais **l'historique est
+>   aplati en un seul commit** (`9f9483e`), ce qui interdit toute comparaison
+>   par `git diff`. C'est le seul point qui exige encore un arbitrage.
+>
+> Le gate `arena/feux-verts.sh` est **PASSÉ** (6 verts, 0 rouge ; feu 3 Flutter
+> non levable dans le sandbox). Les prochains chantiers utiles ne sont donc
+> plus bloqués par l'état du dépôt.
 
 **Une seule prochaine étape recommandée : ouvrir P00-02 (« Hygiène du dépôt ») APRÈS arbitrage explicite du pilote sur les trois points suivants,** qui conditionnent les feux verts du sandbox :
 

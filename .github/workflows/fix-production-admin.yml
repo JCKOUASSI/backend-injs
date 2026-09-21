@@ -2,6 +2,17 @@ name: Fix production admin
 
 on:
   workflow_dispatch:
+    inputs:
+      username:
+        description: "Compte à diagnostiquer"
+        required: false
+        type: string
+        default: "admin"
+      container:
+        description: "Conteneur backend sur le VPS"
+        required: false
+        type: string
+        default: "injs-be"
 
 permissions:
   contents: read
@@ -32,10 +43,18 @@ jobs:
           chmod 600 "$HOME/.ssh/deploy_key"
           ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null
 
+      # Le diagnostic est une commande de gestion du dépôt
+      # (`authentication/management/commands/diagnostic_admin.py`), donc déjà
+      # présente dans l'image. Il n'y a plus de code Python embarqué ici : la
+      # version précédente en mettait à la colonne 1 dans un bloc `run: |`, ce
+      # qui fermait le bloc scalaire et faisait échouer le workflow dès
+      # l'analyse YAML, sans qu'aucune étape ne s'exécute.
       - name: Vérifier le compte admin en production
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          CONTENEUR: ${{ github.event.inputs.container || 'injs-be' }}
+          COMPTE: ${{ github.event.inputs.username || 'admin' }}
         run: |
           set -euo pipefail
 
@@ -47,13 +66,4 @@ jobs:
             -o BatchMode=yes \
             -o StrictHostKeyChecking=accept-new \
             "${VPS_USER}@${VPS_HOST}" \
-            'docker exec injs-be python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-u = User.objects.filter(username=\"admin\").first()
-print(\"ADMIN_EXISTS=\" + str(bool(u)))
-if u:
-    print(\"ADMIN_ACTIVE=\" + str(u.is_active))
-    print(\"ADMIN_STAFF=\" + str(u.is_staff))
-    print(\"ADMIN_SUPERUSER=\" + str(u.is_superuser))
-"'
+            "docker exec ${CONTENEUR} python manage.py diagnostic_admin --username ${COMPTE}"

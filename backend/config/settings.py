@@ -242,7 +242,7 @@ AUTH_USER_MODEL = 'authentication.User'
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'config.api_schema.AutoSchemaINJS',
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -310,6 +310,24 @@ MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS = int(
     os.environ.get('MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)
 )
 
+# ── Moteur d'habilitation — interrupteurs d'exploitation (app ``habilitations``) ──
+# Trois modes, résolus par ``habilitations.services.moteur.mode_moteur()`` :
+#   APPLICATION > OBSERVATION > OFF.
+# ``HABILITATIONS_APPLICATION`` est livré à ``False`` (règle R3) : tant qu'il
+# n'est pas activé volontairement, le moteur ne refuse jamais un accès — il se
+# contente de compter ce qu'il aurait décidé (mode OBSERVATION, qui ne modifie
+# aucune réponse). Ces deux valeurs DOIVENT exister dans ce module : elles sont
+# calculées à l'import depuis l'environnement, ce qui les rend observables et
+# vérifiables par les tests (``override_settings`` ne change pas le défaut livré).
+HABILITATIONS_APPLICATION = os.environ.get(
+    'HABILITATIONS_APPLICATION',
+    'False',
+).lower() in ('true', '1', 'yes')
+HABILITATIONS_OBSERVATION = os.environ.get(
+    'HABILITATIONS_OBSERVATION',
+    'True',
+).lower() in ('true', '1', 'yes')
+
 # CORS — liste stricte d'origines (ou vide = rien)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -360,6 +378,16 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API de gestion LMD, scolarité, formations, participants et badgeage QR de l\'INJS.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # Ne pas rejouer la génération du schéma dans `check --deploy`.
+    #
+    # Par défaut, drf-spectacular émet ses avertissements de schéma dans le
+    # contrôle de déploiement : sur ce dépôt cela noyait le verdict sous 457
+    # « drf_spectacular.W002 — unable to guess serializer », les deux vrais
+    # avertissements de sécurité (`security.W008/W009`) devenant illisibles.
+    # Ces avertissements concernent la documentation d'API, pas la mise en
+    # production : ils restent visibles là où ils ont un sens, c'est-à-dire
+    # lors de `manage.py spectacular` et dans les tests de schéma.
+    'ENABLE_DJANGO_DEPLOY_CHECK': False,
 }
 
 # URL publique de l'application web (lien « Dashboard web » dans l'admin).

@@ -59,6 +59,21 @@ domaines `sygepcpfae.org` (prod historique) et `badge-qr-code.pro` (channel1).
 
 ---
 
+### 2.1 Relevé du 2026-09-21 (mesures refaites ce jour)
+
+| Constat | Mesure | Conséquence |
+|---------|--------|-------------|
+| **`fix-production-admin.yml` n'a jamais pu s'exécuter** | Analyse YAML : `ScannerError` ligne 51 (« could not find expected ':' »). Le diagnostic était du Python posé à la **colonne 1** dans un bloc `run: |`, ce qui fermait le bloc scalaire ; GitHub répond « This run likely failed because of a workflow file issue » | **Corrigé.** Le diagnostic est devenu la commande de gestion `authentication/management/commands/diagnostic_admin.py` (12 tests) ; le workflow ne fait plus qu'un `docker exec … manage.py diagnostic_admin`. Les **5 workflows du dépôt s'analysent** désormais sans erreur. |
+| **`check --deploy` illisible** | Avec les valeurs de prod `injs.badge-qr-code.pro` : **459 problèmes**, dont **457 `drf_spectacular.W002`** (« unable to guess serializer »). Les 2 vrais avertissements de sécurité étaient noyés | **Corrigé** par `ENABLE_DJANGO_DEPLOY_CHECK: False` (ces avertissements concernent la documentation d'API et restent visibles via `manage.py spectacular`). `check --deploy` descend à **1 seul problème**. |
+| Le seul avertissement restant | `security.W008` (`SECURE_SSL_REDIRECT` non activé) | **Volontaire et laissé visible** : `config/settings.py` documente que la redirection HTTP→HTTPS est faite par Nginx. Il n'a **pas** été ajouté à `SILENCED_SYSTEM_CHECKS` — masquer un contrôle de sécurité relève de l'exploitant, pas du dépôt. |
+| **CI bloquée par la facturation, pas par le code** | Runs `#3` (push et PR) : les 4 jobs sont en échec avec **0 étape** ; annotation GitHub : « The job was not started because recent account payments have failed or your spending limit needs to be increased » | **Bloquant n° 1 du déploiement, non corrigeable depuis le dépôt.** Le §2 fait d'une CI verte le prérequis pour armer la sync : tant que la facturation n'est pas réglée, ce prérequis ne peut pas être atteint, et `SYNC_DRY_RUN` doit rester absent (mode sec). |
+| Harnais de la sync | `scripts/sync-injs-app.sh --self-test` → **53 PASS / 0 FAIL** (relancé ce jour) | Le maillon 1 est sain. |
+| **Écart de noms d'images** | Les workflows de **ce** dépôt construisent `jckouassi/injs-be` et `jckouassi/injs-fe` ; ce document et le résumé du workflow de sync annoncent `ophirdesire/qrcode-badge` et `ophirdesire/qr-badge-frontend` | À trancher sur place (§4.1) : ce sont les workflows **du dépôt cible** qui produisent les images INJS, et leurs noms ne sont pas lisibles d'ici. Le VPS doit épingler le bon couple dépôt/tag (§4.3). |
+| Secrets et variables toujours à poser | `INJS_APP_SYNC_TOKEN` (source) ; `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN` (cible) ; `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` (diagnostic admin) | Aucun n'est vérifiable depuis le bac à sable. Sans `DOCKERHUB_*`, la sync réussira **et rien ne sera déployé** (constat déjà posé au §2, toujours d'actualité). |
+| Décision d'URL d'API toujours ouverte | `frontend/nginx.conf` ne proxifie toujours pas `/api` (vérifié : seul le fallback SPA) | Le §5 reste à trancher par l'exploitant avant tout build de l'image de prod. |
+
+---
+
 ## 3. Règles de la sync (pourquoi ce design)
 
 - **G0 — jamais de `--force` sur la cible.** Le mode par défaut `fastforward`

@@ -2,140 +2,18 @@ import { useState, useEffect } from 'react'
 import { formatDate } from '../utils/dates'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
-
-const PARTICIPANT_DETAIL_TABS = [
-  { id: 'statistiques', label: 'Statistiques', icon: 'bi-graph-up' },
-  { id: 'identite', label: 'Identité', icon: 'bi-person-badge' },
-  { id: 'modules', label: 'Modules', icon: 'bi-journal-bookmark' },
-  { id: 'notes', label: 'Notes', icon: 'bi-pencil-square' },
-  { id: 'seances', label: 'Séances', icon: 'bi-clock-history' },
-]
-
-const MENTION_LABELS = {
-  TRES_BIEN: 'Très bien',
-  BIEN: 'Bien',
-  ASSEZ_BIEN: 'Assez bien',
-  PASSABLE: 'Passable',
-  INSUFFISANT: 'Insuffisant',
-  '': '—',
-}
-
-const DECISION_LABELS = {
-  ADMIS: 'Admis',
-  AJOURNE: 'Ajourné',
-  EXCLUSION: 'Exclusion',
-  EN_ATTENTE: 'En attente',
-}
-
-const DECISION_COLORS = {
-  ADMIS: { background: '#e8eff5', color: '#093f70' },
-  AJOURNE: { background: '#fff8e0', color: '#e69700' },
-  EXCLUSION: { background: '#ffebee', color: '#b71c1c' },
-  EN_ATTENTE: { background: '#f5f5f5', color: '#616161' },
-}
-
-const DEFAULT_CRITERES = { seuil_admission: 12, taux_presence_min: 80 }
-
-function mentionFromMoyenne(moyenne) {
-  const n = parseFloat(moyenne)
-  if (isNaN(n)) return ''
-  if (n >= 16) return 'TRES_BIEN'
-  if (n >= 14) return 'BIEN'
-  if (n >= 12) return 'ASSEZ_BIEN'
-  if (n >= 10) return 'PASSABLE'
-  return 'INSUFFISANT'
-}
-
-function formatHeuresModule(heures) {
-  const h = parseFloat(heures)
-  if (isNaN(h) || h <= 0) return null
-  return Number.isInteger(h) ? `${h}h` : `${Math.round(h * 10) / 10}h`
-}
-
-function moduleMetaParts(m) {
-  return [
-    m.grade && { icon: 'bi-people', label: m.grade },
-    m.groupe && { icon: 'bi-people-fill', label: `Groupe ${m.groupe}` },
-    m.vague && { icon: 'bi-layers', label: m.vague },
-    m.site && { icon: 'bi-building', label: m.site },
-  ].filter(Boolean)
-}
-
-function buildDraftFromRow(row) {
-  return {
-    moyenne: row?.moyenne != null ? String(row.moyenne) : '',
-  }
-}
-
-function mapNotesFicheToState(data) {
-  const results = {}
-  for (const m of data.modules || []) {
-    const row = {
-      moyenne: m.moyenne,
-      heures_presence: m.heures_presence,
-      heures_prevues: m.heures_prevues,
-      taux_presence: m.taux_presence,
-      admissible: m.admissible,
-      mention: m.mention,
-    }
-    results[m.module_id] = {
-      colonneId: m.colonne_id ?? null,
-      row,
-      draft: buildDraftFromRow(row),
-      dirty: false,
-    }
-  }
-  const decisions = {}
-  for (const f of data.formations || []) {
-    decisions[f.formation_id] = {
-      decision: f.decision,
-      criteres: f.criteres || DEFAULT_CRITERES,
-    }
-  }
-  return { moduleNotes: results, formationDecisions: decisions }
-}
-
-function computeFormationSummary(formationModules, moduleNotes, criteres = DEFAULT_CRITERES) {
-  let somme = 0
-  let totalPoids = 0
-  let totalPresence = 0
-  let totalPrevu = 0
-
-  formationModules.forEach((m) => {
-    const d = moduleNotes[m.id]
-    const moyenne = parseFloat(d?.draft?.moyenne ?? d?.row?.moyenne)
-    const poids = parseFloat(m.duree_prevue_heures) || 1
-    if (!isNaN(moyenne)) {
-      somme += moyenne * poids
-      totalPoids += poids
-    }
-    const hp = parseFloat(d?.row?.heures_presence)
-    const hprev = parseFloat(d?.row?.heures_prevues ?? m.duree_prevue_heures)
-    if (!isNaN(hp)) totalPresence += hp
-    if (!isNaN(hprev) && hprev > 0) totalPrevu += hprev
-  })
-
-  const moyenneGenerale = totalPoids > 0 ? Math.round((somme / totalPoids) * 100) / 100 : null
-  const tauxPresence = totalPrevu > 0 ? Math.round((totalPresence / totalPrevu) * 10000) / 100 : null
-
-  const seuilNote = criteres?.seuil_admission ?? DEFAULT_CRITERES.seuil_admission
-  const seuilTaux = criteres?.taux_presence_min ?? DEFAULT_CRITERES.taux_presence_min
-  let decision = 'EN_ATTENTE'
-  if (moyenneGenerale != null && tauxPresence != null) {
-    if (moyenneGenerale >= seuilNote && tauxPresence >= seuilTaux) decision = 'ADMIS'
-    else if (moyenneGenerale < 8 || tauxPresence < 50) decision = 'EXCLUSION'
-    else decision = 'AJOURNE'
-  }
-
-  return {
-    moyenneGenerale,
-    tauxPresence,
-    totalPresence: Math.round(totalPresence * 100) / 100,
-    totalPrevu: Math.round(totalPrevu * 100) / 100,
-    decision,
-    mention: moyenneGenerale != null ? mentionFromMoyenne(moyenneGenerale) : '',
-  }
-}
+import {
+  PARTICIPANT_DETAIL_TABS,
+  MENTION_LABELS,
+  DECISION_LABELS,
+  DECISION_COLORS,
+  DEFAULT_CRITERES,
+  mentionFromMoyenne,
+  formatHeuresModule,
+  moduleMetaParts,
+  mapNotesFicheToState,
+  computeFormationSummary,
+} from './participant-detail/utils'
 
 export default function ParticipantDetailModal({
   participant,
