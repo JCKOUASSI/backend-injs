@@ -242,7 +242,7 @@ AUTH_USER_MODEL = 'authentication.User'
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'config.api_schema.AutoSchemaINJS',
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
