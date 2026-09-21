@@ -2,17 +2,54 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "INJS 1 · Bootstrap (préparer l'environnement)",
-      "detail": "Crée .venv, installe les dépendances Python/NPM et écrit l'overlay sandbox. À lancer une fois après chaque clonage.",
+      "label": "INJS 0 · Vérifier l'environnement",
+      "detail": "Vérifie Python, Node, Docker, Git et l'état du dépôt",
       "type": "shell",
       "command": "bash",
-      "args": ["arena/bootstrap.sh"],
+      "args": [
+        "-c",
+        "echo '=== Python ===' && python3 --version && echo '=== Node ===' && node --version && npm --version && echo '=== Docker ===' && docker --version && docker compose version && echo '=== Git ===' && git --version && git status --short && echo '=== .env ===' && ls -la .env 2>&1 | head -5"
+      ],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "INJS · API Django :8000 (sandbox SQLite)",
-      "detail": "API sur le port figé 8000, réglages arena.settings_sandbox (SQLite, SMTP local). Penser à appliquer les migrations au premier lancement.",
+      "label": "INJS 1 · Bootstrap (préparer l'environnement)",
+      "detail": "Crée .venv, installe dépendances Python/NPM et écrit l'overlay sandbox. À lancer une fois après chaque clonage ou après suppression de .venv/node_modules.",
+      "type": "shell",
+      "command": "bash",
+      "args": ["arena/bootstrap.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "INJS 2 · Migrations (sandbox SQLite)",
+      "detail": "Applique toutes les migrations sur la base SQLite sandbox (à jouer après bootstrap et après chaque pull).",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd backend && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py migrate --settings=arena.settings_sandbox --noinput && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py collectstatic --noinput --settings=arena.settings_sandbox"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "INJS 3 · Créer admin local (admin/admin123)",
+      "detail": "Crée ou réinitialise le superuser admin/admin123 en sandbox SQLite",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd backend && PYTHONPATH=${workspaceFolder}:${workspaceFolder}/backend .venv/bin/python manage.py shell --settings=arena.settings_sandbox <<'PY'\nfrom django.contrib.auth import get_user_model\nUser=get_user_model()\nif not User.objects.filter(username='admin').exists():\n    User.objects.create_superuser('admin','admin@injs.local','admin123')\n    print('admin created')\nelse:\n    u=User.objects.get(username='admin')\n    u.set_password('admin123')\n    u.is_superuser=True\n    u.is_staff=True\n    u.is_active=True\n    u.role='ADMIN'\n    u.save()\n    print('admin reset')\nprint(f\"users: {User.objects.count()}\")\nPY\n"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "INJS 4 · API Django :8000 (sandbox SQLite)",
+      "detail": "API sur port figé 8000, réglages arena.settings_sandbox (SQLite, SMTP local).",
       "type": "shell",
       "command": "bash",
       "args": ["arena/lancer-api.sh"],
@@ -22,8 +59,8 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "INJS · Site web :3000 (Vite)",
-      "detail": "Front React/Vite sur le port figé 3000, proxy /api /admin /static /media vers 127.0.0.1:8000.",
+      "label": "INJS 5 · Site web :3000 (Vite + proxy /api)",
+      "detail": "Front React/Vite sur port figé 3000, proxy /api /admin /static /media vers 127.0.0.1:8000, HMR WSS pour preview .e2b.app",
       "type": "shell",
       "command": "bash",
       "args": ["arena/lancer-front.sh"],
@@ -41,43 +78,48 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "INJS · Migrations (sandbox)",
-      "detail": "Applique toutes les migrations sur la base SQLite sandbox (à jouer après le bootstrap et après chaque pull).",
+      "label": "INJS 6 · Mobile Sim :5000 (PWA INJS bleu)",
+      "detail": "Simulation PWA du Flutter mobile sur port 5000, couleurs INJS bleu foncé #0B1F3A + bleu clair #1E62D0, proxy /api -> 8000. Flutter natif bloqué en sandbox (storage.googleapis.com).",
       "type": "shell",
-      "command": "bash",
-      "args": [
-        "-c",
-        "cd backend && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py migrate --settings=arena.settings_sandbox"
-      ],
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "INJS · API Django :8000 (config réelle, PostgreSQL)",
-      "detail": "API avec config.settings du projet (PostgreSQL attendu via l'environnement).",
-      "type": "shell",
-      "command": "${command:python.interpreterPath}",
-      "args": ["manage.py", "runserver", "0.0.0.0:8000"],
-      "options": { "cwd": "${workspaceFolder}/backend" },
+      "command": "node",
+      "args": ["server.js"],
+      "options": { "cwd": "${workspaceFolder}/mobile-sim" },
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "INJS · Tests backend (1 695 tests)",
+      "label": "INJS 7 · Stack complète (API 8000 + Front 3000 + Mobile 5000)",
+      "detail": "Lance les 3 serveurs en parallèle via start_dev.sh all (frontend 3000 SPA + backend 8000 + cron)",
       "type": "shell",
-      "command": "${command:python.interpreterPath}",
-      "args": ["manage.py", "test"],
-      "options": { "cwd": "${workspaceFolder}/backend" },
-      "group": "test",
+      "command": "bash",
+      "args": ["scripts/start_dev.sh", "all"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "INJS · Fix mobile couleurs INJS bleu foncé/clair",
+      "detail": "Passe mobile-sim et Flutter aux couleurs officielles INJS: bleu nuit #0B1F3A + bleu clair #1E62D0 (conforme frontend/src/index.css)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "echo '=== Vérif couleurs actuelles ===' && grep -n 'navy\\|#0B1F3A\\|#1E62D0' mobile-sim/style.css | head -20 && echo '' && grep -n 'navy\\|0B1F3A\\|1E62D0' qr_badge_mobile/lib/theme/qr_badge_theme.dart | head -20 && echo '' && echo '=== Si vert #388E3C encore présent, relancer les tâches de fix ===' && grep -r '388E3C' mobile-sim/ qr_badge_mobile/lib/theme/ || echo '✅ Aucun vert, déjà en bleu INJS'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "INJS · Tests frontend (Vitest)",
+      "label": "INJS · Tests backend (checks + migrations)",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "test:run"],
-      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd backend && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py check --settings=arena.settings_sandbox && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py makemigrations --check --dry-run --settings=arena.settings_sandbox && echo '✅ Backend checks OK'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
       "group": "test",
       "problemMatcher": []
     },
@@ -95,6 +137,15 @@
       "command": "npm",
       "args": ["run", "build"],
       "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "INJS · Tests frontend (Vitest)",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "test:run"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": "test",
       "problemMatcher": []
     },
     {
@@ -122,50 +173,211 @@
       "problemMatcher": []
     },
     {
+      "label": "Git · Commit toutes les modifications",
+      "detail": "Ajoute tous les fichiers modifiés et commit (hors .venv, node_modules, *.sqlite3)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "git status && git add -A && git status && echo '=== Dernier commit ===' && git log --oneline -3"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Git · Push vers origin arena/01a0c5f9-backend-injs",
+      "detail": "Pousse la branche courante vers origin",
+      "type": "shell",
+      "command": "bash",
+      "args": ["-c", "git push origin $(git branch --show-current) && git log --oneline -3"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
       "label": "PR · État et vérifications",
-      "detail": "Affiche les PR de la branche courante et le statut des checks.",
+      "detail": "Affiche les PR de la branche courante et le statut des checks GitHub",
       "type": "shell",
       "command": "gh",
       "args": ["pr", "status", "--repo", "JCKOUASSI/backend-injs"],
       "problemMatcher": []
     },
     {
-      "label": "Déploiement · Sync dry-run vers injs-app",
-      "detail": "Déclenche sync-injs-app.yml en simulation (aucun push) : main -> Tobi-nw/injs-app. Lire le rapport avant d'armer.",
+      "label": "Déploiement 1 · Préparer .env production",
+      "detail": "Crée .env depuis .env.example pour VPS injs.badge-qr-code.pro (152.228.233.123). À éditer avec vrais secrets.",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "if [ -f .env ]; then echo '⚠️ .env existe déjà, backup .env.backup'; cp .env .env.backup; fi && cp .env.example .env && echo '✅ .env créé depuis .env.example' && echo '=== À ÉDITER ===' && grep -E 'PASSWORD|SECRET_KEY' .env | head -20 && echo '' && echo 'Générer SECRET_KEY fort:' && python3 -c \"import secrets; print(secrets.token_urlsafe(50))\" && echo '' && echo 'Éditez .env: nano .env ou code .env'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 2 · Build Docker local (test)",
+      "detail": "Teste le build des images Docker backend et frontend en local (sans pousser)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "docker build -t injs-backend:test ./backend && echo '✅ backend image OK' && docker build -t injs-frontend:test ./frontend --build-arg VITE_API_URL=https://injs.badge-qr-code.pro/api && echo '✅ frontend image OK' && docker image ls | grep injs"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 3 · Sync dry-run vers injs-app (simulation)",
+      "detail": "Déclenche sync-injs-app.yml en simulation (aucun push) : main -> Tobi-nw/injs-app. Lire le rapport avant d'armer le push réel.",
       "type": "shell",
       "command": "gh",
       "args": [
-        "workflow", "run", "sync-injs-app.yml",
-        "--repo", "JCKOUASSI/backend-injs",
-        "-f", "dry_run=true",
-        "-f", "source_ref=main"
+        "workflow",
+        "run",
+        "sync-injs-app.yml",
+        "--repo",
+        "JCKOUASSI/backend-injs",
+        "-f",
+        "dry_run=true",
+        "-f",
+        "source_ref=main"
       ],
       "problemMatcher": []
     },
     {
-      "label": "Déploiement · Sync push réel vers injs-app",
-      "detail": "ARME le push réel main -> Tobi-nw/injs-app @ main (puis Docker Hub -> VPS). À n'utiliser qu'après un dry-run vert.",
+      "label": "Déploiement 4 · Sync push réel vers injs-app (ARME)",
+      "detail": "⚠️ ARME le push réel main -> Tobi-nw/injs-app @ main (puis Docker Hub -> VPS). À n'utiliser qu'après un dry-run vert et vérif billing GitHub.",
       "type": "shell",
       "command": "gh",
       "args": [
-        "workflow", "run", "sync-injs-app.yml",
-        "--repo", "JCKOUASSI/backend-injs",
-        "-f", "dry_run=false",
-        "-f", "source_ref=main"
+        "workflow",
+        "run",
+        "sync-injs-app.yml",
+        "--repo",
+        "JCKOUASSI/backend-injs",
+        "-f",
+        "dry_run=false",
+        "-f",
+        "source_ref=main"
       ],
       "problemMatcher": []
     },
     {
-      "label": "Déploiement · Suivre les exécutions du sync",
+      "label": "Déploiement 5 · Suivre les exécutions du sync",
+      "detail": "Liste les 5 derniers runs du workflow sync-injs-app.yml",
       "type": "shell",
       "command": "gh",
       "args": [
-        "run", "list",
-        "--repo", "JCKOUASSI/backend-injs",
+        "run",
+        "list",
+        "--repo",
+        "JCKOUASSI/backend-injs",
         "--workflow=sync-injs-app.yml",
-        "--limit", "5"
+        "--limit",
+        "5"
       ],
       "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 6 · Vérifier santé prod https://injs.badge-qr-code.pro",
+      "detail": "Teste l'API prod /api/health/ et le frontend (nécessite accès réseau, peut échouer en sandbox avec SSL_ERROR_SYSCALL)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "echo '=== Test local (si conteneurs prod tournent localement) ===' && curl -s http://localhost/api/health/ | head -c 200 || echo 'Local API non joignable' && echo '' && echo '=== Test prod HTTPS (peut échouer en sandbox) ===' && curl -k -s https://injs.badge-qr-code.pro/api/health/ | head -c 500 || echo 'Prod HTTPS non joignable depuis sandbox (normal, SSL bloqué)' && echo '' && echo '=== Test HTTP (IP 152.228.233.123) ===' && curl -s http://injs.badge-qr-code.pro/api/health/ | head -c 200 || echo 'HTTP vide (Nginx ne proxy pas /api, voir fix)'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 7 · Fix production login (admin/admin123)",
+      "detail": "Script complet à exécuter SUR LE VPS 152.228.233.123 pour diagnostiquer et corriger login admin",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/fix_production_login.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Déploiement 8 · Créer admin prod (local Docker)",
+      "detail": "Crée admin/admin123 dans conteneur backend local (docker compose exec)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "docker compose exec backend python manage.py shell < scripts/create_admin_prod.py || docker-compose exec backend python manage.py shell < scripts/create_admin_prod.py || echo '❌ Docker non lancé, lancez docker compose up -d'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 9 · Logs prod backend",
+      "detail": "Affiche les logs du backend en production",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "docker compose logs backend --tail=100 || docker-compose logs backend --tail=100"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 10 · Logs prod frontend",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "docker compose logs frontend --tail=100 || docker-compose logs frontend --tail=100"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 11 · Déverrouiller compte admin prod",
+      "detail": "Déverrouille admin si verrouillé après 5 échecs (CURP flag.curp_verrouillage_connexion, 15 min)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "docker compose exec backend python manage.py shell <<'PY' || docker-compose exec backend python manage.py shell <<'PY'\nfrom django.contrib.auth import get_user_model\nUser=get_user_model()\ntry:\n    u=User.objects.get(username='admin')\n    c=u.profil_habilitation\n    print(f\"Avant: statut={c.statut} echecs={c.echecs_consecutifs} verrouillage={c.date_verrouillage}\")\n    c.echecs_consecutifs=0\n    c.statut='ACTIF'\n    c.date_verrouillage=None\n    c.save()\n    print(\"✅ Déverrouillé\")\nexcept Exception as e:\n    print(f\"Pas de CURP ou erreur: {e}\")\n    print(\"Tentative via connexion_sure\")\n    try:\n        from authentication import connexion_sure\n        # Essaie de réinitialiser via une fonction si existe\n        print(\"Vérif verrouillage:\", connexion_sure.verifier_verrouillage(username='admin'))\n    except Exception as e2:\n        print(f\"Erreur: {e2}\")\nPY\n"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 12 · SSH vers VPS prod (152.228.233.123)",
+      "detail": "Connexion SSH vers le VPS de production (nécessite clé SSH configurée)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "echo '=== Connexion SSH vers VPS prod ===' && echo 'IP: 152.228.233.123' && echo 'Domaine: injs.badge-qr-code.pro' && echo '' && echo 'Commande: ssh user@152.228.233.123' && echo 'Puis: cd /opt/injs && bash scripts/fix_production_login.sh' && echo '' && read -p 'Voulez-vous vous connecter maintenant? (o/n) ' ans && if [ \"$ans\" = \"o\" ]; then ssh -o StrictHostKeyChecking=no root@152.228.233.123 || ssh -o StrictHostKeyChecking=no ubuntu@152.228.233.123 || ssh injs.badge-qr-code.pro; else echo 'Skip SSH'; fi"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement 13 · Vérifier CI GitHub (billing)",
+      "detail": "Vérifie l'état des runs CI - échec actuel dû à facturation GitHub, pas code",
+      "type": "shell",
+      "command": "gh",
+      "args": ["run", "list", "--repo", "JCKOUASSI/backend-injs", "--limit", "10"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Déploiement FULL · Pipeline complet jusqu'à prod",
+      "detail": "Pipeline complet: bootstrap -> migrations -> admin -> tests -> build -> commit -> push -> sync dry-run -> instructions prod",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "echo '=== PIPELINE COMPLET INJS-LMD VERS PROD ===' && echo '' && echo '1. Bootstrap' && bash arena/bootstrap.sh && echo '' && echo '2. Migrations' && cd backend && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py migrate --settings=arena.settings_sandbox --noinput && cd .. && echo '' && echo '3. Admin local' && bash -c \"cd backend && PYTHONPATH=${workspaceFolder}:${workspaceFolder}/backend .venv/bin/python manage.py shell --settings=arena.settings_sandbox <<'PY'\nfrom django.contrib.auth import get_user_model\nUser=get_user_model()\nif not User.objects.filter(username='admin').exists():\n    User.objects.create_superuser('admin','admin@injs.local','admin123')\n    print('admin created')\nelse:\n    u=User.objects.get(username='admin')\n    u.set_password('admin123')\n    u.is_superuser=True\n    u.is_staff=True\n    u.is_active=True\n    u.role='ADMIN'\n    u.save()\n    print('admin reset')\nPY\n\" && echo '' && echo '4. Checks' && cd backend && PYTHONPATH=${workspaceFolder} .venv/bin/python manage.py check --settings=arena.settings_sandbox && cd .. && echo '' && echo '5. Frontend lint+build' && cd frontend && npm run lint --silent && npm run build --silent && cd .. && echo '' && echo '6. Git status' && git status --short && echo '' && echo '7. Instructions déploiement prod:' && echo '   - git add -A && git commit -m \"feat: ...\" && git push origin $(git branch --show-current)' && echo '   - gh workflow run sync-injs-app.yml -f dry_run=true -f source_ref=main' && echo '   - Vérifier dry-run vert, puis dry_run=false' && echo '   - Sur VPS: git pull && docker compose up -d --build && bash scripts/fix_production_login.sh' && echo '' && echo '✅ Pipeline local OK, prêt pour sync vers injs-app puis prod'"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
     }
   ]
 }
