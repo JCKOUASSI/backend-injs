@@ -378,6 +378,16 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API de gestion LMD, scolarité, formations, participants et badgeage QR de l\'INJS.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # Ne pas rejouer la génération du schéma dans `check --deploy`.
+    #
+    # Par défaut, drf-spectacular émet ses avertissements de schéma dans le
+    # contrôle de déploiement : sur ce dépôt cela noyait le verdict sous 457
+    # « drf_spectacular.W002 — unable to guess serializer », les deux vrais
+    # avertissements de sécurité (`security.W008/W009`) devenant illisibles.
+    # Ces avertissements concernent la documentation d'API, pas la mise en
+    # production : ils restent visibles là où ils ont un sens, c'est-à-dire
+    # lors de `manage.py spectacular` et dans les tests de schéma.
+    'ENABLE_DJANGO_DEPLOY_CHECK': False,
 }
 
 # URL publique de l'application web (lien « Dashboard web » dans l'admin).
