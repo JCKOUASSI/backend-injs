@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>QR Badge Mobile - INJS LMD</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#388E3C">
+<link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- Splash -->
+  <div id="splash" class="screen active">
+    <div class="splash-content">
+      <div class="logo">🎓</div>
+      <h1>INJS LMD</h1>
+      <p>QR Badge Mobile</p>
+      <div class="loader"></div>
+      <small id="splash-status">Initialisation...</small>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div id="login" class="screen">
+    <div class="header">
+      <h2>Connexion</h2>
+      <p>INJS Marcory - Badgeage sécurisé</p>
+    </div>
+    <form id="loginForm" class="form">
+      <div class="input-group">
+        <label>Identifiant</label>
+        <input type="text" id="username" placeholder="admin" value="admin" required>
+      </div>
+      <div class="input-group">
+        <label>Mot de passe</label>
+        <input type="password" id="password" placeholder="••••••••" value="admin123" required>
+      </div>
+      <div class="input-group">
+        <label>API Base URL</label>
+        <input type="text" id="apiUrl" placeholder="http://localhost:8000" value="">
+        <small>Auto-détecté si vide. En preview: /api (proxy)</small>
+      </div>
+      <button type="submit" class="btn primary" id="loginBtn">Se connecter</button>
+      <div id="loginError" class="error hidden"></div>
+      <div class="info-box">
+        <strong>Comptes de démo:</strong><br>
+        admin / admin123 (superuser)<br>
+        API: <span id="apiInfo">/api</span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Home Dashboard -->
+  <div id="home" class="screen">
+    <div class="app-bar">
+      <h2>Tableau de bord</h2>
+      <div class="app-bar-actions">
+        <button id="refreshMe" class="icon-btn" title="Rafraîchir">🔄</button>
+        <button id="logoutBtn" class="icon-btn" title="Déconnexion">🚪</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="card profile-card">
+        <div class="avatar">👤</div>
+        <div>
+          <h3 id="userName">Utilisateur</h3>
+          <p id="userRole">Rôle: -</p>
+          <p id="userEmail" class="muted">-</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <button class="action-card" data-action="scan">
+          <span class="icon">📷</span>
+          <span>Scanner QR</span>
+        </button>
+        <button class="action-card" data-action="history">
+          <span class="icon">📜</span>
+          <span>Historique</span>
+        </button>
+        <button class="action-card" data-action="fiche">
+          <span class="icon">📋</span>
+          <span>Ma fiche</span>
+        </button>
+        <button class="action-card" data-action="config">
+          <span class="icon">⚙️</span>
+          <span>Config mobile</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <h4>Statut badgeage</h4>
+        <div id="badgeStatus">Chargement...</div>
+      </div>
+
+      <div class="card">
+        <h4>Séances du jour (EDT)</h4>
+        <div id="seancesDuJour">Chargement...</div>
+      </div>
+
+      <div class="card">
+        <h4>Heartbeat & Géofence</h4>
+        <div class="row">
+          <span>Heartbeat:</span>
+          <span id="heartbeatStatus" class="badge">Inactif</span>
+        </div>
+        <div class="row">
+          <span>Position:</span>
+          <span id="locationStatus" class="muted">Non acquise</span>
+        </div>
+        <button id="toggleHeartbeat" class="btn small">Activer heartbeat</button>
+        <button id="getLocation" class="btn small secondary">📍 Obtenir position</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan -->
+  <div id="scan" class="screen">
+    <div class="app-bar">
+      <button class="icon-btn back" data-back="home">←</button>
+      <h2>Scan QR sécurisé</h2>
+    </div>
+    <div class="content">
+      <div class="card">
+        <div id="reader" style="width:100%"></div>
+        <div class="scan-controls">
+          <button id="startScan" class="btn primary">Démarrer scan</button>
+          <button id="stopScan" class="btn secondary hidden">Arrêter</button>
+        </div>
+        <div class="input-group">
+          <label>Ou saisir manuellement le token QR</label>
+          <input type="text" id="manualToken" placeholder="Token QR / URL">
+        </div>
+        <button id="manualScanBtn" class="btn">Scanner manuellement</button>
+        <div id="scanResult" class="result hidden"></div>
+      </div>
+
+      <div class="card">
+        <h4>Dernier scan</h4>
+        <pre id="lastScan" class="muted">Aucun</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="history" class="screen">
+    <div class="app-bar">
+      <button class="icon-btn back" data-back="home">←</button>
+      <h2>Historique</h2>
+    </div>
+    <div class="content" id="historyContent">
+      Chargement...
+    </div>
+  </div>
+
+  <!-- Fiche -->
+  <div id="fiche" class="screen">
+    <div class="app-bar">
+      <button class="icon-btn back" data-back="home">←</button>
+      <h2>Ma fiche</h2>
+    </div>
+    <div class="content" id="ficheContent">
+      Chargement...
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div id="config" class="screen">
+    <div class="app-bar">
+      <button class="icon-btn back" data-back="home">←</button>
+      <h2>Configuration mobile</h2>
+    </div>
+    <div class="content" id="configContent">
+      Chargement...
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
