@@ -9,6 +9,7 @@ import { getUserRoles, peut } from '../../utils/roles'
 import { LIST_STORAGE_KEYS, listHref } from '../../utils/listFilters'
 import { financeNavHref } from '../../utils/financePeriod'
 import '../../styles/sidebar.css'
+import { safeLocalStorage } from '../../utils/safeStorage'
 
 /**
  * Barre latérale RBAC — Thème Premium INJS Marcory.
@@ -40,7 +41,7 @@ const LIENS_FINANCE = new Set([
 
 function lireEtat() {
   try {
-    const brut = localStorage.getItem(CLE_ETAT)
+    const brut = safeLocalStorage.getItem(CLE_ETAT)
     return brut ? JSON.parse(brut) : null
   } catch {
     return null
@@ -49,7 +50,7 @@ function lireEtat() {
 
 function ecrireEtat(etat) {
   try {
-    localStorage.setItem(CLE_ETAT, JSON.stringify(etat))
+    safeLocalStorage.setItem(CLE_ETAT, JSON.stringify(etat))
   } catch {
     // Mode privé
   }
