@@ -1,14 +1,15 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+
 try:
     from dotenv import load_dotenv
-except ImportError:  # python-dotenv optionnel en développement local
-    def load_dotenv(_path):
-        return False
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    # dotenv not available — continue without .env loading
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / '.env')
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
@@ -69,33 +70,9 @@ if DEBUG and BADGE_BASE_URL:
 if not DEBUG and '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h != '*']
 
-# Reverse proxy (preview TLS, ingress de prod) : fait confiance aux en-têtes
-# X-Forwarded-* transmis par le proxy pour générer les bonnes URL/cookies https.
-if os.environ.get('TRUST_FORWARDED_PROTO', '').lower() in ('1', 'true', 'yes'):
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-if os.environ.get('USE_X_FORWARDED_HOST', '').lower() in ('1', 'true', 'yes'):
-    USE_X_FORWARDED_HOST = True
-    USE_X_FORWARDED_PORT = True
-
-# Aperçu intégré en iframe cross-site : les cookies doivent être SameSite=None
-# et Secure pour être transmis (session admin, CSRF, refresh JWT). Réglable par
-# variable d'env ; en production (variable absente) le défaut Lax est conservé.
-_cookie_samesite = os.environ.get('COOKIE_SAMESITE', '').strip()
-if _cookie_samesite:
-    SESSION_COOKIE_SAMESITE = _cookie_samesite
-    CSRF_COOKIE_SAMESITE = _cookie_samesite
-    if _cookie_samesite.lower() == 'none':
-        SESSION_COOKIE_SECURE = True
-        CSRF_COOKIE_SECURE = True
-
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
     if origin
-]
-# Expressions régulières d'origines de confiance (ex: aperçus *.e2b.app)
-CSRF_TRUSTED_ORIGIN_REGEXES = [
-    rx for rx in os.environ.get('CSRF_TRUSTED_ORIGIN_REGEXES', '').split(',')
-    if rx
 ]
 if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
@@ -124,7 +101,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     # Local apps
-    'core.apps.CoreConfig',  # P01-01 — noyau transverse, journal d'audit unifié
     'authentication',
     'formations.apps.FormationsConfig',
     'presences',
@@ -147,11 +123,9 @@ INSTALLED_APPS = [
     'patrimoine.apps.PatrimoineConfig',                  # L7 : équipements, véhicules, maintenance, réservations
     # Lot L8 — Emploi du temps
     'edts.apps.EdtsConfig',                              # L8 : créneaux, plannings, affectations, conflits
-    # Refonte CURP-INJS (unité U1) : socle additif de données d'habilitation.
-    # Aucun contrôle d'accès n'est branché depuis cette application en U1.
-    'habilitations.apps.HabilitationsConfig',
-    # Phase 1 — référentiel métier INJS (départements/services).
-    'referentiel_injs.apps.ReferentielInjsConfig',
+    # Noyau transverse (audit unifié, P01-01)
+    'core.apps.CoreConfig',
+    'habilitations',
 ]
 
 MIDDLEWARE = [
@@ -160,22 +134,11 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # DÉMO uniquement (DEBUG + DEMO_ADMIN_AUTOLOGIN) : rend l'admin utilisable
-    # dans l'iframe d'aperçu quand les cookies tiers sont bloqués. Inerte en prod.
-    'config.demo_admin_middleware.DemoAdminAutoLoginMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-if DEBUG:
-    # Démo locale : placé APRÈS (donc exécuté en phase réponse APRÈS)
-    # XFrameOptions, il remplace DENY par un frame-ancestors permissif pour
-    # autoriser l'affichage dans l'iframe d'aperçu.
-    MIDDLEWARE.insert(
-        MIDDLEWARE.index('django.middleware.clickjacking.XFrameOptionsMiddleware'),
-        'config.dev_middleware.DevPreviewFrameMiddleware',
-    )
 
 ROOT_URLCONF = 'config.urls'
 
@@ -199,33 +162,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database — PostgreSQL par défaut.
-# Bascules SQLite pour le développement local sans serveur PostgreSQL : USE_SQLITE=1
+# Database — PostgreSQL
 _postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
-if os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes'):
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.environ.get('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3')),
-        }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': _postgres_db,
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
+        'TEST': {
+            'NAME': f'test_{_postgres_db}',
+        },
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+        'CONN_HEALTH_CHECKS': True,
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': _postgres_db,
-            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-            # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
-            'TEST': {
-                'NAME': f'test_{_postgres_db}',
-            },
-            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-            'CONN_HEALTH_CHECKS': True,
-        }
-    }
+}
 
 # Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
@@ -283,12 +237,6 @@ STORAGES = {
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Prévisualisation locale : build React servi par Django (PREVIEW_SPA=1).
-FRONTEND_DIST = os.environ.get(
-    'FRONTEND_DIST', str((BASE_DIR / '..' / 'frontend' / 'dist').resolve())
-)
-PREVIEW_SPA = os.environ.get('PREVIEW_SPA', '').lower() in ('1', 'true', 'yes')
-
 # Custom user model
 AUTH_USER_MODEL = 'authentication.User'
 
@@ -298,9 +246,7 @@ REST_FRAMEWORK = {
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        # Accepte Authorization: Bearer, puis X-JWT-Access de secours,
-        # puis ?access_token= (robustesse en iframe/passerelle d'aperçu).
-        'authentication.auth_classes.FlexibleJWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -364,20 +310,6 @@ MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS = int(
     os.environ.get('MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)
 )
 
-# ─────────────────────────────────────────────────────────────────────────
-# CURP — unité U2 : moteur d'habilitation.
-# OBSERVATION (défaut) évalue et mesure les écarts sans jamais modifier une
-# réponse ; APPLICATION (défaut éteint, jamais activé en U2) rend les refus
-# effectifs. Les deux à faux = no-op total. L'ancien dispositif reste seul
-# décideur tant qu'aucun compte n'est gouverné (migration de comptes U8).
-# ─────────────────────────────────────────────────────────────────────────
-def _flag_env(nom, defaut):
-    return os.environ.get(nom, defaut).lower() in ('1', 'true', 'yes')
-
-
-HABILITATIONS_OBSERVATION = _flag_env('HABILITATIONS_OBSERVATION', 'true')
-HABILITATIONS_APPLICATION = _flag_env('HABILITATIONS_APPLICATION', 'false')
-
 # CORS — liste stricte d'origines (ou vide = rien)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -388,11 +320,9 @@ if DEBUG:
     CORS_ALLOWED_ORIGINS.extend([
         'http://localhost:3000',
         'http://localhost:3001',
-        'http://localhost:3002',
         f'http://localhost:{DEV_SERVER_PORT}',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:3001',
-        'http://127.0.0.1:3002',
         f'http://127.0.0.1:{DEV_SERVER_PORT}',
         f'http://192.168.1.90:3000',
         f'http://192.168.1.90:{DEV_SERVER_PORT}',
@@ -400,11 +330,6 @@ if DEBUG:
         f'http://192.168.100.54:{DEV_SERVER_PORT}',
     ])
 CORS_ALLOWED_ORIGINS = list(dict.fromkeys(CORS_ALLOWED_ORIGINS))
-# Expressions régulières d'origines autorisées (ex: aperçus *.e2b.app)
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    rx for rx in os.environ.get('CORS_ALLOWED_ORIGIN_REGEXES', '').split(',')
-    if rx
-]
 CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']
 # Nécessaire au cookie HttpOnly du refresh JWT (credentials: 'include' côté React).
 # Les origines restent strictes (CORS_ALLOWED_ORIGINS ci-dessus, pas de allow-all).
@@ -521,12 +446,6 @@ LOGGING = {
             'propagate': False,
         },
         'presences': {
-            'handlers': ['console', 'file_rotating'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        # CURP U2 : décisions du moteur d'habilitation et écarts observés.
-        'habilitations': {
             'handlers': ['console', 'file_rotating'],
             'level': 'INFO',
             'propagate': False,

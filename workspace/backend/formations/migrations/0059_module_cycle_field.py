@@ -1,6 +1,22 @@
 # Colonne `cycle` déjà présente sur certaines bases (NOT NULL) sans entrée dans l'historique Django.
+# Colonne `cycle` déjà présente sur certaines bases (NOT NULL) sans entrée dans l'historique Django.
+# Compatible SQLite (pas de IF NOT EXISTS dans ALTER TABLE SQLite).
 
-from django.db import migrations, models
+from django.db import migrations, models, connection
+
+
+def _add_cycle_column_if_not_exists(apps, schema_editor):
+    """Ajoute la colonne cycle si elle n'existe pas (SQLite compatible)."""
+    from django.db import connection
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "ALTER TABLE formations_module "
+            "ADD COLUMN cycle varchar(255) NOT NULL DEFAULT '';"
+        )
+    except Exception:
+        # Colonne existe déjà ou autre erreur — on ignore
+        pass
 
 
 class Migration(migrations.Migration):
@@ -12,12 +28,9 @@ class Migration(migrations.Migration):
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[
-                migrations.RunSQL(
-                    sql=(
-                        "ALTER TABLE formations_module "
-                        "ADD COLUMN IF NOT EXISTS cycle varchar(255) NOT NULL DEFAULT '';"
-                    ),
-                    reverse_sql=migrations.RunSQL.noop,
+                migrations.RunPython(
+                    code=_add_cycle_column_if_not_exists,
+                    reverse_code=migrations.RunPython.noop,
                 ),
             ],
             state_operations=[

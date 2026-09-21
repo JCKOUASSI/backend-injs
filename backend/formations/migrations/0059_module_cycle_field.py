@@ -1,29 +1,22 @@
 # Colonne `cycle` déjà présente sur certaines bases (NOT NULL) sans entrée dans l'historique Django.
+# Colonne `cycle` déjà présente sur certaines bases (NOT NULL) sans entrée dans l'historique Django.
+# Compatible SQLite (pas de IF NOT EXISTS dans ALTER TABLE SQLite).
 
-from django.db import migrations, models
+from django.db import migrations, models, connection
 
 
-def add_cycle_column(apps, schema_editor):
-    connection = schema_editor.connection
-    if connection.vendor == 'postgresql':
-        # ADD COLUMN IF NOT EXISTS : idiome PostgreSQL pour les bases où la
-        # colonne existe déjà sans entrée dans l'historique Django.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "ALTER TABLE formations_module "
-                "ADD COLUMN IF NOT EXISTS cycle varchar(255) NOT NULL DEFAULT '';"
-            )
-        return
-    # Autres moteurs (SQLite en dev local) : ajout standard de la colonne.
-    Module = apps.get_model('formations', 'Module')
-    field = models.CharField(
-        blank=True,
-        default='',
-        help_text='Libellé du cycle de formation (ex. même valeur que Formation.formation)',
-        max_length=255,
-    )
-    field.set_attributes_from_name('cycle')
-    schema_editor.add_field(Module, field)
+def _add_cycle_column_if_not_exists(apps, schema_editor):
+    """Ajoute la colonne cycle si elle n'existe pas (SQLite compatible)."""
+    from django.db import connection
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "ALTER TABLE formations_module "
+            "ADD COLUMN cycle varchar(255) NOT NULL DEFAULT '';"
+        )
+    except Exception:
+        # Colonne existe déjà ou autre erreur — on ignore
+        pass
 
 
 class Migration(migrations.Migration):
@@ -36,8 +29,8 @@ class Migration(migrations.Migration):
         migrations.SeparateDatabaseAndState(
             database_operations=[
                 migrations.RunPython(
-                    add_cycle_column,
-                    migrations.RunPython.noop,
+                    code=_add_cycle_column_if_not_exists,
+                    reverse_code=migrations.RunPython.noop,
                 ),
             ],
             state_operations=[

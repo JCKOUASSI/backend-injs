@@ -34,9 +34,8 @@ DATABASES = {
 # '*' (il ferait échouer le garde-fou de durcissement test_settings_allow_no_wildcard_literal).
 # '.e2b.app' matche tous les sous-domaines de prévisualisation dynamiques.
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1", ".e2b.app"]
-CSRF_TRUSTED_ORIGINS = ["https://*.e2b.app", "http://*.e2b.app", "http://localhost:8000", "http://127.0.0.1:8000"]
+CSRF_TRUSTED_ORIGINS = ["https://*.e2b.app"]
 DEBUG = True
-LOGIN_REDIRECT_URL = "/admin/"
 
 # Courriel : le SMTP Gmail du projet n'est pas joignable ici.
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"

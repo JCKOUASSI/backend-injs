@@ -1,3 +1,9 @@
+# =============================================================================
+# Modified for arena bootstrap: dotenv is optional (no .env file in sandbox)
+# Original code:
+#   from dotenv import load_dotenv
+#   load_dotenv(Path(__file__).resolve().parent / '.env')
+# =============================================================================
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
 import os
@@ -6,11 +12,9 @@ from pathlib import Path
 
 try:
     from dotenv import load_dotenv
-except ImportError:  # python-dotenv optionnel en développement local
-    def load_dotenv(_path):
-        return False
-
-load_dotenv(Path(__file__).resolve().parent / '.env')
+    load_dotenv(Path(__file__).resolve().parent / '.env')
+except ImportError:
+    pass  # dotenv not available in sandbox — no .env file needed
 
 
 def main():
