@@ -7,7 +7,6 @@ import { useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import FinancePeriodFilter from '../components/FinancePeriodFilter'
-import { fmtHeures } from '../components/FinanceStatsGrid'
 import {
   appendPeriodToSearchParams,
   loadFinancePeriod,
@@ -19,25 +18,19 @@ import {
 import { isSecretariatScopedRole, lockedSecretariatId } from '../utils/roles'
 import { useStatsMeta } from '../hooks/useStatsMeta'
 import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
-import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
+import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip } from '../components/AuditeursNotoiresPanel'
 import RapportsWorkflowPanel from '../components/RapportsWorkflowPanel'
 
 // ── Palettes, libellés et constantes — voir ./statistiques/constantes.js ─────
 import {
   C,
-  STATUT_LABELS,
   VALIDATION_ROLES,
   RB_VIEWS,
-  TAUX_PEDAGOGIE,
-  KPI_VH_EXEC,
   KPI_SESSIONS_COMPT,
-  KPI_SESSIONS_TOTAL,
-  KPI_PERIOD_SCOPE_HELP,
   AUDITEURS_NOTOIRES,
   SECRETARIAT_STATS_TABS,
   VH_PERIOD_TABS,
   TAB_SECTIONS,
-  ALERTES_OVERVIEW_CODES,
   PJ_EXPORT_FORMATS,
   RB_PERIODES,
   RB_DIMENSIONS,
@@ -47,19 +40,14 @@ import {
 
 
 // ── Primitives graphiques SVG — voir ./statistiques/graphiques.jsx ───────────
-import { Empty, Donut, Bars, HBars, formatMoisLabelLong, TrendBadge } from './statistiques/graphiques'
+import { Empty, Donut, Bars, HBars, formatMoisLabelLong } from './statistiques/graphiques'
 // ── Cartes, KPI et barres de taux — voir ./statistiques/composants.jsx ─────
 import {
   Card,
   Kpi,
-  MonthTrendChart,
-  StackedPresenceChart,
-  TauxBar,
 } from './statistiques/composants'
 // ── Onglet Alertes — voir ./statistiques/alertes.jsx ────────────────────────
 import {
-  IndicateurSurveillanceCard,
-  AlertesOverviewBandeau,
   buildAlertesSidebarEntries,
   AlertesEnsemblePanel,
   AlertesWidgetDetailPanel,
@@ -67,14 +55,13 @@ import {
 } from './statistiques/alertes'
 // ── Bilan FAC — voir ./statistiques/bilan-fac.jsx ───────────────────────────
 import { BilanFACPanel } from './statistiques/bilan-fac'
-import { normalizeJustificatifs } from './statistiques/justificatifs'
-import { BilansEnsemblePanel, BilanEffectifsModuleTable, BilanDetailPanel } from './statistiques/bilans'
+import { BilansEnsemblePanel, BilanDetailPanel } from './statistiques/bilans'
 // Exporté pour les tests unitaires de la synchro des justificatifs (§10.7 LOT 6).
 export { BilanPeriodeFormationTable } from './statistiques/bilans'
-import { SEC_TABLE_HEADERS, SecretariatsComparatifTable, SecretariatsEnsemblePanel, SecretariatDetailPanel } from './statistiques/secretariats'
+import { SecretariatsEnsemblePanel, SecretariatDetailPanel } from './statistiques/secretariats'
 import { HistoriqueEnsemblePanel, HistoriqueMoisPanel } from './statistiques/historique'
 import { buildPedagogieEntries, PedagogiqueEnsemblePanel, PedagogiqueDetailPanel } from './statistiques/pedagogique'
-import { OVERVIEW_SECTION_DEFS, buildOverviewSections, VueEnsemblePanel, VueOverviewDetailPanel } from './statistiques/vue-ensemble'
+import { buildOverviewSections, VueEnsemblePanel, VueOverviewDetailPanel } from './statistiques/vue-ensemble'
 
 // ── Composant principal ────────────────────────────────────────────────────────
 export default function Statistiques() {
