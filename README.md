@@ -217,6 +217,8 @@ commité (le fichier `.env` est ignoré par Git).
 | `REDIS_URL` | Cache Redis partagé (ex. `redis://redis:6379/0`) | — | **Oui** en multi-instances |
 | `CACHE_DIR` | Répertoire du cache fichier si pas de Redis | `backend/cache` | Non |
 | `PUBLIC_QR_SCAN_ENABLED` | Active le scan QR public (web) ; préférer le parcours mobile authentifié | `False` en prod | **Laisser `False`** |
+| `HABILITATIONS_APPLICATION` | Le moteur d'habilitation refuse effectivement les accès (mode APPLICATION) | `False` — dépôt livré inerte (règle R3) | **Non — bascule sur décision du pilote** |
+| `HABILITATIONS_OBSERVATION` | Compte ce que le moteur aurait décidé et mesure les écarts, sans modifier aucune réponse | `True` | Non |
 | `THROTTLE_LOGIN_RATE` / `THROTTLE_SCAN_RATE` / `THROTTLE_OFFLINE_DATA_RATE` | Limites de débit DRF | `20/min`, `60/min`, `60/min` | Non (réglage) |
 | `AUTO_ABSENT_DELAI_MINUTES` | Délai avant marquage « absent non badgé » | `60` | Non |
 | `MOBILE_HEARTBEAT_DISABLED` | Désactive suspect/sortie auto et heartbeat | `false` | Non |
