@@ -19,7 +19,7 @@ fi
 echo "gunicorn: démarrage avec ${WORKERS} worker(s), autoscale ${MIN}-${MAX} (intervalle ${INTERVAL}s)"
 
 gunicorn config.wsgi:application \
-  --bind 0.0.0.0:8001 \
+  --bind 0.0.0.0:8000 \
   --workers "$WORKERS" \
   --timeout 120 \
   --access-logfile - &
