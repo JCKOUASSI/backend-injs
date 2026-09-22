@@ -91,7 +91,7 @@ concurrency:
 jobs:
   sync:
     name: Sync vers ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # `environment` est une cle de NIVEAU JOB (ignorée au niveau workflow). Cree
     # l'environment a la premiere execution ; y ajouter « Required reviewers » et
     # « Deployment branches: production branches only » transforme la sync en

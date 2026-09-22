@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   fix-admin:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Vérifier les secrets
         env:
