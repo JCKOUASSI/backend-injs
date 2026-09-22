@@ -1,0 +1,17 @@
+name: Self-hosted runner test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Test runner
+        run: |
+          echo "SELF-HOSTED RUNNER OK"
+          uname -a
+          sw_vers
+          python3 --version
+          node --version || true
+          docker --version || true
