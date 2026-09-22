@@ -11,7 +11,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (Django)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:16-alpine
@@ -147,7 +147,7 @@ jobs:
 
   frontend:
     name: Frontend (Vite / React)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -166,7 +166,7 @@ jobs:
 
   frontend-tests:
     name: Frontend tests (Vitest)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -197,7 +197,7 @@ jobs:
 
   mobile:
     name: Mobile (Flutter)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
