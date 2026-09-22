@@ -143,3 +143,14 @@ jobs:
           build-args: |
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
             VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}
+
+  deploy:
+    name: Déployer sur le VPS
+    needs: build-and-push
+    if: ${{ inputs.skip_deploy != 'true' }}
+    uses: ./.github/workflows/deploy-vps.yml
+    with:
+      environment: production
+      backend_image: ${{ steps.cfg.outputs.backend_ref }}
+      frontend_image: ${{ steps.cfg.outputs.frontend_ref }}
+    secrets: inherit
