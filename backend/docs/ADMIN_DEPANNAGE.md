@@ -308,6 +308,68 @@ python manage.py showmigrations
 2. En production : `python manage.py collectstatic --noinput` puis redémarrage.
 3. Vider le cache CDN / navigateur si applicable.
 
+### 10.4 Production — « /api/ » et « /admin/ » renvoient la page React (connexion admin impossible)
+
+> Incident constaté le 2026-09-22 sur `https://injs.badge-qr-code.pro`.
+
+**Symptôme :**
+- L'écran de connexion React s'affiche, mais toute connexion échoue (admin comme autres comptes).
+- `GET  https://injs.badge-qr-code.pro/api/health/` → **200 text/html** (corps = `index.html` du SPA).
+- `POST https://injs.badge-qr-code.pro/api/auth/login/` → **405 Not Allowed** (nginx/openresty).
+- `GET  https://injs.badge-qr-code.pro/admin/` → **200 text/html** (corps = `index.html` du SPA).
+
+**Cause :** le reverse-proxy (openresty) du VPS sert le build React pour **toutes** les
+routes (SPA fallback `try_files $uri $uri/ /index.html`, cf. `frontend/nginx.conf`),
+sans route `proxy_pass` vers le backend Django pour `/api/`, `/admin/`, `/static/`
+et `/media/`. Le front appelle l'API en relatif (`VITE_API_URL || '/api'`,
+cf. `frontend/src/services/api.js`) : dès que la route `/api/` n'est plus proxifiée,
+plus aucune connexion n'est possible. Ce n'est **pas** un problème de compte admin.
+
+**Diagnostic (sur le VPS, lecture seule) :**
+```bash
+# 1. Le backend tourne-t-il et répond-il en interne ?
+docker ps --format '{{.Names}}\t{{.Image}}\t{{.Ports}}'
+docker exec injs-be sh -c "curl -s http://localhost:8000/api/health/ || curl -s http://localhost:8001/api/health/"
+#    Attendu : {"status":"ok","database":"ok",...}
+
+# 2. Où est la config qui route le domaine ?
+grep -rn "injs.badge-qr-code.pro" /etc/nginx /usr/local/openresty/nginx/conf 2>/dev/null
+```
+
+**Correctif :** dans le `server` block du domaine, ajouter AVANT le `location /`
+du SPA (sauvegarde + `nginx -t` obligatoires) :
+```nginx
+    location /api/     { proxy_pass http://127.0.0.1:8000; include /etc/nginx/proxy_params; }
+    location /admin/   { proxy_pass http://127.0.0.1:8000; include /etc/nginx/proxy_params; }
+    location /static/  { proxy_pass http://127.0.0.1:8000; include /etc/nginx/proxy_params; }
+    location /media/   { proxy_pass http://127.0.0.1:8000; include /etc/nginx/proxy_params; }
+```
+- `proxy_params` doit au minimum porter : `Host $host`, `X-Real-IP $remote_addr`,
+  `X-Forwarded-For $proxy_add_x_forwarded_for`, `X-Forwarded-Proto $scheme`
+  (indispensable pour CSRF/HTTPS sur `/admin/`).
+- Adaptez `127.0.0.1:8000` au port réellement publié par le conteneur backend
+  (voir sortie de `docker ps` ; l'architecture historique expose aussi 8001).
+- Si `/static/` est servi directement par nginx (volume `staticfiles`), gardez le
+  `try_files` existant et ne proxifiez que `/api/`, `/admin/`, `/media/`.
+
+```bash
+# Application (avec sauvegarde et contrôle) :
+cp <conf_du_domaine> <conf_du_domaine>.bak-$(date +%F-%H%M)
+# ... éditer la conf ...
+nginx -t && systemctl reload nginx   # ou : openresty -t && openresty -s reload
+```
+
+**Vérification post-correctif :**
+```bash
+curl -s https://injs.badge-qr-code.pro/api/health/        # JSON attendu
+curl -s -o /dev/null -w '%{http_code}\n' https://injs.badge-qr-code.pro/admin/   # 200 page Django
+curl -s -X POST https://injs.badge-qr-code.pro/api/auth/login/ \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}'         # JWT attendu
+```
+Si le login API répond 401/403 à ce stade seulement, le problème est alors le
+compte lui-même : §2.1 (`changepassword` / `createsuperuser` dans `injs-be`).
+
 ---
 
-*Dernière mise à jour : juillet 2026 — interface admin personnalisée (sans django-unfold).*
+*Dernière mise à jour : juillet 2026 — interface admin personnalisée (sans django-unfold). §10.4 ajouté le 2026-09-22 (incident routage /api/ production).*
