@@ -29,8 +29,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://injs.badge-qr-code.pro/api}
         VITE_BADGE_BASE_URL: ${VITE_BADGE_BASE_URL:-https://injs.badge-qr-code.pro}
