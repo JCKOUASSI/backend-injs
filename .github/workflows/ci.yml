@@ -61,13 +61,13 @@ jobs:
 
       - name: Hygiène du dépôt (données nominatives)
         working-directory: backend
-        run: .venv-ci/bin/python backend/manage.py check_repo_hygiene
+        run: ../.venv-ci/bin/python manage.py check_repo_hygiene
 
       - name: Collecte des fichiers statiques (manifeste WhiteNoise)
         working-directory: backend
         # staticfiles/ n'est plus versionné (P00-02) : le manifeste requis par
         # ManifestStaticFilesStorage doit être généré avant les tests de templates.
-        run: SECRET_KEY=ci-secret-key-not-for-production DEBUG=True .venv-ci/bin/python backend/manage.py collectstatic --noinput
+        run: SECRET_KEY=ci-secret-key-not-for-production DEBUG=True ../.venv-ci/bin/python manage.py collectstatic --noinput
 
       - name: Migrations et tests
         working-directory: backend
@@ -75,8 +75,8 @@ jobs:
           SECRET_KEY: ci-secret-key-not-for-production
           DEBUG: "True"
         run: |
-          .venv-ci/bin/python backend/manage.py migrate --noinput
-          .venv-ci/bin/python backend/manage.py test --noinput -v 2
+          ../.venv-ci/bin/python manage.py migrate --noinput
+          ../.venv-ci/bin/python manage.py test --noinput -v 2
 
       - name: Contrat d'API figé (snapshot drf-spectacular, P00-08)
         working-directory: backend
@@ -85,7 +85,7 @@ jobs:
           DEBUG: "True"
         # Échoue si une route / clé requise / code HTTP a été retiré ou renommé
         # sans mise à jour justifiée du snapshot (docs/api/contract.snapshot.json).
-        run: .venv-ci/bin/python backend/manage.py export_api_contract --check
+        run: ../.venv-ci/bin/python manage.py export_api_contract --check
 
       - name: Parcours de fumée bout-en-bout (smoke INJS-LMD, P00-08)
         working-directory: backend
@@ -94,7 +94,7 @@ jobs:
           DEBUG: "True"
         # Base neuve : la commande s'auto-ensemence et annule sa transaction
         # en fin (idempotente) ; tout échec d'une étape rend le build rouge.
-        run: .venv-ci/bin/python backend/manage.py smoke_test_injs
+        run: ../.venv-ci/bin/python manage.py smoke_test_injs
 
       - name: Parcours de fumée d'authentification CURP (U0, 14 comptes témoins)
         working-directory: backend
@@ -107,7 +107,7 @@ jobs:
         # refus web + canal mobile pour FORMATEUR/AUDITEUR, routes de
         # référence à 200 et cloisonnement croisé entre deux secrétariats.
         # Une seule ligne rouge rend le build rouge (sortie 1).
-        run: .venv-ci/bin/python backend/manage.py fumee_authentification --tous --creer
+        run: ../.venv-ci/bin/python manage.py fumee_authentification --tous --creer
 
       - name: "Socle CURP habilitations : politique et intégrité du journal (U1)"
         working-directory: backend
@@ -119,8 +119,8 @@ jobs:
         # PostgreSQL, les déclencheurs BEFORE UPDATE/DELETE sont également
         # actifs et testés par la suite unitaire.
         run: |
-          .venv-ci/bin/python backend/manage.py init_habilitations_injs
-          .venv-ci/bin/python backend/manage.py verifier_chaine_habilitations
+          ../.venv-ci/bin/python manage.py init_habilitations_injs
+          ../.venv-ci/bin/python manage.py verifier_chaine_habilitations
 
       - name: "CURP U2 : moteur d'habilitation en mode observation"
         working-directory: backend
@@ -134,8 +134,8 @@ jobs:
         # Avant U3 (référentiel) et U8 (rattachement des comptes), la
         # campagne est explicitement sans objet : elle vérifie le mécanisme.
         run: |
-          .venv-ci/bin/python backend/manage.py observations_habilitations
-          .venv-ci/bin/python backend/manage.py observations_habilitations --campagne
+          ../.venv-ci/bin/python manage.py observations_habilitations
+          ../.venv-ci/bin/python manage.py observations_habilitations --campagne
 
       - name: Intégrité du journal d'audit unifié (P01-01)
         working-directory: backend
@@ -144,17 +144,17 @@ jobs:
           DEBUG: "True"
         # Vérifie en lecture seule codes uniques, séquences continues et
         # répliques non dupliquées/orphelines du registre core.
-        run: .venv-ci/bin/python backend/manage.py audit_integrity_check
+        run: ../.venv-ci/bin/python manage.py audit_integrity_check
 
       - name: Vérifier l'image Docker backend (collectstatic / permissions)
         run: |
           docker build -t sygep-backend-ci ./backend
-          OWNER=$(docker run --rm sygep-backend-ci stat -c '%U' /app/staticfiles)
+          OWNER=$(docker run --rm sygep-backend-ci python -c "import os, pwd; print(pwd.getpwuid(os.stat('/app/staticfiles').st_uid).pw_name)")
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
             exit 1
           fi
-          docker run --rm sygep-backend-ci .venv-ci/bin/python backend/manage.py collectstatic --noinput --dry-run
+          docker run --rm sygep-backend-ci python manage.py collectstatic --noinput --dry-run
 
   frontend:
     name: Frontend (Vite / React)
