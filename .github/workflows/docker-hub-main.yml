@@ -50,7 +50,7 @@ concurrency:
 jobs:
   build-and-push:
     name: Build & push prod (linux/amd64)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       BACKEND_IMAGE: jckouassi/injs-be
       FRONTEND_IMAGE: jckouassi/injs-fe
