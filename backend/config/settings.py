@@ -76,6 +76,14 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 if RENDER_EXTERNAL_HOSTNAME:
     CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
+
+# Noms de cookies dédiés (environnement DEV) — neutralise tout « vieux »
+# cookie csrftoken / sessionid hérité du navigateur, cause de 403 CSRF
+# (cf. docs/GARDE_FOUS.md §« noms de cookies dédiés »). Mêmes noms que
+# l'overlay Arena (arena/settings_sandbox.py) pour cohérence. Configurable
+# via env ; défauts Django conservés si absent.
+CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'csrftoken')
+SESSION_COOKIE_NAME = os.environ.get('SESSION_COOKIE_NAME', 'sessionid')
 if DEBUG:
     CSRF_TRUSTED_ORIGINS.extend([
         f'http://localhost:{DEV_SERVER_PORT}',
