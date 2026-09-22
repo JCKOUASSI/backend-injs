@@ -11,7 +11,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (Django)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:16-alpine
@@ -206,15 +206,6 @@ jobs:
           channel: stable
           flutter-version: "3.41.7"
           cache: true
-
-      - name: Préparer app.env pour le CI
-        working-directory: qr_badge_mobile
-        run: |
-          mkdir -p assets
-          cat > assets/app.env <<'EOF'
-API_BASE_URL=http://127.0.0.1:8000
-PRIVACY_POLICY_URL=http://127.0.0.1:8000/dashboard/legal/confidentialite-qr-badge/
-EOF
 
       - name: Pub get et analyse statique
         working-directory: qr_badge_mobile
