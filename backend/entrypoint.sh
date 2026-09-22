@@ -59,11 +59,15 @@ django.setup()
 User = get_user_model()
 email = os.environ['DJANGO_SUPERUSER_EMAIL'].strip().lower()
 password = os.environ['DJANGO_SUPERUSER_PASSWORD']
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME', email.split('@')[0])
 first_name = os.environ.get('DJANGO_SUPERUSER_FIRST_NAME', 'Admin')
 last_name = os.environ.get('DJANGO_SUPERUSER_LAST_NAME', 'INJS')
-user = User.objects.filter(email=email).first()
-if user is None:
-    User.objects.create_superuser(email=email, password=password, first_name=first_name, last_name=last_name)
+if not User.objects.filter(email=email).exists():
+    User.objects.create_superuser(
+        username=username, email=email, password=password,
+        first_name=first_name, last_name=last_name,
+        is_staff=True, is_superuser=True,
+    )
     print(f'[injs-be] superuser created: {email}')
 else:
     print(f'[injs-be] superuser already exists: {email}')
