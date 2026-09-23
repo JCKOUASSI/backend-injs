@@ -2,58 +2,99 @@ name: Fix production admin
 
 on:
   workflow_dispatch:
+    inputs:
+      prod_url:
+        description: "URL publique de production (ex: https://injs.badge-qr-code.pro)"
+        required: false
+        type: string
+        default: "https://injs.badge-qr-code.pro"
+      remedier_admin:
+        description: "Exécuter scripts/create_admin_prod.py sur le VPS si SSH disponible"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  fix-admin:
-    runs-on: self-hosted
+  diagnose:
+    name: Diagnostic HTTPS & VPS
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Vérifier les secrets
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Diagnostic HTTPS (sans SSH) — routage /api/ et /admin/
+        env:
+          PROD_URL: ${{ inputs.prod_url || 'https://injs.badge-qr-code.pro' }}
+        run: |
+          set -euo pipefail
+
+          echo "=== 1. GET /api/health/ (doit être JSON Django, PAS le HTML du SPA) ==="
+          health_code=$(curl -s -o /tmp/health_body -w '%{http_code}' \
+            -H 'Accept: application/json' \
+            "$PROD_URL/api/health/" --max-time 20 || true)
+          echo "HTTP ${health_code}"
+          head -c 400 /tmp/health_body || true; echo
+
+          if grep -q '"status"' /tmp/health_body 2>/dev/null; then
+            echo "✅ OK_API_ROUTING=1 — /api/ est bien routé vers Django"
+          else
+            echo "❌ OK_API_ROUTING=0 — /api/ ne renvoie PAS de JSON Django"
+            echo "   Symptôme connu : le reverse-proxy sert index.html (SPA) pour"
+            echo "   toutes les routes => POST /api/auth/login/ -> 405 nginx,"
+            echo "   connexion admin impossible. Voir backend/docs/ADMIN_DEPANNAGE.md §10.4."
+          fi
+
+          echo "=== 2. POST /api/auth/login/ (compte admin de démonstration) ==="
+          login_code=$(curl -s -o /tmp/login_body -w '%{http_code}' \
+            -X POST "$PROD_URL/api/auth/login/" \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"admin123"}' --max-time 20 || true)
+          echo "HTTP ${login_code}"
+          head -c 400 /tmp/login_body || true; echo
+
+          echo "=== 3. GET /admin/ (doit être la page de connexion Django, PAS index.html) ==="
+          admin_headers=$(curl -s -D - -o /dev/null "$PROD_URL/admin/" --max-time 20 || true)
+          echo "$admin_headers" | head -12
+          if echo "$admin_headers" | grep -qi 'x-served-by\|text/html'; then
+            echo "NOTE : vérifier que le corps n'est pas index.html du SPA (cf. §10.4 du guide)."
+          fi
+
+      - name: Diagnostic & remédiation SSH — compte admin + routage nginx
+        if: ${{ env.VPS_HOST != '' && env.VPS_USER != '' && env.VPS_SSH_KEY != '' }}
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          REMEDIER: ${{ inputs.remedier_admin || false }}
         run: |
           set -euo pipefail
-          test -n "$VPS_HOST"
-          test -n "$VPS_USER"
-          test -n "$VPS_SSH_KEY"
 
-      - name: Préparer SSH
-        env:
-          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          set -euo pipefail
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/deploy_key"
-          chmod 600 "$HOME/.ssh/deploy_key"
-          ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null
 
-      - name: Vérifier le compte admin en production
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          set -euo pipefail
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
 
           ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
-          ssh \
-            -i "$HOME/.ssh/deploy_key" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new \
-            "${VPS_USER}@${VPS_HOST}" \
-            'docker exec injs-be python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-u = User.objects.filter(username=\"admin\").first()
-print(\"ADMIN_EXISTS=\" + str(bool(u)))
-if u:
-    print(\"ADMIN_ACTIVE=\" + str(u.is_active))
-    print(\"ADMIN_STAFF=\" + str(u.is_staff))
-    print(\"ADMIN_SUPERUSER=\" + str(u.is_superuser))
-"'
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
+
+          echo "=== Diagnostic du compte admin via commande Django ==="
+          ssh $SSH_OPTS "${VPS_USER}@${VPS_HOST}" 'docker exec -i injs-be python manage.py diagnostic_admin --username admin' || truee
+
+          if [ "$REMEDIER" = "true" ]; then
+            echo "=== Exécution de scripts/create_admin_prod.py sur le VPS ==="
+            ssh $SSH_OPTS "${VPS_USER}@${VPS_HOST}" 'docker exec -i injs-be python scripts/create_admin_prod.py' || true
+          fi
+
+          echo "=== Diagnostic conteneurs et Nginx ==="
+          ssh $SSH_OPTS "${VPS_USER}@${VPS_HOST}" 'bash -s' <<'VPSEOF'
+          echo "--- Conteneurs Docker actifs ---"
+          docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -20
+          echo "--- Configuration Nginx du reverse proxy ---"
+          grep -rn "injs.badge-qr-code.pro" /etc/nginx /usr/local/openresty/nginx/conf /etc/openresty 2>/dev/null | head -20 || true
+          VPSEOF
