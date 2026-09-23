@@ -128,13 +128,13 @@ jobs:
       - name: Vérifier staticfiles (appuser, collectstatic)
         run: |
           IMG="${{ steps.cfg.outputs.backend_ref }}"
-          docker pull "$IMG"
-          OWNER=$(docker run --rm "$IMG" stat -c '%U' /app/staticfiles)
+          docker pull --platform linux/amd64 "$IMG"
+          OWNER=$(docker run --platform linux/amd64 --rm "$IMG" stat -c '%U' /app/staticfiles)
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
             exit 1
           fi
-          docker run --rm "$IMG" python manage.py collectstatic --noinput --dry-run
+          docker run --platform linux/amd64 --rm "$IMG" python manage.py collectstatic --noinput --dry-run
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
