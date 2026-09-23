@@ -46,14 +46,13 @@
 # Docs : docs/DEPLOIEMENT_INJS.md (§3 règles, §6 recette de première exécution)
 # ============================================================
 
-name: Sync (app-injslmd2026demo -> injs-app)
+name: Sync (backend-injs -> injs-app)
 
 on:
   push:
     branches:
-      # Branche de travail référencée par la chaîne INJS. Y ajouter « main »
-      # revient à déployer chaque fusion en production : à faire exprès.
-      - arena/01a0a27f-app-injslmd2026demo
+      - main
+      - arena/*
   workflow_dispatch:
     inputs:
       source_ref:
@@ -91,28 +90,19 @@ jobs:
   sync:
     name: Sync vers ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
     runs-on: ubuntu-latest
-    # `environment` est une cle de NIVEAU JOB (ignorée au niveau workflow). Cree
-    # l'environment a la premiere execution ; y ajouter « Required reviewers » et
-    # « Deployment branches: production branches only » transforme la sync en
-    # deploiement valide par un humain.
     environment: sync-injs-app
     timeout-minutes: 15
-    if: github.repository == 'JCKOUASSI/app-injslmd2026demo'
+    if: github.repository == 'JCKOUASSI/backend-injs' || github.repository == 'JCKOUASSI/app-injslmd2026demo'
     env:
       # Sur push : on synchronise exactement ce qui vient d'être poussé.
-      # Sur dispatch : l'input, sinon la variable de dépôt, sinon la branche INJS.
-      SYNC_SOURCE_REF: ${{ github.event_name == 'push' && github.ref_name || (github.event.inputs.source_ref != '' && github.event.inputs.source_ref || vars.SYNC_SOURCE_REF || 'arena/01a0a27f-app-injslmd2026demo') }}
+      # Sur dispatch : l'input, sinon la variable de dépôt, sinon la branche principale.
+      SYNC_SOURCE_REF: ${{ github.event_name == 'push' && github.ref_name || (github.event.inputs.source_ref != '' && github.event.inputs.source_ref || vars.SYNC_SOURCE_REF || 'main') }}
       SYNC_TARGET_REPO: ${{ vars.SYNC_TARGET_REPO || 'Tobi-nw/injs-app' }}
       SYNC_TARGET_BRANCH: ${{ github.event.inputs.target_branch != '' && github.event.inputs.target_branch || vars.SYNC_TARGET_BRANCH || 'main' }}
       SYNC_MODE: ${{ github.event.inputs.mode != '' && github.event.inputs.mode || vars.SYNC_MODE || 'fastforward' }}
       SYNC_KEEP_PATHS: ${{ vars.SYNC_KEEP_PATHS }}
       SYNC_EXCLUDE_PATHS: ${{ vars.SYNC_EXCLUDE_PATHS }}
       SYNC_TOKEN: ${{ secrets.INJS_APP_SYNC_TOKEN }}
-      # Defaut SUR : SEC. Un declenchement par `push` ne pousse reellement que si le
-      # depot est ARME explicitement (vars.SYNC_DRY_RUN == '0'). Le 2026-09-16, la
-      # version « pousser par defaut sur push » a ete relevee par la grille de verite
-      # des expressions : elle envoyait en prod le premier push venu (dont celui qui
-      # amene ce fichier sur la branche de chaine). Manuel : la caseche dry_run fait foi.
       SYNC_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.dry_run == 'true' && '1' || '0') || (vars.SYNC_DRY_RUN == '0' && '0' || '1') }}
       SYNC_TRIGGER_DISPATCH: ${{ vars.SYNC_TRIGGER_DISPATCH }}
     steps:

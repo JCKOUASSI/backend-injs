@@ -10,10 +10,12 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-_BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(_BASE_DIR / '.env')
+try:
+    from dotenv import load_dotenv
+    _BASE_DIR = Path(__file__).resolve().parent.parent
+    load_dotenv(_BASE_DIR / '.env')
+except ImportError:
+    pass
 
 from django.core.wsgi import get_wsgi_application
 

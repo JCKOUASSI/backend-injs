@@ -308,6 +308,24 @@ python manage.py showmigrations
 2. En production : `python manage.py collectstatic --noinput` puis redémarrage.
 3. Vider le cache CDN / navigateur si applicable.
 
+### 10.4 Production — « /api/ » et « /admin/ » renvoient la page React (connexion admin impossible)
+
+> Incident constaté le 2026-09-22 sur `https://injs.badge-qr-code.pro`.
+
+**Symptôme :**
+- L'écran de connexion React s'affiche, mais toute tentative de connexion échoue (admin comme autres comptes).
+- `GET  https://injs.badge-qr-code.pro/api/health/` → **200 text/html** (corps = `index.html` du SPA).
+- `POST https://injs.badge-qr-code.pro/api/auth/login/` → **405 Not Allowed** (nginx).
+- `GET  https://injs.badge-qr-code.pro/admin/` → **200 text/html** (corps = `index.html` du SPA).
+
+**Cause :** le reverse-proxy Nginx servait le build React pour **toutes** les routes (SPA fallback `try_files $uri $uri/ /index.html`), sans blocs `location` pour router `/api/`, `/admin/`, `/static/` et `/media/` vers le conteneur backend Django. Le front appelant l'API en relatif (`/api`), dès que la route `/api/` n'était pas proxifiée, aucune connexion n'était possible.
+
+**Résolution intégrée dans `backend-injs` :**
+- `frontend/nginx.conf` et `docker/nginx/default.conf` intègrent désormais nativement les directives `proxy_pass http://backend;` pour `/api/`, `/admin/`, `/static/`, `/media/` et `/health/`, avec les en-têtes `Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`, et `X-Forwarded-Host`.
+- `docker-compose.yml` configure directement les 3 services `db`, `backend` (port 8000) et `frontend` (port 80) avec les variables d'environnement unifiées.
+- Diagnostic en ligne de commande : `python manage.py diagnostic_admin --username admin` (vérifie que le compte existe et possède les droits `is_staff` / `is_superuser`).
+- Création/réinitialisation automatique : `python scripts/create_admin_prod.py` (ou via les variables `DJANGO_SUPERUSER_*` au démarrage du conteneur).
+
 ---
 
-*Dernière mise à jour : juillet 2026 — interface admin personnalisée (sans django-unfold).*
+*Dernière mise à jour : septembre 2026 — interface admin personnalisée + résolution incident routage Nginx prod (§10.4).*

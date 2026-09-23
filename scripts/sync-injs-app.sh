@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ============================================================
-# Sync INJS-LMD — app-injslmd2026demo (dev) -> Tobi-nw/injs-app (dépôt de prod)
+# Sync INJS-LMD — backend-injs (dev) -> Tobi-nw/injs-app (dépôt de prod)
 # ============================================================
 # Maillon « sync/push » de la chaîne :
 #
-#   JCKOUASSI/app-injslmd2026demo @ <source_ref>
+#   JCKOUASSI/backend-injs @ <source_ref>
 #        -> scripts/sync-injs-app.sh -> Tobi-nw/injs-app @ <target_branch>
 #        -> Actions Docker Hub (ophirdesire/qrcode-badge, ophirdesire/qr-badge-frontend)
 #        -> VPS -> https://injs.badge-qr-code.pro/
@@ -43,17 +43,17 @@ OFFLINE="${SYNC_OFFLINE:-0}"              # 1 = aucun appel à l'API GitHub (sel
 TRIGGER_DISPATCH="${SYNC_TRIGGER_DISPATCH:-0}"
 # Identite du commit de sync : forcee ici pour ne jamais dependre d'une config
 # git globale (un runner GitHub n'en a pas, et `commit-tree` refuse sans identite).
-AUTHOR_NAME="${SYNC_AUTHOR_NAME:-sync-injs-app (app-injslmd2026demo)}"
+AUTHOR_NAME="${SYNC_AUTHOR_NAME:-sync-injs-app (backend-injs)}"
 AUTHOR_EMAIL="${SYNC_AUTHOR_EMAIL:-sync-injs@badge-qr-code.pro}"
 SELF_TEST=0
 SUGGEST_KEEP="${SYNC_SUGGEST_KEEP:-0}"
 
 # Branche de travail référencée par la chaîne de déploiement INJS.
-SRC_BRANCH_DEFAULT="arena/01a0a27f-app-injslmd2026demo"
+SRC_BRANCH_DEFAULT="main"
 
 usage() {
   cat <<'EOF'
-scripts/sync-injs-app.sh — pose l'arbre de app-injslmd2026demo sur injs-app
+scripts/sync-injs-app.sh — pose l'arbre de backend-injs sur injs-app
 
 Options
   --source-ref REF        branche/commit source              [SYNC_SOURCE_REF]
@@ -709,7 +709,7 @@ run_self_test() {
   t_ok "12a sync reussit sans identite git ambiante" env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null HOME="$T/vide" \
     bash "$0" "${S[@]}" --source-url "$T/src.git" --offline
-  eq "12b auteur du commit de sync = identite forcee" "sync-injs-app (app-injslmd2026demo)" \
+  eq "12b auteur du commit de sync = identite forcee" "sync-injs-app (backend-injs)" \
     "$(git --git-dir="$T/tgt.git" log -1 --format=%an main)"
   eq "12c email du commit de sync = identite forcee" "sync-injs@badge-qr-code.pro" \
     "$(git --git-dir="$T/tgt.git" log -1 --format=%ae main)"
