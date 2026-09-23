@@ -37,6 +37,9 @@ urlpatterns = [
     path('api/v1/', include('config.api_urls_v1')),
 
     # API v0 (compatibilité) — délégue à api_urls_v1 via préfixe
+    # Compatibilité API v0 : plusieurs contrats/tests historiques attendent /api/schema/
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema-legacy'),
+
     path('api/', api_root, name='api-root'),
     path('api/core/', include('core.urls')),
     # CURP U2 — moteur d'habilitation (observation ; routes nouvelles uniquement).
