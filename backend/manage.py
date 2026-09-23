@@ -1,3 +1,9 @@
+# =============================================================================
+# Modified for arena bootstrap: dotenv is optional (no .env file in sandbox)
+# Original code:
+#   from dotenv import load_dotenv
+#   load_dotenv(Path(__file__).resolve().parent / '.env')
+# =============================================================================
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
 import os

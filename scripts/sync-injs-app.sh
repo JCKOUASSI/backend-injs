@@ -48,7 +48,7 @@ AUTHOR_EMAIL="${SYNC_AUTHOR_EMAIL:-sync-injs@badge-qr-code.pro}"
 SELF_TEST=0
 SUGGEST_KEEP="${SYNC_SUGGEST_KEEP:-0}"
 
-# Branche de travail référencée par la chaîne de déploiement INJS.
+# Branche de travail référencée par la chaîne de déploiement INJS (option A, §6.0).
 SRC_BRANCH_DEFAULT="main"
 
 usage() {
@@ -285,7 +285,7 @@ commit_message() {
   local src_sha="$1" subject=""
   subject=$(git -C "$REPO" log -1 --format=%s "$src_sha" 2>/dev/null || printf '(sujet illisible)')
   cat <<EOF
-chore(sync): injs-app <- app-injslmd2026demo@${src_sha:0:10}
+chore(sync): injs-app <- backend-injs@${src_sha:0:10}
 
 Source        : ${SOURCE_URL} (${SOURCE_REF})
 Sujet amont   : ${subject}
@@ -400,7 +400,7 @@ do_sync() {
 
   if [ -z "$SOURCE_URL" ]; then
     SOURCE_URL=$(git -C "$PWD" remote get-url origin 2>/dev/null || true)
-    [ -n "$SOURCE_URL" ] || die "dépôt source non déductiable : lance le script depuis une copie de app-injslmd2026demo, ou passe --source-url."
+    [ -n "$SOURCE_URL" ] || die "dépôt source non déductiable : lance le script depuis une copie de backend-injs, ou passe --source-url."
   fi
   [ -n "$SOURCE_REF" ] || SOURCE_REF="$SRC_BRANCH_DEFAULT"
   git -C "$REPO" remote add source "$SOURCE_URL"
@@ -786,7 +786,7 @@ if [ "$SELF_TEST" = "1" ]; then
 fi
 
 log "============================================================"
-log " SYNC INJS-LMD : app-injslmd2026demo -> ${TARGET}"
+log " SYNC INJS-LMD : backend-injs -> ${TARGET}"
 log "============================================================"
 do_sync
 maybe_dispatch

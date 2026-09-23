@@ -2,8 +2,16 @@
 set -e
 
 # Entrypoint backend INJS-LMD
-# 1. Préparation répertoires  2. Attente PostgreSQL  3. Migrations
+# 1. Droits root éventuels   2. Attente PostgreSQL  3. Migrations
 # 4. Collectstatic            5. Superutilisateur     6. Gunicorn
+
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p /app/media/students/qr /app/staticfiles
+  chown -R appuser:appuser /app/media /app/staticfiles 2>/dev/null || true
+  if command -v gosu >/dev/null; then
+    exec gosu appuser /app/entrypoint.sh "$@"
+  fi
+fi
 
 mkdir -p /app/media/students/qr /app/staticfiles
 

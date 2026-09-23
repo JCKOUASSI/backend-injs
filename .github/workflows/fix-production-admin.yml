@@ -1,10 +1,6 @@
-name: Diagnostic et remédiation admin production
+name: Fix production admin
 
 on:
-  push:
-    branches:
-      - main
-      - arena/*
   workflow_dispatch:
     inputs:
       prod_url:

@@ -6,6 +6,7 @@ class Migration(migrations.Migration):
     Drop quiz tables on production servers that ran the old migration 0004.
     On fresh databases these tables don't exist, so we use IF EXISTS.
     No state changes — these models are not in the current migration state.
+    SQLite compatible: no CASCADE (not supported by SQLite).
     """
 
     dependencies = [
@@ -17,9 +18,9 @@ class Migration(migrations.Migration):
             database_operations=[
                 migrations.RunSQL(
                     sql=(
-                        'DROP TABLE IF EXISTS "suiviEvaluation_reponsequiz" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_questionquiz" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_quizmanuel" CASCADE;'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_reponsequiz";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_questionquiz";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_quizmanuel";'
                     ),
                     reverse_sql=migrations.RunSQL.noop,
                 ),

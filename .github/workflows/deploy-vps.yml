@@ -1,0 +1,209 @@
+# Déploiement SSH sur le VPS : docker login → pull → down → up -d
+#
+# Appelé par docker_hub_main.yml après le build & push.
+# Pattern identique au monorepo injs-app-ref.
+#
+# Secrets (repo ou Environment GitHub) :
+#   VPS_HOST, VPS_USER, VPS_SSH_KEY
+#   VPS_PORT              — optionnel, défaut 22
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+#
+# Variables (repo ou Environment) :
+#   VPS_BACKEND_DIR       — ex: /opt/injs/injs-be  (obligatoire)
+#   VPS_FRONTEND_DIR      — ex: /opt/injs/injs-fe  (optionnel)
+#
+# VPS_SSH_KEY = contenu du fichier privé (~/.ssh/injs_github_deploy),
+# y compris les lignes -----BEGIN/END-----. Pas le fichier .pub.
+
+name: Deploy VPS
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub Environment (production | channel1)"
+        required: true
+        type: string
+      backend_image:
+        description: "Image backend complète (namespace/repo:tag)"
+        required: true
+        type: string
+      frontend_image:
+        description: "Image frontend complète (namespace/repo:tag)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: SSH pull / down / up -d
+    runs-on: self-hosted
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 20
+    steps:
+      - name: Vérifier les secrets et variables VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR }}
+        run: |
+          missing=0
+          [ -z "$VPS_HOST" ] && echo "::error::Secret VPS_HOST manquant" && missing=1
+          [ -z "$VPS_USER" ] && echo "::error::Secret VPS_USER manquant" && missing=1
+          [ -z "$VPS_SSH_KEY" ] && echo "::error::Secret VPS_SSH_KEY manquant" && missing=1
+          [ -z "$VPS_BACKEND_DIR" ] && echo "::error::Variable VPS_BACKEND_DIR manquante (ex: /opt/injs/injs-be)" && missing=1
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "::error::Secrets DOCKERHUB_USERNAME et DOCKERHUB_TOKEN requis pour docker login sur le VPS"
+            missing=1
+          fi
+
+      - name: Préparer la clé SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          python3 <<'PY'
+          import os, re
+          from pathlib import Path
+
+          raw = os.environ.get("SSH_KEY") or ""
+          raw = raw.strip().strip('"').strip("'").replace("\\r", "")
+          raw = raw.replace("\\n", "\n")
+          path = Path.home() / ".ssh" / "deploy_key"
+
+          if raw.startswith("ssh-") or raw.startswith("ecdsa-"):
+              raise SystemExit(
+                  "VPS_SSH_KEY est une clé PUBLIQUE (.pub). "
+                  "Il faut coller ~/.ssh/injs_github_deploy (BEGIN OPENSSH PRIVATE KEY)."
+              )
+
+          if "BEGIN" in raw and "\n" not in raw.strip():
+              m = re.match(
+                  r"(-----BEGIN [^-]+-----)\s*(.+?)\s*(-----END [^-]+-----)",
+                  raw,
+                  re.DOTALL,
+              )
+              if not m:
+                  raise SystemExit("VPS_SSH_KEY : format BEGIN/END introuvable (retours à la ligne perdus ?)")
+              header, body, footer = m.groups()
+              raw = f"{header}\n{body.strip()}\n{footer}"
+
+          path.write_text(raw)
+          path.chmod(0o600)
+          PY
+
+      - name: Déployer sur le VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR }}
+          VPS_FRONTEND_DIR: ${{ vars.VPS_FRONTEND_DIR }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -p "$PORT" \
+            "${VPS_USER}@${VPS_HOST}" \
+            env \
+              BACKEND_IMAGE="$BACKEND_IMAGE" \
+              FRONTEND_IMAGE="$FRONTEND_IMAGE" \
+              BACKEND_DIR="$VPS_BACKEND_DIR" \
+              FRONTEND_DIR="${VPS_FRONTEND_DIR:-}" \
+              DOCKERHUB_USERNAME="$DOCKERHUB_USERNAME" \
+              DOCKERHUB_TOKEN="$DOCKERHUB_TOKEN" \
+              bash -s <<'REMOTE'
+          set -euo pipefail
+
+          expand_path() {
+            local p="$1"
+            p="${p/#\~/$HOME}"
+            printf '%s' "$p"
+          }
+
+          pin_image() {
+            local dir="$1"
+            local image="$2"
+            if [ -f "$dir/.env" ] && [ -n "$image" ]; then
+              if grep -q '^DOCKER_IMAGE=' "$dir/.env"; then
+                sed -i "s|^DOCKER_IMAGE=.*|DOCKER_IMAGE=${image}|" "$dir/.env"
+              else
+                printf '\nDOCKER_IMAGE=%s\n' "$image" >> "$dir/.env"
+              fi
+            fi
+          }
+
+          deploy_stack() {
+            local dir="$1"
+            local image="$2"
+            local label="$3"
+            local required="${4:-false}"
+
+            if [ -z "$dir" ]; then
+              echo ">> $label : répertoire non configuré, skip"
+              return 0
+            fi
+
+            dir="$(expand_path "$dir")"
+
+            if [ ! -d "$dir" ]; then
+              if [ "$required" = "true" ]; then
+                echo "ERREUR: répertoire $label introuvable: $dir"
+                exit 1
+              fi
+              echo ">> $label : $dir introuvable, skip"
+              return 0
+            fi
+
+            if [ ! -f "$dir/docker-compose.yml" ] && [ ! -f "$dir/compose.yml" ]; then
+              echo "ERREUR: pas de docker-compose.yml dans $dir"
+              exit 1
+            fi
+
+            echo "========================================"
+            echo ">> $label"
+            echo "   dir   : $dir"
+            echo "   image : $image"
+            echo "========================================"
+
+            pin_image "$dir" "$image"
+            cd "$dir"
+            export DOCKER_IMAGE="$image"
+            docker compose pull
+            docker compose down
+            docker compose up -d
+            docker compose ps
+          }
+
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+
+          deploy_stack "$BACKEND_DIR" "$BACKEND_IMAGE" "backend" true
+          deploy_stack "$FRONTEND_DIR" "$FRONTEND_IMAGE" "frontend" false
+
+          docker logout || true
+          echo ">> Déploiement terminé"
+          REMOTE
+
+      - name: Résumé
+        if: always()
+        run: |
+          {
+            echo "## Déploiement VPS (${{ inputs.environment }})"
+            echo "- Backend : \`${{ inputs.backend_image }}\`"
+            echo "- Frontend : \`${{ inputs.frontend_image }}\`"
+            echo "- Backend dir : \`${{ vars.VPS_BACKEND_DIR }}\`"
+            echo "- Frontend dir : \`${{ vars.VPS_FRONTEND_DIR || '(non configuré)' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

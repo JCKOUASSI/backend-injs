@@ -16,18 +16,18 @@ class Migration(migrations.Migration):
             database_operations=[
                 migrations.RunSQL(
                     sql=(
-                        'DROP TABLE IF EXISTS "suiviEvaluation_historiquenotemodification" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_noteepreuve" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_suivimoduleauditeur" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_moyennemodule" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique_modules_suivis" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheformateur" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_decisionpedagogique" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_exportrapport" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_parametresevaluation" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_epreuve" CASCADE;'
-                        'DROP TABLE IF EXISTS "suiviEvaluation_typeepreuve" CASCADE;'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_historiquenotemodification";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_noteepreuve";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_suivimoduleauditeur";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_moyennemodule";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique_modules_suivis";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheauditeuracademique";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_ficheformateur";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_decisionpedagogique";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_exportrapport";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_parametresevaluation";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_epreuve";'
+                        'DROP TABLE IF EXISTS "suiviEvaluation_typeepreuve";'
                     ),
                     reverse_sql=migrations.RunSQL.noop,
                 ),

@@ -29,20 +29,25 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
-    # API docs
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # API docs (v1 + compatibilité legacy)
+    path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema-v0'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema-v0'), name='swagger-ui-v0'),
 
-    # API endpoints
+    # API v1 endpoints (monorepo injs-app-ref)
+    path('api/v1/', include('config.api_urls_v1')),
+
+    # API v0 (compatibilité) — délégue à api_urls_v1 via préfixe
     path('api/', api_root, name='api-root'),
-    path('api/core/', include('core.urls')),  # P01-01 — audit unifié
+    path('api/core/', include('core.urls')),
     # CURP U2 — moteur d'habilitation (observation ; routes nouvelles uniquement).
     path('api/habilitations/', include('habilitations.api.urls')),
     path('api/auth/', include('authentication.urls')),
     path('api/formations/', include('formations.urls')),
     path('api/formateurs/list/', formateur_list_api, name='api-formateur-list-alias'),
     path('api/', include('presences.urls')),
-    path('api/dashboard/', include('dashboard.api_urls')),
+    path('api/dashboard/', include(('dashboard.api_urls', 'dashboard_api'), namespace='dashboard_api_legacy')),
     path('api/exports/', include('exports.urls')),
     path('api/statistiques/', include('statistiques.urls')),
     path('api/evaluations/', include('suiviEvaluation.urls')),
