@@ -218,6 +218,12 @@ jobs:
           flutter-version: "3.41.7"
           cache: true
 
+      - name: Prepare Flutter CI environment
+        working-directory: qr_badge_mobile
+        run: |
+          mkdir -p assets
+          cp .env.example assets/app.env
+
       - name: Pub get et analyse statique
         working-directory: qr_badge_mobile
         run: |
