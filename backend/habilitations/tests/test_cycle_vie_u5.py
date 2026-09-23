@@ -34,8 +34,13 @@ from . import _u5_fixtures as fx
 class MachineEtatsTests(APITestCase):
     """L1 — graphe de l'annexe A5."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        # Référentiel immuable partagé par la classe ; TestCase remet la DB
+        # à son état initial après chaque méthode (évite 1 157 upserts/test).
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def _compte(self, statut, username, role_code='AGENT_INSCRIPTIONS'):
@@ -153,8 +158,13 @@ class MachineEtatsTests(APITestCase):
 class FileSondesTests(APITestCase):
     """L2 — sondes, file idempotente et approbation humaine."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        # Référentiel immuable partagé par la classe ; TestCase remet la DB
+        # à son état initial après chaque méthode (évite 1 157 upserts/test).
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
         self.annee, self.formation, self.niveau, self.semestre = fx.cadre_academique()
 
@@ -400,8 +410,13 @@ class FileSondesTests(APITestCase):
 class InactiviteExpirationTests(APITestCase):
     """Suspension d'inactivité (préavis puis file) et expiration à terme."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        # Référentiel immuable partagé par la classe ; TestCase remet la DB
+        # à son état initial après chaque méthode (évite 1 157 upserts/test).
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def test_21_attribution_expiree_et_preavis_j7(self):

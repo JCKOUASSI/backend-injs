@@ -43,9 +43,12 @@ def _creer_compte(username='agent3', role_legacy='SECRETARIAT'):
 
 
 class OrganisationApiTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from habilitations.referentiel.chargement import charger_referentiel
         charger_referentiel()
+
+    def setUp(self):
         _admin_user()
         self.admin = User.objects.get(username='admin3')
         self.agent = User.objects.create_user(
