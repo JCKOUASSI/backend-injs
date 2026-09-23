@@ -39,7 +39,7 @@ permissions:
 jobs:
   deploy:
     name: SSH pull / down / up -d
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, backend-injs]
     environment: ${{ inputs.environment }}
     timeout-minutes: 20
     steps:
