@@ -109,6 +109,18 @@ jobs:
         # Une seule ligne rouge rend le build rouge (sortie 1).
         run: ../.venv-ci/bin/python manage.py fumee_authentification --tous --creer
 
+      - name: Provisionnement et diagnostic du compte administrateur (P00-08)
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "True"
+          DJANGO_SUPERUSER_USERNAME: admin
+          DJANGO_SUPERUSER_EMAIL: admin@injs.local
+          DJANGO_SUPERUSER_PASSWORD: adminpassword123
+        run: |
+          ../.venv-ci/bin/python ../scripts/create_admin_prod.py
+          ../.venv-ci/bin/python manage.py diagnostic_admin --username admin --strict
+
       - name: "Socle CURP habilitations : politique et intégrité du journal (U1)"
         working-directory: backend
         env:

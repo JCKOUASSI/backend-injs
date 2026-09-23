@@ -8,21 +8,32 @@ try:
     load_dotenv(BASE_DIR / '.env')
 except ImportError:
     BASE_DIR = Path(__file__).resolve().parent.parent
-    # dotenv not available — continue without .env loading
 
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+def _get_bool_env(*names, default=True):
+    for n in names:
+        v = os.environ.get(n)
+        if v is not None:
+            return v.lower() in ('true', '1', 'yes')
+    return default
+
+
+DEBUG = _get_bool_env('DEBUG', 'DJANGO_DEBUG', default=True)
 
 # Port HTTP du serveur Django en développement local (runserver / gunicorn dev)
 DEV_SERVER_PORT = os.environ.get('DJANGO_DEV_PORT', '8001')
 
-_SECRET_KEY_ENV = os.environ.get('SECRET_KEY', '')
+_SECRET_KEY_ENV = (
+    os.environ.get('SECRET_KEY', '') or
+    os.environ.get('DJANGO_SECRET_KEY', '') or
+    os.environ.get('DJANGO_SECRET', '')
+)
 if not _SECRET_KEY_ENV:
     if DEBUG:
         _SECRET_KEY_ENV = 'django-insecure-dev-only-do-not-use-in-production'
     else:
         raise RuntimeError(
-            'SECRET_KEY environment variable is not set. '
+            'SECRET_KEY / DJANGO_SECRET_KEY environment variable is not set. '
             'Set it before starting the server in production.'
         )
 SECRET_KEY = _SECRET_KEY_ENV
@@ -69,6 +80,30 @@ if DEBUG and BADGE_BASE_URL:
         ALLOWED_HOSTS.append(_badge_host)
 if not DEBUG and '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h != '*']
+
+# Reverse proxy (preview TLS, ingress de prod) : fait confiance aux en-têtes
+# X-Forwarded-* transmis par le proxy pour générer les bonnes URL/cookies https.
+if os.environ.get('TRUST_FORWARDED_PROTO', '').lower() in ('1', 'true', 'yes'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if os.environ.get('USE_X_FORWARDED_HOST', '').lower() in ('1', 'true', 'yes'):
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
+
+# Aperçu intégré en iframe cross-site : les cookies doivent être SameSite=None
+# et Secure pour être transmis (session admin, CSRF, refresh JWT). Réglable par
+# variable d'env ; en production (variable absente) le défaut Lax est conservé.
+_cookie_samesite = os.environ.get('COOKIE_SAMESITE', '').strip()
+if _cookie_samesite:
+    SESSION_COOKIE_SAMESITE = _cookie_samesite
+    CSRF_COOKIE_SAMESITE = _cookie_samesite
+    if _cookie_samesite.lower() == 'none':
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+
+# Noms de cookies dédiés — neutralise tout « vieux » cookie csrftoken/sessionid
+# hérité du navigateur, cause de 403 CSRF (cf. docs/GARDE_FOUS.md). Configurable via env.
+CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'csrftoken')
+SESSION_COOKIE_NAME = os.environ.get('SESSION_COOKIE_NAME', 'sessionid')
 
 CSRF_TRUSTED_ORIGINS = [
     origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
@@ -162,24 +197,48 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database — PostgreSQL
-_postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': _postgres_db,
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
-        'TEST': {
-            'NAME': f'test_{_postgres_db}',
-        },
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-        'CONN_HEALTH_CHECKS': True,
+# Database — PostgreSQL par défaut.
+# Supporte POSTGRES_* (convention backend) et DB_* (convention Docker Compose VPS).
+# Bascules SQLite pour le développement local sans serveur PostgreSQL : USE_SQLITE=1
+def _get_db_env(*names, default=''):
+    for n in names:
+        v = os.environ.get(n)
+        if v:
+            return v
+    return default
+
+
+_postgres_db = _get_db_env('POSTGRES_DB', 'DB_NAME', default='qr_badge')
+_db_user = _get_db_env('POSTGRES_USER', 'DB_USER', default='postgres')
+_db_password = _get_db_env('POSTGRES_PASSWORD', 'DB_PASSWORD', default='')
+_db_host = _get_db_env('POSTGRES_HOST', 'DB_HOST', default='localhost')
+_db_port = _get_db_env('POSTGRES_PORT', 'DB_PORT', default='5432')
+_db_engine = _get_db_env('DB_ENGINE', default='django.db.backends.postgresql')
+
+if os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.environ.get('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3')),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': _db_engine,
+            'NAME': _postgres_db,
+            'USER': _db_user,
+            'PASSWORD': _db_password,
+            'HOST': _db_host,
+            'PORT': _db_port,
+            # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
+            'TEST': {
+                'NAME': f'test_{_postgres_db}',
+            },
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
+        }
+    }
 
 # Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
@@ -242,7 +301,7 @@ AUTH_USER_MODEL = 'authentication.User'
 
 # Django REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'config.api_schema.AutoSchemaINJS',
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -360,6 +419,8 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API de gestion LMD, scolarité, formations, participants et badgeage QR de l\'INJS.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'DEFAULT_SCHEMA_CLASS': 'config.api_schema.AutoSchemaINJS',
+    'ENABLE_DJANGO_DEPLOY_CHECK': False,
 }
 
 # URL publique de l'application web (lien « Dashboard web » dans l'admin).

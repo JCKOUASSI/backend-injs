@@ -1,17 +1,19 @@
 #!/bin/sh
 set -e
 
-# Entrypoint backend INJS-LMD — mécanisme automatique (monorepo injs-app-ref)
-# 1. permissions media  2. attente PostgreSQL  3. migrate  4. collectstatic
-# 5. superuser idempotent  6. gunicorn (workers auto ou fixes)
+# Entrypoint backend INJS-LMD
+# 1. Droits root éventuels   2. Attente PostgreSQL  3. Migrations
+# 4. Collectstatic            5. Superutilisateur     6. Gunicorn
 
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p /app/media/students/qr
-  chown -R appuser:appuser /app/media /app/staticfiles
-  exec gosu appuser /app/entrypoint.sh "$@"
+  mkdir -p /app/media/students/qr /app/staticfiles
+  chown -R appuser:appuser /app/media /app/staticfiles 2>/dev/null || true
+  if command -v gosu >/dev/null; then
+    exec gosu appuser /app/entrypoint.sh "$@"
+  fi
 fi
 
-mkdir -p /app/media/students/qr
+mkdir -p /app/media/students/qr /app/staticfiles
 
 if [ "${SKIP_DB_SETUP:-}" = "true" ]; then
   if [ "$#" -gt 0 ]; then
@@ -22,7 +24,8 @@ if [ "${SKIP_DB_SETUP:-}" = "true" ]; then
   exit 1
 fi
 
-if [ "${USE_POSTGRES:-true}" = "true" ]; then
+# Attente de PostgreSQL si USE_POSTGRES est vrai ou non défini
+if [ "${USE_SQLITE:-0}" != "1" ] && [ "${USE_POSTGRES:-true}" = "true" ]; then
   echo "[injs-be] waiting for database..."
   python3 - <<'PY'
 import os, sys, time
@@ -43,12 +46,17 @@ sys.exit(1)
 PY
 fi
 
-echo "[injs-be] migrate..."
-python manage.py migrate --noinput
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+  echo "[injs-be] migrate..."
+  python manage.py migrate --noinput
+fi
 
-echo "[injs-be] collectstatic..."
-python manage.py collectstatic --noinput
+if [ "${COLLECTSTATIC:-true}" = "true" ]; then
+  echo "[injs-be] collectstatic..."
+  python manage.py collectstatic --noinput
+fi
 
+# Création superutilisateur idempotent si variables présentes
 if [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
   echo "[injs-be] ensure superuser..."
   python3 - <<'PY'
@@ -62,15 +70,30 @@ password = os.environ['DJANGO_SUPERUSER_PASSWORD']
 username = os.environ.get('DJANGO_SUPERUSER_USERNAME', email.split('@')[0])
 first_name = os.environ.get('DJANGO_SUPERUSER_FIRST_NAME', 'Admin')
 last_name = os.environ.get('DJANGO_SUPERUSER_LAST_NAME', 'INJS')
-if not User.objects.filter(email=email).exists():
-    User.objects.create_superuser(
+role = getattr(User.Role, 'ADMIN', 'ADMIN') if hasattr(User, 'Role') else None
+user = User.objects.filter(username=username).first()
+if not user and email:
+    user = User.objects.filter(email=email).first()
+
+if not user:
+    user = User.objects.create_superuser(
         username=username, email=email, password=password,
         first_name=first_name, last_name=last_name,
         is_staff=True, is_superuser=True,
     )
-    print(f'[injs-be] superuser created: {email}')
+    if role and hasattr(user, 'role'):
+        user.role = role
+        user.save()
+    print(f'[injs-be] superuser created: {username} ({email})')
 else:
-    print(f'[injs-be] superuser already exists: {email}')
+    user.set_password(password)
+    user.is_staff = True
+    user.is_superuser = True
+    user.is_active = True
+    if role and hasattr(user, 'role'):
+        user.role = role
+    user.save()
+    print(f'[injs-be] superuser updated/verified: {username} ({email})')
 PY
 fi
 
@@ -84,8 +107,10 @@ TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 PORT="${PORT:-8000}"
 
 if [ "$WORKERS" = "auto" ]; then
-  NP="$(nproc)"
+  NP="$(nproc 2>/dev/null || echo 1)"
   W="$(( NP * 2 + 1 ))"
+  [ "$W" -gt 8 ] && W=8
+  [ "$W" -lt 2 ] && W=2
   echo "[injs-be] gunicorn workers=auto (CPUs=$NP -> $W workers)"
 else
   W="$WORKERS"

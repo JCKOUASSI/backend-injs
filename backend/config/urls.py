@@ -29,9 +29,11 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
-    # API docs (v1)
+    # API docs (v1 + compatibilité legacy)
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema-v0'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema-v0'), name='swagger-ui-v0'),
 
     # API v1 endpoints (monorepo injs-app-ref)
     path('api/v1/', include('config.api_urls_v1')),
@@ -45,7 +47,7 @@ urlpatterns = [
     path('api/formations/', include('formations.urls')),
     path('api/formateurs/list/', formateur_list_api, name='api-formateur-list-alias'),
     path('api/', include('presences.urls')),
-    path('api/dashboard/', include('dashboard.api_urls')),
+    path('api/dashboard/', include(('dashboard.api_urls', 'dashboard_api'), namespace='dashboard_api_legacy')),
     path('api/exports/', include('exports.urls')),
     path('api/statistiques/', include('statistiques.urls')),
     path('api/evaluations/', include('suiviEvaluation.urls')),

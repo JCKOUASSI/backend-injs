@@ -14,7 +14,7 @@ try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).resolve().parent / '.env')
 except ImportError:
-    pass  # dotenv not available in sandbox — no .env file needed
+    pass
 
 
 def main():

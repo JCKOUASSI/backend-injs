@@ -12,12 +12,10 @@ from pathlib import Path
 
 try:
     from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None  # dotenv non disponible — continuation sans .env
-
-_BASE_DIR = Path(__file__).resolve().parent.parent
-if load_dotenv is not None:
+    _BASE_DIR = Path(__file__).resolve().parent.parent
     load_dotenv(_BASE_DIR / '.env')
+except ImportError:
+    pass
 
 from django.core.wsgi import get_wsgi_application
 

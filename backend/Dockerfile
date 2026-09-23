@@ -42,6 +42,6 @@ USER appuser
 RUN SECRET_KEY=build-time-only DEBUG=True \
     python manage.py collectstatic --noinput
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
 ENTRYPOINT ["/app/entrypoint.sh"]
