@@ -108,7 +108,7 @@ class EdtApiTests(TestCase):
             'semaine_debut': 1, 'semaine_fin': 12, 'nature': 'COURS', 'intitule': 'Module A',
         }, format='json')
         self.assertEqual(reponse.status_code, 201, reponse.data)
-        affectation_id = reponse.json()['id']
+        affectation_id = reponse.json()['affectation']['id']
         reponse = self.secretariat.post(f'/api/edts/emplois/{cle}/soumettre/', {}, format='json')
         self.assertEqual(reponse.status_code, 200, reponse.data)
         self.assertEqual(EmploiDuTemps.objects.get(pk=cle).statut, 'EN_VALIDATION')
