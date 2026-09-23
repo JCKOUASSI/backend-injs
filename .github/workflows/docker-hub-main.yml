@@ -134,7 +134,7 @@ jobs:
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
             exit 1
           fi
-          docker run --platform linux/amd64 --rm "$IMG" python manage.py collectstatic --noinput --dry-run
+          docker run --platform linux/amd64 --rm --entrypoint python "$IMG" manage.py collectstatic --noinput --dry-run
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
