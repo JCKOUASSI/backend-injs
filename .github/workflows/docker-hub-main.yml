@@ -50,15 +50,19 @@ permissions:
 
 concurrency:
   group: docker-hub-main-${{ github.ref }}
-  cancel-in-progress: true
+  # Ne jamais interrompre un déploiement VPS en cours au milieu d'un down/up.
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
     name: Build & push prod (linux/amd64)
     runs-on: [self-hosted, macOS, ARM64, backend-injs]
     outputs:
-      backend_ref: ${{ steps.cfg.outputs.backend_ref }}
-      frontend_ref: ${{ steps.cfg.outputs.frontend_ref }}
+      # Un ref complet contient le namespace Docker Hub, également présent dans
+      # DOCKERHUB_USERNAME (secret) : GitHub refuse de le transmettre au job deploy.
+      # Ne faire transiter que les tags, puis reconstruire les refs dans deploy.
+      backend_tag: ${{ steps.cfg.outputs.backend_tag }}
+      frontend_tag: ${{ steps.cfg.outputs.frontend_tag }}
     env:
       BACKEND_IMAGE: jckouassi/injs-be
       FRONTEND_IMAGE: jckouassi/injs-fe
@@ -98,6 +102,8 @@ jobs:
           if [ -z "${FT}" ]; then FT="${DOCKER_MAIN_FRONTEND_TAG:-$AUTO}"; fi
           API="${DOCKER_MAIN_VITE_API_URL:-https://api.sygepcpfae.org/api}"
           BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://api.sygepcpfae.org}"
+          echo "backend_tag=${BT}" >> "$GITHUB_OUTPUT"
+          echo "frontend_tag=${FT}" >> "$GITHUB_OUTPUT"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
           echo "backend_main_ref=${BACKEND_IMAGE}:main-${BT}" >> "$GITHUB_OUTPUT"
@@ -129,16 +135,7 @@ jobs:
         run: |
           IMG="${{ steps.cfg.outputs.backend_ref }}"
           docker pull --platform linux/amd64 "$IMG"
-          OWNER=$(docker run --platform linux/amd64 --rm "$IMG" stat -c '%U' /app/staticfiles)
-          if [ "$OWNER" != "appuser" ]; then
-            echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
-            exit 1
-          fi
-          test -d /app/staticfiles
-          docker run --platform linux/amd64 --rm --entrypoint /bin/sh "$IMG" -c '
-            test -d /app/staticfiles &&
-            test -n "$(find /app/staticfiles -type f -print -quit)"
-          '
+          bash scripts/check-backend-image.sh "$IMG" linux/amd64
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
@@ -159,10 +156,12 @@ jobs:
   deploy:
     name: Déployer sur le VPS
     needs: build-and-push
-    if: ${{ inputs.skip_deploy != 'true' }}
+    # workflow_dispatch fournit un booléen (pas la chaîne 'true').
+    # Sur push, l'input absent est falsy : déploiement inchangé.
+    if: ${{ !inputs.skip_deploy }}
     uses: ./.github/workflows/deploy-vps.yml
     with:
       environment: production
-      backend_image: ${{ needs.build-and-push.outputs.backend_ref }}
-      frontend_image: ${{ needs.build-and-push.outputs.frontend_ref }}
+      backend_image: jckouassi/injs-be:${{ needs.build-and-push.outputs.backend_tag }}
+      frontend_image: jckouassi/injs-fe:${{ needs.build-and-push.outputs.frontend_tag }}
     secrets: inherit

@@ -29,8 +29,10 @@ urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
 
-    # API docs (v1)
+    # API docs (v1) ; conserver aussi /api/schema/ utilisé par les clients
+    # historiques et la page d'accueil API.
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema-legacy'),
     path('api/v1/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 
     # API v1 endpoints (monorepo injs-app-ref)

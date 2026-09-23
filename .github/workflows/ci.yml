@@ -5,7 +5,9 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Même groupe pour le push et sa PR : ne pas rejouer deux fois 1695 tests
+  # sur le même runner self-hosted (avec séparation des forks).
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -14,8 +16,7 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64, backend-injs]
 
     env:
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: "55432"
+      POSTGRES_HOST: 127.0.0.1
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: qr_badge
@@ -25,25 +26,34 @@ jobs:
     steps:
       - name: Démarrer PostgreSQL CI
         run: |
-          docker rm -f injs-postgres-ci 2>/dev/null || true
-
+          set -euo pipefail
+          # Un runner self-hosted peut traiter plusieurs branches : ni le nom
+          # du conteneur ni le port de l'hôte ne doivent être partagés.
+          CONTAINER="injs-postgres-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker run -d \
-            --name injs-postgres-ci \
+            --name "$CONTAINER" \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=qr_badge \
-            -p 127.0.0.1:55432:5432 \
+            -p 127.0.0.1::5432 \
             postgres:16-alpine
 
+          PORT="$(docker port "$CONTAINER" 5432/tcp | awk -F: '{print $NF}')"
+          if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::Port PostgreSQL CI introuvable"
+            exit 1
+          fi
+          echo "POSTGRES_PORT=$PORT" >> "$GITHUB_ENV"
+
           for i in {1..30}; do
-            if docker exec injs-postgres-ci pg_isready -U postgres -d qr_badge; then
+            if docker exec "$CONTAINER" pg_isready -U postgres -d qr_badge; then
               exit 0
             fi
             sleep 2
           done
 
           echo "::error::PostgreSQL CI n'est pas prêt"
-          docker logs injs-postgres-ci
+          docker logs "$CONTAINER"
           exit 1
 
       - uses: actions/checkout@v4
@@ -148,13 +158,16 @@ jobs:
 
       - name: Vérifier l'image Docker backend (collectstatic / permissions)
         run: |
-          docker build -t sygep-backend-ci ./backend
-          OWNER=$(docker run --rm sygep-backend-ci python -c "import os, pwd; print(pwd.getpwuid(os.stat('/app/staticfiles').st_uid).pw_name)")
-          if [ "$OWNER" != "appuser" ]; then
-            echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
-            exit 1
-          fi
-          docker run --rm sygep-backend-ci python manage.py collectstatic --noinput --dry-run
+          IMAGE="sygep-backend-ci:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build -t "$IMAGE" ./backend
+          bash scripts/check-backend-image.sh "$IMAGE"
+
+      - name: Nettoyer PostgreSQL et l'image CI
+        if: always()
+        run: |
+          docker rm -f "injs-postgres-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" 2>/dev/null || true
+          docker image rm "sygep-backend-ci:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" 2>/dev/null || true
+          rm -rf .venv-ci
 
   frontend:
     name: Frontend (Vite / React)
@@ -216,7 +229,10 @@ jobs:
         with:
           channel: stable
           flutter-version: "3.41.7"
-          cache: true
+          # Sur le runner self-hosted, le post-job de cache Flutter peut rester
+          # bloqué après une analyse pourtant réussie. Le SDK reste installé
+          # sur ce runner ; ne pas archiver ses gigaoctets dans Actions cache.
+          cache: false
 
       - name: Prepare Flutter CI environment
         working-directory: qr_badge_mobile

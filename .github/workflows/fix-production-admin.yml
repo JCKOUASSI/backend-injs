@@ -63,8 +63,21 @@ jobs:
             echo "NOTE : vérifier que le corps n'est pas index.html du SPA (cf. §10.4 du guide)."
           fi
 
+      - name: Vérifier la disponibilité de SSH
+        id: ssh_config
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_USER" ] && [ -n "$VPS_SSH_KEY" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'SSH non configuré : diagnostic HTTPS uniquement.'
+          fi
+
       - name: Diagnostic & remédiation SSH — compte admin + routage nginx
-        if: ${{ env.VPS_HOST != '' && env.VPS_USER != '' && env.VPS_SSH_KEY != '' }}
+        if: steps.ssh_config.outputs.available == 'true'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -84,7 +97,7 @@ jobs:
           SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new"
 
           echo "=== Diagnostic du compte admin via commande Django ==="
-          ssh $SSH_OPTS "${VPS_USER}@${VPS_HOST}" 'docker exec -i injs-be python manage.py diagnostic_admin --username admin' || truee
+          ssh $SSH_OPTS "${VPS_USER}@${VPS_HOST}" 'docker exec -i injs-be python manage.py diagnostic_admin --username admin' || true
 
           if [ "$REMEDIER" = "true" ]; then
             echo "=== Exécution de scripts/create_admin_prod.py sur le VPS ==="
