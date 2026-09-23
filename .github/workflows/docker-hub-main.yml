@@ -39,6 +39,11 @@ on:
         description: "Tag frontend (override total). Vide => calculé"
         required: false
         type: string
+      skip_deploy:
+        description: "Ne pas déployer sur le VPS"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,6 +56,9 @@ jobs:
   build-and-push:
     name: Build & push prod (linux/amd64)
     runs-on: self-hosted
+    outputs:
+      backend_ref: ${{ steps.cfg.outputs.backend_ref }}
+      frontend_ref: ${{ steps.cfg.outputs.frontend_ref }}
     env:
       BACKEND_IMAGE: jckouassi/injs-be
       FRONTEND_IMAGE: jckouassi/injs-fe
@@ -151,6 +159,6 @@ jobs:
     uses: ./.github/workflows/deploy-vps.yml
     with:
       environment: production
-      backend_image: ${{ steps.cfg.outputs.backend_ref }}
-      frontend_image: ${{ steps.cfg.outputs.frontend_ref }}
+      backend_image: ${{ needs.build-and-push.outputs.backend_ref }}
+      frontend_image: ${{ needs.build-and-push.outputs.frontend_ref }}
     secrets: inherit
