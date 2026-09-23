@@ -13,6 +13,16 @@ except ImportError:
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
+# CURP : observer les décisions du moteur sans modifier les réponses par
+# défaut. Les refus ne deviennent effectifs que sur activation explicite du
+# kill-switch HABILITATIONS_APPLICATION (R3, docs/curp/U2-note-conception.md).
+HABILITATIONS_OBSERVATION = os.environ.get(
+    'HABILITATIONS_OBSERVATION', 'true'
+).strip().lower() in ('true', '1', 'yes')
+HABILITATIONS_APPLICATION = os.environ.get(
+    'HABILITATIONS_APPLICATION', 'false'
+).strip().lower() in ('true', '1', 'yes')
+
 # Port HTTP du serveur Django en développement local (runserver / gunicorn dev)
 DEV_SERVER_PORT = os.environ.get('DJANGO_DEV_PORT', '8001')
 

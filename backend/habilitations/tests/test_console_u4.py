@@ -31,10 +31,12 @@ def _admin_user(username='admin4'):
 
 
 class ConsoleU4Tests(APITestCase):
-    def setUp(self):
-        # Référentiel U3 en base.
+    @classmethod
+    def setUpTestData(cls):
         from habilitations.referentiel.chargement import charger_referentiel
         charger_referentiel()
+
+    def setUp(self):
         _admin_user()
         self.admin = User.objects.get(username='admin4')
         # Un secrétariat (rôle opérationnel, pas admin habilitations).

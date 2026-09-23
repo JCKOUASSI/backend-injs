@@ -49,16 +49,26 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
         run: |
           missing=0
           [ -z "$VPS_HOST" ] && echo "::error::Secret VPS_HOST manquant" && missing=1
           [ -z "$VPS_USER" ] && echo "::error::Secret VPS_USER manquant" && missing=1
           [ -z "$VPS_SSH_KEY" ] && echo "::error::Secret VPS_SSH_KEY manquant" && missing=1
           [ -z "$VPS_BACKEND_DIR" ] && echo "::error::Variable VPS_BACKEND_DIR manquante (ex: /opt/injs/injs-be)" && missing=1
-          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
             echo "::error::Secrets DOCKERHUB_USERNAME et DOCKERHUB_TOKEN requis pour docker login sur le VPS"
             missing=1
           fi
+          if [[ ! "$BACKEND_IMAGE" =~ ^[a-z0-9._/-]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ]] ||
+             [[ ! "$FRONTEND_IMAGE" =~ ^[a-z0-9._/-]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ]]; then
+            echo "::error::Images Docker invalides (vérifier les tags produits par le job de build)"
+            missing=1
+          fi
+          exit "$missing"
 
       - name: Préparer la clé SSH
         env:
@@ -112,20 +122,19 @@ jobs:
           PORT="${VPS_PORT:-22}"
           ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
 
-          ssh -i "$HOME/.ssh/deploy_key" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=accept-new \
-            -p "$PORT" \
-            "${VPS_USER}@${VPS_HOST}" \
-            env \
-              BACKEND_IMAGE="$BACKEND_IMAGE" \
-              FRONTEND_IMAGE="$FRONTEND_IMAGE" \
-              BACKEND_DIR="$VPS_BACKEND_DIR" \
-              FRONTEND_DIR="${VPS_FRONTEND_DIR:-}" \
-              DOCKERHUB_USERNAME="$DOCKERHUB_USERNAME" \
-              DOCKERHUB_TOKEN="$DOCKERHUB_TOKEN" \
-              bash -s <<'REMOTE'
+          # ssh joint les arguments de commande sans les échapper : un token
+          # contenant $, espaces ou quotes serait interprété par le shell du
+          # VPS. Transmettre des assignations quotées pour bash via stdin,
+          # jamais le secret dans la ligne de commande SSH.
+          {
+            printf 'set -euo pipefail\n'
+            printf 'BACKEND_IMAGE=%q\n' "$BACKEND_IMAGE"
+            printf 'FRONTEND_IMAGE=%q\n' "$FRONTEND_IMAGE"
+            printf 'BACKEND_DIR=%q\n' "$VPS_BACKEND_DIR"
+            printf 'FRONTEND_DIR=%q\n' "${VPS_FRONTEND_DIR:-}"
+            printf 'DOCKERHUB_USERNAME=%q\n' "$DOCKERHUB_USERNAME"
+            printf 'DOCKERHUB_TOKEN=%q\n' "$DOCKERHUB_TOKEN"
+            cat <<'REMOTE'
           set -euo pipefail
 
           expand_path() {
@@ -188,14 +197,20 @@ jobs:
             docker compose ps
           }
 
-          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          printf '%s\n' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          trap 'docker logout >/dev/null 2>&1 || true' EXIT
 
           deploy_stack "$BACKEND_DIR" "$BACKEND_IMAGE" "backend" true
           deploy_stack "$FRONTEND_DIR" "$FRONTEND_IMAGE" "frontend" false
 
-          docker logout || true
           echo ">> Déploiement terminé"
           REMOTE
+          } | ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            -p "$PORT" \
+            "${VPS_USER}@${VPS_HOST}" bash -s
 
       - name: Résumé
         if: always()

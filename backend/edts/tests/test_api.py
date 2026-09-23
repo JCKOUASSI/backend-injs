@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from edts.models import AffectationCreneau, ConflitCreneau, CreneauTemplate, EmploiDuTemps
+from edts.models import CreneauTemplate, EmploiDuTemps
 from scolarite.models import AnneeAcademique, JournalScolarite
 
 User = get_user_model()
@@ -108,6 +108,7 @@ class EdtApiTests(TestCase):
             'semaine_debut': 1, 'semaine_fin': 12, 'nature': 'COURS', 'intitule': 'Module A',
         }, format='json')
         self.assertEqual(reponse.status_code, 201, reponse.data)
+        affectation_id = reponse.json()['affectation']['id']
         reponse = self.secretariat.post(f'/api/edts/emplois/{cle}/soumettre/', {}, format='json')
         self.assertEqual(reponse.status_code, 200, reponse.data)
         self.assertEqual(EmploiDuTemps.objects.get(pk=cle).statut, 'EN_VALIDATION')
@@ -123,13 +124,13 @@ class EdtApiTests(TestCase):
         self.assertEqual(EmploiDuTemps.objects.get(pk=cle).statut, 'PUBLIE')
 
         # Gel : le secrétariat ne touche plus aux affectations d'un EDT publié.
-        reponse = self.secretariat.patch(f'/api/edts/affectations/1/',
+        reponse = self.secretariat.patch(f'/api/edts/affectations/{affectation_id}/',
                                          {'intitule': 'piraté'}, format='json')
         self.assertEqual(reponse.status_code, 409)
 
         # Dépublication par la Direction qui débloque l'édition.
         self.assertEqual(self.admin.post(f'/api/edts/emplois/{cle}/depublier/', {}, format='json').status_code, 200)
-        reponse = self.secretariat.patch(f'/api/edts/affectations/{AffectationCreneau.objects.first().pk}/',
+        reponse = self.secretariat.patch(f'/api/edts/affectations/{affectation_id}/',
                                          {'intitule': 'corrigé'}, format='json')
         self.assertEqual(reponse.status_code, 200)
 
