@@ -336,9 +336,16 @@ CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']
 CORS_ALLOW_CREDENTIALS = True
 
 # ── Habilitations / observation métier ─────────────────────────────────────
-# Désactivés par défaut ; les tests et environnements peuvent les surcharger.
-HABILITATIONS_OBSERVATION = False
-HABILITATIONS_APPLICATION = False
+# L'observation est le mode livré par défaut : elle mesure les écarts sans
+# modifier les réponses. L'application des refus reste désactivée par défaut.
+# Les variables d'environnement permettent un kill-switch explicite sans
+# modifier le code; les valeurs booléennes acceptent true/1/yes et false/0/no.
+HABILITATIONS_OBSERVATION = os.environ.get(
+    'HABILITATIONS_OBSERVATION', 'true'
+).lower() in ('true', '1', 'yes')
+HABILITATIONS_APPLICATION = os.environ.get(
+    'HABILITATIONS_APPLICATION', 'false'
+).lower() in ('true', '1', 'yes')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
