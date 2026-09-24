@@ -123,8 +123,10 @@ class EdtApiTests(TestCase):
         self.assertEqual(EmploiDuTemps.objects.get(pk=cle).statut, 'PUBLIE')
 
         # Gel : le secrétariat ne touche plus aux affectations d'un EDT publié.
-        reponse = self.secretariat.patch(f'/api/edts/affectations/1/',
-                                         {'intitule': 'piraté'}, format='json')
+        reponse = self.secretariat.patch(
+            f'/api/edts/affectations/{AffectationCreneau.objects.first().pk}/',
+            {'intitule': 'piraté'}, format='json'
+        )
         self.assertEqual(reponse.status_code, 409)
 
         # Dépublication par la Direction qui débloque l'édition.
