@@ -27,11 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/cache@v4
         with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
+          path: ${{ runner.temp }}/pip-cache
+          key: ${{ runner.os }}-arm64-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-pip-
 
       - name: Démarrer PostgreSQL CI
         shell: bash
@@ -39,7 +40,7 @@ jobs:
           # Le runner self-hosted partage Docker avec les autres jobs. La
           # suppression et le démarrage non bornés pouvaient rester bloqués
           # plusieurs heures dans docker rm/docker run.
-          python - <<'PY'
+          /opt/homebrew/bin/python3.12 - <<'PY'
           import subprocess
           import sys
           import time
@@ -99,10 +100,12 @@ jobs:
 
       - name: Préparer Python 3.12 CI
         run: |
-          python -m venv --clear .venv-ci
+          /opt/homebrew/bin/python3.12 -m venv --clear .venv-ci
           .venv-ci/bin/python --version
 
       - name: Installer les dépendances Python
+        env:
+          PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
         run: .venv-ci/bin/pip install -r backend/requirements.txt
 
       - name: Hygiène du dépôt (données nominatives)
@@ -206,7 +209,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          python - <<'PY'
+          /opt/homebrew/bin/python3.12 - <<'PY'
           import subprocess
           import sys
           try:

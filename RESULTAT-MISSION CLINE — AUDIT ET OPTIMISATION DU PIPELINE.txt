@@ -15,7 +15,7 @@ OPTIMISATIONS APPLIQUÉES
 1. Ajout de `timeout-minutes: 90` au job Backend, basé sur le run réussi à 58,1 minutes, avec une marge de sécurité ; ajout de 20 minutes aux jobs Frontend, Vitest et Mobile.
 2. Remplacement du `docker rm -f`/`docker run` non bornés par un script Python embarqué avec limites de 30 s pour le nettoyage, 60 s pour le démarrage, 10 s pour chaque `pg_isready`, et journalisation limitée à 100 lignes en cas d'échec.
 3. Ajout d'un nettoyage PostgreSQL `if: always()` et borné à 30 s, sans `|| true` masquant les contrôles fonctionnels.
-4. Checkout puis `actions/setup-python@v5` avec Python 3.12 et cache pip basé sur `backend/requirements.txt` avant le bootstrap Docker PostgreSQL ; cela garantit l'interpréteur Python utilisé par le workflow et évite de démarrer le conteneur si la préparation Python échoue.
+4. Remplacement de `actions/setup-python@v5`, incompatible avec le runner self-hosted actuel car il échoue sur `mkdir: /Users/runner: Permission denied`, par le Python 3.12 déjà installé à `/opt/homebrew/bin/python3.12`. Le cache pip est conservé via `actions/cache@v4` sur `${{ runner.temp }}/pip-cache`, avec une clé fondée sur `backend/requirements.txt`.
 5. Conservation de `python -m venv --clear .venv-ci` et de l'installation des dépendances ; aucune dépendance n'est figée ou inventée.
 6. Conservation intégrale des contrôles Backend : tests Django, `check_repo_hygiene`, `collectstatic`, contrat drf-spectacular P00-08, smoke INJS-LMD, smoke CURP U0, U1, U2, audit P01-01 et image Docker/permissions/collectstatic.
 7. Aucun `needs` supprimé ou ajouté : Backend, Frontend, Vitest et Mobile restent des jobs indépendants. Ils restent sérialisés en pratique par l'unique runner self-hosted actuel. Plusieurs runners donneraient un gain de parallélisme, sans création automatique de runner.
@@ -48,7 +48,11 @@ Avant, données GitHub réelles :
 - Installation Python : < 0,1 min observée ; installation Node : setup-node 2,0 min et npm ci < 0,1 min.
 - Flutter : installation/action < 0,1 min sur le run réussi ; 6,9 min sur le run en échec, avec attente du runner.
 
-Après : N/D pour les jobs et le pipeline, car aucun workflow modifié n'a été poussé ni relancé automatiquement. Tests Backend ciblés : 4,238 s. Gain exact avant/après : N/D.
+Après : N/D pour les jobs et le pipeline après cette correction, car aucun workflow n'a été poussé ni relancé automatiquement. Tests Backend ciblés : 4,592 s pour 26 tests, `OK`. Gain exact avant/après : N/D.
+- Après le run post-optimisation `35975711315`, une régression de démarrage a été détectée dans `actions/setup-python@v5` (`mkdir: /Users/runner: Permission denied`). Elle a été corrigée localement en utilisant le Python 3.12 installé sur le runner et `actions/cache@v4` pour le cache pip.
+- Après cette correction : N/D pour le nouveau run GitHub, car aucun push n'est effectué.
+- Tests Backend ciblés : 4,592 s pour 26 tests, `OK`. Gain exact avant/après : N/D.
+
 
 Gain attendu : suppression du blocage Docker non borné, plafond Backend à 90 min et nettoyage systématique. Le gain de parallélisme reste nul sur un seul runner ; il deviendrait significatif avec plusieurs runners.
 
@@ -57,8 +61,9 @@ RISQUES / POINTS À SURVEILLER
 - Le timeout de 90 minutes est supérieur au run réussi observé de 58,1 minutes ; ajuster seulement après plusieurs mesures.
 - Surveiller le cache pip sur macOS ARM64, la construction Docker CI et l'image backend.
 - `--parallel` Django et `--keepdb` ne sont pas activés faute de validation PostgreSQL complète ; risque de contamination des tests transactionnels.
-- Commit CI créé : `20739e86c003a47572cde54914eb26d75c76bf0e` ; le commit documentaire sera créé juste avant le push.
-- Les fichiers non suivis préexistants restent préservés.
+- Le run post-optimisation `35975711315` (HEAD `c19c5ef7`) a duré 14,0 min : Frontend 2,5 min succès, Vitest 5,0 min succès, Mobile 4,4 min succès, Backend 0,7 min échec.
+- Le Backend a échoué dans `actions/setup-python@v5` avec `mkdir: /Users/runner: Permission denied` ; aucun contrôle Django n'a été exécuté dans ce run.
+- Correction appliquée : Python 3.12 local explicite et cache pip via `actions/cache@v4`, sans supprimer aucun contrôle.
 
 COMMANDES D'AUDIT CONSIGNÉES
 - `pwd`, `git status --short`, `git branch --show-current`, `git remote -v`, `git log --oneline --decorate -10`.
@@ -75,4 +80,4 @@ CRITÈRE FINAL DE RÉUSSITE
 - Cache pip ajouté, caches npm/Flutter conservés.
 - Timeout Backend : 90 minutes ; contrôles sécurité, CURP, contrats, smoke et Docker conservés.
 - Aucun test supprimé ou désactivé, aucune erreur masquée, aucune opération destructive.
-- Push GitHub : effectué après validation du commit technique et du commit documentaire ; aucune donnée, aucun secret et aucun fichier utilisateur non suivi n'est inclus.
+- Push GitHub : non effectué pour cette correction ; le remote reste inchangé. Aucune donnée, aucun secret et aucun fichier utilisateur non suivi n'est inclus.
