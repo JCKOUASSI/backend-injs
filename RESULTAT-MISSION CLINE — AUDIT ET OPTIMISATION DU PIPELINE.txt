@@ -62,10 +62,11 @@ RISQUES / POINTS À SURVEILLER
 - Réévaluer le timeout Backend après le premier run réussi avec daemon restauré.
 - Le cache pip sera validé par le premier run ; sa clé dépend de `backend/requirements.txt`.
 - `--parallel` et `--keepdb` restent désactivés jusqu'à analyse des fixtures et tests PostgreSQL.
-- Aucun push, aucune modification du VPS, aucune opération destructive et aucune modification de données n'ont été effectués.
+- Aucun push n'avait été effectué avant validation humaine ; le push final a été réalisé normalement sur `origin/main`, sans force. Aucune modification du VPS, aucune opération destructive et aucune modification de données n'ont été effectuées.
 
 COMMIT
-SHA : N/D — commit non créé avant validation humaine du diff.
+SHA d'optimisation : 0aaf1900bcdb34b9695529ba4dd107fd909e371b
+Le commit de mise à jour du présent rapport est le commit immédiatement suivant.
 
 PUSH
-NON EFFECTUÉ
+EFFECTUÉ NORMALEMENT SUR origin/main, SANS FORCE
