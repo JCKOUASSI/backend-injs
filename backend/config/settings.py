@@ -335,6 +335,11 @@ CORS_EXPOSE_HEADERS = ['Content-Disposition', 'Content-Type']
 # Les origines restent strictes (CORS_ALLOWED_ORIGINS ci-dessus, pas de allow-all).
 CORS_ALLOW_CREDENTIALS = True
 
+# ── Habilitations / observation métier ─────────────────────────────────────
+# Désactivés par défaut ; les tests et environnements peuvent les surcharger.
+HABILITATIONS_OBSERVATION = False
+HABILITATIONS_APPLICATION = False
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Email (SMTP) ──────────────────────────────────────────────────────────────

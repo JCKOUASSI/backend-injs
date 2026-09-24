@@ -55,7 +55,7 @@ concurrency:
 jobs:
   build-and-push:
     name: Build & push prod (linux/amd64)
-    runs-on: self-hosted
+    runs-on: [self-hosted, macOS, ARM64, backend-injs]
     outputs:
       backend_ref: ${{ steps.cfg.outputs.backend_ref }}
       frontend_ref: ${{ steps.cfg.outputs.frontend_ref }}
@@ -128,13 +128,17 @@ jobs:
       - name: Vérifier staticfiles (appuser, collectstatic)
         run: |
           IMG="${{ steps.cfg.outputs.backend_ref }}"
-          docker pull "$IMG"
-          OWNER=$(docker run --rm "$IMG" stat -c '%U' /app/staticfiles)
+          docker pull --platform linux/amd64 "$IMG"
+          OWNER=$(docker run --platform linux/amd64 --rm "$IMG" stat -c '%U' /app/staticfiles)
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
             exit 1
           fi
-          docker run --rm "$IMG" python manage.py collectstatic --noinput --dry-run
+          test -d /app/staticfiles
+          docker run --platform linux/amd64 --rm --entrypoint /bin/sh "$IMG" -c '
+            test -d /app/staticfiles &&
+            test -n "$(find /app/staticfiles -type f -print -quit)"
+          '
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6

@@ -12,6 +12,7 @@ jobs:
   backend:
     name: Backend (Django)
     runs-on: [self-hosted, macOS, ARM64, backend-injs]
+
     timeout-minutes: 90
 
     env:
@@ -210,6 +211,7 @@ jobs:
         run: |
           /opt/homebrew/bin/python3.12 - <<'PY'
           import subprocess
+          import sys
           try:
               subprocess.run(
                   ["docker", "rm", "-f", "injs-postgres-ci"],
@@ -219,7 +221,7 @@ jobs:
                   timeout=30,
               )
           except subprocess.TimeoutExpired:
-              print("::warning::Nettoyage PostgreSQL CI non terminé dans la limite")
+              print("::warning::Nettoyage PostgreSQL CI non terminé dans la limite", file=sys.stderr)
           PY
 
   frontend:

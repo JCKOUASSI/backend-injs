@@ -25,12 +25,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd --create-home --shell /bin/bash appuser
 
 # Copier et installer les dépendances Python
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copier le code backend (contexte = racine du monorepo)
-COPY backend/ .
+COPY . .
 
 # Créer les répertoires persistants et appliquer les permissions
 RUN mkdir -p /app/media /app/staticfiles && \
