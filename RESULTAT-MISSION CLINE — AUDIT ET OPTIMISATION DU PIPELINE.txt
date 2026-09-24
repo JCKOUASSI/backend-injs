@@ -1,0 +1,71 @@
+================================================
+RÉSULTAT
+================================================
+Audit et optimisation ciblée du pipeline GitHub Actions CI de backend-injs réalisés localement, sans modification métier, sans suppression de contrôle et sans push GitHub.
+
+CAUSE PRINCIPALE
+Le goulot principal est le démarrage de PostgreSQL via Docker sur le runner self-hosted. Les commandes Docker de suppression, de création et de vérification de disponibilité n'étaient pas bornées. Un run GitHub CI a échoué sur cette étape après le timeout de 30 secondes ajouté dans le diagnostic ; un run antérieur a laissé le job Backend à environ 3 h 28 et le pipeline total à environ 8 h 54, avec les jobs mis en file sur un runner unique. Le daemon Docker local est actuellement non responsive : `docker version` et `docker ps` dépassent 8 secondes lors d'un probe borné.
+
+Le runner `backend-injs-runner` est actuellement `offline` et `busy=true`, avec les labels `self-hosted, macOS, ARM64, backend-injs`. Un seul runner ne peut pas exploiter tout le parallélisme théorique des quatre jobs et crée une concurrence sur le daemon Docker partagé.
+
+CAUSES SECONDAIRES
+- Absence de cache pip dans le workflow Backend.
+- Recréation de l'environnement Python à chaque exécution et upgrade pip inutile.
+- Absence de copie de `.env.example` vers `assets/app.env` avant Flutter.
+- Les quatre jobs sont indépendants, sans `needs`, mais l'infrastructure observable ne permet pas de garantir leur simultanéité.
+- Les tests Django n'ont pas été profilés localement avec une base PostgreSQL fonctionnelle ; aucune conclusion artificielle sur les 10 tests les plus lents n'est faite.
+
+OPTIMISATIONS APPLIQUÉES
+1. Timeout Backend de 90 minutes, au-dessus du run réussi observé d'environ 58 minutes mais inférieur aux blocages de plusieurs heures.
+2. Timeouts de 20 minutes pour Frontend, Vitest et Mobile.
+3. Ciblage explicite du runner par `runs-on: [self-hosted, macOS, ARM64, backend-injs]`.
+4. Checkout effectué avant le démarrage PostgreSQL.
+5. Cache pip `actions/cache@v4` basé sur `backend/requirements.txt`, sans cache de base ni secret.
+6. Environnement Python réutilisé avec `venv --clear` et suppression de l'upgrade pip inutile.
+7. Commandes Docker PostgreSQL bornées : 30 s suppression, 60 s création, 10 s vérification ; erreurs et timeouts visibles.
+8. Nettoyage PostgreSQL `if: always()` borné à 30 secondes.
+9. Copie CI de `.env.example` vers `assets/app.env` avant Flutter.
+10. Conservation intégrale des contrôles Django, API, CURP/U0, U1/U2, audit P01-01, smoke, Docker/collectstatic, Vite, Vitest, Flutter et artefacts.
+
+Aucune optimisation à risque n'a été appliquée : pas de `--parallel`, pas de `--keepdb`, pas de suppression de migration ou de test, pas de `skip`, pas de `|| true` pour masquer un test et pas de modification d'assertion.
+
+FICHIERS MODIFIÉS
+- `.github/workflows/ci.yml`
+- `RESULTAT-MISSION CLINE — AUDIT ET OPTIMISATION DU PIPELINE.txt`
+
+Le fichier non suivi préexistant `optimisation-ci-backend-injs.prompt.md` a été conservé intact.
+
+TESTS EXÉCUTÉS
+- État Git initial et inspection des workflows, requirements, package.json/lockfile, pubspec et configuration Django.
+- Recherche des commandes Django, Vitest et Flutter.
+- Consultation des runs GitHub `35982311116`, `35930932967` et `35911486228` et inspection du runner.
+- Parse YAML Ruby : `YAML OK: backend, frontend, frontend-tests, mobile`.
+- Parse AST des deux heredocs Python : 2 blocs, syntaxe Python valide.
+- `git diff --check` réussi.
+- Vérification de présence des contrats API, smoke, CURP, U1/U2, audit, Docker/collectstatic, Vitest et Flutter réussie.
+- Probe Docker local borné : `docker version` et `docker ps` en timeout après 8 secondes.
+- `npm run test:coverage` et `npm run build` non exécutés : `frontend/node_modules` absent.
+- Flutter non exécuté dans l'état initial : `.dart_tool` et `assets/app.env` absents.
+- Tests Django non exécutés : `.venv-ci` absent et daemon Docker indisponible ; aucune base locale modifiée.
+
+PERFORMANCES
+Avant, run GitHub `35982311116` en échec au démarrage PostgreSQL : pipeline environ 14 min 19 s ; Frontend 2 min 10 s ; Mobile 4 min 23 s ; Backend 1 min 17 s jusqu'à l'échec ; Vitest 4 min 32 s.
+Avant, run GitHub `35911486228` réussi : pipeline environ 1 h 05 min 59 s ; Backend 58 min 04 s ; Frontend 2 min 25 s ; Vitest 4 min 16 s ; Mobile 1 min 26 s.
+Avant, run GitHub `35930932967` en échec : pipeline environ 8 h 54 min 04 s ; Backend 3 h 27 min 58 s ; Vitest 1 h 12 min 28 s ; Frontend 2 min 08 s ; Mobile 8 min 11 s.
+Après : N/D — aucun workflow n'a été poussé ou relancé, conformément à l'interdiction de push.
+Installation Python : N/D. Installation Node : N/D. Flutter : N/D. Tests Backend : N/D. Docker : N/D.
+Gain : N/D, le daemon Docker local est non responsive et aucun push n'est autorisé.
+
+RISQUES / POINTS À SURVEILLER
+- Le runner est actuellement offline ; il faut le rétablir avant toute mesure CI réelle.
+- Le partage Docker entre jobs reste un facteur de contention ; plusieurs runners dédiés ou un runner Backend isolé permettraient un parallélisme réel.
+- Réévaluer le timeout Backend après le premier run réussi avec daemon restauré.
+- Le cache pip sera validé par le premier run ; sa clé dépend de `backend/requirements.txt`.
+- `--parallel` et `--keepdb` restent désactivés jusqu'à analyse des fixtures et tests PostgreSQL.
+- Aucun push, aucune modification du VPS, aucune opération destructive et aucune modification de données n'ont été effectués.
+
+COMMIT
+SHA : N/D — commit non créé avant validation humaine du diff.
+
+PUSH
+NON EFFECTUÉ
