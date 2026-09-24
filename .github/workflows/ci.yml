@@ -13,7 +13,10 @@ jobs:
     name: Backend (Django)
     runs-on: [self-hosted, macOS, ARM64, backend-injs]
 
-    timeout-minutes: 90
+    # La suite exhaustive Django a pris 56 min 54 s sur le run vert de
+    # référence et 89 min 40 s sur le run le plus récent. 120 minutes laisse
+    # une marge de sécurité mesurée tout en bornant un blocage à 2 heures.
+    timeout-minutes: 120
 
     env:
       POSTGRES_HOST: localhost
