@@ -109,6 +109,11 @@ jobs:
       - name: Installer les dépendances Python
         env:
           PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
+          # Le runner self-hosted peut subir des délais réseau intermittents
+          # vers PyPI. On conserve l'installation réelle, mais on augmente
+          # les retries et le timeout sans supprimer de contrôle.
+          PIP_DEFAULT_TIMEOUT: "60"
+          PIP_RETRIES: "8"
         run: .venv-ci/bin/pip install -r backend/requirements.txt
 
       - name: Hygiène du dépôt (données nominatives)

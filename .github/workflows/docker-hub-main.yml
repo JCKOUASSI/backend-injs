@@ -129,7 +129,7 @@ jobs:
         run: |
           IMG="${{ steps.cfg.outputs.backend_ref }}"
           docker pull --platform linux/amd64 "$IMG"
-          OWNER=$(docker run --platform linux/amd64 --rm "$IMG" stat -c '%U' /app/staticfiles)
+          OWNER=$(docker run --platform linux/amd64 --rm --entrypoint stat "$IMG" -c '%U' /app/staticfiles)
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
             exit 1
