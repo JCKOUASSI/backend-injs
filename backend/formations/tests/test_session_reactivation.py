@@ -1,4 +1,5 @@
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -40,20 +41,30 @@ class SessionReactivationTest(TestCase):
         )
 
     def test_reactivation_survives_auto_manage(self):
-        reactiver_session_et_qr(self.session)
-        self.session.refresh_from_db()
-        self.qr.refresh_from_db()
+        # Fixer l'horloge évite un faux échec entre 23:59 et minuit, quand la
+        # borne métier de 23:59 ne peut plus être strictement future.
+        fixed_now = timezone.make_aware(
+            datetime.combine(self.today, time(12, 0)),
+            timezone.get_current_timezone(),
+        )
+        self.session.heure_fin_prevue = time(11, 0)
+        self.session.save(update_fields=['heure_fin_prevue'])
 
-        self.assertIsNone(self.session.terminee_le)
-        self.assertTrue(self.qr.actif)
-        self.assertGreater(self.session.heure_fin_prevue, self.local_now.time())
+        with patch('formations.session_views.timezone.now', return_value=fixed_now):
+            reactiver_session_et_qr(self.session)
+            self.session.refresh_from_db()
+            self.qr.refresh_from_db()
 
-        _auto_manage_sessions(self.formation)
-        self.session.refresh_from_db()
-        self.qr.refresh_from_db()
+            self.assertIsNone(self.session.terminee_le)
+            self.assertTrue(self.qr.actif)
+            self.assertGreater(self.session.heure_fin_prevue, fixed_now.time())
 
-        self.assertIsNone(self.session.terminee_le)
-        self.assertTrue(self.qr.actif)
+            _auto_manage_sessions(self.formation)
+            self.session.refresh_from_db()
+            self.qr.refresh_from_db()
+
+            self.assertIsNone(self.session.terminee_le)
+            self.assertTrue(self.qr.actif)
 
     def test_reactivation_bumps_past_date_to_today(self):
         yesterday = self.today - timedelta(days=1)
