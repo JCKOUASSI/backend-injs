@@ -1,4 +1,4 @@
-# Déploiement SSH sur le VPS : docker login → pull → down → up -d
+# Déploiement SSH sur le VPS : docker login → pull → up -d
 #
 # Appelé par docker_hub_main.yml après le build & push.
 # Pattern identique au monorepo injs-app-ref.
@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   deploy:
-    name: SSH pull / down / up -d
+    name: SSH pull / up -d
     runs-on: [self-hosted, macOS, ARM64, backend-injs]
     environment: ${{ inputs.environment }}
     timeout-minutes: 20
@@ -55,10 +55,17 @@ jobs:
           [ -z "$VPS_USER" ] && echo "::error::Secret VPS_USER manquant" && missing=1
           [ -z "$VPS_SSH_KEY" ] && echo "::error::Secret VPS_SSH_KEY manquant" && missing=1
           [ -z "$VPS_BACKEND_DIR" ] && echo "::error::Variable VPS_BACKEND_DIR manquante (ex: /opt/injs/injs-be)" && missing=1
+          [ -z "${{ inputs.backend_image }}" ] && echo "::error::Image backend vide" && missing=1
+          [ -z "${{ inputs.frontend_image }}" ] && echo "::error::Image frontend vide" && missing=1
+          case "${{ inputs.backend_image }}" in ophirdesire/*) ;; *) echo "::error::Image backend hors ophirdesire/"; missing=1 ;; esac
+          case "${{ inputs.frontend_image }}" in ophirdesire/*) ;; *) echo "::error::Image frontend hors ophirdesire/"; missing=1 ;; esac
+
           if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ] || [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
             echo "::error::Secrets DOCKERHUB_USERNAME et DOCKERHUB_TOKEN requis pour docker login sur le VPS"
             missing=1
           fi
+
+          if [ "$missing" -ne 0 ]; then exit 1; fi
 
       - name: Préparer la clé SSH
         env:
@@ -134,6 +141,23 @@ jobs:
             printf '%s' "$p"
           }
 
+          backup_stack() {
+            local dir="$1"
+            local label="$2"
+            local stamp
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            if [ -f "$dir/.env" ]; then
+              cp -p "$dir/.env" "$dir/.env.pre-direct-$stamp.bak"
+              echo ">> $label : sauvegarde .env.pre-direct-$stamp.bak"
+            fi
+            for compose_file in compose.yml compose.yaml docker-compose.yml docker-compose.yaml; do
+              if [ -f "$dir/$compose_file" ]; then
+                cp -p "$dir/$compose_file" "$dir/$compose_file.pre-direct-$stamp.bak"
+                echo ">> $label : sauvegarde $compose_file.pre-direct-$stamp.bak"
+              fi
+            done
+          }
+
           pin_image() {
             local dir="$1"
             local image="$2"
@@ -179,12 +203,13 @@ jobs:
             echo "   image : $image"
             echo "========================================"
 
+            backup_stack "$dir" "$label"
+
             pin_image "$dir" "$image"
             cd "$dir"
             export DOCKER_IMAGE="$image"
             docker compose pull
-            docker compose down
-            docker compose up -d
+            docker compose up -d --no-build
             docker compose ps
           }
 

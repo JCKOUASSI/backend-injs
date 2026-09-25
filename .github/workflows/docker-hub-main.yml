@@ -60,8 +60,8 @@ jobs:
       backend_ref: ${{ steps.cfg.outputs.backend_ref }}
       frontend_ref: ${{ steps.cfg.outputs.frontend_ref }}
     env:
-      BACKEND_IMAGE: jckouassi/injs-be
-      FRONTEND_IMAGE: jckouassi/injs-fe
+      BACKEND_IMAGE: ${{ vars.DOCKER_BACKEND_IMAGE }}
+      FRONTEND_IMAGE: ${{ vars.DOCKER_FRONTEND_IMAGE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,8 +96,20 @@ jobs:
           FT="${{ inputs.frontend_tag }}"
           if [ -z "${BT}" ]; then BT="${DOCKER_MAIN_BACKEND_TAG:-$AUTO}"; fi
           if [ -z "${FT}" ]; then FT="${DOCKER_MAIN_FRONTEND_TAG:-$AUTO}"; fi
-          API="${DOCKER_MAIN_VITE_API_URL:-https://api.sygepcpfae.org/api}"
-          BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://api.sygepcpfae.org}"
+          API="${DOCKER_MAIN_VITE_API_URL:-https://injs.badge-qr-code.pro/api}"
+          BADGE="${DOCKER_MAIN_VITE_BADGE_BASE_URL:-https://injs.badge-qr-code.pro}"
+          if [ -z "$BACKEND_IMAGE" ] || [ -z "$FRONTEND_IMAGE" ]; then
+            echo "::error::BACKEND_IMAGE et FRONTEND_IMAGE doivent être configurés"
+            exit 1
+          fi
+          case "$BACKEND_IMAGE" in
+            ophirdesire/*) ;;
+            *) echo "::error::BACKEND_IMAGE doit être dans le namespace ophirdesire/"; exit 1 ;;
+          esac
+          case "$FRONTEND_IMAGE" in
+            ophirdesire/*) ;;
+            *) echo "::error::FRONTEND_IMAGE doit être dans le namespace ophirdesire/"; exit 1 ;;
+          esac
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"
           echo "backend_main_ref=${BACKEND_IMAGE}:main-${BT}" >> "$GITHUB_OUTPUT"
@@ -157,9 +169,61 @@ jobs:
             VITE_API_URL=${{ steps.cfg.outputs.vite_api }}
             VITE_BADGE_BASE_URL=${{ steps.cfg.outputs.vite_badge }}
 
+  diagnose-vps:
+    name: Préflight VPS lecture seule
+    needs: build-and-push
+    runs-on: [self-hosted, macOS, ARM64, backend-injs]
+    steps:
+      - name: Vérifier les paramètres SSH sans afficher les secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR }}
+          VPS_FRONTEND_DIR: ${{ vars.VPS_FRONTEND_DIR }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_BACKEND_DIR"
+          test -n "$VPS_FRONTEND_DIR"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          ssh-keygen -y -f "$HOME/.ssh/deploy_key" >/dev/null
+          ssh-keyscan -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=accept-new \
+            "${VPS_USER}@${VPS_HOST}" \
+            env BACKEND_DIR="$VPS_BACKEND_DIR" FRONTEND_DIR="$VPS_FRONTEND_DIR" \
+            bash -s <<'REMOTE'
+          set -eu
+          echo "=== VPS_PRECHECK ==="
+          printf "host="; hostname
+          echo "containers:"
+          docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | head -30
+          for dir in "$BACKEND_DIR" "$FRONTEND_DIR"; do
+            echo "=== directory: $dir ==="
+            if [ -d "$dir" ]; then
+              find "$dir" -maxdepth 2 -type f \( -name 'compose.yml' -o -name 'compose.yaml' -o -name 'docker-compose.yml' -o -name 'docker-compose.yaml' -o -name '*.conf' \) -print | sort
+              find "$dir" -maxdepth 2 -type f -name '.env' -print
+            else
+              echo "missing"
+            fi
+          done
+          echo "=== nginx route references ==="
+          grep -RInE "injs\.badge-qr-code\.pro|location[[:space:]]+/api|proxy_pass" /etc/nginx /usr/local/openresty/nginx/conf /etc/openresty 2>/dev/null | head -120 || true
+          echo "=== listening ports ==="
+          (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null || true) | head -80
+          REMOTE
+
   deploy:
     name: Déployer sur le VPS
-    needs: build-and-push
+    needs: [build-and-push, diagnose-vps]
     if: ${{ inputs.skip_deploy != true }}
     uses: ./.github/workflows/deploy-vps.yml
     with:
