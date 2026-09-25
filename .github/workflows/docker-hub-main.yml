@@ -134,7 +134,8 @@ jobs:
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser). Ne pas lancer collectstatic en root sur le VPS."
             exit 1
           fi
-          test -d /app/staticfiles
+          # Le chemin /app/staticfiles appartient au conteneur ; sa présence
+          # et son contenu sont vérifiés dans les commandes docker ci-dessous.
           docker run --platform linux/amd64 --rm --entrypoint /bin/sh "$IMG" -c '
             test -d /app/staticfiles &&
             test -n "$(find /app/staticfiles -type f -print -quit)"
