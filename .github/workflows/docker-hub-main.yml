@@ -160,7 +160,7 @@ jobs:
   deploy:
     name: Déployer sur le VPS
     needs: build-and-push
-    if: ${{ inputs.skip_deploy != 'true' }}
+    if: ${{ inputs.skip_deploy != true }}
     uses: ./.github/workflows/deploy-vps.yml
     with:
       environment: production
