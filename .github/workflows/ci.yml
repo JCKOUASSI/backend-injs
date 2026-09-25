@@ -202,12 +202,15 @@ jobs:
       - name: Vérifier l'image Docker backend (collectstatic / permissions)
         run: |
           docker build -t sygep-backend-ci ./backend
-          OWNER=$(docker run --rm sygep-backend-ci python -c "import os, pwd; print(pwd.getpwuid(os.stat('/app/staticfiles').st_uid).pw_name)")
+          # Ces contrôles sont statiques : ils ne doivent pas déclencher
+          # l'entrypoint de production, qui attend PostgreSQL avant d'exécuter
+          # la commande. Le build ci-dessus valide déjà collectstatic.
+          OWNER=$(docker run --rm --entrypoint python sygep-backend-ci -c "import os, pwd; print(pwd.getpwuid(os.stat('/app/staticfiles').st_uid).pw_name)")
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
             exit 1
           fi
-          docker run --rm sygep-backend-ci python manage.py collectstatic --noinput --dry-run
+          docker run --rm --entrypoint python sygep-backend-ci manage.py collectstatic --noinput --dry-run
 
       - name: Nettoyer PostgreSQL CI
         if: always()
