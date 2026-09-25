@@ -11,7 +11,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (Django)
-    runs-on: [self-hosted, macOS, ARM64, backend-injs]
+    runs-on: ubuntu-latest
 
     # La suite exhaustive Django a pris 56 min 54 s sur le run vert de
     # référence et 89 min 40 s sur le run le plus récent. 120 minutes laisse
@@ -238,7 +238,7 @@ jobs:
 
   frontend:
     name: Frontend (Vite / React)
-    runs-on: [self-hosted, macOS, ARM64, backend-injs]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -258,7 +258,7 @@ jobs:
 
   frontend-tests:
     name: Frontend tests (Vitest)
-    runs-on: [self-hosted, macOS, ARM64, backend-injs]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -290,7 +290,7 @@ jobs:
 
   mobile:
     name: Mobile (Flutter)
-    runs-on: [self-hosted, macOS, ARM64, backend-injs]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
