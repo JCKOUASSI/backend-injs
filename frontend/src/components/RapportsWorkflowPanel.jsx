@@ -3,8 +3,8 @@ import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { appendPeriodToSearchParams } from '../utils/financePeriod'
 
-const GENERATION_ROLES = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT']
-const VALIDATION_ROLES = ['ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
+const GENERATION_ROLES = ['ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT']
+const VALIDATION_ROLES = ['ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN']
 
 const RAPPORT_TYPES = [
   { value: 'MENSUEL', label: 'Mensuel' },

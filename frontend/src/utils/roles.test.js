@@ -8,7 +8,7 @@ import { ALL_ROLES } from '@/test/utils/factories'
 // figer en test interdit toute dérive silencieuse des droits affichés.
 // ──────────────────────────────────────────────────────────────────────────
 
-const A = ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
+const A = ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN']
 
 const EXPECTED_SETS = {
   ADMIN_LEVEL_ROLES: A,

@@ -11,8 +11,8 @@ from authentication.role_groups import get_user_roles
 ROLES_EDITION_REFERENTIEL = frozenset({
     'ADMIN',
     'DIRECTION',
-    'CHEF_CPFAE_ADMIN',
-    'CPFAE_ADMIN',
+    'CHEF_INJS_ADMIN',
+    'INJS_ADMIN',
     'CHEF_SECRETARIAT',
     'SECRETARIAT',
 })

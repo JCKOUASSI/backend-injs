@@ -218,7 +218,7 @@ export default function Users() {
     } finally { setSaving(false) }
   }
 
-  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_CPFAE_ADMIN': 'badge-dfrc', 'CPFAE_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ARCHIVE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'FORMATEUR': 'badge-formateur', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
+  const getRoleBadge = (role) => ({ 'DIRECTION': 'badge-direction', 'CHEF_INJS_ADMIN': 'badge-dfrc', 'INJS_ADMIN': 'badge-dfrc', 'CHEF_SECRETARIAT': 'badge-secretariat', 'SECRETARIAT': 'badge-secretariat', 'FINANCE': 'badge-info', 'ARCHIVE': 'badge-info', 'ENCADRANT': 'badge-encadrant', 'FORMATEUR': 'badge-formateur', 'AUDITEUR': 'badge-auditeur' }[role] || 'badge-info')
 
   const getFullName = (u) => `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username
   const getInitials = (u) => `${(u.first_name || '')[0] || ''}${(u.last_name || '')[0] || ''}`.toUpperCase() || u.username[0]?.toUpperCase()
@@ -409,7 +409,7 @@ export default function Users() {
                     <select className="form-control" required value={form.role} onChange={e => setForm({...form, role: e.target.value, new_secretariat_nom: '', new_secretariat_type: ''})}>
                       {(userTab === 'auditeurs' ? ['AUDITEUR'] : userTab === 'formateurs' ? ['FORMATEUR'] : staffRoleOptions).map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
                     </select>
-                    {form.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN') && (
+                    {form.role === 'CHEF_INJS_ADMIN' && users.some(u => u.role === 'CHEF_INJS_ADMIN') && (
                       <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef INJS Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
                     )}
                   </div>
@@ -435,7 +435,7 @@ export default function Users() {
                   <label className="form-label">Mot de passe *</label>
                   <input type="password" className="form-control" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
                 </div>
-                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(form.role) && (
+                {!['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(currentUser?.role) && !['CHEF_INJS_ADMIN', 'INJS_ADMIN', 'ENCADRANT'].includes(form.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={form.secretariat} onChange={e => setForm({...form, secretariat: e.target.value})}>
@@ -508,7 +508,7 @@ export default function Users() {
                   {!creatableRoles.includes(editingUser?.role) && (
                     <small className="text-warning"><i className="bi bi-lock me-1"></i>Rôle protégé — modification impossible.</small>
                   )}
-                  {editForm.role === 'CHEF_CPFAE_ADMIN' && users.some(u => u.role === 'CHEF_CPFAE_ADMIN' && u.id !== editingUser?.id) && (
+                  {editForm.role === 'CHEF_INJS_ADMIN' && users.some(u => u.role === 'CHEF_INJS_ADMIN' && u.id !== editingUser?.id) && (
                     <small className="text-danger"><i className="bi bi-exclamation-triangle me-1"></i>Un Chef INJS Admin existe déjà. Ce rôle est unique sur la plateforme.</small>
                   )}
                   {editForm.role === 'CHEF_SECRETARIAT' && editForm.secretariat && (() => {
@@ -519,7 +519,7 @@ export default function Users() {
                     ) : null
                   })()}
                 </div>
-                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT'].includes(editForm.role) && (
+                {currentUser?.role !== 'SECRETARIAT' && !['CHEF_INJS_ADMIN', 'INJS_ADMIN', 'ENCADRANT'].includes(editForm.role) && (
                   <div className="form-group">
                     <label className="form-label">Secrétariat</label>
                     <select className="form-control" value={editForm.secretariat} onChange={e => setEditForm({...editForm, secretariat: e.target.value})}>

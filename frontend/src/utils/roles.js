@@ -1,6 +1,6 @@
 /** Aligné sur backend/authentication/role_groups.py */
 
-export const ADMIN_LEVEL_ROLES = ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
+export const ADMIN_LEVEL_ROLES = ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN']
 
 export const ALLOWED_WEB_ROLES = [
   ...ADMIN_LEVEL_ROLES,

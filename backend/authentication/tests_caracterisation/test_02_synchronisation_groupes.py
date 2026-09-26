@@ -13,6 +13,7 @@ OneToOne sans changer ces synchronisations.
 """
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
 
 from authentication.role_groups import (
@@ -156,15 +157,43 @@ class ChangementDeRoleTests(TestCase):
         utilisateur.refresh_from_db()
         self.assertEqual(utilisateur.role, 'FINANCE')
 
-    def test_compte_sans_groupe_et_role_vide_n_a_aucun_role_effectif(self):
-        # Filet de sécurité de get_user_roles : sans groupe ROLE_*, le champ
-        # ``role`` sert de dernier recours ; il faut donc le vider aussi.
+    def test_compte_sans_groupe_conserve_son_role_rbac_canonique(self):
+        """Lot L4b — `User.role` porte TOUJOURS un rôle RBAC canonique.
+
+        Avant L4b, un compte pouvait être « désarmé » en vidant le champ `role` :
+        cet état n'est plus représentable (contrainte `auth_user_role_canonique_l4b`).
+        Sans groupe `ROLE_*`, `get_user_roles()` retombe donc toujours sur le
+        champ `role`, qui reste renseigné.
+        """
         utilisateur = User.objects.create_user(
             username='car-sans-role', password=MOT_DE_PASSE, role='AUDITEUR',
         )
         utilisateur.groups.clear()
-        utilisateur.role = ''
-        utilisateur.save()
-        self.assertEqual(get_user_roles(utilisateur), frozenset())
-        # Le rôle principal retombe alors sur le champ dénormalisé, lui aussi vide.
-        self.assertEqual(get_user_role(utilisateur), '')
+        # Le compte est créé avec un rôle canonique : il ne peut pas s'en priver.
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                with connection.cursor() as curseur:
+                    curseur.execute(
+                        "UPDATE authentication_user SET role = '' WHERE id = %s",
+                        [utilisateur.id],
+                    )
+        # Après refus de l'écriture, l'état est intact.
+        utilisateur.refresh_from_db()
+        self.assertEqual(utilisateur.role, 'AUDITEUR')
+        self.assertEqual(get_user_roles(utilisateur), frozenset({'AUDITEUR'}))
+        self.assertEqual(get_user_role(utilisateur), 'AUDITEUR')
+
+    def test_role_vide_refuse_par_la_contrainte_de_base(self):
+        """Lot L4b — la chaîne vide n'est pas un rôle RBAC."""
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                with connection.cursor() as curseur:
+                    curseur.execute(
+                        'INSERT INTO authentication_user '
+                        '(password, is_superuser, username, first_name, last_name, '
+                        ' email, is_staff, is_active, date_joined, role, telephone, '
+                        ' organisation, grade, must_change_password) '
+                        "VALUES ('x', 0, 'car-role-vide', '', '', '', 0, 1, "
+                        "CURRENT_TIMESTAMP, '', '', '', '', 0)"
+                    )
+        self.assertFalse(User.objects.filter(username='car-role-vide').exists())

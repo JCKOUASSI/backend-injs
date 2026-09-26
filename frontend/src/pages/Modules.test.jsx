@@ -13,8 +13,8 @@ import { makeUser } from '@/test/utils/factories'
 import Modules from '@/pages/Modules'
 
 const LABELS = {
-  ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef INJS Admin',
-  CPFAE_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat',
+  ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_INJS_ADMIN: 'Chef INJS Admin',
+  INJS_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat',
   FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur',
   FORMATEUR: 'Formateur', AUDITEUR: 'Étudiant',
 }

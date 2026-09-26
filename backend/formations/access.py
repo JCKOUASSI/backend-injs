@@ -71,8 +71,8 @@ def formation_accessible(user, pk):
     - SECRETARIAT /
       CHEF_SECRETARIAT       : au moins un module de la formation doit appartenir au secrétariat de l'utilisateur.
                                Si l'utilisateur n'est rattaché à aucun secrétariat → accès refusé.
-    - CPFAE_ADMIN /
-      CHEF_CPFAE_ADMIN /
+    - INJS_ADMIN /
+      CHEF_INJS_ADMIN /
       DIRECTION / ARCHIVE / ADMIN      : accès complet à toutes les formations.
     - FINANCE                : accès refusé ici (module finance dédié).
     """

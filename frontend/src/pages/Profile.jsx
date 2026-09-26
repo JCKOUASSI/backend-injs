@@ -6,8 +6,8 @@ import ConfirmModal from '../components/ConfirmModal'
 
 const ROLE_LABELS = {
   DIRECTION: 'Direction',
-  CHEF_CPFAE_ADMIN: 'Chef INJS Admin',
-  CPFAE_ADMIN: 'INJS Admin',
+  CHEF_INJS_ADMIN: 'Chef INJS Admin',
+  INJS_ADMIN: 'INJS Admin',
   CHEF_SECRETARIAT: 'Chef Secrétariat',
   SECRETARIAT: 'Secrétariat',
   FINANCE: 'Finance',

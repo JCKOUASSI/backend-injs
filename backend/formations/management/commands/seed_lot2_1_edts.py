@@ -221,16 +221,22 @@ class Command(BaseCommand):
         ).distinct()
 
         pointages_ok = 0
+        # Coordonnées de démonstration : le centre officiel de l'INJS Marcory
+        # (arbitrage A-03 du 26/09/2026). Les pointages doivent être produits à
+        # l'intérieur du rayon autorisé, sinon le contrôle de périmètre (N-12)
+        # refuse le badgeage — ce qui est le comportement attendu.
+        coords_demo = {'last_latitude': 5.3083, 'last_longitude': -3.9825,
+                       'last_accuracy_m': 10}
         for etu in etudiants_groupe:
             # 1. Scan ENTREE
             action_e, pt_e, err_e = seances_edt_services.badger_scan(
                 fake_request, participant=etu, affectation=aff_mardi_soir, date=today,
-                device_id='device-injs-android-01', coords={'last_latitude': 5.3025, 'last_longitude': -3.9785}
+                device_id='device-injs-android-01', coords=coords_demo
             )
             # 2. Scan SORTIE
             action_s, pt_s, err_s = seances_edt_services.badger_scan(
                 fake_request, participant=etu, affectation=aff_mardi_soir, date=today,
-                device_id='device-injs-android-01', coords={'last_latitude': 5.3025, 'last_longitude': -3.9785}
+                device_id='device-injs-android-01', coords=coords_demo
             )
             if action_e == 'ENTREE' and action_s == 'SORTIE':
                 pointages_ok += 1

@@ -9,7 +9,7 @@ from presences.models import AuditLog, _log_audit
 
 # Rôles avec accès admin global (pas de filtrage queryset).
 _ADMIN_GLOBAL_ROLES = frozenset({
-    'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION', 'FINANCE',
+    'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'DIRECTION', 'FINANCE',
 })
 
 

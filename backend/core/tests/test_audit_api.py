@@ -21,8 +21,8 @@ def _positionner_flag(valeur):
         defaults=dict(
             libelle=FLAG_LOT1, categorie='flags', type='bool',
             valeur=valeur, valeur_defaut='false', modifiable=True,
-            modifiable_par_roles='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
-            lecturable_par_roles='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
+            modifiable_par_roles='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
+            lecturable_par_roles='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
             actif=True))
     cache.delete(FLAGS_CACHE_KEY)
 
@@ -61,8 +61,8 @@ class AuditCoreAPITests(APITestCase):
     def test_matrice_des_roles_avec_flag_actif(self):
         activer_flag_lot1()
         autorises = (
-            User.Role.ADMIN, User.Role.DIRECTION, User.Role.CHEF_CPFAE_ADMIN,
-            User.Role.CPFAE_ADMIN, User.Role.AUDITEUR, User.Role.ARCHIVE,
+            User.Role.ADMIN, User.Role.DIRECTION, User.Role.CHEF_INJS_ADMIN,
+            User.Role.INJS_ADMIN, User.Role.AUDITEUR, User.Role.ARCHIVE,
         )
         interdits = (
             User.Role.CHEF_SECRETARIAT, User.Role.SECRETARIAT, User.Role.FINANCE,

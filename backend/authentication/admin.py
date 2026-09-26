@@ -171,8 +171,8 @@ class UserAdmin(
         colors = {
             User.Role.ADMIN: ('#fdecec', '#b42318'),
             User.Role.DIRECTION: ('#eef6fc', '#0f4c81'),
-            User.Role.CHEF_CPFAE_ADMIN: ('#eef6fc', '#0f4c81'),
-            User.Role.CPFAE_ADMIN: ('#eef6fc', '#0f4c81'),
+            User.Role.CHEF_INJS_ADMIN: ('#eef6fc', '#0f4c81'),
+            User.Role.INJS_ADMIN: ('#eef6fc', '#0f4c81'),
             User.Role.CHEF_SECRETARIAT: ('#fffae8', '#9a7a00'),
             User.Role.SECRETARIAT: ('#fffae8', '#9a7a00'),
             User.Role.FINANCE: ('#f0f4ff', '#3949ab'),

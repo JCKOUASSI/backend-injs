@@ -125,10 +125,10 @@ export default function DashboardEngineView() {
   // Cockpits profil (spec Tableaux de bord §7–§8 / §20) :
   // - AUDITEUR / FORMATEUR : onglet principal de leur espace
   // - ADMIN / DIRECTION : aperçu de tous les cockpits (Dashboard Engine)
-  if (role === 'AUDITEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_CPFAE_ADMIN' || role === 'CPFAE_ADMIN') {
+  if (role === 'AUDITEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_INJS_ADMIN' || role === 'INJS_ADMIN') {
     tabsConfig.push({ id: 'etudiant', label: role === 'AUDITEUR' ? 'Mon Espace Étudiant' : 'Espace Étudiant', icon: 'bi-person-badge' })
   }
-  if (role === 'FORMATEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_CPFAE_ADMIN' || role === 'CPFAE_ADMIN') {
+  if (role === 'FORMATEUR' || role === 'ADMIN' || role === 'DIRECTION' || role === 'CHEF_INJS_ADMIN' || role === 'INJS_ADMIN') {
     tabsConfig.push({ id: 'enseignant', label: role === 'FORMATEUR' ? 'Mon Espace Enseignant' : 'Espace Enseignant', icon: 'bi-person-workspace' })
   }
   if (role === 'AUDITEUR') {

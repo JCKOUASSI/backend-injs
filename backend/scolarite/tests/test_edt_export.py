@@ -20,7 +20,7 @@ from scolarite.models import (
 )
 
 
-def make_user(username, role='CPFAE_ADMIN', **kwargs):
+def make_user(username, role='INJS_ADMIN', **kwargs):
     return User.objects.create_user(username=username, password='pass', role=role, **kwargs)
 
 

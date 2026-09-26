@@ -39,8 +39,10 @@ User = get_user_model()
 
 #: Rôle d'administration technique du nouveau référentiel.
 ROLE_ADMIN_SYSTEME = 'ADMIN_SYSTEME'
-#: Trio d'administration legacy, pour la garde des deux administrateurs.
-ROLES_LEGACY_ADMIN = frozenset({'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'})
+#: Trio d'administration INJS-LMD (renommé en L4b : anciennement
+#: `ROLES_LEGACY_ADMIN`, un nom devenu trompeur puisque son contenu est
+#: entièrement canonique). Sert à garder au moins deux administrateurs actifs.
+ROLES_ADMIN_SYSTEME = frozenset({'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'})
 
 SEUIL_ADMINISTRATEURS = 2
 
@@ -179,7 +181,7 @@ def administrateurs_actifs():
     suspendu/désactivé fait sortir son User du décompte.
     """
     users = User.objects.filter(
-        role__in=ROLES_LEGACY_ADMIN, is_active=True
+        role__in=ROLES_ADMIN_SYSTEME, is_active=True
     ).select_related('profil_habilitation')
     nombre = 0
     for user in users:
@@ -195,7 +197,7 @@ def administrateurs_actifs():
             role__code=ROLE_ADMIN_SYSTEME,
             compte__statut=CompteUtilisateur.Statut.ACTIF,
         )
-        .exclude(compte__user__role__in=ROLES_LEGACY_ADMIN)
+        .exclude(compte__user__role__in=ROLES_ADMIN_SYSTEME)
         .values_list('compte__user_id', flat=True)
     )
     nombre += User.objects.filter(pk__in=list(ids_comptes), is_active=True).count()
@@ -507,7 +509,7 @@ def _appliquer_transition(compte, acteur, transition, motif, meta):
     statut_cible, evenement, actif = TRANSITIONS_STATUT[transition].values()
     statut_source = compte.statut
     etait_admin = (
-        compte.user.role in ROLES_LEGACY_ADMIN
+        compte.user.role in ROLES_ADMIN_SYSTEME
         or compte.attributions.filter(
             statut=AttributionRole.Statut.ACTIVE, role__code=ROLE_ADMIN_SYSTEME
         ).exists()

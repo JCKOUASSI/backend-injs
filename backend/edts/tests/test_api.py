@@ -203,8 +203,8 @@ class EdtApiTests(TestCase):
         self.assertEqual(reponse.status_code, 403)
 
     def test_role_injs_admin_peut_planifier(self):
-        """Régularisation CURP : CPFAE_ADMIN (ex-compte 'dfrc') est planificateur."""
-        client, _ = make_client('CPFAE_ADMIN', 'ex-dfrc')
+        """Régularisation CURP : INJS_ADMIN (ex-compte 'dfrc') est planificateur."""
+        client, _ = make_client('INJS_ADMIN', 'ex-dfrc')
         reponse = client.post('/api/edts/emplois/', {
             'annee_academique_id': self.annee.pk, 'population_type': 'ENSEIGNANT',
             'population_id': self.encadrant_user.pk, 'titre': 'par INJS-Admin',

@@ -49,15 +49,15 @@ admin_user = reset_demo_user(
 )
 dfrc_user = reset_demo_user(
     'dfrc', 'dfrc123', email='dfrc@injs.ci', first_name='Responsable', last_name='CPFAE',
-    role=User.Role.CPFAE_ADMIN, is_staff=True, is_superuser=False,
+    role=User.Role.INJS_ADMIN, is_staff=True, is_superuser=False,
 )
 jck = reset_demo_user(
     'jckouassi', 'JckPcm@123', email='jck@injs.ci', first_name='Jean-Claude', last_name='Kouassi',
-    role=User.Role.CHEF_CPFAE_ADMIN, is_staff=True, is_superuser=True,
+    role=User.Role.CHEF_INJS_ADMIN, is_staff=True, is_superuser=True,
 )
 injs_user = reset_demo_user(
     'injs', 'injs123', email='injs@injs.ci', first_name='Responsable', last_name='INJS',
-    role=User.Role.CPFAE_ADMIN, is_staff=True, is_superuser=False,
+    role=User.Role.INJS_ADMIN, is_staff=True, is_superuser=False,
 )
 secretariat_user = reset_demo_user(
     'secretariat', 'sec123', email='secretariat@injs.ci', first_name='Secrétariat', last_name='INJS',

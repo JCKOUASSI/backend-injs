@@ -4,7 +4,7 @@ from authentication.role_groups import get_user_role
 
 register = template.Library()
 
-ROLE_DFRC = ['CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN']
+ROLE_DFRC = ['CHEF_INJS_ADMIN', 'INJS_ADMIN']
 ROLE_SECRETARIAT = ['CHEF_SECRETARIAT', 'SECRETARIAT']
 ROLE_ENCADRANT = ['ENCADRANT']
 ROLE_ADMIN_MUTATION = ROLE_DFRC + ROLE_SECRETARIAT

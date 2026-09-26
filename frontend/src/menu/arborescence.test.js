@@ -310,7 +310,6 @@ describe('non-régression : les écrans historiques restent accessibles', () => 
     '/scolarite/graduation',
     '/scolarite/finances',
     '/formations',
-    '/modules',
     '/formateurs',
     '/edt',
     '/evaluations',
@@ -335,5 +334,52 @@ describe('non-régression : les écrans historiques restent accessibles', () => 
 
   it('le personnel reste joignable', () => {
     expect(chemins.has('/personnel/agents')).toBe(true)
+  })
+})
+
+/**
+ * Lot L3 (C4) — l'héritage CPFAE est retiré du MENU, pas de l'application.
+ *
+ * `formations.cours` (« Cours & modules (CPFAE — héritage) ») a été retiré de
+ * l'arborescence : l'entrée de correspondance est désormais `formations.cours_lmd`
+ * (« Cours (LMD) » → `/cours`), qui porte la chaîne métier INJS-LMD
+ * Année → Formation → Parcours → UE → ECUE → Séance.
+ *
+ * Ce test verrouille trois choses distinctes :
+ *  1. l'entrée CPFAE a bien disparu du MENU ;
+ *  2. l'entrée LMD qui la remplace est bien présente ;
+ *  3. la ROUTE `/modules` reste déclarée dans `App.jsx` — le retrait est
+ *     strictement navigationnel, aucune functionality n'est supprimée.
+ */
+describe('L3 — retrait du menu CPFAE, conservation de la route /modules', () => {
+  const ids = new Set(toutesEntrees.map((entree) => entree.id))
+  const chemins = new Set(toutesEntrees.map((entree) => entree.chemin))
+
+  it("l'entrée CPFAE « Cours & modules » a disparu du menu", () => {
+    expect(ids.has('formations.cours')).toBe(false)
+  })
+
+  it('aucune entrée de menu ne pointe plus vers /modules', () => {
+    expect(chemins.has('/modules')).toBe(false)
+  })
+
+  it('aucun libellé CPFAE ne subsiste dans le menu', () => {
+    const residus = toutesEntrees
+      .filter((entree) => /CPFAE/.test(entree.libelle || ''))
+      .map((entree) => entree.id)
+    expect(residus).toEqual([])
+  })
+
+  it('l\'entrée LMD de remplacement est bien présente', () => {
+    expect(ids.has('formations.cours_lmd')).toBe(true)
+    expect(chemins.has('/cours')).toBe(true)
+  })
+
+  it('la route /modules reste déclarée dans App.jsx (transition)', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const racine = path.resolve(process.cwd(), 'src')
+    const source = fs.readFileSync(path.join(racine, 'App.jsx'), 'utf8')
+    expect(source).toContain('path="/modules"')
   })
 })

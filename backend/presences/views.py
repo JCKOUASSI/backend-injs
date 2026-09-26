@@ -12,7 +12,6 @@ from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Q
-from math import radians, sin, cos, sqrt, atan2
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -29,6 +28,7 @@ FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from formations.serializers import ParticipantSerializer, FormateurSerializer, FormationListSerializer
 from formations.access import participant_fiche_accessible
+from . import geofence  # noqa: F401  (source de vérité du contrôle de périmètre)
 from .models import Pointage, DeviceBinding, AuditLog, Rattrapage, _log_audit
 from .offline_cache import (
     OFFLINE_DATA_CACHE_TIMEOUT,
@@ -525,13 +525,7 @@ def _require_mobile_device_id(type_str, device_id):
 
 def _distance_meters(lat1, lon1, lat2, lon2):
     """Distance approximative en mètres (haversine)."""
-    earth_radius_m = 6371000
-    phi1 = radians(float(lat1))
-    phi2 = radians(float(lat2))
-    d_phi = radians(float(lat2) - float(lat1))
-    d_lambda = radians(float(lon2) - float(lon1))
-    a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lambda / 2) ** 2
-    return 2 * earth_radius_m * atan2(sqrt(a), sqrt(1 - a))
+    return geofence.distance_meters(lat1, lon1, lat2, lon2)
 
 
 def _resolve_site_geofence(module):
@@ -558,54 +552,28 @@ def _resolve_site_geofence(module):
     else:
         site = None
 
-    # Fallback legacy: match par texte
     if site is None:
+        # Fallback legacy: match par texte
         site_name = (getattr(module, 'site_legacy', '') or '').strip()
         if not site_name:
             return None, None, None
         site = RefSite.objects.filter(nom__iexact=site_name).first()
 
-    if site is None or site.geofence_latitude is None or site.geofence_longitude is None:
+    if geofence.site_non_localise(site):
         return None, None, None
-    rayon = site.geofence_rayon_m or getattr(settings, 'MOBILE_GEOFENCE_DEFAULT_RADIUS_M', 200)
-    return site.geofence_latitude, site.geofence_longitude, rayon
+    return site.geofence_latitude, site.geofence_longitude, geofence.rayon_du_site(site)
 
 
 def _check_geofence(module, latitude, longitude, accuracy_m=None):
     """
     Vérifie si la position est dans la zone autorisée du site du module.
     Retourne (ok, code, detail, distance_m, rayon_m).
+
+    Délégué à `presences.geofence`, module partagé avec le canal EDT
+    (`seances_edt_services._controle_geofence_edt`) : les deux canaux appliquent
+    ainsi strictement la même règle de périmètre.
     """
-    site_lat, site_lon, rayon_m = _resolve_site_geofence(module)
-    if site_lat is None or site_lon is None:
-        return True, None, None, None, None
-
-    max_accuracy = getattr(settings, 'MOBILE_GEOFENCE_MAX_ACCURACY_M', 80)
-    if accuracy_m is not None and float(accuracy_m) > float(max_accuracy):
-        return (
-            False,
-            'LOCATION_INACCURATE',
-            f"Précision GPS insuffisante ({round(float(accuracy_m), 1)}m). "
-            f"Seuil maximum autorisé: {max_accuracy}m.",
-            None,
-            None,
-        )
-
-    rayon_m = float(rayon_m)
-    distance_m = _distance_meters(latitude, longitude, site_lat, site_lon)
-    if distance_m > rayon_m:
-        return (
-            False,
-            'OUT_OF_GEOFENCE',
-            (
-                f"Hors périmètre autorisé ({round(distance_m, 1)}m du site, "
-                f"rayon max {round(rayon_m, 1)}m)."
-            ),
-            distance_m,
-            rayon_m,
-        )
-
-    return True, None, None, distance_m, rayon_m
+    return geofence.verifier_geofence_module(module, latitude, longitude, accuracy_m)
 
 
 # ──────────────────────────────────────────────
@@ -2612,14 +2580,14 @@ def participant_historique(request, pk):
 def participant_fiche_admin(request, pk):
     """Fiche complète d'un participant avec historique détaillé (badgeage, présence, temps de cours).
 
-    Accès : ADMIN, SECRETARIAT, CHEF_SECRETARIAT, CPFAE_ADMIN, CHEF_CPFAE_ADMIN, ENCADRANT (complet).
+    Accès : ADMIN, SECRETARIAT, CHEF_SECRETARIAT, INJS_ADMIN, CHEF_INJS_ADMIN, ENCADRANT (complet).
     Lecture seule : DIRECTION, FINANCE.
     """
     user = request.user
     role = getattr(user, 'role', None)
 
     # Permissions : accès complet ou lecture seule
-    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
+    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'ENCADRANT'}
     read_only_roles = {'DIRECTION', 'FINANCE', 'ARCHIVE'}
 
     if role not in full_access_roles and role not in read_only_roles:
@@ -2668,7 +2636,7 @@ def _resolve_participant_fiche_admin(request, pk):
     user = request.user
     role = getattr(user, 'role', None)
 
-    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'}
+    full_access_roles = {'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'ENCADRANT'}
     read_only_roles = {'DIRECTION', 'FINANCE', 'ARCHIVE'}
 
     if role not in full_access_roles and role not in read_only_roles:

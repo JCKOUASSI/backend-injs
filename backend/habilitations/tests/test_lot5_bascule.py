@@ -382,22 +382,65 @@ class RattacherComptesLegacyTests(SocleOrganisation):
         # le rattachement refuse l'auto-élévation (J2-1).
         self.assertFalse(CompteUtilisateur.objects.filter(
             user__username='legacy_admin').exists())
-        # Un rôle mixte (CHEF_CPFAE_ADMIN = ADMIN_SYSTEME sensible seul ?) :
+        # Un rôle mixte (CHEF_INJS_ADMIN = ADMIN_SYSTEME sensible seul ?) :
         # ici on vérifie le cheminement « propositions » sur un compte posé.
         role = RoleMetier.objects.get(code='ADMIN_SYSTEME')
         self.assertTrue(role.sensible)
 
     def test_04_idempotence_et_role_sans_correspondance(self):
+        """Rattachement idempotent, et rejet des rôles hors nomenclature.
+
+        Lot L4b : `User.role` n'accepte plus que les 12 rôles RBAC canoniques.
+        L'ancien scénario « role='INCONNU' » n'est plus constructible : la
+        commande `rattacher_comptes_legacy` rejette elle-même toute valeur hors
+        nomenclature (voir `ROLE_LEGACY_INCONNU`). Le cas « sans
+        correspondance » se teste désormais au niveau applicatif, et non via
+        une écriture SQL invalide.
+        """
         self._user('legacy_rejoue', 'SECRETARIAT')
-        self._user('legacy_orphelin', 'INCONNU')
+        self._user('legacy_orphelin', 'FORMATEUR')
         appel = dict(stdout=__import__('io').StringIO())
         call_command('rattacher_comptes_legacy', '--appliquer', **appel)
         premier = CompteUtilisateur.objects.count()
         call_command('rattacher_comptes_legacy', '--appliquer', **appel)
+        # Idempotence : la seconde passe ne pose aucun compte supplémentaire.
         self.assertEqual(CompteUtilisateur.objects.count(), premier)
-        self.assertEqual(premier, 1)
-        self.assertFalse(CompteUtilisateur.objects.filter(
-            user__username='legacy_orphelin').exists())
+        # Les deux rôles ont une correspondance CURP (CORRESPONDANCE_LEGACY).
+        self.assertEqual(premier, 2)
+        for username in ('legacy_rejoue', 'legacy_orphelin'):
+            self.assertTrue(CompteUtilisateur.objects.filter(
+                user__username=username).exists(), username)
+
+    def test_04b_role_hors_nomenclature_refuse_par_la_commande(self):
+        """Un rôle absent des 12 rôles RBAC est rejeté avant toute écriture.
+
+        Lot L4b : `User.role` est un champ RBAC strict. Le service de création
+        refuse explicitement toute valeur hors nomenclature
+        (`ROLE_LEGACY_INCONNU`), et la contrainte de base
+        `auth_user_role_canonique_l4b` ferme la porte en dernier recours.
+        """
+        from django.contrib.auth import get_user_model
+        from habilitations.services.comptes_admin import (
+            ErreurConsole, creer_compte,
+        )
+        User = get_user_model()
+        acteur = self._user('acteur_console', 'ADMIN')
+        avant = User.objects.count()
+        payload = {
+            'identifiants': {
+                'username': 'role_bidon',
+                'role_legacy': 'PERSONNEL',  # rôle CURP, pas RBAC
+                'mot_de_passe': 'Mot#2026x',
+                'email': '',
+            },
+            'personne': {},
+        }
+        with self.assertRaises(ErreurConsole) as contexte:
+            creer_compte(acteur, payload)
+        self.assertEqual(contexte.exception.code, 'ROLE_LEGACY_INCONNU')
+        # Aucune écriture partielle : le compte fantôme n'existe pas.
+        self.assertEqual(User.objects.count(), avant)
+        self.assertFalse(User.objects.filter(username='role_bidon').exists())
         self.assertFalse(User.objects.filter(
             username='legacy_orphelin',
             profil_habilitation__isnull=False).exists())

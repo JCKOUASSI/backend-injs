@@ -9,7 +9,7 @@ from statistiques.access import resolve_stats_scope, rapport_accessible, user_se
 from statistiques.models import ConfigAlerteSeuil, Rapport
 
 
-def make_user(username, role='CPFAE_ADMIN', **kwargs):
+def make_user(username, role='INJS_ADMIN', **kwargs):
     return User.objects.create_user(username=username, password='pass', role=role, **kwargs)
 
 
@@ -40,7 +40,7 @@ class ResolveStatsScopeTests(TestCase):
 
     def test_user_secretariat_scope_locked(self):
         sec = make_user('sec_lock', role='SECRETARIAT', secretariat=self.sec_a)
-        admin = make_user('admin_lock', role='CPFAE_ADMIN')
+        admin = make_user('admin_lock', role='INJS_ADMIN')
         self.assertTrue(user_secretariat_scope_locked(sec))
         self.assertFalse(user_secretariat_scope_locked(admin))
 
@@ -60,7 +60,7 @@ class ResolveStatsScopeTests(TestCase):
         self.assertIsNotNone(err)
 
     def test_admin_global_scope(self):
-        admin = make_user('admin_stats', role='CPFAE_ADMIN')
+        admin = make_user('admin_stats', role='INJS_ADMIN')
         scope, err = resolve_stats_scope(admin, secretariat_id=self.sec_b.id)
         self.assertIsNone(err)
         self.assertEqual(scope.secretariat_id, self.sec_b.id)
@@ -166,14 +166,28 @@ class StatistiquesAPIAccessTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['kpis']['modules'], 0)
 
-    def test_legacy_dfrc_role_can_open_dashboard(self):
-        user = make_user('legacy_dfrc', role='DFRC')
+    def test_legacy_dfrc_alias_maps_to_injs_admin(self):
+        """L'alias historique DFRC pointe vers le rôle canonique INJS_ADMIN.
+
+        Lot L4b : `User.role` n'accepte plus que les 12 rôles RBAC canoniques,
+        donc `DFRC` ne peut plus être écrit en base. C'est désormais
+        `statistiques.access.ROLE_ALIASES` — et non le champ lui-même — qui
+        assure la compatibilité de lecture. Le test vérifie donc l'alias, et
+        non une écriture devenue impossible.
+        """
+        from statistiques.access import ROLE_ALIASES, _normalize_stats_roles
+
+        self.assertEqual(ROLE_ALIASES['DFRC'], 'INJS_ADMIN')
+        self.assertIn('INJS_ADMIN', _normalize_stats_roles({'DFRC'}))
+
+        # Le compte réel porte le rôle canonique : il accède au dashboard.
+        user = make_user('dfrc_alias', role='INJS_ADMIN')
         self.client.force_authenticate(user)
         res = self.client.get('/api/statistiques/?sections=kpis')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_put_alertes_seuils_accepts_list_body(self):
-        admin = make_user('admin_seuils', role='CPFAE_ADMIN')
+        admin = make_user('admin_seuils', role='INJS_ADMIN')
         ConfigAlerteSeuil.objects.create(
             indicateur='taux_presence',
             seuil_avertissement=75,
@@ -207,7 +221,7 @@ class RapportAccessTests(TestCase):
         cls.sec_b = Secretariat.objects.create(nom='Sec Rap B')
         cls.gen = make_user('gen', role='SECRETARIAT', secretariat=cls.sec_a)
         cls.other = make_user('other_sec', role='SECRETARIAT', secretariat=cls.sec_b)
-        cls.admin = make_user('admin_rap', role='CPFAE_ADMIN')
+        cls.admin = make_user('admin_rap', role='INJS_ADMIN')
         cls.rapport = Rapport.objects.create(
             titre='Rapport test',
             type=Rapport.Type.MENSUEL,

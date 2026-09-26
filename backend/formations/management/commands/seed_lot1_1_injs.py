@@ -56,12 +56,20 @@ class Command(BaseCommand):
                 code=code, defaults={"libelle": libelle, "description": desc, "actif": True}
             )
 
+        # Coordonnées **officielles** de l'INJS Marcory, validées par le
+        # commanditaire le 26/09/2026 (arbitrage A-03 de l'audit
+        # docs/audits/AUDIT-INJS-LMD-2026-09-26.md, § 23.1).
+        #
+        # ATTENTION — historique : ce seed posait 5.302500 / -3.978500 avec un
+        # rayon de 300 m. Cette valeur n'a jamais été validée par l'INJS et se
+        # situe à **782 m** des coordonnées officielles : avec un rayon de 200 m
+        # elle placerait le campus hors de sa propre zone. Ne pas la restaurer.
         site, _ = RefSite.objects.get_or_create(
             nom="Campus INJS Marcory (Abidjan)",
             defaults={
-                "geofence_latitude": Decimal("5.302500"),
-                "geofence_longitude": Decimal("-3.978500"),
-                "geofence_rayon_m": 300,
+                "geofence_latitude": Decimal("5.308300"),
+                "geofence_longitude": Decimal("-3.982500"),
+                "geofence_rayon_m": 200,
                 "actif": True,
             }
         )

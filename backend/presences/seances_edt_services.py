@@ -97,7 +97,7 @@ def seances_du_jour(user, date=None, *, inclure_toutes=False):
 
     if date is None:
         date = timezone.localdate()
-    roles = {'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT',
+    roles = {'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT',
              'DIRECTION'}
     peut_voir_tout = inclure_toutes or (user.role or '').upper() in roles
     qs = (AffectationCreneau.objects
@@ -139,7 +139,7 @@ def seances_du_jour(user, date=None, *, inclure_toutes=False):
 def peut_gerer_seance(user, affectation):
     """Enseignant affecté, encadrant, secrétariat ou DFRC — jamais le simple auditeur."""
     role = (getattr(user, 'role', '') or '').upper()
-    if role in {'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT',
+    if role in {'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT',
                 'CHEF_SECRETARIAT', 'DIRECTION'}:
         return True
     if role in {'ENCADRANT', 'FORMATEUR'} and affectation.enseignant_id == user.id:
@@ -199,10 +199,49 @@ def generer_jeton(request, affectation, date):
 # Badgeage automatique (scan du QR)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Contrôle de périmètre géographique (décision métier A-02 du 26/09/2026)
+# ---------------------------------------------------------------------------
+
+def _controle_geofence_edt(affectation, coords):
+    """Vérifie la position transmise par le client face au site de la séance.
+
+    Retourne ``(ok, code, detail, distance_m, rayon_m)`` avec la même convention
+    que le canal legacy (`presences/views.py:_check_geofence`).
+
+    Le site est déduit de la salle planifiée (cf. ``geofence.site_de_seance_edt``).
+    Si aucun site n'est déterminable, ou si ce site n'a pas de géofence
+    configurée, le contrôle est neutralisé : le comportement historique est
+    alors conservé.
+    """
+    from . import geofence
+
+    site = geofence.site_de_seance_edt(affectation)
+    if geofence.site_non_localise(site):
+        return True, None, None, None, None
+
+    latitude = (coords or {}).get('last_latitude')
+    longitude = (coords or {}).get('last_longitude')
+    if latitude is None or longitude is None:
+        return (
+            False,
+            'LOCATION_REQUIRED',
+            'La géolocalisation est obligatoire pour badger cette séance.',
+            None,
+            None,
+        )
+
+    return geofence.verifier_position(
+        site, latitude, longitude, (coords or {}).get('last_accuracy_m'))
+
+
 @transaction.atomic
 def badger_scan(request, *, participant, affectation, date, device_id='', coords=None,
                 type_personne='participant'):
     """Entrée/sortie au scan du QR — anti-fraude : 1 entrée + 1 sortie par séance.
+
+    Le contrôle de périmètre géographique est appliqué **à l'entrée** : la sortie
+    referme le pointage déjà ouvert et n'est pas re-vérifiée.
 
     Retourne (action, pointage, None) ou (None, None, réponse-dict d'erreur).
     """
@@ -239,6 +278,21 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
         return None, None, {'code': 'ALREADY_SCANNED',
                             'detail': 'Vous avez déjà pointé (entrée + sortie) pour cette séance.'}
 
+    # Décision métier A-02 : alerte ET refus hors périmètre. Le refus précède la
+    # création du pointage — aucun pointage n'est écrit si la position est rejetée.
+    geo_ok, geo_code, geo_detail, distance_m, rayon_m = _controle_geofence_edt(affectation, coords)
+    if not geo_ok:
+        _log_scan(AuditLog.Action.OUT_OF_GEOFENCE, request, participant, affectation,
+                  None, device_id, {
+                      'code': geo_code,
+                      'detail': geo_detail,
+                      'distance_m': distance_m,
+                      'rayon_m': rayon_m,
+                      'latitude': (coords or {}).get('last_latitude'),
+                      'longitude': (coords or {}).get('last_longitude'),
+                  })
+        return None, None, {'code': geo_code, 'detail': geo_detail}
+
     seuil_retard = debut + timedelta(minutes=_parametre(CLE_TOLERANCE_RETARD))
     pointage = Pointage.objects.create(
         participant=participant,
@@ -255,7 +309,11 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
         **(coords or {}),
     )
     _log_scan(AuditLog.Action.SCAN_SECURE_ENTREE, request, participant, affectation,
-              pointage, device_id, {'retard': pointage.statut_assiduite == Pointage.StatutAssiduite.RETARD})
+              pointage, device_id, {
+                  'retard': pointage.statut_assiduite == Pointage.StatutAssiduite.RETARD,
+                  'distance_m': distance_m,
+                  'rayon_m': rayon_m,
+              })
     return 'ENTREE', pointage, None
 
 

@@ -204,7 +204,7 @@ def assign_superviseur(request, pk):
 # ──────────────────────────────────────────────
 
 class ParticipantListCreateView(generics.ListCreateAPIView):
-    """Secrétariat/CPFAE_ADMIN : lister et créer des participants. Encadrant : lecture seule."""
+    """Secrétariat/INJS_ADMIN : lister et créer des participants. Encadrant : lecture seule."""
     serializer_class = ParticipantSerializer
 
     def get_permissions(self):
@@ -254,7 +254,7 @@ class ParticipantListCreateView(generics.ListCreateAPIView):
 
 
 class ParticipantDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Secrétariat/CPFAE_ADMIN : détail / modifier / supprimer un participant. Encadrant : lecture seule."""
+    """Secrétariat/INJS_ADMIN : détail / modifier / supprimer un participant. Encadrant : lecture seule."""
     serializer_class = ParticipantSerializer
 
     def get_permissions(self):
@@ -842,7 +842,7 @@ def session_qr_image(request, pk, session_pk):
 # ──────────────────────────────────────────────
 
 class FormateurListCreateView(generics.ListCreateAPIView):
-    """Secrétariat/CPFAE_ADMIN : lister et créer des formateurs. Encadrant : lecture seule."""
+    """Secrétariat/INJS_ADMIN : lister et créer des formateurs. Encadrant : lecture seule."""
     serializer_class = FormateurSerializer
 
     def get_permissions(self):
@@ -867,7 +867,7 @@ class FormateurListCreateView(generics.ListCreateAPIView):
 
 
 class FormateurDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Secrétariat/CPFAE_ADMIN : détail / modifier / supprimer un formateur. Encadrant : lecture seule."""
+    """Secrétariat/INJS_ADMIN : détail / modifier / supprimer un formateur. Encadrant : lecture seule."""
     serializer_class = FormateurSerializer
 
     def get_permissions(self):

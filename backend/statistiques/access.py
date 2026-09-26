@@ -21,7 +21,7 @@ from authentication.role_groups import (
 from .models import Rapport
 
 ROLE_ALIASES = {
-    'DFRC': 'CPFAE_ADMIN',
+    'DFRC': 'INJS_ADMIN',
     'SUPERVISEUR': 'ENCADRANT',
     'SUPERVISOR': 'ENCADRANT',
 }

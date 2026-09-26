@@ -228,7 +228,7 @@ class RattrapageApiTest(TestCase):
         self.formation = Formation.objects.create(formation='Cycle A')
         self.mod_a, self.seance_a, self.p = _cohorte(self.formation, 'GROUPE 1', 'P100')
         self.mod_b, self.seance_b, self.q = _cohorte(self.formation, 'GROUPE 2', 'Q100')
-        self.user = User.objects.create_user(username='dfrc', password='pass', role='CPFAE_ADMIN')
+        self.user = User.objects.create_user(username='dfrc', password='pass', role='INJS_ADMIN')
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 

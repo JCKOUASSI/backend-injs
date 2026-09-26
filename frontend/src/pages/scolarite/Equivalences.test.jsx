@@ -82,7 +82,7 @@ const mount = (role = 'ADMIN', demandesFn = () => demandes) => {
   })
 }
 
-const ROLES_ACTEURS = ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT']
+const ROLES_ACTEURS = ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT']
 const canAct = (role) => ROLES_ACTEURS.includes(role)
 
 const getCalls = (path) =>

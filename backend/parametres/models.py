@@ -122,11 +122,11 @@ class Parametre(models.Model):
         help_text="Si False, le paramètre ne peut pas être modifié",
     )
     modifiable_par_roles = models.TextField(
-        default='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
+        default='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
         help_text="Rôles autorisés à modifier (JSON array)",
     )
     lecturable_par_roles = models.TextField(
-        default='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN", "DIRECTION", "FINANCE"]',
+        default='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN", "DIRECTION", "FINANCE"]',
         help_text="Rôles autorisés à consulter (JSON array)",
     )
 

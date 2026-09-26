@@ -107,7 +107,7 @@ class ParcoursCompletTests(TestCase):
 
     def setUp(self):
         self.acteur = User.objects.create_user(
-            username='scolarite', password='pass', role='CPFAE_ADMIN',
+            username='scolarite', password='pass', role='INJS_ADMIN',
         )
         self.client = APIClient()
         self.client.force_authenticate(self.acteur)

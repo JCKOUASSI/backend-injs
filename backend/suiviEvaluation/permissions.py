@@ -4,7 +4,7 @@ from authentication.permissions import _has_role
 from authentication.role_groups import get_user_role, user_has_perm
 
 
-ROLES_SUPERVISEUR = {'SUPERVISEUR', 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'}
+ROLES_SUPERVISEUR = {'SUPERVISEUR', 'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'}
 
 # Aligné sur frontend EVALUATION_ALLOWED_ROLES
 ROLES_GESTION_QUESTIONNAIRES = ROLES_SUPERVISEUR | {
@@ -13,13 +13,13 @@ ROLES_GESTION_QUESTIONNAIRES = ROLES_SUPERVISEUR | {
 
 # Rôles autorisés à saisir/gérer les notes et épreuves
 ROLES_GESTION_NOTES = {
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
+    'ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN',
     'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT', 'SUPERVISEUR',
 }
 
 # Rôles autorisés à valider les décisions pédagogiques
 ROLES_DECISION = {
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'ENCADRANT', 'SUPERVISEUR',
+    'ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'ENCADRANT', 'SUPERVISEUR',
 }
 
 # Rôles ayant accès en lecture aux fiches/tableaux de bord

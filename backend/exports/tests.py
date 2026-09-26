@@ -30,7 +30,7 @@ from .views import (
 )
 
 
-def make_user(username, role='CPFAE_ADMIN', **kwargs):
+def make_user(username, role='INJS_ADMIN', **kwargs):
     return User.objects.create_user(username=username, password='pass', role=role, **kwargs)
 
 
@@ -91,7 +91,7 @@ class ExportFixtureMixin:
             duree_presence_minutes=120,
         )
 
-        cls.admin = make_user('export_admin', role='CPFAE_ADMIN')
+        cls.admin = make_user('export_admin', role='INJS_ADMIN')
         cls.direction = make_user('export_direction', role='DIRECTION')
         cls.finance = make_user('export_finance', role='FINANCE')
         cls.encadrant = make_user('export_encadrant', role='ENCADRANT')

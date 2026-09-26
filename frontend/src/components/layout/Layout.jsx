@@ -333,7 +333,12 @@ export default function Layout({ children, breadcrumb }) {
           </div>
         </header>
 
-        <div className="page-content" style={{ padding: 0 }}>
+        {/* Le padding n'est plus forcé à 0 : `.page-content` applique la
+            gouttière du design system INJS (1.5rem / 1.75rem), identique à
+            celle du Dashboard Engine. Les écrans qui construisent leur propre
+            conteneur (.scolarite-dashboard-page, .finance-page,
+            .dashboard-engine-wrapper) conservent leur padding. */}
+        <div className="page-content">
           {children}
         </div>
       </main>

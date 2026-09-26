@@ -30,7 +30,7 @@ const STATUT_LABELS = {
   ABSENT_NON_BADGE:'Absent non badgé', HORS_LIGNE_SUSPECT:'Hors ligne suspect',
   SORTIE_AUTO:'Sortie automatique',
 }
-const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_CPFAE_ADMIN','CPFAE_ADMIN']
+const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_INJS_ADMIN','INJS_ADMIN']
 
 const RB_VIEWS = [
   { id: 'bilans', label: 'Bilans INJS', icon: 'bi-table' },

@@ -399,7 +399,7 @@ La liste affiche pour chaque token :
 
 | Groupe | Usage typique |
 |--------|----------------|
-| ROLE_ADMIN / ROLE_CPFAE_ADMIN | Accès large, administration |
+| ROLE_ADMIN / ROLE_INJS_ADMIN | Accès large, administration |
 | ROLE_CHEF_SECRETARIAT / ROLE_SECRETARIAT | Gestion du secrétariat |
 | ROLE_ENCADRANT | Supervision de modules assignés |
 | ROLE_DIRECTION / ROLE_FINANCE | Consultation, exports |

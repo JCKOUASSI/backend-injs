@@ -15,7 +15,7 @@ from ..models import (
 from ..volume_horaire import compute_dashboard_volume_horaire
 
 
-def make_user(username, role='CPFAE_ADMIN', **kwargs):
+def make_user(username, role='INJS_ADMIN', **kwargs):
     u = User.objects.create_user(username=username, password='pass', role=role, **kwargs)
     return u
 
@@ -109,7 +109,7 @@ class SecretariatListAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_sec', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_sec', role='INJS_ADMIN')
         self.client.force_authenticate(user=self.admin)
         self.f = make_formation()
         self.sec_a = Secretariat.objects.create(nom='Sec A')
@@ -171,7 +171,7 @@ class ModuleAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_module', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_module', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
         self.f = make_formation()
         self.m = make_module(self.f, intitule='Module API', statut='PLANIFIEE')
@@ -310,7 +310,7 @@ class ModuleParticipantAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_mp', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_mp', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
         self.f = make_formation()
         self.m = make_module(self.f)
@@ -362,7 +362,7 @@ class ModuleFormateurAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_mf', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_mf', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
         self.f = make_formation()
         self.m = make_module(self.f)
@@ -467,7 +467,7 @@ class DashboardStatsAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_stats', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_stats', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
         f = make_formation()
         make_module(f, intitule='Module en cours 1', statut='EN_COURS', groupe='GROUPE 1')
@@ -507,7 +507,7 @@ class ReferentielsAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        u = make_user('admin_ref', role='CPFAE_ADMIN')
+        u = make_user('admin_ref', role='INJS_ADMIN')
         self.client.force_authenticate(u)
 
     def test_referentiels(self):
@@ -531,7 +531,7 @@ class RefModuleFormationsAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        u = make_user('admin_ref_module', role='CPFAE_ADMIN')
+        u = make_user('admin_ref_module', role='INJS_ADMIN')
         self.client.force_authenticate(u)
         # Préfixe [TEST] : repérable si du code est lancé hors manage.py test (shell, serveur dev).
         self.f1 = RefFormation.objects.create(intitule='[TEST] CYCLE A', actif=True)
@@ -601,7 +601,7 @@ class RefSalleAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        u = make_user('admin_ref_salle', role='CPFAE_ADMIN')
+        u = make_user('admin_ref_salle', role='INJS_ADMIN')
         self.client.force_authenticate(u)
         self.site = RefSite.objects.create(nom='[TEST] INJS MARCORY', actif=True)
         self.other_site = RefSite.objects.create(nom='[TEST] AUTRE SITE', actif=True)
@@ -656,7 +656,7 @@ class ParticipantSecretariatDispatchByMatriculeAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_dispatch_matricule', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_dispatch_matricule', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
         self.sec_fab = Secretariat.objects.create(nom='FAB')
         self.sec_fac = Secretariat.objects.create(nom='FAC')

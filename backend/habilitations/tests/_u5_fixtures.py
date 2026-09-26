@@ -46,6 +46,11 @@ def admin(username='admin5', role='ADMIN'):
     )
 
 
+#: Rôle RBAC utilisé quand une fixture demande l'ancien pseudo-rôle métier
+#: `PERSONNEL`, qui n'appartient pas aux 12 rôles canoniques INJS-LMD.
+ROLE_RBAC_DEFAUT = User.Role.SECRETARIAT
+
+
 def positionner_flag(cle, actif):
     Parametre.objects.update_or_create(
         cle=cle,
@@ -66,9 +71,18 @@ def ouvrir(*cles):
 def compte_curp(username, role_code=None, statut=CompteUtilisateur.Statut.ACTIF,
                 role_legacy='PERSONNEL', cree_par=None, niveau='N2',
                 canal=CanalAcces.WEB, **champs):
-    """Crée un User + profil CURP direct (pour les tests de services)."""
+    """Crée un User + profil CURP direct (pour les tests de services).
+
+    `role_legacy` alimente `User.role`, qui n'accepte que les 12 rôles RBAC
+    INJS-LMD (contrainte `auth_user_role_canonique_l4b`, lot L4b). La valeur
+    historique `PERSONNEL` était un rôle métier CURP, jamais un rôle RBAC :
+    elle est désormais mappée sur `SECRETARIAT`, qui joue exactement le même
+    rôle de « compte opérationnel » dans ces tests. Le rôle métier reste porté
+    par `role_code` / `AttributionRole`, comme dans le modèle cible.
+    """
+    role_rbac = ROLE_RBAC_DEFAUT if role_legacy == 'PERSONNEL' else role_legacy
     user = User.objects.create_user(
-        username=username, password='Mot#2026x', role=role_legacy,
+        username=username, password='Mot#2026x', role=role_rbac,
         is_active=statut == CompteUtilisateur.Statut.ACTIF,
     )
     compte = CompteUtilisateur.objects.create(
@@ -154,7 +168,7 @@ def agent_actif(matricule='AG001', date_entree=None, date_sortie=None,
                 avec_compte=False, role_code=None, cree_par=None):
     from ressources_humaines.models import Agent
     user = User.objects.create_user(
-        username=matricule.lower(), password='Mot#2026x', role='PERSONNEL',
+        username=matricule.lower(), password='Mot#2026x', role=ROLE_RBAC_DEFAUT,
     ) if avec_compte else None
     agent = Agent.objects.create(
         matricule=matricule, nom='Diallo', prenom='Mamadou',

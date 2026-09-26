@@ -35,7 +35,7 @@ User = get_user_model()
 # ---------------------------------------------------------------------------
 TOUS_MODULES = tuple(CAPACITES_DESCRIPTEURS.keys())
 
-ADMIN_TRIO = ('ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN')
+ADMIN_TRIO = ('ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN')
 SECRETARIATS = ('CHEF_SECRETARIAT', 'SECRETARIAT')
 
 MATRICE = {
@@ -43,7 +43,7 @@ MATRICE = {
     for role in User.Role.values
 }
 
-# --- ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN (matrice identique) --------------
+# --- ADMIN, CHEF_INJS_ADMIN, INJS_ADMIN (matrice identique) --------------
 for _role in ADMIN_TRIO:
     MATRICE[_role].update({
         'web': ['acceder', 'operationnel'],
@@ -134,7 +134,7 @@ MATRICE['SUPERVISEUR'].update({
 # FORMATEUR et AUDITEUR : aucune capacité (comptes réservés au mobile).
 
 NIVEAU_ATTENDU = {
-    'ADMIN': 'N4', 'DIRECTION': 'N4', 'CHEF_CPFAE_ADMIN': 'N4', 'CPFAE_ADMIN': 'N4',
+    'ADMIN': 'N4', 'DIRECTION': 'N4', 'CHEF_INJS_ADMIN': 'N4', 'INJS_ADMIN': 'N4',
     'CHEF_SECRETARIAT': 'N3', 'FINANCE': 'N3',
     'SECRETARIAT': 'N2', 'ENCADRANT': 'N2', 'SUPERVISEUR': 'N2', 'FORMATEUR': 'N2',
     'ARCHIVE': 'N1', 'AUDITEUR': 'N1',

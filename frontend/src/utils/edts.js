@@ -66,7 +66,7 @@ export const ROLES_VALIDATION = ['ADMIN', 'DIRECTION']
 
 /** Rôles planificateurs (miroir de edts.permissions.PLANIFICATION_ROLES). */
 export const ROLES_PLANIFICATION = [
-  'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'SECRETARIAT',
+  'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'SECRETARIAT',
   'CHEF_SECRETARIAT', 'DIRECTION', 'ENCADRANT',
 ]
 

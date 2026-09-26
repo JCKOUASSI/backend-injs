@@ -29,8 +29,8 @@ MOT_DE_PASSE_DEFAUT = "Temoin#2026"
 # (suffixe username, rôle, secrétariat de rattachement ou None)
 COMPTES = [
     ("temoin_admin", User.Role.ADMIN, None),
-    ("temoin_chef_cpfae_admin", User.Role.CHEF_CPFAE_ADMIN, None),
-    ("temoin_cpfae_admin", User.Role.CPFAE_ADMIN, None),
+    ("temoin_chef_cpfae_admin", User.Role.CHEF_INJS_ADMIN, None),
+    ("temoin_cpfae_admin", User.Role.INJS_ADMIN, None),
     ("temoin_direction", User.Role.DIRECTION, None),
     ("temoin_chef_secretariat_a", User.Role.CHEF_SECRETARIAT, "A"),
     ("temoin_chef_secretariat_b", User.Role.CHEF_SECRETARIAT, "B"),

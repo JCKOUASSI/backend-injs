@@ -179,7 +179,7 @@ class ImportExcelAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='import_api', password='pass', role='CPFAE_ADMIN',
+            username='import_api', password='pass', role='INJS_ADMIN',
         )
         self.client.force_authenticate(self.user)
 

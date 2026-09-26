@@ -8,7 +8,7 @@
   background: linear-gradient(180deg, #F0F5FB 0%, #E8F0F8 100%);
   min-height: calc(100vh - 70px);
   color: #1e293b;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-lmd2026);
 }
 
 /* ── 1. EN-TÊTE ── */
@@ -74,12 +74,12 @@
 
 .export-pill-btn:hover {
   background: #ffffff;
-  color: #1E62D0;
+  color: #2563EB;
 }
 
 /* Bouton bleu + Nouvelle inscription */
 .btn-nouvelle-inscription {
-  background: linear-gradient(135deg, #1E62D0 0%, #2F80ED 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #2A7FFF 100%);
   color: #ffffff !important;
   font-size: 0.85rem;
   font-weight: 700;
@@ -88,13 +88,13 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
-  box-shadow: 0 4px 14px rgba(47, 128, 237, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   transition: all 0.15s ease;
 }
 
 .btn-nouvelle-inscription:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(47, 128, 237, 0.45);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
 }
 
 /* ── 2. GRILLE DE RACCOURCIS (PILLS) ── */
@@ -125,15 +125,15 @@
 
 .quick-pill-btn:hover {
   background: #ffffff;
-  border-color: #2F80ED;
-  color: #1E62D0;
+  border-color: #2A7FFF;
+  color: #2563EB;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(47, 128, 237, 0.15);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
 .quick-pill-btn i {
   font-size: 1.05rem;
-  color: #2F80ED;
+  color: #2A7FFF;
 }
 
 .quick-pill-admissions {
@@ -199,7 +199,7 @@
 
 .kpi-icon-box.kpi-blue {
   background: #EBF3FF;
-  color: #2F80ED;
+  color: #2A7FFF;
 }
 
 .kpi-icon-box.kpi-teal {

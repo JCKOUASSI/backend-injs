@@ -162,7 +162,7 @@ class WelcomeEmailTests(TestCase):
     """Tests pour l'envoi d'email de bienvenue lors de la création d'un utilisateur."""
 
     def setUp(self):
-        self.admin = make_user(username='email_admin', password='adminpass', role='CHEF_CPFAE_ADMIN')
+        self.admin = make_user(username='email_admin', password='adminpass', role='CHEF_INJS_ADMIN')
         self.client = APIClient()
         self.client.force_authenticate(user=self.admin)
 
@@ -235,7 +235,7 @@ class EncadrantSecretariatTests(TestCase):
         from rest_framework.test import APIRequestFactory
 
         sec = Secretariat.objects.create(nom='Sec Enc Create')
-        admin = make_user('enc-admin', role='CHEF_CPFAE_ADMIN')
+        admin = make_user('enc-admin', role='CHEF_INJS_ADMIN')
         request = APIRequestFactory().post('/api/auth/users/')
         request.user = admin
         serializer = UserCreateSerializer(

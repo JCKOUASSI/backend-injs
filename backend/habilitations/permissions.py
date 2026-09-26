@@ -135,7 +135,7 @@ class ExigePermission(BasePermission):
 
 
 class EstAdministrateurHabilitations(BasePermission):
-    """Réservé au trio d'administration legacy (ADMIN, CPFAE_ADMIN, CHEF).
+    """Réservé au trio d'administration legacy (ADMIN, INJS_ADMIN, CHEF).
 
     On ne se fonde PAS sur la permission ``mutate_users`` : les secrétariats
     la détiennent pour gérer les comptes métier, mais la synthèse
@@ -155,7 +155,7 @@ class EstAdministrateurHabilitations(BasePermission):
             from authentication.role_groups import user_in_roles
             return user_in_roles(
                 user,
-                ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'),
+                ('ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'),
             )
         except ImportError:
             return False

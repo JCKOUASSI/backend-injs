@@ -205,7 +205,7 @@ def dashboard_stats(request):
         modules_qs = modules_qs.filter(superviseur=request.user)
         fp_ids = ModuleParticipant.objects.filter(module__superviseur=request.user).values_list('participant_id', flat=True)
         participants_qs = participants_qs.filter(id__in=fp_ids).distinct()
-    elif request.user.is_authenticated and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION', 'ARCHIVE') and secretariat_filter:
+    elif request.user.is_authenticated and request.user.role in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'DIRECTION', 'ARCHIVE') and secretariat_filter:
         modules_qs = modules_qs.filter(secretariat_id=secretariat_filter)
         participants_qs = participants_qs.filter(secretariat_id=secretariat_filter)
 
@@ -571,7 +571,7 @@ def _filtered_modules_queryset(request, *, archives_only=False):
         queryset = queryset.filter(secretariat__type_id=secretariat_type)
 
     secretariat_id = request.query_params.get('secretariat')
-    if secretariat_id and request.user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'DIRECTION', 'ARCHIVE'):
+    if secretariat_id and request.user.role in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'DIRECTION', 'ARCHIVE'):
         queryset = queryset.filter(secretariat_id=secretariat_id)
 
     vague_filter = request.query_params.get('vague')
@@ -4798,7 +4798,7 @@ def module_remove_formateur(request, formation_pk, module_pk, formateur_id):
 def module_assign_superviseur(request, formation_pk, module_pk):
     """Assigner (ou retirer) un encadrant superviseur à un module.
 
-    - Rôles autorisés : SECRETARIAT, CHEF_SECRETARIAT, CPFAE_ADMIN, CHEF_CPFAE_ADMIN.
+    - Rôles autorisés : SECRETARIAT, CHEF_SECRETARIAT, INJS_ADMIN, CHEF_INJS_ADMIN.
     - Scope : SECRETARIAT/CHEF_SECRETARIAT ne peuvent agir que sur les modules
       de leur propre secrétariat.
     - Body : { "superviseur_id": <int|null> }  (null ou omis => retrait).

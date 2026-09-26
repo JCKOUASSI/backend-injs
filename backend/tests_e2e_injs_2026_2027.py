@@ -168,10 +168,13 @@ def run():
     regime_init = RegimeEtudes.objects.get(code='INITIAL')
     statut_actif = StatutEtudiant.objects.get(code='ACTIF')
 
-    # Infrastructure physique Marcory
+    # Infrastructure physique Marcory — géofence aux coordonnées **officielles**
+    # validées par le commanditaire le 26/09/2026 (arbitrage A-03). L'ancienne
+    # valeur 5.302500 / -3.978500 (rayon 300 m) n'a jamais été validée et se
+    # situe à 782 m du point officiel : ne pas la restaurer.
     site_marcory, _ = RefSite.objects.get_or_create(
         nom='Campus INJS Marcory (Abidjan)',
-        defaults={'geofence_latitude': Decimal('5.302500'), 'geofence_longitude': Decimal('-3.978500'), 'geofence_rayon_m': 300, 'actif': True}
+        defaults={'geofence_latitude': Decimal('5.308300'), 'geofence_longitude': Decimal('-3.982500'), 'geofence_rayon_m': 200, 'actif': True}
     )
     bat_staps, _ = RefBatiment.objects.get_or_create(site=site_marcory, nom='Bâtiment Pédagogique STAPS', defaults={'actif': True})
     bat_sport, _ = RefBatiment.objects.get_or_create(site=site_marcory, nom='Complexe Sportif & Gymnase', defaults={'actif': True})

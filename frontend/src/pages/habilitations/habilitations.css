@@ -4,7 +4,7 @@
    ========================================================================== */
 
 .hab-bandeau {
-  background: linear-gradient(135deg, #1E62D0 0%, #0B1F3A 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #0B1F3A 100%);
   color: #fff;
   font-size: 0.84rem;
   font-weight: 600;
@@ -60,7 +60,7 @@
 }
 
 .hab-nav a.active {
-  background: linear-gradient(90deg, #1E70EB 0%, #2F80ED 100%) !important;
+  background: linear-gradient(90deg, #2563EB 0%, #2A7FFF 100%) !important;
   color: #FFFFFF !important;
   box-shadow: 0 4px 12px rgba(30, 112, 235, 0.35);
 }
@@ -123,9 +123,9 @@
 }
 
 .hab-etape.active {
-  border-color: #2F80ED;
+  border-color: #2A7FFF;
   background: #EBF3FF;
-  color: #1E62D0;
+  color: #2563EB;
   font-weight: 700;
 }
 

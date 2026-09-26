@@ -287,15 +287,6 @@ export const ARBORESCENCE = [
         },
       },
       {
-        id: 'formations.cours',
-        libelle: 'Cours & modules (CPFAE — héritage)',
-        chemin: '/modules',
-        droit: {
-          curp: ['pedagogie.volume_horaire.consulter'],
-          legacy: [['web', 'operationnel']],
-        },
-      },
-      {
         id: 'formations.enseignants',
         libelle: 'Enseignants',
         chemin: '/formateurs',
@@ -633,7 +624,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['diplomation.registre.consulter'],
           legacy: [['scolarite', 'voir']],
-          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
     ],
@@ -967,7 +958,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['administrations.version_document.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
       {
@@ -979,7 +970,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['administrations.version_document.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
       {
@@ -989,7 +980,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['administrations.version_document.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ARCHIVE', 'DIRECTION', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
     ],
@@ -1183,7 +1174,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['administration.politique.administrer', 'parametres.parametre.administrer'],
           legacy: [['habilitations_admin', 'gerer']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
     ],
@@ -1295,7 +1286,7 @@ export const ARBORESCENCE = [
     icone: 'bi-sliders',
     droit: {
       legacy: [['web', 'operationnel']],
-      roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+      roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
     },
     enfants: [
       {
@@ -1305,7 +1296,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['referentiels.referentiel.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
       {
@@ -1395,7 +1386,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['parametres.parametre.consulter'],
           legacy: [['web', 'operationnel']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
       {
@@ -1405,7 +1396,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['parametres.parametre.administrer'],
           legacy: [['web', 'operationnel']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'],
+          roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'],
         },
       },
       {
@@ -1417,7 +1408,7 @@ export const ARBORESCENCE = [
         droit: {
           curp: ['scolarite.dossier_etudiant.creer', 'scolarite.inscription_administrative.creer'],
           legacy: [['participants', 'gerer']],
-          roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'],
+          roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT'],
         },
       },
     ],
@@ -1430,7 +1421,7 @@ export const ARBORESCENCE = [
     icone: 'bi-search',
     droit: {
       legacy: [['habilitations_admin', 'gerer'], ['statistiques', 'voir_globales']],
-      roles: ['ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION'],
+      roles: ['ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'DIRECTION'],
     },
     enfants: [
       {
@@ -1541,8 +1532,8 @@ export const PIED_DE_BARRE = [
 export const LIBELLES_ROLES = {
   ADMIN: 'Administrateur',
   DIRECTION: 'Direction',
-  CHEF_CPFAE_ADMIN: 'Chef INJS Admin',
-  CPFAE_ADMIN: 'INJS Admin',
+  CHEF_INJS_ADMIN: 'Chef INJS Admin',
+  INJS_ADMIN: 'INJS Admin',
   CHEF_SECRETARIAT: 'Chef Secrétariat',
   SECRETARIAT: 'Secrétariat',
   FINANCE: 'Finance',

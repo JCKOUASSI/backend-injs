@@ -9,6 +9,11 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import './index.css'
 import './styles/finance.css'
 import './styles/login.css'
+// Doit être importé EN DERNIER : cette feuille harmonise le design de
+// référence (Dashboard Engine) sur tous les autres tableaux de bord et
+// fenêtres. Chargée après index.css / finance.css, elle prend donc le
+// dessus sur la cascade. Ne jamais la remonter.
+import './styles/harmonisation.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

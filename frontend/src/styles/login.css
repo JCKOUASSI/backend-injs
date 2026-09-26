@@ -206,8 +206,8 @@
 }
 
 .login-input:focus-within {
-  border-color: #2F80ED;
-  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.18);
+  border-color: #2A7FFF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .login-input i {
@@ -322,10 +322,10 @@
 
 .btn-login-admin:hover {
   background: #FFFFFF;
-  border-color: #2F80ED;
-  color: #1E62D0;
+  border-color: #2A7FFF;
+  color: #2563EB;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(47, 128, 237, 0.16);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.16);
 }
 
 .btn-login-admin i {
@@ -335,7 +335,7 @@
 }
 
 .btn-login-admin:hover i {
-  color: #2F80ED;
+  color: #2A7FFF;
 }
 
 /* Plaquette des comptes démo avec effet de carte douce */

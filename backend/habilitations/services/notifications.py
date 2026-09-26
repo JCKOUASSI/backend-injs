@@ -24,7 +24,7 @@ def notifier_admins(categorie, titre, message='', meta=None):
     """Notifie le trio d'administration legacy (comptes actifs uniquement)."""
     from authentication.models import User
     admins = User.objects.filter(
-        role__in=('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'),
+        role__in=('ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'),
         is_active=True,
     )
     return [

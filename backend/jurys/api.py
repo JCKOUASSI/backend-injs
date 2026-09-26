@@ -129,9 +129,9 @@ def _user_model():
 
 
 def _has_role_complet(user):
-    """ADMIN / CPFAE_ADMIN / CHEF_CPFAE_ADMIN : accès complet (IsDFRC complet)."""
+    """ADMIN / INJS_ADMIN / CHEF_INJS_ADMIN : accès complet (IsDFRC complet)."""
     return (user and user.is_authenticated
-            and getattr(user, 'role', None) in ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'))
+            and getattr(user, 'role', None) in ('ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'))
 
 
 @api_view(['GET', 'POST'])

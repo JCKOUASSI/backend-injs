@@ -104,11 +104,11 @@ class CanManageModuleParticipant(HasFormationsPerm):
 
 
 class IsDFRC(BasePermission):
-    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN : accès complet. Direction : lecture seule."""
+    """ADMIN/CHEF_INJS_ADMIN/INJS_ADMIN : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if _has_role(request.user, 'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'):
             return True
         if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
@@ -116,11 +116,11 @@ class IsDFRC(BasePermission):
 
 
 class IsDFRCOrEncadrant(BasePermission):
-    """ADMIN/CHEF_CPFAE_ADMIN/CPFAE_ADMIN/Encadrant : accès complet. Direction/Archiviste : lecture seule."""
+    """ADMIN/CHEF_INJS_ADMIN/INJS_ADMIN/Encadrant : accès complet. Direction/Archiviste : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _has_role(request.user, 'ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ENCADRANT'):
+        if _has_role(request.user, 'ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN', 'ENCADRANT'):
             return True
         if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
@@ -170,7 +170,7 @@ class IsSecretariatOrDFRC(BasePermission):
             return False
         if _has_role(
             request.user,
-            'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN',
+            'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'INJS_ADMIN', 'CHEF_INJS_ADMIN',
         ):
             return True
         if _has_role(
@@ -208,11 +208,11 @@ class IsUserMutationAllowed(BasePermission):
 
 
 class IsSecretariatOrEncadrantOrDFRC(BasePermission):
-    """ADMIN, Secrétariat, Chef Secrétariat, Encadrant, CPFAE_ADMIN, Chef CPFAE_ADMIN : accès complet. Direction : lecture seule."""
+    """ADMIN, Secrétariat, Chef Secrétariat, Encadrant, INJS_ADMIN, Chef INJS_ADMIN : accès complet. Direction : lecture seule."""
     def has_permission(self, request, view):
         if not (request.user and request.user.is_authenticated):
             return False
-        if _has_role(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'):
+        if _has_role(request.user, 'ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT', 'ENCADRANT', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'):
             return True
         if _has_role(request.user, 'DIRECTION', 'ARCHIVE') and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True

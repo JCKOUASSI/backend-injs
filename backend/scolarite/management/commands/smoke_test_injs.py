@@ -190,7 +190,7 @@ class Command(BaseCommand):
         module_b = Module.objects.create(
             formation=formation_op, intitule='Physiologie (démo)', ref_module=ref_b,
         )
-        acteur = User.objects.create_user(username='smoke_agent', password='x', role='CPFAE_ADMIN')
+        acteur = User.objects.create_user(username='smoke_agent', password='x', role='INJS_ADMIN')
 
         self.contexte.update(locals())
 

@@ -15,7 +15,7 @@ from formations.models import (
 )
 
 
-def make_user(username, role='CPFAE_ADMIN', **kwargs):
+def make_user(username, role='INJS_ADMIN', **kwargs):
     return User.objects.create_user(username=username, password='pass', role=role, **kwargs)
 
 
@@ -270,7 +270,7 @@ class ReferentielAPIAccessTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_cpfae_can_access_ref_formations(self):
-        admin = make_user('admin_ref', role='CPFAE_ADMIN')
+        admin = make_user('admin_ref', role='INJS_ADMIN')
         self.client.force_authenticate(admin)
         res = self.client.get('/api/formations/ref/formations/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)

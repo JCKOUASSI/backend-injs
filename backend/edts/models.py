@@ -224,6 +224,18 @@ class AffectationCreneau(models.Model):
         default='',
         help_text='Salle attendue (chaîne éditable).',
     )
+    salle = models.ForeignKey(
+        'formations.RefSalle',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='seances_edt',
+        help_text=(
+            "Salle du référentiel INJS (Lot L2). Complète `salle_nom`, conservé "
+            "en lecture/transition : le rattachement est MANUEL et explicite, "
+            "aucune déduction automatique n'est effectuée."
+        ),
+    )
     formation = models.ForeignKey(
         'formations.RefFormation',
         on_delete=models.PROTECT,
@@ -265,6 +277,18 @@ class AffectationCreneau(models.Model):
     )
     intitule = models.CharField(max_length=255, blank=True, default='')
     commentaire = models.TextField(blank=True, default='')
+    affectation_pedagogique = models.ForeignKey(
+        'scolarite.AffectationPedagogique',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='seances_edt',
+        help_text=(
+            "Contexte pédagogique de la séance (formation, parcours, niveau, semestre, "
+            "UE, ECUE, groupe, enseignant). Rattachement MANUEL et explicite : aucune "
+            "déduction automatique n'est effectuée."
+        ),
+    )
     actif = models.BooleanField(default=True, db_index=True)
     cree_par = models.ForeignKey(
         settings.AUTH_USER_MODEL,

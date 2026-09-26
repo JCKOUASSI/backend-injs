@@ -16,8 +16,8 @@ import Users from '@/pages/Users'
 
 const PAGE_SIZE = 50
 const LABELS = {
-  ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_CPFAE_ADMIN: 'Chef INJS Admin',
-  CPFAE_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat',
+  ADMIN: 'Administrateur', DIRECTION: 'Direction', CHEF_INJS_ADMIN: 'Chef INJS Admin',
+  INJS_ADMIN: 'INJS Admin', CHEF_SECRETARIAT: 'Chef Secrétariat', SECRETARIAT: 'Secrétariat',
   FINANCE: 'Finance', ARCHIVE: 'Archiviste', ENCADRANT: 'Encadrant', SUPERVISEUR: 'Superviseur',
   FORMATEUR: 'Formateur', AUDITEUR: 'Étudiant',
 }
@@ -78,7 +78,7 @@ const adminMe = () =>
       badge_account_roles: ['AUDITEUR', 'FORMATEUR'],
       can_mutate_users: true,
       manageable_roles: [
-        'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT',
+        'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT',
         'FINANCE', 'ARCHIVE', 'ENCADRANT', 'SUPERVISEUR', 'FORMATEUR', 'AUDITEUR',
       ],
       staff_filter_roles: ['FINANCE', 'ENCADRANT'],
@@ -532,7 +532,7 @@ describe('pages/Users.jsx — présentation de la liste, données dégradées et
     setup(adminMe(), {
       rows: [
         cu(3, { role: 'DIRECTION', first_name: 'Dir', last_name: 'A' }),
-        cu(4, { role: 'CHEF_CPFAE_ADMIN', first_name: 'Chf', last_name: 'B' }),
+        cu(4, { role: 'CHEF_INJS_ADMIN', first_name: 'Chf', last_name: 'B' }),
         cu(5, { role: 'CHEF_SECRETARIAT', first_name: 'Chs', last_name: 'C' }),
         cu(6, { role: 'ARCHIVE', first_name: 'Arc', last_name: 'D' }),
         cu(7, { role: 'ROLE_BIDON', first_name: 'Bid', last_name: 'E' }),
@@ -553,14 +553,14 @@ describe('pages/Users.jsx — présentation de la liste, données dégradées et
     const me = makeUser('ADMIN', {
       username: 'cpfaadmin',
       role_context: {
-        labels: { ...LABELS, CPFAE_ADMIN: 'Administrateur CPFAE' },
+        labels: { ...LABELS, INJS_ADMIN: 'Administrateur CPFAE' },
         badge_account_roles: ['AUDITEUR', 'FORMATEUR'],
         can_mutate_users: true,
-        manageable_roles: ['CPFAE_ADMIN', 'ENCADRANT'],
+        manageable_roles: ['INJS_ADMIN', 'ENCADRANT'],
         staff_filter_roles: [],
       },
     })
-    setup(me, { rows: [cu(8, { role: 'CPFAE_ADMIN', first_name: 'Cpf', last_name: 'X' })] })
+    setup(me, { rows: [cu(8, { role: 'INJS_ADMIN', first_name: 'Cpf', last_name: 'X' })] })
     await waitForResults(1)
     // Le remplacement vaut pour le badge de la ligne (le libellé est aussi dans le filtre).
     expect(roleBadge('Cpf X').textContent).toBe('Administrateur INJS')
@@ -884,12 +884,12 @@ describe('pages/Users.jsx — création de comptes (LOT 36)', () => {
   })
 
   it("signale qu'un Chef INJS Admin existe déjà dès qu'on choisit ce rôle en création", async () => {
-    setup(adminMe(), { rows: [cu(20, { role: 'CHEF_CPFAE_ADMIN', first_name: 'Chef', last_name: 'Installe' })] })
+    setup(adminMe(), { rows: [cu(20, { role: 'CHEF_INJS_ADMIN', first_name: 'Chef', last_name: 'Installe' })] })
     await waitForResults(1)
 
     const modal = await openCreate()
     expect(within(modal).queryByText(/rôle est unique/i)).not.toBeInTheDocument()
-    fillCreate(modal, { role: 'CHEF_CPFAE_ADMIN' })
+    fillCreate(modal, { role: 'CHEF_INJS_ADMIN' })
     expect(await within(modal).findByText(/un chef injs admin existe déjà/i)).toBeInTheDocument()
     fillCreate(modal, { role: 'DIRECTION' })
     expect(within(modal).queryByText(/rôle est unique/i)).not.toBeInTheDocument()
@@ -1113,14 +1113,14 @@ describe('pages/Users.jsx — édition d\'un utilisateur (LOT 36)', () => {
     setup(adminMe(), {
       rows: [
         cu(35, { username: 'cand35', first_name: 'Cand', last_name: 'Idat' }),
-        cu(36, { role: 'CHEF_CPFAE_ADMIN', username: 'lechef', first_name: 'Le', last_name: 'Chef' }),
+        cu(36, { role: 'CHEF_INJS_ADMIN', username: 'lechef', first_name: 'Le', last_name: 'Chef' }),
       ],
     })
     await waitForResults(2)
 
     const modal = await openEdit('Cand Idat')
     expect(within(modal).queryByText(/rôle est unique/i)).not.toBeInTheDocument()
-    fillEdit(modal, { role: 'CHEF_CPFAE_ADMIN' })
+    fillEdit(modal, { role: 'CHEF_INJS_ADMIN' })
     expect(within(modal).getByText(/un chef injs admin existe déjà/i)).toBeInTheDocument()
   })
 

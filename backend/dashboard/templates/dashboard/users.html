@@ -64,7 +64,7 @@
                 <tr>
                     <td>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold {% if u.role == 'DIRECTION' %}bg-role-direction{% elif u.role == 'CHEF_CPFAE_ADMIN' or u.role == 'CPFAE_ADMIN' %}bg-role-dfrc{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}bg-role-dfrc{% elif u.role == 'ENCADRANT' %}bg-role-superviseur{% else %}bg-role-participant{% endif %}"
+                            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold {% if u.role == 'DIRECTION' %}bg-role-direction{% elif u.role == 'CHEF_INJS_ADMIN' or u.role == 'INJS_ADMIN' %}bg-role-dfrc{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}bg-role-dfrc{% elif u.role == 'ENCADRANT' %}bg-role-superviseur{% else %}bg-role-participant{% endif %}"
                                  style="width:32px;height:32px;font-size:0.75rem;">
                                 {{ u.first_name.0 }}{{ u.last_name.0 }}
                             </div>
@@ -77,7 +77,7 @@
                     <td>{{ u.email|default:"-" }}</td>
                     <td>
                         <span class="badge"
-                              style="{% if u.role == 'DIRECTION' %}background:#fa5f5f;{% elif u.role == 'CHEF_CPFAE_ADMIN' or u.role == 'CPFAE_ADMIN' %}background:#ef5ce3;{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}background:#1A68AC;{% elif u.role == 'ENCADRANT' %}background:#F5B100;{% else %}background:#2277C1;{% endif %}">
+                              style="{% if u.role == 'DIRECTION' %}background:#fa5f5f;{% elif u.role == 'CHEF_INJS_ADMIN' or u.role == 'INJS_ADMIN' %}background:#ef5ce3;{% elif u.role == 'CHEF_SECRETARIAT' or u.role == 'SECRETARIAT' %}background:#1A68AC;{% elif u.role == 'ENCADRANT' %}background:#F5B100;{% else %}background:#2277C1;{% endif %}">
                             {{ role_labels|get_item:u.role|default:u.role }}
                         </span>
                     </td>

@@ -57,8 +57,8 @@ User = get_user_model()
 NIVEAU_PROVISOIRE_PAR_ROLE = {
     User.Role.ADMIN: 'N4',
     User.Role.DIRECTION: 'N4',
-    User.Role.CHEF_CPFAE_ADMIN: 'N4',
-    User.Role.CPFAE_ADMIN: 'N4',
+    User.Role.CHEF_INJS_ADMIN: 'N4',
+    User.Role.INJS_ADMIN: 'N4',
     User.Role.CHEF_SECRETARIAT: 'N3',
     User.Role.FINANCE: 'N3',
     User.Role.SECRETARIAT: 'N2',
@@ -173,7 +173,7 @@ def _peut_gerer_console_curp(user):
         # Application parametres absente ou indisponible : repli fermé.
         return False
     return user_in_roles(
-        user, ('ADMIN', 'CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN'),
+        user, ('ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'),
     )
 
 

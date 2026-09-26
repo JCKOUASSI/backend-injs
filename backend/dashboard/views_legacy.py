@@ -34,7 +34,7 @@ from presences.models import Pointage, AuditLog, _log_audit
 User = get_user_model()
 
 
-ALLOWED_WEB_ROLES = ('DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT')
+ALLOWED_WEB_ROLES = ('DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'ENCADRANT')
 
 
 def staff_required(view_func):
@@ -56,7 +56,7 @@ def dfrc_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('web-login')
-        if request.user.role not in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.role not in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
             messages.error(request, "Accès réservé aux profils CPFAE/Secrétariat.")
             return redirect('web-dashboard')
         return view_func(request, *args, **kwargs)
@@ -69,7 +69,7 @@ def admin_view_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('web-login')
-        if request.user.role not in ('DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
+        if request.user.role not in ('DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
             messages.error(request, "Accès réservé à la Direction, CPFAE et Secrétariat.")
             return redirect('web-dashboard')
         return view_func(request, *args, **kwargs)
@@ -666,7 +666,7 @@ def formation_edit(request, pk):
 @staff_required
 @require_POST
 def formation_delete(request, pk):
-    if request.user.role not in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
+    if request.user.role not in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT', 'CHEF_SECRETARIAT'):
         messages.error(request, "Accès refusé.")
         return redirect('web-formations')
     formation = get_object_or_404(Formation, pk=pk)
@@ -689,7 +689,7 @@ def formation_delete(request, pk):
 
 @staff_required
 def formation_generate_qr(request, pk):
-    """Superviseur ou CPFAE_ADMIN : générer un nouveau QR code pour une séance."""
+    """Superviseur ou INJS_ADMIN : générer un nouveau QR code pour une séance."""
     if request.user.role == 'DIRECTION':
         messages.error(request, "La Direction ne peut pas générer de QR codes.")
         return redirect('web-formation-detail', pk=pk)
@@ -744,7 +744,7 @@ def formation_generate_qr(request, pk):
 @require_POST
 def formation_change_statut(request, pk):
     """
-    Superviseur ou CPFAE_ADMIN : changer le statut de la formation.
+    Superviseur ou INJS_ADMIN : changer le statut de la formation.
     Flux : PLANIFIEE → EN_COURS (démarrer)
            EN_COURS → SUSPENDUE (suspendre / pause)
            SUSPENDUE → EN_COURS (reprendre)
@@ -1550,7 +1550,7 @@ def users_list(request):
 
 @staff_required
 def user_create(request):
-    if request.user.role not in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT'):
+    if request.user.role not in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT'):
         messages.error(request, "Accès refusé.")
         return redirect('web-dashboard')
     if request.method == 'POST':
@@ -1570,7 +1570,7 @@ def user_create(request):
             organisation=request.POST.get('organisation', ''),
         )
         user.set_password(request.POST['password'])
-        if user.role in ('DIRECTION', 'CPFAE_ADMIN', 'SECRETARIAT'):
+        if user.role in ('DIRECTION', 'INJS_ADMIN', 'SECRETARIAT'):
             user.is_staff = True
         if request.user.role == 'SECRETARIAT':
             user.secretariat = request.user.secretariat
@@ -1588,7 +1588,7 @@ def user_create(request):
 @staff_required
 @require_POST
 def user_delete(request, pk):
-    if request.user.role not in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'SECRETARIAT'):
+    if request.user.role not in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'SECRETARIAT'):
         messages.error(request, "Accès refusé.")
         return redirect('web-users')
     if pk != request.user.id:

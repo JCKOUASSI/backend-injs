@@ -58,7 +58,7 @@ class PermissionsEffectivesTests(TestCase):
         self.assertTrue(admin.has_perm('formations.delete_participant'))
 
     def test_trio_admin_permissions_identiques(self):
-        for role in ('ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'):
+        for role in ('ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'):
             with self.subTest(role=role):
                 compte = self._compte(role, 3)
                 self.assertTrue(compte.has_perm('authentication.mutate_users'))

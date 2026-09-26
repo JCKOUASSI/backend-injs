@@ -14,10 +14,24 @@ class User(AbstractUser):
     # Forward-declare to avoid circular import
     # (Secretariat is in formations app)
     class Role(models.TextChoices):
+        """Rôles canoniques INJS-LMD (12 rôles).
+
+        Lot L4a : `CPFAE_ADMIN` → `INJS_ADMIN` et `CHEF_CPFAE_ADMIN` →
+        `CHEF_INJS_ADMIN`. Ces deux identifiants étaient des vestiges de
+        l'application historique Sygepcpfae ; les libellés affichés étaient
+        déjà en terminologie INJS, seuls les codes portaient CPFAE.
+
+        Lot L4b : plus aucune chaîne CPFAE n'est acceptée ni persistée. Le
+        verrou est double — `choices` côté applicatif, contrainte CHECK côté
+        base (migration `authentication.0024`).
+
+        Le passage de 12 à 14 rôles exigerait une définition métier validée ;
+        il n'a pas eu lieu dans le lot L4a.
+        """
         ADMIN = 'ADMIN', 'Administrateur'
         DIRECTION = 'DIRECTION', 'Direction'
-        CHEF_CPFAE_ADMIN = 'CHEF_CPFAE_ADMIN', 'Chef INJS Admin'
-        CPFAE_ADMIN = 'CPFAE_ADMIN', 'INJS Admin'
+        CHEF_INJS_ADMIN = 'CHEF_INJS_ADMIN', 'Chef INJS Admin'
+        INJS_ADMIN = 'INJS_ADMIN', 'INJS Admin'
         CHEF_SECRETARIAT = 'CHEF_SECRETARIAT', 'Chef Secrétariat'
         SECRETARIAT = 'SECRETARIAT', 'Secrétariat'
         FINANCE = 'FINANCE', 'Finance'
@@ -78,11 +92,11 @@ class User(AbstractUser):
 
     @property
     def is_chef_cpfae_admin(self):
-        return self.role == self.Role.CHEF_CPFAE_ADMIN
+        return self.role == self.Role.CHEF_INJS_ADMIN
 
     @property
     def is_dfrc(self):
-        return self.role == self.Role.CPFAE_ADMIN
+        return self.role == self.Role.INJS_ADMIN
 
     @property
     def is_chef_secretariat(self):

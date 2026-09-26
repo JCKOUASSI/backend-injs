@@ -396,8 +396,8 @@ describe('pages/scolarite/FinancesEtudiantes.jsx — habilitations (LOT 26)', ()
   it.each([
     ['FINANCE', true],
     ['DIRECTION', true],
-    ['CHEF_CPFAE_ADMIN', true],
-    ['CPFAE_ADMIN', true],
+    ['CHEF_INJS_ADMIN', true],
+    ['INJS_ADMIN', true],
   ])('rôle %s : formulaire de saisie ET colonne Action (confirmation)', async (role) => {
     mount(role)
     await settle()

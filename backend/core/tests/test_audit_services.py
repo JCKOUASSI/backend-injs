@@ -30,8 +30,8 @@ from scolarite.models import JournalScolarite
 DEFAUTS_FLAG = dict(
     libelle=FLAG_LOT1, categorie='flags', type='bool',
     valeur_defaut='false', modifiable=True,
-    modifiable_par_roles='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
-    lecturable_par_roles='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
+    modifiable_par_roles='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
+    lecturable_par_roles='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
     actif=True,
 )
 

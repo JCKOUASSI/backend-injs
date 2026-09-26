@@ -16,7 +16,7 @@ class NotesFicheExportTest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.admin = make_user('admin_fiche_notes', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_fiche_notes', role='INJS_ADMIN')
         self.client.force_authenticate(self.admin)
 
         self.f = make_formation('Cycle fiche notes')

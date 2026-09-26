@@ -63,7 +63,7 @@ class ParticipantMatriculeValidationTests(TestCase):
 
 class ParticipantMatriculeSyncTests(TestCase):
     def setUp(self):
-        self.admin = make_user('admin_matricule', role='CPFAE_ADMIN')
+        self.admin = make_user('admin_matricule', role='INJS_ADMIN')
         ref_type = RefTypeSecretariat.objects.create(libelle='FAB')
         self.sec_fab = Secretariat.objects.create(numero=1, nom='FAB', type=ref_type)
         ref_type_fac = RefTypeSecretariat.objects.create(libelle='FAC')

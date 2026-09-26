@@ -10,6 +10,14 @@ logger = logging.getLogger(__name__)
 
 _bulk_role_sync_depth = 0
 
+# Lot L4b : la compatibilité transitoire `ROLES_LEGACY` / `normalize_role()` a
+# été supprimée. L'audit du 26/09/2026 a établi qu'aucun code de production,
+# aucune API, aucun client web ou mobile et aucune ligne de base n'utilisait
+# encore la chaîne historique `CPFAE_ADMIN` : la conserver n'était qu'un
+# contrat avec personne. Le RBAC est désormais verrouillé applicativement
+# (`User.Role.choices`) **et** en base (contrainte CHECK, migration
+# `authentication.0024`).
+
 
 def is_bulk_role_sync():
     """True pendant sync_all_users_role_groups (évite les signaux m2m/post_save)."""
@@ -29,8 +37,8 @@ def _bulk_role_sync():
 # Rôles pouvant accéder à l'admin Django ET à la plateforme web.
 DUAL_ACCESS_ROLES = frozenset({
     User.Role.ADMIN,
-    User.Role.CHEF_CPFAE_ADMIN,
-    User.Role.CPFAE_ADMIN,
+    User.Role.CHEF_INJS_ADMIN,
+    User.Role.INJS_ADMIN,
 })
 
 # Rôles encadrants reconnus pour le badgeage mobile (legacy SUPERVISEUR inclus).
@@ -124,8 +132,8 @@ BADGE_ACCOUNT_ROLES = MOBILE_ONLY_ROLES
 
 USER_MANAGEABLE_ROLES = frozenset({
     User.Role.DIRECTION,
-    User.Role.CHEF_CPFAE_ADMIN,
-    User.Role.CPFAE_ADMIN,
+    User.Role.CHEF_INJS_ADMIN,
+    User.Role.INJS_ADMIN,
     *SECRETARIAT_ROLES,
     User.Role.FINANCE,
     User.Role.ARCHIVE,
@@ -186,8 +194,8 @@ ALLOWED_MULTI_ROLE_COMBINATIONS = frozenset({
 ROLE_HIERARCHY = [
     User.Role.ADMIN,
     User.Role.DIRECTION,
-    User.Role.CHEF_CPFAE_ADMIN,
-    User.Role.CPFAE_ADMIN,
+    User.Role.CHEF_INJS_ADMIN,
+    User.Role.INJS_ADMIN,
     User.Role.CHEF_SECRETARIAT,
     User.Role.SECRETARIAT,
     User.Role.FINANCE,
@@ -203,8 +211,8 @@ ROLE_LABELS = {value: str(label) for value, label in User.Role.choices}
 ROLE_GROUP_NAMES = {
     User.Role.ADMIN: "ROLE_ADMIN",
     User.Role.DIRECTION: "ROLE_DIRECTION",
-    User.Role.CHEF_CPFAE_ADMIN: "ROLE_CHEF_CPFAE_ADMIN",
-    User.Role.CPFAE_ADMIN: "ROLE_CPFAE_ADMIN",
+    User.Role.CHEF_INJS_ADMIN: "ROLE_CHEF_INJS_ADMIN",
+    User.Role.INJS_ADMIN: "ROLE_INJS_ADMIN",
     User.Role.CHEF_SECRETARIAT: "ROLE_CHEF_SECRETARIAT",
     User.Role.SECRETARIAT: "ROLE_SECRETARIAT",
     User.Role.FINANCE: "ROLE_FINANCE",
@@ -243,7 +251,7 @@ ROLE_POLICY = {
             "validate_decisions", "consult_evaluation",
         ),
     },
-    User.Role.CHEF_CPFAE_ADMIN: {
+    User.Role.CHEF_INJS_ADMIN: {
         "apps": CORE_APPS,
         "actions": ("view", "add", "change", "delete"),
         "custom": (
@@ -252,7 +260,7 @@ ROLE_POLICY = {
             "validate_decisions", "consult_evaluation",
         ),
     },
-    User.Role.CPFAE_ADMIN: {
+    User.Role.INJS_ADMIN: {
         "apps": CORE_APPS,
         "actions": ("view", "add", "change", "delete"),
         "custom": (
@@ -495,7 +503,7 @@ def get_subordinate_roles(role):
 def get_creatable_roles(role):
     """Retourne les rôles qu'un utilisateur peut créer."""
     subordinates = get_subordinate_roles(role)
-    if role == User.Role.CHEF_CPFAE_ADMIN and User.Role.DIRECTION not in subordinates:
+    if role == User.Role.CHEF_INJS_ADMIN and User.Role.DIRECTION not in subordinates:
         return [User.Role.DIRECTION, *subordinates]
     return subordinates
 

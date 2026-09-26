@@ -23,7 +23,7 @@ def sidebar_counts(request):
 
     counts = {'sidebar_formations_count': nb_formations}
 
-    if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'DIRECTION'):
+    if role in ('CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT', 'SECRETARIAT', 'DIRECTION'):
         counts['sidebar_participants_count'] = Participant.objects.count()
         counts['sidebar_formateurs_count'] = Formateur.objects.count()
         counts['sidebar_users_count'] = User.objects.count()

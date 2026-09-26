@@ -24,7 +24,7 @@ User = get_user_model()
 
 # L'identité exacte des 12 rôles actuels, figée pour U0.
 ROLES_ATTENDUS = frozenset({
-    'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
+    'ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN',
     'CHEF_SECRETARIAT', 'SECRETARIAT', 'FINANCE', 'ARCHIVE', 'ENCADRANT',
     'SUPERVISEUR', 'FORMATEUR', 'AUDITEUR',
 })
@@ -63,13 +63,13 @@ class ReferentielRolesTests(TestCase):
     def test_trio_admin_roles_a_double_acces(self):
         self.assertEqual(
             frozenset(rg.DUAL_ACCESS_ROLES),
-            {'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'},
+            {'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'},
         )
 
     def test_roles_a_acces_global_exacts(self):
         self.assertEqual(
             frozenset(rg.GLOBAL_ACCESS_ROLES),
-            {'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'DIRECTION', 'ARCHIVE'},
+            {'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'DIRECTION', 'ARCHIVE'},
         )
 
     def test_roles_secretariat_exacts(self):
@@ -87,7 +87,7 @@ class ReferentielRolesTests(TestCase):
     def test_roles_pouvant_muter_un_compte(self):
         self.assertEqual(
             frozenset(rg.USER_MUTATION_ROLES),
-            {'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN',
+            {'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN',
              'CHEF_SECRETARIAT', 'SECRETARIAT'},
         )
 

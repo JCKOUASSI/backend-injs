@@ -59,8 +59,8 @@ def _user_payload(user):
 
 # Rôles sans rattachement secrétariat sur le compte User (aligné serializers UserCreate/Update).
 USER_ROLES_WITHOUT_SECRETARIAT = frozenset({
-    User.Role.CHEF_CPFAE_ADMIN,
-    User.Role.CPFAE_ADMIN,
+    User.Role.CHEF_INJS_ADMIN,
+    User.Role.INJS_ADMIN,
     User.Role.FINANCE,
     User.Role.ARCHIVE,
     User.Role.ENCADRANT,

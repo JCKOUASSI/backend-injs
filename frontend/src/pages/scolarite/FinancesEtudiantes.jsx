@@ -15,7 +15,7 @@ export default function FinancesEtudiantes() {
   const { user } = useAuth()
   const toast = useToast()
   // FINANCE / DIRECTION / ADMIN : opérations sensibles (confirmer paiement, remboursement, rapprochement)
-  const peutConfirmer = ['FINANCE', 'DIRECTION', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)
+  const peutConfirmer = ['FINANCE', 'DIRECTION', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'].includes(user?.role)
   const peutEcrire = peutConfirmer || ['SECRETARIAT', 'CHEF_SECRETARIAT'].includes(user?.role)
 
   const [echeanciers, setEcheanciers] = useState([])

@@ -45,7 +45,7 @@ class JuryWorkflowBase(TestCase):
     """Session de jury + étudiant inscrit + maquette ACTIVE avec 1 UE/2 ECUE."""
 
     def setUp(self):
-        self.dfrc = make_user('dfrc_jury', User.Role.CPFAE_ADMIN)
+        self.dfrc = make_user('dfrc_jury', User.Role.INJS_ADMIN)
         self.secretariat = make_user('sec_jury', User.Role.SECRETARIAT)
         self.direction = make_user('dir_jury', User.Role.DIRECTION)
         self.auditeur = make_user('aud_jury', User.Role.AUDITEUR)

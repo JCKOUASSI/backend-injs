@@ -23,7 +23,7 @@ from formations.models import (
 from .models import Pointage
 
 
-def make_user(username, role='CPFAE_ADMIN'):
+def make_user(username, role='INJS_ADMIN'):
     return User.objects.create_user(username=username, password='pass', role=role)
 
 
@@ -88,7 +88,7 @@ class SessionAPITest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = make_user('presuser', role='CPFAE_ADMIN')
+        self.user = make_user('presuser', role='INJS_ADMIN')
         self.client.force_authenticate(self.user)
         self.f, self.m, self.s = make_session()
 
@@ -390,7 +390,7 @@ class ScanModuleExclusivityTest(TestCase):
         from formations.volume_horaire import _session_prevu_minutes
         from presences.models import AuditLog
 
-        user = make_user('bulk_force_user', role='CPFAE_ADMIN')
+        user = make_user('bulk_force_user', role='INJS_ADMIN')
         self.client.force_authenticate(user)
 
         participants = []
@@ -868,7 +868,7 @@ class PointageAdminSaveTest(TestCase):
 
         self.tz = ZoneInfo('Africa/Abidjan')
         self.date_journee = datetime(2026, 6, 18).date()
-        self.admin_user = make_user('pointageadmin', role='CPFAE_ADMIN')
+        self.admin_user = make_user('pointageadmin', role='INJS_ADMIN')
         self.factory = RequestFactory()
         self.admin = PointageAdmin(Pointage, AdminSite())
         self.form = MagicMock()
@@ -949,7 +949,7 @@ class MobileConfigApiTest(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = make_user('mobile_cfg_user', role='CPFAE_ADMIN')
+        self.user = make_user('mobile_cfg_user', role='INJS_ADMIN')
 
     def test_mobile_config_requires_auth(self):
         res = self.client.get('/api/mobile/config/')
@@ -961,7 +961,7 @@ class MobileConfigApiTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.data['heartbeat_enabled'])
         self.assertEqual(res.data['heartbeat_interval_seconds'], 60)
-        self.assertEqual(res.data['role'], 'CPFAE_ADMIN')
+        self.assertEqual(res.data['role'], 'INJS_ADMIN')
         self.assertFalse(res.data['evaluations_enabled'])
 
     @override_settings(MOBILE_HEARTBEAT_DISABLED=True, MOBILE_HEARTBEAT_INTERVAL_SECONDS=120)

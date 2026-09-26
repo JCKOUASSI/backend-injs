@@ -27,8 +27,8 @@ _FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"
 ROLE_LABELS = {
     'ADMIN': 'Administrateur',
     'DIRECTION': 'Direction',
-    'CHEF_CPFAE_ADMIN': 'Chef INJS Admin',
-    'CPFAE_ADMIN': 'INJS Admin',
+    'CHEF_INJS_ADMIN': 'Chef INJS Admin',
+    'INJS_ADMIN': 'INJS Admin',
     'CHEF_SECRETARIAT': 'Chef Secrétariat',
     'SECRETARIAT': 'Secrétariat',
     'FINANCE': 'Finance',

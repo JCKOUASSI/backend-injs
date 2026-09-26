@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 
 from authentication.models import User
 from edts.models import AffectationCreneau, CreneauTemplate, EmploiDuTemps
-from formations.models import Participant, QRToken, RefFormation
+from formations.models import Participant, QRToken, RefFormation, RefSalle, RefSite
 from presences import seances_edt_services as service
 from presences.models import AuditLog, Pointage
 from scolarite.models import (
@@ -23,6 +23,13 @@ from scolarite.models import (
 )
 
 JOURS = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI', 'DIMANCHE']
+
+#: Coordonnées **officielles** de l'INJS Marcory, validées par le commanditaire
+#: le 26/09/2026 (arbitrage A-03). Le seed historique ``seed_lot1_1_injs.py``
+#: portait 5.302500/-3.978500, soit 782 m plus au sud-est : cette valeur a été
+#: déclarée non validée et ne doit plus servir de référence.
+LAT_INJS_MARCORY = 5.3083
+LON_INJS_MARCORY = -3.9825
 
 
 def _fenetre_temporelle():
@@ -284,3 +291,107 @@ class AutoCloreTests(SeanceEdtFixtureMixin, TestCase):
         self.assertFalse(QRToken.objects.filter(actif=True).exists())
         self.assertTrue(AuditLog.objects.filter(
             action=AuditLog.Action.AUTO_EXIT, extra__source='AUTOCLOTURE').exists())
+
+
+class GeofenceSeanceEdtTests(SeanceEdtFixtureMixin, TestCase):
+    """Contrôle de périmètre géographique sur le canal EDT (N-12, arbitrage A-02).
+
+    Avant la correction N-12, ``badger_scan`` enregistrait la position reçue sans
+    jamais la vérifier : aucun de ces refus n'était atteignable. Ces tests
+    prouvent que le canal EDT applique désormais la même règle que le canal
+    legacy, et que la décision métier « alerte ET refus » est bien appliquée.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(self.enseignant)
+        self.token = self.client.post(
+            f'/api/presences/seances-edt/{self.affectation.pk}/qr/').data['token']
+        self.site = RefSite.objects.create(
+            nom='INJS MARCORY — TEST GEO',
+            geofence_latitude=LAT_INJS_MARCORY,
+            geofence_longitude=LON_INJS_MARCORY,
+            geofence_rayon_m=200,
+        )
+        # La séance est planifiée en « Amphi 1 » : le site est résolu via la salle.
+        RefSalle.objects.create(site=self.site, nom='Amphi 1')
+
+    def _scan(self, user, device='geo-test', **coords):
+        self.client.force_authenticate(user)
+        charge = {'token_qr': self.token, 'device_id': device}
+        charge.update(coords)
+        return self.client.post('/api/presences/seances-edt/scan/', charge, format='json')
+
+    def _dans_la_zone(self):
+        """Position à quelques mètres du centre du site (dans le rayon de 200 m)."""
+        return {'latitude': LAT_INJS_MARCORY + 0.0002,
+                'longitude': LON_INJS_MARCORY,
+                'accuracy_m': 10}
+
+    def test_position_dans_la_zone_acceptee_et_tracee(self):
+        reponse = self._scan(self.auditeurs[0], **self._dans_la_zone())
+        self.assertEqual(reponse.status_code, 201, reponse.data)
+        pointage = Pointage.objects.get(pk=reponse.data['pointage_id'])
+        self.assertIsNotNone(pointage.last_latitude)
+        journal = AuditLog.objects.filter(action=AuditLog.Action.SCAN_SECURE_ENTREE).latest('id')
+        self.assertIsNotNone(journal.extra.get('distance_m'))
+        self.assertIsNotNone(journal.extra.get('rayon_m'))
+
+    def test_hors_perimetre_refuse_et_aucun_pointage_ecrit(self):
+        # ~1,1 km au nord du site : très au-delà du rayon de 200 m.
+        reponse = self._scan(
+            self.auditeurs[0],
+            latitude=LAT_INJS_MARCORY + 0.010, longitude=LON_INJS_MARCORY, accuracy_m=10)
+        self.assertEqual(reponse.status_code, 400, reponse.data)
+        self.assertEqual(reponse.data['code'], 'OUT_OF_GEOFENCE')
+        self.assertIn('Hors périmètre', reponse.data['detail'])
+        # Le refus doit précéder la création : aucune trace de présence.
+        self.assertFalse(Pointage.objects.filter(participant=self.participants[0]).exists())
+
+    def test_hors_perimetre_est_trace_dans_le_journal(self):
+        self._scan(self.auditeurs[0], latitude=LAT_INJS_MARCORY + 0.010,
+                   longitude=LON_INJS_MARCORY, accuracy_m=10)
+        evenement = AuditLog.objects.filter(action=AuditLog.Action.OUT_OF_GEOFENCE).latest('id')
+        self.assertIsNotNone(evenement, 'le refus doit être journalisé (décision alerte ET refus)')
+        self.assertEqual(evenement.extra['code'], 'OUT_OF_GEOFENCE')
+        self.assertEqual(evenement.extra['canal'], 'EDT_LMD')
+        self.assertGreater(evenement.extra['distance_m'], 200)
+
+    def test_position_absente_refusee_si_site_geolocalise(self):
+        reponse = self._scan(self.auditeurs[0])
+        self.assertEqual(reponse.status_code, 400, reponse.data)
+        self.assertEqual(reponse.data['code'], 'LOCATION_REQUIRED')
+        self.assertFalse(Pointage.objects.filter(participant=self.participants[0]).exists())
+
+    def test_precision_insuffisante_refusee(self):
+        reponse = self._scan(self.auditeurs[0], latitude=LAT_INJS_MARCORY,
+                             longitude=LON_INJS_MARCORY, accuracy_m=500)
+        self.assertEqual(reponse.status_code, 400, reponse.data)
+        self.assertEqual(reponse.data['code'], 'LOCATION_INACCURATE')
+        self.assertFalse(Pointage.objects.filter(participant=self.participants[0]).exists())
+
+    def test_ancienne_géofence_du_seed_refusee(self):
+        """Le point du seed historique (782 m) doit être refusé par le rayon de 200 m."""
+        reponse = self._scan(self.auditeurs[0], latitude=5.3025, longitude=-3.9785, accuracy_m=10)
+        self.assertEqual(reponse.status_code, 400, reponse.data)
+        self.assertEqual(reponse.data['code'], 'OUT_OF_GEOFENCE')
+
+    def test_site_non_geolocalise_ne_bloque_pas(self):
+        """Régression : sans géofence configurée, le comportement historique est conservé."""
+        RefSite.objects.update(geofence_latitude=None, geofence_longitude=None)
+        reponse = self._scan(self.auditeurs[0], **self._dans_la_zone())
+        self.assertEqual(reponse.status_code, 201, reponse.data)
+        self.assertEqual(reponse.data['action'], 'ENTREE')
+
+    def test_sortie_non_soumise_au_controle_de_zone(self):
+        """La sortie referme le pointage déjà ouvert : elle n'est pas re-vérifiée.
+
+        Un élève déjà entré puis sorti loin du site doit obtenir sa sortie — sinon
+        l'étudiant resterait bloqué « en cours » toute la journée.
+        """
+        entree = self._scan(self.auditeurs[0], **self._dans_la_zone())
+        self.assertEqual(entree.status_code, 201, entree.data)
+        sortie = self._scan(self.auditeurs[0], latitude=LAT_INJS_MARCORY + 0.010,
+                            longitude=LON_INJS_MARCORY, accuracy_m=10)
+        self.assertEqual(sortie.status_code, 200, sortie.data)
+        self.assertEqual(sortie.data['action'], 'SORTIE')

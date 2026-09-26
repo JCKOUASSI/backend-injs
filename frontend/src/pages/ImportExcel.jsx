@@ -130,7 +130,7 @@ export default function ImportExcel() {
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  if (!['CHEF_SECRETARIAT', 'SECRETARIAT', 'ADMIN', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN'].includes(user?.role)) {
+  if (!['CHEF_SECRETARIAT', 'SECRETARIAT', 'ADMIN', 'CHEF_INJS_ADMIN', 'INJS_ADMIN'].includes(user?.role)) {
     return (
       <div className="card">
         <div className="card-body text-center text-muted py-5">

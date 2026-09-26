@@ -33,7 +33,7 @@ class QRImageIsolationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='admin_qr', password='x', role='CPFAE_ADMIN',
+            username='admin_qr', password='x', role='INJS_ADMIN',
         )
         self.client.force_authenticate(self.user)
 
@@ -102,7 +102,7 @@ class QRGenerationScopeTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = User.objects.create_user(
-            username='admin_gen', password='x', role='CPFAE_ADMIN',
+            username='admin_gen', password='x', role='INJS_ADMIN',
         )
         self.client.force_authenticate(self.user)
 

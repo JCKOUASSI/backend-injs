@@ -15,7 +15,7 @@ import { FLAGS_QUERY_KEY } from '../lib/queryClient'
  * et de la carte React Query du frontend).
  */
 const ROLE_OPTIONS = [
-  'ADMIN', 'DIRECTION', 'CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'CHEF_SECRETARIAT',
+  'ADMIN', 'DIRECTION', 'CHEF_INJS_ADMIN', 'INJS_ADMIN', 'CHEF_SECRETARIAT',
   'SECRETARIAT', 'FINANCE', 'ARCHIVE', 'ENCADRANT', 'SUPERVISEUR', 'FORMATEUR', 'AUDITEUR',
 ]
 

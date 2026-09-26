@@ -717,7 +717,7 @@ def _check_export_access(request, formation):
     """
     Vérifie que l'utilisateur peut exporter les données de cette formation.
 
-    - DFRC (CPFAE_ADMIN / CHEF_CPFAE_ADMIN) : accès complet.
+    - DFRC (INJS_ADMIN / CHEF_INJS_ADMIN) : accès complet.
     - DIRECTION / ARCHIVE                      : accès complet (lecture + export).
     - SECRETARIAT / CHEF_SECRETARIAT         : uniquement si au moins un module
                                                de la formation appartient au secrétariat
@@ -729,7 +729,7 @@ def _check_export_access(request, formation):
     user = request.user
     if not user.is_authenticated:
         return False
-    if user.role in ('CPFAE_ADMIN', 'CHEF_CPFAE_ADMIN', 'ADMIN', 'DIRECTION', 'ARCHIVE'):
+    if user.role in ('INJS_ADMIN', 'CHEF_INJS_ADMIN', 'ADMIN', 'DIRECTION', 'ARCHIVE'):
         return True
     if user.role in ('SECRETARIAT', 'CHEF_SECRETARIAT'):
         secretariat = getattr(user, 'secretariat', None)

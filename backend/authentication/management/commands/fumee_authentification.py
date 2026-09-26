@@ -42,8 +42,8 @@ MOT_DE_PASSE_DEFAUT = "Temoin#2026"
 # username témoin -> (rôle, libellé court de la vérification de cloisonnement)
 TEMOINS_WEB = [
     ("temoin_admin", "ADMIN"),
-    ("temoin_chef_cpfae_admin", "CHEF_CPFAE_ADMIN"),
-    ("temoin_cpfae_admin", "CPFAE_ADMIN"),
+    ("temoin_chef_cpfae_admin", "CHEF_INJS_ADMIN"),
+    ("temoin_cpfae_admin", "INJS_ADMIN"),
     ("temoin_direction", "DIRECTION"),
     ("temoin_chef_secretariat_a", "CHEF_SECRETARIAT"),
     ("temoin_chef_secretariat_b", "CHEF_SECRETARIAT"),

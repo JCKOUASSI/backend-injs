@@ -55,8 +55,8 @@ def make_bool_flag(cle, valeur='false', actif=True, lecturable=None):
         valeur=valeur,
         valeur_defaut='false',
         modifiable=True,
-        modifiable_par_roles='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
-        lecturable_par_roles=lecturable or '["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
+        modifiable_par_roles='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
+        lecturable_par_roles=lecturable or '["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
         actif=actif,
     )
 
@@ -251,7 +251,7 @@ class FeatureFlagsEndpointTests(TestCase):
     def test_secretariat_ne_peut_patcher_ni_voir_le_catalogue(self):
         flag = make_bool_flag(
             'flag.test_admin_only',
-            lecturable='["ADMIN", "CHEF_CPFAE_ADMIN", "CPFAE_ADMIN"]',
+            lecturable='["ADMIN", "CHEF_INJS_ADMIN", "INJS_ADMIN"]',
         )
         sec = make_user('u_patch_sec', role='SECRETARIAT')
         self.client.force_authenticate(sec)

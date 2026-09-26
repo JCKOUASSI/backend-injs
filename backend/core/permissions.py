@@ -3,7 +3,7 @@
 L'accès en lecture au journal transverse est réservé aux rôles d'audit et de
 direction globales, validés au cadrage P01-01 :
 
-* N4 — ADMIN, DIRECTION, CHEF_CPFAE_ADMIN, CPFAE_ADMIN ;
+* N4 — ADMIN, DIRECTION, CHEF_INJS_ADMIN, INJS_ADMIN ;
 * N1 — AUDITEUR (conformité) et ARCHIVE.
 
 Les autres rôles conservent l'accès aux journaux métriers ciblés existants
@@ -20,7 +20,7 @@ from authentication.models import User
 
 #: Rôles autorisés à consulter le journal unifié.
 AUDIT_CORE_ROLES = frozenset({
-    *ADMIN_LEVEL_ROLES,          # ADMIN, CHEF_CPFAE_ADMIN, CPFAE_ADMIN
+    *ADMIN_LEVEL_ROLES,          # ADMIN, CHEF_INJS_ADMIN, INJS_ADMIN
     User.Role.DIRECTION,
     User.Role.AUDITEUR,
     User.Role.ARCHIVE,

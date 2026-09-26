@@ -19,13 +19,13 @@ from authentication.permissions import _has_role
 
 
 # Correction audit 2026-09-15 : le littéral « DFRC » ne correspond à aucun rôle
-# de User.Role (le socle mappe DFRC sur {ADMIN, CPFAE_ADMIN, CHEF_CPFAE_ADMIN}
+# de User.Role (le socle mappe DFRC sur {ADMIN, INJS_ADMIN, CHEF_INJS_ADMIN}
 # via authentication.permissions.IsDFRC). Les comptes INJS-Admin étaient donc
 # silencieusement exclus de la planification. La liste reprend la matrice CURP.
 PLANIFICATION_ROLES = (
     'ADMIN',
-    'CHEF_CPFAE_ADMIN',
-    'CPFAE_ADMIN',
+    'CHEF_INJS_ADMIN',
+    'INJS_ADMIN',
     'SECRETARIAT',
     'CHEF_SECRETARIAT',
     'DIRECTION',

@@ -148,7 +148,7 @@ L’admin applique un **filtrage par rôle** via `backend/admin_mixins.py` (`Adm
 
 | Rôle | Portée typique |
 |------|----------------|
-| ADMIN, CPFAE_ADMIN, DIRECTION, FINANCE | Accès global |
+| ADMIN, INJS_ADMIN, DIRECTION, FINANCE | Accès global |
 | SECRETARIAT, CHEF_SECRETARIAT | Données de leur secrétariat |
 | ENCADRANT | Modules / séances supervisés |
 

@@ -19,7 +19,7 @@
   --ci-white: #FFFFFF;
   --ci-light: #dce6f2;
   --ci-danger: #EF4444;
-  --ci-blue: #1E62D0;
+  --ci-blue: #2563EB;
   --ci-blue-dark: #123E6A;
   --ci-purple: #7B1FA2;
   --bg-color: #EDF4FB;
@@ -30,20 +30,57 @@
   --border-color: #CBD5E1;
   --border-glass: rgba(255, 255, 255, 0.85);
   --sidebar-width: 260px;
-  --radius: 14px;
-  --radius-lg: 18px;
+  --radius: 12px;
+  --radius-lg: 12px;
   --radius-pill: 9999px;
   --shadow-glass: 0 10px 30px -5px rgba(11, 31, 58, 0.05), 0 0 1px 1px rgba(255, 255, 255, 0.9);
+  /* Ombre de carte de la référence LMD2026 : beaucoup plus fine et
+     neutre que l'ombre « verre » ci-dessus, qui reste utilisée pour
+     les panneaux flottants (top-bar, menus, modales). */
+  --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+
+  /* ── Alias de compatibilité ────────────────────────────────────────────
+     Ces variables sont référencées par les écrans secondaires
+     (Dashboard, Évaluation, Finances…) via des styles inline.
+     Elles ne sont pas déclarées ailleurs : sans ces alias, les
+     propriétés concernées retombent sur leur valeur initiale
+     (transparent / noir) et les cartes se cassent.
+     Elles pointent toutes vers les tokens du Dashboard Engine
+     afin de garantir un rendu homogène sur toute l'application. */
+  --primary: #2563EB;          /* bleu action INJS (réf. LMD2026) */
+  --primary-dark: #1D4ED8;
+  --secondary: #475569;        /* gris ardoise          */
+  --success: #10B981;          /* vert succès           */
+  --warning: #F59E0B;          /* ambre avertissement   */
+  --danger: #EF4444;           /* rouge danger          */
+  --info: #0284C7;             /* cyan information      */
+  --border: #E2E8F0;           /* bordure standard      */
+  --bg-secondary: #F1F5F9;     /* fond secondaire       */
+  --text: #0F172A;             /* texte principal       */
+
+  /* ── Typographie ───────────────────────────────────────────────────────
+     La référence LMD2026 demande Inter / Poppins / Sora.
+     Aucune police n'est bundlée (aucune installation npm autorisée) :
+     Inter est donc placée en tête de pile — elle sera utilisée si déjà
+     présente sur le poste (souvent le cas sous macOS/Windows) — sinon la
+     pile retombe sur system-ui, qui est l'état actuel inchangé.
+     Si un jour Inter est ajoutée au projet, aucune autre règle à changer. */
+  --font-lmd2026: 'Inter', 'Poppins', 'Sora', system-ui, -apple-system,
+                  BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* ── Fond d'application (réf. LMD2026) ─────────────────────────────────
+     Déclaré une seule fois et réutilisé par body, .main-content et tous
+     les conteneurs de pages, ce qui garantit un fond strictement
+     identique sur l'ensemble de l'application. */
+  --bg-app-lmd2026: linear-gradient(160deg, #EAF1FB 0%, #DCE8F7 100%);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: 
-    radial-gradient(circle at 92% 10%, rgba(147, 197, 253, 0.45) 0%, rgba(191, 219, 254, 0.25) 30%, transparent 60%),
-    radial-gradient(circle at 78% 22%, rgba(96, 165, 250, 0.22) 0%, transparent 45%),
-    linear-gradient(180deg, #EDF4FB 0%, #E2EDF8 100%);
+  font-family: var(--font-lmd2026);
+  background: var(--bg-app-lmd2026);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
@@ -61,10 +98,8 @@ body {
   margin-left: var(--sidebar-width);
   padding: 0;
   min-height: 100vh;
-  background: 
-    radial-gradient(circle at 92% 10%, rgba(147, 197, 253, 0.45) 0%, rgba(191, 219, 254, 0.25) 30%, transparent 60%),
-    radial-gradient(circle at 78% 22%, rgba(96, 165, 250, 0.22) 0%, transparent 45%),
-    linear-gradient(180deg, #EDF4FB 0%, #E2EDF8 100%);
+  background: var(--bg-app-lmd2026);
+  background-attachment: fixed;
   transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   width: calc(100% - var(--sidebar-width));
 }
@@ -120,7 +155,7 @@ body {
   list-style: none;
   flex-wrap: wrap;
 }
-.top-bar .breadcrumb a { color: #1E62D0; text-decoration: none; font-weight: 600; }
+.top-bar .breadcrumb a { color: #2563EB; text-decoration: none; font-weight: 600; }
 .top-bar .breadcrumb a:hover { text-decoration: underline; }
 .top-bar .breadcrumb .separator { color: #94A3B8; }
 
@@ -135,7 +170,7 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0B1F3A 0%, #1E62D0 100%);
+  background: linear-gradient(135deg, #0B1F3A 0%, #2563EB 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -174,14 +209,16 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 }
 
 /* ═══ Cartes & Panneaux Glassmorphism Prémium ═══ */
+/* Fond blanc opaque + bordure #E9ECF2 : densité visuelle de la
+   référence LMD2026, plus nette que le verre translucide d'origine. */
 .card {
-  background: rgba(255, 255, 255, 0.88);
+  background: #FFFFFF;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-glass);
+  box-shadow: var(--shadow-card);
   margin-bottom: 1.5rem;
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -211,13 +248,13 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   margin-bottom: 1.5rem;
 }
 .stat-card {
-  background: rgba(255, 255, 255, 0.88);
+  background: #FFFFFF;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-glass);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-color);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .stat-card:hover {
@@ -240,41 +277,44 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   font-size: 1.45rem;
   flex-shrink: 0;
 }
-.stat-icon.bg-primary { background: #EBF3FF; color: #2F80ED; }
+.stat-icon.bg-primary { background: #EFF6FF; color: #2A7FFF; }
 .stat-icon.bg-success { background: #ECFDF5; color: #10B981; }
 .stat-icon.bg-info { background: #E0F2FE; color: #0284C7; }
 .stat-icon.bg-warning { background: #FFFBEB; color: #F59E0B; }
 .stat-card .stat-value { font-size: 2rem; font-weight: 800; line-height: 1.1; color: #0B1F3A; }
 .stat-card .stat-label { font-size: 0.78rem; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; margin-bottom: 0.2rem; }
 
-/* ═══ Boutons Prémiums Unifiés ═══ */
+/* ═══ Boutons Prémiums Unifiés ═══
+   Référence LMD2026 : hauteur 32px (h-8), px-3, coins 8px (rounded-lg),
+   texte 12px font-medium. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.52rem 1.15rem;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
+  min-height: 32px;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   gap: 0.45rem;
   border: 1px solid transparent;
-  font-size: 0.86rem;
+  font-size: 12px;
   text-decoration: none;
 }
 
 .btn-primary,
 .btn-dfrc {
-  background: linear-gradient(135deg, #1E62D0 0%, #2F80ED 100%) !important;
+  background: linear-gradient(135deg, #2563EB 0%, #2A7FFF 100%) !important;
   color: #FFFFFF !important;
   border: none;
-  box-shadow: 0 4px 14px rgba(47, 128, 237, 0.35);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   font-weight: 700;
 }
 .btn-primary:hover,
 .btn-dfrc:hover {
   background: linear-gradient(135deg, #1852B5 0%, #256FD0 100%) !important;
-  box-shadow: 0 6px 18px rgba(47, 128, 237, 0.45);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
   transform: translateY(-1px);
   color: #FFFFFF !important;
 }
@@ -331,11 +371,11 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .btn-outline-primary {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
-  color: #1E62D0;
-  border: 1.5px solid #2F80ED;
+  color: #2563EB;
+  border: 1.5px solid #2A7FFF;
 }
 .btn-outline-primary:hover {
-  background: #2F80ED;
+  background: #2A7FFF;
   color: #FFFFFF;
   transform: translateY(-1px);
 }
@@ -351,8 +391,8 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   border-color: #94A3B8;
 }
 
-.btn-sm { padding: 0.38rem 0.85rem; font-size: 0.8rem; }
-.btn-lg { padding: 0.72rem 1.6rem; font-size: 1rem; }
+.btn-sm { min-height: 28px; padding: 0.25rem 0.7rem; font-size: 11px; }
+.btn-lg { min-height: 40px; padding: 0.55rem 1.4rem; font-size: 14px; }
 .btn-group { display: flex; gap: 0.35rem; }
 
 /* ═══ Formulaires & Champs de Saisie Dépolis ═══ */
@@ -381,8 +421,8 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .form-control:focus, .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
   background: #FFFFFF;
-  border-color: #2F80ED;
-  box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.18);
+  border-color: #2A7FFF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 .input-group { display: flex; }
 .input-group .input-group-text {
@@ -595,7 +635,7 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   background: rgba(219, 234, 254, 0.85);
   color: #1E40AF;
   border: 1px solid #BFDBFE;
-  border-left: 4px solid #2F80ED;
+  border-left: 4px solid #2A7FFF;
 }
 
 /* ═══ Pagination Dépolie ═══ */
@@ -621,16 +661,16 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 }
 .pagination-btn:hover:not(:disabled) {
   background: #FFFFFF;
-  border-color: #2F80ED;
-  color: #1E62D0;
+  border-color: #2A7FFF;
+  color: #2563EB;
   transform: translateY(-1px);
 }
 .pagination-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .pagination-num--active {
-  background: linear-gradient(135deg, #1E62D0 0%, #2F80ED 100%) !important;
+  background: linear-gradient(135deg, #2563EB 0%, #2A7FFF 100%) !important;
   color: #FFFFFF !important;
   border-color: transparent !important;
-  box-shadow: 0 2px 8px rgba(47, 128, 237, 0.35);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 /* ═══ Effet de Verre / Glassmorphism Universel & Utilitaires ═══ */
@@ -639,7 +679,7 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
   backdrop-filter: blur(14px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
   border: 1px solid rgba(255, 255, 255, 0.85) !important;
-  border-radius: 18px !important;
+  border-radius: 12px !important;
   padding: 1.15rem 1.4rem !important;
   box-shadow: 0 10px 30px -5px rgba(11, 31, 58, 0.06), 0 0 1px 1px rgba(255, 255, 255, 0.9) !important;
   margin-top: 1.25rem;
@@ -692,24 +732,24 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .btn-quick-action-secondary:hover,
 .quick-action-link:hover {
   background: #F8FAFC !important;
-  border-color: #2F80ED !important;
-  color: #1E62D0 !important;
+  border-color: #2A7FFF !important;
+  color: #2563EB !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 6px 18px rgba(47, 128, 237, 0.16) !important;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.16) !important;
 }
 
 .btn-quick-action-primary {
-  background: linear-gradient(135deg, #1E62D0 0%, #2F80ED 100%) !important;
+  background: linear-gradient(135deg, #2563EB 0%, #2A7FFF 100%) !important;
   color: #FFFFFF !important;
   border: 1.5px solid transparent !important;
-  box-shadow: 0 4px 14px rgba(47, 128, 237, 0.32) !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32) !important;
 }
 
 .btn-quick-action-primary:hover {
   background: linear-gradient(135deg, #1557BF 0%, #1E70EB 100%) !important;
   color: #FFFFFF !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 8px 22px rgba(47, 128, 237, 0.42) !important;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.42) !important;
 }
 
 .quick-action-icon-wrap {
@@ -726,13 +766,13 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 
 .btn-quick-action-secondary .quick-action-icon-wrap,
 .quick-action-link .quick-action-icon-wrap {
-  background: rgba(47, 128, 237, 0.1);
-  color: #2F80ED;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2A7FFF;
 }
 
 .btn-quick-action-secondary:hover .quick-action-icon-wrap,
 .quick-action-link:hover .quick-action-icon-wrap {
-  background: #2F80ED;
+  background: #2A7FFF;
   color: #FFFFFF;
 }
 
@@ -785,8 +825,8 @@ a.top-bar-user:hover .user-avatar { filter: brightness(1.05); }
 .spinner {
   width: 44px;
   height: 44px;
-  border: 4px solid rgba(47, 128, 237, 0.15);
-  border-top-color: #2F80ED;
+  border: 4px solid rgba(37, 99, 235, 0.15);
+  border-top-color: #2A7FFF;
   border-radius: 50%;
   animation: spin 0.9s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
 }

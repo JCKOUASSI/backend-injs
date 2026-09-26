@@ -21,7 +21,7 @@ class BilanFACExportsTest(TestCase):
             groupe='G1',
         )
         self.user = User.objects.create_user(
-            username='fac_export', password='test', role='CPFAE_ADMIN',
+            username='fac_export', password='test', role='INJS_ADMIN',
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)

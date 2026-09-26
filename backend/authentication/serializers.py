@@ -147,10 +147,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role')
         secretariat = attrs.get('secretariat')
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE', 'ENCADRANT'):
+        if role in ('CHEF_INJS_ADMIN', 'INJS_ADMIN', 'FINANCE', 'ENCADRANT'):
             attrs['secretariat'] = None
-        if role == 'CHEF_CPFAE_ADMIN':
-            if users_with_role('CHEF_CPFAE_ADMIN').exists():
+        if role == 'CHEF_INJS_ADMIN':
+            if users_with_role('CHEF_INJS_ADMIN').exists():
                 logger.warning('user_create_chef_cpfae_admin_already_exists')
                 raise serializers.ValidationError(
                     {'role': "Un Chef CPFAE Admin existe déjà. Ce rôle est unique sur toute la plateforme."}
@@ -237,10 +237,10 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         role = attrs.get('role', get_user_role(self.instance) if self.instance else None)
         secretariat = attrs.get('secretariat', self.instance.secretariat if self.instance else None)
-        if role in ('CHEF_CPFAE_ADMIN', 'CPFAE_ADMIN', 'FINANCE', 'ENCADRANT'):
+        if role in ('CHEF_INJS_ADMIN', 'INJS_ADMIN', 'FINANCE', 'ENCADRANT'):
             attrs['secretariat'] = None
-        if role == 'CHEF_CPFAE_ADMIN':
-            already_exists = users_with_role('CHEF_CPFAE_ADMIN').exclude(
+        if role == 'CHEF_INJS_ADMIN':
+            already_exists = users_with_role('CHEF_INJS_ADMIN').exclude(
                 pk=self.instance.pk if self.instance else None
             ).exists()
             if already_exists:
