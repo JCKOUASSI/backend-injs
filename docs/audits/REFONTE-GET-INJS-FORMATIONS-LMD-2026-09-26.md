@@ -1113,14 +1113,210 @@ serializers, views, permissions, capabilities, frontend et configuration.
 
 ---
 
+## 20. LOT L5 — EXPOSITION DE LA CHAÎNE LMD (FK STRICTE) — 26/09/2026 ✅
+
+### 20.1 Ce qui existait déjà
+
+L'API **`GET /api/scolarite/pedagogie/cours/`** exposait déjà presque toute la
+chaîne (Année → Formation → Parcours → Niveau → Semestre → UE → ECUE → Groupe →
+Enseignant + effectif, volume, statut, planning). Consommée par
+`frontend/src/pages/CoursLmd.jsx`, testée par `scolarite/tests/test_cours_lmd.py`,
+documentée dans le catalogue d'endpoints. **Rien n'a donc été créé de zéro.**
+
+### 20.2 Le défaut corrigé
+
+L'API rattachait les séances à un cours par **heuristique** :
+
+```python
+# AVANT — déduction
+AffectationCreneau.objects.filter(groupe_id__in=..., formation_id__in=...)
+```
+
+Un groupe portant CM + TD + TP voyait **toutes** ses séances s'afficher sur
+**chacun** de ses cours. C'est précisément la déduction que L1 avait interdite.
+
+### 20.3 Comportement après
+
+| | Avant | Après |
+| :--- | :--- | :--- |
+| Source de vérité | `(groupe, cycle)` | **`affectation_pedagogique_id`** |
+| Séance rattachée | sur tous les cours du groupe | sur **son seul** cours |
+| Séance sans FK | rattachée par heuristique | **à aucun cours**, comptée et signalée |
+| Repli heuristique | implicite | **supprimé** (règle 4) |
+| Séances réalisées | `max()` par groupe (approximatif) | `sum()` sur les séances du cours |
+
+### 20.4 Nouveaux champs (additifs, contrat préservé)
+
+| Champ | Type | Rôle |
+| :--- | :--- | :--- |
+| `nb_seances_rattachees` | int | Séances rattachées à ce cours |
+| `nb_seances_non_rattachees` | int | Séances du périmètre à régulariser |
+| `regularisation_requise` | bool | `true` si le cours n'a aucune séance |
+| `planning[].salle_id` | int\|null | FK `RefSalle` (lot L2), `salle` texte inchangé |
+
+Aucun champ historique retiré — `test_les_valeurs_existantes_du_contrat_sont_conservees`
+le verrouille sur les 21 champs d'origine.
+
+### 20.5 Tests
+
+**Créé** `scolarite/tests/test_cours_lmd_rattachement.py` (10 tests) : cas CM/TD/TP
+sur un groupe unique, absence de doublon, séance orpheline détectable mais intacte,
+séances réalisées par cours, séance inactive ignorée, API en lecture seule,
+contrat conservé, absence de CPFAE.
+
+**Adapté** `test_cours_lmd.py` : la séance de fixture est désormais rattachée via
+la FK (exigence de la nouvelle règle).
+
+| Suite | Résultat |
+| :--- | :--- |
+| `test_cours_lmd` + `test_cours_lmd_rattachement` | **15 OK** |
+| `test scolarite` | **269 OK** |
+| Suite backend complète | **1779 OK** (+10) |
+| Suite frontend | **1751 OK** — **aucune modification frontend requise** |
+| `manage.py check` / `makemigrations --check` | ✅ / ✅ No changes |
+
+### 20.6 Base — strictement inchangée
+
+`annee=1 · ref_formation=8 · parcours=0 · groupe=0 · maquette=0 · ue=0 · ecue=0 ·
+aff_pedago=0 · seance=0 · seance_rattachee=0 · formateur=3 · refsalle=58 · pointage=34`
+
+**Aucune donnée créée, modifiée ou supprimée.** Aucune migration.
+
+### 20.7 Reste à arbitrer (D)
+
+- **La chaîne est vide** : `parcours`, `groupe`, `maquette`, `ue`, `ecue`,
+  `affectation_pedagogique` et `seance` sont à **0 ligne**. L'écran Cours ne peut
+  donc rien afficher tant qu'aucune maquette n'est chargée. Le chargement relève
+  de l'arbitrage **A-4 (nomenclature officielle)**, non tranché.
+- **Aucune interface de rattachement** : rien ne permet aujourd'hui à un agent de
+  *poser* `affectation_pedagogique` sur une séance depuis l'IHM. L'indicateur
+  `regularisation_requise` signale le besoin mais ne le résout pas.
+
+---
+
+## 21. ARBITRAGE A-4 — DATA CONTRACT DE LA CHAÎNE LMD (26/09/2026)
+
+> **Statut : document d'audit. Aucune donnée créée, aucune nomenclature inventée.**
+> L5 est figé (FK stricte, sans fallback) et n'est pas commité.
+
+### 21.1 Chaîne LMD — modèles de référence
+
+| # | Maillon | Modèle | Unicité |
+| :-- | :--- | :--- | :--- |
+| 1 | Année académique | `scolarite.AnneeAcademique` | `libelle` |
+| 2 | Formation (cycle) | `formations.RefFormation` | `intitule` (unique) |
+| 3 | Type de formation | `scolarite.TypeFormation` | `code` (unique) |
+| 4 | Parcours | `scolarite.Parcours` | ⚠️ **aucune** |
+| 5 | Spécialité | **n'existe pas** | 🔴 à arbitrer (A-3) |
+| 6 | Niveau | `scolarite.Niveau` | `code` (unique) |
+| 7 | Semestre | `scolarite.Semestre` | `(niveau, numero)` |
+| 8 | Groupe | `scolarite.Groupe` | ⚠️ **aucune** |
+| 9 | Maquette | `scolarite.Maquette` | `(année, formation, parcours, niveau, version)` |
+| 10 | UE | `scolarite.UE` | ⚠️ **aucune** |
+| 11 | ECUE | `scolarite.ECUE` | ⚠️ **aucune** (`code` libre) |
+| 12 | Formateur | `formations.Formateur` | `numerobadge` (unique) |
+| 13 | Affectation pédagogique | `scolarite.AffectationPedagogique` | contrôlée par `clean()` |
+| 14 | Séance | `edts.AffectationCreneau` | — |
+| 15 | Salle | `formations.RefSalle` | `(site, batiment, nom)` |
+
+### 21.2 Données réellement disponibles
+
+| Entité | Lignes | Valeurs / statut |
+| :-- | :-- | :--- |
+| Année académique | **1** | `2026-2027` (courante) ✅ |
+| Type de formation | **4** | LICENCE, MASTER, FORMATION_CONTINUE, FORMATION_INITIALE ✅ (cohérents avec les 8 cycles) |
+| Formation (cycle) | **8** | ÉDUCATION ET MOTRICITÉ — LICENCE/MASTER · ACTIVITÉS PHYSIQUES ADAPTÉES — LICENCE/MASTER · PROFESSORAT DE LYCÉE — EPS/SPORT · PROFESSORAT DE COLLÈGE — EPS · MAÎTRE(SSE) D'ÉDUCATION PHYSIQUE ET SPORTIVE — ⚠️ `code` **vide** |
+| Module CPFAE | 10 | ❌ héritage, exclu par L3 |
+| Niveau | **5** | L1, L2, L3, M1, M2 ✅ |
+| Semestre | **10** | 2 par niveau ✅ |
+| Vague | **15** | « VAGUE SEMESTRE 1…12 - 2026-2027 » ✅ |
+| Site / Bâtiment / Salle | 1 / 10 / **58** | INJS MARCORY ✅ |
+| Formateur | **3** | ⚠️ **démonstrations** : KONÉ Seydou (Management public), OUÉDRAOGO Alima (Finances publiques), NDIAYE Ibrahima (Droit administratif) — **sans rapport avec les formations EPS** |
+| **Parcours / Groupe / Maquette / UE / ECUE / Affectation / Séance** | **0** chacune | 🔴 **chaîne LMD vide** |
+| Pointage legacy | 34 | ❌ hors chaîne |
+
+### 21.3 Sources potentielles de nomenclature
+
+| Source | Type | Contenu | Statut | Risque |
+| :--- | :--- | :--- | :--- | :--- |
+| `docs/modeles/modele_formations.csv` | CSV | 1 ligne **factice** « FORMATION EXEMPLE / SALLE EXEMPLE » | ❌ gabarit | 🔴 nul |
+| `docs/modeles/modele_seances.csv` | CSV | 1 ligne factice | ❌ gabarit | 🔴 nul |
+| `docs/modeles/modele_formateurs.csv` | CSV | 1 ligne factice « EXEMPLE » | ❌ gabarit | 🔴 nul |
+| `backend/test_import_formations_seances.xlsx` | Excel | fichier de test d'import | ❌ test | 🔴 nul |
+| **`formations_refformation` (8 lignes)** | base | 8 intitulés INJS plausibles (EPS, professorat) | ⚠️ **à valider** | 🟡 source la plus crédible, mais incomplète |
+| 8 seeders `seed_*` | Python | démonstrations | ❌ démo | 🔴 ne pas importer |
+| `formations_module` (10) | base | modules CPFAE | ❌ historique | 🔴 exclu (L3) |
+
+**Conclusion** : les 8 `RefFormation` sont la seule nomenclature à ancrage INJS
+crédible, mais **incomplètes** (ni code, ni type, ni niveau) et **non déclarées
+officielles** par un document.
+
+### 21.4 Ambiguïtés A-4 — à trancher
+
+| # | Question | Pourquoi je ne tranche pas |
+| :-- | :--- | :--- |
+| A-4.1 | Les 8 `RefFormation` sont-elles la nomenclature **officielle** ? | Aucun document ne le déclare ; saisies sans seeder |
+| A-4.2 | Quelle **Spécialité** ? Le modèle **n'existe pas** | Créer un modèle = décision structurelle |
+| A-4.3 | **Code officiel** des formations ? `code` est **vide** sur les 8 lignes | Conditionne unicité et imports |
+| A-4.4 | Les 3 formateurs démo sont-ils à **remplacer** par les enseignants réels ? | Leurs spécialités ne correspondent pas aux formations EPS |
+| A-4.5 | Parcours : 1 ou plusieurs par formation ? **Aucune** contrainte d'unicité | Règle métier |
+| A-4.6 | Groupes : nommage officiel et capacité ? | Aucune règle dans le dépôt |
+
+### 21.5 Data Contract proposé (structure — **sans valeurs**)
+
+| Entité | Champs minimaux attendus | Relations obligatoires | Prérequis |
+| :--- | :--- | :--- | :--- |
+| **Année** | `libelle`, `date_debut`, `date_fin`, `courante` | — | ✅ disponible |
+| **Type de formation** | `code`, `libelle`, `actif` | — | ✅ disponible (4) |
+| **Formation** | `intitule`, `code`, `type_diplome` | — | ⚠️ 8 lignes, `code` vide |
+| **Parcours** | `code`, `intitule`, `actif` | `ref_formation`, `type_formation` | 🔴 0 ligne |
+| **Niveau** | `code`, `libelle`, `cycle`, `ordre` | — | ✅ disponible (5) |
+| **Semestre** | `numero`, `libelle` | `niveau` | ✅ disponible (10) |
+| **Groupe** | `nom`, `capacite_max`, `actif` | `annee_academique`, `ref_formation`, `niveau` (+`parcours` opt.) | 🔴 0 ligne |
+| **Maquette** | `version`, `statut`, `libelle` | `annee_academique`, `ref_formation`, `parcours`, `niveau` | 🔴 0 ligne |
+| **UE** | `code`, `intitule`, `credits` | `maquette`, `semestre` | 🔴 0 ligne |
+| **ECUE** | `code`, `intitule`, `credits`, `volume_cm/td/tp` | `ue` | 🔴 0 ligne |
+| **Formateur** | `numerobadge`, `nom`, `prenom`, `specialite` | — | ⚠️ 3 démo à remplacer |
+| **Affectation pédagogique** | `type_enseignement`, `volume_horaire`, `statut` | `annee`, `formation`, `parcours`, `niveau`, `semestre`, `ue`, `ecue`, `groupe`, `enseignant` | 🔴 0 ligne |
+| **Séance** | `semaine_debut/fin`, `nature`, `intitule` | `emploi_du_temps`, `creneau_template`, `affectation_pedagogique` | 🔴 0 ligne |
+| **Salle** | `nom`, `type_lieu`, `capacite` | `site`, `batiment` (opt.) | ✅ disponible (58) |
+
+### 21.6 Ordre de chargement recommandé
+
+```
+1.  RefFormation             ← 8 lignes (types disponibles), compléter `code`
+2.  Parcours                 ← 0, règle A-4.5 à trancher
+3.  Maquette (BROUILLON)     ← version 1
+4.  UE                       ← rattachées au semestre
+5.  ECUE                     ← rattachées à l'UE
+6.  Groupe                   ← rattachés à année/formation/niveau
+7.  Affectation pédagogique  ← exige 3+4+5+6 + formateur
+8.  Maquette ACTIVE          ← ⚠️ APRÈS les affectations (immuabilité)
+9.  Séance EDT               ← exige 7 + Salle
+10. AffectationCreneau.affectation_pedagogique ← rattachement MANUEL (L1)
+```
+
+> ⚠️ **Piège identifié** : une `Maquette` passée en `ACTIVE` devient **immuable** —
+> `_verifier_maquette_modifiable` lève une `ValidationError` dès l'écriture d'une UE.
+> Toute correction ultérieure impose un **clonage en version 2**.
+
+### 21.7 Données manquantes pour L6
+
+**Bloquant** (toutes à 0) : `Parcours`, `Maquette`, `UE`, `ECUE`, `Groupe`,
+`Affectation pédagogique`, `Séance`.
+
+**Non bloquant mais requis pour un écran réaliste** : les `code` des 8 formations, et
+des formateurs dont la spécialité correspond aux formations EPS.
+
+### 21.8 IHM de rattachement — NON développée
+
+Conformément à la consigne, **aucune interface de rattachement manuel** n'est
+développée. L'indicateur `regularisation_requise` (L5) signale le besoin ; l'IHM sera
+décidée après A-4 et vérification de la disponibilité réelle des données LMD.
+
+---
+
 *Rapport initial produit le 26/09/2026 — audit préalable.*
-*Lots **L1/L2/L3/L4a/L4b** réalisés le 26/09/2026 (§ 15 à § 19). Lots L5 et L6 non démarrés.*
+*Lots **L1/L2/L3/L4a/L4b/L5** réalisés le 26/09/2026 (§ 15 à § 20). A-4 documenté au § 21. L6 non démarré.*
 *Créer une nomenclature, un rattachement automatique ou un modèle `Promotion` supplémentaire*
 *exige toujours un arbitrage métier explicite (§ 25).*
-
-
-
-
-
-
-

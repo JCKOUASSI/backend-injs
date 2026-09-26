@@ -70,6 +70,10 @@ class CoursLmdTests(TestCase):
             emploi_du_temps=cls.edt, creneau_template=cls.template,
             semaine_debut=1, semaine_fin=10, groupe=cls.groupe,
             formation=cls.cycle, salle_nom='Amphi 2', intitule='Droit public CM',
+            # Lot L5 : le rattachement séance → cours est EXPLICITE. L'ancienne
+            # jointure par (groupe, cycle) est supprimée : sans cette clé, la
+            # séance n'apparaît sur aucun cours.
+            affectation_pedagogique=cls.ap,
         )
         # Deux auditeurs inscrits dans le groupe.
         statut_actif = StatutEtudiant.objects.create(code='ACTIF', libelle='Actif')
