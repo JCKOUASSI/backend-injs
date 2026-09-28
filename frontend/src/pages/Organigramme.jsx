@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { isAdminLevelRole } from '../utils/roles'
+import '../styles/organigramme.css'
 
 /**
  * Organigramme de l'établissement — Directions / Départements / Services,
@@ -58,22 +59,33 @@ function SousServices({ items }) {
   ))
 }
 
+/** Initiales du responsable (rendu « pilule » du tableau, comme la référence). */
+function initiales(nom) {
+  return String(nom || '?')
+    .split(/\s+/).filter(Boolean).slice(0, 2).map((m) => m[0].toUpperCase()).join('')
+}
+
 function ResponsableBadge({ valeur }) {
-  if (!valeur) return <span className="text-muted">—</span>
-  return <span title={`Responsable : ${valeur.nom}`}><i className="bi bi-person-badge me-1"></i>{valeur.nom}</span>
+  if (!valeur) return <span className="orga-sous-texte">— non pourvu —</span>
+  return (
+    <span className="orga-avec-avatar" title={`Responsable : ${valeur.nom}`}>
+      <span className="orga-avatar">{initiales(valeur.nom)}</span>
+      <span>{valeur.nom}</span>
+    </span>
+  )
 }
 
 function NoeudArbre({ libelle, code, effectif, sousNoeuds }) {
   return (
-    <li className="mb-1">
-      <span>
-        {code && <code className="me-2">{code}</code>}
+    <li className="orga-noeud">
+      <span className="orga-noeud-ligne">
+        {code && <code>{code}</code>}
         {libelle}
         {typeof effectif === 'number' && (
-          <span className="badge-bg-secondary ms-2" title="Comptes rattachés">{effectif}</span>
+          <span className="orga-effectif" title="Comptes rattachés">{effectif}</span>
         )}
       </span>
-      {sousNoeuds && sousNoeuds.length > 0 && <ul className="list-unstyled ms-4 mt-1">{sousNoeuds}</ul>}
+      {sousNoeuds && sousNoeuds.length > 0 && <ul className="orga-noeud-enfants">{sousNoeuds}</ul>}
     </li>
   )
 }
@@ -247,19 +259,27 @@ export default function Organisation() {
         {onglet === 'secretariats' ? (
           <>
             <td><code>{ligne.numero}</code></td>
-            <td><strong>{ligne.nom}</strong>{!ligne.actif && <span className="badge-bg-warning ms-2">inactif</span>}</td>
+            <td>
+              <div className="orga-cellule">
+                <strong>{ligne.nom}</strong>
+                {!ligne.actif && <span className="badge-bg-warning">inactif</span>}
+              </div>
+            </td>
             <td>{ligne.type_libelle || <span className="text-muted">—</span>}</td>
             <td>{ligne.direction_libelle || ligne.departement_libelle || <span className="text-muted">non rattaché</span>}</td>
             <td><ResponsableBadge valeur={ligne.responsable} /></td>
-            <td>{ligne.nb_participants ?? 0}</td>
-            <td>{ligne.nb_modules ?? 0}</td>
+            <td><span className="orga-pastille">{ligne.nb_participants ?? 0}</span></td>
+            <td><span className="orga-pastille">{ligne.nb_modules ?? 0}</span></td>
           </>
         ) : (
           <>
             <td><code>{ligne.code}</code></td>
             <td>
-              <strong>{onglet === 'services' ? ligne.nom : ligne.libelle}</strong>{!ligne.actif && <span className="badge-bg-warning ms-2">inactif</span>}
-              {ligne.description && <><br /><small className="text-muted">{ligne.description}</small></>}
+              <div className="orga-cellule">
+                <strong>{onglet === 'services' ? ligne.nom : ligne.libelle}</strong>
+                {!ligne.actif && <span className="badge-bg-warning">inactif</span>}
+                {ligne.description && <span className="orga-sous-texte">{ligne.description}</span>}
+              </div>
             </td>
             {onglet === 'services' && (
               <td>
@@ -273,14 +293,16 @@ export default function Organisation() {
             {onglet === 'departements' && <td>{ligne.direction_libelle || <span className="text-muted">autonome</span>}</td>}
             <td><ResponsableBadge valeur={ligne.responsable} /></td>
             <td>
-              {ligne.telephone && <div><i className="bi bi-telephone me-1"></i>{ligne.telephone}</div>}
-              {ligne.email && <div><i className="bi bi-envelope me-1"></i>{ligne.email}</div>}
-              {!ligne.telephone && !ligne.email && <span className="text-muted">—</span>}
+              <div className="orga-cellule">
+                {ligne.telephone && <span><i className="bi bi-telephone me-1"></i>{ligne.telephone}</span>}
+                {ligne.email && <span className="orga-sous-texte"><i className="bi bi-envelope me-1"></i>{ligne.email}</span>}
+                {!ligne.telephone && !ligne.email && <span className="orga-sous-texte">—</span>}
+              </div>
             </td>
             {onglet !== 'secretariats' && <td>{ligne.localisation || <span className="text-muted">—</span>}</td>}
-            {onglet === 'directions' && <td>{ligne.nb_departements ?? 0}</td>}
-            {onglet === 'departements' && <td>{ligne.nb_services ?? 0}</td>}
-            <td>{ligne.effectif ?? 0}</td>
+            {onglet === 'directions' && <td><span className="orga-pastille">{ligne.nb_departements ?? 0}</span></td>}
+            {onglet === 'departements' && <td><span className="orga-pastille">{ligne.nb_services ?? 0}</span></td>}
+            <td><span className="orga-pastille orga-pastille--neutre">{ligne.effectif ?? 0}</span></td>
           </>
         )}
       </>
@@ -288,23 +310,25 @@ export default function Organisation() {
     return (
       <tr key={ligne.id}>
         {base}
-        <td className="text-end">
-          {isDFRC && (
-            <>
-              <button className="btn btn-outline-secondary btn-sm me-1" onClick={() => openEdit(ligne)} title="Modifier">
-                <i className="bi bi-pencil"></i>
-              </button>
-              {ligne.actif === false ? (
-                <button className="btn btn-outline-success btn-sm" onClick={() => reactiver(ligne)} title="Réactiver">
-                  <i className="bi bi-arrow-counterclockwise"></i>
+        <td className="orga-actions-cell">
+          <div className="orga-ligne-actions">
+            {isDFRC && (
+              <>
+                <button className="btn btn-outline-secondary btn-sm" onClick={() => openEdit(ligne)} title="Modifier">
+                  <i className="bi bi-pencil"></i>
                 </button>
-              ) : (
-                <button className="btn btn-outline-danger btn-sm" onClick={() => desactiver(ligne)} title="Désactiver">
-                  <i className="bi bi-slash-circle"></i>
-                </button>
-              )}
-            </>
-          )}
+                {ligne.actif === false ? (
+                  <button className="btn btn-outline-success btn-sm" onClick={() => reactiver(ligne)} title="Réactiver">
+                    <i className="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                ) : (
+                  <button className="btn btn-outline-danger btn-sm" onClick={() => desactiver(ligne)} title="Désactiver">
+                    <i className="bi bi-slash-circle"></i>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </td>
       </tr>
     )
@@ -312,7 +336,7 @@ export default function Organisation() {
 
   const champ = (cle, libelle, composant) => (
     <div className="mb-2">
-      <label className="label" htmlFor={`orga-champ-${cle}`}>{libelle}</label>
+      <label className="orga-label" htmlFor={`orga-champ-${cle}`}>{libelle}</label>
       {cloneElement(composant, { id: `orga-champ-${cle}` })}
     </div>
   )
@@ -334,8 +358,8 @@ export default function Organisation() {
           <form onSubmit={soumettre}>
             <div className="modal-body">
               {formError && <div className="error-message" style={{ whiteSpace: 'pre-line' }}>{formError}</div>}
-              <div className="row">
-                <div className="col-md-6">
+              <div className="orga-grille">
+                <div className="orga-col">
                   {(onglet === 'directions' || onglet === 'departements')
                     && champ('code', 'Code *', texte('code', { placeholder: onglet === 'directions' ? 'ex. DAF' : 'ex. DEP-PED' }))}
                   {(onglet === 'directions' || onglet === 'departements')
@@ -396,7 +420,7 @@ export default function Organisation() {
                   {(onglet === 'directions' || onglet === 'departements')
                     && champ('ordre', 'Ordre d’affichage', texte('ordre', { type: 'number' }))}
                 </div>
-                <div className="col-md-6">
+                <div className="orga-col">
                   {champ('responsable_id', 'Responsable', selectResponsable(form.responsable_id, set('responsable_id')))}
                   {champ('adjoint_id', 'Adjoint(e)', selectResponsable(form.adjoint_id, set('adjoint_id')))}
                   {champ('telephone', 'Téléphone', texte('telephone', { placeholder: '+225 …' }))}
@@ -406,9 +430,9 @@ export default function Organisation() {
                     <textarea className="input" rows={2} value={form.description ?? ''} onChange={set('description')} />
                   ))}
                   {champ('motif', 'Motif du changement', texte('motif', { placeholder: 'journalisé avec la modification' }))}
-                  <div className="form-check">
-                    <input id="orga-actif" type="checkbox" className="form-check-input" checked={form.actif !== false} onChange={setBool('actif')} />
-                    <label htmlFor="orga-actif" className="form-check-label">Unité active</label>
+                  <div className="orga-check">
+                    <input id="orga-actif" type="checkbox" className="orga-check-input" checked={form.actif !== false} onChange={setBool('actif')} />
+                    <label htmlFor="orga-actif" className="orga-check-label">Unité active</label>
                   </div>
                 </div>
               </div>
@@ -426,20 +450,21 @@ export default function Organisation() {
   }
 
   return (
-    <div>
-      <div className="card">
+    <div className="orga-page">
+      <div className="card orga-hero">
         <div className="card-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div className="orga-hero-row">
             <div>
-              <h6 className="mb-0" style={{ fontWeight: 700 }}>
-                <i className="bi bi-diagram-3 me-2"></i>Directions / Départements / Services
+              <span className="orga-ensemble">Organisation</span>
+              <h6 className="orga-titre">
+                <i className="bi bi-diagram-3"></i>Directions / Départements / Services
               </h6>
-              <small className="text-muted">
+              <small className="orga-sous-titre">
                 Structure hiérarchique de l’établissement (modèle 13) ; les secrétariats s’y rattachent.
               </small>
             </div>
-            <div className="d-flex align-items-center gap-2">
-              <label className="d-flex align-items-center gap-1 mb-0" style={{ cursor: 'pointer' }}>
+            <div className="orga-actions">
+              <label className="orga-switch">
                 <input type="checkbox" checked={voirInactifs} onChange={(e) => setVoirInactifs(e.target.checked)} />
                 <small>Inactifs</small>
               </label>
@@ -453,12 +478,12 @@ export default function Organisation() {
               )}
             </div>
           </div>
-          <ul className="nav nav-tabs mt-3">
+          <ul className="orga-onglets">
             {ONGLETS.map((o) => (
-              <li key={o.cle} className="nav-item">
+              <li key={o.cle}>
                 <button
                   type="button"
-                  className={`nav-link ${onglet === o.cle ? 'active' : ''}`}
+                  className={`orga-onglet ${onglet === o.cle ? 'is-active' : ''}`}
                   onClick={() => changerOnglet(o.cle)}
                 >
                   <i className={`bi ${o.icone} me-1`}></i>{o.libelle}
@@ -472,14 +497,14 @@ export default function Organisation() {
       {error && <div className="error-message">{error}</div>}
 
       {montreArbre ? (
-        <div className="card">
-          <div className="card-header-bar">
-            <span><i className="bi bi-share me-2"></i>Arbre de l’organisation</span>
+        <div className="card orga-panel">
+          <div className="card-header-bar orga-panel-head">
+            <span><i className="bi bi-share"></i>Arbre de l’organisation</span>
             {loading && <span className="spinner"></span>}
           </div>
           <div className="card-body">
             {!arbres ? <div className="loading"><div className="spinner"></div></div> : (
-              <ul className="list-unstyled mb-0">
+              <ul className="orga-arbre">
                 {(arbres.directions || []).map((d) => (
                   <NoeudArbre
                     key={`d-${d.id}`}
@@ -543,31 +568,43 @@ export default function Organisation() {
           </div>
         </div>
       ) : (
-        <div className="card">
-          <div className="card-header-bar">
-            <span><i className={`bi ${cfg.icone} me-2`}></i>{cfg.libelle}</span>
-            <div className="d-flex align-items-center gap-2">
-              <input
-                className="input input-sm"
-                placeholder="Rechercher…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                style={{ maxWidth: 220 }}
-              />
-              <span className="badge-bg-secondary">{lignes.length} unité(s)</span>
+        <div className="card orga-panel">
+          <div className="card-header-bar orga-panel-head">
+            <span><i className={`bi ${cfg.icone}`}></i>{cfg.libelle}</span>
+            <div className="orga-panel-actions">
+              <div className="orga-recherche">
+                <i className="bi bi-search"></i>
+                <input
+                  type="search"
+                  placeholder="Rechercher…"
+                  aria-label="Rechercher une unité"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+              <span className="orga-compteur">{lignes.length} unité(s)</span>
             </div>
           </div>
           <div className="card-body-flush">
             {loading ? (
               <div className="loading"><div className="spinner"></div></div>
             ) : lignes.length === 0 ? (
-              <div className="text-center py-5 text-muted">
-                <i className={`bi ${cfg.icone}`} style={{ fontSize: '2rem' }}></i>
-                <p className="mt-2">Aucune unité dans cet onglet.</p>
+              <div className="orga-vide">
+                <i className={`bi ${cfg.icone}`}></i>
+                <span className="orga-vide-titre">Aucune unité dans cet onglet</span>
+                <span className="orga-vide-aide">
+                  Créez une première unité
+                  {onglet === 'secretariats' ? ' et rattachez-la à une direction ou à un département.' : '.'}
+                </span>
+                {isDFRC && (
+                  <button className="btn btn-dfrc btn-sm" onClick={openCreate}>
+                    <i className="bi bi-plus-lg me-1"></i>Créer une unité
+                  </button>
+                )}
               </div>
             ) : (
               <div className="table-container">
-                <table className="table">
+                <table className="table orga-table">
                   <thead>
                     <tr>{colonnes.map((c) => <th key={c}>{c}</th>)}<th className="text-end">Actions</th></tr>
                   </thead>
