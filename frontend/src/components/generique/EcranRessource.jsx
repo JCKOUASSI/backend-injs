@@ -40,10 +40,20 @@ export function lireChemin(objet, chemin) {
 const MOIS = {
   montant: (v) => (v == null || v === '' ? '—'
     : `${Number(v).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} F`),
-  date: (v) => (v ? new Date(v).toLocaleDateString('fr-FR') : '—'),
-  datetime: (v) => (v ? new Date(v).toLocaleString('fr-FR', {
-    dateStyle: 'short', timeStyle: 'short',
-  }) : '—'),
+  // Certains endpoints renvoient déjà une date française (jj/mm/aaaa) :
+  // `new Date` échoue alors silencieusement — on affiche la valeur brute.
+  date: (v) => {
+    if (!v) return '—'
+    const d = new Date(v)
+    return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('fr-FR')
+  },
+  datetime: (v) => {
+    if (!v) return '—'
+    const d = new Date(v)
+    return Number.isNaN(d.getTime())
+      ? String(v)
+      : d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  },
   booleen: (v) => (v ? 'Oui' : 'Non'),
   pourcentage: (v) => (v == null || v === '' ? '—' : `${Number(v).toLocaleString('fr-FR')} %`),
 }
@@ -146,11 +156,27 @@ export function colonnesPour(ecran, lignes) {
     return 0
   })
   const retenues = cles.slice(0, ecran.maxColonnes || 8)
-  return retenues.map((cle) => ({
-    cle,
-    libelle: LIBELLES_CHAMPS[cle] || cle.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()),
-    format: infererFormat(cle, echantillon[cle]),
-  }))
+  // Écarte les clés « X_id » quand la clé « X » est déjà retenue : la FK
+  // n'apporte rien à l'écran et occupait une colonne entière (X, X id).
+  const retenuesFiltrees = retenues.filter(
+    (cle) => !(cle.endsWith('_id') && retenues.includes(cle.slice(0, -3))),
+  )
+  // Déduplication des libellés : un même libellé ne peut pas apparaître deux
+  // fois (ex. « Année » et « Année id » déduits par la déduction
+  // automatique). Sans cela, l'écran affiche des colonnes redondantes.
+  const vus = new Set()
+  return retenuesFiltrees
+    .map((cle) => ({
+      cle,
+      libelle: LIBELLES_CHAMPS[cle] || cle.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()),
+      format: infererFormat(cle, echantillon[cle]),
+    }))
+    .filter((colonne) => {
+      const libelle = colonne.libelle.toLowerCase()
+      if (vus.has(libelle)) return false
+      vus.add(libelle)
+      return true
+    })
 }
 
 function Cellule({ ligne, colonne }) {
@@ -254,6 +280,17 @@ export function ListeGenerique({ ecran, cleBase }) {
     return base
   }, [ecran, filtres, rechercheDebounced, page])
 
+  // Filtres marqués `requis: true` : la requête attend leur valeur — un appel
+  // sans paramètre obligatoire renverrait une erreur 400 serveur inutile.
+  const filtresManquants = useMemo(
+    () => (ecran.filtres || []).filter((f) => {
+      if (!f.requis) return false
+      const v = params[f.param]
+      return v === undefined || v === null || v === ''
+    }),
+    [ecran, params],
+  )
+
   const cle = useMemo(
     () => [...cleBase, ecran.id, params],
     [cleBase, ecran.id, params],
@@ -272,7 +309,7 @@ export function ListeGenerique({ ecran, cleBase }) {
       }
       return parsePaginatedResponse(brut, ecran.taillePage || 50)
     },
-    enabled: Boolean(ecran.endpoint),
+    enabled: Boolean(ecran.endpoint) && filtresManquants.length === 0,
     retry: false,
   })
 
@@ -322,32 +359,116 @@ export function ListeGenerique({ ecran, cleBase }) {
     mutation.mutate({ action, ligne })
   }
 
+  // Barre d'outils commune : recherche, filtres, actions globales, rechargement.
+  const barre = (
+    <div className="gen-toolbar">
+      {ecran.recherche && (
+        <div className="gen-field">
+          <label className="gen-field-label">{ecran.recherche.libelle || 'Rechercher'}</label>
+          <div className="gen-search">
+            <i className="bi bi-search"></i>
+            <input
+              type="search"
+              className="form-control form-control-sm"
+              placeholder={ecran.recherche.placeholder || 'Rechercher…'}
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+      {(ecran.filtres || []).map((filtre) => (
+        <div className="gen-field" key={filtre.param}>
+          <label className="gen-field-label">{filtre.libelle}</label>
+          <Filtre
+            filtre={filtre}
+            valeur={filtres[filtre.param]}
+            onChange={(v) => setFiltres((p) => ({ ...p, [filtre.param]: v }))}
+          />
+        </div>
+      ))}
+      <div className="gen-toolbar-actions">
+        {(ecran.actionsGlobales || []).map((action) => (
+          <button
+            key={action.libelle}
+            type="button"
+            className="btn btn-sm btn-outline-primary"
+            onClick={() => demander(action, null)}
+            disabled={mutation.isPending}
+          >
+            {action.icone && <i className={`bi ${action.icone} me-1`}></i>}
+            {action.libelle}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="btn btn-sm gen-refresh"
+          onClick={() => queryClient.invalidateQueries({ queryKey: cle })}
+          title="Recharger depuis le serveur"
+          aria-label="Recharger depuis le serveur"
+        >
+          <i className={`bi bi-arrow-clockwise${isFetching ? ' spin' : ''}`}></i>
+        </button>
+      </div>
+    </div>
+  )
+
+  // Filtre requis encore vide : barre de sélection + invite neutre, sans appel
+  // serveur (un appel sans paramètre obligatoire renverrait une erreur 400).
+  if (filtresManquants.length) {
+    return (
+      <div className="ecran-generique">
+        {barre}
+        <div className="alert alert-info" role="status" data-testid="ecran-parametres-requis">
+          <strong>Sélection requise.</strong>{' '}
+          {filtresManquants.length === 1
+            ? `Choisissez « ${filtresManquants[0].libelle} » pour charger les données.`
+            : `Choisissez ${filtresManquants.map((f) => `« ${f.libelle} »`).join(', ')} pour charger les données.`}
+          <div className="small text-muted mt-1">Endpoint appelé : <code>{ecran.endpoint}</code></div>
+        </div>
+        {ecran.note && <p className="gen-note mt-3">{ecran.note}</p>}
+      </div>
+    )
+  }
+
   const indicateurs = data?.indicateurs
 
   if (indicateurs) {
+    // Sans recherche, filtre ni action, la barre ne contiendrait que le
+    // rechargement : on la masque pour préserver l'aspect des écrans purs.
+    const sansBarre = !ecran.recherche
+      && !(ecran.filtres || []).length
+      && !(ecran.actionsGlobales || []).length
     return (
       <div className="ecran-generique">
-        <div className="row g-3">
-          {Object.entries(indicateurs).map(([cle, valeur]) => (
-            <div className="col-md-4" key={cle}>
-              <div className="card h-100">
-                <div className="card-body py-3">
-                  <div className="text-muted small text-uppercase">
+        {!sansBarre && barre}
+        <div className="gen-kpi-grid">
+          {Object.entries(indicateurs).map(([cle, valeur]) => {
+            // Un nombre reste un gros chiffre KPI ; un booléen, un objet ou une
+            // chaîne longue est un texte et prend le même corps que la liste des
+            // cartes voisines (sinon JSON et « Non » s'affichent en 1,6 rem).
+            const estDetail = typeof valeur === 'boolean'
+              || (typeof valeur === 'object' && !Array.isArray(valeur))
+              || (typeof valeur === 'string' && valeur.length > 40)
+            return (
+              <div className="card h-100 gen-kpi" key={cle}>
+                <div className="card-body">
+                  <span className="gen-kpi-label">
                     {LIBELLES_CHAMPS[cle] || cle.replace(/_/g, ' ')}
-                  </div>
-                  <div className="fs-5 fw-semibold">
+                  </span>
+                  <div className={`gen-kpi-value${estDetail ? ' gen-kpi-value--texte' : ''}`}>
                     {typeof valeur === 'boolean'
                       ? (valeur
                         ? <span className="text-success"><i className="bi bi-check-circle-fill me-1"></i>Oui</span>
                         : <span className="text-danger"><i className="bi bi-x-circle-fill me-1"></i>Non</span>)
                       : Array.isArray(valeur)
                         ? (valeur.length
-                          ? <span className="badge text-bg-warning">{valeur.length} anomalie(s)</span>
+                          ? <span className="badge text-bg-warning">{valeur.length} élément(s)</span>
                           : <span className="text-success"><i className="bi bi-shield-check me-1"></i>Aucune</span>)
                         : formater(valeur, /_le$|_at$|date/.test(cle) ? 'datetime' : undefined)}
                   </div>
                   {Array.isArray(valeur) && valeur.length > 0 && (
-                    <ul className="small text-muted mt-2 mb-0 ps-3">
+                    <ul className="gen-kpi-list">
                       {valeur.slice(0, 6).map((a, i) => (
                         <li key={i}>{typeof a === 'object' ? JSON.stringify(a) : String(a)}</li>
                       ))}
@@ -356,66 +477,17 @@ export function ListeGenerique({ ecran, cleBase }) {
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
-        {ecran.note && <p className="text-muted small mt-3">{ecran.note}</p>}
+        {ecran.note && <p className="gen-note mt-3">{ecran.note}</p>}
       </div>
     )
   }
 
   return (
     <div className="ecran-generique">
-      <div className="card mb-3">
-        <div className="card-body py-2">
-          <div className="row g-2 align-items-end">
-            {ecran.recherche && (
-              <div className="col-md-4">
-                <label className="form-label small text-muted mb-1">{ecran.recherche.libelle || 'Rechercher'}</label>
-                <input
-                  type="search"
-                  className="form-control form-control-sm"
-                  placeholder={ecran.recherche.placeholder || 'Rechercher…'}
-                  value={recherche}
-                  onChange={(e) => setRecherche(e.target.value)}
-                />
-              </div>
-            )}
-            {(ecran.filtres || []).map((filtre) => (
-              <div className="col-md-3" key={filtre.param}>
-                <label className="form-label small text-muted mb-1">{filtre.libelle}</label>
-                <Filtre
-                  filtre={filtre}
-                  valeur={filtres[filtre.param]}
-                  onChange={(v) => setFiltres((p) => ({ ...p, [filtre.param]: v }))}
-                />
-              </div>
-            ))}
-            <div className="col text-end">
-              {(ecran.actionsGlobales || []).map((action) => (
-                <button
-                  key={action.libelle}
-                  type="button"
-                  className="btn btn-sm btn-outline-primary me-2"
-                  onClick={() => demander(action, null)}
-                  disabled={mutation.isPending}
-                >
-                  {action.icone && <i className={`bi ${action.icone} me-1`}></i>}
-                  {action.libelle}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-secondary"
-                onClick={() => queryClient.invalidateQueries({ queryKey: cle })}
-                title="Recharger depuis le serveur"
-              >
-                <i className={`bi bi-arrow-clockwise${isFetching ? ' spin' : ''}`}></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {barre}
 
       {error && (
         <div
@@ -443,9 +515,20 @@ export function ListeGenerique({ ecran, cleBase }) {
         </div>
       )}
 
-      <div className="card">
-        <div className="table-responsive">
-          <table className="table table-sm table-hover align-middle mb-0">
+      <div className="gen-panel">
+        <div className="gen-panel-head">
+          <h2 className="gen-panel-title">
+            <i className="bi bi-list-ul"></i>
+            {ecran.titreListe || 'Résultats'}
+          </h2>
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <span className="gen-count-pill">
+              {isFetching ? 'Chargement…' : `${data?.count ?? lignes.length} élément(s)`}
+            </span>
+          </div>
+        </div>
+        <div className="table-responsive gen-table-wrap">
+          <table className="table table-sm table-hover align-middle mb-0 gen-table">
             <thead>
               <tr>
                 {colonnes.map((c) => (
@@ -495,23 +578,27 @@ export function ListeGenerique({ ecran, cleBase }) {
               ))}
               {lignes.length === 0 && !isFetching && (
                 <tr>
-                  <td colSpan={Math.max(1, colonnes.length) + 1} className="text-center text-muted py-4">
-                    <i className="bi bi-inbox d-block mb-2" style={{ fontSize: '1.4rem' }}></i>
-                    {ecran.vide || "Aucun élément à afficher pour ces critères."}
+                  <td colSpan={Math.max(1, colonnes.length) + 1}>
+                    <div className="gen-empty">
+                      <i className="bi bi-inbox"></i>
+                      {ecran.vide || "Aucun élément à afficher pour ces critères."}
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="card-footer d-flex justify-content-between align-items-center py-2">
-          <small className="text-muted">
-            {isFetching ? 'Chargement…' : `${data?.count ?? lignes.length} élément(s)`}
-            {ecran.note && <> · {ecran.note}</>}
-          </small>
+        <div className="gen-panel-foot">
+          {ecran.note ? (
+            <span className="gen-panel-foot-info">
+              <i className="bi bi-info-circle"></i>
+              {ecran.note}
+            </span>
+          ) : <span />}
           {data && data.count > (ecran.taillePage || 50) && (
-            <nav>
-              <ul className="pagination pagination-sm mb-0">
+            <nav aria-label="Pagination">
+              <ul className="pagination pagination-sm mb-0 gen-pagination">
                 <li className={`page-item${page <= 1 ? ' disabled' : ''}`}>
                   <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>Précédent</button>
                 </li>
@@ -658,7 +745,7 @@ export function EcranOnglets({ ecran, cleBase }) {
   const courant = ecran.onglets.find((o) => o.id === actif) || ecran.onglets[0]
   return (
     <div>
-      <ul className="nav nav-tabs mb-3" role="tablist">
+      <ul className="gen-onglets-bar" role="tablist">
         {ecran.onglets.map((o) => (
           <li className="nav-item" key={o.id} role="presentation">
             <button

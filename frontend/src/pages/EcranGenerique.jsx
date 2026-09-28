@@ -5,6 +5,7 @@ import { useMenuAutorise } from '../hooks/useMenuAutorise'
 import { ecranParId } from '../menu/ecrans'
 import { ARBORESCENCE, PIED_DE_BARRE, aplatir } from '../menu/arborescence'
 import { droitRequis } from '../menu/autorisation'
+import '../styles/ecransGeneriques.css'
 
 /**
  * Page hôte des **écrans génériques** de la navigation réorganisée.
@@ -71,17 +72,17 @@ export default function EcranGenerique({ id }) {
 
   return (
     <div data-testid={`ecran-${id}`}>
-      <div className="d-flex align-items-start justify-content-between mb-3">
-        <div>
-          <h4 className="mb-1">
-            {ecran.icone && <i className={`bi ${ecran.icone} me-2 text-primary`}></i>}
+      <div className="gen-hero">
+        <div className="gen-hero-text">
+          {ecran.fil && <span className="gen-plaquette">{ecran.fil}</span>}
+          <h1 className="gen-hero-title">
+            {ecran.icone && <i className={`bi ${ecran.icone}`}></i>}
             {ecran.titre}
-          </h4>
+          </h1>
           {ecran.introduction && (
-            <p className="text-muted small mb-0" style={{ maxWidth: '70ch' }}>{ecran.introduction}</p>
+            <p className="gen-hero-intro">{ecran.introduction}</p>
           )}
         </div>
-        {ecran.fil && <span className="badge text-bg-light border">{ecran.fil}</span>}
       </div>
 
       {ecran.type === 'documents'

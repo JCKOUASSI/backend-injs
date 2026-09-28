@@ -339,3 +339,34 @@ describe('variantes de descripteur', () => {
     expect(apiController.findCall('get', '/audit-logs/')).toBeTruthy()
   })
 })
+
+describe('filtre requis', () => {
+  it('n\'interroge pas le serveur tant que le filtre requis est vide, puis charge à la sélection', async () => {
+    apiController.setRoute('/test/finances/', { total_dossiers: 42 })
+    monter({
+      id: 'test_requis',
+      titre: 'Finances de test',
+      endpoint: '/test/finances/',
+      type: 'indicateurs',
+      filtres: [{
+        param: 'formation_id',
+        libelle: 'Formation',
+        type: 'select',
+        requis: true,
+        options: [{ valeur: '3', libelle: 'Licence Informatique' }],
+      }],
+      note: 'Source : /api/test/finances/',
+    })
+
+    // Aucun appel serveur tant que la sélection obligatoire est vide.
+    expect(await screen.findByTestId('ecran-parametres-requis')).toBeTruthy()
+    expect(apiController.findCall('get', '/test/finances/')).toBeFalsy()
+
+    // Renseigné → appel immédiat avec le paramètre, cartes rendues, barre
+    // de filtre conservée pour permettre de changer de formation.
+    fireEvent.change(screen.getByLabelText('Formation'), { target: { value: '3' } })
+    expect(await screen.findByText('42')).toBeTruthy()
+    expect(screen.getByLabelText('Formation')).toBeTruthy()
+    expect(derniersParams()).toMatchObject({ formation_id: '3' })
+  })
+})

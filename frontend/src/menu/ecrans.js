@@ -107,6 +107,7 @@ export const ECRANS = {
   controle_dossiers: {
     id: 'controle_dossiers',
     titre: 'Contrôle des dossiers',
+    titreListe: 'Dossiers de candidature',
     fil: 'Scolarité',
     icone: 'bi-folder-check',
     introduction: 'Dossiers de candidature et pièces déposées : consulter, '
@@ -1367,6 +1368,18 @@ export const ECRANS = {
     icone: 'bi-cash-coin',
     introduction: 'Bilan financier des formations (FAC) calculé par le serveur.',
     endpoint: '/statistiques/bilan-fac/',
+    // L'endpoint exige formation_id (400 sinon) : le descripteur impose le
+    // filtre et le moteur attend sa valeur avant d'appeler le serveur.
+    filtres: [
+      {
+        param: 'formation_id',
+        libelle: 'Formation',
+        type: 'select',
+        requis: true,
+        tous: 'Choisir une formation…',
+        ...RESSOURCES.formations,
+      },
+    ],
     note: 'Source : /api/statistiques/bilan-fac/',
   },
 
