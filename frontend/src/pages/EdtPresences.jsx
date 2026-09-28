@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
+import '../styles/edts.css'
 
 /**
  * Émargement des séances LMD (modèle fonctionnel MODULE 08, lot C) :
@@ -201,45 +202,45 @@ export default function EdtPresences() {
   )
 
   return (
-    <div>
-      <div className="card">
-        <div className="card-body">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h6 className="mb-0" style={{ fontWeight: 700 }}>
-                <i className="bi bi-qr-code me-2"></i>Présences de séance LMD
-              </h6>
-              <small className="text-muted">
-                QR de séance pour le badgeage automatique des auditeurs, émargement manuel à motif
-                et clôture automatique (modèle 08 appliqué à l’EDT).
-              </small>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              <input type="date" className="input" value={date}
-                     onChange={(e) => { setDate(e.target.value); setSelection(null) }} />
-            </div>
-          </div>
+    <div className="edt-page">
+      <div className="edt-hero">
+        <div className="edt-hero-text">
+          <span className="edt-hero-badge"><i className="bi bi-qr-code" /> PRÉSENCES</span>
+          <h6 className="edt-hero-title">
+            <i className="bi bi-qr-code" />Présences de séance LMD
+          </h6>
+          <p className="edt-hero-intro">
+            QR de séance pour le badgeage automatique des auditeurs, émargement manuel à motif
+            et clôture automatique (modèle 08 appliqué à l’EDT).
+          </p>
+        </div>
+        <div className="edt-hero-actions">
+          <label className="edt-date-label" htmlFor="edt-presences-date">Date des séances</label>
+          <input id="edt-presences-date" type="date" className="input" value={date}
+                 onChange={(e) => { setDate(e.target.value); setSelection(null) }} />
         </div>
       </div>
 
       {erreur && <div className="error-message">{erreur}</div>}
 
-      <div className="card">
-        <div className="card-header-bar">
-          <span><i className="bi bi-calendar3 me-2"></i>Séances du {date}</span>
-          <span className="badge-bg-secondary">{seances.length} séance(s)</span>
+      <div className="card edt-panel">
+        <div className="card-header-bar" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span><i className="bi bi-calendar3 me-2" />Séances du {date}</span>
+          <span className="d-flex gap-2">
+            <span className="badge badge-bg-secondary">{seances.length} séance(s)</span>
+          </span>
         </div>
         <div className="card-body-flush">
           {charge ? (
             <div className="loading"><div className="spinner"></div></div>
           ) : seances.length === 0 ? (
-            <div className="text-center py-5 text-muted">
+            <div className="text-center py-5 text-muted edt-empty">
               <i className="bi bi-calendar-x" style={{ fontSize: '2rem' }}></i>
               <p className="mt-2">Aucune séance planifiée ce jour pour votre périmètre.</p>
             </div>
           ) : (
             <div className="table-container">
-              <table className="table">
+              <table className="table edt-table">
                 <thead>
                   <tr><th>Horaire</th><th>Intitulé</th><th>Groupe</th><th>Salle</th><th>Enseignant</th><th /></tr>
                 </thead>
@@ -272,13 +273,18 @@ export default function EdtPresences() {
       </div>
 
       {selection && selection.peut_gerer && emargement && (
-        <div className="card">
-          <div className="card-header-bar">
+        <div className="card edt-panel">
+          <div className="card-header-bar" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
             <span>
-              <i className="bi bi-check2-square me-2"></i>Liste d’émargement — {selection.intitule}
-              <span className="ms-2 badge-bg-secondary">{emargement.presents}/{emargement.effectif} présents</span>
+              <i className="bi bi-check2-square me-2" />Liste d’émargement — {selection.intitule}
             </span>
-            <span className="d-flex gap-2">
+            <span className="d-flex gap-2 align-items-center">
+              <span className="badge badge-bg-secondary">{emargement.presents}/{emargement.effectif} présents</span>
+              {modifies > 0 && (
+                <span className="badge badge-bg-warning" title="Statuts modifiés non encore enregistrés">
+                  {modifies} correction(s)
+                </span>
+              )}
               <button className="btn btn-outline-secondary btn-sm" onClick={badgerTousPresents}
                       title="Présupposer tous les inscrits présents (puis corriger les exceptions)">
                 <i className="bi bi-check2-all me-1"></i>Tous présents
@@ -292,7 +298,7 @@ export default function EdtPresences() {
           {clotureInfo && <div className="alert alert-success mb-0" style={{ borderRadius: 0 }}>{clotureInfo}</div>}
           <div className="card-body-flush">
             <div className="table-container">
-              <table className="table">
+              <table className="table edt-table">
                 <thead>
                   <tr><th>Auditeur</th><th>Badge QR</th><th>Statut séance</th><th>Forçage tracé</th></tr>
                 </thead>

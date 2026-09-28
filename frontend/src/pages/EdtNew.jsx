@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { messageErreurApi, libelleStatut } from '../utils/edts'
+import '../styles/edts.css'
 
 const TYPES_POPULATION = [
   { valeur: 'FORMATION', libelle: 'Formation', endpoint: '/formations/ref/formations/', cleLabel: 'intitule' },
@@ -110,19 +111,19 @@ export default function EdtNew() {
   }
 
   return (
-    <div className="container-fluid">
+    <div className="container-fluid edt-page">
       <div className="row justify-content-center">
         <div className="col-lg-9 col-xxl-8">
           <div className="card">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0"><i className="bi bi-calendar-plus me-2"></i>Nouvel emploi du temps</h5>
+            <div className="card-header edt-panel-head">
+              <h5 className="edt-panel-title"><i className="bi bi-calendar-plus" />Nouvel emploi du temps</h5>
               <Link to="/edt" className="btn btn-outline-secondary btn-sm">
                 <i className="bi bi-arrow-left"></i> Retour à la liste
               </Link>
             </div>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="edt-form">
               <div className="card-body">
-                <p className="text-muted small mb-3">
+                <p className="edt-intro-note">
                   Un emploi du temps est l'espace d'édition d'une <strong>population cible</strong> (une formation,
                   un groupe, un enseignant ou une salle) pour une année académique donnée. Il naît en statut
                   {''} <span className="badge text-bg-secondary">{libelleStatut('BROUILLON')}</span> ; la soumission

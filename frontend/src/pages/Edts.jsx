@@ -10,6 +10,7 @@ import {
   libelleJour, libelleStatut, LIBELLES_CONFLITS, LIBELLES_NATURES,
   messageErreurApi, lireMutationAffectation, COULEURS_NATURES,
 } from '../utils/edts'
+import '../styles/edts.css'
 
 const NATURES = Object.keys(LIBELLES_NATURES)
 
@@ -317,10 +318,14 @@ export default function Edts() {
   const demanderConfirmation = (config) => setConfirmation(config)
 
   return (
-    <div className="container-fluid pb-5">
-      <div className="d-flex justify-content-between flex-wrap gap-2 mb-3">
-        <h2 className="mb-0"><i className="bi bi-calendar-week me-2"></i>Emplois du temps <span className="text-muted fs-6">(GET-INJS)</span></h2>
-        <div className="d-flex gap-2">
+    <div className="container-fluid pb-5 edt-page">
+      <div className="edt-hero">
+        <div className="edt-hero-text">
+          <span className="edt-hero-badge"><i className="bi bi-calendar-week" /> GET-INJS</span>
+          <h2 className="edt-hero-title"><i className="bi bi-calendar-week" />Emplois du temps <span className="edt-hero-title-sub">(GET-INJS)</span></h2>
+          <p className="edt-hero-intro">Planification hebdomadaire des créneaux, affectation des salles et détection des conflits (enseignant · salle · groupe).</p>
+        </div>
+        <div className="edt-hero-actions">
           <Link to="/edt/conflits" className="btn btn-outline-danger"><i className="bi bi-exclamation-octagon"></i> Conflits globaux</Link>
           <Link to="/edt/salles-espaces" className="btn btn-outline-secondary"><i className="bi bi-door-open"></i> Salles</Link>
           {peutPlanifier && (
@@ -329,7 +334,7 @@ export default function Edts() {
         </div>
       </div>
 
-      <div className="card mb-3">
+      <div className="card mb-3 edt-toolbar">
         <div className="card-body row g-2 align-items-end">
           <div className="col-md-3">
             <label className="form-label small text-muted mb-1">Année académique</label>
@@ -362,23 +367,23 @@ export default function Edts() {
 
       <div className="row g-3">
         <div className="col-xl-3">
-          <div className="card">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <span>Emplois du temps</span>
-              <span className="badge text-bg-secondary">{edts.length}</span>
+          <div className="card edt-panel">
+            <div className="card-header edt-panel-head">
+              <span className="edt-panel-title"><i className="bi bi-calendar3" /> Emplois du temps</span>
+              <span className="edt-count-pill">{edts.length}</span>
             </div>
-            <div className="list-group list-group-flush" style={{ maxHeight: 480, overflowY: 'auto' }}>
+            <div className="list-group list-group-flush edt-list" style={{ maxHeight: 480, overflowY: 'auto' }}>
               {loading ? (
                 <div className="text-center py-4"><div className="spinner-border text-primary" /></div>
               ) : edts.length === 0 ? (
-                <div className="text-center py-4 text-muted">
+                <div className="text-center py-4 text-muted edt-empty">
                   <i className="bi bi-calendar-x fs-1 d-block mb-2" />
                   Aucun emploi du temps
                   {peutPlanifier && <div className="small mt-2">Créez-en un avec « Nouvel EDT ».</div>}
                 </div>
               ) : edts.map((edt) => (
                 <button key={edt.id} type="button"
-                        className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2 ${selectedId === edt.id ? 'active' : ''}`}
+                        className={`edt-item list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2 ${selectedId === edt.id ? 'active' : ''}`}
                         onClick={() => selectionner(edt.id)}>
                   <span className="text-truncate text-start">
                     <span className="d-block fw-semibold">{edt.titre || edt.population_label}</span>
@@ -395,19 +400,19 @@ export default function Edts() {
 
         <div className="col-xl-9">
           {!selectedId ? (
-            <div className="card"><div className="card-body text-center py-5 text-muted">
+            <div className="card edt-empty-panel"><div className="card-body text-center py-5 text-muted">
               <i className="bi bi-calendar-week fs-1 d-block mb-3" />Sélectionnez un emploi du temps.
             </div></div>
           ) : (
             <>
-              <div className="card mb-3">
+              <div className="card mb-3 edt-detail">
                 <div className="card-body d-flex flex-wrap justify-content-between align-items-center gap-2">
-                  <div>
-                    <h5 className="mb-1">
+                  <div className="edt-detail-text">
+                    <h5 className="edt-detail-title mb-1">
                       {selectedEdt?.titre || selectedEdt?.population_label}{' '}
                       <span className={classeBadgeStatut(selectedEdt?.statut)}>{libelleStatut(selectedEdt?.statut)}</span>
                     </h5>
-                    <div className="text-muted small">
+                    <div className="text-muted small edt-detail-meta">
                       {selectedEdt?.population_label} · {selectedEdt?.annee_academique} · Semaines {selectedEdt?.semaine_debut} à {selectedEdt?.semaine_fin}
                       {selectedEdt?.conflits_count ? ` · ${selectedEdt.conflits_count} conflit(s) actif(s)` : ''}
                     </div>
@@ -549,10 +554,10 @@ export default function Edts() {
               {chargementDetail ? (
                 <div className="card"><div className="card-body text-center py-5"><div className="spinner-border text-primary" /></div></div>
               ) : vue === 'grille' ? (
-                <div className="card mb-3">
-                  <div className="card-header d-flex justify-content-between align-items-center">
-                    <span><i className="bi bi-grid-3x3 me-1" />Semaine {semaine ?? '—'}</span>
-                    <small className="text-muted">{conflits.length} conflit(s) actif(s)</small>
+                <div className="card mb-3 edt-panel">
+                  <div className="card-header edt-panel-head">
+                    <span className="edt-panel-title"><i className="bi bi-grid-3x3" /> Semaine {semaine ?? '—'}</span>
+                    <span className={`edt-count-pill ${conflits.length ? 'is-danger' : ''}`}>{conflits.length} conflit(s) actif(s)</span>
                   </div>
                   <div className="table-responsive">
                     {matrice.length === 0 ? (
@@ -561,7 +566,7 @@ export default function Edts() {
                         Aucun créneau occupé {semaine ? `en semaine ${semaine}` : ''}.
                       </div>
                     ) : (
-                      <table className="table table-bordered align-top mb-0">
+                      <table className="table table-bordered align-top mb-0 edt-table">
                         <thead className="table-light">
                           <tr>{matrice.map((col) => <th key={col.jour}>{col.libelle}</th>)}</tr>
                         </thead>
@@ -580,7 +585,7 @@ export default function Edts() {
                                         <>
                                           <div className="text-muted small">{formatHeure(cellule.heure_debut)}–{formatHeure(cellule.heure_fin)}</div>
                                           {cellule.affectations.map((a) => (
-                                            <div key={a.id} className="mb-1 p-2 rounded bg-light border">
+                                            <div key={a.id} className="mb-2 p-2 rounded border edt-cell">
                                               <span className={`badge ${COULEURS_NATURES[a.nature] || 'text-bg-secondary'} me-1`}>
                                                 {LIBELLES_NATURES[a.nature] || a.nature}
                                               </span>
@@ -605,10 +610,12 @@ export default function Edts() {
                   </div>
                 </div>
               ) : (
-                <div className="card mb-3">
-                  <div className="card-header"><i className="bi bi-table me-1" /> Créneaux posés ({affectations.length})</div>
+                <div className="card mb-3 edt-panel">
+                  <div className="card-header edt-panel-head">
+                    <span className="edt-panel-title"><i className="bi bi-table" /> Créneaux posés ({affectations.length})</span>
+                  </div>
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
+                    <table className="table table-hover align-middle mb-0 edt-table">
                       <thead className="table-light">
                         <tr>
                           <th>Créneau</th><th>Semaines</th><th>Nature</th><th>Contenu</th>
@@ -665,10 +672,10 @@ export default function Edts() {
                 </div>
               )}
 
-              <div className="card">
-                <div className="card-header d-flex justify-content-between align-items-center">
-                  <span><i className="bi bi-exclamation-triangle text-danger me-1" /> Conflits de cet emploi du temps</span>
-                  <span className="badge text-bg-danger">{conflits.length}</span>
+              <div className="card edt-panel">
+                <div className="card-header edt-panel-head">
+                  <span className="edt-panel-title is-danger"><i className="bi bi-exclamation-triangle" /> Conflits de cet emploi du temps</span>
+                  <span className="edt-count-pill is-danger">{conflits.length}</span>
                 </div>
                 <div className="card-body">
                   {conflits.length === 0 ? (
