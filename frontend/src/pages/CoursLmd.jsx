@@ -92,13 +92,13 @@ export default function CoursLmd() {
                 l’avancement suit les pointages de séance (QR / émargement).
               </small>
             </div>
-            <div className="d-flex align-items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <div className="d-flex align-items-center gap-2" style={{ flexWrap: 'nowrap' }}>
               <input className="input input-sm" placeholder="Rechercher ECUE, enseignant, groupe…"
-                     value={filtres.q} onChange={majFiltre('q')} style={{ maxWidth: 260 }} />
-              <select className="input input-sm" value={filtres.type} onChange={majFiltre('type')} style={{ maxWidth: 140 }}>
+                     value={filtres.q} onChange={majFiltre('q')} style={{ width: 'auto', maxWidth: 260 }} />
+              <select className="input input-sm" value={filtres.type} onChange={majFiltre('type')} style={{ width: 'auto', maxWidth: 140 }}>
                 {TYPES.map((t) => <option key={t.valeur} value={t.valeur}>{t.libelle}</option>)}
               </select>
-              <select className="input input-sm" value={filtres.statut} onChange={majFiltre('statut')} style={{ maxWidth: 160 }}>
+              <select className="input input-sm" value={filtres.statut} onChange={majFiltre('statut')} style={{ width: 'auto', maxWidth: 160 }}>
                 {STATUTS.map((st) => <option key={st} value={st}>{st || 'Tous statuts'}</option>)}
               </select>
             </div>

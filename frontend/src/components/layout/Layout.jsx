@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { hasAppRole, peut, getUserRoles } from '../../utils/roles'
@@ -202,14 +202,14 @@ export default function Layout({ children, breadcrumb }) {
                 }}
               />
             </form>
-
-            {/* Fil d'Ariane discret */}
-            <nav className="d-none d-xl-block" style={{ marginLeft: '0.5rem' }}>
-              <ol className="breadcrumb mb-0" style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                {breadcrumb || <li>Accueil</li>}
-              </ol>
-            </nav>
           </div>
+
+          {/* Fil d'Ariane discret — enfant direct de la top-bar pour tenir sur une seule ligne */}
+          <nav className="d-none d-xl-block" style={{ flex: '1 1 auto', minWidth: 0 }}>
+            <ol className="breadcrumb mb-0" style={{ fontSize: '0.8rem', color: '#64748B' }}>
+              {breadcrumb || <li>Accueil</li>}
+            </ol>
+          </nav>
 
           {/* Côté Droit : Année Académique + Notifications + Profil Directeur */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexShrink: 0 }}>
@@ -346,18 +346,25 @@ export default function Layout({ children, breadcrumb }) {
   )
 }
 
-/** Fil d'Ariane standard : Accueil / …segments. */
+/**
+ * Fil d'Ariane standard : Accueil / …segments.
+ *
+ * Les segments sont rendus en `Fragment` (et non enveloppés dans un `<span>`)
+ * afin que chaque `<li>` reste un enfant direct de l'`<ol>` : enveloppé dans un
+ * `<span>`, le fil s'affichait en escalier dans la barre supérieure au lieu
+ * de tenir sur une seule ligne.
+ */
 export function FilAriane({ segments = [] }) {
   return (
     <>
       <li><Link to="/">Accueil</Link></li>
       {segments.map((segment, index) => (
-        <span key={`${segment.libelle}-${index}`}>
+        <Fragment key={`${segment.libelle}-${index}`}>
           <li className="separator">/</li>
           {segment.chemin && index < segments.length - 1
             ? <li><Link to={segment.chemin}>{segment.libelle}</Link></li>
             : <li>{segment.libelle}</li>}
-        </span>
+        </Fragment>
       ))}
     </>
   )
