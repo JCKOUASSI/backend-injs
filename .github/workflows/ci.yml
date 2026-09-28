@@ -43,7 +43,7 @@ jobs:
           # Le runner self-hosted partage Docker avec les autres jobs. La
           # suppression et le démarrage non bornés pouvaient rester bloqués
           # plusieurs heures dans docker rm/docker run.
-          /opt/homebrew/bin/python3.12 - <<'PY'
+          python3 - <<'PY'
           import subprocess
           import sys
           import time
@@ -103,7 +103,7 @@ jobs:
 
       - name: Préparer Python 3.12 CI
         run: |
-          /opt/homebrew/bin/python3.12 -m venv --clear .venv-ci
+          python3 -m venv --clear .venv-ci
           .venv-ci/bin/python --version
 
       - name: Installer les dépendances Python
@@ -221,7 +221,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          /opt/homebrew/bin/python3.12 - <<'PY'
+          python3 - <<'PY'
           import subprocess
           import sys
           try:

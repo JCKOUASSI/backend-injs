@@ -45,6 +45,10 @@ module.exports = {
         beforeEach: 'readonly',
         afterEach: 'readonly',
         vi: 'readonly',
+        // process.cwd() / process.env dans les tests Node (lecture de fichiers,
+        // résolution de racines). 'no-undef' reste active : seul le global
+        // Node est déclaré, la règle n'est ni désactivée ni contournée.
+        process: 'readonly',
       },
       rules: {
         // Les tests utilisent volontairement des assertions et du JSX.
