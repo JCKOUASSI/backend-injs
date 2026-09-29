@@ -60,8 +60,8 @@ jobs:
       backend_ref: ${{ steps.cfg.outputs.backend_ref }}
       frontend_ref: ${{ steps.cfg.outputs.frontend_ref }}
     env:
-      BACKEND_IMAGE: jckouassi/injs-be
-      FRONTEND_IMAGE: jckouassi/injs-fe
+      BACKEND_IMAGE: ophirdesire/injs-be
+      FRONTEND_IMAGE: ophirdesire/injs-fe
     steps:
       - name: Checkout
         uses: actions/checkout@v4

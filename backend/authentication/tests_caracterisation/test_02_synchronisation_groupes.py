@@ -193,7 +193,10 @@ class ChangementDeRoleTests(TestCase):
                         '(password, is_superuser, username, first_name, last_name, '
                         ' email, is_staff, is_active, date_joined, role, telephone, '
                         ' organisation, grade, must_change_password) '
-                        "VALUES ('x', 0, 'car-role-vide', '', '', '', 0, 1, "
-                        "CURRENT_TIMESTAMP, '', '', '', '', 0)"
+                        # Colonnes boolean : TRUE/FALSE et non 0/1, sinon
+                        # PostgreSQL refuse (DatatypeMismatch) et l'erreur SQL
+                        # non picklable fait tomber le worker en --parallel.
+                        "VALUES ('x', FALSE, 'car-role-vide', '', '', '', "
+                        "FALSE, TRUE, CURRENT_TIMESTAMP, '', '', '', '', FALSE)"
                     )
         self.assertFalse(User.objects.filter(username='car-role-vide').exists())

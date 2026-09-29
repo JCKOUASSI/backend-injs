@@ -46,8 +46,16 @@ class ContrainteRoleCanoniqueTests(TestCase):
                     '(password, is_superuser, username, first_name, last_name, '
                     ' email, is_staff, is_active, date_joined, role, telephone, '
                     ' organisation, grade, must_change_password) '
-                    "VALUES ('x', 0, %s, '', '', '', 0, 1, CURRENT_TIMESTAMP, "
-                    '%s, %s, %s, %s, 0)',
+                    # is_superuser / is_staff / is_active / must_change_password
+                    # sont des colonnes boolean : on écrit TRUE/FALSE et non 0/1,
+                    # sinon PostgreSQL refuse l'insertion
+                    # (DatatypeMismatch: column "is_superuser" is of type boolean
+                    #  but expression is of type integer). L'échec SQL non
+                    # picklable faisait ensuite tomber tout le worker en
+                    # --parallel et polluait la suite de 'connection already
+                    # closed'.
+                    "VALUES ('x', FALSE, %s, '', '', '', FALSE, TRUE, "
+                    'CURRENT_TIMESTAMP, %s, %s, %s, %s, FALSE)',
                     [username, role, '', '', ''],
                 )
 
