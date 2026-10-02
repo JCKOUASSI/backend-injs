@@ -2676,10 +2676,17 @@ def _serialize_participant_module_notes(module, participant):
 
 
 def _build_notes_fiche_payload(participant, inscriptions):
-    """Payload notes + décisions pour un auditeur (tous ses cours)."""
+    """Payload notes + décisions pour un auditeur (tous ses cours).
+
+    La décision OFFICIELLE (`jurys.DecisionJury`, moteur LMD/ECTS) prime
+    toujours. Le verdict `suiviEvaluation.DecisionPedagogique` est conservé
+    sous le nom explicite `verdict_operationnel` : il n'est pas une autorité
+    académique et ne doit jamais être présenté comme telle.
+    """
     from suiviEvaluation.models import DecisionPedagogique
     from suiviEvaluation.academic_views import _serialize_decision
     from suiviEvaluation.services import _get_parametres
+    from jurys.services import decision_officielle_pour
 
     modules_notes = [
         _serialize_participant_module_notes(ins.module, participant)
@@ -2701,6 +2708,9 @@ def _build_notes_fiche_payload(participant, inscriptions):
     ).select_related('validee_par', 'formation')
     decisions_map = {d.formation_id: d for d in decisions_qs}
 
+    # Décision officielle INJS-LMD (unique source de vérité).
+    officielle = decision_officielle_pour(participant)
+
     formations_data = []
     for fid in sorted(formation_ids):
         formation = formations_map.get(fid)
@@ -2711,12 +2721,40 @@ def _build_notes_fiche_payload(participant, inscriptions):
             'formation_id': fid,
             'formation_libelle': formation.formation,
             'criteres': _get_parametres(formation),
-            'decision': _serialize_decision(dec) if dec else None,
+            # Décision officielle : celle affichée comme telle.
+            'decision': (
+                {
+                    'decision': officielle.decision,
+                    'moyenne_generale': (
+                        float(officielle.moyenne_generale)
+                        if officielle.moyenne_generale is not None else None
+                    ),
+                    'credits_acquis': officielle.credits_acquis,
+                    'mention': officielle.mention,
+                    'validee_le': (
+                        officielle.decide_le.isoformat()
+                        if getattr(officielle, 'decide_le', None) else None
+                    ),
+                    'autorite': 'officielle',
+                    'source': 'jurys.DecisionJury',
+                }
+                if officielle is not None else None
+            ),
+            # Verdict opérationnel : jamais une décision, toujours étiqueté.
+            'verdict_operationnel': _serialize_decision(dec) if dec else None,
         })
 
     return {
         'modules': modules_notes,
         'formations': formations_data,
+        'decision_officielle': (
+            {
+                'decision': officielle.decision,
+                'credits_acquis': officielle.credits_acquis,
+                'mention': officielle.mention,
+            }
+            if officielle is not None else None
+        ),
     }
 
 

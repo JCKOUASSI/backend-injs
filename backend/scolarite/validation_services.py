@@ -240,10 +240,28 @@ def calculer_validation_etudiant(inscription, maquette, regle=None,
         })
 
     credits_total_acquis += int(credits_capitalises or 0)
-    decision = 'ADMIS' if (
-        credits_total_acquis >= maquette.niveau.credits_requis
-        and toutes_ecues_completes
-    ) else 'AJOURNE'
+
+    # ── Décision officielle ──────────────────────────────────────────
+    # EXCLUSION : au moins une UE est sous le seuil éliminatoire
+    # paramétré (`RegleValidationLMD.seuil_elim`). Ce seuil existait déjà
+    # dans le référentiel LMD ; on ne crée aucune règle nouvelle, on donne
+    # enfin à l'élimination sa traduction décisionnelle officielle.
+    # EXCLUSION n'est jamais ramené à AJOURNE.
+    ue_eliminee = any(
+        r.seuil_elim is not None
+        and ue_r['moyenne'] is not None
+        and float(ue_r['moyenne']) < r.seuil_elim
+        for sem in resultats_semestres
+        for ue_r in sem['ues']
+    )
+
+    if ue_eliminee:
+        decision = 'EXCLUSION'
+    elif credits_total_acquis >= maquette.niveau.credits_requis \
+            and toutes_ecues_completes:
+        decision = 'ADMIS'
+    else:
+        decision = 'AJOURNE'
 
     return {
         'participant_id': participant.id,

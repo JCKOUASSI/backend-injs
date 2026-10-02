@@ -83,3 +83,9 @@ workspace/.pycache/
 /storage/
 /.kilo/
 /.cursor/
+
+# Artefacts de chantier (cloture INJS-LMD)
+/.venv-ci/
+/workspace/
+/arena/previews/
+*.prompt.md

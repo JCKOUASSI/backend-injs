@@ -20,21 +20,26 @@ const decisions = [
     id: 1, participant_nom: 'Awa Koffi', participant_matricule: 'ETU001',
     moyenne_generale: 14.5, taux_presence: 92, total_heures_prevues: 100, total_heures_presence: 92,
     decision: 'ADMIS', mention: 'BIEN', validee_le: '2026-07-01', validee_par_nom: 'M. le Directeur',
+    decision_officielle: { decision: 'ADMIS', autorite: 'officielle', source: 'jurys.DecisionJury' },
   },
   {
     id: 2, participant_nom: 'Jean Yao', participant_matricule: 'ETU002',
     moyenne_generale: 9, taux_presence: 60, total_heures_prevues: 100, total_heures_presence: 60,
     decision: 'AJOURNE', mention: '', validee_le: null, validee_par_nom: null,
+    decision_officielle: null,
   },
   {
     id: 3, participant_nom: 'Exclu Test', participant_matricule: 'ETU003',
     moyenne_generale: null, taux_presence: null, total_heures_prevues: 0, total_heures_presence: 0,
     decision: 'EXCLUSION', mention: null, validee_le: null, validee_par_nom: null,
+    // L'EXCLUSION officielle (moteur LMD) ne doit jamais être rabattue.
+    decision_officielle: { decision: 'EXCLUSION', autorite: 'officielle', source: 'jurys.DecisionJury' },
   },
   {
     id: 4, participant_nom: 'Attente Eleve', participant_matricule: 'ETU004',
     moyenne_generale: 12, taux_presence: 80, total_heures_prevues: 50, total_heures_presence: 40,
     decision: 'EN_ATTENTE', mention: 'PASSABLE', validee_le: null, validee_par_nom: null,
+    decision_officielle: { decision: 'ADMIS_RESERVES', autorite: 'officielle', source: 'jurys.DecisionJury' },
   },
 ]
 const criteres = { seuil_admission: 12, taux_presence_min: 80 }
@@ -68,7 +73,7 @@ describe('pages/DecisionsPedagogiques.jsx — tableau et décisions', () => {
     // Critères d'admission issus du backend (dans le paragraphe d'en-tête,
     // car les libellés 12/20 et 80 % existent aussi dans les lignes).
     const entete = screen
-      .getByRole('heading', { name: 'Décisions pédagogiques' })
+      .getByRole('heading', { name: 'Verdicts pédagogiques (opérationnels)' })
       .closest('div')
     expect(within(entete).getByText('12/20')).toBeInTheDocument()
     expect(within(entete).getByText('80%')).toBeInTheDocument()
@@ -104,7 +109,7 @@ describe('pages/DecisionsPedagogiques.jsx — tableau et décisions', () => {
     renderPage()
     expect(await screen.findByText('Awa Koffi')).toBeInTheDocument()
     // Critères par défaut du frontend.
-    const entete = screen.getByRole('heading', { name: 'Décisions pédagogiques' }).closest('div')
+    const entete = screen.getByRole('heading', { name: 'Verdicts pédagogiques (opérationnels)' }).closest('div')
     expect(within(entete).getByText('12/20')).toBeInTheDocument()
   })
 
@@ -229,5 +234,48 @@ describe('pages/DecisionsPedagogiques.jsx — tableau et décisions', () => {
     expect(await screen.findByText('Erreur validation')).toBeInTheDocument()
     // L'édition n'est pas refermée : l'utilisateur peut réessayer.
     expect(screen.getByRole('combobox')).toBeInTheDocument()
+  })
+
+  // ── Anti-ambiguïté : verdict opérationnel vs décision officielle ──────
+  it('explicite que la page ne montre que des verdicts opérationnels', async () => {
+    loadRoutes()
+    renderPage()
+    await screen.findByText('Awa Koffi')
+
+    expect(
+      screen.getByText(/ne valent pas décision de jury/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Verdict opérationnel' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Décision officielle' }),
+    ).toBeInTheDocument()
+  })
+
+  it('affiche la décision officielle du jury dans sa colonne dédiée', async () => {
+    loadRoutes()
+    renderPage()
+    await screen.findByText('Awa Koffi')
+
+    // Awa : verdict ADMIS + décision officielle ADMIS (source jurys.DecisionJury).
+    const rowAwa = screen.getByText('Awa Koffi').closest('tr')
+    expect(
+      within(rowAwa).getByTitle('Source : jurys.DecisionJury'),
+    ).toBeInTheDocument()
+
+    // Exclu Test : verdict « Exclusion » + décision officielle « Exclusion ».
+    const rowExclu = screen.getByText('Exclu Test').closest('tr')
+    const badgesExclu = within(rowExclu).getAllByText('Exclusion')
+    expect(badgesExclu.length).toBe(2) // verdict + décision officielle
+
+    // Attente Eleve : « Admis avec réserves » n'existe QUE côté officiel
+    // (jamais dans le jeu de valeurs du verdict opérationnel).
+    const rowAttente = screen.getByText('Attente Eleve').closest('tr')
+    expect(within(rowAttente).getByText('Admis avec réserves')).toBeInTheDocument()
+
+    // Jean Yao : jury non statué.
+    const rowJean = screen.getByText('Jean Yao').closest('tr')
+    expect(within(rowJean).getByText('Jury non statué')).toBeInTheDocument()
   })
 })

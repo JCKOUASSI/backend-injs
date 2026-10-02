@@ -15,6 +15,14 @@ const DECISION_COLORS = {
 const MENTION_LABELS = {
   TRES_BIEN: 'Très bien', BIEN: 'Bien', ASSEZ_BIEN: 'Assez bien', PASSABLE: 'Passable', '': '—',
 }
+// Décisions OFFICIELLES du jury (`jurys.DecisionJury.Decision`) : jeu de valeurs
+// distinct du verdict opérationnel — ne pas mélanger les deux listes.
+const DECISION_LABELS_OFFICIELLES = {
+  // Libellé aligné sur le badge opérationnel et les cartes KPI (« Exclusion »),
+  // pour qu'un même étudiant ne porte pas deux mots différents dans deux
+  // colonnes voisines. La distinction verdict/officiel est portée par l'en-tête.
+  ADMIS: 'Admis', AJOURNE: 'Ajourné', ADMIS_RESERVES: 'Admis avec réserves', EXCLUSION: 'Exclusion',
+}
 
 export default function DecisionsPedagogiques() {
   const { formationId } = useParams()
@@ -80,10 +88,10 @@ export default function DecisionsPedagogiques() {
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h2 style={{ margin: 0, fontWeight: 700 }}>Décisions pédagogiques</h2>
+          <h2 style={{ margin: 0, fontWeight: 700 }}>Verdicts pédagogiques (opérationnels)</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
             {formation?.formation} · {decisions.length} étudiant{decisions.length !== 1 ? 's' : ''}
-            · Admis si moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et présence au module ≥ <strong>{criteres.taux_presence_min}%</strong>
+            · Verdict calculé sur notes/présences : moyenne ≥ <strong>{criteres.seuil_admission}/20</strong> et présence au module ≥ <strong>{criteres.taux_presence_min}%</strong>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -94,6 +102,15 @@ export default function DecisionsPedagogiques() {
             {recalc ? 'Calcul…' : <><i className="bi bi-arrow-clockwise me-1"></i>Recalculer (auto)</>}
           </button>
         </div>
+      </div>
+
+      {/* Portée : verdicts opérationnels, jamais autorité académique */}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.6rem 0.85rem', marginBottom: '1rem', borderRadius: '6px', background: '#fff8e0', border: '1px solid #f0d48a', fontSize: '0.8rem', color: '#7a5b00' }}>
+        <i className="bi bi-info-circle-fill" style={{ marginTop: '2px' }}></i>
+        <span>
+          Ces verdicts sont calculés à partir des <strong>notes et présences</strong> et ne valent pas décision de jury.
+          Seule la <strong>décision officielle</strong> (<code>jurys.DecisionJury</code>, moteur LMD/ECTS) fait foi.
+        </span>
       </div>
 
       {/* KPIs */}
@@ -122,7 +139,8 @@ export default function DecisionsPedagogiques() {
                 <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700 }}>Étudiant</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Moyenne</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Présence</th>
-                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Décision</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Verdict opérationnel</th>
+                <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Décision officielle</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Mention</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Validée</th>
                 <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>Actions</th>
@@ -162,6 +180,18 @@ export default function DecisionsPedagogiques() {
                       <span style={{ ...DECISION_COLORS[d.decision], fontSize: '0.72rem', fontWeight: 700, padding: '2px 9px', borderRadius: '20px' }}>
                         {DECISION_LABELS[d.decision]}
                       </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                    {d.decision_officielle ? (
+                      <span
+                        style={{ ...(DECISION_COLORS[d.decision_officielle.decision] || DECISION_COLORS.EN_ATTENTE), fontSize: '0.72rem', fontWeight: 700, padding: '2px 9px', borderRadius: '20px' }}
+                        title={`Source : ${d.decision_officielle.source}`}
+                      >
+                        {DECISION_LABELS_OFFICIELLES[d.decision_officielle.decision] || d.decision_officielle.decision}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Jury non statué</span>
                     )}
                   </td>
                   <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.8rem' }}>

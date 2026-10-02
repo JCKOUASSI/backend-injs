@@ -13,7 +13,7 @@ import hashlib
 import json
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 
 from scolarite.models import InscriptionAdministrative, journaliser
 from scolarite.validation_services import (
@@ -244,3 +244,183 @@ def publier(session, user):
     journaliser('JURY_PUBLICATION', objet=session, acteur=user)
     notifier_publication(session)
     return session
+
+
+# ── Exposition API (lot « Délibérations ») ─────────────────────────────────
+# Ces fonctions ne reproduisent AUCUNE règle métier : elles exposent les
+# contrôles déjà présents ci-dessus et les agrégats des modèles canoniques
+# (SessionJury / PropositionJury / DecisionJury). Aucune nouvelle source de
+# vérité, aucun second moteur.
+
+
+class Gravite(models.TextChoices):
+    """Gravité d'une anomalie."""
+    BLOQUANTE = 'BLOQUANTE', 'Bloquante'
+    AVERTISSEMENT = 'AVERTISSEMENT', 'Avertissement'
+
+
+def _derniere_propositions(session):
+    """Dernier calcul par inscription (Propositions append-only)."""
+    return (
+        PropositionJury.objects
+        .filter(session=session)
+        .order_by('inscription_id', '-calcule_le')
+        .distinct('inscription_id')
+    )
+
+
+def analyser_deliberation(session):
+    """Anomalies RÉELLEMENT contrôlées, dérivées des garde-fous existants.
+
+    Rien n'est inventé : chaque anomalie correspond à un contrôle déjà exercé
+    par le workflow — ``transition`` exige une proposition avant DELIBERATION,
+    ``decisions_verrouillables`` exige la complétude des décisions,
+    ``DecisionJury.clean`` exige une justification pour toute décision manuelle.
+    """
+    anomalies = []
+    concernes_ids = set(inscriptions_concernees(session).values_list('id', flat=True))
+
+    # 1. Population indéterminée.
+    if not concernes_ids:
+        anomalies.append({
+            'code': 'POPULATION_VIDE',
+            'gravite': Gravite.BLOQUANTE,
+            'message': (
+                'Aucune inscription administrative validée ne couvre cette '
+                'session : la population à délibérer est indéterminée.'
+            ),
+            'participant_id': None,
+            'bloquante': True,
+        })
+
+    proposees = set(_derniere_propositions(session).values_list('inscription_id', flat=True))
+    # 2. Aucune proposition : garde-fou de `transition` vers DELIBERATION.
+    if not proposees:
+        anomalies.append({
+            'code': 'PROPOSITIONS_ABSENTES',
+            'gravite': Gravite.BLOQUANTE,
+            'message': (
+                "Aucune proposition calculée : exécutez l'action « calcul » "
+                'avant d\'examiner les résultats.'
+            ),
+            'participant_id': None,
+            'bloquante': True,
+        })
+
+    # 3. Inscription sans proposition du moteur.
+    for inscription_id in sorted(concernes_ids - proposees):
+        anomalies.append({
+            'code': 'PROPOSITION_MANQUANTE',
+            'gravite': Gravite.BLOQUANTE,
+            'message': 'Aucune proposition du moteur pour cette inscription.',
+            'participant_id': inscription_id,
+            'bloquante': True,
+        })
+
+    decidees = set(
+        DecisionJury.objects.filter(session=session).values_list('inscription_id', flat=True)
+    )
+    # 4. Décision absente — même contrôle que `decisions_verrouillables`.
+    for inscription_id in sorted(concernes_ids - decidees):
+        anomalies.append({
+            'code': 'DECISION_ABSENTE',
+            'gravite': Gravite.BLOQUANTE,
+            'message': (
+                'Aucune décision de jury enregistrée : la session ne pourra '
+                'pas être verrouillée.'
+            ),
+            'participant_id': inscription_id,
+            'bloquante': True,
+        })
+
+    # 5. Décision divergente du calcul sans justification (DecisionJury.clean).
+    for obj in DecisionJury.objects.filter(session=session, decision_manuelle=True):
+        if not (obj.justification or '').strip():
+            anomalies.append({
+                'code': 'JUSTIFICATION_ABSENTE',
+                'gravite': Gravite.BLOQUANTE,
+                'message': 'Décision manuelle sans justification : motif obligatoire.',
+                'participant_id': obj.inscription_id,
+                'bloquante': True,
+            })
+
+    # 6. Décision hors périmètre de la session (avertissement, non bloquant).
+    for obj in DecisionJury.objects.filter(session=session).exclude(
+        inscription_id__in=concernes_ids,
+    ):
+        anomalies.append({
+            'code': 'DECISION_HORS_PERIMETRE',
+            'gravite': Gravite.AVERTISSEMENT,
+            'message': 'Décision rattachée à une inscription hors périmètre.',
+            'participant_id': obj.inscription_id,
+            'bloquante': False,
+        })
+
+    return anomalies
+
+
+def decision_officielle_pour(participant, *, session=None):
+    """Décision officielle INJS-LMD d'un participant : `DecisionJury` ou `None`.
+
+    SOURCE UNIQUE DE VÉRITÉ. Les écrans de consultation (fiche 360°, exports,
+    dashboards) doivent passer par ici : le verdict opérationnel
+    `suiviEvaluation.DecisionPedagogique` n'est PAS une autorité académique et
+    ne doit jamais être présenté comme telle.
+
+    `session` restreint la recherche à une session de jury donnée ; sinon la
+    décision la plus récente est retenue.
+    """
+    qs = DecisionJury.objects.filter(participant=participant)
+    if session is not None:
+        return qs.filter(session=session).order_by('-session__created_at').first()
+    return qs.order_by('-session__created_at').first()
+
+
+def statistiques_deliberation(session):
+    """Agrégats calculés à la demande depuis les modèles canoniques.
+
+    Aucune colonne dénormalisée : tout provient de ``Count`` /
+    ``values().annotate()`` sur SessionJury / DecisionJury /
+    PropositionJury — pas de boucle Python sur les participants.
+    """
+    participants = inscriptions_concernees(session).count()
+
+    # Répartition des décisions : une seule requête agrégée.
+    repartition = {
+        row['decision']: row['total']
+        for row in DecisionJury.objects.filter(session=session)
+        .values('decision')
+        .annotate(total=models.Count('id'))
+    }
+    admis = repartition.get(DecisionJury.Decision.ADMIS, 0) + repartition.get(
+        DecisionJury.Decision.ADMIS_AVEC_RESERVES, 0,
+    )
+    ajournes = repartition.get(DecisionJury.Decision.AJOURNE, 0)
+    exclusions = repartition.get(DecisionJury.Decision.EXCLUSION, 0)
+    autres = sum(repartition.values()) - admis - ajournes - exclusions
+
+    decidees = DecisionJury.objects.filter(session=session).count()
+    propositions = _derniere_propositions(session).count()
+    anomalies = analyser_deliberation(session)
+
+    return {
+        'session_id': session.pk,
+        'statut': session.statut,
+        'verrouillee': session.verrouillee,
+        'participants': participants,
+        'admis': admis,
+        'ajournes': ajournes,
+        'exclus': exclusions,
+        'autres_decisions': autres,
+        'decisions': {
+            'enregistrees': decidees,
+            'completes': decidees >= participants,
+            'manquantes': max(participants - decidees, 0),
+        },
+        'propositions': propositions,
+        'repartition': repartition,
+        'anomalies': {
+            'total': len(anomalies),
+            'bloquantes': sum(1 for a in anomalies if a['bloquante']),
+        },
+    }

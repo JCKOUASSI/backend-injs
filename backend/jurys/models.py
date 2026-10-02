@@ -219,9 +219,15 @@ class DecisionJury(models.Model):
     """Décision officielle du jury pour un étudiant (une par session)."""
 
     class Decision(models.TextChoices):
+        # `EXCLUSION` est une décision officielle INJS : elle n'est JAMAIS
+        # convertie en AJOURNE. Elle est produite par le moteur LMD lorsque la
+        # moyenne d'une UE passe sous le seuil éliminatoire paramétré
+        # (`RegleValidationLMD.seuil_elim`), qui existe déjà dans le
+        # référentiel LMD officiel.
         ADMIS = 'ADMIS', 'Admis'
         AJOURNE = 'AJOURNE', 'Ajourné'
         ADMIS_AVEC_RESERVES = 'ADMIS_RESERVES', 'Admis avec réserves'
+        EXCLUSION = 'EXCLUSION', 'Exclu'
 
     session = models.ForeignKey(
         SessionJury, on_delete=models.CASCADE, related_name='decisions',

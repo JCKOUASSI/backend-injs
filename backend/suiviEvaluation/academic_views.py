@@ -15,9 +15,28 @@ from .services import (
 )
 
 
-def _serialize_decision(d):
+_NON_FOURNI = object()
+
+
+def _serialize_decision(d, officielle=_NON_FOURNI):
+    """Sérialise un verdict `DecisionPedagogique` en l'étiquetant sans ambiguïté.
+
+    `DecisionPedagogique` est un **verdict opérationnel** issu du suivi des
+    notes et présences : ce n'est PAS une décision officielle du jury. La
+    décision officielle INJS-LMD est portée par `jurys.DecisionJury` (moteur
+    LMD/ECTS) et est exposée ici sous `decision_officielle` pour que l'interface
+    ne puisse jamais les confondre.
+
+    `officielle` peut être fourni par l'appelant afin d'éviter les requêtes
+    N+1 dans les listes ; la sentinelle `_NON_FOURNI` (défaut) déclenche la
+    résolution à la volée, tandis qu'un `None` explicite signifie « aucune
+    décision officielle » et n'entraîne aucune requête supplémentaire.
+    """
     p = d.participant
     validee_par = d.validee_par
+    if officielle is _NON_FOURNI:
+        from jurys.services import decision_officielle_pour
+        officielle = decision_officielle_pour(p) if d.participant_id else None
     return {
         'id': d.id,
         'participant_id': p.id,
@@ -35,6 +54,25 @@ def _serialize_decision(d):
             validee_par.get_full_name() or validee_par.username if validee_par else None
         ),
         'criteres_appliques': d.criteres_appliques or {},
+        # ── Étiquetage d'autorité (anti-ambiguïté) ───────────────────
+        'autorite': 'operationnelle',
+        'est_decision_officielle': False,
+        'source': 'suiviEvaluation.DecisionPedagogique',
+        'libelle_autorite': (
+            "Verdict opérationnel (notes et présences) — "
+            "ne vaut pas décision de jury."
+        ),
+        # ── Décision officielle du jury, si elle existe ──────────────
+        'decision_officielle': (
+            {
+                'decision': officielle.decision,
+                'credits_acquis': officielle.credits_acquis,
+                'mention': officielle.mention,
+                'autorite': 'officielle',
+                'source': 'jurys.DecisionJury',
+            }
+            if officielle is not None else None
+        ),
     }
 
 
@@ -71,9 +109,32 @@ def formation_decisions_list(request, formation_pk):
         formation=formation,
     ).select_related('participant', 'validee_par').order_by('participant__nom', 'participant__prenom')
     criteres = _get_parametres(formation)
+    decisions = list(qs)
+
+    # Préchargement des décisions officielles (évite le N+1) : le verdict
+    # opérationnel et la décision officielle sont exposés côte à côte.
+    officielles = {}
+    participant_ids = [d.participant_id for d in decisions if d.participant_id]
+    if participant_ids:
+        from jurys.models import DecisionJury
+        for dec in (
+            DecisionJury.objects
+            .filter(participant_id__in=participant_ids)
+            .select_related('session')
+            .order_by('participant_id', '-session__created_at')
+        ):
+            officielles.setdefault(dec.participant_id, dec)
+
     return Response({
         'criteres': criteres,
-        'decisions': [_serialize_decision(d) for d in qs],
+        'decisions': [
+            _serialize_decision(d, officielle=officielles.get(d.participant_id))
+            for d in decisions
+        ],
+        'note_autorite': (
+            "« decision » est un verdict opérationnel (notes et présences) ; "
+            "seule « decision_officielle » (jurys.DecisionJury) fait foi."
+        ),
     })
 
 

@@ -35,13 +35,15 @@ _HEADER_LINES = [
     "Centre de Perfectionnement des Fonctionnaires et Agents de l'État — CPFAE",
 ]
 
-_TABLE_HEADERS = ['N°', 'Matricule', 'Nom', 'Prénom', 'Sexe', 'Grade', 'Téléphone', 'Type concours', 'Moyenne', 'Temps', 'Décision']
+_TABLE_HEADERS = ['N°', 'Matricule', 'Nom', 'Prénom', 'Sexe', 'Grade', 'Téléphone', 'Type concours', 'Moyenne', 'Crédits ECTS', 'Décision officielle']
 
 _DECISION_LABELS = {
+    # Décisions OFFICIELLES (`jurys.DecisionJury.Decision`). Le verdict
+    # opérationnel `DecisionPedagogique` n'est plus exposé par l'export.
     'ADMIS': 'Admis',
     'AJOURNE': 'Ajourné',
-    'EXCLUSION': 'Exclusion',
-    'EN_ATTENTE': 'En attente',
+    'ADMIS_RESERVES': 'Admis avec réserves',
+    'EXCLUSION': 'Exclu',
 }
 
 
@@ -51,10 +53,12 @@ def _decision_moyenne(decision):
     return f"{decision.moyenne_generale}/20"
 
 
-def _decision_temps(decision):
-    if decision is None or decision.taux_presence is None:
+def _decision_credits(decision):
+    """Crédits ECTS officiels validés par le jury (remplace le taux de
+    présence, qui n'appartient pas à la décision officielle)."""
+    if decision is None or not decision.credits_acquis:
         return '—'
-    return f"{decision.taux_presence}%"
+    return f"{decision.credits_acquis} ECTS"
 
 
 def _decision_label(decision):
@@ -98,7 +102,7 @@ def _participant_table_row(index, participant):
         participant.telephone or '—',
         participant.type_concours or '—',
         _decision_moyenne(decision),
-        _decision_temps(decision),
+        _decision_credits(decision),
         _decision_label(decision),
     ]
 
@@ -156,19 +160,24 @@ def _apply_participant_filters(queryset, params):
 
 
 def _attach_decisions(participants):
-    """Attache à chaque participant sa décision pédagogique la plus récente (_decision)."""
+    """Attache à chaque participant sa décision OFFICIELLE (`_decision`).
+
+    Source de vérité : `jurys.DecisionJury` (moteur LMD/ECTS). L'export ne
+    doit jamais diverger de l'interface : on n'utilise plus
+    `suiviEvaluation.DecisionPedagogique`, qui n'est qu'un verdict
+    opérationnel et ne constitue pas une autorité académique.
+    """
     if not participants:
         return
-    try:
-        from suiviEvaluation.models import DecisionPedagogique
-    except Exception:
-        return
+    from jurys.models import DecisionJury
+
     ids = [p.id for p in participants]
     latest = {}
     for dec in (
-        DecisionPedagogique.objects
+        DecisionJury.objects
         .filter(participant_id__in=ids)
-        .order_by('participant_id', '-updated_at')
+        .select_related('session')
+        .order_by('participant_id', '-session__created_at')
     ):
         if dec.participant_id not in latest:
             latest[dec.participant_id] = dec
