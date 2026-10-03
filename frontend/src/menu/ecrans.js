@@ -655,12 +655,15 @@ export const ECRANS = {
     introduction: 'Membres de chaque session de jury (président, membres, '
       + 'suppléants) et leur rôle.',
     endpoint: '/juries/sessions/',
-    priorite: ['reference', 'libelle', 'statut', 'annee_academique', 'session', 'date_debut'],
+    // Priorités alignées sur le CONTRAT RÉEL de `_serializer_session` :
+    // SessionJury n'a pas de `reference`/`date_debut`/`date_fin`.
+    priorite: ['libelle', 'statut', 'type_session', 'annee_academique_id', 'niveau_id', 'ref_formation_id'],
     detail: {
-      titre: (l) => `Composition — ${l.reference || l.libelle || l.id}`,
+      titre: (l) => `Composition — ${l.libelle || l.id}`,
       sousTitre: 'Membres du jury',
       endpoint: (l) => `/juries/sessions/${l.id}/membres/`,
-      priorite: ['nom', 'prenoms', 'role', 'fonction', 'enseignant', 'statut'],
+      // Contrat réel de `_serializer_membre` (nom + nom_affiche + fonction).
+      priorite: ['nom', 'nom_affiche', 'fonction', 'user_id'],
     },
     note: 'Source : /api/juries/sessions/ + /membres/',
   },
@@ -673,12 +676,15 @@ export const ECRANS = {
     introduction: 'Propositions calculées et décisions prises en délibération. '
       + 'Les propositions et décisions ne sont jamais supprimées (append-only).',
     endpoint: '/juries/sessions/',
-    priorite: ['reference', 'libelle', 'statut', 'date_debut', 'date_fin'],
+    priorite: ['libelle', 'statut', 'type_session', 'annee_academique_id', 'niveau_id', 'ref_formation_id'],
     detail: {
-      titre: (l) => `Décisions — ${l.reference || l.id}`,
+      titre: (l) => `Délibération — ${l.libelle || l.id}`,
       sousTitre: 'Décisions de la session',
-      endpoint: (l) => `/juries/sessions/${l.id}/decisions/`,
-      priorite: ['etudiant', 'decision', 'moyenne', 'rang', 'motif', 'statut'],
+      // `/decisions/` est une saisie (POST) : la consultation passe par le
+      // détail de session, qui expose déjà `decisions` et `propositions`.
+      endpoint: (l) => `/juries/sessions/${l.id}/`,
+      // Champs réels de `_serializer_session(detail=True)`.
+      priorite: ['matricule', 'nom', 'decision', 'moyenne_generale', 'credits_acquis', 'mention', 'decision_manuelle', 'justification'],
     },
     actions: [
       {
@@ -703,12 +709,15 @@ export const ECRANS = {
     introduction: 'Procès-verbaux : génération, signature et publication. Actes '
       + 'réservés au personnel autorisé et tracés côté serveur.',
     endpoint: '/juries/sessions/',
-    priorite: ['reference', 'libelle', 'statut', 'date_debut', 'date_fin'],
+    priorite: ['libelle', 'statut', 'type_session', 'annee_academique_id', 'niveau_id', 'ref_formation_id'],
     detail: {
-      titre: (l) => `PV — ${l.reference || l.id}`,
+      titre: (l) => `PV — ${l.libelle || l.id}`,
       sousTitre: 'Procès-verbal',
-      endpoint: (l) => `/juries/sessions/${l.id}/pv/`,
-      priorite: ['numero', 'statut', 'date_signature', 'signataire', 'reference'],
+      // `/pv/` renvoie un FICHIER (FileResponse) : il ne peut pas alimenter
+      // un tableau de détail JSON. Le PV est exposé par le détail de session.
+      endpoint: (l) => `/juries/sessions/${l.id}/`,
+      // Champs réels de `_serializer_pv` (exposés sous `pv`).
+      priorite: ['sha256', 'genere_le', 'fichier'],
     },
     actions: [
       {
@@ -734,7 +743,7 @@ export const ECRANS = {
     introduction: 'Transition, vérification des décisions puis publication des '
       + 'résultats de la session.',
     endpoint: '/juries/sessions/',
-    priorite: ['reference', 'libelle', 'statut', 'date_debut', 'date_fin'],
+    priorite: ['libelle', 'statut', 'type_session', 'annee_academique_id', 'niveau_id', 'ref_formation_id'],
     actions: [
       {
         libelle: 'Vérifier les décisions',

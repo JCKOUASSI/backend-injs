@@ -8,6 +8,8 @@ les propositions et décisions ne sont jamais détruites (append-only).
 Routes préfixées par ``/api/juries/`` (cf. jurys/urls.py).
 """
 from django.core.exceptions import ValidationError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,6 +27,23 @@ from .models import (
     PVJury,
     SessionJury,
 )
+
+
+def _serializer_membre(membre):
+    """Membre de jury sérialisé.
+
+    ``nom_affiche`` est fourni parce que l'écran générique de composition le
+    consomme : on n'expose pas une donnée inventée, mais l'identité réelle du
+    membre (nom complet, ou identifiant si l'utilisateur n'a pas de nom).
+    """
+    return {
+        'id': membre.id,
+        'user_id': membre.user_id,
+        'nom': membre.user.get_full_name() or membre.user.username,
+        'nom_affiche': membre.user.get_full_name() or membre.user.username,
+        'fonction': membre.fonction,
+        'ajoute_par_id': membre.ajoute_par_id,
+    }
 
 
 def _get_session(pk):
@@ -128,12 +147,91 @@ def _user_model():
     return get_user_model()
 
 
+#: Filtres réellement supportés par `SessionJury` (relations existantes).
+#: Chaque paramètre est validé côté base : aucun filtre fantôme n'est exposé.
+FILTRES_SESSION = {
+    'statut': 'statut',
+    'annee_academique': 'annee_academique_id',
+    'formation': 'ref_formation_id',
+    'parcours': 'parcours_id',
+    'niveau': 'niveau_id',
+    'semestre': 'semestre_id',
+    'maquette': 'maquette_id',
+    'type_session': 'type_session',
+}
+
+#: Champs de tri autorisés (évite l'injection d'ordre via l'API).
+TRIS_SESSION = ['annee_academique__libelle', 'statut', 'created_at', 'id']
+
+
+def _sessions_filtrees(request):
+    """Queryset des sessions : filtres réels + recherche + tri.
+
+    Réutilise la pagination globale du projet (``PageNumberPagination``,
+    ``PAGE_SIZE``) sans format local (§16/§19 du lot).
+    """
+    qs = SessionJury.objects.all()
+    for param, champ in FILTRES_SESSION.items():
+        valeur = request.query_params.get(param)
+        if valeur:
+            qs = qs.filter(**{champ: valeur})
+    recherche = (request.query_params.get('q') or '').strip()
+    if recherche:
+        # `libelle` est l'unique champ texte libre du modèle : la recherche ne
+        # porte que sur lui, pas sur les libellés d'autres tables (§18).
+        qs = qs.filter(libelle__icontains=recherche)
+    tri = request.query_params.get('ordering')
+    if tri in TRIS_SESSION:
+        qs = qs.order_by(tri)
+    return qs
+
+
+def _paginer_requete(request, queryset, serializer_liste):
+    """Pagination DRF du projet : ``PageNumberPagination`` + ``PAGE_SIZE``.
+
+    `serializer_liste` reçoit une page de queryset et renvoie la liste déjà
+    sérialisée. Aucun format local n'est introduit (§16).
+    """
+    from rest_framework.pagination import PageNumberPagination
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(queryset, request)
+    if page is not None:
+        return paginator.get_paginated_response(serializer_liste(page))
+    return Response(serializer_liste(queryset))
+
+
 def _has_role_complet(user):
     """ADMIN / INJS_ADMIN / CHEF_INJS_ADMIN : accès complet (IsDFRC complet)."""
     return (user and user.is_authenticated
             and getattr(user, 'role', None) in ('ADMIN', 'INJS_ADMIN', 'CHEF_INJS_ADMIN'))
 
 
+@extend_schema(
+    operation_id='jurys_session_list',
+    summary='Sessions de délibération (paginées, filtrables)',
+    description=(
+        'GET : liste paginée des sessions de jury du périmètre autorisé. '
+        'POST : création d\'une session (réservée au personnel DFRC).'
+    ),
+    parameters=[
+        OpenApiParameter('statut', OpenApiTypes.STR, required=False,
+                         description='Statut de la session (valeurs de SessionJury.Statut).'),
+        OpenApiParameter('type_session', OpenApiTypes.STR, required=False,
+                         description='Type de session (NORMALE / RATTRAPAGE / RECTIFICATION).'),
+        OpenApiParameter('annee_academique', OpenApiTypes.INT, required=False),
+        OpenApiParameter('formation', OpenApiTypes.INT, required=False),
+        OpenApiParameter('parcours', OpenApiTypes.INT, required=False),
+        OpenApiParameter('niveau', OpenApiTypes.INT, required=False),
+        OpenApiParameter('semestre', OpenApiTypes.INT, required=False),
+        OpenApiParameter('maquette', OpenApiTypes.INT, required=False),
+        OpenApiParameter('q', OpenApiTypes.STR, required=False,
+                         description='Recherche sur le libellé de la session.'),
+        OpenApiParameter('ordering', OpenApiTypes.STR, required=False,
+                         description='Tri : ' + ', '.join(TRIS_SESSION)),
+        OpenApiParameter('page', OpenApiTypes.INT, required=False,
+                         description='Page demandée (pagination globale, page size 50).'),
+    ],
+)
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
 def session_list(request):
@@ -186,14 +284,14 @@ def session_list(request):
         journaliser('JURY_SESSION_CREEE', objet=session, acteur=request.user)
         return Response(_serializer_session(session, detail=True), status=201)
 
-    qs = SessionJury.objects.select_related(
+    qs = _sessions_filtrees(request).select_related(
         'annee_academique', 'ref_formation', 'niveau', 'parcours', 'maquette',
     )
-    for filtre in ('annee_academique', 'ref_formation', 'niveau', 'type_session', 'statut'):
-        valeur = request.query_params.get(filtre)
-        if valeur:
-            qs = qs.filter(**{filtre: valeur})
-    return Response([_serializer_session(s) for s in qs[:100]])
+    # Pagination du projet : la liste brute tronquée à 100 laisse le front deviner
+    # s'il y a plus de 100 sessions (§16).
+    return _paginer_requete(
+        request, qs, lambda page: [_serializer_session(s) for s in page],
+    )
 
 
 @api_view(['GET'])
@@ -257,10 +355,42 @@ def session_action(request, pk):
     return Response(_serializer_session(session, detail=True))
 
 
+@extend_schema(
+    operation_id='jurys_session_membres',
+    summary='Composition du jury (lecture) / ajout d’un membre (écriture)',
+    description=(
+        'GET : liste des membres de la session. '
+        'POST : ajoute un membre (session non verrouillée).'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def membre_liste_ou_ajout(request, pk):
+    """Composition du jury : GET = liste, POST = ajout.
+
+    Une seule URL pour les deux opérations, comme le veut le contrat REST :
+    la consultation de la composition est une lecture, l'ajout une écriture.
+    """
+    if request.method == 'GET':
+        session = _get_session(pk)
+        if session is None:
+            return Response({'detail': 'Session introuvable.'}, status=404)
+        return Response([
+            _serializer_membre(m) for m in session.membres.select_related('user')
+        ])
+    return _ajouter_membre(request, pk)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
 def membre_ajout(request, pk):
     """Ajoute un membre au jury (session non verrouillée)."""
+    return _ajouter_membre(request, pk)
+
+
+def _ajouter_membre(request, pk):
+    """Implémentation de l'ajout, réutilisée par la route GET/POST."""
     session = _get_session(pk)
     if session is None:
         return Response({'detail': 'Session introuvable.'}, status=404)
@@ -347,3 +477,55 @@ def notifications_jury(request):
         ],
         'non_lues': qs.filter(lu=False).count(),
     })
+
+
+# ── Exposition API « Délibérations » (lecture seule) ──────────────────────
+# Ces deux actions n'introduisent AUCUNE règle métier : elles exposent
+# `services.analyser_deliberation` et `services.statistiques_deliberation`,
+# qui s'appuient sur les modèles canoniques et le moteur LMD existant.
+# Elles ne mutent rien et ne contournent aucun verrouillage.
+
+
+@extend_schema(
+    operation_id='jurys_session_anomalies',
+    summary='Anomalies de la session de délibération',
+    description=(
+        'Anomalies réellement contrôlées par le workflow Jury '
+        '(propositions absentes, décisions manquantes, justification '
+        'obligatoire). Une anomalie `bloquante` empêche le verrouillage.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def session_anomalies(request, pk):
+    session = _get_session(pk)
+    if session is None:
+        return Response({'detail': 'Session introuvable.'}, status=404)
+    anomalies = services.analyser_deliberation(session)
+    return Response({
+        'session_id': session.pk,
+        'statut': session.statut,
+        'total': len(anomalies),
+        'bloquantes': sum(1 for a in anomalies if a['bloquante']),
+        'verrouillage_possible': not any(a['bloquante'] for a in anomalies),
+        'anomalies': anomalies,
+    })
+
+
+@extend_schema(
+    operation_id='jurys_session_statistiques',
+    summary='Statistiques agrégées de la session',
+    description=(
+        'Agrégats calculés à la demande depuis DecisionJury / '
+        'PropositionJury / inscriptions concernées (aucune valeur figée).'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsSecretariatOrDFRC])
+def session_statistiques(request, pk):
+    session = _get_session(pk)
+    if session is None:
+        return Response({'detail': 'Session introuvable.'}, status=404)
+    return Response(services.statistiques_deliberation(session))
