@@ -111,9 +111,17 @@ remplace que ce que le sandbox ne peut pas fournir : PostgreSQL, SMTP, broker.
 Usage :  python manage.py test --settings=arena.settings_sandbox
 Le dossier racine du projet doit être sur PYTHONPATH.
 """
+import os
+
+# B4 : config.settings lit DEBUG et SECRET_KEY au moment de l'import, et son
+# defaut est sur (DEBUG=False) avec un garde-fou qui refuse de démarrer sans
+# clé. Il faut donc fournir ces variables AVANT l'import ci-dessous.
+# Valeur de développement uniquement : jamais une clé de production.
+os.environ.setdefault('DJANGO_DEBUG', '1')
+os.environ.setdefault('DJANGO_SECRET_KEY', 'sandbox-dev-only-not-a-production-key')
+
 from $SET_MOD import *  # noqa: F401,F403
 from $SET_MOD import BASE_DIR as _BASE_DIR, INSTALLED_APPS as _INSTALLED_APPS
-import os
 PY
 cat <<'PY'
 

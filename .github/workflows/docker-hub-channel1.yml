@@ -12,7 +12,8 @@
 #
 # Variables optionnelles (Actions → Variables) pour surcharger les tags / URLs :
 #   DOCKER_VERSION_PREFIX (défaut 1.1), DOCKER_BACKEND_TAG, DOCKER_FRONTEND_TAG
-#   DOCKER_VITE_API_URL       défaut https://api.badge-qr-code.pro/api
+#   DOCKER_VITE_API_URL (OBLIGATOIRE)
+#   Cible INJS-LMD : https://api-injs.badge-qr-code.pro/api (DNS pas encore configure)
 #   DOCKER_VITE_BADGE_BASE_URL (optionnel, passé au Dockerfile si défini)
 #
 # Tags poussés à chaque run (channel1) :
@@ -91,7 +92,14 @@ jobs:
           FT="${{ inputs.frontend_tag }}"
           if [ -z "${BT}" ]; then BT="${DOCKER_BACKEND_TAG:-$AUTO}"; fi
           if [ -z "${FT}" ]; then FT="${DOCKER_FRONTEND_TAG:-$AUTO}"; fi
-          API="${DOCKER_VITE_API_URL:-https://api.badge-qr-code.pro/api}"
+          # Garde-fou INJS-LMD : pas de repli silencieux vers une autre API.
+            if [ -z "${DOCKER_VITE_API_URL}" ]; then
+              echo "::error::Variable DOCKER_VITE_API_URL absente."
+              echo "::error::Cible INJS-LMD attendue : https://api-injs.badge-qr-code.pro/api"
+              echo "::error::La poser dans Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          API="${DOCKER_VITE_API_URL}"
           BADGE="${DOCKER_VITE_BADGE_BASE_URL:-}"
           echo "backend_ref=${BACKEND_IMAGE}:${BT}" >> "$GITHUB_OUTPUT"
           echo "frontend_ref=${FRONTEND_IMAGE}:${FT}" >> "$GITHUB_OUTPUT"

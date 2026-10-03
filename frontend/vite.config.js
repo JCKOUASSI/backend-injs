@@ -42,21 +42,42 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // L'administration Django ne doit jamais transiter par le port 3000,
+      // exposé au public via le proxy/le tunnel : elle reste réservée à
+      // http://127.0.0.1:8000/admin/. Blocage ciblé sur le segment exact
+      // 'admin' uniquement : les routes SPA /administration/… et les fichiers
+      // /static/admin/… ne sont pas concernés.
+      {
+        name: 'injs-blocage-admin',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const chemin = decodeURIComponent((req.url || '').split('?')[0])
+            if (chemin === '/admin' || chemin.startsWith('/admin/')) {
+              res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+              res.end('Not Found')
+              return
+            }
+            next()
+          })
+        },
+      },
+    ],
     resolve: { alias },
     server: {
       // Ports du projet : l'API Django sur 8000, le front sur 3000 (règle projet).
       port: 3000,
       strictPort: true,
       host: true,
-      allowedHosts: ['.e2b.app', 'localhost', '127.0.0.1'],
+      allowedHosts: ['.e2b.app', '.trycloudflare.com', 'localhost', '127.0.0.1'],
       hmr,
       proxy: {
         // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
         // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
         '/api': proxyOpts,
-        // Admin Django legacy et fichiers servis par le backend.
-        '/admin': proxyOpts,
+        // Fichiers servis par le backend. '/admin' n'est volontairement PAS
+        // proxifié : voir le plugin injs-blocage-admin ci-dessus.
         '/static': proxyOpts,
         '/media': proxyOpts,
       },

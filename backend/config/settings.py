@@ -11,12 +11,36 @@ except ImportError:
     # dotenv not available — continue without .env loading
 
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+# --- Resolution de la configuration -----------------------------------------
+# Convention canonique : prefixe DJANGO_ (modele .env de production).
+# Alias de compatibilite : nom sans prefixe (historique CI / Docker).
+# La convention canonique l'emporte ; une valeur vide vaut absence.
+def _env_first(*names, default=None):
+    # Premiere variable d'environnement NON VIDE parmi names (ordre = priorite).
+    for name in names:
+        raw = os.environ.get(name)
+        if raw is not None and raw.strip():
+            return raw.strip()
+    return default
+
+
+def _env_flag(*names, default=False):
+    # Booleen depuis la premiere variable non vide ; default si toutes absentes.
+    raw = _env_first(*names)
+    if raw is None:
+        return default
+    return raw.lower() in ('true', '1', 'yes', 'on')
+
+
+# Risque B4 : le defaut est sur (False). Historiquement 'True', ce qui
+# neutralisait la variable canonique du .env de production et exposait
+# la page de debug Django sur le domaine public.
+DEBUG = _env_flag('DJANGO_DEBUG', 'DEBUG', default=False)
 
 # Port HTTP du serveur Django en développement local (runserver / gunicorn dev)
 DEV_SERVER_PORT = os.environ.get('DJANGO_DEV_PORT', '8001')
 
-_SECRET_KEY_ENV = os.environ.get('SECRET_KEY', '')
+_SECRET_KEY_ENV = _env_first('DJANGO_SECRET_KEY', 'SECRET_KEY', default='')
 if not _SECRET_KEY_ENV:
     if DEBUG:
         _SECRET_KEY_ENV = 'django-insecure-dev-only-do-not-use-in-production'
@@ -29,7 +53,7 @@ SECRET_KEY = _SECRET_KEY_ENV
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 ALLOWED_HOSTS = [
-    h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+    h.strip() for h in _env_first('DJANGO_ALLOWED_HOSTS', 'ALLOWED_HOSTS', default='').split(',')
     if h.strip()
 ]
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
@@ -71,7 +95,7 @@ if not DEBUG and '*' in ALLOWED_HOSTS:
     ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h != '*']
 
 CSRF_TRUSTED_ORIGINS = [
-    origin for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    origin for origin in _env_first('DJANGO_CSRF_TRUSTED_ORIGINS', 'CSRF_TRUSTED_ORIGINS', default='').split(',')
     if origin
 ]
 if RENDER_EXTERNAL_HOSTNAME:
@@ -375,7 +399,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 # URL publique de l'application web (lien « Dashboard web » dans l'admin).
-PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'https://app.sygepcpfae.org').rstrip('/')
+PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'https://injs.badge-qr-code.pro').rstrip('/')
 
 # ── Production security (activé quand DEBUG=False) ──
 # NOTE: SECURE_SSL_REDIRECT est intentionnellement désactivé — la redirection
