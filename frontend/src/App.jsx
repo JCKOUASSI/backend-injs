@@ -13,6 +13,7 @@ import Login from './pages/Login'
 import ForcedPasswordChange from './pages/ForcedPasswordChange'
 import Dashboard from './pages/Dashboard'
 import Formations from './pages/Formations'
+import FormationsLmd from './pages/FormationsLmd'
 import FormationDetail from './pages/FormationDetail'
 import ModuleDetail from './pages/ModuleDetail'
 import Participants from './pages/Participants'
@@ -169,6 +170,23 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/formations" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES} capacite={{ module: 'web', action: 'operationnel' }}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations LMD</li></>}>
+                <FormationsLmd />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/formations-operations" element={
+            <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES} capacite={{ module: 'web', action: 'operationnel' }}>
+              <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
+                <Formations />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          {/* Alias historique : /formations/operational conserve l'accès aux
+              sessions d'exploitation (modules, notes, présences) sans
+              l'exposer sous le libellé « Formations LMD » (L6 §11). */}
+          <Route path="/formations/operational" element={
             <ProtectedRoute allowedRoles={OPERATION_VIEW_ROLES} capacite={{ module: 'web', action: 'operationnel' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li>Formations</li></>}>
                 <Formations />

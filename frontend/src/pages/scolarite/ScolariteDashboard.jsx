@@ -272,7 +272,7 @@ export default function ScolariteDashboard() {
           <i className="bi bi-bar-chart-line"></i>
           <span>Rapports</span>
         </Link>
-        <Link to="/formations" className="quick-pill-btn">
+        <Link to="/formations/operational" className="quick-pill-btn">
           <i className="bi bi-journal-bookmark"></i>
           <span>Formations</span>
         </Link>

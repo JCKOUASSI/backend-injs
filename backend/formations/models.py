@@ -167,8 +167,38 @@ class RefFormation(models.Model):
         PROFESSIONNALISANT = 'PROFESSIONNALISANT', 'Cycle professionnalisant'
         AUTRE = 'AUTRE', 'Autre'
 
+    class Perimetre(models.TextChoices):
+        """L6 — qualification de la ligne au regard du référentiel métier INJS.
+
+        Une ligne ``INJS`` est une formation validée par la source métier
+        (docs/audits/A-4.5 §2, nomenclature des 8 filières). Une ligne
+        ``LEGACY`` provient d'un autre corpus (CPFAE / Sygepcpfae, plans de
+        professorat) et n'appartient pas au référentiel INJS. ``NON_DETERMINE``
+        est l'état par défaut : aucune valeur n'est inventée.
+        """
+
+        INJS = 'INJS', 'INJS validé'
+        LEGACY = 'LEGACY', 'Legacy / autre source'
+        NON_DETERMINE = 'NON_DETERMINE', 'Non déterminé'
+
     intitule = models.CharField(max_length=255, unique=True)
     actif = models.BooleanField(default=True)
+    # --- Lot L6 (référentiel officiel INJS) : qualification + traçabilité ---
+    perimetre = models.CharField(
+        max_length=20, choices=Perimetre.choices, default=Perimetre.NON_DETERMINE,
+        db_index=True,
+        help_text='L6 : INJS = filière validée par la source métier ; LEGACY = corpus '
+                  'étranger (CPFAE/Sygepcpfae) exclu du référentiel INJS.',
+    )
+    filiere_code = models.CharField(
+        max_length=10, blank=True, default='', db_index=True,
+        help_text='L6 : code stable de la filière métier (F01…F08) — voir docs/audits/'
+                  'A-4.5 §2. Vide si la ligne n\'est rattachée à aucune filière validée.',
+    )
+    source = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='L6 : référence de la source métier ayant attesté la ligne.',
+    )
     # --- Lot B refonte (modèle 04.4) : descripteur de cycle ---
     code = models.CharField(max_length=30, blank=True, default='', db_index=True,
                             help_text='Code court du cycle (ex. LIC-ADMIN).')
