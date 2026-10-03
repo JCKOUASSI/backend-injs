@@ -109,8 +109,11 @@ class ReferentielRolesCiblesTests(APITestCase):
 class OrganisationTests(APITestCase):
     """Direction → Département → Service (existant) et rattachements compte."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def test_01_hierarchie_et_rattachement_service(self):

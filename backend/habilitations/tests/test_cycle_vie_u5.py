@@ -34,8 +34,16 @@ from . import _u5_fixtures as fx
 class MachineEtatsTests(APITestCase):
     """L1 — graphe de l'annexe A5."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        # Le référentiel RBAC est un CATALOGUE en lecture seule. Le charger
+        # dans `setUp` le recréait (update_or_create sur 33 rôles + ~200
+        # permissions) avant CHAQUE test : c'était la cause racine de la
+        # lenteur de la suite globale. `setUpTestData` le charge une seule
+        # fois par classe, dans une transaction annulée en fin de classe.
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def _compte(self, statut, username, role_code='AGENT_INSCRIPTIONS'):
@@ -153,8 +161,11 @@ class MachineEtatsTests(APITestCase):
 class FileSondesTests(APITestCase):
     """L2 — sondes, file idempotente et approbation humaine."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
         self.annee, self.formation, self.niveau, self.semestre = fx.cadre_academique()
 
@@ -400,8 +411,11 @@ class FileSondesTests(APITestCase):
 class InactiviteExpirationTests(APITestCase):
     """Suspension d'inactivité (préavis puis file) et expiration à terme."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def test_21_attribution_expiree_et_preavis_j7(self):

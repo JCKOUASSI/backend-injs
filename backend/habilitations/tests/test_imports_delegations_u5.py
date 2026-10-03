@@ -44,8 +44,12 @@ def ligne_etudiant(index):
 
 
 class ImportsMasseTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        # Catalogue RBAC chargé une fois par classe (cf. test_cycle_vie_u5).
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
 
     def test_27_execution_refusee_drapeau_ferme_mais_apercu_disponible(self):
@@ -180,8 +184,11 @@ class ImportsMasseTests(APITestCase):
 
 
 class DelegationsTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
         self.role_rp = RoleMetier.objects.get(code='RESPONSABLE_PEDAGOGIQUE')
         self.role_agent = RoleMetier.objects.get(code='AGENT_INSCRIPTIONS')
@@ -328,8 +335,11 @@ class DelegationsTests(APITestCase):
 
 
 class ApiFileNotificationsTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         fx.referentiel_charge()
+
+    def setUp(self):
         self.admin = fx.admin()
         self.annee, self.formation, self.niveau, self.semestre = fx.cadre_academique()
         fx.positionner_flag(fx.F_UI, True)

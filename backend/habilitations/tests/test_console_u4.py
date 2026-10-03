@@ -31,10 +31,16 @@ def _admin_user(username='admin4'):
 
 
 class ConsoleU4Tests(APITestCase):
-    def setUp(self):
-        # Référentiel U3 en base.
+    @classmethod
+    def setUpTestData(cls):
+        # Référentiel U3 en base — chargé UNE FOIS par classe (le standard
+        # déjà appliqué par test_lot4_e2e_scenario / test_lot4_refus_croises).
+        # Le recharger dans `setUp` le recréait avant chaque test (81 rôles,
+        # 1 155 permissions) : c'était la lenteur dominante de la suite.
         from habilitations.referentiel.chargement import charger_referentiel
         charger_referentiel()
+
+    def setUp(self):
         _admin_user()
         self.admin = User.objects.get(username='admin4')
         # Un secrétariat (rôle opérationnel, pas admin habilitations).
