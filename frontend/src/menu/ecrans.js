@@ -127,14 +127,67 @@ export const ECRANS = {
   resultats_concours: {
     id: 'resultats_concours',
     titre: 'Résultats concours',
+    titreListe: 'Résultats',
     fil: 'Scolarité',
     icone: 'bi-trophy',
     introduction: 'Campagnes de concours : classement calculé puis publié. '
       + 'Le calcul et la publication sont des actes tracés côté serveur.',
     endpoint: '/admissions/campagnes/',
-    priorite: ['code', 'libelle', 'statut', 'date_debut', 'date_fin', 'annee_academique'],
+    // La colonne « Libellé » (donnée de test « Debug ») est volontairement
+    // exclue : la campagne est identifiée par sa formation + son année.
+    exclure: ['libelle', 'code'],
+    priorite: ['ref_formation_id', 'annee_academique_id', 'statut', 'nb_candidatures', 'nb_epreuves', 'date_ouverture', 'date_fermeture', 'quota_admissibles'],
+    // 8 colonnes explicites : `colonnesPour` renvoie `ecran.colonnes` tel quel
+    // quand il est renseigné (aucune troncature `maxColonnes`, aucune déduction).
+    recherche: { param: 'search', libelle: 'Rechercher une campagne', placeholder: 'Formation, statut…' },
+    filtres: [
+      {
+        param: 'statut', libelle: 'Statut', type: 'select',
+        options: [
+          { valeur: 'BROUILLON', libelle: 'Brouillon' },
+          { valeur: 'PLANIFIEE', libelle: 'Planifiée' },
+          { valeur: 'OUVERTE', libelle: 'Ouverte' },
+          { valeur: 'SUSPENDUE', libelle: 'Suspendue' },
+          { valeur: 'CLOTUREE', libelle: 'Clôturée' },
+          { valeur: 'ANNULEE', libelle: 'Annulée' },
+          { valeur: 'ARCHIVEE', libelle: 'Archivée' },
+        ],
+      },
+      {
+        param: 'ref_formation_id', libelle: 'Formation', type: 'select',
+        optionsEndpoint: '/scolarite/ref/formations/',
+        optionsCleValeur: 'id',
+        optionsCleLibelle: 'intitule',
+      },
+      {
+        param: 'annee_academique_id', libelle: 'Année', type: 'select',
+        options: [
+          { valeur: '2026-2027', libelle: '2026 – 2027' },
+          { valeur: '2025-2026', libelle: '2025 – 2026' },
+        ],
+      },
+    ],
+    colonnes: [
+      { cle: 'ref_formation_id', libelle: 'Formation' },
+      { cle: 'annee_academique_id', libelle: 'Année' },
+      {
+        cle: 'statut', libelle: 'Statut', format: 'badge',
+        couleurs: {
+          BROUILLON: 'text-bg-secondary', PLANIFIEE: 'text-bg-info',
+          OUVERTE: 'text-bg-success', SUSPENDUE: 'text-bg-warning',
+          CLOTUREE: 'text-bg-dark', ANNULEE: 'text-bg-danger',
+          ARCHIVEE: 'text-bg-dark',
+        },
+      },
+      { cle: 'nb_candidatures', libelle: 'Candidatures' },
+      { cle: 'nb_epreuves', libelle: 'Épreuves' },
+      { cle: 'date_ouverture', libelle: 'Ouverture', format: 'date' },
+      { cle: 'date_fermeture', libelle: 'Fermeture', format: 'date' },
+      { cle: 'quota_admissibles', libelle: 'Quota admis.' },
+    ],
+    vide: 'Aucune campagne de concours pour ces critères.',
     detail: {
-      titre: (l) => `Classement — ${l.libelle || l.code || l.id}`,
+      titre: (l) => `Classement — ${l.ref_formation || l.annee_academique || `campagne ${l.id}`}`,
       sousTitre: 'Candidats classés',
       endpoint: (l) => `/admissions/campagnes/${l.id}/classement/`,
       priorite: ['rang', 'candidat', 'note', 'total', 'admissible', 'decision'],

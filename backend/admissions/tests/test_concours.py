@@ -4,10 +4,12 @@ Couvre : workflow de campagne, refus de candidature hors campagne ouverte,
 capacité de salle, double session de surveillant, verrouillage des notes,
 historique des corrections, classement reproductible et publication.
 """
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -36,8 +38,18 @@ class ConcoursBase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        # Les dates sont exprimées RELATIVEMENT au jour d'exécution du test.
+        # Avant, elles étaient codées en dur (2026-09-01 → 2026-09-30) : le
+        # scénario « campagne ouverte » expirait le jour où cette date était
+        # atteinte (le 30/09/2026), rendant le test non reproductible. Le
+        # comportement métier n'est pas modifié : c'est uniquement le jeu de
+        # données du test qui devient indépendant du calendrier.
+        aujourd_hui = timezone.localdate()
+        J = timedelta
         cls.annee = AnneeAcademique.objects.create(
-            libelle='2026-2027', date_debut='2026-10-01', date_fin='2027-07-31', courante=True,
+            libelle='2026-2027',
+            date_debut=aujourd_hui - J(days=60),
+            date_fin=aujourd_hui + J(days=300), courante=True,
         )
         cls.formation = RefFormation.objects.create(intitule='LICENCE STAPS')
         cls.niveau = Niveau.objects.create(code='L1', libelle='Licence 1', ordre=1)
@@ -46,17 +58,19 @@ class ConcoursBase(TestCase):
 
         cls.campagne = CampagneAdmission.objects.create(
             libelle='Entrée L1 STAPS 2026', annee_academique=cls.annee,
-            ref_formation=cls.formation, date_ouverture='2026-09-01',
-            date_fermeture='2026-09-30', quota_admissibles=2, quota_admis=1,
+            ref_formation=cls.formation,
+            date_ouverture=aujourd_hui - J(days=30),
+            date_fermeture=aujourd_hui + J(days=30),
+            quota_admissibles=2, quota_admis=1,
         )
         cls.ecrit = Epreuve.objects.create(
             campagne=cls.campagne, type=Epreuve.Type.ECRIT, intitule='Écrit d’admissibilité',
-            date='2026-09-15', heure_debut='08:00', duree_minutes=120,
+            date=aujourd_hui - J(days=15), heure_debut='08:00', duree_minutes=120,
             centre=None, salle=cls.salle, coefficient=2,
         )
         cls.oral = Epreuve.objects.create(
             campagne=cls.campagne, type=Epreuve.Type.ORAL, intitule='Oral d’admission',
-            date='2026-09-20', heure_debut='09:00', duree_minutes=30, coefficient=1,
+            date=aujourd_hui - J(days=10), heure_debut='09:00', duree_minutes=30, coefficient=1,
         )
         cls.candidatures = []
         for i, (nom, prenom) in enumerate([
@@ -131,7 +145,7 @@ class ConcoursReglesTests(ConcoursBase):
         petite_salle = RefSalle.objects.create(site=self.site, nom='Salle B', capacite=2)
         epreuve = Epreuve.objects.create(
             campagne=self.campagne, type=Epreuve.Type.ECRIT, intitule='Écrit petite salle',
-            date='2026-09-16', heure_debut='08:00', salle=petite_salle,
+            date=(timezone.localdate() - timedelta(days=14)), heure_debut='08:00', salle=petite_salle,
         )
         crees = concours_services.generer_convocations(epreuve)
         self.assertEqual(crees, 2)  # capacité 2 → seules 2 convocations
@@ -140,7 +154,7 @@ class ConcoursReglesTests(ConcoursBase):
     def test_convocation_manuelle_sur_capacite_atteinte_refusee(self):
         epreuve = Epreuve.objects.create(
             campagne=self.campagne, type=Epreuve.Type.ECRIT, intitule='Écrit capacité 1',
-            date='2026-09-17', heure_debut='08:00',
+            date=(timezone.localdate() - timedelta(days=13)), heure_debut='08:00',
             salle=RefSalle.objects.create(site=self.site, nom='Salle C', capacite=1),
         )
         ConvocationEpreuve.objects.create(epreuve=epreuve, candidature=self.candidatures[0])
