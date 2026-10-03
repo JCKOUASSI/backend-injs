@@ -596,47 +596,14 @@ export const ECRANS = {
     note: 'Source : /api/formations/ref/modules/ + workflow de notes',
   },
 
-  deliberations_notes: {
-    id: 'deliberations_notes',
-    titre: 'Délibérations',
-    fil: 'Évaluations',
-    icone: 'bi-people-fill',
-    introduction: 'Décisions pédagogiques par formation (rattrapages, '
-      + 'compensations, ajournements).',
-    endpoint: '/formations/list/',
-    recherche: { param: 'search', libelle: 'Rechercher', placeholder: 'Intitulé de formation…' },
-    priorite: ['intitule', 'titre', 'statut', 'date_debut', 'date_fin'],
-    actions: [
-      {
-        libelle: 'Délibérer',
-        icone: 'bi-clipboard-check',
-        apparence: 'btn-outline-primary',
-        vers: (l) => `/formations/${l.id ?? l.formation_id}/decisions`,
-      },
-    ],
-    note: 'Source : /api/formations/list/',
-  },
-
-  resultats_notes: {
-    id: 'resultats_notes',
-    titre: 'Résultats',
-    fil: 'Évaluations',
-    icone: 'bi-graph-up',
-    introduction: 'Résultats et moyennes par formation : ouvrir la fiche pour '
-      + 'le détail par module et par étudiant.',
-    endpoint: '/formations/list/',
-    recherche: { param: 'search', libelle: 'Rechercher', placeholder: 'Intitulé de formation…' },
-    priorite: ['intitule', 'titre', 'statut', 'date_debut', 'date_fin'],
-    actions: [
-      {
-        libelle: 'Voir les résultats',
-        icone: 'bi-box-arrow-up-right',
-        apparence: 'btn-outline-secondary',
-        vers: (l) => `/formations/${l.id ?? l.formation_id}`,
-      },
-    ],
-    note: 'Source : /api/formations/list/',
-  },
+  // NOTE — `deliberations_notes` et `resultats_notes` ont été SUPPRIMÉS.
+  // Ces descripteurs pointaient sur `/formations/list/` (des formations, pas
+  // des délibérations ni des résultats) et déclaraient une route concurrente
+  // pour `/evaluations/deliberations` et `/evaluations/resultats`.
+  // Ces sous-modules sont désormais rendus par les composants métier dédiés
+  // d'App.jsx, branchés sur la VRAIE API :
+  //   - Délibérations → `/api/jurys/` (moteur LMD/ECTS, source de vérité) ;
+  //   - Résultats    → `/api/evaluations-academiques/resultats/{ecue,ue,semestre}/`.
 
   releves_notes: {
     id: 'releves_notes',

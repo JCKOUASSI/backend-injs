@@ -60,6 +60,15 @@ import AffectationNew from './pages/AffectationNew'
 import FicheAuditeur from './pages/FicheAuditeur'
 import FicheFormateur from './pages/FicheFormateur'
 import EvaluationDashboard from './pages/EvaluationDashboard'
+import {
+  ListeEvaluations,
+  TableauDeBordEvaluations,
+  SaisieNotes,
+  ControleNotes,
+  Deliberations,
+  ResultatsEvaluations,
+  Reveles,
+} from './pages/EvaluationsModule'
 import AnalyseQualitative from './pages/AnalyseQualitative'
 import NotesModule from './pages/NotesModule'
 import DecisionsPedagogiques from './pages/DecisionsPedagogiques'
@@ -102,6 +111,34 @@ const Jurys = lazy(() => import('./pages/scolarite/Jurys'))
 const Graduation = lazy(() => import('./pages/scolarite/Graduation'))
 const FinancesEtudiantes = lazy(() => import('./pages/scolarite/FinancesEtudiantes'))
 const DashboardEngineView = lazy(() => import('./pages/DashboardEngineView'))
+
+/**
+ * Fil d'Ariane du module Évaluations (E1.3).
+ *
+ * Toutes les routes du module partagent le même préfixe « Évaluations » puis
+ * portent LEUR PROPRE libellé : c'est ce qui corrige l'affichage de
+ * « Évaluations » comme titre de « Saisie des notes ».
+ *
+ * @param {string} libelle  Libellé du sous-module (ex. « Saisie des notes »)
+ * @param {string} [detail] Détail optionnel (ex. code ECUE réel)
+ */
+function filEvaluations(libelle, detail) {
+  return (
+    <>
+      <li><Link to="/">Accueil</Link></li>
+      <li className="separator">/</li>
+      <li><Link to="/evaluations/tableau-de-bord">Évaluations</Link></li>
+      <li className="separator">/</li>
+      <li>{libelle}</li>
+      {detail && (
+        <>
+          <li className="separator">/</li>
+          <li>{detail}</li>
+        </>
+      )}
+    </>
+  )
+}
 
 
 function App() {
@@ -484,10 +521,49 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/evaluations" element={
+            <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES} capacite={{ module: 'evaluations', action: 'consulter' }}>
+              <Layout breadcrumb={filEvaluations('Évaluations')}>
+                <ListeEvaluations />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          {/* Questionnaires auditeurs : découplés du module Évaluations
+              (décision produit E1.2 option a). Fonctionnalité conservée. */}
+          <Route path="/evaluations/questionnaires" element={
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES} capacite={{ module: 'evaluations', action: 'gerer_questionnaires' }}>
               <EvaluationRoute />
             </ProtectedRoute>
           } />
+          {/* ── Module Évaluations (INJS-LMD) : 7 sous-modules ─────────────
+              E1.3 : chaque route porte SON propre fil d'Ariane. Le tableau de
+              bord est déclaré avant les autres pour garder l'ordre de la
+              barre latérale ; React Router ne dépend pas de cet ordre.
+              `/evaluations/saisie` rend l'écran de saisie dédié (E1.3 §2) :
+              il ne doit plus afficher « Évaluations » comme titre. */}
+          {/* Les éléments sont instanciés dans le `map` (et non dans un tableau
+              littéral) : chaque Route porte son propre `key`. */}
+          {[
+            ['/evaluations/tableau-de-bord', () => <TableauDeBordEvaluations />, 'Tableau de bord des évaluations'],
+            ['/evaluations/saisie', () => <SaisieNotes />, 'Saisie des notes'],
+            ['/evaluations/saisie/:id', () => <SaisieNotes />, 'Saisie des notes'],
+            ['/evaluations/controle', () => <ControleNotes />, 'Contrôle des notes'],
+            ['/evaluations/deliberations', () => <Deliberations />, 'Délibérations'],
+            ['/evaluations/resultats', () => <ResultatsEvaluations />, 'Résultats'],
+            ['/evaluations/releves', () => <Reveles />, 'Relevés de notes'],
+          ].map(([chemin, fabrique, libelle]) => (
+            <Route
+              key={chemin}
+              path={chemin}
+              element={
+                <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES} capacite={{ module: 'evaluations', action: 'consulter' }}>
+                  <Layout breadcrumb={filEvaluations(libelle)}>
+                    {fabrique()}
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          {/* Rattrapage : aucun sous-menu (API non exposée — cf. E1.2 §16) */}
           <Route path="/evaluations/repondre/:id" element={
             <ProtectedRoute allowedRoles={EVALUATION_ALLOWED_ROLES} capacite={{ module: 'evaluations', action: 'gerer_questionnaires' }}>
               <Layout breadcrumb={<><li><Link to="/">Accueil</Link></li><li className="separator">/</li><li><Link to="/evaluations">Évaluations</Link></li><li className="separator">/</li><li>Répondre</li></>}>

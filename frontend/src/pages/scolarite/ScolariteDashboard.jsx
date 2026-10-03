@@ -260,11 +260,11 @@ export default function ScolariteDashboard() {
         </Link>
 
         {/* Ligne 2 */}
-        <Link to="/patrimoine" className="quick-pill-btn">
+        <Link to="/edt/salles-espaces" className="quick-pill-btn">
           <i className="bi bi-building"></i>
           <span>Salles</span>
         </Link>
-        <Link to="/presences" className="quick-pill-btn">
+        <Link to="/edt/presences" className="quick-pill-btn">
           <i className="bi bi-check2-square"></i>
           <span>Présences</span>
         </Link>
@@ -338,7 +338,7 @@ export default function ScolariteDashboard() {
           <button
             type="button"
             className="btn-ouvrir-presences"
-            onClick={() => navigate('/presences')}
+            onClick={() => navigate('/edt/presences')}
           >
             Ouvrir les présences
           </button>

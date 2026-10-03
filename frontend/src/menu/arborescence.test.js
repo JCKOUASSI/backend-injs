@@ -327,7 +327,7 @@ describe('non-régression : les écrans historiques restent accessibles', () => 
     '/import',
     '/archives/listes-notes',
     '/archives/cahiers-appel',
-    '/evaluations?tab=dashboard',
+    '/evaluations/tableau-de-bord',
   ])('conserve l\'entrée %s', (chemin) => {
     expect(chemins.has(chemin), `${chemin} a disparu du menu`).toBe(true)
   })
@@ -381,5 +381,76 @@ describe('L3 — retrait du menu CPFAE, conservation de la route /modules', () =
     const racine = path.resolve(process.cwd(), 'src')
     const source = fs.readFileSync(path.join(racine, 'App.jsx'), 'utf8')
     expect(source).toContain('path="/modules"')
+  })
+})
+
+/**
+ * E1.3 — Module « Évaluations » : ordre exact des 7 sous-modules.
+ *
+ * Le tableau de bord est l'entrée analytique : il doit précéder « Évaluations »
+ * dans la barre latérale, et aucun libellé « Évaluations académiques » ne doit
+ * réapparaître dans le menu.
+ */
+describe('menu — module Évaluations (E1.3)', () => {
+  const module = ARBORESCENCE.find((n) => n.id === 'evaluations')
+
+  it('le module parent « Évaluations » existe et n’est pas supprimé', () => {
+    expect(module).toBeTruthy()
+    expect(module.libelle).toBe('Évaluations')
+  })
+
+  it('expose exactement les 7 sous-modules attendus, dans l’ordre imposé', () => {
+    expect(module.enfants.map((e) => e.libelle)).toEqual([
+      'Tableau de bord des évaluations',
+      'Évaluations',
+      'Saisie des notes',
+      'Contrôle des notes',
+      'Délibérations',
+      'Résultats',
+      'Relevés de notes',
+    ])
+  })
+
+  it('chaque sous-module pointe vers sa route fonctionnelle', () => {
+    const parLibelle = Object.fromEntries(module.enfants.map((e) => [e.libelle, e.chemin]))
+    expect(parLibelle).toEqual({
+      'Tableau de bord des évaluations': '/evaluations/tableau-de-bord',
+      'Évaluations': '/evaluations',
+      'Saisie des notes': '/evaluations/saisie',
+      'Contrôle des notes': '/evaluations/controle',
+      'Délibérations': '/evaluations/deliberations',
+      'Résultats': '/evaluations/resultats',
+      'Relevés de notes': '/evaluations/releves',
+    })
+  })
+
+  it('ne réintroduit pas « Évaluations académiques » dans le menu', () => {
+    const residus = aplatir([module])
+      .filter((e) => /Évaluations?\s+académiques?/i.test(e.libelle || ''))
+      .map((e) => e.libelle)
+    expect(residus).toEqual([])
+  })
+
+  it('l’entrée /evaluations n’est plus rattachée aux questionnaires', () => {
+    const liste = module.enfants.find((e) => e.chemin === '/evaluations')
+    expect(liste.id).toBe('evaluations.liste')
+    expect(liste.id).not.toBe('evaluations.questionnaires')
+  })
+
+  it('chaque sous-module conserve un contrat de droits', () => {
+    for (const enfant of module.enfants) {
+      expect(enfant.droit, `${enfant.id} sans droit`).toBeTruthy()
+    }
+    // Les six entrées opérationnelles partagent le droit de consultation ;
+    // « Relevés de notes » conserve son contrat historique (exports/notes).
+    const attendus = module.enfants
+      .filter((e) => e.chemin !== '/evaluations/releves')
+      .map((e) => e.id)
+    for (const id of attendus) {
+      const enfant = module.enfants.find((e) => e.id === id)
+      expect(enfant.droit.legacy, id).toContainEqual(['evaluations', 'consulter'])
+    }
+    const releves = module.enfants.find((e) => e.chemin === '/evaluations/releves')
+    expect(releves.droit.legacy).toEqual([['notes', 'gerer'], ['exports', 'liste_classe']])
   })
 })

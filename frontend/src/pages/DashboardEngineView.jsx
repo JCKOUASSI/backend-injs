@@ -610,7 +610,7 @@ export default function DashboardEngineView() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <Link to="/presences" className="btn-premium-primary">
+                    <Link to="/edt/presences" className="btn-premium-primary">
                       Historique des Pointages
                     </Link>
                     <Link to="/edt" className="btn-premium-glass">
@@ -1029,7 +1029,7 @@ export default function DashboardEngineView() {
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <Link to="/evaluations" className="btn-premium-primary">Saisir les notes</Link>
-                    <Link to="/presences" className="btn-premium-glass">Lancer un appel QR</Link>
+                    <Link to="/edt/presences" className="btn-premium-glass">Lancer un appel QR</Link>
                   </div>
                 </div>
               </div>

@@ -426,67 +426,68 @@ export const ARBORESCENCE = [
     droit: { legacy: [['evaluations', 'consulter']] },
     enfants: [
       {
-        id: 'evaluations.questionnaires',
+        // E1.3 : le tableau de bord est l'entrée analytique du module et
+        // doit précéder « Évaluations » dans la barre latérale.
+        id: 'evaluations.tableau',
+        libelle: 'Tableau de bord des évaluations',
+        chemin: '/evaluations/tableau-de-bord',
+        droit: {
+          curp: ['evaluations.questionnaire.consulter'],
+          legacy: [['evaluations', 'consulter']],
+        },
+      },
+      {
+        id: 'evaluations.liste',
         libelle: 'Évaluations',
         chemin: '/evaluations',
         droit: {
           curp: ['evaluations.questionnaire.consulter'],
-          legacy: [['evaluations', 'gerer_questionnaires']],
-        },
-      },
-      {
-        // Onglet « tableau de bord » du module d'évaluations : entrée distincte
-        // conservée pour les superviseurs (ancienne barre latérale).
-        id: 'evaluations.tableau',
-        libelle: 'Tableau de bord des évaluations',
-        chemin: '/evaluations?tab=dashboard',
-        droit: {
-          curp: ['evaluations.questionnaire.consulter'],
           legacy: [['evaluations', 'consulter']],
-          roles: ['SUPERVISEUR', 'DIRECTION', 'ADMIN'],
         },
       },
       {
         id: 'evaluations.saisie_notes',
         libelle: 'Saisie des notes',
-        chemin: '/evaluations/saisie-notes',
+        chemin: '/evaluations/saisie',
         ecran: 'saisie_notes',
         droit: {
           curp: ['evaluations.note.saisir'],
-          legacy: [['notes', 'gerer']],
+          legacy: [['evaluations', 'consulter']],
         },
       },
       {
         id: 'evaluations.controle_notes',
         libelle: 'Contrôle des notes',
-        chemin: '/evaluations/controle-notes',
+        chemin: '/evaluations/controle',
         ecran: 'controle_notes',
         droit: {
           curp: [
             'evaluations.note.valider',
             'evaluations.correction_note.consulter',
           ],
-          legacy: [['notes', 'gerer']],
+          legacy: [['evaluations', 'consulter']],
         },
       },
       {
         id: 'evaluations.deliberations',
         libelle: 'Délibérations',
         chemin: '/evaluations/deliberations',
-        ecran: 'deliberations_notes',
+        // Pas d'`ecran` : la route est rendue par App.jsx (`<Deliberations />`,
+        // branché sur l'API Jurys). Déclarer ici un écran générique créait une
+        // SECONDE route pour le même chemin — code mort, la première gagnait.
         droit: {
           curp: ['evaluations.decision_pedagogique.consulter'],
-          legacy: [['notes', 'valider_decisions']],
+          legacy: [['evaluations', 'consulter']],
         },
       },
       {
         id: 'evaluations.resultats',
         libelle: 'Résultats',
         chemin: '/evaluations/resultats',
-        ecran: 'resultats_notes',
+        // Idem Délibérations : rendu par App.jsx (`<ResultatsEvaluations />`).
         droit: {
           curp: ['evaluations.moyenne.calculer', 'evaluations.moyenne.publier'],
-          legacy: [['notes', 'gerer']],
+          legacy: [['evaluations', 'consulter']],
         },
       },
       {
