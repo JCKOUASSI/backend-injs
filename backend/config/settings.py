@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
 
@@ -208,7 +209,26 @@ DATABASES = {
 
 # Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
-if DEBUG:
+#
+# ATTENTION — suite de tests : Django force DEBUG=False, donc la branche
+# LocMem ci-dessous n'est jamais atteinte et les tests retombaient sur le
+# FileBasedCache, dont LOCATION est UN SEUL répertoire partagé par TOUS les
+# processus ET toutes les bases de test. Or chaque worker de `--parallel`
+# travaille sur sa propre base (`test_<db>_1`, `test_<db>_2`, …) avec ses
+# propres données de flags : le cache `parametres:flags:v1` écrit par un worker
+# pouvait donc être lu par un autre, provoquant des 403 et des échecs JURY
+# parasites (séquentiel : vert ; 2 classes / 2 workers : vert ; ≥3 classes /
+# 2 workers : rouge).
+#
+# En test on force donc un cache strictement local au PROCESSUS : chaque worker a
+# ainsi son propre cache, cohérent avec sa propre base — pas de répertoire
+# partagé, pas d'invalidation croisée entre workers.
+_RUNNING_TESTS = (
+    'test' in sys.argv
+    or os.environ.get('PYTEST_CURRENT_TEST') is not None
+)
+
+if DEBUG or _RUNNING_TESTS:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
