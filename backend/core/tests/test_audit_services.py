@@ -219,6 +219,12 @@ class ConcurrencePostgreSQLTests(TransactionTestCase):
         erreurs = []
 
         def travailleur():
+            # Pas de connection.close() ici : `connection` est le proxy
+            # thread-local de Django, et le fermer depuis un thread de test
+            # scalpait aussi la connexion du thread principal du worker, ce qui
+            # faisait échouer en cascade les tests suivants avec
+            # InterfaceError('connection already closed') sous --parallel.
+            # Django ferme et gère lui-même les connexions des threads de test.
             try:
                 barriere.wait(timeout=10)
                 evenement = enregistrer_evenement(
@@ -226,8 +232,6 @@ class ConcurrencePostgreSQLTests(TransactionTestCase):
                 resultats.append(evenement.code)
             except Exception as exc:  # noqa: BLE001
                 erreurs.append(exc)
-            finally:
-                connection.close()
 
         fils = [threading.Thread(target=travailleur) for _ in range(nombre)]
         for fil in fils:
