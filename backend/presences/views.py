@@ -577,6 +577,134 @@ def _check_geofence(module, latitude, longitude, accuracy_m=None):
 
 
 # ──────────────────────────────────────────────
+# Empilement canal EDT/LMD — QR de séance planifiée
+# ──────────────────────────────────────────────
+# Un ``QRToken`` peut viser une séance **LMD** (``seance_edt``) au lieu d'une
+# ``SessionModule`` legacy. Les endpoints mobiles existants servent alors le
+# service des séances LMD (``presences.seances_edt_services``) : aucune seconde
+# route, aucun second heartbeat n'est créé — l'application mobile interroge les
+# mêmes URLs et le serveur route selon le jeton présenté.
+
+def _coords_from_payload(donnees):
+    """Télémétrie mobile → champs ``Pointage`` (position GPS + état appareil)."""
+    coords = {}
+    for cle, champ in (('latitude', 'last_latitude'), ('longitude', 'last_longitude'),
+                       ('accuracy_m', 'last_accuracy_m'),
+                       ('battery_level', 'last_battery_level'),
+                       ('is_charging', 'last_is_charging')):
+        if cle in (donnees or {}):
+            coords[champ] = donnees.get(cle)
+    return coords or None
+
+
+def _jeton_lmd_pour_mobile(qr_token):
+    """``(jeton, erreur)`` — suit un QR de séance LMD remplacé ou expiré.
+
+    Un QR régénéré par l'enseignant invalide l'ancien jeton : le mobile qui
+    présente encore l'ancien QR doit être redirigé vers le remplaçant actif
+    tant que celui-ci est valide (sinon ``TOKEN_EXPIRED``).
+    """
+    from . import seances_edt_services as service
+
+    if qr_token is not None and qr_token.is_valid:
+        return qr_token, None
+    return service.resoudre_jeton_lmd(getattr(qr_token, 'token', qr_token))
+
+
+def _scan_seance_edt_mobile(*, request, qr_token, personne, type_str, device_id, donnees):
+    """Badgeage mobile d'une séance LMD (QR d'affectation de créneau).
+
+    Mêmes règles que le canal legacy : identité déduite du compte, autorisation
+    serveur, géofence calculée côté serveur, 1 entrée + 1 sortie, journal
+    d'audit. Le corps de réponse conserve les clés attendues par l'application
+    mobile (``action``, ``heure_entree``, ``seance_intitule``…).
+    """
+    from . import seances_edt_services as service
+
+    affectation = qr_token.seance_edt
+    date = timezone.localdate()
+    if not service.est_seance_du_jour(affectation, date):
+        return Response({'code': 'HORS_SEANCE',
+                         'detail': 'Ce créneau n’a pas séance aujourd’hui.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    autorise, code, detail, http = service.autorisation_badgeage(
+        request.user, personne, type_str, affectation)
+    if not autorise:
+        return Response({'code': code, 'detail': detail},
+                        status=http or status.HTTP_403_FORBIDDEN)
+
+    label = affectation.intitule or str(affectation.creneau_template)
+    action, pointage, erreur = service.badger_scan(
+        request, personne=personne, affectation=affectation, date=date,
+        device_id=device_id, coords=_coords_from_payload(donnees),
+        type_personne=type_str)
+    if erreur:
+        return Response(erreur, status=status.HTTP_400_BAD_REQUEST)
+
+    numero, nom, prenom = service.libelle_personne(personne, type_str)
+    personne_data = {'numero': numero, 'nom': nom, 'prenom': prenom}
+    return Response({
+        'action': action,
+        'canal': 'EDT_LMD',
+        'type_personne': type_str,
+        'participant': personne_data if type_str == 'participant' else None,
+        'formateur': personne_data if type_str == 'formateur' else None,
+        'encadrant': personne_data if type_str == 'encadrant' else None,
+        'seance': {'id': affectation.pk, 'intitule': label, 'date': date.isoformat()},
+        'seance_intitule': label,
+        'date': date.isoformat(),
+        'pointage_id': pointage.pk,
+        'statut': pointage.statut,
+        'statut_assiduite': pointage.statut_assiduite,
+        'timestamp': (pointage.timestamp_sortie if action == 'SORTIE'
+                      else pointage.timestamp_entree),
+        'heure_entree': timezone.localtime(pointage.timestamp_entree).strftime('%H:%M'),
+        'duree_session_minutes': (float(pointage.duree_presence_minutes)
+                                  if pointage.duree_presence_minutes is not None else None),
+        'message': f'{action} enregistrée ({label}).',
+    }, status=(status.HTTP_201_CREATED if action == 'ENTREE' else status.HTTP_200_OK))
+
+
+def _heartbeat_seance_edt_mobile(*, request, qr_token, personne, type_str, device_id, donnees):
+    """Heartbeat mobile d'une séance LMD (même endpoint que le canal legacy)."""
+    from . import seances_edt_services as service
+
+    charge, erreur = service.heartbeat_seance(
+        request, personne=personne, affectation=qr_token.seance_edt,
+        date=timezone.localdate(), device_id=device_id,
+        coords=_coords_from_payload(donnees), type_personne=type_str)
+    if erreur:
+        return Response(erreur, status=status.HTTP_400_BAD_REQUEST)
+    return Response(charge)
+
+
+def _check_status_seance_edt_mobile(*, request, qr_token, personne, type_str):
+    """État du badgeage LMD pour ``/api/scan/secure/check-status/``.
+
+    La position éventuellement jointe par le client (query string) sert
+    uniquement à **afficher** l'état de périmètre ; le calcul reste serveur.
+    """
+    from . import seances_edt_services as service
+
+    def _nombre(brut):
+        try:
+            return float(brut) if brut not in (None, '') else None
+        except (TypeError, ValueError):
+            return None
+
+    coords = {
+        'last_latitude': _nombre(request.GET.get('latitude')),
+        'last_longitude': _nombre(request.GET.get('longitude')),
+        'last_accuracy_m': _nombre(request.GET.get('accuracy_m')),
+    }
+    return Response(service.etat_badgeage_seance(
+        request, personne=personne, affectation=qr_token.seance_edt,
+        date=timezone.localdate(), type_personne=type_str,
+        coords={cle: val for cle, val in coords.items() if val is not None} or None))
+
+
+# ──────────────────────────────────────────────
 # ENDPOINT /api/scan/ — Participants & Formateurs
 # ──────────────────────────────────────────────
 
@@ -882,13 +1010,27 @@ def secure_scan_view(request):
 
     # 2. Vérifier token QR valide
     try:
-        qr_token = QRToken.objects.select_related('session__module__formation').get(
+        qr_token = QRToken.objects.select_related(
+            'session__module__formation', 'seance_edt__creneau_template',
+            'seance_edt__emploi_du_temps__annee_academique', 'seance_edt__groupe',
+        ).get(
             token=data['token_qr']
         )
     except QRToken.DoesNotExist:
         return Response(
             {'code': 'INVALID_TOKEN', 'detail': 'QR code invalide.'},
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Empilement canal EDT/LMD : un QR de séance planifiée est traité par le
+    # service des séances LMD (aucune seconde route, aucun second heartbeat).
+    if qr_token.seance_edt_id is not None:
+        jeton, erreur = _jeton_lmd_pour_mobile(qr_token)
+        if erreur is not None:
+            return Response(erreur, status=status.HTTP_400_BAD_REQUEST)
+        return _scan_seance_edt_mobile(
+            request=request, qr_token=jeton, personne=personne, type_str=type_str,
+            device_id=device_id, donnees=data,
         )
 
     if qr_token.is_expired:
@@ -1215,13 +1357,28 @@ def secure_scan_heartbeat(request):
             )
 
     try:
-        qr_token = QRToken.objects.select_related('session__module__formation').get(
+        qr_token = QRToken.objects.select_related(
+            'session__module__formation', 'seance_edt__creneau_template',
+            'seance_edt__emploi_du_temps__annee_academique', 'seance_edt__groupe',
+        ).get(
             token=data['token_qr']
         )
     except QRToken.DoesNotExist:
         return Response(
             {'code': 'INVALID_TOKEN', 'detail': 'QR code invalide.'},
             status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Empilement canal EDT/LMD : le heartbeat d'une séance planifiée est traité
+    # par le service des séances LMD, sur ce même endpoint (aucun second
+    # mécanisme de heartbeat n'existe dans le projet).
+    if qr_token.seance_edt_id is not None:
+        jeton, erreur = _jeton_lmd_pour_mobile(qr_token)
+        if erreur is not None:
+            return Response(erreur, status=status.HTTP_400_BAD_REQUEST)
+        return _heartbeat_seance_edt_mobile(
+            request=request, qr_token=jeton, personne=personne, type_str=type_str,
+            device_id=device_id, donnees=data,
         )
 
     if qr_token.is_expired:
@@ -1498,7 +1655,11 @@ def my_historique(request):
         return err
 
     pointages_qs = _pointages_queryset_for_personne(personne, type_str, user=user)
-    pointages = pointages_qs.select_related('session__module__formation')
+    pointages = pointages_qs.select_related(
+        'session__module__formation',
+        'seance_edt__creneau_template', 'seance_edt__groupe', 'seance_edt__formation',
+        'ecue_lmd',
+    )
 
     data = [_pointage_historique_item(pt) for pt in pointages]
 
@@ -1603,14 +1764,34 @@ def _pointage_historique_item(pt):
     module = pt.session.module if pt.session_id else None
     formation = module.formation if module and module.formation_id else None
     session = pt.session if pt.session_id else None
+    seance_edt = pt.seance_edt if pt.seance_edt_id else None
+    seance_edt_intitule = ''
+    groupe_edt_libelle = ''
+    ecue_libelle = ''
+    if seance_edt is not None:
+        seance_edt_intitule = seance_edt.intitule or str(seance_edt.creneau_template)
+        groupe = getattr(seance_edt, 'groupe', None)
+        groupe_edt_libelle = (getattr(groupe, 'nom', '') or getattr(groupe, 'libelle', ''))
+        ecue = pt.ecue_lmd if pt.ecue_lmd_id else None
+        ecue_libelle = (getattr(ecue, 'intitule', '') or getattr(ecue, 'code', '')) if ecue else ''
     return {
         'id': pt.id,
+        'canal': 'EDT_LMD' if seance_edt is not None else 'SESSION_MODULE',
         'formation_id': formation.pk if formation else None,
         'formation_titre': formation.formation if formation else '',
         'module_id': module.pk if module else None,
-        'module_intitule': module.intitule if module else '',
+        'module_intitule': module.intitule if module else ecue_libelle,
         'seance_numero': session.numero if session else None,
-        'seance_intitule': session.intitule if session else '',
+        'seance_intitule': session.intitule if session else seance_edt_intitule,
+        # Séance planifiée (EDT/LMD) : ni module ni SessionModule côté legacy.
+        'seance_edt': {
+            'id': seance_edt.pk,
+            'intitule': seance_edt_intitule,
+            'date': str(pt.date_journee),
+            'salle': seance_edt.salle_nom,
+            'groupe': groupe_edt_libelle,
+            'ecue': ecue_libelle,
+        } if seance_edt is not None else None,
         'date_journee': str(pt.date_journee),
         'timestamp_entree': pt.timestamp_entree.isoformat() if pt.timestamp_entree else None,
         'timestamp_sortie': pt.timestamp_sortie.isoformat() if pt.timestamp_sortie else None,
@@ -3178,11 +3359,20 @@ def secure_check_badge_status(request):
         return err
 
     try:
-        qr_token = QRToken.objects.select_related('session__module__formation').get(
+        qr_token = QRToken.objects.select_related(
+            'session__module__formation', 'seance_edt__creneau_template',
+            'seance_edt__emploi_du_temps__annee_academique', 'seance_edt__groupe',
+        ).get(
             token=token_qr,
         )
     except (QRToken.DoesNotExist, ValueError):
         return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})
+
+    # Empilement canal EDT/LMD : état de badgeage d'une séance planifiée, avec
+    # l'état de périmètre calculé côté serveur (l'appli n'en décide jamais).
+    if qr_token.seance_edt_id is not None:
+        return _check_status_seance_edt_mobile(
+            request=request, qr_token=qr_token, personne=personne, type_str=type_str)
 
     if not qr_token.is_valid and qr_token.actif:
         return Response({'statut': 'INCONNU', 'action_suivante': 'ENTREE'})

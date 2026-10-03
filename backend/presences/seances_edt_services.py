@@ -13,6 +13,7 @@ Conventions héritées du socle présences (préserver) :
 """
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -165,6 +166,105 @@ def pointages_du_jour(affectation, date):
         seance_edt=affectation, date_journee=date, participant__isnull=False)}
 
 
+def ecue_de_seance(affectation):
+    """ECUE de la séance via **son** affectation pédagogique (chaîne LMD).
+
+    Retourne ``None`` si la séance n'est pas rattachée à une affectation
+    pédagogique : aucune déduction depuis un module ou un groupe n'est tentée
+    (convention « rattachement manuel et explicite » de l'EDT).
+    """
+    if not affectation.affectation_pedagogique_id:
+        return None
+    return getattr(affectation.affectation_pedagogique, 'ecue', None)
+
+
+# ---------------------------------------------------------------------------
+# Personnes du badgeage (auditeur, enseignant, encadrant)
+# ---------------------------------------------------------------------------
+
+def filtres_personne(type_personne, personne):
+    """Champs de ``Pointage`` identifiant la personne selon son type.
+
+    Le socle présences porte trois FK distinctes (``participant``,
+    ``formateur``, ``encadrant``) : cette fonction est la seule à savoir
+    laquelle utiliser, pour que les deux canaux (EDT/LMD et legacy mobile)
+    appliquent la même convention sans dupliquer la Table de correspondance.
+    """
+    if type_personne == 'formateur':
+        return {'formateur': personne}
+    if type_personne == 'encadrant':
+        return {'encadrant': personne}
+    return {'participant': personne}
+
+
+def libelle_personne(personne, type_personne='participant'):
+    """``(numero, nom, prenom)`` d'une personne de badgeage, quel que soit son type."""
+    numero = (
+        getattr(personne, 'matricule', None)
+        or getattr(personne, 'numerobadge', None)
+        or getattr(personne, 'numero', '')
+        or ''
+    )
+    nom = getattr(personne, 'nom', None) or getattr(personne, 'last_name', '') or ''
+    prenom = getattr(personne, 'prenom', None) or getattr(personne, 'first_name', '') or ''
+    if not nom and hasattr(personne, 'get_full_name'):
+        nom = (personne.get_full_name() or '').strip()
+    if not nom:
+        nom = getattr(personne, 'username', '') or ''
+    return numero, nom, prenom
+
+
+def enseignant_autorise(affectation, user):
+    """L'intervenant désigné de la séance est-il cet utilisateur ?
+
+    La référence est **l'affectation elle-même**, jamais un rapprochement par
+    nom : ``AffectationCreneau.enseignant_id`` (compte enseignant/encadrant du
+    créneau) puis ``affectation_pedagogique.enseignant.user`` (socle LMD).
+    Un encadrant désigné sur le créneau est donc couvert par la même règle.
+    """
+    if user is None or not getattr(user, 'pk', None):
+        return False
+    if affectation.enseignant_id and affectation.enseignant_id == user.pk:
+        return True
+    formateur = affectation.formateur if affectation.formateur_id else None
+    if formateur is not None and formateur.user_id == user.pk:
+        return True
+    if not affectation.affectation_pedagogique_id:
+        return False
+    enseignant = getattr(affectation.affectation_pedagogique, 'enseignant', None)
+    return bool(enseignant is not None and enseignant.user_id == user.pk)
+
+
+def autorisation_badgeage(user, personne, type_personne, affectation):
+    """Contrôle d'accès au badgeage QR d'une séance LMD.
+
+    Retourne ``(ok, code, detail, status_code)`` :
+
+    - **auditeur** : doit être inscrit dans le groupe de la séance ;
+    - **enseignant / encadrant** : doit être l'intervenant désigné du créneau
+      (cf. ``enseignant_autorise``), jamais déduit de son nom.
+    """
+    if type_personne == 'participant':
+        if affectation.groupe_id is None:
+            return True, None, None, None
+        if membres_groupe(affectation).filter(pk=personne.pk).exists():
+            return True, None, None, None
+        return (
+            False,
+            'NOT_IN_LIST',
+            "Vous n'êtes pas inscrit(e) dans le groupe de cette séance.",
+            403,
+        )
+    if enseignant_autorise(affectation, user):
+        return True, None, None, None
+    return (
+        False,
+        'UTILISATEUR_NON_AUTORISE',
+        "Vous n'êtes pas l'intervenant affecté à cette séance.",
+        403,
+    )
+
+
 # ---------------------------------------------------------------------------
 # QR de séance
 # ---------------------------------------------------------------------------
@@ -193,6 +293,42 @@ def generer_jeton(request, affectation, date):
         extra={'date': date.isoformat(), 'token': str(jeton.token), 'canal': 'EDT_LMD'},
     )
     return jeton
+
+
+def resoudre_jeton_lmd(token):
+    """Résout un jeton QR de séance LMD.
+
+    Retourne ``(jeton, erreur)``. Un QR **remplacé** (régénéré par
+    l'enseignant) est suivi automatiquement tant que son remplaçant est valide ;
+    un QR expiré ou dont la séance n'a plus de jeton actif est refusé
+    (``TOKEN_EXPIRED``) — c'est la partie serveur de l'anti-rejeu.
+    """
+    from django.core.exceptions import ValidationError
+
+    try:
+        jeton = (QRToken.objects
+                 .select_related(
+                     'seance_edt__creneau_template',
+                     'seance_edt__emploi_du_temps__annee_academique',
+                     'seance_edt__groupe', 'seance_edt__formation',
+                     'seance_edt__affectation_pedagogique__enseignant',
+                 )
+                 .filter(token=token).first())
+    except (ValidationError, ValueError, TypeError):
+        jeton = None
+    if jeton is None or jeton.seance_edt_id is None:
+        return None, {'code': 'INVALID_TOKEN',
+                      'detail': 'QR code inconnu ou hors séance LMD.'}
+    if not jeton.is_valid:
+        remplacement = (QRToken.objects
+                        .filter(seance_edt=jeton.seance_edt, actif=True)
+                        .select_related('seance_edt')
+                        .order_by('-created_at').first())
+        if remplacement is None or not remplacement.is_valid:
+            return None, {'code': 'TOKEN_EXPIRED',
+                          'detail': 'QR code expiré — demandez un réaffichage.'}
+        jeton = remplacement
+    return jeton, None
 
 
 # ---------------------------------------------------------------------------
@@ -236,15 +372,21 @@ def _controle_geofence_edt(affectation, coords):
 
 
 @transaction.atomic
-def badger_scan(request, *, participant, affectation, date, device_id='', coords=None,
-                type_personne='participant'):
+def badger_scan(request, *, affectation, date, personne=None, participant=None,
+                device_id='', coords=None, type_personne='participant'):
     """Entrée/sortie au scan du QR — anti-fraude : 1 entrée + 1 sortie par séance.
 
     Le contrôle de périmètre géographique est appliqué **à l'entrée** : la sortie
     referme le pointage déjà ouvert et n'est pas re-vérifiée.
 
+    ``participant`` est conservé comme alias historique du paramètre
+    ``personne`` (appelants existants : commande de démonstration), mais seul
+    ``type_personne`` décide de la FK portée par le ``Pointage``
+    (auditeur / enseignant / encadrant).
+
     Retourne (action, pointage, None) ou (None, None, réponse-dict d'erreur).
     """
+    personne = personne if personne is not None else participant
     now = timezone.now()
     debut, fin = horodatages(affectation, date)
     ouverture, cloture = fenetre_scan(affectation, date)
@@ -255,8 +397,9 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
         return None, None, {'code': 'HORS_FENETRE',
                             'detail': 'La fenêtre de badgeage de cette séance est fermée.'}
 
+    filtre_personne = filtres_personne(type_personne, personne)
     verrou = (Pointage.objects
-              .filter(seance_edt=affectation, date_journee=date, participant=participant)
+              .filter(seance_edt=affectation, date_journee=date, **filtre_personne)
               .select_for_update())
     termine_existant = verrou.filter(timestamp_sortie__isnull=False).first()
     ouvert = verrou.filter(timestamp_sortie__isnull=True).order_by('-timestamp_entree').first()
@@ -270,8 +413,9 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
             if ouvert.timestamp_entree <= seuil_retard:
                 ouvert.statut_assiduite = Pointage.StatutAssiduite.PRESENT
         ouvert.save()
-        _log_scan(AuditLog.Action.SCAN_SECURE_SORTIE, request, participant, affectation,
-                  ouvert, device_id, {'duree_minutes': float(ouvert.duree_presence_minutes or 0)})
+        _log_scan(AuditLog.Action.SCAN_SECURE_SORTIE, request, personne, affectation,
+                  ouvert, device_id, {'duree_minutes': float(ouvert.duree_presence_minutes or 0)},
+                  type_personne=type_personne)
         return 'SORTIE', ouvert, None
 
     if termine_existant is not None:
@@ -282,7 +426,7 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
     # création du pointage — aucun pointage n'est écrit si la position est rejetée.
     geo_ok, geo_code, geo_detail, distance_m, rayon_m = _controle_geofence_edt(affectation, coords)
     if not geo_ok:
-        _log_scan(AuditLog.Action.OUT_OF_GEOFENCE, request, participant, affectation,
+        _log_scan(AuditLog.Action.OUT_OF_GEOFENCE, request, personne, affectation,
                   None, device_id, {
                       'code': geo_code,
                       'detail': geo_detail,
@@ -290,12 +434,11 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
                       'rayon_m': rayon_m,
                       'latitude': (coords or {}).get('last_latitude'),
                       'longitude': (coords or {}).get('last_longitude'),
-                  })
+                  }, type_personne=type_personne)
         return None, None, {'code': geo_code, 'detail': geo_detail}
 
     seuil_retard = debut + timedelta(minutes=_parametre(CLE_TOLERANCE_RETARD))
     pointage = Pointage.objects.create(
-        participant=participant,
         seance_edt=affectation,
         session=None,
         date_journee=date,
@@ -306,30 +449,258 @@ def badger_scan(request, *, participant, affectation, date, device_id='', coords
         device_id=(device_id or '')[:255],
         annee_academique_id=affectation.emploi_du_temps.annee_academique_id,
         groupe_lmd_id=affectation.groupe_id,
+        # Comme le canal legacy, l'entrée ouvre le suivi de présence : le
+        # heartbeat démarre côté client juste après (last_heartbeat_at = entrée).
+        last_heartbeat_at=now,
+        ecue_lmd=ecue_de_seance(affectation),
+        **filtre_personne,
         **(coords or {}),
     )
-    _log_scan(AuditLog.Action.SCAN_SECURE_ENTREE, request, participant, affectation,
+    _log_scan(AuditLog.Action.SCAN_SECURE_ENTREE, request, personne, affectation,
               pointage, device_id, {
                   'retard': pointage.statut_assiduite == Pointage.StatutAssiduite.RETARD,
                   'distance_m': distance_m,
                   'rayon_m': rayon_m,
-              })
+              }, type_personne=type_personne)
     return 'ENTREE', pointage, None
 
 
-def _log_scan(action, request, participant, affectation, pointage, device_id, extra):
+def _log_scan(action, request, personne, affectation, pointage, device_id, extra,
+              type_personne='participant'):
+    numero, nom, prenom = libelle_personne(personne, type_personne)
     AuditLog.objects.create(
         action=action,
         acteur=request.user if request and request.user.is_authenticated else None,
         acteur_label=(request.user.get_full_name() or request.user.username)
         if request and request.user.is_authenticated else 'Mobile',
-        cible_type='participant',
-        cible_numero=getattr(participant, 'matricule', '') or getattr(participant, 'numero', '') or '',
-        cible_nom=f'{getattr(participant, "nom", "")} {getattr(participant, "prenom", "")}'.strip(),
+        cible_type=type_personne,
+        cible_numero=numero,
+        cible_nom=f'{nom} {prenom}'.strip(),
         pointage=pointage,
         device_id=device_id or '',
         extra={'canal': 'EDT_LMD', 'seance_edt': affectation.pk, **(extra or {})},
     )
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat d'une séance LMD (app mobile : /api/scan/secure/heartbeat/)
+# ---------------------------------------------------------------------------
+
+def _heartbeat_audit_du(previous_heartbeat_at):
+    """Un heartbeat conforme n'est tracé au journal que périodiquement."""
+    interval = int(getattr(settings, 'MOBILE_HEARTBEAT_AUDIT_INTERVAL_SECONDS', 600))
+    if previous_heartbeat_at is None:
+        return True
+    return (timezone.now() - previous_heartbeat_at).total_seconds() >= interval
+
+
+@transaction.atomic
+def heartbeat_seance(request, *, personne, affectation, date, device_id='', coords=None,
+                     type_personne='participant'):
+    """Heartbeat du pointage **ouvert** d'une séance LMD.
+
+    Retourne ``(payload, erreur)`` : ``payload`` est le corps de réponse (200) à
+    renvoyer tel quel, ``erreur`` un dict ``{code, detail}`` (400).
+
+    Règles identiques au canal legacy (``presences.views.secure_scan_heartbeat``) :
+    la position est vérifiée **côté serveur** ; une sortie temporaire du périmètre
+    ne supprime pas la présence déjà validée, elle alimente
+    ``outside_geofence_count`` (anomalie tracée) et la sortie automatique n'est
+    déclenchée qu'après ``MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS`` confirmations
+    consécutives hors zone.
+    """
+    pointage = (Pointage.objects.select_for_update()
+                .filter(seance_edt=affectation, date_journee=date,
+                        timestamp_sortie__isnull=True,
+                        **filtres_personne(type_personne, personne))
+                .order_by('-timestamp_entree').first())
+    if pointage is None:
+        return None, {'code': 'NO_OPEN_SESSION',
+                      'detail': 'Aucune présence ouverte à mettre à jour pour ce QR.'}
+    return appliquer_heartbeat(
+        request, pointage, affectation=affectation, coords=coords,
+        device_id=device_id, type_personne=type_personne,
+    )
+
+
+
+
+def appliquer_heartbeat(request, pointage, *, affectation, coords=None, device_id='',
+                        type_personne='participant'):
+    """Applique un heartbeat géolocalisé à un pointage ouvert (source unique).
+
+    Utilisé par le canal LMD ; la logique est celle du canal legacy, factorisée
+    ici pour qu'aucune règle de périmètre ne puisse diverger entre les canaux.
+    """
+    now = timezone.now()
+    coords = coords or {}
+    latitude = coords.get('last_latitude')
+    longitude = coords.get('last_longitude')
+    accuracy_m = coords.get('last_accuracy_m')
+
+    geo_ok, geo_code, geo_detail, distance_m, rayon_m = _controle_geofence_edt(
+        affectation, coords)
+    outside_limit = max(1, int(getattr(settings, 'MOBILE_GEOFENCE_OUTSIDE_CONFIRMATIONS', 2)))
+    previous_heartbeat_at = pointage.last_heartbeat_at
+
+    pointage.last_heartbeat_at = now
+    pointage.last_latitude = latitude
+    pointage.last_longitude = longitude
+    pointage.last_accuracy_m = accuracy_m
+    pointage.last_battery_level = coords.get('last_battery_level')
+    pointage.last_is_charging = coords.get('last_is_charging')
+    champs_position = [
+        'last_heartbeat_at', 'last_latitude', 'last_longitude', 'last_accuracy_m',
+        'last_battery_level', 'last_is_charging', 'updated_at',
+    ]
+
+    if geo_ok:
+        pointage.outside_geofence_count = 0
+        if pointage.statut == Pointage.Statut.HORS_LIGNE_SUSPECT:
+            pointage.statut = Pointage.Statut.EN_COURS
+        pointage.save(update_fields=champs_position + ['outside_geofence_count', 'statut'])
+        if _heartbeat_audit_du(previous_heartbeat_at):
+            _log_scan(AuditLog.Action.SCAN_HEARTBEAT, request, pointage.personne,
+                      affectation, pointage, device_id, {
+                          'distance_m': round(distance_m, 1) if distance_m is not None else None,
+                          'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+                          'accuracy_m': accuracy_m,
+                          'battery_level': coords.get('last_battery_level'),
+                          'is_charging': coords.get('last_is_charging'),
+                      }, type_personne=type_personne)
+        return ({
+            'detail': 'Heartbeat enregistré.',
+            'canal': 'EDT_LMD',
+            'statut': pointage.statut,
+            'outside_geofence_count': pointage.outside_geofence_count,
+            'distance_m': round(distance_m, 1) if distance_m is not None else None,
+            'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+            'geofence_code': None,
+        }, None)
+
+    pointage.outside_geofence_count = (pointage.outside_geofence_count or 0) + 1
+    extra = {
+        'code': geo_code,
+        'detail': geo_detail,
+        'distance_m': round(distance_m, 1) if distance_m is not None else None,
+        'rayon_m': round(rayon_m, 1) if rayon_m is not None else None,
+        'accuracy_m': accuracy_m,
+        'outside_geofence_count': pointage.outside_geofence_count,
+        'outside_geofence_limit': outside_limit,
+    }
+
+    if pointage.outside_geofence_count >= outside_limit:
+        _, cloture = fenetre_scan(affectation, pointage.date_journee)
+        pointage.timestamp_sortie = min(now, cloture)
+        pointage.statut = Pointage.Statut.SORTIE_AUTO
+        pointage.calculer_duree()
+        pointage.save(update_fields=champs_position + [
+            'timestamp_sortie', 'statut', 'duree_presence_minutes',
+            'outside_geofence_count',
+        ])
+        _log_scan(AuditLog.Action.OUT_OF_GEOFENCE, request, pointage.personne,
+                  affectation, pointage, device_id, extra, type_personne=type_personne)
+        _log_scan(AuditLog.Action.AUTO_EXIT, request, pointage.personne,
+                  affectation, pointage, device_id, extra, type_personne=type_personne)
+        return ({
+            'detail': 'Sortie automatique déclenchée (hors périmètre).',
+            'action': 'SORTIE_AUTO',
+            'canal': 'EDT_LMD',
+            'statut': pointage.statut,
+            'timestamp_sortie': pointage.timestamp_sortie,
+            'duree_session_minutes': float(pointage.duree_presence_minutes or 0),
+            'motif': geo_code or 'OUT_OF_GEOFENCE',
+            **extra,
+        }, None)
+
+    pointage.statut = Pointage.Statut.HORS_LIGNE_SUSPECT
+    pointage.save(update_fields=champs_position + ['statut', 'outside_geofence_count'])
+    _log_scan(AuditLog.Action.SCAN_HEARTBEAT, request, pointage.personne,
+              affectation, pointage, device_id, extra, type_personne=type_personne)
+    return ({
+        'detail': geo_detail or 'Position hors périmètre enregistrée (présence conservée).',
+        'canal': 'EDT_LMD',
+        'statut': pointage.statut,
+        'distance_m': extra['distance_m'],
+        'rayon_m': extra['rayon_m'],
+        'geofence_code': geo_code,
+        'outside_geofence_count': pointage.outside_geofence_count,
+    }, None)
+
+
+# ---------------------------------------------------------------------------
+# État du badgeage d'une séance (check-status mobile)
+# ---------------------------------------------------------------------------
+
+def etat_badgeage_seance(request, *, personne, affectation, date,
+                         type_personne='participant', coords=None):
+    """État du badgeage d'une séance LMD (pour ``/scan/secure/check-status/``).
+
+    Reprend le contrat de la voie legacy (``statut``, ``action_suivante``,
+    ``heure_entree``, ``seance_intitule``) et y ajoute l'état de périmètre calculé
+    **côté serveur**, afin que l'application mobile affiche la même information
+    sans jamais décider elle-même de la validité de la position.
+    """
+    from . import geofence
+
+    debut, fin = horodatages(affectation, date)
+    label = affectation.intitule or str(affectation.creneau_template)
+    site = geofence.site_de_seance_edt(affectation)
+    configure = not geofence.site_non_localise(site)
+    info = {
+        'canal': 'EDT_LMD',
+        'seance_id': affectation.pk,
+        'date': date.isoformat(),
+        'type_personne': type_personne,
+        'seance_intitule': label,
+        'debut': debut.isoformat(),
+        'fin': fin.isoformat(),
+        'geofence_configured': configure,
+        'geofence_latitude': float(site.geofence_latitude) if configure else None,
+        'geofence_longitude': float(site.geofence_longitude) if configure else None,
+        'geofence_rayon_m': geofence.rayon_du_site(site) if configure else None,
+        'distance_m': None,
+        'in_geofence': None,
+        'accuracy_ok': None,
+        'accuracy_max_m': float(getattr(settings, 'MOBILE_GEOFENCE_MAX_ACCURACY_M', 80)),
+    }
+    latitude = (coords or {}).get('last_latitude')
+    longitude = (coords or {}).get('last_longitude')
+    accuracy_m = (coords or {}).get('last_accuracy_m')
+    if configure and latitude is not None and longitude is not None:
+        distance = geofence.distance_meters(
+            latitude, longitude, site.geofence_latitude, site.geofence_longitude)
+        info['distance_m'] = round(distance, 1)
+        info['in_geofence'] = distance <= info['geofence_rayon_m']
+    if accuracy_m is not None:
+        info['accuracy_ok'] = float(accuracy_m) <= info['accuracy_max_m']
+
+    filtre = filtres_personne(type_personne, personne)
+    ouvert = (Pointage.objects
+              .filter(seance_edt=affectation, date_journee=date,
+                      timestamp_sortie__isnull=True, **filtre)
+              .order_by('-timestamp_entree').first())
+    if ouvert is not None:
+        info.update({
+            'statut': 'EN_SALLE',
+            'action_suivante': 'SORTIE',
+            'heure_entree': timezone.localtime(ouvert.timestamp_entree).strftime('%H:%M'),
+        })
+        return info
+
+    termine = Pointage.objects.filter(
+        seance_edt=affectation, date_journee=date,
+        timestamp_sortie__isnull=False, **filtre).exists()
+    if termine:
+        info.update({'statut': 'TERMINE', 'action_suivante': None, 'heure_entree': None})
+        return info
+
+    if not est_seance_du_jour(affectation, date):
+        info.update({'statut': 'HORS_SEANCE', 'action_suivante': None, 'heure_entree': None})
+        return info
+
+    info.update({'statut': 'ABSENT', 'action_suivante': 'ENTREE', 'heure_entree': None})
+    return info
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +823,14 @@ def emarger(request, affectation, date, entries, *, motif_global=''):
                 pointage.save(update_fields=['duree_presence_minutes'])
             action = (AuditLog.Action.FORCE_SORTIE
                       if avant['sortie'] else AuditLog.Action.FORCE_ENTREE)
+
+        # Raccordement ECUE (chaîne LMD) : la séance porte l'affectation
+        # pédagogique, donc l'ECUE. Aucune déduction depuis le groupe.
+        if pointage.ecue_lmd_id is None:
+            ecue = ecue_de_seance(affectation)
+            if ecue is not None:
+                pointage.ecue_lmd = ecue
+                pointage.save(update_fields=['ecue_lmd'])
 
         nouvelle = {
             'statut': pointage.statut,

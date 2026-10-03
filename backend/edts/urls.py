@@ -8,9 +8,49 @@ et versionnés ensemble.
 from django.urls import path
 
 from . import api
+from . import api_lmd as lmd
 
 # Pas d'app_name volontaire : le jeu de routes est monté deux fois
 # (/api/edts/ et /api/timetable/) — un namespace dupliqué déclenche urls.W005.
+#
+# ── LOT 3 — couche LMD (routes NOUVELLES, ajoutées) ─────────────────────────
+# Toutes ces routes sont préfixées ``lmd/`` : aucune route existante n'est
+# supprimée, renommée ou modifiée. Le générateur historique
+# ``POST /api/edts/emplois/{id}/generer/`` (generer_brouillon) reste le chemin
+# contractuel d'origine ; la couche LMD y ajoute le moteur du LOT 2.
+urlpatterns_lmd = [
+    # Pré-requis (§7, §17)
+    # `lmd/audit/` est déclarée AVANT `lmd/<int:pk>/audit/` : ces deux chemins
+    # sont distincts (`int:pk` ne capture pas le littéral « audit »), et cet
+    # ordre garantit que l'audit de préparation ne soit jamais capté par pk.
+    path('lmd/audit/', lmd.audit_api, name='edt-lmd-audit'),
+    path('lmd/constraints/', lmd.contraintes_api, name='edt-lmd-contraintes'),
+    path('lmd/versions/', lmd.versions_api, name='edt-lmd-versions'),
+
+    # Ressources (§8, §9)
+    path('lmd/availability/teachers/', lmd.disponibilites_enseignants_api,
+         name='edt-lmd-availability-teachers'),
+    path('lmd/availability/rooms/', lmd.disponibilites_salles_api,
+         name='edt-lmd-availability-rooms'),
+    path('lmd/slots/', lmd.slots_api, name='edt-lmd-slots'),
+
+    # Génération / validation / publication (§6, §10, §11)
+    path('lmd/generate/', lmd.generate_api, name='edt-lmd-generate'),
+    path('lmd/<int:pk>/validate/', lmd.validate_api, name='edt-lmd-validate'),
+    path('lmd/<int:pk>/publish/', lmd.publish_api, name='edt-lmd-publish'),
+
+    # Restitution (§7, §24, §25, §28)
+    # `edt_audit_api` porte un nom d'opération distinct (`edt_lmd_edt_audit`)
+    # : `/api/docs/` reste non ambigu malgré la proximité des deux chemins.
+    path('lmd/<int:pk>/audit/', lmd.edt_audit_api, name='edt-lmd-edt-audit'),
+    path('lmd/<int:pk>/result/', lmd.result_api, name='edt-lmd-result'),
+    path('lmd/<int:pk>/grille/', lmd.grille_api, name='edt-lmd-grille'),
+
+    # Opérations sur séance (§12, §13)
+    path('lmd/items/<int:pk>/move/', lmd.item_move_api, name='edt-lmd-item-move'),
+    path('lmd/items/<int:pk>/cancel/', lmd.item_cancel_api, name='edt-lmd-item-cancel'),
+]
+
 urlpatterns = [
     # Référentiel horaire (P01)
     path('creneaux-types/', api.creneaux_types_api, name='edt-creneau-templates'),
@@ -43,3 +83,9 @@ urlpatterns = [
     path('publics/', api.edt_publics_api, name='edt-publics'),
     path('referentiel-enseignants/', api.referentiel_enseignants_api, name='edt-referentiel-enseignants'),
 ]
+
+# Les routes LMD viennent APRÈS les routes historiques : leur préfixe `lmd/`
+# ne peut de toute façon pas être capté par `creneaux-types/`, `emplois/`,
+# `affectations/` ou `conflits/`, l'ordre les rend donc sans effet — il est
+# conservé pour que la lecture du fichier reflète l'historique en premier.
+urlpatterns += urlpatterns_lmd

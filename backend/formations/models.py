@@ -425,6 +425,16 @@ class RefSalle(models.Model):
         GYMNASE = 'GYMNASE', 'Gymnase'
         REUNION = 'REUNION', 'Salle de réunion'
         CONFERENCE = 'CONFERENCE', 'Salle de conférence'
+        # Lot L8 (étape H) — types ajoutés pour rendre la contrainte forte C7
+        # (compatibilité salle / type d'enseignement CM·TD·TP) évaluable par le
+        # moteur. Aucun reclassement automatique : les 58 salles restent SALLE
+        # tant que l'INJS ne les requalifie pas.
+        COURS = 'COURS', 'Salle de cours'
+        TD = 'TD', 'Salle de TD'
+        TP = 'TP', 'Salle de travaux pratiques'
+        INFORMATIQUE = 'INFORMATIQUE', 'Salle informatique'
+        LABORATOIRE = 'LABORATOIRE', 'Laboratoire'
+        SPORT = 'SPORT', 'Espace sportif couvert'
 
     site = models.ForeignKey(RefSite, on_delete=models.CASCADE, related_name='salles')
     batiment = models.ForeignKey(RefBatiment, on_delete=models.SET_NULL, null=True, blank=True, related_name='salles')

@@ -101,14 +101,19 @@ def qr_seance(request, pk):
 @throttle_classes([ScanRateThrottle])
 @permission_classes([IsAuthenticated])
 def scan_seance(request):
-    """Scan du QR de séance LMD par le mobile de l'auditeur (ou de l'enseignant)."""
-    from formations.models import QRToken
+    """Scan du QR de séance LMD par le mobile de l'auditeur (ou de l'enseignant).
+
+    Sont acceptés : l'auditeur inscrit au groupe de la séance, ainsi que
+    l'enseignant / l'encadrant **désigné sur le créneau** (affectation
+    planifiée ou affectation pédagogique) — jamais un rapprochement par nom.
+    """
+    from uuid import UUID as _UUID
 
     token = (request.data.get('token_qr') or '').strip()
     if not token:
         return Response({'detail': '« token_qr » requis.'}, status=400)
     try:
-        token = UUID(token)
+        token = _UUID(token)
     except ValueError:
         return Response({'code': 'INVALID_TOKEN', 'detail': 'QR code invalide.'}, status=400)
     if getattr(request.user, 'must_change_password', False):
@@ -118,28 +123,13 @@ def scan_seance(request):
     personne, type_str, erreur = _resolve_authenticated_personne(request.user)
     if erreur is not None:
         return erreur
-    if type_str != 'participant':
-        # Formateurs/encadrants : leur pointage (salaire) reste sur le flux
-        # SessionModule ; sur séance LMD, ils gèrent l'émargement, ils ne le
-        # subissent pas.
-        return Response({'code': 'BADGE_RESERVE_AUX_PARTICIPANTS',
-                         'detail': 'Le scan de séance LMD est réservé aux auditeurs inscrits '
-                                   'au groupe.'}, status=403)
     device_err = _require_mobile_device_id(type_str, device_id)
     if device_err is not None:
         return device_err
 
-    jeton = QRToken.objects.filter(token=token).select_related('seance_edt').first()
-    if jeton is None or jeton.seance_edt_id is None:
-        return Response({'code': 'INVALID_TOKEN', 'detail': 'QR code inconnu ou hors séance LMD.'},
-                        status=400)
-    if not jeton.is_valid:
-        remplacement = (QRToken.objects.filter(seance_edt=jeton.seance_edt, actif=True)
-                        .order_by('-created_at').first())
-        if remplacement is None or not remplacement.is_valid:
-            return Response({'code': 'TOKEN_EXPIRED',
-                             'detail': 'QR code expiré — demandez un réaffichage.'}, status=400)
-        jeton = remplacement
+    jeton, erreur = service.resoudre_jeton_lmd(token)
+    if erreur is not None:
+        return Response(erreur, status=400)
 
     affectation = jeton.seance_edt
     from django.utils import timezone
@@ -148,14 +138,10 @@ def scan_seance(request):
         return Response({'code': 'HORS_SEANCE',
                          'detail': 'Ce créneau n’a pas séance aujourd’hui.'}, status=400)
 
-    participant = personne
-
-    inscrit = (affectation.groupe_id is None) or service.membres_groupe(affectation).filter(
-        pk=participant.pk).exists()
-    if not inscrit:
-        return Response({'code': 'NOT_IN_LIST',
-                         'detail': 'Vous n’êtes pas inscrit(e) dans le groupe de cette séance.'},
-                        status=403)
+    autorise, code, detail, statut_http = service.autorisation_badgeage(
+        request.user, personne, type_str, affectation)
+    if not autorise:
+        return Response({'code': code, 'detail': detail}, status=statut_http or 403)
 
     coords = {}
     for cle, champ in (('latitude', 'last_latitude'), ('longitude', 'last_longitude'),
@@ -165,12 +151,14 @@ def scan_seance(request):
             coords[champ] = request.data.get(cle)
 
     action, pointage, erreur = service.badger_scan(
-        request, participant=participant, affectation=affectation, date=date,
-        device_id=device_id, coords=coords or None)
+        request, personne=personne, affectation=affectation, date=date,
+        device_id=device_id, coords=coords or None, type_personne=type_str)
     if erreur:
         return Response(erreur, status=400)
     return Response({
         'action': action,
+        'canal': 'EDT_LMD',
+        'type_personne': type_str,
         'seance': {'id': affectation.pk,
                    'libelle': affectation.intitule or str(affectation.creneau_template),
                    'date': date.isoformat()},
@@ -211,6 +199,19 @@ def presences_seance(request, pk):
     effectif = len(lignes)
     presents = sum(1 for l in lignes if l['statut'] in (Pointage.StatutAssiduite.PRESENT,
                                                         Pointage.StatutAssiduite.RETARD))
+    retards = sum(1 for l in lignes if l['statut'] == Pointage.StatutAssiduite.RETARD)
+    absents = sum(1 for l in lignes if l['statut'] in (
+        Pointage.StatutAssiduite.ABSENT, Pointage.StatutAssiduite.ABSENCE_JUSTIFIEE,
+        Pointage.StatutAssiduite.EXCUSE))
+    # Anomalies et gestes manuels : lus sur les pointages (jamais déduits).
+    presences_manuelles = sum(1 for p in pointages.values()
+                              if p.device_id == 'EMARGEMENT_MANUEL')
+    anomalies_gps = sum(1 for p in pointages.values()
+                        if (p.outside_geofence_count or 0) > 0)
+    sorties_automatiques = sum(1 for p in pointages.values()
+                               if p.statut == Pointage.Statut.SORTIE_AUTO)
+    absents_non_badges = sum(1 for p in pointages.values()
+                             if p.statut == Pointage.Statut.ABSENT_NON_BADGE)
     return Response({
         'seance': {'id': affectation.pk, 'date': date.isoformat(),
                    'groupe_libelle': (getattr(affectation.groupe, 'nom', '')
@@ -218,7 +219,15 @@ def presences_seance(request, pk):
                    if affectation.groupe_id else '',
                    'intitule': affectation.intitule or str(affectation.creneau_template)},
         'effectif': effectif,
+        'attendus': effectif,
         'presents': presents,
+        'retards': retards,
+        'absents': absents,
+        'non_pointes': max(0, effectif - len(pointages)),
+        'presences_manuelles': presences_manuelles,
+        'anomalies_gps': anomalies_gps,
+        'sorties_automatiques': sorties_automatiques,
+        'absents_non_badges': absents_non_badges,
         'lignes': lignes,
     })
 

@@ -345,11 +345,11 @@ def _disponibilites_generantes(enseignant_user_ids, formateur_ids, semaine_refs)
     generes = set()
     NOMS_JOURS = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI', 'DIMANCHE']
     for indispo in IndisponibiliteEnseignant.objects.filter(
-            formateur_id__in=ids, date_debut__lte=fin, date_fin__gte=debut):
+            enseignant_id__in=ids, date_debut__lte=fin, date_fin__gte=debut):
         date_courante = max(indispo.date_debut, debut)
         butee = min(indispo.date_fin, fin)
         while date_courante <= butee:
-            generes.add((indispo.formateur_id, NOMS_JOURS[date_courante.weekday()]))
+            generes.add((indispo.enseignant_id, NOMS_JOURS[date_courante.weekday()]))
             date_courante += timedelta(days=1)
     return generes
 

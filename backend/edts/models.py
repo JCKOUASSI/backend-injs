@@ -6,6 +6,20 @@ Principes :
   population cible (formation, groupe, enseignant, salle) ;
 - les affectations expriment ce qui est placé dans un créneau ;
 - les conflits sont détectés côté service et peuvent être journalisés.
+
+Chaîne canonique INJS-LMD (décision d'architecture validée, 2026-09-28) :
+    Année académique → Formation → Parcours/Spécialité → Niveau → Semestre
+                    → Groupe → Maquette → UE → ECUE → AffectationPedagogique
+                    → Besoin horaire → AffectationCreneau (séance planifiable)
+                    → EmploiDuTemps publié → Pointage (présence/QR)
+
+**Il n'existe PAS de table `Promotion`** (arbitrage explicite du commanditaire,
+2026-09-28). Le modèle `scolarite.Groupe` est l'entité qui porte la promotion
+pédagogique : année académique + formation INJS + parcours/spécialité + niveau +
+vague + groupe. Créer une table `Promotion` reviendrait à reproduire
+l'architecture héritée CPFAE/Sygepcpfae, ce que le périmètre INJS interdit. Le
+service `edts.services.besoins` expose si besoin une notion **calculée** de
+promotion dérivée du Groupe, sans nouvelle table ni nouvelle clé étrangère.
 """
 
 from django.conf import settings
@@ -53,7 +67,21 @@ CONFLIT_TYPE_CHOICES = [
     ('HORAIRE_GROUPETUDIANT', 'Chevauchement groupe/étudiant'),
     ('HORAIRE_SALLE', 'Chevauchement salle'),
     ('HORAIRE_MODULE', 'Chevauchement module'),
+    ('CAPACITE', 'Capacité de salle insuffisante'),
+    ('COMPATIBILITE_SALLE', 'Salle incompatible avec le type d’enseignement'),
+    ('HORS_CALENDRIER', 'Séance hors période autorisée'),
+    ('DISPONIBILITE', 'Indisponibilité enseignant ou salle'),
     ('MANUEL', 'Signalé manuellement'),
+]
+
+# Lot L8 — nature de la période déclarée par un enseignant ou une salle.
+# Les trois statuts séparent la contrainte FORTE (INDISPONIBLE) des préférences
+# (PREFERENCE, contrainte souple au sens de l'étape K) et des ouvertures
+# explicites (DISPONIBLE).
+DISPONIBILITE_STATUT_CHOICES = [
+    ('DISPONIBLE', 'Disponible'),
+    ('INDISPONIBLE', 'Indisponible'),
+    ('PREFERENCE', 'Préférence'),
 ]
 
 
@@ -161,6 +189,33 @@ class EmploiDuTemps(models.Model):
         blank=True,
         related_name='edt_crees',
     )
+    # --- Lot L8 (étape R) : versionnage et traçabilité du cycle de vie ---
+    version = models.PositiveSmallIntegerField(
+        default=1, db_index=True,
+        help_text='Version de l\'EDT pour ce périmètre (V1, V2, V3…). '
+                  'Une nouvelle version se crée par clonage, jamais par écrasement.',
+    )
+    motif_modification = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text='Motif de la version courante (ex. « ajout salle TP Marcory »).',
+    )
+    valide_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='edt_valides',
+    )
+    valide_le = models.DateTimeField(null=True, blank=True)
+    publie_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='edt_publies',
+    )
+    publie_le = models.DateTimeField(null=True, blank=True)
+    # Empreinte des paramètres de génération : garantit l'idempotence (étape
+    # 43) — relancer une génération strictement identique ne duplique rien.
+    empreinte = models.CharField(
+        max_length=64, blank=True, default='', db_index=True,
+        help_text='SHA-256 des paramètres de génération (année, formation, parcours, '
+                  'niveau, semestre, groupes, maquette, version).',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -171,8 +226,14 @@ class EmploiDuTemps(models.Model):
         indexes = [
             models.Index(fields=['annee_academique', 'population_type', 'population_id']),
             models.Index(fields=['statut']),
+            models.Index(fields=['empreinte']),
         ]
-        unique_together = ['annee_academique', 'population_type', 'population_id']
+        # Étape R : la version entre dans la clé d'unicité pour autoriser
+        # plusieurs versions d'un même périmètre (l'unicité stricte
+        # annee+population rendait le versionnage impossible).
+        unique_together = [
+            ['annee_academique', 'population_type', 'population_id', 'version'],
+        ]
 
     def clean(self):
         super().clean()
@@ -392,4 +453,101 @@ class ConflitCreneau(models.Model):
 
     def __str__(self):
         return f"{self.get_type_conflit_display()} — {self.emploi_du_temps}"
+
+
+class DisponibiliteHoraire(models.Model):
+    """Période de disponibilité/indisponibilité d'un enseignant ou d'une salle.
+
+    Lote L8 (étape G/H). Complète ``scolarite.IndisponibiliteEnseignant``,
+    purement datée et donc inexploitable pour un placement horaire : cette
+    période exprime un **jour + plage horaire**, ce qui rend les contraintes
+    fortes C5 (indisponibilité enseignant) et C6 (indisponibilité salle)
+    évaluables par le moteur de génération.
+
+    Une ligne porte EXACTEMENT un porteur (enseignant XOR salle) — contrainte
+    appliquée par ``CheckConstraint`` : une disponibilité sans porteur n'a aucun
+    sens métier et une double cible serait ambiguë pour le solveur.
+
+    Statuts :
+
+    * ``INDISPONIBLE`` — contrainte FORTE, aucun placement sur la période ;
+    * ``PREFERENCE``  — contrainte SOUPLE (étape K), pénalité, jamais un blocage ;
+    * ``DISPONIBLE``   — ouverture explicite (contournement d'une indisponibilité
+      plus large, ou créneau réservé). Un créneau sans ligne vaut « disponible ».
+    """
+
+    annee_academique = models.ForeignKey(
+        'scolarite.AnneeAcademique', on_delete=models.CASCADE,
+        related_name='disponibilites_horaires',
+        help_text='Année concernée : les disponibilités sont annuelles.',
+    )
+    enseignant = models.ForeignKey(
+        'formations.Formateur', on_delete=models.CASCADE,
+        related_name='disponibilites_horaires', null=True, blank=True,
+    )
+    salle = models.ForeignKey(
+        'formations.RefSalle', on_delete=models.CASCADE,
+        related_name='disponibilites_horaires', null=True, blank=True,
+    )
+    jour = models.CharField(max_length=10, choices=JOUR_CHOICES, db_index=True)
+    heure_debut = models.TimeField()
+    heure_fin = models.TimeField()
+    statut = models.CharField(
+        max_length=15, choices=DISPONIBILITE_STATUT_CHOICES,
+        default='INDISPONIBLE', db_index=True,
+    )
+    motif = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['jour', 'heure_debut', 'heure_fin']
+        verbose_name = 'EDT – Disponibilité horaire'
+        verbose_name_plural = 'EDT – Disponibilités horaires'
+        indexes = [
+            models.Index(fields=['annee_academique', 'jour', 'heure_debut']),
+            models.Index(fields=['enseignant', 'annee_academique', 'statut']),
+            models.Index(fields=['salle', 'annee_academique', 'statut']),
+        ]
+        constraints = [
+            # Exactement un porteur : enseignant XOR salle.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(enseignant__isnull=False, salle__isnull=True)
+                    | models.Q(enseignant__isnull=True, salle__isnull=False)
+                ),
+                name='dispo_horaire_un_seul_porteur',
+            ),
+            # Plage horaire cohérente.
+            models.CheckConstraint(
+                condition=models.Q(heure_fin__gt=models.F('heure_debut')),
+                name='dispo_horaire_plage_valide',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        erreurs = {}
+        if self.enseignant_id and self.salle_id:
+            erreurs['salle'] = "Renseignez soit un enseignant, soit une salle — jamais les deux."
+        if not self.enseignant_id and not self.salle_id:
+            erreurs['enseignant'] = "Une disponibilité doit concerner un enseignant ou une salle."
+        if self.heure_debut and self.heure_fin and self.heure_fin <= self.heure_debut:
+            erreurs['heure_fin'] = "L'heure de fin doit être strictement postérieure à l'heure de début."
+        if erreurs:
+            raise ValidationError(erreurs)
+
+    @property
+    def porteur_label(self):
+        if self.enseignant_id:
+            return str(self.enseignant)
+        if self.salle_id:
+            return str(self.salle)
+        return '—'
+
+    def __str__(self):
+        return (f'{self.annee_academique_id and self.annee_academique} — '
+                f'{self.porteur_label} {self.get_jour_display()} '
+                f'{self.heure_debut:%H:%M}–{self.heure_fin:%H:%M} '
+                f'[{self.get_statut_display()}]')
 
