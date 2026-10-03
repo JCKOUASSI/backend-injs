@@ -132,6 +132,7 @@ INSTALLED_APPS = [
     'dashboard',
     'statistiques',
     'suiviEvaluation',
+    'evaluations.apps.EvaluationsConfig',
     'scolarite.apps.ScolariteConfig',
     'admissions.apps.AdmissionsConfig',
     'parametres.apps.ParametresConfig',
