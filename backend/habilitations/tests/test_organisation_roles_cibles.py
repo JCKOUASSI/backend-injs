@@ -34,9 +34,26 @@ ROLES_CIBLES = [ligne for ligne in ROLES if ligne[8] >= 360]
 
 
 class ReferentielRolesCiblesTests(APITestCase):
-    """Le référentiel étendu se charge sans anomalie (portails qualité U3)."""
+    """Le référentiel étendu se charge sans anomalie (portails qualité U3).
+
+    Le catalogue RBAC est un CATALOGUE en lecture seule : il est chargé UNE
+    fois par classe dans `setUpTestData` (transaction annulée en fin de
+    classe). Le recharger dans chaque test enchaînait cinq chargements
+    complets — des milliers d'`update_or_create` — dans UNE SEULE
+    transaction : la transaction s'allongeait démesurément et chaque
+    rechargement devenait quadrativement plus coûteux (36 minutes mesurées
+    pour la seule exécution de test_06, contre 11 s pour le fichier entier
+    exécuté seul). Le test d'idempotence est isolé dans sa propre classe
+    pour disposer d'une transaction dédiée.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        charger_referentiel()
 
     def test_01_chargement_81_roles_sans_anomalie(self):
+        # Le RAPPORT du chargeur est vérifié ici : cet appel est le-sujet
+        # du test, il ne peut pas être remplacé par le chargement de classe.
         rapport = charger_referentiel()
         self.assertEqual(rapport.roles, len(ROLES))
         self.assertEqual(len(ROLES), 81)
@@ -54,7 +71,6 @@ class ReferentielRolesCiblesTests(APITestCase):
         self.assertEqual(sans_case, [])
 
     def test_03_caracteristiques_des_roles_cibles(self):
-        charger_referentiel()
         sysadmin = RoleMetier.objects.get(code='SYSADMIN')
         self.assertTrue(sysadmin.sensible)
         self.assertEqual(sysadmin.niveau_defaut, 'N4')
@@ -72,7 +88,6 @@ class ReferentielRolesCiblesTests(APITestCase):
         self.assertEqual(auditeur.niveau_defaut, 'N1')
 
     def test_04_permissions_cibles_derivees(self):
-        charger_referentiel()
         sysadmin = RoleMetier.objects.get(code='SYSADMIN')
         support = RoleMetier.objects.get(code='SUPPORT_IT')
         auditeur = RoleMetier.objects.get(code='AUDITEUR')
@@ -98,6 +113,17 @@ class ReferentielRolesCiblesTests(APITestCase):
         # Les règles dérivées s'appliquent aussi aux rôles cibles.
         niveaux_auditeur, _ = niveaux_du_role('AUDITEUR', 'ADMINISTRATION_GENERALE')
         self.assertEqual(niveaux_auditeur.get('referentiels'), 'N1')
+
+
+class IdempotenceRechargementTests(APITestCase):
+    """Le rechargement du catalogue est idempotent (classe dédiée).
+
+    Ce contrôle enchaîne DEUX chargements complets et doit donc disposer
+    d'une transaction à lui seul : le partager avec les tests de
+    consultation l'accumulait aux rechargements precedents et rendait
+    l'exécution quadrativement plus lente. Aucun `setUpTestData` ici : la
+    transaction ne contient que ce que le test produit.
+    """
 
     def test_06_idempotence_du_rechargement(self):
         premier = charger_referentiel()
