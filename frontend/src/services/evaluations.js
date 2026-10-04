@@ -133,6 +133,40 @@ export async function getResultatsSemestre(params = {}) {
   return res.data ?? {}
 }
 
+/**
+ * Passage de niveau — calcul technique fourni par le backend.
+ * Le frontend ne recalcule NI moyenne, NI crédits, NI éligibilité : il se
+ * contente d'afficher la réponse du moteur (D10 : aucune décision de jury
+ * n'est fabriquée côté client).
+ */
+export async function getPassageNiveau({ inscription_id, session_id, niveau_id }) {
+  const res = await api.get(`${BASE}/resultats/passage/`, {
+    params: { inscription_id, session_id, niveau_id },
+  })
+  return res.data ?? {}
+}
+
+/** Relevés de notes — consultation paginée. */
+export async function getReleves(params = {}) {
+  const res = await api.get(`${BASE}/releves/`, { params })
+  return res.data ?? {}
+}
+
+/** Génère le relevé : crée la version suivante, ne réécrit jamais l'existant. */
+export async function genererReleve({ inscription_id, session_id }) {
+  const res = await api.post(`${BASE}/releves/generer/`, {
+    inscription_id,
+    session_id,
+  })
+  return res.data ?? {}
+}
+
+/** Détail d'une version de relevé (contenu canonique inclus). */
+export async function getReleve(pk) {
+  const res = await api.get(`${BASE}/releves/${pk}/`)
+  return res.data ?? {}
+}
+
 // ── Délibérations (source de vérité : module Jurys) ────────────────────────
 // La décision académique est UNIQUE : elle est produite par le moteur
 // LMD/ECTS du module `jurys`. Ce service ne fait qu'exposer l'API existante

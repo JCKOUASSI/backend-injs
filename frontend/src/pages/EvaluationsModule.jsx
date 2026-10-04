@@ -6,7 +6,7 @@ import {
   getEvaluations, getSessions, getEvaluation, getComposants,
   getParticipants, getResultatsEcue, getResultatsUe, getResultatsSemestre,
   getJurySessions, getJuryAnomalies, getJuryStatistiques,
-  saisirNotes,
+  saisirNotes, getReleves, getReleve,
 } from '../services/evaluations'
 import '../styles/evaluations.css'
 
@@ -1315,46 +1315,6 @@ export function ResultatsEvaluations() {
   )
 }
 
-// ── 5. Délibérations / 7. Relevés : services non exposés par l'API ──────────
-
-/**
- * Écran premium de fonctionnalité indisponible.
- *
- * Aucun faux tableau, aucune fausse statistique, aucun mock : l'API métier
- * n'existe pas encore, l'écran l'assume explicitement (E1.3 §12 et §14).
- */
-function EcranIndisponible({ icone, titre, message, precision }) {
-  const navigate = useNavigate()
-  return (
-    <div className="page-container ev-scope">
-      <header className="px-hero">
-        <span className="px-hero-icon" aria-hidden="true">
-          <i className={`bi ${icone}`} />
-        </span>
-        <div className="px-hero-text">
-          <h1 className="px-hero-title ev-titre">{titre}</h1>
-          <p className="px-hero-intro">Fonctionnalité en cours d’intégration au service académique.</p>
-        </div>
-      </header>
-      <div className="ev-indisponible">
-        <span className="ev-indisponible-icone" aria-hidden="true">
-          <i className={`bi ${icone}`} />
-        </span>
-        <h2 className="ev-indisponible-titre">{titre}</h2>
-        <p className="ev-indisponible-texte">{message}</p>
-        <p className="ev-indisponible-texte">{precision}</p>
-        <button
-          type="button"
-          className="ev-btn ev-btn--primary"
-          onClick={() => navigate('/evaluations')}
-        >
-          <i className="bi bi-arrow-left" aria-hidden="true" />
-          Retour aux évaluations
-        </button>
-      </div>
-    </div>
-  )
-}
 
 export function Deliberations() {
   const [selection, setSelection] = useState(null)
@@ -1485,13 +1445,242 @@ export function Deliberations() {
   )
 }
 
-export function Reveles() {
+/**
+ * Détail d'un relevé archivé.
+ *
+ * Toutes les valeurs (moyennes, crédits, décision) sont AFFICHÉES telles que
+ * le backend les a calculées : ce composant ne recalcule rien. Une note
+ * `null` (absence, composante non notée) reste « Non renseigné », jamais
+ * un 0 (D2/D6).
+ */
+function DetailReleve({ contenu, decision }) {
+  const semestre = contenu?.semestres ?? []
+  const ues = contenu?.unites_enseignement ?? []
+  const ecues = ues.flatMap((u) =>
+    (u.ecues ?? []).map((e) => ({ ...e, ue_code: u.ue_code })))
+
   return (
-    <EcranIndisponible
-      icone="bi-file-earmark-text"
+    <div className="card-body">
+      <dl className="row mb-0">
+        <dt className="col-sm-3">Participant</dt>
+        <dd className="col-sm-9">
+          {affichage(contenu?.participant?.nom_complet)}
+          {' '}
+          <span className="ev-note-bareme">
+            ({affichage(contenu?.participant?.matricule)})
+          </span>
+        </dd>
+        <dt className="col-sm-3">Niveau</dt>
+        <dd className="col-sm-9">{affichage(contenu?.niveau)}</dd>
+        <dt className="col-sm-3">Formation</dt>
+        <dd className="col-sm-9">{affichage(contenu?.formation)}</dd>
+        <dt className="col-sm-3">Décision</dt>
+        <dd className="col-sm-9">
+          <BadgeEtat valeur={decision ?? 'EN_ATTENTE'} />
+        </dd>
+      </dl>
+
+      <h3 className="px-panel-title mt-4">Semestres</h3>
+      {semestre.length === 0 ? (
+        <EtatVide
+          icone="bi-dash"
+          titre="Aucun semestre"
+          message="Aucun résultat de semestre archivé."
+        />
+      ) : (
+        <div className="ev-table-scroll">
+          <table className="table px-table">
+            <thead>
+              <tr>
+                <th scope="col">Semestre</th>
+                <th scope="col">Niveau</th>
+                <th scope="col">Crédits</th>
+                <th scope="col">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {semestre.map((s, i) => (
+                <tr key={`${s.semestre}-${i}`}>
+                  <td>{affichage(s.semestre)}</td>
+                  <td>{affichage(s.niveau)}</td>
+                  <td>{affichage(s.credits_acquis)} / {affichage(s.credits_attendus)}</td>
+                  <td><BadgeEtat valeur={s.statut} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3 className="px-panel-title mt-4">Unités d'enseignement</h3>
+      {ues.length === 0 ? (
+        <EtatVide
+          icone="bi-dash"
+          titre="Aucune UE"
+          message="Aucun résultat d'unité d'enseignement archivé."
+        />
+      ) : (
+        <div className="ev-table-scroll">
+          <table className="table px-table">
+            <thead>
+              <tr>
+                <th scope="col">UE</th>
+                <th scope="col">Intitulé</th>
+                <th scope="col">Crédits</th>
+                <th scope="col">Moyenne</th>
+                <th scope="col">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ues.map((u, i) => (
+                <tr key={`${u.ue_code}-${i}`}>
+                  <td><span className="ev-note-bareme">{affichage(u.ue_code)}</span></td>
+                  <td>{affichage(u.ue_libelle)}</td>
+                  <td>{affichage(u.credits_ue)}</td>
+                  <td>{affichage(u.moyenne)}</td>
+                  <td><BadgeEtat valeur={u.statut} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {ecues.length > 0 && (
+        <>
+          <h3 className="px-panel-title mt-4">ECUE</h3>
+          <div className="ev-table-scroll">
+            <table className="table px-table">
+              <thead>
+                <tr>
+                  <th scope="col">ECUE</th>
+                  <th scope="col">Intitulé</th>
+                  <th scope="col">Note</th>
+                  <th scope="col">Bareme</th>
+                  <th scope="col">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ecues.map((e, i) => (
+                  <tr key={`${e.ue_code}-${e.ecue_code}-${i}`}>
+                    <td><span className="ev-note-bareme">{affichage(e.ecue_code)}</span></td>
+                    <td>{affichage(e.ecue_libelle)}</td>
+                    <td>{affichage(e.note)}</td>
+                    <td>{affichage(e.bareme)}</td>
+                    <td><BadgeEtat valeur={e.statut} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export function Reveles() {
+  const [selection, setSelection] = useState(null)
+  const liste = useCharge(() => getReleves(), [])
+  const detail = useCharge(
+    () => (selection == null ? Promise.resolve(null) : getReleve(selection)),
+    [selection],
+  )
+  const lignes = liste.donnees?.results ?? []
+  const releve = detail.donnees
+  const contenu = releve?.contenu ?? null
+  const decision = releve?.decision_valeur ?? null
+
+  return (
+    <Page
       titre="Relevés de notes"
-      message="La génération des relevés de notes n’est pas encore disponible."
-      precision="Le service de relevé sera connecté lorsque son API métier sera disponible."
-    />
+      icone="bi-file-earmark-text"
+      sousTitre="Relevés versionnés, produits par le service académique"
+      chargement={liste.chargement}
+      erreur={liste.erreur}
+      reessayer={liste.reessayer}
+      actions={<span className="px-count-pill px-count-pill--muted">{lignes.length}</span>}
+    >
+      <div className="card px-panel">
+        <div className="px-panel-head">
+          <div className="px-panel-headtext">
+            <h2 className="px-panel-title">
+              <i className="bi bi-journals" aria-hidden="true" />
+              Relevés disponibles
+            </h2>
+            <p className="px-panel-sub">
+              Chaque relevé est versionné et horodaté par une empreinte SHA-256.
+            </p>
+          </div>
+        </div>
+        <div className="card-body-flush">
+          {lignes.length === 0 ? (
+            <EtatVide
+              icone="bi-file-earmark-text"
+              titre="Aucun relevé"
+              message="Les relevés apparaîtront ici dès leur génération par la scolarité."
+            />
+          ) : (
+            <div className="ev-table-scroll">
+              <table className="table px-table">
+                <caption className="visually-hidden">Relevés de notes</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Matricule</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Décision</th>
+                    <th scope="col">Généré le</th>
+                    <th scope="col" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lignes.map((r) => (
+                    <tr key={r.id}>
+                      <td><span className="ev-note-bareme">{affichage(r.participant_matricule)}</span></td>
+                      <td>v{affichage(r.version)}</td>
+                      <td><BadgeEtat valeur={r.decision_valeur ?? 'EN_ATTENTE'} /></td>
+                      <td>{affichage(r.genere_le)}</td>
+                      <td className="text-end">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => setSelection(r.id)}
+                          data-testid={`releve-${r.id}`}
+                        >
+                          Consulter
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selection != null && (
+        <div className="card px-panel" data-testid="releve-detail">
+          <div className="px-panel-head">
+            <div className="px-panel-headtext">
+              <h2 className="px-panel-title">
+                <i className="bi bi-file-earmark-text" aria-hidden="true" />
+                Relevé v{affichage(releve?.version)}
+              </h2>
+              <p className="px-panel-sub">
+                Empreinte {affichage(String(releve?.sha256 ?? '').slice(0, 12))}
+              </p>
+            </div>
+          </div>
+          <div className="card-body-flush">
+            {detail.chargement || !releve ? (
+              <EtatVide icone="bi-hourglass" titre="Chargement…" message="Lecture du relevé archivé." />
+            ) : (
+              <DetailReleve contenu={contenu} decision={decision} />
+            )}
+          </div>
+        </div>
+      )}
+    </Page>
   )
 }

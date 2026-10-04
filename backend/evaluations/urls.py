@@ -47,6 +47,15 @@ urlpatterns = [
     path('resultats/semestre/', views.resultats_semestre_list,
          name='eval-resultats-semestre'),
 
+    # ── Passage de niveau (calcul technique, lecture seule) ──────────
+    path('resultats/passage/', views.passage_niveau_calcul,
+         name='eval-resultats-passage'),
+
+    # ── Relevés de notes (versionnés, SHA-256) ───────────────────────
+    path('releves/', views.releves_list, name='eval-releves-list'),
+    path('releves/generer/', views.releves_generer, name='eval-releves-generer'),
+    path('releves/<int:pk>/', views.releves_detail, name='eval-releve-detail'),
+
     # ── Référentiels et règles (aucun seed en C1) ────────────────────
     path('regles/', views.regles_list, name='eval-regles-list'),
     path('regles/versions/', views.regles_versions_list, name='eval-regles-versions'),

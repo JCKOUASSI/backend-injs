@@ -21,6 +21,8 @@ from rest_framework.response import Response
 
 from . import permissions as perms
 from .services import calcul as services_calcul
+from .services import passage as services_passage
+from .services import releves as services_releves
 from .models import (
     ECUEResult,
     Epreuve,
@@ -31,6 +33,7 @@ from .models import (
     EvaluationGradeHistory,
     EvaluationParticipant,
     RegleCalcul,
+    ReleveNotes,
     RegleCalculVersion,
     SemesterResult,
     SessionEvaluation,
@@ -47,9 +50,11 @@ from .serializers import (
     EvaluationGradeSerializer,
     EvaluationParticipantSerializer,
     EvaluationSerializer,
+    PassageNiveauSerializer,
     PreparationSerializer,
     RegleCalculSerializer,
     RegleCalculVersionSerializer,
+    ReleveNotesSerializer,
     SemesterResultSerializer,
     SessionEvaluationSerializer,
     TypeEvaluationSerializer,
@@ -514,6 +519,164 @@ def _resultats_visibles(user, model, champ_ecue=None):
     else:
         qs = qs.filter(session__in=_sessions_visibles(user))
     return qs
+
+
+def _inscription_du_perimetre(user, inscription_id):
+    """Inscription administrative lisible par l'utilisateur (jamais de fuite).
+
+    Le périmètre est appliqué **en base** : un encadrant ne peut pas
+    atteindre une inscription hors de ses affectations.
+    """
+    from scolarite.models import InscriptionAdministrative
+
+    qs = InscriptionAdministrative.objects.select_related(
+        'etudiant__participant', 'ref_formation', 'niveau', 'parcours', 'vague',
+    )
+    return qs.filter(pk=inscription_id).first() if perms.peut_consulter(user) else None
+
+
+def _session_du_perimetre(user, session_id):
+    """Session d'évaluation lisible par l'utilisateur (même règle)."""
+    if not perms.peut_consulter(user):
+        return None
+    return SessionEvaluation.objects.filter(pk=session_id).first()
+
+
+@extend_schema(
+    tags=TAGS, responses=PassageNiveauSerializer,
+    parameters=[
+        OpenApiParameter('inscription_id', int, required=True),
+        OpenApiParameter('session_id', int, required=True),
+        OpenApiParameter('niveau_id', int, required=False),
+    ],
+)
+@api_view(['GET'])
+@permission_classes([perms.EstConsultantEvaluations])
+def passage_niveau_calcul(request):
+    """Passage de niveau — **calcul technique, en lecture seule**.
+
+    La méthode est volontairement GET : l'appel ne modifie rien et ne
+    produit **aucune** décision de jury (D10). La décision officielle reste
+    celle de `jurys.DecisionJury`, ici reprise telle quelle dans
+    `decision_jury` lorsqu'elle existe.
+    """
+    inscription_id = request.query_params.get('inscription_id')
+    session_id = request.query_params.get('session_id')
+    if not inscription_id or not session_id:
+        return _erreur(
+            'inscription_id et session_id sont obligatoires.',
+            'PARAMETRES_MANQUANTS',
+        )
+    inscription = _inscription_du_perimetre(request.user, inscription_id)
+    if inscription is None:
+        return _erreur(
+            'Inscription introuvable ou hors périmètre.',
+            'INSCRIPTION_INTROUVABLE', http=status.HTTP_404_NOT_FOUND,
+        )
+    session = _session_du_perimetre(request.user, session_id)
+    if session is None:
+        return _erreur(
+            'Session introuvable ou hors périmètre.',
+            'SESSION_INTROUVABLE', http=status.HTTP_404_NOT_FOUND,
+        )
+    niveau = None
+    if request.query_params.get('niveau_id'):
+        from scolarite.models import Niveau
+
+        niveau = Niveau.objects.filter(
+            pk=request.query_params['niveau_id'], actif=True,
+        ).first()
+        if niveau is None:
+            return _erreur(
+                'Niveau introuvable.', 'NIVEAU_INTROUVABLE',
+                http=status.HTTP_404_NOT_FOUND,
+            )
+    resultat = services_passage.passage_niveau(inscription, session, niveau)
+    return Response(PassageNiveauSerializer(resultat).data)
+
+
+def _releves_visibles(user, queryset):
+    """Relevés restreints aux sessions visibles par l'utilisateur."""
+    return queryset.filter(session__in=_sessions_visibles(user))
+
+
+@extend_schema(
+    tags=TAGS, responses=ReleveNotesSerializer(many=True),
+    parameters=[OpenApiParameter('session_id', int)],
+)
+@api_view(['GET'])
+@permission_classes([perms.EstConsultantEvaluations])
+def releves_list(request):
+    """Relevés de notes — consultation, du plus récent au plus ancien."""
+    qs = _releves_visibles(request.user, ReleveNotes.objects.select_related(
+        'inscription__etudiant__participant', 'session',
+    ))
+    if request.query_params.get('session_id'):
+        qs = qs.filter(session_id=request.query_params['session_id'])
+    if request.query_params.get('inscription_id'):
+        qs = qs.filter(inscription_id=request.query_params['inscription_id'])
+    return _paginer(request, qs, ReleveNotesSerializer)
+
+
+@extend_schema(
+    tags=TAGS, request=None, responses=ReleveNotesSerializer,
+    parameters=[
+        OpenApiParameter('inscription_id', int, required=True),
+        OpenApiParameter('session_id', int, required=True),
+    ],
+)
+@api_view(['POST'])
+@permission_classes([perms.EstGestionEvaluations])
+def releves_generer(request):
+    """Génère le relevé : **version suivante**, jamais de réécriture.
+
+    La génération est réservée à la gestion (scolarité / encadrement /
+    direction) : la consultation reste ouverte aux rôles de lecture.
+    """
+    inscription_id = request.data.get('inscription_id')
+    session_id = request.data.get('session_id')
+    if not inscription_id or not session_id:
+        return _erreur(
+            'inscription_id et session_id sont obligatoires.',
+            'PARAMETRES_MANQUANTS',
+        )
+    inscription = _inscription_du_perimetre(request.user, inscription_id)
+    if inscription is None:
+        return _erreur(
+            'Inscription introuvable ou hors périmètre.',
+            'INSCRIPTION_INTROUVABLE', http=status.HTTP_404_NOT_FOUND,
+        )
+    session = _session_du_perimetre(request.user, session_id)
+    if session is None:
+        return _erreur(
+            'Session introuvable ou hors périmètre.',
+            'SESSION_INTROUVABLE', http=status.HTTP_404_NOT_FOUND,
+        )
+    releve, _charge = services_releves.enregistrer_releve(
+        inscription, session, user=request.user,
+    )
+    releve.refresh_from_db()
+    return Response(
+        ReleveNotesSerializer(releve).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@extend_schema(tags=TAGS, responses=ReleveNotesSerializer)
+@api_view(['GET'])
+@permission_classes([perms.EstConsultantEvaluations])
+def releves_detail(request, pk):
+    """Relevé de notes — détail d'une version, contenu canonique inclus."""
+    releve = _releves_visibles(
+        request.user,
+        ReleveNotes.objects.select_related('inscription__etudiant__participant'),
+    ).filter(pk=pk).first()
+    if releve is None:
+        return _erreur(
+            'Relevé introuvable ou hors périmètre.', 'RELEVE_INTROUVABLE',
+            http=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(ReleveNotesSerializer(releve).data)
 
 
 @extend_schema(tags=TAGS, responses=ECUEResultSerializer(many=True),

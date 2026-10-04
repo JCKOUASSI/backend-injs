@@ -507,13 +507,75 @@ describe('pages/EvaluationsModule — comportement', () => {
       })
     })
 
-    it('relevés affiche un écran d’indisponibilité sans appel API', async () => {
-      const f = installFetch({})
+    it('relevés appelle l’API des relevés et affiche son contenu', async () => {
+      const f = installFetch({
+        'GET /api/evaluations-academiques/releves/': {
+          count: 1,
+          results: [{
+            id: 7, version: 2, sha256: 'abc123def456',
+            participant_matricule: 'MAT-001', decision_valeur: 'ADMIS',
+            genere_le: '2026-01-15T10:00:00Z',
+          }],
+        },
+        'GET /api/evaluations-academiques/releves/7/': {
+          id: 7, version: 2, sha256: 'abc123def456',
+          participant_matricule: 'MAT-001', decision_valeur: 'ADMIS',
+          genere_le: '2026-01-15T10:00:00Z',
+          contenu: {
+            participant: { matricule: 'MAT-001', nom_complet: 'ABDOU KONE' },
+            niveau: 'L1', formation: 'LMD-L1',
+            semestres: [{ semestre: 'S1', niveau: 'L1', credits_acquis: 30, credits_attendus: 30, statut: 'VALIDE' }],
+            unites_enseignement: [{
+              ue_code: 'UE1', ue_libelle: 'UE Intitule', credits_ue: 30,
+              moyenne: '14.50', statut: 'VALIDE',
+              ecues: [{
+                ecue_code: 'ECUE1', ecue_libelle: 'ECUE Intitule',
+                note: null, bareme: '20', statut: 'BROUILLON',
+              }],
+            }],
+            decision: { valeur: 'ADMIS' },
+          },
+        },
+      })
       rendre(<Reveles />)
       await waitFor(() => {
-        expect(screen.getByRole('heading', { level: 1, name: 'Relevés de notes' })).toBeInTheDocument()
+        expect(screen.getByText('MAT-001')).toBeInTheDocument()
       })
-      expect(f).not.toHaveBeenCalled()
+      // La version du relevé est affichée telle que renvoyée par l'API.
+      expect(screen.getByText('v2')).toBeInTheDocument()
+      // La décision officielle est exposée, jamais recalculée.
+      expect(f.mock.calls.some((c) => String(c[0]).includes('/releves/'))).toBe(true)
+
+      await userEvent.click(screen.getByTestId('releve-7'))
+      await waitFor(() => {
+        expect(screen.getByTestId('releve-detail')).toBeInTheDocument()
+      })
+      expect(screen.getByText('ABDOU KONE')).toBeInTheDocument()
+      expect(screen.getByText('UE1')).toBeInTheDocument()
+      expect(screen.getByText('ECUE1')).toBeInTheDocument()
+      // Note absente (null) : affichée « Non renseigné », jamais 0.
+      expect(screen.getByText('Non renseigné')).toBeInTheDocument()
+    })
+
+    it('relevés affiche un état vide quand l’API ne renvoie rien', async () => {
+      installFetch({
+        'GET /api/evaluations-academiques/releves/': { count: 0, results: [] },
+      })
+      rendre(<Reveles />)
+      await waitFor(() => {
+        expect(screen.getByText('Aucun relevé')).toBeInTheDocument()
+      })
+    })
+
+    it('relevés propage l’erreur API sans la masquer', async () => {
+      installFetch({
+        'GET /api/evaluations-academiques/releves/': () =>
+          etatHttp(500, { detail: 'Service indisponible.' }),
+      })
+      rendre(<Reveles />)
+      await waitFor(() => {
+        expect(screen.getByText(/indisponible/i)).toBeInTheDocument()
+      })
     })
   })
 

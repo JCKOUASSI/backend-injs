@@ -5,6 +5,8 @@ aucune règle métier n'est appliquée. Les champs Decimal sont sérialisés en
 nombre (et non en chaîne) pour rester compatibles avec le frontend React et
 l'application mobile, sans modifier le réglage global de DRF.
 """
+import json
+
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -336,9 +338,64 @@ class PreparationSerializer(serializers.Serializer):
 
 
 class ReleveNotesSerializer(serializers.ModelSerializer):
+    """Relevé de notes — métadonnées + contenu canonique persisté.
+
+    `contenu` est relu depuis le fichier JSON stocké par le service : aucune
+    donnée n'est reconstruite côté API, et `sha256` reste l'empreinte du
+    contenu réellement archivé.
+    """
+
+    nom_fichier = serializers.CharField(source='fichier.name', read_only=True)
+    contenu = serializers.SerializerMethodField()
+    participant_matricule = serializers.SerializerMethodField()
+    decision_valeur = serializers.SerializerMethodField()
+
     class Meta:
         model = ReleveNotes
         fields = [
             'id', 'inscription', 'session', 'version', 'sha256', 'genere_le',
-            'genere_par', 'verrouillee',
+            'genere_par', 'verrouillee', 'nom_fichier', 'contenu',
+            'participant_matricule', 'decision_valeur',
         ]
+        read_only_fields = fields
+
+    def get_contenu(self, obj):
+        """Contenu canonique archivé (lecture seule du fichier).
+
+        `FieldFile` met en cache le flux sous-jacent : sans réouverture
+        explicite, une seconde lecture renvoie un flux vide.
+        """
+        try:
+            with obj.fichier.open('rb') as flux:
+                return json.loads(flux.read().decode('utf-8'))
+        except (OSError, ValueError):
+            return None
+
+    def get_participant_matricule(self, obj):
+        return obj.inscription.etudiant.participant.matricule
+
+    def get_decision_valeur(self, obj):
+        """Décision officielle du jury reproduite telle quelle, ou `None`."""
+        contenu = self.get_contenu(obj)
+        if not contenu:
+            return None
+        decision = contenu.get('decision')
+        return decision['valeur'] if decision else None
+
+
+class PassageNiveauSerializer(serializers.Serializer):
+    """Contrat de sortie du moteur de passage de niveau (lecture seule).
+
+    Le moteur ne produit **aucune** décision de jury : `decision_jury` est
+    reprise telle quelle lorsqu'elle existe, absente sinon.
+    """
+
+    niveau_cible = serializers.CharField(allow_null=True)
+    eligibilite = serializers.CharField()
+    code = serializers.CharField()
+    credits_acquis = serializers.IntegerField(allow_null=True)
+    credits_requis = serializers.IntegerField(allow_null=True)
+    justification = serializers.CharField()
+    empreinte = serializers.CharField()
+    decision_jury = serializers.DictField(allow_null=True)
+    semestres = serializers.ListField(child=serializers.DictField())
