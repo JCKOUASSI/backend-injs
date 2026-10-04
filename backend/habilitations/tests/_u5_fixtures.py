@@ -41,9 +41,24 @@ def referentiel_charge():
 
 
 def admin(username='admin5', role='ADMIN'):
-    return User.objects.create_user(
-        username=username, password='Mot#2026x', role=role, is_staff=True,
+    """Administrateur de test, idempotent.
+
+    Le `username` est la contrainte d'unicité de la table utilisateur : deux
+    creations successives du MÊME nom dans une même transaction de test
+    levaient une `IntegrityError`. La fixture est donc réutilisée si elle
+    existe déjà (un test peut légitimement appeler `fx.admin()` plusieurs fois,
+    ou une seconde fois depuis un `setUp` qui l'a déjà appelée).
+    """
+    user, cree = User.objects.get_or_create(
+        username=username,
+        defaults={
+            'role': role, 'is_staff': True,
+        },
     )
+    if cree:
+        user.set_password('Mot#2026x')
+        user.save(update_fields=['password'])
+    return user
 
 
 #: Rôle RBAC utilisé quand une fixture demande l'ancien pseudo-rôle métier
