@@ -8,6 +8,17 @@ import { droitRequis } from '../menu/autorisation'
 import '../styles/ecransGeneriques.css'
 
 /**
+ * Libellé de la famille de vue rendue par le moteur générique : sert de
+ * plaquette de synthèse dans le bandeau d'accueil (aucune donnée serveur).
+ */
+function libelleVue(ecran) {
+  if (ecran.type === 'documents') return 'Générateur de documents'
+  if (ecran.type === 'indicateurs') return 'Indicateurs consolidés'
+  if (ecran.recherche || (ecran.filtres || []).length) return 'Liste filtrable'
+  return 'Consultation'
+}
+
+/**
  * Page hôte des **écrans génériques** de la navigation réorganisée.
  *
  * Elle fait trois choses, dans cet ordre :
@@ -73,15 +84,29 @@ export default function EcranGenerique({ id }) {
   return (
     <div data-testid={`ecran-${id}`}>
       <div className="gen-hero">
+        {ecran.icone && (
+          <span className="gen-hero-icon" aria-hidden="true">
+            <i className={`bi ${ecran.icone}`}></i>
+          </span>
+        )}
         <div className="gen-hero-text">
-          {ecran.fil && <span className="gen-plaquette">{ecran.fil}</span>}
-          <h1 className="gen-hero-title">
-            {ecran.icone && <i className={`bi ${ecran.icone}`}></i>}
-            {ecran.titre}
-          </h1>
+          {ecran.fil && <span className="gen-hero-eyebrow">{ecran.fil}</span>}
+          <h1 className="gen-hero-title">{ecran.titre}</h1>
           {ecran.introduction && (
             <p className="gen-hero-intro">{ecran.introduction}</p>
           )}
+        </div>
+        <div className="gen-hero-side">
+          {ecran.type === 'documents' && (ecran.documents || []).length > 0 && (
+            <span className="gen-plaquette gen-plaquette--accent">
+              <i className="bi bi-collection" aria-hidden="true"></i>
+              {ecran.documents.length} document{ecran.documents.length > 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="gen-plaquette gen-plaquette--soft">
+            <i className="bi bi-layers" aria-hidden="true"></i>
+            {libelleVue(ecran)}
+          </span>
         </div>
       </div>
 

@@ -91,6 +91,11 @@ def persister_plan(emploi_du_temps, placements, remplacer=False):
             formation_id=besoin.ref_formation_id,
             groupe_id=besoin.groupe_id,
             affectation_pedagogique_id=besoin.affectation_pedagogique_id,
+            # -- Enseignant : FK métier Formateur (identifiant INJS).
+            # `TeachingNeed` est immuable et n'expose que l'identifiant ; le
+            # libellé reste porté par la dénormalisation de l'EDT. Sans cette
+            # FK, la détection de conflits ne peut pas comparer les enseignants.
+            formateur_id=besoin.enseignant_id,
             nature=place.besoin.nature,
             intitule=besoin.intitule,
             actif=True,

@@ -31,6 +31,8 @@ import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import { canMutateFormations, FINANCE_MODULE_ROLES } from '../utils/roles'
 import { safeLocalStorage } from '../utils/safeStorage'
+import '../styles/premiumCommun.css'
+import '../styles/formateurs.css'
 
 const emptyForm = { numerobadge: '', nom: '', prenom: '', email: '', telephone: '', specialite: '', organisation: '', observations: '', secretariats: [] }
 
@@ -514,43 +516,63 @@ export default function Formateurs() {
   }
 
   return (
-    <div>
-      {/* Search bar */}
-      <div className="card">
-        <div className="card-body">
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ flex: '1 1 250px' }}>
-              <div className="input-group">
-                <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder={canViewFinanceData ? 'Rechercher un enseignant...' : 'Rechercher par nom, prénom ou spécialité...'}
-                  value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
-              </div>
-            </div>
-            {canDelete && (
+    <div className="ens-page">
+      {/* Hero — Variante A « Clair raffiné » */}
+      <header className="px-hero">
+        <span className="px-hero-icon"><i className="bi bi-person-video3"></i></span>
+        <div className="px-hero-text">
+          <span className="px-hero-eyebrow">Corps enseignant · INJS</span>
+          <h1 className="px-hero-title">Enseignants</h1>
+          <p className="px-hero-intro">Profils, spécialités et rattachement des modules enseignés dans les formations LMD.</p>
+        </div>
+        <div className="px-hero-side">
+          <span className="px-plaquette">{formateurs.length} enseignant(s)</span>
+          <span className="px-plaquette px-plaquette--soft">{canDelete ? 'Gestion' : 'Consultation'}</span>
+        </div>
+      </header>
+
+      {/* Barre de recherche — panneau premium */}
+      <div className="card px-panel ens-toolbar">
+        <div className="px-toolbar-body">
+          <label className="px-field px-field--recherche">
+            <span className="px-field-label">Rechercher</span>
+            <span className="px-search">
+              <i className="bi bi-search"></i>
+              <input type="text" className="px-input" placeholder={canViewFinanceData ? 'Rechercher un enseignant...' : 'Rechercher par nom, prénom ou spécialité...'}
+                value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            </span>
+          </label>
+          {canDelete && (
+            <div className="px-toolbar-actions">
               <button onClick={openCreate} className="btn btn-dfrc">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel enseignant
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message px-error">{error}</div>}
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-header-bar">
-          <span>
-            <i className={`bi ${canViewFinanceData ? 'bi-calculator' : 'bi-person-video3'} me-2`}></i>
-            {canViewFinanceData ? 'Suivi des temps de cours enseignants' : 'Liste des enseignants'}
-          </span>
-          <span className="badge-bg-secondary">{formateurs.length} résultat(s)</span>
+      {/* Résultats */}
+      <div className="card px-panel ens-panel">
+        <div className="px-panel-head">
+          <div className="px-panel-headtext">
+            <h2 className="px-panel-title">
+              <i className={`bi ${canViewFinanceData ? 'bi-calculator' : 'bi-person-video3'}`}></i>
+              {canViewFinanceData ? 'Suivi des temps de cours enseignants' : 'Liste des enseignants'}
+            </h2>
+            <p className="px-panel-sub">Ouvrez la fiche complète d'un enseignant avec « Détail ».</p>
+          </div>
+          <div className="px-panel-tools">
+            <span className="px-count-pill">{formateurs.length} résultat(s)</span>
+          </div>
         </div>
         <div className="card-body-flush">
-          {loading ? <div className="loading"><div className="spinner"></div></div> : (
+          {loading ? <div className="loading px-loading"><div className="spinner"></div></div> : (
             <>
               <div className="table-container">
-                <table className="table">
+                <table className="table px-table ens-table">
                   <thead>
                     <tr>
                       <th>Numéro</th>
@@ -573,13 +595,17 @@ export default function Formateurs() {
                   <tbody>
                     {formateurs.length > 0 ? formateurs.map((f) => (
                       <tr key={f.id}>
-                        <td><span className="badge-bg-info">{f.numerobadge || '-'}</span></td>
+                        <td>{f.numerobadge
+                          ? <span className="badge-bg-info ens-num">{f.numerobadge}</span>
+                          : <span className="px-dash">—</span>}</td>
                         <td><strong>{f.nom}</strong></td>
                         <td>{f.prenom}</td>
-                        <td>{f.specialite || '-'}</td>
-                        {!canViewFinanceData && <td>{f.email || '-'}</td>}
-                        {!canViewFinanceData && <td>{f.telephone || '-'}</td>}
-                        {!canViewFinanceData && <td><span className="badge-bg-success">{f.nb_formations || 0}</span></td>}
+                        <td>{f.specialite || <span className="px-dash">—</span>}</td>
+                        {!canViewFinanceData && <td>{f.email || <span className="px-dash">—</span>}</td>}
+                        {!canViewFinanceData && <td>{f.telephone || <span className="px-dash">—</span>}</td>}
+                        {!canViewFinanceData && (
+                          <td><span className={`ens-count${f.nb_formations ? ' ens-count--on' : ''}`}>{f.nb_formations || 0}</span></td>
+                        )}
                         {!canViewFinanceData && canViewSensitive && <td className="small">{f.numero_piece_identite || '-'}</td>}
                         {!canViewFinanceData && canViewSensitive && <td className="small">{f.numero_compte_bancaire || '-'}</td>}
                         {canViewFinanceData && (
@@ -631,7 +657,12 @@ export default function Formateurs() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={canViewFinanceData ? 10 : (8 + (canViewSensitive ? 2 : 0))} className="text-center py-4 text-muted">Aucun enseignant trouvé</td></tr>
+                      <tr><td colSpan={canViewFinanceData ? 10 : (8 + (canViewSensitive ? 2 : 0))} className="text-center py-4 text-muted">
+                        <span className="px-empty">
+                          <span className="px-empty-badge"><i className="bi bi-person-x"></i></span>
+                          Aucun enseignant trouvé
+                        </span>
+                      </td></tr>
                     )}
                   </tbody>
                 </table>

@@ -27,6 +27,7 @@ from habilitations.services.machine_etats import (
     transitions_possibles,
 )
 from habilitations.services.provisionnement import approbation, file as file_service
+from parametres.flags import invalidate_flags_cache
 
 from . import _u5_fixtures as fx
 
@@ -159,13 +160,24 @@ class MachineEtatsTests(APITestCase):
 
 
 class FileSondesTests(APITestCase):
-    """L2 — sondes, file idempotente et approbation humaine."""
+    """L2 — sondes, file idempotente et approbation humaine.
+
+    Le cache des drapeaux (`parametres.flags`, 300 s) survit au rollback de
+    la transaction de test : un test qui ouvre un drapeau laisse ce drapeau
+    visible dans le cache pour les tests suivants de la classe. L'ordre
+    d'exécution étant différent en `--parallel`, `test_10_scan_noop_
+    drapeaux_fermes` pouvait lire un drapeau resté en cache et observer une
+    sonde active alors que la base est revenue à son état initial. Le cache
+    est donc invalidé avant chaque test : le contrôle porte bien sur l'état
+    réel de la base, dans n'importe quel ordre d'exécution.
+    """
 
     @classmethod
     def setUpTestData(cls):
         fx.referentiel_charge()
 
     def setUp(self):
+        invalidate_flags_cache()
         self.admin = fx.admin()
         self.annee, self.formation, self.niveau, self.semestre = fx.cadre_academique()
 

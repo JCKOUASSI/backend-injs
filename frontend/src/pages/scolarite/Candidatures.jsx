@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useToast } from '../../context/ToastContext'
 import CompletudeBar from '../../components/scolarite/CompletudeBar'
 import StatutBadge from '../../components/scolarite/StatutBadge'
@@ -17,6 +17,7 @@ import {
   transitionCandidature,
   verifierPiece,
 } from '../../services/scolarite'
+import '../../styles/candidatures.css'
 
 const STATUTS = [
   ['BROUILLON', 'Brouillon'],
@@ -122,10 +123,10 @@ function DossierPanel({ candidature, onClose, onChange }) {
   const peutOuvrirAdmission = ['EN_ETUDE', 'ADMISSIBLE', 'LISTE_ATTENTE'].includes(detail.statut)
 
   return (
-    <div className="card mb-3 border-primary">
+    <div className="card cand-panel cand-dossier mb-3">
       <div className="card-header d-flex justify-content-between align-items-center">
         <div>
-          <strong>{detail.numero}</strong>
+          <strong className="cand-info-value">{detail.numero}</strong>
           <span className="ms-2">{detail.candidat}</span>
           <span className="ms-2"><StatutBadge statut={detail.statut} libelle={detail.statut_libelle} /></span>
         </div>
@@ -137,12 +138,21 @@ function DossierPanel({ candidature, onClose, onChange }) {
         ) : (
           <>
             <div className="row g-3 mb-3">
-              <div className="col-md-4"><small className="text-muted d-block">Formation</small>{detail.ref_formation}</div>
-              <div className="col-md-4"><small className="text-muted d-block">Niveau</small>{detail.niveau}</div>
-              <div className="col-md-4"><small className="text-muted d-block">Année</small>{detail.annee_academique}</div>
+              <div className="col-md-4">
+                <span className="cand-info-label">Formation</span>
+                <span className="cand-info-value">{detail.ref_formation}</span>
+              </div>
+              <div className="col-md-4">
+                <span className="cand-info-label">Niveau</span>
+                <span className="cand-info-value">{detail.niveau}</span>
+              </div>
+              <div className="col-md-4">
+                <span className="cand-info-label">Année</span>
+                <span className="cand-info-value">{detail.annee_academique}</span>
+              </div>
             </div>
 
-            <h6>Pièces justificatives</h6>
+            <h6 className="cand-section-title">Pièces justificatives</h6>
             <div className="table-responsive mb-3">
               <table className="table table-sm align-middle">
                 <thead>
@@ -205,7 +215,7 @@ function DossierPanel({ candidature, onClose, onChange }) {
               </div>
             </div>
 
-            <h6>Suite du parcours</h6>
+            <h6 className="cand-section-title">Suite du parcours</h6>
             <div className="d-flex flex-wrap gap-2">
               {transitions.map((statut) => (
                 <button
@@ -268,7 +278,7 @@ function NouvelleCandidature({ annee, formations, niveaux, onCree, onAnnuler }) 
   }
 
   return (
-    <div className="card mb-3">
+    <div className="card cand-panel cand-form mb-3">
       <div className="card-header"><strong>Nouvelle candidature</strong></div>
       <form className="card-body" onSubmit={soumettre}>
         {erreur && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{erreur}</div>}
@@ -403,16 +413,71 @@ export default function Candidatures() {
 
   useEffect(() => { charger() }, [charger])
 
+  // Indicateurs de pilotage, calculés sur la liste affichée (aucun appel API
+  // supplémentaire) : ils reprennent la logique des tuiles KPI du
+  // « Tableau de bord LMD 2026 ».
+  const indicateurs = useMemo(() => {
+    const total = candidatures.length
+    const complets = candidatures.filter((c) => (c.taux_completude ?? 0) === 100).length
+    const enCours = candidatures.filter((c) =>
+      ['SOUMISE', 'EN_ATTENTE_DE_VERIFICATION', 'PIECES_INCOMPLETES', 'EN_ETUDE'].includes(c.statut)
+    ).length
+    const admis = candidatures.filter((c) =>
+      ['ADMIS', 'ADMIS_SOUS_RESERVE'].includes(c.statut)
+    ).length
+    return { total, complets, enCours, admis }
+  }, [candidatures])
+
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <div>
-          <h4 className="mb-0">Candidatures</h4>
-          <small className="text-muted">{annee ? `Année ${annee.libelle}` : 'Année courante non définie'}</small>
+    <div className="cand-page">
+      {/* ── Bandeau d'accueil (matière de la référence LMD2026) ── */}
+      <div className="cand-hero">
+        <div className="cand-hero-text">
+          <span className="plaquette plaquette-primary cand-hero-badge">
+            <i className="bi bi-mortarboard"></i>Scolarité — Admissions
+          </span>
+          <h1 className="cand-hero-title">Candidatures</h1>
+          <p className="cand-hero-sub">
+            {annee ? `Année ${annee.libelle}` : 'Année courante non définie'}
+            {' · '}Dossiers d'admission et pièces justificatives
+          </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreation((c) => !c)}>
-          <i className="bi bi-plus-lg me-1"></i>Nouvelle candidature
+        <button className="btn-premium-primary" onClick={() => setCreation((c) => !c)}>
+          <i className="bi bi-plus-lg"></i>
+          {creation ? 'Fermer le formulaire' : 'Nouvelle candidature'}
         </button>
+      </div>
+
+      {/* ── Tuiles KPI ── */}
+      <div className="cand-kpi-row">
+        <div className="cand-kpi">
+          <div>
+            <span className="cand-kpi-label">Dossiers reçus</span>
+            <span className="cand-kpi-value">{indicateurs.total}</span>
+          </div>
+          <div className="cand-kpi-icon is-blue"><i className="bi bi-file-earmark-text-fill"></i></div>
+        </div>
+        <div className="cand-kpi">
+          <div>
+            <span className="cand-kpi-label">Dossiers complets</span>
+            <span className="cand-kpi-value">{indicateurs.complets}</span>
+          </div>
+          <div className="cand-kpi-icon is-green"><i className="bi bi-check2-circle"></i></div>
+        </div>
+        <div className="cand-kpi">
+          <div>
+            <span className="cand-kpi-label">En cours de traitement</span>
+            <span className="cand-kpi-value">{indicateurs.enCours}</span>
+          </div>
+          <div className="cand-kpi-icon is-amber"><i className="bi bi-hourglass-split"></i></div>
+        </div>
+        <div className="cand-kpi">
+          <div>
+            <span className="cand-kpi-label">Admis</span>
+            <span className="cand-kpi-value">{indicateurs.admis}</span>
+          </div>
+          <div className="cand-kpi-icon is-slate"><i className="bi bi-award"></i></div>
+        </div>
       </div>
 
       {creation && (
@@ -433,36 +498,46 @@ export default function Candidatures() {
         />
       )}
 
-      <div className="card">
-        <div className="card-body">
-          <div className="row g-2 mb-3">
-            <div className="col-md-4">
+      {/* ── Liste des dossiers ── */}
+      <div className="card cand-panel">
+        <div className="cand-panel-head">
+          <h2 className="cand-panel-title">
+            <i className="bi bi-list-check"></i>Dossiers de candidature
+          </h2>
+          <span className="cand-count-pill">
+            {candidatures.length} dossier{candidatures.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className="cand-panel-body">
+          <div className="cand-filters">
+            <div className="cand-search">
+              <i className="bi bi-search"></i>
               <input
                 className="form-control form-control-sm"
                 placeholder="Rechercher un numéro, un nom…"
+                aria-label="Rechercher une candidature"
                 value={filtres.q}
                 onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
               />
             </div>
-            <div className="col-md-3">
-              <select
-                className="form-select form-select-sm"
-                value={filtres.statut}
-                onChange={(e) => setFiltres({ ...filtres, statut: e.target.value })}
-              >
-                <option value="">Tous les statuts</option>
-                {STATUTS.map(([valeur, libelle]) => (
-                  <option key={valeur} value={valeur}>{libelle}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              className="form-select form-select-sm cand-filter-select"
+              aria-label="Filtrer par statut"
+              value={filtres.statut}
+              onChange={(e) => setFiltres({ ...filtres, statut: e.target.value })}
+            >
+              <option value="">Tous les statuts</option>
+              {STATUTS.map(([valeur, libelle]) => (
+                <option key={valeur} value={valeur}>{libelle}</option>
+              ))}
+            </select>
           </div>
 
           {loading ? (
             <div className="text-center py-4"><div className="spinner-border"></div></div>
           ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle">
+            <div className="table-responsive cand-table-wrap">
+              <table className="table table-hover align-middle cand-table">
                 <thead>
                   <tr>
                     <th>N°</th><th>Candidat</th><th>Formation</th><th>Niveau</th>
@@ -472,12 +547,12 @@ export default function Candidatures() {
                 <tbody>
                   {candidatures.map((c) => (
                     <tr key={c.id}>
-                      <td className="text-nowrap"><code>{c.numero}</code></td>
-                      <td>{c.candidat}</td>
-                      <td>{c.ref_formation}</td>
+                      <td className="text-nowrap"><span className="cand-numero">{c.numero}</span></td>
+                      <td className="cand-candidat">{c.candidat}</td>
+                      <td className="cand-formation">{c.ref_formation}</td>
                       <td>{c.niveau}</td>
                       <td><StatutBadge statut={c.statut} libelle={c.statut_libelle} /></td>
-                      <td style={{ minWidth: '140px' }}>
+                      <td className="cand-progress">
                         <CompletudeBar
                           validees={c.pieces_validees}
                           total={c.pieces_obligatoires}
@@ -486,16 +561,23 @@ export default function Candidatures() {
                       </td>
                       <td className="text-end">
                         <button
-                          className="btn btn-sm btn-outline-primary"
+                          className="btn btn-sm cand-open-btn"
                           onClick={() => setSelection(c)}
                         >
-                          Ouvrir
+                          <i className="bi bi-folder2-open me-1"></i>Ouvrir
                         </button>
                       </td>
                     </tr>
                   ))}
                   {candidatures.length === 0 && (
-                    <tr><td colSpan={7} className="text-center text-muted py-4">Aucune candidature.</td></tr>
+                    <tr>
+                      <td colSpan={7}>
+                        <div className="cand-empty">
+                          <i className="bi bi-inbox"></i>
+                          Aucune candidature.
+                        </div>
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

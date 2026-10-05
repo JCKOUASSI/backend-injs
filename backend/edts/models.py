@@ -22,6 +22,8 @@ service `edts.services.besoins` expose si besoin une notion **calculée** de
 promotion dérivée du Groupe, sans nouvelle table ni nouvelle clé étrangère.
 """
 
+from datetime import datetime
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -86,7 +88,16 @@ DISPONIBILITE_STATUT_CHOICES = [
 
 
 class CreneauTemplate(models.Model):
-    """Référentiel de créneaux types (jour + horaire)."""
+    """Référentiel de créneaux types (jour + horaire).
+
+    **Représentation temporelle stable et idempotente.** Un créneau est un
+    repère horaire d'emploi du temps : il doit donc être identifié par son seul
+    couple (jour, heure de début, heure de fin). Les heures sont normalisées à la
+    minute à l'écriture pour que deux exécutions d'un même plan de création
+    reconduisent le **même** créneau au lieu d'en produire un nouveau à chaque
+    fois — le cas classique étant ``datetime.now().time()``, qui embarque des
+    microsecondes et rend toute comparaison/recréation instable.
+    """
 
     jour = models.CharField(max_length=10, choices=JOUR_CHOICES, db_index=True)
     heure_debut = models.TimeField()
@@ -97,6 +108,10 @@ class CreneauTemplate(models.Model):
         help_text='Durée calculée (laisser None pour auto-calcul).',
     )
 
+    #: Les heures sont un repère d'agenda : la granularité utile est la minute.
+    #: Toute granularité plus fine n'a aucun sens métier et casse l'idempotence.
+    GRANULARITE_MINUTES = 1
+
     class Meta:
         ordering = ['jour', 'heure_debut']
         verbose_name = 'LMD – Créneau type'
@@ -104,14 +119,37 @@ class CreneauTemplate(models.Model):
         indexes = [
             models.Index(fields=['jour', 'heure_debut', 'heure_fin']),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['jour', 'heure_debut', 'heure_fin'],
+                name='uniq_creneau_template_jour_horaires',
+                violation_error_message=(
+                    'Ce créneau horaire existe déjà pour ce jour : un créneau '
+                    'identique (jour, début, fin) ne peut être créé deux fois.'
+                ),
+            ),
+        ]
+
+    @classmethod
+    def normaliser(cls, valeur):
+        """Ramène une ``time`` à la granularité métier (minute), sans secondes."""
+        if valeur is None:
+            return None
+        base = datetime(2000, 1, 1, valeur.hour, valeur.minute)
+        return base.time()
 
     def clean(self):
+        super().clean()
+        self.heure_debut = self.normaliser(self.heure_debut)
+        self.heure_fin = self.normaliser(self.heure_fin)
         if self.heure_debut and self.heure_fin and self.heure_debut >= self.heure_fin:
             raise ValidationError({
                 'heure_fin': "L'heure de fin doit être strictement après l'heure de début.",
             })
 
     def save(self, *args, **kwargs):
+        self.heure_debut = self.normaliser(self.heure_debut)
+        self.heure_fin = self.normaliser(self.heure_fin)
         self.full_clean()
         if not self.duree_prevue_minutes and self.heure_debut and self.heure_fin:
             self.duree_prevue_minutes = self._calculer_duree_minutes()

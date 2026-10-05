@@ -8,6 +8,7 @@ import {
   messageErreur,
   repartirGroupes,
 } from '../../services/scolarite'
+import '../../styles/groupes.css'
 
 export default function Groupes() {
   const { showToast } = useToast()
@@ -92,26 +93,30 @@ export default function Groupes() {
   }, [groupes])
 
   return (
-    <div className="container-fluid py-4" style={{ background: 'linear-gradient(180deg, #F0F5FB 0%, #E8F0F8 100%)', minHeight: 'calc(100vh - 70px)' }}>
-      {/* ── En-tête ── */}
-      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-          <h1 className="h4 mb-0 fw-bold text-dark d-flex align-items-center gap-2">
-            <i className="bi bi-people-fill text-primary"></i>
+    <div className="container-fluid py-4 grp-page">
+      {/* ── Bandeau d'accueil (matière de la référence LMD2026) ── */}
+      <div className="grp-hero">
+        <div className="grp-hero-text">
+          <span className="grp-hero-badge">
+            <i className="bi bi-people-fill"></i>Scolarité — Groupes
+          </span>
+          <h1 className="grp-hero-title">
+            <i className="bi bi-diagram-3-fill"></i>
             Groupes pédagogiques
           </h1>
-          <p className="text-muted small mb-0 mt-1">
-            {annee ? `Année académique ${annee.libelle}` : 'Année courante non définie'} · {totalEffectif} étudiant(s) affecté(s) aux sections TD/TP.
+          <p className="grp-hero-sub">
+            {annee ? `Année académique ${annee.libelle}` : 'Année courante non définie'}
+            {' · '}{totalEffectif} étudiant(s) affecté(s) aux sections TD/TP.
           </p>
         </div>
         <button
-          className="btn btn-primary d-flex align-items-center gap-2 fw-semibold shadow-sm"
-          style={{ borderRadius: '10px', padding: '0.5rem 1.1rem' }}
+          type="button"
+          className="grp-action"
           disabled={action}
           onClick={repartir}
         >
           {action ? (
-            <span className="spinner-border spinner-border-sm me-1"></span>
+            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           ) : (
             <i className="bi bi-diagram-3"></i>
           )}
@@ -119,68 +124,60 @@ export default function Groupes() {
         </button>
       </div>
 
-      {/* ── Plaquettes KPIs ── */}
-      <div className="row g-3 mb-4">
-        <div className="col-md-3">
-          <div
-            className="p-3 shadow-sm rounded-4 text-white d-flex align-items-center gap-3"
-            style={{ background: 'linear-gradient(135deg, #0e58ab 0%, #0b478a 100%)' }}
-          >
-            <div className="rounded-3 p-2 bg-white bg-opacity-25 fs-4">
-              <i className="bi bi-grid-3x3-gap-fill"></i>
-            </div>
-            <div>
-              <div className="small text-white-50 text-uppercase fw-semibold">Total Groupes</div>
-              <div className="fs-4 fw-bold">{stats.totalGroupes}</div>
-            </div>
+      {/* ── Tuiles KPI ── */}
+      <div className="grp-kpi-row">
+        <div className="grp-kpi">
+          <div>
+            <span className="grp-kpi-label">Total Groupes</span>
+            <span className="grp-kpi-value">{stats.totalGroupes}</span>
           </div>
+          <div className="grp-kpi-icon is-blue"><i className="bi bi-grid-3x3-gap-fill"></i></div>
         </div>
 
-        <div className="col-md-3">
-          <div className="p-3 bg-white shadow-sm rounded-4 border d-flex align-items-center gap-3">
-            <div className="rounded-3 p-2 text-primary fs-4" style={{ background: 'rgba(14, 88, 171, 0.1)' }}>
-              <i className="bi bi-person-check-fill"></i>
-            </div>
-            <div>
-              <div className="small text-muted text-uppercase fw-semibold">Étudiants Affectés</div>
-              <div className="fs-4 fw-bold text-dark">{totalEffectif}</div>
-            </div>
+        <div className="grp-kpi">
+          <div>
+            <span className="grp-kpi-label">Étudiants Affectés</span>
+            <span className="grp-kpi-value">{totalEffectif}</span>
           </div>
+          <div className="grp-kpi-icon is-green"><i className="bi bi-person-check-fill"></i></div>
         </div>
 
-        <div className="col-md-3">
-          <div className="p-3 bg-white shadow-sm rounded-4 border d-flex align-items-center gap-3">
-            <div className="rounded-3 p-2 text-success fs-4" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-              <i className="bi bi-pie-chart-fill"></i>
-            </div>
-            <div>
-              <div className="small text-muted text-uppercase fw-semibold">Taux Remplissage</div>
-              <div className="fs-4 fw-bold text-success">{stats.tauxMoyen !== null ? `${stats.tauxMoyen}%` : '—'}</div>
-            </div>
+        <div className="grp-kpi">
+          <div>
+            <span className="grp-kpi-label">Taux Remplissage</span>
+            <span className={`grp-kpi-value${stats.tauxMoyen !== null ? ' is-green' : ''}`}>
+              {stats.tauxMoyen !== null ? `${stats.tauxMoyen}%` : '—'}
+            </span>
           </div>
+          <div className="grp-kpi-icon is-amber"><i className="bi bi-pie-chart-fill"></i></div>
         </div>
 
-        <div className="col-md-3">
-          <div className="p-3 bg-white shadow-sm rounded-4 border d-flex align-items-center gap-3">
-            <div className="rounded-3 p-2 text-info fs-4" style={{ background: 'rgba(6, 182, 212, 0.1)' }}>
-              <i className="bi bi-check2-circle"></i>
-            </div>
-            <div>
-              <div className="small text-muted text-uppercase fw-semibold">Groupes Actifs</div>
-              <div className="fs-4 fw-bold text-dark">{stats.actifs}</div>
-            </div>
+        <div className="grp-kpi">
+          <div>
+            <span className="grp-kpi-label">Groupes Actifs</span>
+            <span className="grp-kpi-value">{stats.actifs}</span>
           </div>
+          <div className="grp-kpi-icon is-slate"><i className="bi bi-check2-circle"></i></div>
         </div>
       </div>
 
       {/* ── Filtres & Liste ── */}
-      <div className="card shadow-sm border-0 rounded-4 mb-4" style={{ background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(12px)' }}>
-        <div className="card-body p-4">
-          <div className="row g-3 mb-4">
-            <div className="col-md-4">
-              <label className="form-label small text-muted fw-semibold">Formation</label>
+      <div className="card grp-panel">
+        <div className="grp-panel-head">
+          <h2 className="grp-panel-title">
+            <i className="bi bi-list-check"></i>Répartition par groupe
+          </h2>
+          <span className="grp-count-pill">
+            {groupes.length} groupe{groupes.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className="grp-panel-body">
+          <div className="grp-filters">
+            <div className="grp-field">
+              <label className="grp-field-label" htmlFor="groupe-formation">Formation</label>
               <select
-                className="form-select shadow-sm"
+                id="groupe-formation"
+                className="form-select"
                 value={filtres.ref_formation_id}
                 onChange={(e) => setFiltres({ ...filtres, ref_formation_id: e.target.value })}
               >
@@ -188,10 +185,11 @@ export default function Groupes() {
                 {formations.map((f) => <option key={f.id} value={f.id}>{f.intitule}</option>)}
               </select>
             </div>
-            <div className="col-md-3">
-              <label className="form-label small text-muted fw-semibold">Niveau</label>
+            <div className="grp-field">
+              <label className="grp-field-label" htmlFor="groupe-niveau">Niveau</label>
               <select
-                className="form-select shadow-sm"
+                id="groupe-niveau"
+                className="form-select"
                 value={filtres.niveau_id}
                 onChange={(e) => setFiltres({ ...filtres, niveau_id: e.target.value })}
               >
@@ -202,29 +200,31 @@ export default function Groupes() {
           </div>
 
           {repartition?.echecs?.length > 0 && (
-            <div className="alert alert-warning border-0 rounded-3 shadow-sm mb-3">
-              <strong>{repartition.echecs.length} étudiant(s) non affecté(s)</strong>
-              <div className="small mt-1">{repartition.echecs[0].motif}</div>
+            <div className="grp-alert" role="alert">
+              <i className="bi bi-exclamation-triangle-fill"></i>
+              <div>
+                <strong>{repartition.echecs.length} étudiant(s) non affecté(s)</strong>
+                <div className="grp-alert-detail">{repartition.echecs[0].motif}</div>
+              </div>
             </div>
           )}
 
           {loading ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Chargement...</span>
-              </div>
+            <div className="grp-loading">
+              <span className="spinner-border" role="status" aria-hidden="true"></span>
+              <span>Chargement des groupes…</span>
             </div>
           ) : (
-            <div className="table-responsive rounded-3 overflow-hidden border">
-              <table className="table table-hover align-middle mb-0">
-                <thead style={{ background: '#0B1F3A', color: '#ffffff' }}>
+            <div className="grp-table-wrap">
+              <table className="table table-hover align-middle grp-table">
+                <thead>
                   <tr>
-                    <th style={{ background: '#0B1F3A', color: '#fff', padding: '0.85rem 1rem' }}>Groupe</th>
-                    <th style={{ background: '#0B1F3A', color: '#fff' }}>Formation</th>
-                    <th style={{ background: '#0B1F3A', color: '#fff' }}>Niveau</th>
-                    <th style={{ background: '#0B1F3A', color: '#fff' }}>Effectif</th>
-                    <th style={{ minWidth: '180px', background: '#0B1F3A', color: '#fff' }}>Remplissage</th>
-                    <th style={{ background: '#0B1F3A', color: '#fff' }}>État</th>
+                    <th>Groupe</th>
+                    <th>Formation</th>
+                    <th>Niveau</th>
+                    <th>Effectif</th>
+                    <th style={{ minWidth: '180px' }}>Remplissage</th>
+                    <th>État</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,24 +233,24 @@ export default function Groupes() {
                     return (
                       <tr key={g.id}>
                         <td>
-                          <strong className="text-dark">{g.nom}</strong>
+                          <span className="grp-nom">{g.nom}</span>
                         </td>
-                        <td>{g.ref_formation}</td>
+                        <td className="grp-formation">{g.ref_formation}</td>
                         <td><span className="badge bg-light text-dark border">{g.niveau}</span></td>
                         <td>
-                          <span className="fw-semibold">{g.effectif}</span>
-                          {g.capacite_max ? <span className="text-muted small"> / {g.capacite_max}</span> : ''}
+                          <span className="grp-effectif">{g.effectif}</span>
+                          {g.capacite_max ? <span className="grp-effectif-cap"> / {g.capacite_max}</span> : ''}
                         </td>
                         <td>
                           {taux === null ? (
-                            <span className="text-muted small">Sans limite</span>
+                            <span className="grp-sans-limite">Sans limite</span>
                           ) : (
-                            <div>
-                              <div className="d-flex justify-content-between small text-muted mb-1">
-                                <span>{taux}%</span>
+                            <div className="grp-progress">
+                              <div className="grp-progress-meta">
+                                <span className={taux >= 100 ? 'is-over' : undefined}>{taux}%</span>
                                 <span>{g.effectif}/{g.capacite_max}</span>
                               </div>
-                              <div className="progress" style={{ height: '0.55rem', borderRadius: '999px' }}>
+                              <div className="progress">
                                 <div
                                   className={`progress-bar bg-${taux >= 100 ? 'danger' : taux >= 80 ? 'warning' : 'success'}`}
                                   style={{ width: `${Math.min(taux, 100)}%` }}
@@ -261,11 +261,11 @@ export default function Groupes() {
                         </td>
                         <td>
                           {g.actif ? (
-                            <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                            <span className="badge bg-success-subtle text-success border border-success-subtle">
                               Actif
                             </span>
                           ) : (
-                            <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                            <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
                               Inactif
                             </span>
                           )}
@@ -275,8 +275,8 @@ export default function Groupes() {
                   })}
                   {groupes.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center text-muted py-5">
-                        <i className="bi bi-inbox fs-3 d-block text-muted mb-2"></i>
+                      <td colSpan={6} className="grp-empty">
+                        <i className="bi bi-inbox"></i>
                         Aucun groupe défini pour les filtres sélectionnés.
                       </td>
                     </tr>

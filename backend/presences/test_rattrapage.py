@@ -1,8 +1,17 @@
 """Tests du flux de rattrapage inter-cohorte (déplacement d'un auditeur vers la
-séance d'une autre cohorte pour rattraper un cours manqué)."""
+séance d'une autre cohorte pour rattraper un cours manqué).
+
+`test_badge_naturel_lie_rattrapage` appelle `/api/scan/` : c'est le scan QR
+PUBLIC, volontairement désactivé par défaut hors DEBUG
+(``PUBLIC_QR_SCAN_ENABLED``, cf. config/settings.py). Le scénario testé — un
+badge réel sur la séance d'accueil — suppose explicitement ce scan actif :
+on l'active donc via ``override_settings``, comme le fait déjà
+``presences.tests.ScanModuleExclusivityTest``. Sans cela le test échoue avec
+``403 SCAN_DISABLED`` dès que ``DEBUG`` est à ``False`` (CI, production).
+"""
 from datetime import time
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from formations.models import (
@@ -36,6 +45,7 @@ def _cohorte(formation, groupe, matricule):
     return module, seance, participant
 
 
+@override_settings(PUBLIC_QR_SCAN_ENABLED=True)
 class RattrapageFlowTest(TestCase):
     def setUp(self):
         self.formation = Formation.objects.create(formation='Cycle A')

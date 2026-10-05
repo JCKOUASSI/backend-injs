@@ -187,7 +187,19 @@ function Cellule({ ligne, colonne }) {
     return <span className={`badge ${colonne.couleurs[cle] || 'text-bg-secondary'}`}>{texte}</span>
   }
   if (colonne.format === 'booleen') {
-    return <i className={`bi ${valeur ? 'bi-check-circle-fill text-success' : 'bi-dash-circle text-muted'}`}></i>
+    // Pastille explicite (« Actif / Inactif ») plutôt qu'une icône nue : le
+    // libellé suit celui de la colonne (« Courante » → « Non courante »…).
+    const libelleOn = colonne.libelle || 'Oui'
+    const libelleOff = libelleOn === 'Actif' ? 'Inactif' : `Non ${libelleOn.toLowerCase()}`
+    return (
+      <span className={`gen-bool-pill ${valeur ? 'gen-bool-pill--on' : 'gen-bool-pill--off'}`}>
+        <i className={`bi ${valeur ? 'bi-check-circle-fill' : 'bi-dash-circle'}`}></i>
+        {valeur ? libelleOn : libelleOff}
+      </span>
+    )
+  }
+  if (colonne.cle === 'code' && texte !== '—') {
+    return <span className="gen-code-chip">{texte}</span>
   }
   return texte
 }
@@ -359,56 +371,92 @@ export function ListeGenerique({ ecran, cleBase }) {
     mutation.mutate({ action, ligne })
   }
 
+  // Critères renseignés (recherche + filtres) : indicateur de lecture calculé
+  // en local, aucun appel serveur supplémentaire.
+  const nbCriteres = (recherche ? 1 : 0)
+    + Object.values(filtres).filter((v) => v !== '' && v != null).length
+  const aDesCriteres = Boolean(ecran.recherche) || (ecran.filtres || []).length > 0
+  // La barre n'a de sens que s'il y a un contenu à afficher (critère ou
+  // action globale) : sinon elle se réduisait à une carte quasi vide ne
+  // contenant que le bouton de rechargement — le rechargement vit désormais
+  // dans l'en-tête du panneau de résultats pour les listes.
+  const aBarre = aDesCriteres || (ecran.actionsGlobales || []).length > 0
+  const indicateurs = data?.indicateurs
+
+  // Rechargement manuel : dans la barre pour les écrans d'indicateurs (sans
+  // panneau de liste), dans l'en-tête du panneau pour les listes.
+  const recharger = (
+    <button
+      type="button"
+      className="btn btn-sm gen-refresh"
+      onClick={() => queryClient.invalidateQueries({ queryKey: cle })}
+      title="Recharger depuis le serveur"
+      aria-label="Recharger depuis le serveur"
+    >
+      <i className={`bi bi-arrow-clockwise${isFetching ? ' spin' : ''}`}></i>
+    </button>
+  )
+
   // Barre d'outils commune : recherche, filtres, actions globales, rechargement.
   const barre = (
     <div className="gen-toolbar">
-      {ecran.recherche && (
-        <div className="gen-field">
-          <label className="gen-field-label">{ecran.recherche.libelle || 'Rechercher'}</label>
-          <div className="gen-search">
-            <i className="bi bi-search"></i>
-            <input
-              type="search"
-              className="form-control form-control-sm"
-              placeholder={ecran.recherche.placeholder || 'Rechercher…'}
-              value={recherche}
-              onChange={(e) => setRecherche(e.target.value)}
-            />
-          </div>
+      {aDesCriteres && (
+        <div className="gen-toolbar-head">
+          <h2 className="gen-panel-title">
+            <i className="bi bi-funnel" aria-hidden="true"></i>
+            Filtres et recherche
+          </h2>
+          <span className="gen-count-pill">
+            {nbCriteres === 0
+              ? 'Aucun critère'
+              : `${nbCriteres} critère${nbCriteres > 1 ? 's' : ''} actif${nbCriteres > 1 ? 's' : ''}`}
+          </span>
         </div>
       )}
-      {(ecran.filtres || []).map((filtre) => (
-        <div className="gen-field" key={filtre.param}>
-          <label className="gen-field-label">{filtre.libelle}</label>
-          <Filtre
-            filtre={filtre}
-            valeur={filtres[filtre.param]}
-            onChange={(v) => setFiltres((p) => ({ ...p, [filtre.param]: v }))}
-          />
-        </div>
-      ))}
-      <div className="gen-toolbar-actions">
-        {(ecran.actionsGlobales || []).map((action) => (
-          <button
-            key={action.libelle}
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={() => demander(action, null)}
-            disabled={mutation.isPending}
-          >
-            {action.icone && <i className={`bi ${action.icone} me-1`}></i>}
-            {action.libelle}
-          </button>
+      <div className="gen-toolbar-body">
+        {ecran.recherche && (
+          <div className="gen-field gen-field--recherche">
+            <label className="gen-field-label" htmlFor="gen-recherche">
+              {ecran.recherche.libelle || 'Rechercher'}
+            </label>
+            <div className="gen-search">
+              <i className="bi bi-search" aria-hidden="true"></i>
+              <input
+                id="gen-recherche"
+                type="search"
+                className="form-control form-control-sm"
+                placeholder={ecran.recherche.placeholder || 'Rechercher…'}
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+        {(ecran.filtres || []).map((filtre) => (
+          <div className="gen-field gen-field--filtre" key={filtre.param}>
+            <label className="gen-field-label">{filtre.libelle}</label>
+            <Filtre
+              filtre={filtre}
+              valeur={filtres[filtre.param]}
+              onChange={(v) => setFiltres((p) => ({ ...p, [filtre.param]: v }))}
+            />
+          </div>
         ))}
-        <button
-          type="button"
-          className="btn btn-sm gen-refresh"
-          onClick={() => queryClient.invalidateQueries({ queryKey: cle })}
-          title="Recharger depuis le serveur"
-          aria-label="Recharger depuis le serveur"
-        >
-          <i className={`bi bi-arrow-clockwise${isFetching ? ' spin' : ''}`}></i>
-        </button>
+        <div className="gen-toolbar-actions">
+          {(ecran.actionsGlobales || []).map((action) => (
+            <button
+              key={action.libelle}
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => demander(action, null)}
+              disabled={mutation.isPending}
+            >
+              {action.icone && <i className={`bi ${action.icone} me-1`}></i>}
+              {action.libelle}
+            </button>
+          ))}
+          {indicateurs && recharger}
+        </div>
       </div>
     </div>
   )
@@ -430,8 +478,6 @@ export function ListeGenerique({ ecran, cleBase }) {
       </div>
     )
   }
-
-  const indicateurs = data?.indicateurs
 
   if (indicateurs) {
     // Sans recherche, filtre ni action, la barre ne contiendrait que le
@@ -487,7 +533,7 @@ export function ListeGenerique({ ecran, cleBase }) {
 
   return (
     <div className="ecran-generique">
-      {barre}
+      {aBarre && barre}
 
       {error && (
         <div
@@ -525,6 +571,7 @@ export function ListeGenerique({ ecran, cleBase }) {
             <span className="gen-count-pill">
               {isFetching ? 'Chargement…' : `${data?.count ?? lignes.length} élément(s)`}
             </span>
+            {recharger}
           </div>
         </div>
         <div className="table-responsive gen-table-wrap">
@@ -580,8 +627,11 @@ export function ListeGenerique({ ecran, cleBase }) {
                 <tr>
                   <td colSpan={Math.max(1, colonnes.length) + 1}>
                     <div className="gen-empty">
-                      <i className="bi bi-inbox"></i>
-                      {ecran.vide || "Aucun élément à afficher pour ces critères."}
+                      <i className="bi bi-inbox" aria-hidden="true"></i>
+                      <span className="gen-empty-title">Aucun résultat</span>
+                      <span className="gen-empty-text">
+                        {ecran.vide || "Aucun élément à afficher pour ces critères."}
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -593,7 +643,7 @@ export function ListeGenerique({ ecran, cleBase }) {
           {ecran.note ? (
             <span className="gen-panel-foot-info">
               <i className="bi bi-info-circle"></i>
-              {ecran.note}
+              <code className="gen-endpoint-chip">{ecran.note}</code>
             </span>
           ) : <span />}
           {data && data.count > (ecran.taillePage || 50) && (

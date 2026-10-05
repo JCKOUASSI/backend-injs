@@ -4,6 +4,7 @@ import api from '../../services/api'
 import { canActScolarite } from '../../utils/roles'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import '../../styles/campagnes.css'
 import '../../styles/maquettes.css'
 
 const STATUTS = [
@@ -129,90 +130,110 @@ export default function Maquettes() {
   }, [maquettes, recherche])
 
   return (
-    <div className="container-fluid maquettes-lmd-container py-4">
+    <div className="container-fluid maquettes-lmd-container camp-page py-4">
       {/* ── En-tête de page ── */}
-      <div className="d-flex justify-content-between align-items-center mb-4 maquettes-header">
-        <div>
-          <h1 className="h4 mb-0 maquettes-title">
-            <i className="bi bi-diagram-3 text-primary"></i>
+      <div className="camp-hero mb-4 maquettes-header">
+        <div className="camp-hero-text">
+          <h1 className="h4 mb-0 maquettes-title camp-hero-title">
+            <i className="bi bi-diagram-3"></i>
             Maquettes pédagogiques LMD
           </h1>
-          <p className="text-muted small mb-0 maquettes-subtitle">
+          <p className="text-muted small mb-0 maquettes-subtitle camp-hero-sub">
             Conception, structuration des parcours (UE/ECUE/ECTS) et cycles de validation académique.
           </p>
+        </div>
+        <div className="camp-hero-side">
+          <span className="plaquette plaquette-primary">
+            <i className="bi bi-mortarboard"></i>{maquettes.length} maquette{maquettes.length > 1 ? 's' : ''}
+          </span>
+          <span className="plaquette plaquette-soft">
+            <i className="bi bi-shield-lock"></i>Actives immuables
+          </span>
         </div>
       </div>
 
       {/* ── Rangée de KPI Plaquettes ── */}
-      <div className="maquettes-stats-grid">
-        <div className="maquette-kpi-card maquette-kpi-card--primary">
-          <div className="maquette-kpi-icon">
+      <div className="maquettes-stats-grid camp-kpi-row">
+        <div className="maquette-kpi-card maquette-kpi-card--primary camp-kpi">
+          <div className="maquette-kpi-info camp-kpi-info">
+            <span className="maquette-kpi-title camp-kpi-label">Total Maquettes</span>
+            <span className="maquette-kpi-value camp-kpi-value">{stats.total}</span>
+          </div>
+          <div className="maquette-kpi-icon camp-kpi-icon">
             <i className="bi bi-mortarboard-fill"></i>
           </div>
-          <div className="maquette-kpi-info">
-            <span className="maquette-kpi-title">Total Maquettes</span>
-            <span className="maquette-kpi-value">{stats.total}</span>
-          </div>
         </div>
 
-        <div className="maquette-kpi-card">
-          <div className="maquette-kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }}>
+        <div className="maquette-kpi-card camp-kpi">
+          <div className="maquette-kpi-info camp-kpi-info">
+            <span className="maquette-kpi-title camp-kpi-label">Actives (Immuables)</span>
+            <span className="maquette-kpi-value camp-kpi-value">{stats.actives}</span>
+          </div>
+          <div className="maquette-kpi-icon camp-kpi-icon is-green">
             <i className="bi bi-check-circle-fill"></i>
           </div>
-          <div className="maquette-kpi-info">
-            <span className="maquette-kpi-title">Actives (Immuables)</span>
-            <span className="maquette-kpi-value" style={{ color: '#10B981' }}>{stats.actives}</span>
-          </div>
         </div>
 
-        <div className="maquette-kpi-card">
-          <div className="maquette-kpi-icon" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#0891B2' }}>
+        <div className="maquette-kpi-card camp-kpi">
+          <div className="maquette-kpi-info camp-kpi-info">
+            <span className="maquette-kpi-title camp-kpi-label">Validées (Gelées)</span>
+            <span className="maquette-kpi-value camp-kpi-value">{stats.validees}</span>
+          </div>
+          <div className="maquette-kpi-icon camp-kpi-icon is-blue">
             <i className="bi bi-lock-fill"></i>
           </div>
-          <div className="maquette-kpi-info">
-            <span className="maquette-kpi-title">Validées (Gelées)</span>
-            <span className="maquette-kpi-value" style={{ color: '#0891B2' }}>{stats.validees}</span>
-          </div>
         </div>
 
-        <div className="maquette-kpi-card">
-          <div className="maquette-kpi-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#D97706' }}>
-            <i className="bi bi-pencil-square"></i>
+        <div className="maquette-kpi-card camp-kpi">
+          <div className="maquette-kpi-info camp-kpi-info">
+            <span className="maquette-kpi-title camp-kpi-label">Brouillons</span>
+            <span className="maquette-kpi-value camp-kpi-value">{stats.brouillons}</span>
           </div>
-          <div className="maquette-kpi-info">
-            <span className="maquette-kpi-title">Brouillons</span>
-            <span className="maquette-kpi-value" style={{ color: '#D97706' }}>{stats.brouillons}</span>
+          <div className="maquette-kpi-icon camp-kpi-icon is-amber">
+            <i className="bi bi-pencil-square"></i>
           </div>
         </div>
       </div>
 
       {/* ── Filtres & Recherche ── */}
-      <div className="maquettes-glass-card mb-4">
-        <div className="row g-3 align-items-end">
-          <div className="col-md-4">
-            <label className="form-label small text-muted">Filtrer par statut</label>
-            <select className="form-select" value={filtreStatut} onChange={(e) => setFiltreStatut(e.target.value)}>
-              {STATUTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="col-md-5">
-            <label className="form-label small text-muted">Rechercher une formation ou parcours</label>
-            <div className="input-group">
-              <span className="input-group-text bg-white border-end-0">
-                <i className="bi bi-search text-muted"></i>
-              </span>
-              <input
-                type="text"
-                className="form-control border-start-0"
-                placeholder="Filtrer par intitulé, niveau, parcours…"
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-              />
-              {recherche && (
-                <button className="btn btn-outline-secondary" type="button" onClick={() => setRecherche('')}>
-                  <i className="bi bi-x"></i>
-                </button>
-              )}
+      <div className="maquettes-glass-card camp-panel mb-4">
+        <div className="camp-panel-head">
+          <h2 className="camp-panel-title"><i className="bi bi-funnel"></i>Filtres et recherche</h2>
+          <span className="camp-count-pill">{maquettesFiltrees.length} résultat{maquettesFiltrees.length > 1 ? 's' : ''}</span>
+        </div>
+        <div className="camp-panel-body">
+          <div className="row g-3 align-items-end camp-form">
+            <div className="col-md-4">
+              <label className="form-label" htmlFor="maq-filtre-statut">Filtrer par statut</label>
+              <select
+                id="maq-filtre-statut"
+                className="form-select maq-select"
+                value={filtreStatut}
+                onChange={(e) => setFiltreStatut(e.target.value)}
+              >
+                {STATUTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="col-md-5">
+              <label className="form-label" htmlFor="maq-recherche">Rechercher une formation ou parcours</label>
+              <div className="input-group maq-search">
+                <span className="input-group-text">
+                  <i className="bi bi-search"></i>
+                </span>
+                <input
+                  id="maq-recherche"
+                  type="text"
+                  className="form-control"
+                  placeholder="Filtrer par intitulé, niveau, parcours…"
+                  value={recherche}
+                  onChange={(e) => setRecherche(e.target.value)}
+                />
+                {recherche && (
+                  <button className="btn btn-outline-secondary" type="button" onClick={() => setRecherche('')} aria-label="Effacer la recherche">
+                    <i className="bi bi-x" aria-hidden="true"></i>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -220,40 +241,49 @@ export default function Maquettes() {
 
       {/* ── Formulaire de Création ── */}
       {peutAgir && (
-        <div className="card maquettes-glass-card mb-4">
-          <div className="card-body p-0">
-            <h2 className="h6 card-title mb-3 fw-bold text-dark d-flex align-items-center gap-2">
-              <i className="bi bi-plus-circle-fill text-primary"></i>
-              Nouvelle maquette
-            </h2>
-            <form className="row g-2" onSubmit={creer}>
+        <div className="card maquettes-glass-card camp-panel mb-4">
+          <div className="camp-panel-head">
+            <h2 className="camp-panel-title"><i className="bi bi-plus-circle"></i>Nouvelle maquette</h2>
+            <span className="camp-count-pill">Brouillon v1</span>
+          </div>
+          <div className="card-body camp-panel-body">
+            <form className="row g-3 align-items-end camp-form" onSubmit={creer}>
               <div className="col-md-3">
-                <select className="form-select" required value={form.annee_academique_id}
+                <label className="form-label" htmlFor="maq-annee">Année académique *</label>
+                <select id="maq-annee" className="form-select maq-select" required value={form.annee_academique_id}
                         onChange={(e) => setForm({ ...form, annee_academique_id: e.target.value })}>
                   <option value="">Année académique…</option>
                   {options.annees.map((a) => <option key={a.id} value={a.id}>{a.libelle}</option>)}
                 </select>
               </div>
               <div className="col-md-3">
-                <select className="form-select" required value={form.ref_formation_id}
+                <label className="form-label" htmlFor="maq-formation">Formation *</label>
+                <select id="maq-formation" className="form-select maq-select" required value={form.ref_formation_id}
                         onChange={(e) => setForm({ ...form, ref_formation_id: e.target.value })}>
                   <option value="">Formation…</option>
                   {options.formations.map((f) => <option key={f.id} value={f.id}>{f.intitule}</option>)}
                 </select>
               </div>
               <div className="col-md-2">
-                <select className="form-select" required value={form.niveau_id}
+                <label className="form-label" htmlFor="maq-niveau">Niveau *</label>
+                <select id="maq-niveau" className="form-select maq-select" required value={form.niveau_id}
                         onChange={(e) => setForm({ ...form, niveau_id: e.target.value })}>
                   <option value="">Niveau…</option>
                   {options.niveaux.map((n) => <option key={n.id} value={n.id}>{n.code}</option>)}
                 </select>
               </div>
               <div className="col-md-2">
-                <input className="form-control" placeholder="Libellé (optionnel)"
+                <label className="form-label" htmlFor="maq-libelle">Libellé</label>
+                <input id="maq-libelle" className="form-control maq-input" placeholder="Libellé (optionnel)"
                        value={form.libelle} onChange={(e) => setForm({ ...form, libelle: e.target.value })} />
               </div>
               <div className="col-md-2">
-                <button className="btn btn-primary w-100 fw-bold" disabled={enCours}>Créer</button>
+                <button className="btn btn-primary w-100 fw-bold camp-submit-btn" disabled={enCours}>
+                  <i className="bi bi-plus-lg me-1" aria-hidden="true"></i>Créer
+                </button>
+              </div>
+              <div className="col-12">
+                <p className="form-text mb-0">La maquette est enregistrée au statut brouillon : ajoutez les UE/ECUE puis validez avant activation (immuable).</p>
               </div>
             </form>
           </div>
@@ -261,10 +291,14 @@ export default function Maquettes() {
       )}
 
       {/* ── Tableau des Maquettes ── */}
-      <div className="card maquettes-table-container">
+      <div className="card maquettes-table-container camp-panel">
+        <div className="camp-panel-head">
+          <h2 className="camp-panel-title"><i className="bi bi-table"></i>Maquettes</h2>
+          <span className="camp-count-pill">{maquettesFiltrees.length} maquette{maquettesFiltrees.length > 1 ? 's' : ''}</span>
+        </div>
         <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="table-light">
+          <table className="table table-hover align-middle mb-0 camp-table maq-table">
+            <thead>
               <tr>
                 <th>Formation</th><th>Niveau</th><th>Parcours</th><th>Année</th>
                 <th>Version</th><th>Statut</th><th>UE</th><th>Crédits</th>
@@ -275,50 +309,53 @@ export default function Maquettes() {
               {chargement ? (
                 <tr><td colSpan={9} className="text-center py-4"><div className="spinner-border spinner-border-sm text-primary" /></td></tr>
               ) : maquettesFiltrees.length === 0 ? (
-                <tr><td colSpan={9} className="text-center text-muted py-4">Aucune maquette.</td></tr>
+                <tr><td colSpan={9}>
+                  <div className="camp-empty"><i className="bi bi-inbox"></i>Aucune maquette.</div>
+                </td></tr>
               ) : maquettesFiltrees.map((m) => (
                 <tr key={m.id}>
                   <td>
-                    <Link to={`/scolarite/maquettes/${m.id}`} className="fw-semibold text-primary text-decoration-none">
+                    <Link to={`/scolarite/maquettes/${m.id}`} className="fw-semibold text-decoration-none camp-link">
                       {m.ref_formation}
                     </Link>
+                    <span className="camp-sub">Maquette v{m.version}</span>
                   </td>
-                  <td><span className="badge bg-light text-dark border">{m.niveau}</span></td>
+                  <td><span className="badge bg-light text-dark border maq-chip">{m.niveau}</span></td>
                   <td>{m.parcours || '—'}</td>
                   <td>{m.annee_academique}</td>
-                  <td><span className="badge bg-secondary-subtle text-secondary border">v{m.version}</span></td>
+                  <td><span className="badge bg-secondary-subtle text-secondary border maq-chip">v{m.version}</span></td>
                   <td>
                     <span className={`badge text-bg-${BADGE_STATUT[m.statut] || 'secondary'} maquette-badge`}>
                       {m.statut}
                     </span>
                   </td>
-                  <td>{m.nb_ue}</td>
-                  <td>{m.total_credits}</td>
+                  <td><span className="camp-candidatures">{m.nb_ue}</span></td>
+                  <td><span className="camp-candidatures">{m.total_credits}</span></td>
                   {peutAgir && (
                     <td className="text-end">
-                      <div className="btn-group btn-group-sm">
+                      <div className="d-inline-flex gap-2 flex-wrap justify-content-end">
                         {m.statut === 'BROUILLON' && (
-                          <button className="btn btn-outline-info maquette-action-btn" disabled={enCours}
+                          <button className="btn btn-outline-info maquette-action-btn camp-action-btn" disabled={enCours}
                                   onClick={() => action(m, 'valider', 'Valider cette maquette (contenu gelé) ?')}>
-                            Valider
+                            <i className="bi bi-check2-circle me-1" aria-hidden="true"></i>Valider
                           </button>
                         )}
                         {m.statut === 'VALIDEE' && (
-                          <button className="btn btn-outline-success maquette-action-btn" disabled={enCours}
+                          <button className="btn btn-outline-success maquette-action-btn camp-action-btn" disabled={enCours}
                                   onClick={() => action(m, 'activer', 'Activer cette maquette (immuable) ?')}>
-                            Activer
+                            <i className="bi bi-lightning-charge me-1" aria-hidden="true"></i>Activer
                           </button>
                         )}
                         {m.statut === 'ACTIVE' && (
-                          <button className="btn btn-outline-dark maquette-action-btn" disabled={enCours}
+                          <button className="btn btn-outline-dark maquette-action-btn camp-action-btn" disabled={enCours}
                                   onClick={() => action(m, 'archiver', 'Archiver cette maquette ?')}>
-                            Archiver
+                            <i className="bi bi-archive me-1" aria-hidden="true"></i>Archiver
                           </button>
                         )}
                         {m.statut !== 'BROUILLON' && (
-                          <button className="btn btn-outline-secondary maquette-action-btn" disabled={enCours}
+                          <button className="btn btn-outline-secondary maquette-action-btn camp-action-btn" disabled={enCours}
                                   onClick={() => action(m, 'cloner', 'Créer une nouvelle version (clonage) ?')}>
-                            Cloner
+                            <i className="bi bi-copy me-1" aria-hidden="true"></i>Cloner
                           </button>
                         )}
                       </div>

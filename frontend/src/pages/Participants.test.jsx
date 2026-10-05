@@ -327,7 +327,7 @@ describe('pages/Participants.jsx — habilitations (LOT 23)', () => {
     const row = rowFor('Nom1 Prenom1')
     expect(within(row).queryByTitle('Modifier')).not.toBeInTheDocument()
     expect(within(row).queryByTitle('Supprimer')).not.toBeInTheDocument()
-    expect(within(row).getByTitle('Détail')).toBeInTheDocument()
+    expect(within(row).getByTitle('Visualiser')).toBeInTheDocument()
   })
 
   it('SUPERVISEUR : ni gestion ni export liste de classe', async () => {
@@ -600,7 +600,7 @@ describe('pages/Participants.jsx — fenêtre de détail (LOT 23)', () => {
     }))
     mount()
     await waitForTable()
-    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Détail'))
+    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Visualiser'))
     expect(await screen.findByRole('heading', { name: /Nom1 Prenom1/ })).toBeInTheDocument()
     // Le contenu (onglets) ne s'affiche qu'après le chargement.
     expect(await screen.findByRole('tablist')).toBeInTheDocument()
@@ -617,7 +617,7 @@ describe('pages/Participants.jsx — fenêtre de détail (LOT 23)', () => {
     apiController.setRoute('/formations/participants/1/formations/', () => ({ count: 0, results: [] }))
     mount('SUPERVISEUR')
     await waitForTable()
-    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Détail'))
+    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Visualiser'))
     expect(await screen.findByRole('tablist')).toBeInTheDocument()
     expect(
       apiMock.get.mock.calls.some(([p]) => p === '/participant/1/fiche-admin/'),
@@ -634,7 +634,7 @@ describe('pages/Participants.jsx — fenêtre de détail (LOT 23)', () => {
     })
     mount()
     await waitForTable()
-    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Détail'))
+    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Visualiser'))
     expect(await screen.findByRole('tablist')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Nom1 Prenom1/ })).toBeInTheDocument()
     // La pastille « Modules 0 » du résumé (un autre libellé « Modules » existe
@@ -652,7 +652,7 @@ describe('pages/Participants.jsx — fenêtre de détail (LOT 23)', () => {
     }))
     mount()
     await waitForTable()
-    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Détail'))
+    fireEvent.click(within(rowFor('Nom1 Prenom1')).getByTitle('Visualiser'))
     const heading = await screen.findByRole('heading', { name: /Nom1 Prenom1/ })
     await screen.findByRole('tablist')
     const close = heading.closest('.modal-content').querySelector('.btn-close')
@@ -791,8 +791,8 @@ describe('pages/Participants.jsx — P00-06 (capacités backend)', () => {
     const row = rowFor('Nom1 Prenom1')
     expect(within(row).queryByTitle('Modifier')).not.toBeInTheDocument()
     expect(within(row).queryByTitle('Supprimer')).not.toBeInTheDocument()
-    // La lecture (détail) reste possible : l'action « lister » est bien présente.
-    expect(within(row).getByTitle('Détail')).toBeInTheDocument()
+    // La lecture (fiche) reste possible : l'action « lister » est bien présente.
+    expect(within(row).getByTitle('Visualiser')).toBeInTheDocument()
   })
 
   it('un SECRETARIAT doté de « creer » par le backend voit le bouton de création (le backend peut accorder plus que le statique)', async () => {

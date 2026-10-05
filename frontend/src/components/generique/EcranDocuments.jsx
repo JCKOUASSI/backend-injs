@@ -70,14 +70,25 @@ function CarteDocument({ document: doc }) {
     }
   }
 
+  const styleBouton = (format) => {
+    if (format.id === 'excel') return 'btn-outline-success'
+    if (format.id === 'pdf') return 'btn-outline-danger'
+    return 'btn-outline-primary'
+  }
+
   return (
-    <div className="col-md-6 col-xl-4">
-      <div className="card h-100">
-        <div className="card-body">
-          <h6 className="card-title">
-            {doc.icone && <i className={`bi ${doc.icone} me-2`}></i>}{doc.libelle}
-          </h6>
-          {doc.description && <p className="text-muted small">{doc.description}</p>}
+    <article className="gen-doc-card">
+      <div className="gen-doc-head">
+        <span className="gen-doc-icon" aria-hidden="true">
+          <i className={`bi ${doc.icone || 'bi-file-earmark-text'}`}></i>
+        </span>
+        <div className="gen-doc-head-text">
+          <h2 className="gen-doc-title">{doc.libelle}</h2>
+          {doc.description && <p className="gen-doc-desc">{doc.description}</p>}
+        </div>
+      </div>
+      {parametres.length > 0 && (
+        <div className="gen-doc-body">
           {parametres.map((p) => (
             <Parametre
               key={p.cle}
@@ -86,26 +97,32 @@ function CarteDocument({ document: doc }) {
               onChange={(v) => setValeurs((prev) => ({ ...prev, [p.cle]: v }))}
             />
           ))}
+          {manquants.length > 0 && (
+            <p className="gen-doc-hint">
+              <i className="bi bi-info-circle me-1"></i>
+              Champs requis : {manquants.join(', ')}.
+            </p>
+          )}
         </div>
-        <div className="card-footer d-flex gap-2">
-          {(doc.formats || [{ id: 'pdf', libelle: 'PDF', suffixe: 'pdf' }]).map((format) => (
-            <button
-              key={format.id}
-              type="button"
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => generer(format)}
-              disabled={enCours === format.id}
-              data-testid={`doc-${doc.id}-${format.id}`}
-            >
-              {enCours === format.id
-                ? <span className="spinner-border spinner-border-sm"></span>
-                : <i className={`bi ${format.icone || 'bi-download'} me-1`}></i>}
-              {format.libelle}
-            </button>
-          ))}
-        </div>
+      )}
+      <div className="gen-doc-foot">
+        {(doc.formats || [{ id: 'pdf', libelle: 'PDF', suffixe: 'pdf' }]).map((format) => (
+          <button
+            key={format.id}
+            type="button"
+            className={`btn btn-sm gen-doc-btn ${styleBouton(format)}`}
+            onClick={() => generer(format)}
+            disabled={enCours === format.id}
+            data-testid={`doc-${doc.id}-${format.id}`}
+          >
+            {enCours === format.id
+              ? <span className="spinner-border spinner-border-sm me-1"></span>
+              : <i className={`bi ${format.icone || 'bi-download'} me-1`}></i>}
+            {format.libelle}
+          </button>
+        ))}
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -113,14 +130,14 @@ function Parametre({ parametre, valeur, onChange }) {
   const { data: options } = useOptions(parametre)
   const choix = parametre.options || options || []
   return (
-    <div className="mb-2">
-      <label className="form-label small text-muted mb-1">
+    <div className="gen-doc-field">
+      <label className="gen-doc-label">
         {parametre.libelle}
-        {parametre.requis !== false && <span className="text-danger"> *</span>}
+        {parametre.requis !== false && <span className="gen-doc-required"> *</span>}
       </label>
       {parametre.type === 'select' ? (
         <select
-          className="form-select form-select-sm"
+          className="form-select"
           value={valeur ?? ''}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -130,7 +147,7 @@ function Parametre({ parametre, valeur, onChange }) {
       ) : (
         <input
           type={parametre.type === 'nombre' ? 'number' : 'text'}
-          className="form-control form-control-sm"
+          className="form-control"
           value={valeur ?? ''}
           placeholder={parametre.placeholder || ''}
           onChange={(e) => onChange(e.target.value)}
@@ -142,16 +159,13 @@ function Parametre({ parametre, valeur, onChange }) {
 
 export default function EcranDocuments({ ecran }) {
   return (
-    <div>
-      {ecran.introduction && (
-        <div className="alert alert-light border small">{ecran.introduction}</div>
-      )}
-      <div className="row g-3">
+    <div className="gen-docs">
+      <div className="gen-docs-grid">
         {(ecran.documents || []).map((doc) => (
           <CarteDocument key={doc.id || doc.libelle} document={doc} />
         ))}
       </div>
-      {ecran.note && <p className="text-muted small mt-3">{ecran.note}</p>}
+      {ecran.note && <p className="gen-panel-foot-note gen-docs-note">{ecran.note}</p>}
     </div>
   )
 }

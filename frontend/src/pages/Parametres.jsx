@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import api from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { formatApiErrors } from '../utils/apiErrors'
+import '../styles/parametres.css'
 
 const CATEGORIES = [
   { value: 'general', label: 'Général', icon: 'bi-building' },
@@ -128,6 +129,16 @@ export default function Parametres() {
     })
   }, [params, tab, query])
 
+  // Indicateurs de pilotage, calculés sur la liste déjà chargée (aucun appel
+  // API supplémentaire) : ils reprennent la logique des tuiles KPI du
+  // « Tableau de bord LMD 2026 ».
+  const indicateurs = useMemo(() => ({
+    total: params.length,
+    categories: visibleTabs.length,
+    modifiables: params.filter(p => p.modifiable).length,
+    critiques: params.filter(p => p.est_critique).length,
+  }), [params, visibleTabs])
+
   const openEdit = (row) => {
     setHistory([])
     setModal({ type: 'edit', row })
@@ -189,20 +200,67 @@ export default function Parametres() {
   const currentTab = CATEGORIES.find(c => c.value === tab)
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title"><i className="bi bi-gear me-2"></i>Paramètres</h1>
-          <p className="page-subtitle">
+    <div className="page-container par-page">
+      {/* ── Bandeau d'accueil (matière de la référence LMD2026) ── */}
+      <div className="par-hero">
+        <div className="par-hero-text">
+          <span className="par-hero-badge">
+            <i className="bi bi-sliders"></i>Administration
+          </span>
+          <h1 className="par-hero-title">
+            <i className="bi bi-gear-fill"></i>
+            Paramètres
+          </h1>
+          <p className="par-hero-sub">
             Paramètres fonctionnels de l’établissement. Les tarifs finance restent dans{' '}
             <Link to="/finance-parametrage">Paramétrage finance</Link>.
             Les emplois du temps sont générés dans <strong>app-ept-injs-lmd 2026</strong> puis importés dans Cours → Séances.
           </p>
         </div>
+        <span className="par-hero-pill">
+          {indicateurs.categories} catégorie{indicateurs.categories > 1 ? 's' : ''}
+        </span>
       </div>
 
-      {/* Onglets catégories — style Référentiels */}
-      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color)', paddingBottom: '0' }}>
+      {/* ── Tuiles KPI ── */}
+      <div className="par-kpi-row">
+        <div className="par-kpi">
+          <div>
+            <span className="par-kpi-label">Paramètres Actifs</span>
+            <span className="par-kpi-value">{indicateurs.total}</span>
+          </div>
+          <div className="par-kpi-icon is-blue"><i className="bi bi-sliders"></i></div>
+        </div>
+
+        <div className="par-kpi">
+          <div>
+            <span className="par-kpi-label">Catégories</span>
+            <span className="par-kpi-value is-slate">{indicateurs.categories}</span>
+          </div>
+          <div className="par-kpi-icon is-slate"><i className="bi bi-collection"></i></div>
+        </div>
+
+        <div className="par-kpi">
+          <div>
+            <span className="par-kpi-label">Modifiables</span>
+            <span className="par-kpi-value is-green">{indicateurs.modifiables}</span>
+          </div>
+          <div className="par-kpi-icon is-green"><i className="bi bi-pencil-square"></i></div>
+        </div>
+
+        <div className="par-kpi">
+          <div>
+            <span className="par-kpi-label">Critiques</span>
+            <span className={`par-kpi-value${indicateurs.critiques > 0 ? ' is-amber' : ' is-slate'}`}>
+              {indicateurs.critiques}
+            </span>
+          </div>
+          <div className="par-kpi-icon is-amber"><i className="bi bi-exclamation-triangle-fill"></i></div>
+        </div>
+      </div>
+
+      {/* Onglets catégories — pilules de la référence */}
+      <div className="par-tabs" role="tablist" aria-label="Catégories de paramètres">
         {visibleTabs.map(c => {
           const count = params.filter(p => p.categorie === c.value).length
           const active = tab === c.value
@@ -212,103 +270,81 @@ export default function Parametres() {
               type="button"
               role="tab"
               aria-selected={active}
+              className={`par-tab${active ? ' is-active' : ''}`}
               onClick={() => setTab(c.value)}
-              style={{
-                padding: '0.5rem 1.1rem',
-                border: 'none',
-                borderRadius: '6px 6px 0 0',
-                background: active ? 'var(--navy)' : 'transparent',
-                color: active ? '#fff' : 'var(--text-secondary)',
-                fontWeight: active ? 600 : 400,
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                transition: 'all 0.15s',
-              }}
             >
-              <i className={`bi ${c.icon} me-1`}></i>{c.label}
-              <span style={{
-                marginLeft: '0.4rem',
-                background: active ? 'rgba(255,255,255,0.25)' : 'var(--border-color)',
-                color: active ? '#fff' : 'var(--text-secondary)',
-                borderRadius: '10px',
-                padding: '0 6px',
-                fontSize: '0.75rem',
-              }}>
-                {count}
-              </span>
+              <i className={`bi ${c.icon}`}></i>{c.label}
+              <span className="par-tab-count">{count}</span>
             </button>
           )
         })}
       </div>
 
       {loading ? (
-        <div className="loading py-5"><div className="spinner"></div></div>
+        <div className="par-loading">
+          <div className="spinner"></div>
+          <span>Chargement des paramètres…</span>
+        </div>
       ) : (
-        <div className="card">
-          <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <span>
-              <i className={`bi ${currentTab?.icon ?? 'bi-gear'} me-2`}></i>
+        <div className="card par-panel">
+          <div className="par-panel-head">
+            <h2 className="par-panel-title">
+              <i className={`bi ${currentTab?.icon ?? 'bi-gear'}`}></i>
               {currentTab?.label ?? 'Paramètres'}
-            </span>
-            <div className="d-flex align-items-center gap-2">
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="search"
-                  className="form-control form-control-sm"
-                  style={{ minWidth: 220, paddingLeft: '2rem' }}
-                  placeholder="Rechercher un paramètre…"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                />
-                <i className="bi bi-search" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}></i>
-              </div>
-              <span className="text-muted small">
-                {filtered.length} entrée{filtered.length !== 1 ? 's' : ''}
-              </span>
+            </h2>
+            <div className="par-search">
+              <i className="bi bi-search"></i>
+              <input
+                type="search"
+                className="form-control form-control-sm"
+                placeholder="Rechercher un paramètre…"
+                aria-label="Rechercher un paramètre"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+              />
             </div>
+            <span className="par-count-pill">
+              {filtered.length} entrée{filtered.length !== 1 ? 's' : ''}
+            </span>
           </div>
-          <div className="card-body" style={{ padding: 0 }}>
+          <div className="par-panel-body">
             {filtered.length === 0 ? (
-              <div className="text-center py-5 text-muted">
-                <i className="bi bi-inbox" style={{ fontSize: '2rem' }}></i>
-                <p className="mt-2">Aucun paramètre dans cette catégorie.</p>
+              <div className="par-empty">
+                <i className="bi bi-inbox"></i>
+                <p>Aucun paramètre dans cette catégorie.</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="table" style={{ width: '100%' }}>
+              <div className="par-table-wrap">
+                <table className="table par-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '74%' }}>Libellé</th>
-                      <th style={{ width: '10%' }}>Statut</th>
-                      <th style={{ width: '16%', textAlign: 'right' }}>Actions</th>
+                      <th>Libellé</th>
+                      <th>Statut</th>
+                      <th className="is-actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map(row => {
                       const editable = canEdit(row)
                       return (
-                        <tr key={row.id} style={row.modifiable ? undefined : { background: '#f6f8fb' }}>
-                          <td style={row.modifiable ? undefined : { opacity: 0.75 }}>
-                            <div className="fw-semibold">
+                        <tr key={row.id} className={row.modifiable ? undefined : 'is-locked'}>
+                          <td>
+                            <div className="par-libelle">
                               {row.libelle}
                               {row.est_critique && (
-                                <span className="badge badge-suspendue ms-2" title="Paramètre critique — confirmation requise">
-                                  <i className="bi bi-exclamation-triangle-fill me-1"></i>Critique
+                                <span className="par-badge-critique" title="Paramètre critique — confirmation requise">
+                                  <i className="bi bi-exclamation-triangle-fill"></i>Critique
                                 </span>
                               )}
                               {!row.modifiable && (
-                                <span className="badge bg-secondary ms-2" title="Paramètre système non modifiable">
-                                  <i className="bi bi-lock-fill me-1"></i>Verrouillé
+                                <span className="par-badge-verrou" title="Paramètre système non modifiable">
+                                  <i className="bi bi-lock-fill"></i>Verrouillé
                                 </span>
                               )}
                             </div>
-                            {row.description && <div className="small text-muted">{row.description}</div>}
-                            <div className="small" style={{ marginTop: '0.35rem' }}>
-                              <span
-                                className="badge badge-planifiee"
-                                style={{ maxWidth: '100%', display: 'inline-block', overflowWrap: 'anywhere', whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem', textAlign: 'left' }}
-                                title={displayValue(row)}
-                              >
+                            {row.description && <div className="par-desc">{row.description}</div>}
+                            <div>
+                              <span className="par-value" title={displayValue(row)}>
                                 {displayValue(row)}
                               </span>
                             </div>
@@ -316,22 +352,24 @@ export default function Parametres() {
                           <td>
                             <span className="badge badge-planifiee">Actif</span>
                           </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div className="btn-group" style={{ justifyContent: 'flex-end' }}>
+                          <td>
+                            <div className="par-actions">
                               <button
                                 type="button"
-                                className="btn btn-outline-primary btn-sm"
+                                className="btn btn-outline-primary btn-sm par-icon-btn"
                                 onClick={() => openEdit(row)}
                                 disabled={!editable}
                                 title={editable ? 'Modifier la valeur' : 'Non modifiable'}
+                                aria-label={`Modifier ${row.libelle}`}
                               >
                                 <i className="bi bi-pencil"></i>
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-outline-secondary btn-sm"
+                                className="btn btn-outline-secondary btn-sm par-icon-btn"
                                 onClick={() => openHistory(row)}
                                 title="Historique des modifications"
+                                aria-label={`Historique de ${row.libelle}`}
                               >
                                 <i className="bi bi-clock-history"></i>
                               </button>
@@ -350,9 +388,9 @@ export default function Parametres() {
 
       {editing && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content par-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>Modifier le paramètre</h5>
+              <h5 className="modal-title">Modifier le paramètre</h5>
               <button type="button" className="btn-close" onClick={closeModal}>&times;</button>
             </div>
             <form onSubmit={handleSubmit}>
@@ -361,8 +399,8 @@ export default function Parametres() {
                   <strong>{editing.libelle}</strong> <code>({editing.cle})</code>
                 </p>
                 <div className="mb-3">
-                  <div className="small text-muted">Ancienne valeur</div>
-                  <code>{displayValue(editing)}</code>
+                  <span className="par-old-label">Ancienne valeur</span>
+                  <span className="par-old-value">{displayValue(editing)}</span>
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">Nouvelle valeur</label>
@@ -417,19 +455,19 @@ export default function Parametres() {
 
       {modal?.type === 'history' && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content par-modal par-modal-hist" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h5>Historique — {modal.row.libelle}</h5>
+              <h5 className="modal-title">Historique — {modal.row.libelle}</h5>
               <button type="button" className="btn-close" onClick={closeModal}>&times;</button>
             </div>
             <div className="modal-body">
               {historyLoading ? (
-                <div className="loading py-3"><div className="spinner"></div></div>
+                <div className="par-loading"><div className="spinner"></div></div>
               ) : history.length === 0 ? (
                 <p className="text-muted mb-0">Aucune modification enregistrée.</p>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-sm">
+                <div className="par-table-wrap">
+                  <table className="table table-sm par-table">
                     <thead>
                       <tr>
                         <th>Date</th>

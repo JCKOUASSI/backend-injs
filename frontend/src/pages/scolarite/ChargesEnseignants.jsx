@@ -3,6 +3,8 @@ import api from '../../services/api'
 import { canActScolarite } from '../../utils/roles'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import '../../styles/premiumCommun.css'
+import '../../styles/chargesEnseignants.css'
 
 export default function ChargesEnseignants() {
   const { user } = useAuth()
@@ -136,11 +138,23 @@ export default function ChargesEnseignants() {
   }
 
   return (
-    <div className="container-fluid py-4">
-      <h1 className="h4 mb-3"><i className="bi bi-people me-2"></i>Charges pédagogiques des enseignants</h1>
+    <div className="container-fluid py-4 chg-page">
+      {/* Hero — Variante A « Clair raffiné » */}
+      <header className="px-hero">
+        <span className="px-hero-icon"><i className="bi bi-person-workspace"></i></span>
+        <div className="px-hero-text">
+          <span className="px-hero-eyebrow">Scolarité · Charges LMD</span>
+          <h1 className="px-hero-title">Charges pédagogiques des enseignants</h1>
+          <p className="px-hero-intro">Volumes prévus, affectés, planifiés et réalisés par enseignant sur l'année académique courante.</p>
+        </div>
+        <div className="px-hero-side">
+          <span className="px-plaquette">{annee ? `Année ${annee.libelle}` : 'Année courante'}</span>
+          <span className="px-plaquette px-plaquette--soft">{occupation.length} enseignant(s)</span>
+        </div>
+      </header>
 
       {anomalies.length > 0 && (
-        <div className="alert alert-warning">
+        <div className="alert alert-warning px-alert">
           <strong><i className="bi bi-exclamation-triangle me-1"></i>
             {anomalies.length} anomalie(s) détectée(s) :</strong>
           <ul className="mb-0 mt-1">
@@ -149,11 +163,19 @@ export default function ChargesEnseignants() {
         </div>
       )}
 
-      <div className="card mb-3">
+      <div className="card px-panel mb-3 chg-occ">
+        <div className="px-panel-head">
+          <div className="px-panel-headtext">
+            <h2 className="px-panel-title"><i className="bi bi-graph-up"></i>Occupation par enseignant — {annee?.libelle}</h2>
+            <p className="px-panel-sub">Cliquez sur une ligne pour afficher le détail des affectations.</p>
+          </div>
+          <div className="px-panel-tools">
+            <span className="px-count-pill">{occupation.length} enseignant(s)</span>
+          </div>
+        </div>
         <div className="card-body">
-          <h2 className="h6 card-title">Occupation par enseignant — {annee?.libelle}</h2>
           <div className="table-responsive">
-            <table className="table table-sm table-hover mb-0">
+            <table className="table table-sm table-hover mb-0 px-table chg-occ-table">
               <thead className="table-light">
                 <tr>
                   <th>Enseignant</th><th>Prévue (h)</th><th>Affectée (h)</th>
@@ -168,13 +190,13 @@ export default function ChargesEnseignants() {
                       className={o.enseignant_id === Number(enseignantChoisi) ? 'table-active' : ''}
                       onClick={() => choisirEnseignant(o.enseignant_id)}>
                     <td>{o.enseignant}</td>
-                    <td>{o.prevue}</td>
-                    <td>{o.affectee}</td>
-                    <td>{o.planifiee}</td>
-                    <td>{o.realisee}</td>
+                    <td className="px-num">{o.prevue}</td>
+                    <td className="px-num">{o.affectee}</td>
+                    <td className="px-num">{o.planifiee}</td>
+                    <td className="px-num">{o.realisee}</td>
                     <td>{o.surcharge
-                      ? <span className="badge text-bg-danger">Surcharge</span>
-                      : <span className="badge text-bg-success">OK</span>}</td>
+                      ? <span className="badge text-bg-danger px-state px-state--danger">Surcharge</span>
+                      : <span className="badge text-bg-success px-state px-state--ok">OK</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -184,14 +206,22 @@ export default function ChargesEnseignants() {
       </div>
 
       {charge && (
-        <div className="card mb-3 border-primary">
+        <div className="card px-panel mb-3 chg-detail">
+          <div className="px-panel-head">
+            <div className="px-panel-headtext">
+              <h2 className="px-panel-title"><i className="bi bi-person-badge"></i>Détail — {charge.enseignant}</h2>
+              <p className="px-panel-sub">Volumes de l'année pour cet enseignant.</p>
+            </div>
+            <div className="px-panel-tools">
+              <span className="px-count-pill px-count-pill--muted">{affectations.length} affectation(s)</span>
+            </div>
+          </div>
           <div className="card-body">
-            <h2 className="h6 card-title">Détail — {charge.enseignant}</h2>
-            <ul className="list-unstyled mb-2">
+            <ul className="list-unstyled mb-2 chg-recap">
               <li>Prévue : {charge.prevue} h · Affectée : {charge.affectee} h ·
                 Planifiée : {charge.planifiee} h · Réalisée : {charge.realisee} h</li>
             </ul>
-            <table className="table table-sm mb-0">
+            <table className="table table-sm mb-0 px-table chg-aff-table">
               <thead className="table-light">
                 <tr><th>ECUE</th><th>Type</th><th>Volume (h)</th><th>Statut</th></tr>
               </thead>
@@ -199,9 +229,9 @@ export default function ChargesEnseignants() {
                 {affectations.map((a) => (
                   <tr key={a.id}>
                     <td>{a.ecue || '—'}</td>
-                    <td>{a.type_enseignement}</td>
-                    <td>{a.volume_horaire}</td>
-                    <td>{a.statut}</td>
+                    <td><span className="chg-type">{a.type_enseignement}</span></td>
+                    <td className="px-num">{a.volume_horaire}</td>
+                    <td className="chg-statut">{a.statut}</td>
                   </tr>
                 ))}
               </tbody>
@@ -211,50 +241,60 @@ export default function ChargesEnseignants() {
       )}
 
       {peutAgir && (
-        <div className="card mb-3">
+        <div className="card px-panel mb-3 chg-create">
+          <div className="px-panel-head">
+            <div className="px-panel-headtext">
+              <h2 className="px-panel-title"><i className="bi bi-plus-circle me-1"></i>Nouvelle affectation pédagogique</h2>
+              <p className="px-panel-sub">Rattachez un enseignant à une ECUE de l'année académique courante.</p>
+            </div>
+          </div>
           <div className="card-body">
-            <h2 className="h6 card-title"><i className="bi bi-plus-circle me-1"></i>Nouvelle affectation pédagogique</h2>
-            <form className="row g-2" onSubmit={creerAffectation}>
-              <div className="col-md-3">
-                <select className="form-select" required value={form.enseignant_id}
+            <form className="chg-form-grid" onSubmit={creerAffectation}>
+              <label className="px-field">
+                <span className="px-field-label">Enseignant à affecter</span>
+                <select className="px-input px-select" required value={form.enseignant_id}
                         onChange={(e) => setForm({ ...form, enseignant_id: e.target.value })}>
                   <option value="">Enseignant…</option>
                   {options.formateurs.map((f) => (
                     <option key={f.id} value={f.id}>{f.nom} {f.prenom}</option>
                   ))}
                 </select>
-              </div>
-              <div className="col-md-2">
-                <select className="form-select" required value={form.ref_formation_id}
+              </label>
+              <label className="px-field">
+                <span className="px-field-label">Formation</span>
+                <select className="px-input px-select" required value={form.ref_formation_id}
                         onChange={(e) => setForm({ ...form, ref_formation_id: e.target.value })}>
                   <option value="">Formation…</option>
                   {options.formations.map((f) => <option key={f.id} value={f.id}>{f.intitule}</option>)}
                 </select>
-              </div>
-              <div className="col-md-2">
-                <select className="form-select" required value={form.niveau_id}
+              </label>
+              <label className="px-field">
+                <span className="px-field-label">Niveau</span>
+                <select className="px-input px-select" required value={form.niveau_id}
                         onChange={(e) => setForm({ ...form, niveau_id: e.target.value })}>
                   <option value="">Niveau…</option>
                   {options.niveaux.map((n) => <option key={n.id} value={n.id}>{n.code}</option>)}
                 </select>
-              </div>
-              <div className="col-md-2">
-                <select className="form-select" required value={form.semestre_id}
+              </label>
+              <label className="px-field">
+                <span className="px-field-label">Semestre</span>
+                <select className="px-input px-select" required value={form.semestre_id}
                         onChange={(e) => setForm({ ...form, semestre_id: e.target.value })}>
                   <option value="">Semestre…</option>
                   {options.semestres.filter((s) => s.niveau_id === Number(form.niveau_id)).map((s) => (
                     <option key={s.id} value={s.id}>{s.libelle}</option>
                   ))}
                 </select>
-              </div>
-              <div className="col-md-2">
-                <input type="number" min="0" step="0.5" className="form-control" placeholder="Volume (h)"
+              </label>
+              <label className="px-field">
+                <span className="px-field-label">Volume (h)</span>
+                <input type="number" min="0" step="0.5" className="px-input" placeholder="Volume (h)"
                        required value={form.volume_horaire}
                        onChange={(e) => setForm({ ...form, volume_horaire: e.target.value })} />
-              </div>
-              <div className="col-12">
-                <button className="btn btn-primary btn-sm" disabled={enCours || !annee}>
-                  Créer l'affectation {annee ? `(${annee.libelle})` : ''}
+              </label>
+              <div className="chg-form-actions">
+                <button className="btn btn-dfrc" disabled={enCours || !annee}>
+                  <i className="bi bi-check2-circle me-1"></i>Créer l'affectation {annee ? `(${annee.libelle})` : ''}
                 </button>
               </div>
             </form>

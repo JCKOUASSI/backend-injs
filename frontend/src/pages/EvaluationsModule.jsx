@@ -6,7 +6,7 @@ import {
   getEvaluations, getSessions, getEvaluation, getComposants,
   getParticipants, getResultatsEcue, getResultatsUe, getResultatsSemestre,
   getJurySessions, getJuryAnomalies, getJuryStatistiques,
-  saisirNotes, getReleves, getReleve,
+  saisirNotes, getReleves, getReleve, getPassageNiveau,
 } from '../services/evaluations'
 import '../styles/evaluations.css'
 
@@ -1227,12 +1227,109 @@ export function ControleNotes() {
 
 // ── 6. Résultats ────────────────────────────────────────────────────────────
 
+/**
+ * Panneau du passage de niveau.
+ *
+ * Le moteur backend est l'unique source : éligibilité, ECTS, semestres et
+ * décision de jury sont AFFICHÉS tels que renvoyés. Une donnée manquante
+ * reste « indeterminate », jamais un 0 ni une validation supposée (D6).
+ */
+function PanneauPassage({ etat }) {
+  if (etat.chargement) {
+    return (
+      <EtatVide
+        icone="bi-hourglass"
+        titre="Chargement…"
+        message="Calcul du passage de niveau."
+      />
+    )
+  }
+  if (etat.erreur) {
+    return (
+      <PanneauErreur
+        erreur={etat.erreur}
+        onReessayer={etat.erreur ? etat.reessayer : null}
+      />
+    )
+  }
+  const d = etat.donnees
+  if (!d) return null
+  const decision = d.decision_jury ?? null
+  return (
+    <div className="card-body">
+      <dl className="row mb-0">
+        <dt className="col-sm-3">Éligibilité</dt>
+        <dd className="col-sm-9">
+          <BadgeEtat valeur={d.eligibilite} />
+        </dd>
+        <dt className="col-sm-3">Niveau visé</dt>
+        <dd className="col-sm-9">{affichage(d.niveau_cible)}</dd>
+        <dt className="col-sm-3">ECTS</dt>
+        <dd className="col-sm-9">
+          {affichage(d.credits_acquis)} / {affichage(d.credits_requis)}
+        </dd>
+        <dt className="col-sm-3">Décision du jury</dt>
+        <dd className="col-sm-9">
+          {decision == null
+            ? <span className="px-dash">Aucune décision enregistrée</span>
+            : <BadgeEtat valeur={decision.valeur} />}
+        </dd>
+        <dt className="col-sm-3">Motif</dt>
+        <dd className="col-sm-9">{affichage(d.code)} — {affichage(d.justification)}</dd>
+      </dl>
+
+      <h3 className="px-panel-title mt-4">Semestres du niveau</h3>
+      {(d.semestres ?? []).length === 0 ? (
+        <EtatVide
+          icone="bi-dash"
+          titre="Aucun semestre"
+          message="Aucun résultat de semestre pour ce niveau : le passage ne peut pas être conclu."
+        />
+      ) : (
+        <div className="ev-table-scroll">
+          <table className="table px-table">
+            <thead>
+              <tr>
+                <th scope="col">Semestre</th>
+                <th scope="col">Crédits acquis</th>
+                <th scope="col">Crédits attendus</th>
+                <th scope="col">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.semestres.map((s, i) => (
+                <tr key={`${s.semestre}-${i}`}>
+                  <td>{affichage(s.semestre)}</td>
+                  <td>{affichage(s.credits_acquis)}</td>
+                  <td>{affichage(s.credits_attendus)}</td>
+                  <td><BadgeEtat valeur={s.statut} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ResultatsEvaluations() {
   const [niveau, setNiveau] = useState('ecue')
+  const [passage, setPassage] = useState(null)
   const { donnees, chargement, erreur, reessayer } = useCharge(
     () => (niveau === 'ecue' ? getResultatsEcue()
       : niveau === 'ue' ? getResultatsUe() : getResultatsSemestre()),
     [niveau],
+  )
+  // Passage de niveau : calcul backend, jamais recalculé ici (D10).
+  const passageCharge = useCharge(
+    () => (passage == null
+      ? Promise.resolve(null)
+      : getPassageNiveau({
+        inscription_id: passage.inscription_id,
+        session_id: passage.session_id,
+      })),
+    [passage],
   )
   const lignes = donnees?.results ?? []
   const segments = [['ecue', 'ECUE'], ['ue', 'UE'], ['semestre', 'Semestre']]
@@ -1293,6 +1390,7 @@ export function ResultatsEvaluations() {
                     {Object.keys(lignes[0] ?? {}).map((c) => (
                       <th scope="col" key={c}>{c.replace(/_/g, ' ')}</th>
                     ))}
+                    {niveau === 'semestre' && <th scope="col">Passage</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1303,6 +1401,22 @@ export function ResultatsEvaluations() {
                           {affichage(l[c])}
                         </td>
                       ))}
+                      {niveau === 'semestre' && (
+                        <td className="text-end">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => setPassage({
+                              inscription_id: l.inscription,
+                              session_id: l.session,
+                              libelle: `${l.semestre} — ${l.statut_semestre}`,
+                            })}
+                            data-testid={`passage-${l.inscription}-${l.session}`}
+                          >
+                            Passage de niveau
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1311,6 +1425,29 @@ export function ResultatsEvaluations() {
           )}
         </div>
       </div>
+
+      {passage != null && (
+        <div className="card px-panel" data-testid="passage-detail">
+          <div className="px-panel-head">
+            <div className="px-panel-headtext">
+              <h2 className="px-panel-title">
+                <i className="bi bi-signpost-split" aria-hidden="true" />
+                Passage de niveau — {affichage(passage.libelle)}
+              </h2>
+              <p className="px-panel-sub">
+                Calcul technique fourni par le moteur LMD ; la décision officielle
+                reste celle du jury.
+              </p>
+            </div>
+          </div>
+          <div className="card-body-flush">
+            <PanneauPassage
+              etat={passageCharge}
+              reessayer={passageCharge.reessayer}
+            />
+          </div>
+        </div>
+      )}
     </Page>
   )
 }

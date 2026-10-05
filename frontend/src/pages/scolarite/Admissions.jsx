@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import ConfirmModal from '../../components/ConfirmModal'
 import StatutBadge from '../../components/scolarite/StatutBadge'
+import '../../styles/campagnes.css'
 import {
   annulerAdmission,
   decisionAdmission,
@@ -236,22 +237,43 @@ export default function Admissions() {
     })
   }
 
+  const kpis = useMemo(() => ({
+    total: admissions.length,
+    admis: admissions.filter((a) => ['ADMIS', 'ADMIS_SOUS_RESERVE'].includes(a.decision)).length,
+    attente: admissions.filter((a) => a.decision === 'EN_ATTENTE').length,
+    aInscrire: admissions.filter((a) => a.permet_inscription).length,
+  }), [admissions])
+
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <div>
-          <h4 className="mb-0">Admissions</h4>
-          <small className="text-muted">{annee ? `Année ${annee.libelle}` : 'Année courante non définie'}</small>
+    <div className="camp-page">
+      <div className="camp-hero">
+        <div className="camp-hero-text">
+          <h1 className="camp-hero-title"><i className="bi bi-patch-check"></i>Admissions</h1>
+          <p className="camp-hero-sub">{annee ? `Année ${annee.libelle}` : 'Année courante non définie'} · Décisions prononcées puis inscription des admis.</p>
         </div>
-        <select
-          className="form-select form-select-sm" style={{ maxWidth: '220px' }}
-          value={filtreDecision} onChange={(e) => setFiltreDecision(e.target.value)}
-        >
-          <option value="">Toutes les décisions</option>
-          {DECISIONS.map(([valeur, libelle]) => (
-            <option key={valeur} value={valeur}>{libelle}</option>
-          ))}
-        </select>
+        <div className="camp-hero-side">
+          <span className="plaquette plaquette-primary"><i className="bi bi-mortarboard"></i>{annee?.libelle || 'Année en cours'}</span>
+          <span className="plaquette plaquette-soft"><i className="bi bi-people"></i>{admissions.length} admission{admissions.length > 1 ? 's' : ''}</span>
+        </div>
+      </div>
+
+      <div className="camp-kpi-row">
+        <div className="camp-kpi">
+          <div><span className="camp-kpi-label">Décisions</span><span className="camp-kpi-value">{kpis.total}</span></div>
+          <span className="camp-kpi-icon is-blue"><i className="bi bi-clipboard-check"></i></span>
+        </div>
+        <div className="camp-kpi">
+          <div><span className="camp-kpi-label">Admis</span><span className="camp-kpi-value">{kpis.admis}</span></div>
+          <span className="camp-kpi-icon is-green"><i className="bi bi-award"></i></span>
+        </div>
+        <div className="camp-kpi">
+          <div><span className="camp-kpi-label">En attente</span><span className="camp-kpi-value">{kpis.attente}</span></div>
+          <span className="camp-kpi-icon is-amber"><i className="bi bi-hourglass-split"></i></span>
+        </div>
+        <div className="camp-kpi">
+          <div><span className="camp-kpi-label">À inscrire</span><span className="camp-kpi-value">{kpis.aInscrire}</span></div>
+          <span className="camp-kpi-icon is-slate"><i className="bi bi-person-plus"></i></span>
+        </div>
       </div>
 
       {selection && (
@@ -264,25 +286,40 @@ export default function Admissions() {
         />
       )}
 
-      <div className="card">
-        <div className="card-body">
+      <div className="camp-panel card">
+        <div className="camp-panel-head">
+          <h2 className="camp-panel-title"><i className="bi bi-list-check"></i>Décisions d&apos;admission</h2>
+          <div className="camp-filters">
+            <select
+              className="form-select form-select-sm camp-filter-select" aria-label="Filtrer par décision"
+              value={filtreDecision} onChange={(e) => setFiltreDecision(e.target.value)}
+            >
+              <option value="">Toutes les décisions</option>
+              {DECISIONS.map(([valeur, libelle]) => (
+                <option key={valeur} value={valeur}>{libelle}</option>
+              ))}
+            </select>
+            <span className="camp-count-pill">{admissions.length} dossier{admissions.length > 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div className="camp-panel-body">
           {loading ? (
             <div className="text-center py-4"><div className="spinner-border"></div></div>
           ) : (
             <div className="table-responsive">
-              <table className="table table-hover align-middle">
-                <thead>
+              <table className="table table-hover align-middle mb-0 camp-table">
+                <thead className="table-light">
                   <tr>
                     <th>Candidat</th><th>Formation</th><th>Niveau</th><th>Décision</th>
-                    <th>Référence</th><th>Limite</th><th></th>
+                    <th>Référence</th><th>Limite</th><th className="text-end">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {admissions.map((a) => (
                     <tr key={a.id}>
                       <td>
-                        {a.candidat}
-                        <div className="text-muted small">{a.candidature_numero}</div>
+                        <span className="camp-link">{a.candidat}</span>
+                        <span className="camp-sub">{a.candidature_numero}</span>
                       </td>
                       <td>{a.ref_formation}</td>
                       <td>{a.niveau}</td>
@@ -291,33 +328,35 @@ export default function Admissions() {
                         {a.est_expiree && <span className="badge bg-danger ms-1">Expirée</span>}
                       </td>
                       <td>{a.reference_decision || <span className="text-muted">—</span>}</td>
-                      <td>{a.date_limite_inscription || <span className="text-muted">—</span>}</td>
+                      <td className="text-nowrap">{a.date_limite_inscription || <span className="text-muted">—</span>}</td>
                       <td className="text-end">
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary" onClick={() => setSelection(a)}>
-                            Décision
+                          <button className="btn btn-outline-primary camp-action-btn" onClick={() => setSelection(a)}>
+                            <i className="bi bi-gavel me-1"></i>Décision
                           </button>
                           <button
-                            className="btn btn-outline-success"
+                            className="btn btn-outline-success camp-action-btn"
                             disabled={!a.permet_inscription}
                             title={a.permet_inscription ? 'Créer le dossier étudiant' : "L'admission ne permet pas l'inscription"}
                             onClick={() => inscrire(a)}
                           >
-                            Inscrire
+                            <i className="bi bi-person-plus me-1"></i>Inscrire
                           </button>
                           <button
-                            className="btn btn-outline-danger"
+                            className="btn btn-outline-danger camp-action-btn"
                             disabled={a.decision === 'ANNULEE'}
                             onClick={() => annuler(a)}
                           >
-                            Annuler
+                            <i className="bi bi-x-circle me-1"></i>Annuler
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {admissions.length === 0 && (
-                    <tr><td colSpan={7} className="text-center text-muted py-4">Aucune admission.</td></tr>
+                    <tr><td colSpan={7}>
+                      <div className="camp-empty"><i className="bi bi-inbox"></i>Aucune admission pour ces critères. Les décisions prononcées apparaîtront ici.</div>
+                    </td></tr>
                   )}
                 </tbody>
               </table>

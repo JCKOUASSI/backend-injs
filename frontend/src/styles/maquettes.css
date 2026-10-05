@@ -185,3 +185,95 @@
   padding: 0.35rem 0.75rem;
   transition: all 0.15s ease-in-out;
 }
+
+/* ==========================================================================
+   FINITIONS PRÉMIUM (alignées sur campagnes.css / candidatures.css)
+   ========================================================================== */
+
+/* Le fond de page est déjà dégradé : la grille KPI ne double pas les marges. */
+.maquettes-lmd-container .maquettes-stats-grid {
+  margin-bottom: 0;
+}
+
+/* KPI : icône colorée par variante, chiffre à droite (lecture pilotage). */
+.maquettes-lmd-container .maquette-kpi-card {
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+}
+
+.maquette-kpi-icon.is-green { background: #ecfdf5; color: #10b981; }
+.maquette-kpi-icon.is-blue { background: #ebf3ff; color: #2a7fff; }
+.maquette-kpi-icon.is-amber { background: #fffbeb; color: #d97706; }
+.maquette-kpi-icon.is-slate { background: #eef2f7; color: #475569; }
+
+.maquettes-lmd-container .maquette-kpi-title {
+  margin-bottom: 0.2rem;
+}
+
+/* Panneaux : le titre de panneau remplace l'ancien <h2> de carte. */
+.maquettes-lmd-container .camp-panel-title {
+  font-size: 1rem;
+}
+
+/* Filtres : libellés en capitales discrètes + contrôles arrondis. */
+.maquettes-lmd-container .camp-form .form-label {
+  margin-bottom: 0.3rem;
+}
+
+.maq-select,
+.maq-input {
+  border-radius: 10px;
+  border-color: #e2e8f0;
+  font-size: 0.88rem;
+}
+
+.maq-select:focus,
+.maq-input:focus {
+  border-color: #2a7fff;
+  box-shadow: 0 0 0 3px rgba(42, 127, 255, 0.12);
+}
+
+.maq-search .input-group-text {
+  background: #fff;
+  border-color: #e2e8f0;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  color: #94a3b8;
+}
+
+.maq-search .form-control {
+  border-radius: 0 10px 10px 0;
+  border-left: 0;
+}
+
+.maq-search .form-control:focus {
+  border-color: #2a7fff;
+  box-shadow: 0 0 0 3px rgba(42, 127, 255, 0.12);
+}
+
+.maq-search .btn-outline-secondary {
+  border-radius: 0 10px 10px 0;
+}
+
+/* Tableau : pastilles d'identifiants et alignement vertical propre. */
+.maq-chip {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+}
+
+.maquettes-lmd-container .maq-table tbody td {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.maquettes-lmd-container .maq-table .camp-candidatures {
+  min-width: 2.2rem;
+}
+
+/* Actions en pilules, jamais collées au bord droit de la cellule. */
+.maquettes-lmd-container .camp-action-btn {
+  white-space: nowrap;
+}

@@ -9,7 +9,7 @@
  *   alerte rouge générique.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import {
@@ -449,6 +449,160 @@ describe('pages/EvaluationsModule — comportement', () => {
       const urls = f.mock.calls.map((c) => c[0])
       // Aucun endpoint fictif (rattrapage, délibérations, relevés).
       expect(urls.every((u) => /resultats\/(ecue|ue|semestre)\//.test(u))).toBe(true)
+    })
+  })
+
+  // ── 6b. Passage de niveau : calcul backend, lecture seule (D10) ─────────
+  describe('6b. Passage de niveau — panneau de consultation', () => {
+    /** Payload conforme à `SemesterResultSerializer`. */
+    const LIGNE_SEMESTRE = {
+      id: 51, inscription: 3, session: 2, semestre: 'S3', statut_semestre: 'VALIDE',
+      moyenne: '14.00', credits_attendus: 30, credits_acquis: 30, statut: 'VALIDE',
+    }
+    const PAGE_SEMESTRE = {
+      count: 1, next: null, previous: null, results: [LIGNE_SEMESTRE],
+    }
+    /** Payload conforme à `PassageNiveauSerializer` (moteur `passage.py`). */
+    const PASSAGE = {
+      niveau_cible: 'L2', eligibilite: 'ELIGIBLE', code: 'PASSAGE_ELIGIBLE',
+      credits_acquis: 60, credits_requis: 60,
+      justification: 'Niveau L2 complet : 60/60 ECTS, tous les semestres validés.',
+      empreinte: 'sha256:abc', decision_jury: null,
+      semestres: [
+        { semestre: 'S3', numero: 3, statut: 'VALIDE', credits_attendus: 30, credits_acquis: 30 },
+        { semestre: 'S4', numero: 4, statut: 'VALIDE', credits_attendus: 30, credits_acquis: 30 },
+      ],
+    }
+    const VIDE = { count: 0, next: null, previous: null, results: [] }
+
+    /** Bascule sur l'onglet Semestre puis ouvre le panneau de passage. */
+    async function ouvrirPassage(routes) {
+      const f = installFetch({
+        'GET /api/evaluations-academiques/resultats/ecue/': VIDE,
+        ...routes,
+      })
+      rendre(<ResultatsEvaluations />)
+      await screen.findByRole('button', { name: 'Semestre' })
+      await userEvent.click(screen.getByRole('button', { name: 'Semestre' }))
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Passage de niveau' }),
+      )
+      return f
+    }
+
+    it('ouvre le panneau et affiche le calcul tel que renvoyé par le moteur', async () => {
+      const f = installFetch({
+        'GET /api/evaluations-academiques/resultats/ecue/': VIDE,
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': PASSAGE,
+      })
+      rendre(<ResultatsEvaluations />)
+      await userEvent.click(await screen.findByRole('button', { name: 'Semestre' }))
+      await screen.findByRole('button', { name: 'Passage de niveau' })
+      // Aucun panneau avant la demande explicite de l'utilisateur.
+      expect(screen.queryByTestId('passage-detail')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Passage de niveau' }))
+      expect(await screen.findByTestId('passage-detail')).toBeInTheDocument()
+      // L'appel porte les identifiants de la ligne, en GET exclusif (D10 :
+      // le calcul ne modifie rien, aucune décision n'est produite ici).
+      const appel = f.mock.calls.find(([u]) => u.includes('/resultats/passage/'))
+      expect(appel[0]).toContain('inscription_id=3')
+      expect(appel[0]).toContain('session_id=2')
+      expect(f.mock.calls.every((c) => (c[1]?.method || 'GET') === 'GET')).toBe(true)
+      // Valeurs backend affichées telles quelles.
+      expect(screen.getByText('ELIGIBLE')).toBeInTheDocument()
+      expect(screen.getByText(/PASSAGE_ELIGIBLE/)).toBeInTheDocument()
+      expect(screen.getByText('60 / 60')).toBeInTheDocument()
+      expect(screen.getAllByText('S3').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('S4').length).toBeGreaterThan(0)
+      // Aucune décision de jury : jamais une validation supposée (D6).
+      expect(screen.getByText('Aucune décision enregistrée')).toBeInTheDocument()
+    })
+
+    it('affiche l’état de chargement tant que le moteur ne répond pas', async () => {
+      let liberer
+      await ouvrirPassage({
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': () =>
+          new Promise((resolve) => { liberer = resolve }),
+      })
+      expect(screen.getByText('Chargement…')).toBeInTheDocument()
+      expect(screen.getByText('Calcul du passage de niveau.')).toBeInTheDocument()
+      await waitFor(() => expect(typeof liberer).toBe('function'))
+      liberer(fetchResponse(PASSAGE))
+      expect(await screen.findByText('Aucune décision enregistrée')).toBeInTheDocument()
+    })
+
+    it('signale l’absence de semestre sans conclure au passage', async () => {
+      await ouvrirPassage({
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': { ...PASSAGE, semestres: [] },
+      })
+      expect(await screen.findByText('Aucun semestre')).toBeInTheDocument()
+      expect(screen.getByText(/le passage ne peut pas être conclu/i)).toBeInTheDocument()
+    })
+
+    it('signale l’erreur du calcul et recharge sur « Réessayer »', async () => {
+      let tentatives = 0
+      await ouvrirPassage({
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': () => {
+          tentatives += 1
+          return tentatives === 1
+            ? etatHttp(403, { detail: 'Consultation non autorisée.', code: 'ACCES_REFUSE' })
+            : fetchResponse(PASSAGE)
+        },
+      })
+      // Le refus backend est nommé, pas fondu dans un message générique.
+      expect(await screen.findByText('Accès refusé')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /Réessayer/i }))
+      expect(await screen.findByText('Aucune décision enregistrée')).toBeInTheDocument()
+      expect(tentatives).toBe(2)
+    })
+
+    it('reproduit la décision EXCLUSION du jury sans la contredire', async () => {
+      await ouvrirPassage({
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': {
+          ...PASSAGE,
+          eligibilite: 'BLOQUE',
+          code: 'DECISION_JURY_BLOQUANTE',
+          justification: 'Décision officielle du jury : Exclusion — aucun passage automatique ne peut être proposé.',
+          decision_jury: {
+            valeur: 'EXCLUSION', libelle: 'Exclusion', decide_le: '2026-06-30T10:00:00Z',
+          },
+        },
+      })
+      const panneau = await screen.findByTestId('passage-detail')
+      expect(within(panneau).getByText('BLOQUE')).toBeInTheDocument()
+      expect(within(panneau).getByText('EXCLUSION')).toBeInTheDocument()
+      expect(within(panneau).queryByText('Aucune décision enregistrée')).not.toBeInTheDocument()
+    })
+
+    it('ne convertit jamais null en 0 (crédits et décision)', async () => {
+      await ouvrirPassage({
+        'GET /api/evaluations-academiques/resultats/semestre/': PAGE_SEMESTRE,
+        'GET /api/evaluations-academiques/resultats/passage/': {
+          ...PASSAGE, credits_acquis: null, credits_requis: null,
+        },
+      })
+      const panneau = await screen.findByTestId('passage-detail')
+      expect(within(panneau).getByText('Non renseigné / Non renseigné')).toBeInTheDocument()
+      expect(within(panneau).getByText('Aucune décision enregistrée')).toBeInTheDocument()
+      expect(within(panneau).queryByText(/^0$/)).not.toBeInTheDocument()
+    })
+
+    it('un refus de consultation (403) n’expose aucun bouton de passage', async () => {
+      installFetch({
+        'GET /api/evaluations-academiques/resultats/ecue/': VIDE,
+        'GET /api/evaluations-academiques/resultats/semestre/': () =>
+          etatHttp(403, { detail: 'Accès à la consultation des évaluations refusé.' }),
+      })
+      rendre(<ResultatsEvaluations />)
+      const seg = await screen.findByRole('button', { name: 'Semestre' })
+      await userEvent.click(seg)
+      expect(await screen.findByText('Accès refusé')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Passage de niveau' })).not.toBeInTheDocument()
     })
   })
 

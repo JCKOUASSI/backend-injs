@@ -17,6 +17,7 @@ import { canCreateParticipant, canManageParticipant, canViewPresences as canView
 import Pagination from '../components/Pagination'
 import { parsePaginatedResponse } from '../utils/paginatedResponse'
 import ParticipantDetailModal from '../components/ParticipantDetailModal'
+import '../styles/campagnes.css'
 
 const emptyForm = {
   matricule: '',
@@ -290,20 +291,29 @@ export default function Participants() {
   }
 
   return (
-    <div>
+    <div className="camp-page">
+      {/* Hero premium */}
+      <div className="camp-hero">
+        <div className="camp-hero-text">
+          <h1 className="camp-hero-title"><i className="bi bi-people"></i>Étudiants</h1>
+          <p className="camp-hero-sub">Registre des étudiants · recherche, filtres par secrétariat, grade, groupe, concours, sexe et vague.</p>
+        </div>
+        <div className="camp-hero-side">
+          <span className="plaquette plaquette-soft"><i className="bi bi-list-ul"></i>{totalCount} étudiant{totalCount > 1 ? 's' : ''}</span>
+        </div>
+      </div>
+
       {/* Search + Filter bar */}
-      <div className="card">
-        <div className="card-body">
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ flex: '1 1 250px' }}>
-              <div className="input-group">
-                <span className="input-group-text"><i className="bi bi-search"></i></span>
-                <input type="text" className="form-control" placeholder="Nom, prénom, matricule, e-mail, concours…"
-                  value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
-              </div>
+      <div className="camp-panel card">
+        <div className="camp-panel-body">
+          <div className="parti-filters">
+            <div className="camp-search parti-search">
+              <i className="bi bi-search"></i>
+              <input type="text" className="form-control" placeholder="Nom, prénom, matricule, e-mail, concours…"
+                value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
             </div>
-            <div>
-              <select className="form-control" value={secretariatFilter}
+            <div className="parti-filter">
+              <select className="form-select camp-filter-select w-100" value={secretariatFilter}
                 onChange={(e) => { setSecretariatFilter(e.target.value); setPage(1) }}>
                 <option value="">Tous (secrétariat)</option>
                 {filterOptions.secretariats.map((s) => (
@@ -311,8 +321,8 @@ export default function Participants() {
                 ))}
               </select>
             </div>
-            <div>
-              <select className="form-control" value={gradeFilter}
+            <div className="parti-filter">
+              <select className="form-select camp-filter-select w-100" value={gradeFilter}
                 onChange={(e) => { setGradeFilter(e.target.value); setPage(1) }}>
                 <option value="">Tous (grade)</option>
                 {filterOptions.grades.map((g) => (
@@ -320,8 +330,8 @@ export default function Participants() {
                 ))}
               </select>
             </div>
-            <div>
-              <select className="form-control" value={groupeFilter}
+            <div className="parti-filter">
+              <select className="form-select camp-filter-select w-100" value={groupeFilter}
                 onChange={(e) => { setGroupeFilter(e.target.value); setPage(1) }}>
                 <option value="">Tous (groupe)</option>
                 {filterOptions.groupes.map((g) => (
@@ -329,8 +339,8 @@ export default function Participants() {
                 ))}
               </select>
             </div>
-            <div>
-              <select className="form-control" value={typeConcoursFilter}
+            <div className="parti-filter">
+              <select className="form-select camp-filter-select w-100" value={typeConcoursFilter}
                 onChange={(e) => { setTypeConcoursFilter(e.target.value); setPage(1) }}>
                 <option value="">Tous (type concours)</option>
                 {filterOptions.types_concours.map((t) => (
@@ -338,8 +348,8 @@ export default function Participants() {
                 ))}
               </select>
             </div>
-            <div>
-              <select className="form-control" value={sexeFilter}
+            <div className="parti-filter">
+              <select className="form-select camp-filter-select w-100" value={sexeFilter}
                 onChange={(e) => { setSexeFilter(e.target.value); setPage(1) }}>
                 <option value="">Tous (sexe)</option>
                 <option value="MASCULIN">Masculin</option>
@@ -347,8 +357,8 @@ export default function Participants() {
               </select>
             </div>
             {refs.vagues && refs.vagues.length > 0 && (
-              <div>
-                <select className="form-control" value={vagueFilter}
+              <div className="parti-filter">
+                <select className="form-select camp-filter-select w-100" value={vagueFilter}
                   onChange={(e) => { setVagueFilter(e.target.value); setPage(1) }}>
                   <option value="">Toutes les vagues</option>
                   {refs.vagues.map(v => (
@@ -358,7 +368,7 @@ export default function Participants() {
               </div>
             )}
             {canCreate && (
-              <button onClick={openCreate} className="btn btn-dfrc">
+              <button onClick={openCreate} className="camp-submit-btn btn btn-primary btn-sm">
                 <i className="bi bi-plus-lg me-1"></i>Nouvel étudiant
               </button>
             )}
@@ -366,7 +376,7 @@ export default function Participants() {
               <>
                 <button
                   type="button"
-                  className="btn btn-outline-danger btn-sm"
+                  className="btn btn-outline-danger btn-sm camp-action-btn"
                   disabled={exportingListeClasse}
                   onClick={() => handleExportListeClasse('pdf')}
                   title={groupeFilter ? `Liste de classe PDF — ${groupeFilter}` : 'Liste de classe PDF — tous les groupes'}
@@ -376,7 +386,7 @@ export default function Participants() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-outline-success btn-sm"
+                  className="btn btn-outline-success btn-sm camp-action-btn"
                   disabled={exportingListeClasse}
                   onClick={() => handleExportListeClasse('excel')}
                   title={groupeFilter ? `Liste de classe Excel — ${groupeFilter}` : 'Liste de classe Excel — tous les groupes'}
@@ -393,32 +403,32 @@ export default function Participants() {
       {error && <div className="error-message">{error}</div>}
 
       {/* Table */}
-      <div className="card">
-        <div className="card-header-bar">
-          <span><i className="bi bi-people me-2"></i>Liste des étudiants</span>
-          <span className="badge-bg-secondary">{totalCount} résultat(s)</span>
+      <div className="camp-panel card">
+        <div className="camp-panel-head">
+          <h2 className="camp-panel-title"><i className="bi bi-people"></i>Liste des étudiants</h2>
+          <span className="camp-count-pill">{totalCount} résultat(s)</span>
         </div>
-        <div className="card-body-flush">
+        <div className="camp-panel-body">
           {loading ? <div className="loading"><div className="spinner"></div></div> : (
             <>
-              <div className="table-container">
-                <table className="table">
-                  <thead>
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0 camp-table">
+                  <thead className="table-light">
                     <tr>
                       <th>N° d'inscription</th>
                       <th>Nom &amp; Prénom</th>
                       <th>Sexe</th>
                       <th>Grade</th>
                       <th>Téléphone</th>
-                      <th>Actions</th>
+                      <th className="text-end">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {participants.length > 0 ? participants.map((p) => (
                       <tr key={p.id}>
-                        <td><span className="badge-bg-info">{p.matricule || '-'}</span></td>
+                        <td><span className="camp-candidatures">{p.matricule || '-'}</span></td>
                         <td>
-                          <strong>{p.nom} {p.prenom}</strong>
+                          <span className="camp-link">{p.nom} {p.prenom}</span>
                           </td>
                         <td>
                           {p.sexe
@@ -426,27 +436,27 @@ export default function Participants() {
                             : <span className="text-muted">-</span>}
                         </td>
                         <td>{p.grade || '-'}</td>
-                        <td><small>{p.telephone || '-'}</small></td>
-                        <td>
-                          <div className="btn-group">
-                            <button onClick={() => setShowDetail(p)} className="btn btn-outline-info btn-sm" title="Détail">
-                              <i className="bi bi-eye"></i>
+                        <td><small className="text-muted">{p.telephone || '-'}</small></td>
+                        <td className="text-end">
+                          <div className="btn-group btn-group-sm">
+                            <button onClick={() => setShowDetail(p)} className="btn btn-outline-secondary camp-action-btn" title="Visualiser">
+                              <i className="bi bi-eye me-1"></i>Visualiser
                             </button>
                             {canManage && (
-                              <button onClick={() => openEdit(p)} className="btn btn-outline-primary btn-sm" title="Modifier">
-                                <i className="bi bi-pencil"></i>
+                              <button onClick={() => openEdit(p)} className="btn btn-outline-primary camp-action-btn" title="Modifier">
+                                <i className="bi bi-pencil me-1"></i>Modifier
                               </button>
                             )}
                             {canManage && (
-                              <button onClick={() => handleDelete(p.id)} className="btn btn-outline-danger btn-sm" title="Supprimer">
-                                <i className="bi bi-trash"></i>
+                              <button onClick={() => handleDelete(p.id)} className="btn btn-outline-danger camp-action-btn" title="Supprimer">
+                                <i className="bi bi-trash me-1"></i>Supprimer
                               </button>
                             )}
                           </div>
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="6" className="text-center py-4 text-muted">Aucun étudiant trouvé</td></tr>
+                      <tr><td colSpan="6"><div className="camp-empty"><i className="bi bi-inbox"></i>Aucun étudiant trouvé</div></td></tr>
                     )}
                   </tbody>
                 </table>

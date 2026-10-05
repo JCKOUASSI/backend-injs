@@ -47,15 +47,34 @@ def types_conflit(a, b):
     """Retourne la liste des types de conflit applicables entre deux affectations.
 
     Un même couple peut cumuler plusieurs types (ex. même enseignant ET même salle).
+
+    Source de vérité : les **clés étrangères réelles** de l'affectation.
+    - L'enseignant est ``AffectationCreneau.formateur_id`` (FK ``Formateur``,
+      identifiant métier INJS) ; ``enseignant_id`` (compte utilisateur) n'est
+      qu'un vestige de l'historique mobile et ne sert que de repli.
+    - La salle est ``AffectationCreneau.salle_id`` (FK ``RefSalle``). Le champ
+      texte ``salle_nom`` est dénormalisé et ne sert que de repli : comparer
+      deux libellés fusionnerait ou séparerait à tort des salles distinctes.
     """
     types = []
-    if a.formateur_id and b.formateur_id and a.formateur_id == b.formateur_id:
+    # -- Enseignant : FK métier d'abord, compte utilisateur en repli --------
+    a_ens, b_ens = a.formateur_id, b.formateur_id
+    if not (a_ens and b_ens and a_ens == b_ens):
+        a_ens, b_ens = a.enseignant_id, b.enseignant_id
+    if a_ens and b_ens and a_ens == b_ens:
         types.append('HORAIRE_ENSEIGNANT')
-    elif a.enseignant_id and b.enseignant_id and a.enseignant_id == b.enseignant_id:
-        types.append('HORAIRE_ENSEIGNANT')
+    # -- Groupe : FK LMD ---------------------------------------------------
     if a.groupe_id and b.groupe_id and a.groupe_id == b.groupe_id:
         types.append('HORAIRE_GROUPETUDIANT')
-    if a.salle_nom and b.salle_nom and a.salle_nom.strip().casefold() == b.salle_nom.strip().casefold():
+    # -- Salle : la FK RefSale prime ; le libellé n'est consulté QUE si l'au
+    # moins une des deux FK est absente. Deux salles distinctes (FK différentes)
+    # ne sont jamais un conflit, même si leur libellé se ressemble.
+    a_salle, b_salle = a.salle_id, b.salle_id
+    if a_salle and b_salle:
+        if a_salle == b_salle:
+            types.append('HORAIRE_SALLE')
+    elif a.salle_nom and b.salle_nom and \
+            a.salle_nom.strip().casefold() == b.salle_nom.strip().casefold():
         types.append('HORAIRE_SALLE')
     if not types and a.formation_id and b.formation_id and a.formation_id == b.formation_id \
             and not a.groupe_id and not b.groupe_id:
@@ -464,6 +483,11 @@ def generer_brouillon(emploi_du_temps, *, remplace_existant=False, max_par_semai
                     creneau_template=ct,
                     semaine_debut=sem_debut,
                     semaine_fin=sem_fin,
+                    # -- Chaîne LMD : la séance est rattachée à son affectation
+                    # pédagogique, seule source de l'ECUE/UE/semestre/enseignant.
+                    # Sans ce FK, la séance reste orpheline côté pédagogie et
+                    # inexploitable par les présences QR.
+                    affectation_pedagogique_id=besoin.id,
                     formation_id=besoin.ref_formation_id,
                     groupe_id=besoin.groupe_id,
                     formateur_id=besoin.enseignant_id,
