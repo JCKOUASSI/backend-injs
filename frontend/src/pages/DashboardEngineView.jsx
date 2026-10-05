@@ -20,7 +20,7 @@ import {
   FinancialSituationCard,
 } from '@/components/dashboard/ExecutiveWidgets'
 import { DashboardSkeleton, DashboardErrorState } from '@/components/dashboard/StateViews'
-import LegacyDashboard from '@/pages/Dashboard'
+import SeancesEnDirect from '@/pages/SeancesEnDirect'
 import campusHeroImg from '@/assets/campus-injs.jpg'
 
 export default function DashboardEngineView() {
@@ -90,7 +90,9 @@ export default function DashboardEngineView() {
     }
   }, [activeTab, viewMode, fetchTabData])
 
-  // Rendu de la vue opérationnelle historique si sélectionnée
+  // Vue opérationnelle « Séances en direct » : supervision LMD des séances du
+  // jour et des présences rattachées (remplace l'ancien tableau de bord legacy
+  // basé sur SessionModule/Module, hors chaîne LMD).
   if (viewMode === 'operationnel') {
     return (
       <div className="dashboard-engine-wrapper">
@@ -107,7 +109,7 @@ export default function DashboardEngineView() {
             <i className="bi bi-speedometer2" /> Basculer vers Tableau de bord LMD 2026
           </button>
         </div>
-        <LegacyDashboard />
+        <SeancesEnDirect />
       </div>
     )
   }
@@ -157,7 +159,8 @@ export default function DashboardEngineView() {
   const inscritsVal = data?.kpis?.etudiants_inscrits ?? 1248
   const candidatsVal = data?.kpis?.candidats ?? 2340
   const enseignantsVal = data?.kpis?.enseignants ?? 186
-  const presenceVal = data?.kpis?.taux_presence ?? '92%'
+  // Un taux absent reste « non disponible » : ni 0 % ni pourcentage de repli.
+  const presenceVal = data?.kpis?.taux_presence ?? 'Non disponible'
   const diplomesVal = data?.kpis?.diplomes_delivres ?? 85
 
   return (
@@ -891,7 +894,7 @@ export default function DashboardEngineView() {
                   />
                   <KpiCard
                     title="Assiduité"
-                    value={data.kpis.assiduite ?? data.taux_presence ?? '—'}
+                    value={data.kpis.assiduite ?? data.taux_presence ?? 'Non disponible'}
                     icon="bi-clock-history"
                     trend="Présence"
                   />

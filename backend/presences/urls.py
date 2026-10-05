@@ -8,6 +8,11 @@ urlpatterns = [
     # Lot C refonte — présence par QR sur les séances LMD (EDT), émargement
     # manuel à motif et clôture automatique (modèle fonctionnel MODULE 08).
     path('presences/seances-edt/du-jour/', seances_edt_api.seances_du_jour, name='presences-edt-du-jour'),
+    # Bloc « Séances en direct » du dashboard administrateur : supervision
+    # consultative des séances LMD d'une journée (statut, contexte LMD,
+    # présences rattachées). Lecture seule — ne déclenche aucune écriture.
+    path('presences/seances-edt/supervision/', seances_edt_api.supervision_api,
+         name='presences-edt-supervision'),
     path('presences/seances-edt/scan/', seances_edt_api.scan_seance, name='presences-edt-scan'),
     path('presences/seances-edt/<int:pk>/qr/', seances_edt_api.qr_seance, name='presences-edt-qr'),
     path('presences/seances-edt/<int:pk>/presences/', seances_edt_api.presences_seance,

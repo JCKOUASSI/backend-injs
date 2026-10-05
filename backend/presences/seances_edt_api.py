@@ -30,6 +30,7 @@ from edts.models import AffectationCreneau
 from habilitations.permissions import ExigePermission
 
 from . import seances_edt_services as service
+from . import seances_supervision as supervision
 from .models import Pointage
 from .views import _require_mobile_device_id, _resolve_authenticated_personne
 
@@ -55,6 +56,48 @@ def _affectation_ou_404(pk):
 def _erreur(serviceErreur):
     return Response({'code': serviceErreur.code, 'detail': serviceErreur.detail},
                     status=serviceErreur.status_code)
+
+
+def _entier(request, nom):
+    """Entier optionnel : absent → ``None`` (filtre non appliqué, jamais 0)."""
+    brut = (request.query_params.get(nom) or '').strip()
+    if not brut:
+        return None
+    try:
+        return int(brut)
+    except (TypeError, ValueError):
+        return None
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, ExigePermission.pour('presences.emargement.consulter')])
+def supervision_api(request):
+    """Séances d'une journée + suivi de leurs présences (bloc « Séances en direct »).
+
+    `GET /api/presences/seances-edt/supervision/?date=&statut=&formation_id=&groupe_id=&enseignant_id=`
+
+    Vue **consultative** : statut de séance dérivé des horaires planifiés,
+    contexte LMD par clés étrangères, présences réellement rattachées
+    (``Pointage.seance_edt``). Aucune écriture, aucun badgeage, aucun QR
+    généré, aucune clôture : ouvrir, filtrer ou rafraîchir le dashboard est
+    sans effet de bord.
+    """
+    jour, err = _date(request)
+    if err:
+        return Response(err, status=status.HTTP_400_BAD_REQUEST)
+    statut = (request.query_params.get('statut') or '').strip().upper() or None
+    if statut and statut not in supervision.STATUTS_SEANCE:
+        return Response(
+            {'detail': 'Statut inconnu. Valeurs acceptées : '
+                       + ', '.join(supervision.STATUTS_SEANCE) + '.'},
+            status=status.HTTP_400_BAD_REQUEST)
+    return Response(supervision.supervision_seances(
+        request.user, jour,
+        statut=statut,
+        formation_id=_entier(request, 'formation_id'),
+        groupe_id=_entier(request, 'groupe_id'),
+        enseignant_id=_entier(request, 'enseignant_id'),
+    ))
 
 
 @api_view(['GET'])

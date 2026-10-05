@@ -752,3 +752,347 @@
     flex: 1 1 100%;
   }
 }
+
+/* ==========================================================================
+   BLOC « SEANCES EN DIRECT » — supervision LMD (etend le design system)
+   Reutilise les tokens ci-dessus : aucune nouvelle palette n'est introduite.
+   ========================================================================== */
+
+.seances-en-direct {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seances-en-direct__entete {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.seances-en-direct__titre {
+  margin: 0.3rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--injs-blue-dark);
+}
+
+.seances-en-direct__precision {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--injs-text-secondary);
+}
+
+/* --- Filtres ------------------------------------------------------------ */
+.seance-filtres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+}
+
+.seance-filtre {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 150px;
+  flex: 1 1 150px;
+}
+
+.seance-filtre > span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--injs-text-muted);
+}
+
+.seance-filtre select,
+.seance-filtre input {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--injs-text-primary);
+  background: var(--injs-surface);
+  border: 1px solid var(--injs-border);
+  border-radius: var(--injs-radius-sm);
+}
+
+/* --- Resume ------------------------------------------------------------- */
+.seance-resume {
+  padding: 1rem 1.15rem;
+}
+
+.seance-resume__entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.seance-resume__titre {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--injs-blue-dark);
+}
+
+.seance-resume__precision {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--injs-text-muted);
+}
+
+.seance-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.seance-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--injs-blue-tint);
+  border: 1px solid var(--injs-border);
+  border-left: 3px solid var(--injs-blue-accent);
+  border-radius: var(--injs-radius-sm);
+}
+
+.seance-kpi__icone {
+  font-size: 0.95rem;
+  color: var(--injs-blue-accent);
+}
+
+.seance-kpi__valeur {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--injs-blue-dark);
+  line-height: 1.1;
+}
+
+.seance-kpi__label {
+  font-size: 0.74rem;
+  color: var(--injs-text-secondary);
+}
+
+.seance-kpi--encours { border-left-color: var(--injs-success); }
+.seance-kpi--enseignant { border-left-color: var(--injs-info); }
+.seance-kpi--salle { border-left-color: var(--injs-blue-vibrant); }
+.seance-kpi--present { border-left-color: var(--injs-success); }
+.seance-kpi--anomalie { border-left-color: var(--injs-warning); }
+
+/* --- Grille de seances -------------------------------------------------- */
+.seances-en-direct__grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.seance-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+}
+
+.seance-carte__entete {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.seance-statut {
+  align-self: flex-start;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--injs-radius-pill);
+  background: var(--injs-blue-light);
+  color: var(--injs-blue-institution);
+}
+
+.seance-statut--encours {
+  background: var(--injs-success-bg);
+  color: #047857;
+}
+
+.seance-statut--terminee {
+  background: var(--injs-border);
+  color: var(--injs-text-secondary);
+}
+
+.seance-statut--annulee {
+  background: var(--injs-danger-bg);
+  color: #B91C1C;
+}
+
+.seance-carte__titre {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--injs-blue-dark);
+}
+
+.seance-carte__ue,
+.seance-carte__alerte {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--injs-text-secondary);
+}
+
+.seance-carte__alerte {
+  padding: 0.35rem 0.5rem;
+  background: var(--injs-warning-bg);
+  border-radius: var(--injs-radius-sm);
+  color: #92400E;
+}
+
+.seance-carte__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.seance-carte__meta > div {
+  min-width: 0;
+}
+
+.seance-carte__meta dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--injs-text-muted);
+}
+
+.seance-carte__meta dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--injs-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.seance-carte__presences {
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--injs-border);
+}
+
+.seance-presence-titre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--injs-text-secondary);
+}
+
+.seance-source {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--injs-info);
+}
+
+.seance-compteurs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.seance-compteur {
+  padding: 0.45rem 0.55rem;
+  background: var(--injs-blue-tint);
+  border-radius: var(--injs-radius-sm);
+  text-align: center;
+}
+
+.seance-compteur__valeur {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--injs-blue-dark);
+}
+
+.seance-compteur__label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--injs-text-secondary);
+}
+
+.seance-compteur--present {
+  background: var(--injs-success-bg);
+}
+
+.seance-compteur--present .seance-compteur__valeur {
+  color: #047857;
+}
+
+.seance-taux {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--injs-text-primary);
+}
+
+.seance-retard {
+  font-weight: 500;
+  color: var(--injs-warning);
+}
+
+/* Valeur absente : jamais un 0 presente. */
+.seance-vide {
+  font-style: italic;
+  color: var(--injs-text-muted);
+}
+
+.seance-carte__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+/* --- Etats -------------------------------------------------------------- */
+.seance-etat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.75rem 1rem;
+  text-align: center;
+  color: var(--injs-text-secondary);
+}
+
+.seance-etat p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.seance-etat--erreur {
+  border-left: 3px solid var(--injs-danger);
+  color: #B91C1C;
+}
+
+@media (max-width: 768px) {
+  .seances-en-direct__grille {
+    grid-template-columns: 1fr;
+  }
+  .seance-compteurs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .seance-carte__meta {
+    grid-template-columns: 1fr;
+  }
+}

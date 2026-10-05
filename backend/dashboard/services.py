@@ -25,6 +25,19 @@ from patrimoine.models import Equipement, Maintenance
 from core.models import EvenementAudit
 
 
+def _supervision_du_jour(date=None):
+    """Séances LMD du jour + présences rattachées (source de vérité dashboard).
+
+    Enveloppe ``presences.seances_supervision`` : même règle de statut (horaires
+    planifiés), même effectif attendu (membres actifs du groupe), mêmes
+    catégories d'assiduité que le bloc « Séances en direct ». Aucun ``user`` :
+    ce résumé de pilotage est global, son périmètre reste celui de l'EDT publié.
+    """
+    from presences import seances_supervision
+
+    return seances_supervision.supervision_seances(None, date)
+
+
 def get_current_academic_year():
     return AnneeAcademique.courante_ou_none() or AnneeAcademique.objects.order_by('-libelle').first()
 
@@ -56,12 +69,21 @@ def get_direction_overview():
     nb_groupes = Groupe.objects.count()
     nb_cours = ECUE.objects.count()
 
-    # Présences du jour
+    # Présences du jour — séances **LMD** (edts.AffectationCreneau) et non le
+    # flux legacy SessionModule : le bloc « Séances en direct » doit refléter la
+    # chaîne LMD, pas le module historique.
     today = timezone.localdate()
-    seances_jour = SessionModule.objects.filter(date_journee=today)
-    nb_seances_jour = seances_jour.count()
-    pointages_jour = Pointage.objects.filter(date_journee=today)
-    taux_presence = 100.0 if pointages_jour.count() > 0 else 0.0
+    supervision = _supervision_du_jour(today)
+    nb_seances_jour = supervision['resume']['seances_total']
+    presents_aujourdhui = supervision['resume']['participants_presents']
+    attendus_connus = [s['effectif_attendu'] for s in supervision['seances']
+                       if s['effectif_attendu'] is not None]
+    # Taux = présents / attendus × 100, uniquement si le dénominateur est
+    # connu. Sans dénominateur (aucune séance avec groupe rattaché), la valeur
+    # reste ``None`` : afficher 0 % ou 100 % serait faux.
+    total_attendus = sum(attendus_connus)
+    taux_presence = (round(presents_aujourdhui / total_attendus * 100, 1)
+                     if total_attendus > 0 else None)
 
     # Stages & Diplômation
     nb_stages_en_cours = ConventionStage.objects.filter(statut=ConventionStage.Statut.EN_COURS).count()
@@ -129,7 +151,8 @@ def get_direction_overview():
             'formations': nb_formations,
             'groupes': nb_groupes,
             'cours': nb_cours,
-            'taux_presence': f"{taux_presence}%",
+            'taux_presence': (f"{taux_presence}%" if taux_presence is not None
+                           else 'Non disponible'),
             'stages_en_cours': nb_stages_en_cours,
             'diplomes_delivres': nb_diplomes,
             'seances_jour': nb_seances_jour,
@@ -364,33 +387,50 @@ def get_pedagogie_dashboard():
 
 
 def get_presences_dashboard():
-    """Dashboard Assiduité & Présences biométriques / QR."""
+    """Dashboard Assiduité & Présences — séances LMD et présences rattachées.
+
+    Les compteurs proviennent de ``presences.seances_supervision`` : une séance
+    de l'EDT (``AffectationCreneau``) et les ``Pointage`` réellement rattachés à
+    elle. Aucune valeur de repli n'est inventée : un compteur sans donnée vaut 0
+    (c'est un décompte), un taux sans dénominateur vaut ``None``.
+    """
     today = timezone.localdate()
-    pointages_jour = Pointage.objects.filter(date_journee=today)
-    seances_jour = SessionModule.objects.filter(date_journee=today)
+    supervision = _supervision_du_jour(today)
+    seances = supervision['seances']
+
+    presents_jour = sum(s['presences']['presents'] for s in seances)
+    retards_jour = sum(s['presences']['retards'] for s in seances)
+    absents_jour = (sum(s['presences']['absents_injustifies'] for s in seances)
+                    + sum(s['presences']['absents_justifies'] for s in seances))
+    pointages_jour = Pointage.objects.filter(date_journee=today).count()
     total_pointages = Pointage.objects.count()
-    
-    nb_presents = pointages_jour.filter(statut__in=[Pointage.Statut.TERMINE, Pointage.Statut.EN_COURS]).count()
-    nb_retards = pointages_jour.filter(statut=Pointage.Statut.SORTIE_AUTO).count()
-    nb_absents = pointages_jour.filter(statut=Pointage.Statut.ABSENT_NON_BADGE).count()
+    attendus_connus = [s['effectif_attendu'] for s in seances
+                       if s['effectif_attendu'] is not None]
+    total_attendus = sum(attendus_connus)
+    # Un taux sans denominateur connu reste None : ni 0 % ni 100 % inventes.
+    taux_assiduite = (round(presents_jour / total_attendus * 100, 1)
+                      if total_attendus > 0 else None)
+    anomalies_geofence = (Pointage.objects.filter(date_journee=today)
+                          .exclude(outside_geofence_count=0).count())
 
     return {
         'date': str(today),
         'kpis': {
-            'seances_jour': seances_jour.count(),
-            'pointages_jour': pointages_jour.count(),
-            'presents_jour': nb_presents,
-            'retards_jour': nb_retards,
-            'absents_jour': nb_absents,
+            'seances_jour': supervision['resume']['seances_total'],
+            'seances_en_cours': supervision['resume']['seances_en_cours'],
+            'pointages_jour': pointages_jour,
+            'presents_jour': presents_jour,
+            'retards_jour': retards_jour,
+            'absents_jour': absents_jour,
             'total_historique_pointages': total_pointages,
-            'taux_assiduite_moyen': '94.2%',
-            'anomalies_geofence': 0,
+            'taux_assiduite_moyen': taux_assiduite,
+            'anomalies_geofence': anomalies_geofence,
         },
         'charts': {
             'repartition_du_jour': [
-                {'label': 'Présents', 'value': nb_presents or 25, 'color': '#10B981'},
-                {'label': 'Retards', 'value': nb_retards or 3, 'color': '#F59E0B'},
-                {'label': 'Absents', 'value': nb_absents or 2, 'color': '#EF4444'},
+                {'label': 'Présents', 'value': presents_jour, 'color': '#10B981'},
+                {'label': 'Retards', 'value': retards_jour, 'color': '#F59E0B'},
+                {'label': 'Absents', 'value': absents_jour, 'color': '#EF4444'},
             ],
         },
     }
