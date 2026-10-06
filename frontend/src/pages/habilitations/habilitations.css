@@ -219,3 +219,100 @@
   color: #64748B;
   font-size: 0.84rem;
 }
+
+/* ── Couche IMPACT (additive) : arbre, grille de tuiles, barres ─────── */
+.hab-arbre {
+  list-style: none;
+  padding-left: 1.1rem;
+  border-left: 1px dashed #CBD5E1;
+  margin: 0.25rem 0 0.25rem 0.35rem;
+}
+
+.hab-arbre-noeud {
+  margin: 0.2rem 0;
+}
+
+.hab-arbre-bascule {
+  background: none;
+  border: none;
+  padding: 0.1rem 0.2rem;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.hab-arbre-role {
+  font-weight: 600;
+}
+
+.hab-badge-critique {
+  background: #7F1D1D;
+}
+
+.hab-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.hab-lien-tuile {
+  text-decoration: none;
+  color: inherit;
+}
+
+.hab-lien-tuile:hover {
+  text-decoration: none;
+}
+
+.hab-tuile-valeur {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.hab-barre-ligne {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.3rem 0;
+}
+
+.hab-barre-libelle {
+  min-width: 9rem;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.hab-barre-piste {
+  flex: 1;
+  background: #E2E8F0;
+  border-radius: 999px;
+  height: 0.6rem;
+  overflow: hidden;
+}
+
+.hab-barre {
+  display: block;
+  height: 100%;
+  background: #2563EB;
+  border-radius: 999px;
+}
+
+.hab-barre-total {
+  min-width: 2.4rem;
+  text-align: right;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+/* Lien contextuel discret vers une vue d'impact (crosshair). */
+.hab-lien-impact {
+  color: #2563EB;
+  opacity: 0.75;
+}
+
+.hab-lien-impact:hover {
+  opacity: 1;
+  text-decoration: none;
+}

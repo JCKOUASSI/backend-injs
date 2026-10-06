@@ -6,6 +6,8 @@ from . import views_admin
 from . import views_admin_cycle as vc
 from . import views_admin_organisation as org
 from . import views_admin_workflow as wf
+from . import vues_dashboard
+from . import vues_impact
 
 urlpatterns = [
     # ── U2 ─────────────────────────────────────────────────────────────
@@ -152,5 +154,27 @@ urlpatterns = [
     path(
         'delegations/<int:pk>/action/',
         vc.DelegationActionView.as_view(), name='hab-delegation-action',
+    ),
+
+    # ── Couche IMPACT (additive — garde identique à la console U4) ──────
+    path(
+        'impact/permission/<str:code>/',
+        vues_impact.ImpactPermissionView.as_view(),
+        name='hab-impact-permission',
+    ),
+    path(
+        'impact/role/<str:code>/',
+        vues_impact.ImpactRoleView.as_view(),
+        name='hab-impact-role',
+    ),
+    path(
+        'impact/utilisateur/<int:user_id>/',
+        vues_impact.ImpactUtilisateurView.as_view(),
+        name='hab-impact-utilisateur',
+    ),
+    path(
+        'dashboard/',
+        vues_dashboard.DashboardHabilitationsView.as_view(),
+        name='hab-dashboard',
     ),
 ]

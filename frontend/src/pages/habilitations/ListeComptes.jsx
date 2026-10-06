@@ -154,6 +154,12 @@ export default function ListeComptes() {
                   <td>
                     <Link className="btn btn-sm btn-outline-success me-1"
                           to={`/administration/comptes/${compte.id}/modifier`}>Modifier</Link>
+                    <Link className="btn btn-sm btn-outline-primary me-1"
+                          title="Arbre des accès effectifs de ce compte"
+                          data-testid={`acces-effectifs-${compte.username}`}
+                          to={`/administration/comptes/acces-effectifs?user=${compte.user_id}`}>
+                      <i className="bi bi-diagram-2" aria-hidden="true" />
+                    </Link>
                     {compte.statut === 'ACTIF' ? (
                       <button className="btn btn-sm btn-outline-danger"
                               data-testid={`suspendre-${compte.username}`}

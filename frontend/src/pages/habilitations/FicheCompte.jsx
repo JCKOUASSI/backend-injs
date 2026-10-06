@@ -8,6 +8,7 @@ import {
 import { mfaSetup, mfaConfirm, mfaDisable, messageErreurMfa } from '@/services/mfa'
 import { useToast } from '@/context/ToastContext'
 import { BadgeCanal, BadgeSensible, BadgeStatut, EnChargement } from './partages'
+import SensibleBadge from './SensibleBadge'
 import MotifModal from './MotifModal'
 import './habilitations.css'
 
@@ -272,8 +273,48 @@ export default function FicheCompte() {
                 </div>
               </details>
             ) : <p className="hab-muted mb-0">Aucune permission effective (aucun rôle actif ni dérogation).</p>}
+            {compte.impact && (
+              <p className="hab-muted mb-0" data-testid="fiche-impact-compteurs">
+                Origine des accès : hérités des rôles : {compte.impact.total_heritees} ·
+                directes (dérogations) : {compte.impact.total_directes} ·
+                retraits actifs : {compte.impact.total_retraits} ·
+                effectives au total : <strong>{compte.impact.total_effectives}</strong>
+              </p>
+            )}
           </>
         ) : <p className="hab-muted mb-0">Chargement…</p>}
+      </Section>
+
+      {/* Couche IMPACT (additive) : liens contextuels vers l'arbre et la vue
+          d'impact de cet utilisateur. Le user_id est l'identifiant attendu
+          par l'API (cf. impact/utilisateur/<user_id>/). */}
+      <Section titre="Accès effectifs & impact">
+        <p className="hab-muted mb-2">
+          Arbre lisible Utilisateur → Rôle → Module → Permission, octrois directs
+          et retraits actifs distingués — résolu par le moteur CURP.
+        </p>
+        <Link
+          className="btn btn-sm btn-outline-primary me-2"
+          data-testid="fiche-lien-acces-effectifs"
+          to={`/administration/comptes/acces-effectifs?user=${compte.user_id}`}
+        >
+          <i className="bi bi-diagram-2 me-1" />Voir l'arbre des accès effectifs
+        </Link>
+        <Link
+          className="btn btn-sm btn-outline-secondary"
+          data-testid="fiche-lien-impact-utilisateur"
+          to={`/administration/comptes/impact-utilisateur?user=${compte.user_id}`}
+        >
+          <i className="bi bi-crosshair me-1" />Impact de cet utilisateur
+        </Link>
+        {compte.impact && compte.impact.actions_sensibles_effectives.length > 0 && (
+          <div className="hab-avertissement mt-2" data-testid="fiche-impact-sensibles">
+            <SensibleBadge type="acces" critique /> Actions sensibles effectives :{' '}
+            {compte.impact.actions_sensibles_effectives.map((c) => (
+              <code key={c} className="me-1">{c}</code>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section titre="Chronologie (journal)">

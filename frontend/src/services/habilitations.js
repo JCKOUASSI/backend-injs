@@ -69,6 +69,10 @@ export const listerRolesCurp = () =>
     return data.results || data
   })
 
+/** Catalogue des permissions (pagination serveur, API U2 existante). */
+export const listerPermissions = (page = 1) =>
+  api.get(`${BASE}/permissions/${urlParams({ page })}`).then((r) => r.data)
+
 export const recupererRole = (code) =>
   api.get(`${BASE}/roles/${encodeURIComponent(code)}/`).then((r) => r.data)
 
@@ -208,6 +212,20 @@ export const detacherCompteService = (id, compteId) =>
 
 export const permissionsEffectives = (id) =>
   api.get(`${BASE}/comptes/${id}/effective-permissions/`).then((r) => r.data)
+
+// ── Couche IMPACT (additive) : endpoints impact/dashboard, garde identique
+// à la console (drapeau + trio d'administration côté Django). ─────────────
+export const impactPermission = (code) =>
+  api.get(`${BASE}/impact/permission/${encodeURIComponent(code)}/`).then((r) => r.data)
+
+export const impactRole = (code) =>
+  api.get(`${BASE}/impact/role/${encodeURIComponent(code)}/`).then((r) => r.data)
+
+export const impactUtilisateur = (user_id) =>
+  api.get(`${BASE}/impact/utilisateur/${user_id}/`).then((r) => r.data)
+
+export const dashboardHabilitations = () =>
+  api.get(`${BASE}/dashboard/`).then((r) => r.data)
 
 /** Extrait le message français d'une erreur DRF (403, 409, 400). */
 export function messageErreur(erreur, repli = 'Une erreur est survenue.') {

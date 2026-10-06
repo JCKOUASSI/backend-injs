@@ -1040,6 +1040,17 @@ export const ARBORESCENCE = [
         },
       },
       {
+        id: 'utilisateurs.catalogue_permissions',
+        libelle: 'Catalogue des permissions',
+        console: true,
+        chemin: '/administration/comptes/permissions',
+        droit: {
+          // Couche IMPACT (additive) : mêmes garde et conventions que la
+          // console CURP (voir commentaire ci-dessus).
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
         id: 'utilisateurs.organisation',
         libelle: 'Départements & Services',
         console: true,
@@ -1165,6 +1176,53 @@ export const ARBORESCENCE = [
           // volet `curp` n'est donc déclaré ici — en afficher un ferait voir
           // l'entrée à un compte gouverné qui recevrait un 403. La capacité
           // projetée `habilitations_admin.gerer` reproduit exactement la garde.
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
+        id: 'utilisateurs.dashboard',
+        libelle: 'Dashboard habilitations',
+        console: true,
+        chemin: '/administration/comptes/dashboard',
+        droit: {
+          // Couche IMPACT (additive) : mêmes garde et conventions que les
+          // autres écrans de la console CURP (voir commentaire ci-dessus).
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
+        id: 'utilisateurs.impact_permission',
+        libelle: "Impact d'une permission",
+        console: true,
+        chemin: '/administration/comptes/impact-permission',
+        droit: {
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
+        id: 'utilisateurs.impact_role',
+        libelle: "Impact d'un rôle",
+        console: true,
+        chemin: '/administration/comptes/impact-role',
+        droit: {
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
+        id: 'utilisateurs.impact_utilisateur',
+        libelle: "Impact d'un utilisateur",
+        console: true,
+        chemin: '/administration/comptes/impact-utilisateur',
+        droit: {
+          legacy: [['habilitations_admin', 'gerer']],
+        },
+      },
+      {
+        id: 'utilisateurs.acces_effectifs',
+        libelle: 'Accès effectifs',
+        console: true,
+        chemin: '/administration/comptes/acces-effectifs',
+        droit: {
           legacy: [['habilitations_admin', 'gerer']],
         },
       },

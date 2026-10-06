@@ -1,5 +1,10 @@
-/** GestionRoles — consultation du référentiel, description et titulaires. */
+/** GestionRoles — consultation du référentiel, description et titulaires.
+ *
+ * Couche IMPACT (additive) : chaque rôle ouvre sa vue d'impact
+ * (?code=…) — aucune seconde page équivalente n'est créée.
+ */
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listerRolesCurp, recupererRole } from '@/services/habilitations'
 import { libelleDomaine } from '@/utils/habilitations'
 import { BadgeSensible, BadgeCanal, EnChargement } from './partages'
@@ -30,7 +35,7 @@ export default function GestionRoles() {
                onChange={(e) => setFiltre(e.target.value)} />
         <div style={{ maxHeight: 620, overflow: 'auto' }}>
           <table className="hab-table">
-            <thead><tr><th>Code</th><th>Libellé</th><th>Domaine</th><th>Niv.</th><th>Permissions</th><th>Disponible</th></tr></thead>
+            <thead><tr><th>Code</th><th>Libellé</th><th>Domaine</th><th>Niv.</th><th>Permissions</th><th>Disponible</th><th>Impact</th></tr></thead>
             <tbody>
               {rolesFiltres.map((r) => (
                 <tr key={r.code} style={{ cursor: 'pointer' }} onClick={() => ouvrir(r.code)}
@@ -41,6 +46,17 @@ export default function GestionRoles() {
                   <td>{r.niveau_defaut}</td>
                   <td>{r.permissions_count}</td>
                   <td>{r.disponible ? 'Oui' : <span className="text-danger">Module absent</span>}</td>
+                  <td>
+                    <Link
+                      className="hab-lien-impact"
+                      title={`Impact du rôle ${r.code}`}
+                      data-testid={`lien-impact-role-${r.code}`}
+                      to={`/administration/comptes/impact-role?code=${encodeURIComponent(r.code)}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <i className="bi bi-crosshair" aria-hidden="true" />
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -65,7 +81,14 @@ export default function GestionRoles() {
               ))}
             </ul>
           )}
-          <button className="btn btn-secondary btn-sm mt-2" onClick={() => setDetail(null)}>Fermer</button>
+          <Link
+            className="btn btn-sm btn-outline-primary mt-2"
+            data-testid="detail-role-impact"
+            to={`/administration/comptes/impact-role?code=${encodeURIComponent(detail.code)}`}
+          >
+            <i className="bi bi-crosshair me-1" />Voir l'impact de ce rôle
+          </Link>
+          <button className="btn btn-secondary btn-sm mt-2 ms-2" onClick={() => setDetail(null)}>Fermer</button>
         </div>
       )}
     </section>

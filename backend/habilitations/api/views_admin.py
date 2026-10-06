@@ -22,6 +22,7 @@ from habilitations.permissions import ExigeDrapeauAdmin
 from habilitations.referentiel.catalogue_modules import MODULES
 from habilitations.referentiel.chargement import niveaux_du_role
 from habilitations.services import comptes_admin as service
+from habilitations.services import impact as service_impact
 from habilitations.services.journalisation import verifier_chaine
 
 from .serializers_admin import (
@@ -126,6 +127,9 @@ class CompteDetailView(APIView):
             for e in JournalHabilitation.objects.filter(compte_concerne=compte)
             .order_by('-numero')[:100]
         ]
+        # Couche IMPACT (additive) : vue des accès effectifs de ce compte,
+        # dérivée du service CURP — aucun champ existant modifié.
+        data['impact'] = service_impact.impact_utilisateur(compte.user_id)
         return Response(data)
 
 

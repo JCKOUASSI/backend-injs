@@ -42,6 +42,13 @@ import FileProvisionnement from './pages/habilitations/FileProvisionnement'
 import NotificationsHabilitation from './pages/habilitations/NotificationsHabilitation'
 import RevueHabilitations from './pages/habilitations/RevueHabilitations'
 import JournalHabilitations from './pages/habilitations/JournalHabilitations'
+// Couche IMPACT (additive) — vues d'impact, accès effectifs, dashboard.
+import DashboardHabilitations from './pages/habilitations/Dashboard'
+import ImpactPermission from './pages/habilitations/ImpactPermission'
+import ImpactRole from './pages/habilitations/ImpactRole'
+import ImpactUtilisateur from './pages/habilitations/ImpactUtilisateur'
+import AccesEffectifs from './pages/habilitations/AccesEffectifs'
+import CataloguePermissions from './pages/habilitations/CataloguePermissions'
 import Modules from './pages/Modules'
 import Profile from './pages/Profile'
 import FinanceDashboard from './pages/FinanceDashboard'
@@ -490,10 +497,17 @@ function App() {
             <Route path="revue" element={<RevueHabilitations />} />
             <Route path="journal" element={<JournalHabilitations />} />
             <Route path="roles" element={<GestionRoles />} />
+            <Route path="permissions" element={<CataloguePermissions />} />
             <Route path="matrice" element={<MatricePermissions />} />
             <Route path="derogations" element={<Derogations />} />
             <Route path="delegations" element={<Delegations />} />
             <Route path="organisation" element={<Organigramme />} />
+            {/* Couche IMPACT (additive) — placées avant :id pour la lisibilité */}
+            <Route path="dashboard" element={<DashboardHabilitations />} />
+            <Route path="impact-permission" element={<ImpactPermission />} />
+            <Route path="impact-role" element={<ImpactRole />} />
+            <Route path="impact-utilisateur" element={<ImpactUtilisateur />} />
+            <Route path="acces-effectifs" element={<AccesEffectifs />} />
             <Route path=":id" element={<FicheCompte />} />
             <Route path=":id/modifier" element={<ModificationCompte />} />
           </Route>

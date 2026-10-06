@@ -1,5 +1,10 @@
-/** MatricePermissions — visualisation croisée rôle × module, filtrable, exportable. */
+/** MatricePermissions — visualisation croisée rôle × module, filtrable, exportable.
+ *
+ * Couche IMPACT (additive) : chaque rôle porte un lien direct vers sa vue
+ * d'impact (?code=…) — la matrice reste une lecture niveaux uniquement.
+ */
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { recupererMatrice } from '@/services/habilitations'
 import { telechargerCsv } from '@/utils/habilitations'
 import { EnChargement } from './partages'
@@ -72,6 +77,14 @@ export default function MatricePermissions() {
                   <td style={{ position: 'sticky', left: 0, background: '#fff', textAlign: 'left', whiteSpace: 'nowrap' }}>
                     {l.sensible && <i className="bi bi-shield-exclamation text-danger me-1" title="Sensible" />}
                     {l.libelle}
+                    <Link
+                      className="hab-lien-impact ms-1"
+                      title={`Impact du rôle ${l.code}`}
+                      data-testid={`lien-impact-matrice-${l.code}`}
+                      to={`/administration/comptes/impact-role?code=${encodeURIComponent(l.code)}`}
+                    >
+                      <i className="bi bi-crosshair" aria-hidden="true" />
+                    </Link>
                   </td>
                   {matrice.modules.map((m) => {
                     const case_ = l.niveaux[m.code]
