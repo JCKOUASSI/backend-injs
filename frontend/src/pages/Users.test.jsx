@@ -510,7 +510,7 @@ describe('pages/Users.jsx — présentation de la liste, données dégradées et
     const row = occurrences[0].closest('tr')
 
     // Initiales construites depuis la première lettre du username.
-    expect(row.querySelector('div[style*="border-radius: 50%"]').textContent).toBe('S')
+    expect(row.querySelector('.prof-avatar').textContent).toBe('S')
     // Trois champs absents (matricule, e-mail, téléphone).
     expect(within(row).getAllByText('-').length).toBe(3)
     // Badge de statut inactif.
@@ -1025,7 +1025,7 @@ describe('pages/Users.jsx — édition d\'un utilisateur (LOT 36)', () => {
     const [nom] = screen.getAllByText('nu31')
     const row = nom.closest('tr')
     expect(within(row).getAllByText('-').length).toBe(3)
-    expect(row.querySelector('div[style*="border-radius: 50%"]').textContent).toBe('N')
+    expect(row.querySelector('.prof-avatar').textContent).toBe('N')
 
     const modal = await openEdit('nu31')
     expect(modalField(modal, /nom d'utilisateur/i)).toHaveValue('nu31')

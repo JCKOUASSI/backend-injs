@@ -18,11 +18,12 @@ import { formatApiErrors } from '../utils/apiErrors'
 import { useSecretariats } from '../hooks/useSecretariats'
 import { useQueryClient } from '@tanstack/react-query'
 import { SECRETARIATS_QUERY_KEY } from '../lib/queryClient'
+import '../styles/profils.css'
 
 const TAB_CONFIG = {
-  personnel: { title: 'Liste des utilisateurs', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
-  auditeurs: { title: 'Comptes étudiants', icon: 'bi-person-badge', createLabel: 'Nouveau compte étudiant', modalTitle: 'Nouveau compte étudiant' },
-  formateurs: { title: 'Comptes enseignants', icon: 'bi-person-video3', createLabel: 'Nouveau compte enseignant', modalTitle: 'Nouveau compte enseignant' },
+  personnel: { title: 'Liste des utilisateurs', description: 'Comptes du personnel administratif, technique et pédagogique.', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
+  auditeurs: { title: 'Comptes étudiants', description: 'Comptes étudiants (auditeurs) inscrits aux formations.', icon: 'bi-person-badge', createLabel: 'Nouveau compte étudiant', modalTitle: 'Nouveau compte étudiant' },
+  formateurs: { title: 'Comptes enseignants', description: 'Comptes enseignants et intervenants pédagogiques.', icon: 'bi-person-video3', createLabel: 'Nouveau compte enseignant', modalTitle: 'Nouveau compte enseignant' },
 }
 const emptyForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: 'ENCADRANT', password: '', telephone: '', secretariat: '', new_secretariat_nom: '', new_secretariat_type: '' }
 const emptyEditForm = { username: '', first_name: '', last_name: '', email: '', matricule: '', role: '', telephone: '', is_active: true, password: '', secretariat: '' }
@@ -237,69 +238,74 @@ export default function Users() {
     : 'N° Matricule (badge)'
 
   return (
-    <div>
-      {showTabBar && (
-        <div className="card mb-3">
-          <div className="card-body py-2">
-            <div className="d-flex gap-2 flex-wrap" role="tablist" style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', marginBottom: '-0.5rem', paddingBottom: '0.5rem' }}>
-              {availableTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={userTab === tab.id}
-                  className={`btn btn-sm ${userTab === tab.id ? 'btn-dfrc' : 'btn-outline-secondary'}`}
-                  onClick={() => setUserTabAndReset(tab.id)}
-                >
-                  <i className={`bi ${tab.icon} me-1`}></i>{tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search + filter bar */}
-      <div className="card">
-        <div className="card-body">
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ flex: '1 1 250px' }}>
-              <div className="input-group">
+    <div className="container-fluid py-3">
+      <div className="prof-bandeau" role="note">
+        <i className="bi bi-journal-lock" aria-hidden="true"></i>
+        <span>Toute action sur les comptes est tracée dans le journal des accès, immuable et horodaté.</span>
+      </div>
+      <h2 className="prof-entete">
+        <i className="bi bi-shield-lock" aria-hidden="true"></i>
+        <span>Gestion des profils — Utilisateurs & Accès</span>
+      </h2>
+      <p className="prof-sous-titre">Répertoire des comptes du personnel, des comptes étudiants et des comptes enseignants de l'INJS.</p>
+      <div className={showTabBar ? 'prof-layout' : undefined}>
+        {showTabBar && (
+          <nav className="prof-nav" role="tablist" aria-label="Catégories de profils">
+            {availableTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={userTab === tab.id}
+                className={userTab === tab.id ? 'active' : ''}
+                onClick={() => setUserTabAndReset(tab.id)}
+              >
+                <i className={`bi ${tab.icon}`} aria-hidden="true"></i>{tab.label}
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="prof-contenu">
+          {/* Search + filter bar */}
+          <div className="prof-carte">
+            <div className="prof-filtres">
+              <div className="prof-recherche input-group">
                 <span className="input-group-text"><i className="bi bi-search"></i></span>
                 <input type="text" className="form-control" placeholder="Rechercher par nom, username, matricule..."
                   value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </div>
+              {userTab === 'personnel' && staffFilterRoles.length > 0 && (
+                <div>
+                  <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
+                    <option value="">Tous les rôles</option>
+                    {staffFilterRoles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                  </select>
+                </div>
+              )}
+              {canCreateOnTab && (
+                <button type="button" onClick={() => { setForm({ ...emptyForm, role: createRoleForTab }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
+                  <i className="bi bi-plus-lg me-1"></i>{tabMeta.createLabel}
+                </button>
+              )}
             </div>
-            {userTab === 'personnel' && staffFilterRoles.length > 0 && (
-              <div>
-                <select className="form-control" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
-                  <option value="">Tous les rôles</option>
-                  {staffFilterRoles.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
-                </select>
-              </div>
-            )}
-            {canCreateOnTab && (
-              <button type="button" onClick={() => { setForm({ ...emptyForm, role: createRoleForTab }); setFormError(''); setShowModal(true) }} className="btn btn-dfrc">
-                <i className="bi bi-plus-lg me-1"></i>{tabMeta.createLabel}
-              </button>
-            )}
           </div>
-        </div>
-      </div>
 
-      {error && <div className="error-message">{error}</div>}
+          {error && <div className="error-message">{error}</div>}
 
-      {/* Table */}
-      <div className="card">
-        <div className="card-header-bar">
-          <span><i className={`bi ${listIcon} me-2`}></i>{listTitle}</span>
-          <span className="badge-bg-secondary">{users.length} résultat(s)</span>
-        </div>
-        <div className="card-body-flush">
+          {/* Table */}
+          <div className="prof-carte">
+            <div className="prof-carte-entete">
+              <div>
+                <h3 className="prof-carte-titre"><i className={`bi ${listIcon} me-2`}></i>{listTitle}</h3>
+                <p className="prof-carte-sous-titre">{tabMeta.description}</p>
+              </div>
+              <span className="prof-compteur">{users.length} résultat(s)</span>
+            </div>
+            <div className="prof-carte-corps">
           {loading ? <div className="loading"><div className="spinner"></div></div> : (
             <>
-              <div className="table-container">
-                <table className="table">
+              <div className="prof-table-wrap">
+                <table className="prof-table">
                   <thead>
                     <tr>
                       <th>Nom complet</th>
@@ -316,10 +322,8 @@ export default function Users() {
                     {users.length > 0 ? users.map((u) => (
                       <tr key={u.id}>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--navy)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600, flexShrink: 0 }}>
-                              {getInitials(u)}
-                            </div>
+                          <div className="prof-cellule-identite">
+                            <div className="prof-avatar">{getInitials(u)}</div>
                             <strong>{getFullName(u)}</strong>
                           </div>
                         </td>
@@ -366,6 +370,8 @@ export default function Users() {
               />
             </>
           )}
+            </div>
+          </div>
         </div>
       </div>
 

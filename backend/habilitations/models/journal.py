@@ -85,6 +85,16 @@ class JournalHabilitation(models.Model):
         # Lot A refonte — organigramme unifié (création/désactivation d'unité).
         ORGANISATION_CREEE = 'ORGANISATION_CREEE', 'Création d’une unité d’organigramme'
         ORGANISATION_DESACTIVEE = 'ORGANISATION_DESACTIVEE', 'Désactivation d’une unité d’organigramme'
+        # Lot B — versionnement et restauration des rôles métier.
+        ROLE_VERSIONNE = 'ROLE_VERSIONNE', 'Versionnement de rôle'
+        ROLE_RESTAURE = 'ROLE_RESTAURE', 'Restauration d’une version de rôle'
+        # Lot C — workflow générique de demandes d'accès.
+        DEMANDE_ACCES_CREEE = 'DEMANDE_ACCES_CREEE', 'Création d’une demande d’accès'
+        DEMANDE_ACCES_SOUMISE = 'DEMANDE_ACCES_SOUMISE', 'Soumission d’une demande d’accès'
+        DEMANDE_ACCES_EN_REVUE = 'DEMANDE_ACCES_EN_REVUE', 'Demande d’accès placée en revue'
+        DEMANDE_ACCES_APPROUVEE = 'DEMANDE_ACCES_APPROUVEE', 'Demande d’accès approuvée'
+        DEMANDE_ACCES_REFUSEE = 'DEMANDE_ACCES_REFUSEE', 'Demande d’accès refusée'
+        DEMANDE_ACCES_ANNULEE = 'DEMANDE_ACCES_ANNULEE', 'Demande d’accès annulée'
         AUTRE = 'AUTRE', 'Autre événement'
 
     #: Numéro de séquence, continue et dans l'ordre du chaînage.

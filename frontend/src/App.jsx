@@ -37,6 +37,7 @@ import GestionRoles from './pages/habilitations/GestionRoles'
 import MatricePermissions from './pages/habilitations/MatricePermissions'
 import Derogations from './pages/habilitations/Derogations'
 import Delegations from './pages/habilitations/Delegations'
+import DemandesAcces from './pages/habilitations/DemandesAcces'
 import OperationsMasse from './pages/habilitations/OperationsMasse'
 import FileProvisionnement from './pages/habilitations/FileProvisionnement'
 import NotificationsHabilitation from './pages/habilitations/NotificationsHabilitation'
@@ -501,6 +502,7 @@ function App() {
             <Route path="matrice" element={<MatricePermissions />} />
             <Route path="derogations" element={<Derogations />} />
             <Route path="delegations" element={<Delegations />} />
+            <Route path="demandes" element={<DemandesAcces />} />
             <Route path="organisation" element={<Organigramme />} />
             {/* Couche IMPACT (additive) — placées avant :id pour la lisibilité */}
             <Route path="dashboard" element={<DashboardHabilitations />} />

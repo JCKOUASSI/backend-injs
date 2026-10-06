@@ -9,8 +9,11 @@ indépendamment) ; l'API est testée avec la garde CURP réelle
 (``ExigeDrapeauAdmin``) : 401 non authentifié, 403 non-administrateur ou
 drapeau fermé, 404 objet inconnu, structure JSON stable.
 """
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from habilitations.models import (
@@ -270,6 +273,58 @@ class ImpactApiTests(APITestCase):
         self.assertEqual(donnees['permissions']['par_module'][0]['module'],
                          'evaluations')
         self.assertGreaterEqual(donnees['comptes']['total'], 1)
+
+    def test_dashboard_lot_a_habilitations_et_alertes(self):
+        """Lot A : compteurs d'habilitations + alertes prioritaires."""
+        # Attribution échue : encore ACTIVE, date_fin dépassée → alerte revue.
+        role_etanche = fx.creer_role('ROLE_ETANCHE', 'Rôle échue de test')
+        user_echu = fx.creer_user('hab-echu')
+        compte_echu = fx.creer_compte(user=user_echu)
+        fx.creer_attribution(
+            compte_echu, role_etanche,
+            date_fin=timezone.localdate() - timedelta(days=3),
+        )
+
+        # Conflit de séparation des tâches : deux rôles incompatibles portés
+        # simultanément par le même compte.
+        role_a = fx.creer_role('ROLE_SOD_A', 'SoD A')
+        role_b = fx.creer_role('ROLE_SOD_B', 'SoD B')
+        role_a.incompatible_avec.add(role_b)
+        user_sod = fx.creer_user('hab-sod')
+        compte_sod = fx.creer_compte(user=user_sod)
+        fx.creer_attribution(compte_sod, role_a)
+        fx.creer_attribution(compte_sod, role_b)
+
+        self.client.force_authenticate(self.admin)
+        donnees = self.client.get('/api/habilitations/dashboard/').json()
+
+        for cle in ('habilitations', 'alertes'):
+            self.assertIn(cle, donnees)
+        self.assertIn('actives', donnees['habilitations'])
+        self.assertIn('expirant_prochainement', donnees['habilitations'])
+        self.assertIn('echues', donnees['habilitations'])
+        self.assertEqual(donnees['habilitations']['echues'], 1)
+
+        alertes = donnees['alertes']
+        self.assertGreaterEqual(alertes['habilitations_echues'], 1)
+        self.assertGreaterEqual(
+            alertes['conflits_separation_taches']['total'], 1,
+        )
+        codes_exemple = {
+            tuple(exemple['roles'])
+            for exemple in alertes['conflits_separation_taches']['exemples']
+        }
+        self.assertIn(('ROLE_SOD_A', 'ROLE_SOD_B'), codes_exemple)
+        # Le seuil d'inactivité dérive de la politique de sécurité réelle.
+        self.assertIn('seuil_jours', alertes['comptes_inactifs'])
+
+    def test_dashboard_sans_conflit_alertes_vides(self):
+        """Sans attribution incompatible, aucun conflit SoD n'est signalé."""
+        self.client.force_authenticate(self.admin)
+        donnees = self.client.get('/api/habilitations/dashboard/').json()
+        self.assertEqual(
+            donnees['alertes']['conflits_separation_taches']['total'], 0,
+        )
 
     def test_acces_transversal_permission_sensible_exposee_nulle_part(self):
         # Un non-administrateur ne doit pas obtenir la moindre donnée

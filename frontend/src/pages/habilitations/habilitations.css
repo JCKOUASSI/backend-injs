@@ -316,3 +316,71 @@
   opacity: 1;
   text-decoration: none;
 }
+
+/* ── Lot A : alertes et actions prioritaires du dashboard ────────────── */
+.hab-alerte-liste {
+  list-style: none;
+  padding-left: 0;
+}
+
+.hab-alerte-item {
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hab-alerte-critique {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.hab-alerte-attention {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.hab-alerte-info {
+  background: #DBEAFE;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
+}
+
+/* ── Lot B : comparaison de rôles ────────────────────────────────────── */
+.hab-diff-table td:nth-child(2) {
+  color: #991B1B;
+}
+
+.hab-diff-table td:nth-child(3) {
+  color: #166534;
+}
+
+.hab-diff-listes {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  font-size: 0.84rem;
+}
+
+.hab-diff-ajouts {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+}
+
+.hab-diff-retraits {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+}

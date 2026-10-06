@@ -21,6 +21,7 @@ const LIENS = [
   { to: '/administration/comptes/acces-effectifs', icone: 'bi-diagram-2', libelle: 'Accès effectifs' },
   { to: '/administration/comptes/derogations', icone: 'bi-key', libelle: 'Dérogations' },
   { to: '/administration/comptes/delegations', icone: 'bi-person-check', libelle: 'Délégations' },
+  { to: '/administration/comptes/demandes', icone: 'bi-clipboard2-check', libelle: "Demandes d'accès" },
   { to: '/administration/comptes/provisionnement', icone: 'bi-inbox', libelle: 'File de provisionnement' },
   { to: '/administration/comptes/operations-masse', icone: 'bi-upload', libelle: 'Opérations en masse' },
   { to: '/administration/comptes/notifications', icone: 'bi-bell', libelle: 'Notifications' },

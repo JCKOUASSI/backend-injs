@@ -324,6 +324,61 @@ def _enrichir(txt):
     txt = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", txt)
     txt = re.sub(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])", r"<i>\1</i>", txt)
     return txt
+
+
+def _normaliser_glyphes(texte):
+    """Remplace les caractères absents de la police du PDF.
+
+    La source emploie l'U+2011 (trait d'union insécable) dans « sous‑menus ».
+    ReportLab ne dispose pas de ce glyphe : il dessine un carré noir à la place,
+    ce qui casse la lecture. Le caractère est remplacé à la lecture du texte par
+    un trait d'union ASCII ; le fichier Markdown n'est pas modifié.
+    """
+    return texte.replace("\u2011", "-")
+
+
+def _desequilibre(ligne):
+    """Vrai si la ligne laisse un marqueur inline ouvert.
+
+    Soit un gras « ** » non fermé, soit une italique « * » non fermée : les
+    deux cas laissent un marqueur littéral dans le PDF si la ligne suivante
+    n'est pas rattachée.
+    """
+    return (ligne.count("*") % 2 == 1) or (ligne.count("**") % 2 == 1)
+
+
+def _fusionner_continuations(lignes):
+    """Rapproche une ligne de continuation de la précédente si celle-ci laisse
+    un marqueur ** ou * ouvert.
+    Le générateur analyse le document ligne à ligne : un formatage qui traverse
+    un retour à la ligne (ex. « … et **statut de » suivi de « validation**. »,
+    ou une légende « *Figure 12 — … » fermée sur la ligne suivante) formerait
+    deux moitiés non appariées et laisserait le marqueur littéral dans le PDF.
+    Les lignes sont donc réunies avant analyse pour que _enrichir() forme la
+    paire. Seules les lignes réellement orphelines sont fusionnées : la source
+    Markdown n'est pas modifiée, et les blocs (titres, tableaux, images, listes)
+    ne sont jamais absorbés.
+    """
+    sortie = []
+    for ligne in lignes:
+        precedent = sortie[-1] if sortie else None
+        if (precedent is not None
+                and not precedent.strip().startswith("|")
+                and _desequilibre(precedent)):
+            suite = ligne.lstrip()
+            if (suite
+                    and not suite.startswith("|")
+                    and not suite.startswith("#")
+                    and not suite.startswith("!")
+                    and not re.match(r"^\d+\.\s+", suite)
+                    and not re.match(r"^[-*+]\s+", suite)
+                    and not re.fullmatch(r"[-=_]{3,}", suite)):
+                sortie[-1] = precedent + " " + suite
+                continue
+        sortie.append(ligne)
+    return sortie
+
+
 def construire_pdf_reportlab():
     """Produit le PDF directement depuis la source Markdown (ReportLab)."""
     from reportlab.lib import colors
@@ -339,7 +394,7 @@ def construire_pdf_reportlab():
     bleu_clair = colors.HexColor("#1D4ED8")
     gris = colors.HexColor("#475569")
 
-    texte = lire_source()
+    texte = _normaliser_glyphes(lire_source())
     base = os.path.dirname(SOURCE)
 
     bs = getSampleStyleSheet()
@@ -407,9 +462,9 @@ def construire_pdf_reportlab():
     def vider_tableau():
         if not tampon:
             return
-        donnees = [[Paragraph(echapper(c), S_ent) for c in tampon[0]]]
+        donnees = [[Paragraph(_enrichir(c), S_ent) for c in tampon[0]]]
         for ligne in tampon[1:]:
-            donnees.append([Paragraph(echapper(c), S_cell) for c in ligne])
+            donnees.append([Paragraph(_enrichir(c), S_cell) for c in ligne])
         nb = max(len(d) for d in donnees)
         for d in donnees:
             while len(d) < nb:
@@ -438,15 +493,22 @@ def construire_pdf_reportlab():
         tampon.append(cells)
 
     couverture = False
-    lignes = texte.split("\n")
+    lignes = _fusionner_continuations(texte.split("\n"))
     i = 0
     while i < len(lignes):
         ligne = lignes[i]
         i += 1
         brut = ligne.strip()
+        # le marqueur de citation Markdown n'est pas interprété par le
+        # générateur : il serait affiché littéralement en tête de paragraphe.
+        brut = re.sub(r"^>\s?", "", brut)
 
         if brut.startswith("|") and brut.endswith("|"):
             vider_tableau()
+            # la première ligne du tableau est déjà son contenu : elle doit
+            # être transmise, sinon l'en-tête est perdu et la première ligne
+            # de données prend sa place.
+            analyser_tableau(brut)
             while i < len(lignes) and lignes[i].strip().startswith("|"):
                 analyser_tableau(lignes[i])
                 i += 1

@@ -83,7 +83,6 @@ const compteDetail = {
   id: 3, user_id: 21, username: 'hab.agent', email: 'agent@injs.ci',
   is_active: true, role_legacy: 'SECRETARIAT', statut: 'ACTIF', canal: 'WEB',
   mfa_actif: false, nb_roles: 1, nb_roles_sensibles: 1,
-  role_legacy: 'SECRETARIAT',
   personne: { nom: 'KONE', prenoms: 'Awa', matricule: 'HAB-0001' },
   roles_actifs: [{
     id: 9, role: 'RESPONSABLE_CONCOURS', role_libelle:

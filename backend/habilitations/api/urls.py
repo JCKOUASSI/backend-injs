@@ -7,7 +7,9 @@ from . import views_admin_cycle as vc
 from . import views_admin_organisation as org
 from . import views_admin_workflow as wf
 from . import vues_dashboard
+from . import vues_demandes_acces as vd
 from . import vues_impact
+from . import vues_versions_roles as vv
 
 urlpatterns = [
     # ── U2 ─────────────────────────────────────────────────────────────
@@ -87,6 +89,30 @@ urlpatterns = [
     path(
         'organisation/services/<int:pk>/comptes/',
         org.ServiceComptesView.as_view(), name='hab-org-service-comptes',
+    ),
+    # ── Lot B : versions, comparaison et restauration des rôles ────────
+    # Déclarées AVANT le détail générique `roles/<code>/` pour la lisibilité.
+    path(
+        'roles/<str:code>/versions/',
+        vv.RoleVersionsView.as_view(), name='hab-role-versions',
+    ),
+    path(
+        'roles/<str:code>/versions/<int:numero>/restaurer/',
+        vv.RoleVersionRestaurerView.as_view(), name='hab-role-version-restaurer',
+    ),
+    path(
+        'roles/<str:code>/comparer/',
+        vv.RoleComparerView.as_view(), name='hab-role-comparer',
+    ),
+    # ── Lot C : demandes d'accès ────────────────────────────────────────
+    path('demandes/', vd.DemandeListCreateView.as_view(), name='hab-demandes'),
+    path(
+        'demandes/<int:pk>/',
+        vd.DemandeDetailView.as_view(), name='hab-demande-detail',
+    ),
+    path(
+        'demandes/<int:pk>/action/',
+        vd.DemandeActionView.as_view(), name='hab-demande-action',
     ),
     path('roles/<str:code>/', views_admin.RoleDetailView.as_view(), name='hab-role-detail'),
     path('matrice/', views_admin.MatriceView.as_view(), name='hab-matrice'),

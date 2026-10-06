@@ -112,6 +112,21 @@ const dashboard = {
                  { module: 'evaluations', total: 90 }],
   },
   comptes_privileges: 4,
+  habilitations: { actives: 26, expirant_prochainement: 3, echues: 2,
+                   preavis_expiration_jours: 30 },
+  alertes: {
+    comptes_inactifs: { total: 1, seuil_jours: 180 },
+    comptes_prileges: 4,
+    roles_sensibles_recemment_modifies: { total: 1, codes: ['SCOLARITE'] },
+    conflits_separation_taches: {
+      total: 1,
+      exemples: [{ compte: 99, roles: ['ROLE_A', 'ROLE_B'] }],
+    },
+    habilitations_echues: 2,
+    habilitations_expirantes: 3,
+    provisionnement_en_attente: 5,
+    demandes_acces_en_attente: 1,
+  },
   derogations: { octrois: 3, retraits: 1 },
   delegations: { actives: 2, expirant_prochainement: 1 },
   provisionnement: { propositions_en_attente: 5 },
@@ -277,6 +292,25 @@ describe('Dashboard habilitations', () => {
     expect(screen.getByTestId('dash-privileges')).toHaveTextContent('4')
     expect(screen.getByTestId('dash-journal'))
       .toHaveTextContent('Attribution de rôle')
+  })
+
+  it('affiche les tuiles Lot A et les alertes prioritaires', async () => {
+    apiController.setRoute(/dashboard\/$/, dashboard)
+    monter(<Dashboard />)
+    expect(await screen.findByTestId('dash-comptes-suspendus'))
+      .toHaveTextContent('2')
+    expect(screen.getByTestId('dash-comptes-verrouilles'))
+      .toHaveTextContent('0')
+    expect(screen.getByTestId('dash-comptes-attente'))
+      .toHaveTextContent('0')
+    expect(screen.getByTestId('dash-hab-expirantes'))
+      .toHaveTextContent('3')
+    expect(screen.getByTestId('dash-alerte-conflits-separation-taches'))
+      .toHaveTextContent('conflit(s) de séparation des tâches')
+    expect(screen.getByTestId('dash-alerte-habilitations-echues'))
+      .toHaveTextContent('2 habilitation(s) expirée(s)')
+    expect(screen.getByTestId('dash-alerte-comptes-prileges'))
+      .toHaveTextContent('privilèges élevés')
   })
 
   it("affiche l'erreur API sans tuile", async () => {

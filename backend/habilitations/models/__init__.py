@@ -13,6 +13,7 @@ from .cycle_vie import (
     NotificationHabilitation,
     PropositionProvisionnement,
 )
+from .demande_acces import DemandeAcces
 from .delegation import DelegationHabilitation
 from .enums import (
     CanalAcces,
@@ -30,15 +31,19 @@ from .permission import PermissionMetier
 from .personne import Personne
 from .politique import PolitiqueSecurite
 from .role import RoleMetier
+from .version_role import CHAMPS_VERSIONNES, RoleVersion
 
 __all__ = [
     'Personne',
     'CompteUtilisateur',
     'RoleMetier',
+    'RoleVersion',
+    'CHAMPS_VERSIONNES',
     'PermissionMetier',
     'Perimetre',
     'AttributionRole',
     'PermissionAttribuee',
+    'DemandeAcces',
     'DelegationHabilitation',
     'PropositionProvisionnement',
     'ExecutionImport',

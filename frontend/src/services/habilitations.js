@@ -213,6 +213,40 @@ export const detacherCompteService = (id, compteId) =>
 export const permissionsEffectives = (id) =>
   api.get(`${BASE}/comptes/${id}/effective-permissions/`).then((r) => r.data)
 
+// ── Lot B : versions, comparaison et restauration des rôles ────────────
+export const listerVersionsRole = (code) =>
+  api.get(`${BASE}/roles/${encodeURIComponent(code)}/versions/`).then((r) => r.data)
+
+export const capturerVersionRole = (code, motif) =>
+  api.post(`${BASE}/roles/${encodeURIComponent(code)}/versions/`, { motif })
+    .then((r) => r.data)
+
+export const restaurerVersionRole = (code, numero, motif) =>
+  api.post(
+    `${BASE}/roles/${encodeURIComponent(code)}/versions/${numero}/restaurer/`,
+    { motif },
+  ).then((r) => r.data)
+
+export const comparerRoles = (code, params) => {
+  const query = params.avec
+    ? `avec=${encodeURIComponent(params.avec)}`
+    : `de=${params.de}&vers=${params.vers}`
+  return api.get(
+    `${BASE}/roles/${encodeURIComponent(code)}/comparer/?${query}`,
+  ).then((r) => r.data)
+}
+
+// ── Lot C : demandes d'accès ────────────────────────────────────────────
+export const listerDemandesAcces = (filtres = {}) =>
+  api.get(`${BASE}/demandes/${urlParams(filtres)}`).then((r) => r.data)
+
+export const creerDemandeAcces = (payload) =>
+  api.post(`${BASE}/demandes/`, payload).then((r) => r.data)
+
+export const actionDemandeAcces = (id, action, motif_decision = '') =>
+  api.post(`${BASE}/demandes/${id}/action/`, { action, motif_decision })
+    .then((r) => r.data)
+
 // ── Couche IMPACT (additive) : endpoints impact/dashboard, garde identique
 // à la console (drapeau + trio d'administration côté Django). ─────────────
 export const impactPermission = (code) =>
