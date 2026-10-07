@@ -25,6 +25,7 @@ export default function MatricePermissions() {
   const [matrice, setMatrice] = useState(null)
   const [filtre, setFiltre] = useState('')
   const [domaine, setDomaine] = useState('')
+  const [detaillee, setDetaillee] = useState(false)
 
   useEffect(() => { recupererMatrice().then(setMatrice).catch(() => setMatrice(null)) }, [])
 
@@ -46,14 +47,29 @@ export default function MatricePermissions() {
       <div className="hab-carte">
         <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <h2 className="h5 mb-0">Matrice rôle × module</h2>
-          <button className="btn btn-outline-success btn-sm" data-testid="export-matrice"
-                  onClick={() => exporter(matrice)}>
-            <i className="bi bi-download me-1" />Exporter (CSV)
-          </button>
+          <div className="d-flex gap-2 align-items-center">
+            <div className="form-check" title="Afficher les actions réellement octroyées (source : rôles du référentiel)">
+              <input
+                className="form-check-input" type="checkbox" id="matrice-detaillee"
+                data-testid="matrice-detaillee" checked={detaillee}
+                onChange={(e) => setDetaillee(e.target.checked)}
+              />
+              <label className="form-check-label hab-muted" htmlFor="matrice-detaillee">
+                Vue détaillée (actions réelles)
+              </label>
+            </div>
+            <button className="btn btn-outline-success btn-sm" data-testid="export-matrice"
+                    onClick={() => exporter(matrice)}>
+              <i className="bi bi-download me-1" />Exporter (CSV)
+            </button>
+          </div>
         </div>
         <p className="hab-muted mt-1 mb-2">
           Les niveaux provisoires (modules hors annexe A2, à valider à l'atelier J2) sont
           signalés par un contour pointillé. N0 lecture très limitée → N4 administration.
+          En vue détaillée, chaque cellule liste les actions réellement octroyées par le
+          rôle pour le module (source de vérité : permissions du rôle), avec le nombre de
+          comptes titulaires.
         </p>
         <div className="hab-filtres">
           <input className="form-control" placeholder="Rechercher un rôle…" value={filtre}
@@ -77,6 +93,12 @@ export default function MatricePermissions() {
                   <td style={{ position: 'sticky', left: 0, background: '#fff', textAlign: 'left', whiteSpace: 'nowrap' }}>
                     {l.sensible && <i className="bi bi-shield-exclamation text-danger me-1" title="Sensible" />}
                     {l.libelle}
+                    {typeof l.comptes_titulaires === 'number' && (
+                      <span className="hab-muted ms-1" data-testid={`matrice-titulaires-${l.code}`}
+                            title="Comptes titulaires (attributions actives)">
+                        ({l.comptes_titulaires})
+                      </span>
+                    )}
                     <Link
                       className="hab-lien-impact ms-1"
                       title={`Impact du rôle ${l.code}`}
@@ -89,10 +111,18 @@ export default function MatricePermissions() {
                   {matrice.modules.map((m) => {
                     const case_ = l.niveaux[m.code]
                     if (!case_) return <td key={m.code}>—</td>
+                    const actions = detaillee ? (l.actions_par_module?.[m.code] || []) : null
                     return (
                       <td key={m.code} className={`hab-niveau-${case_.niveau} ${case_.origine === 'J2' ? 'hab-provisoire' : ''}`}
                           title={case_.origine === 'J2' ? `Provisoire J2 — ${m.libelle}` : m.libelle}>
                         {case_.niveau}
+                        {detaillee && (
+                          <div className="hab-matrice-actions" data-testid={`matrice-actions-${l.code}-${m.code}`}>
+                            {actions.length === 0
+                              ? <span className="hab-muted">aucune</span>
+                              : actions.map((a) => <div key={a}>{a}</div>)}
+                          </div>
+                        )}
                       </td>
                     )
                   })}

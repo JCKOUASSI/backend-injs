@@ -5,7 +5,7 @@ Toutes les routes sont gardées par :class:`ExigeDrapeauAdmin` (drapeau
 elles renvoient 403 et l'interface ne les référence pas. Les gestes sont
 journalisés ; le moteur d'autorisation reste en mode observation.
 """
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -241,9 +241,25 @@ class MatriceView(APIView):
 
     def get(self, request):
         """Vue compacte rôle × module (niveaux), pour l'écran matrice."""
+        titulaires = dict(
+            AttributionRole.objects
+            .filter(statut=AttributionRole.Statut.ACTIVE)
+            .values_list('role_id')
+            .annotate(total=Count('id'))
+            .values_list('role_id', 'total')
+        )
         lignes = []
         for role in RoleMetier.objects.prefetch_related('permissions').order_by('ordre'):
             niveaux, origine = niveaux_du_role(role.code, role.domaine)
+            permissions_par_module = {}
+            for permission in role.permissions.all():
+                permissions_par_module.setdefault(permission.module, []).append(
+                    permission.action,
+                )
+            actions_par_module = {
+                module: sorted(set(actions))
+                for module, actions in permissions_par_module.items()
+            }
             lignes.append({
                 'code': role.code,
                 'libelle': role.libelle,
@@ -252,6 +268,8 @@ class MatriceView(APIView):
                 'niveaux': {m: {'niveau': n, 'origine': origine.get(m, 'A2')}
                             for m, n in niveaux.items()},
                 'permissions_count': role.permissions.count(),
+                'actions_par_module': actions_par_module,
+                'comptes_titulaires': titulaires.get(role.pk, 0),
             })
         return Response({
             'modules': [

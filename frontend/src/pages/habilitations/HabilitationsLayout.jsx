@@ -4,31 +4,10 @@
  * navigation latérale entre les onze écrans. La console est entièrement
  * nouvelle ; elle ne remplace pas l'écran Utilisateurs existant.
  */
-import { NavLink, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { useDroits } from '@/hooks/useDroits'
 import { BandeauTraçabilite, Message403 } from './partages'
-
-const LIENS = [
-  { to: '/administration/comptes', fin: true, icone: 'bi-people', libelle: 'Comptes' },
-  { to: '/administration/comptes/nouveau', icone: 'bi-person-plus', libelle: 'Nouveau compte' },
-  { to: '/administration/comptes/dashboard', icone: 'bi-speedometer2', libelle: 'Dashboard' },
-  { to: '/administration/comptes/roles', icone: 'bi-person-badge', libelle: 'Rôles' },
-  { to: '/administration/comptes/impact-role', icone: 'bi-crosshair', libelle: 'Impact rôle' },
-  { to: '/administration/comptes/permissions', icone: 'bi-list-columns', libelle: 'Catalogue des permissions' },
-  { to: '/administration/comptes/impact-permission', icone: 'bi-crosshair2', libelle: 'Impact permission' },
-  { to: '/administration/comptes/matrice', icone: 'bi-grid-3x3-gap', libelle: 'Matrice des permissions' },
-  { to: '/administration/comptes/impact-utilisateur', icone: 'bi-person-check', libelle: 'Impact utilisateur' },
-  { to: '/administration/comptes/acces-effectifs', icone: 'bi-diagram-2', libelle: 'Accès effectifs' },
-  { to: '/administration/comptes/derogations', icone: 'bi-key', libelle: 'Dérogations' },
-  { to: '/administration/comptes/delegations', icone: 'bi-person-check', libelle: 'Délégations' },
-  { to: '/administration/comptes/demandes', icone: 'bi-clipboard2-check', libelle: "Demandes d'accès" },
-  { to: '/administration/comptes/provisionnement', icone: 'bi-inbox', libelle: 'File de provisionnement' },
-  { to: '/administration/comptes/operations-masse', icone: 'bi-upload', libelle: 'Opérations en masse' },
-  { to: '/administration/comptes/notifications', icone: 'bi-bell', libelle: 'Notifications' },
-  { to: '/administration/comptes/revue', icone: 'bi-clipboard-check', libelle: 'Revue des habilitations' },
-  { to: '/administration/comptes/journal', icone: 'bi-journal-text', libelle: 'Journal' },
-  { to: '/administration/comptes/organisation', icone: 'bi-diagram-3', libelle: 'Organisation' },
-]
+import NavigationUtilisateursAcces from './NavigationUtilisateursAcces'
 
 export default function HabilitationsLayout() {
   const droits = useDroits()
@@ -52,18 +31,7 @@ export default function HabilitationsLayout() {
         <i className="bi bi-shield-lock me-2" />Administration des comptes — CURP
       </h2>
       <div className="hab-layout">
-        <nav className="hab-nav" aria-label="Navigation de la console d'habilitation">
-          {LIENS.map((lien) => (
-            <NavLink
-              key={lien.to}
-              to={lien.to}
-              end={lien.fin}
-              className={({ isActive }) => (isActive ? 'active' : '')}
-            >
-              <i className={`bi ${lien.icone}`} />{lien.libelle}
-            </NavLink>
-          ))}
-        </nav>
+        <NavigationUtilisateursAcces />
         <div className="hab-contenu">
           <Outlet />
         </div>

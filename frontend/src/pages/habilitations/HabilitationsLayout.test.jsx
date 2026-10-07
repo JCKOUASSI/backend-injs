@@ -15,9 +15,15 @@ import CapabilitiesSync from '@/components/auth/CapabilitiesSync'
 import { ToastProvider } from '@/context/ToastContext'
 import { makeUser } from '@/test/utils/factories'
 import HabilitationsLayout from './HabilitationsLayout'
+import NavigationUtilisateursAcces from './NavigationUtilisateursAcces'
+import { CAPABILITIES_QUERY_KEY, FLAGS_QUERY_KEY } from '@/lib/queryClient'
 
 function monter(capacites) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  qc.setQueryData(FLAGS_QUERY_KEY, { 'flag.curp_ui_admin': true })
+  qc.setQueryData(CAPABILITIES_QUERY_KEY, {
+    role: 'ADMIN', roles: ['ADMIN'], niveau: 'N4', capacites,
+  })
   window.localStorage.setItem('access_token', 'jeton-test')
   apiController.setMe(makeUser('ADMIN'))
   apiController.setRoute('/auth/capabilities/', { capacites })
@@ -57,6 +63,31 @@ describe('HabilitationsLayout — dérivation des capacités (C2 §3)', () => {
     monter({ habilitations_admin: ['gerer'] })
     expect(await screen.findByTestId('enfant-liste')).toBeInTheDocument()
     expect(screen.getByText(/Toute action sur les habilitations est tracée/)).toBeInTheDocument()
-    expect(screen.getByText('Journal')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Journal/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Profils/ })).toBeInTheDocument()
+  })
+
+  it('ne montre pas les liens console lorsque le drapeau est fermé', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    qc.setQueryData(FLAGS_QUERY_KEY, { 'flag.curp_ui_admin': false })
+    qc.setQueryData(CAPABILITIES_QUERY_KEY, {
+      role: 'ADMIN', roles: ['ADMIN'], niveau: 'N4',
+      capacites: { habilitations_admin: ['gerer'] },
+    })
+    window.localStorage.setItem('access_token', 'jeton-test')
+    apiController.setMe(makeUser('ADMIN'))
+    apiController.setRoute('/auth/capabilities/', { capacites: { habilitations_admin: ['gerer'] } })
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/users']}>
+          <AuthProvider>
+            <CapabilitiesSync />
+            <Routes><Route path="/users" element={<NavigationUtilisateursAcces />} /></Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByRole('link', { name: /Profils/ })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Comptes/ })).not.toBeInTheDocument()
   })
 })

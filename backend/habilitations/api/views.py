@@ -13,7 +13,7 @@ Aucune de ces vues ne modifie une décision d'accès legacy : l'écriture des
 attributions relève de l'admin Django et, plus tard, des écrans U4.
 """
 from django.contrib.auth import get_user_model
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
@@ -197,13 +197,36 @@ class RoleListView(generics.ListAPIView):
 
 
 class PermissionListView(generics.ListAPIView):
-    """``GET /api/habilitations/permissions/`` : référentiel des permissions."""
+    """``GET /api/habilitations/permissions/`` : référentiel des permissions.
+
+    Filtres serveur (additifs) : ``module``, ``ressource``, ``action``,
+    ``criticite`` et recherche ``q`` (code/libellé). Chaque ligne porte
+    ``total_roles`` — nombre réel de rôles qui l'octroient (source de
+    vérité : M2M ``RoleMetier.permissions``).
+    """
 
     serializer_class = PermissionMetierSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return PermissionMetier.objects.all().order_by('module', 'ressource')
+        qs = (
+            PermissionMetier.objects.all()
+            .annotate(total_roles=Count('roles_octroyants', distinct=True))
+            .order_by('module', 'ressource')
+        )
+        params = self.request.query_params
+        if params.get('module'):
+            qs = qs.filter(module=params['module'])
+        if params.get('ressource'):
+            qs = qs.filter(ressource=params['ressource'])
+        if params.get('action'):
+            qs = qs.filter(action=params['action'])
+        if params.get('criticite'):
+            qs = qs.filter(criticite=params['criticite'])
+        q = params.get('q', '').strip()
+        if q:
+            qs = qs.filter(Q(code__icontains=q) | Q(libelle__icontains=q))
+        return qs
 
 
 class ObservationsSyntheseView(APIView):

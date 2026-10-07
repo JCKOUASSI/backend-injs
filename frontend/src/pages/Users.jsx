@@ -19,6 +19,8 @@ import { useSecretariats } from '../hooks/useSecretariats'
 import { useQueryClient } from '@tanstack/react-query'
 import { SECRETARIATS_QUERY_KEY } from '../lib/queryClient'
 import '../styles/profils.css'
+import '../pages/habilitations/habilitations.css'
+import NavigationUtilisateursAcces from './habilitations/NavigationUtilisateursAcces'
 
 const TAB_CONFIG = {
   personnel: { title: 'Liste des utilisateurs', description: 'Comptes du personnel administratif, technique et pédagogique.', icon: 'bi-person-gear', createLabel: 'Nouvel utilisateur', modalTitle: 'Nouvel utilisateur' },
@@ -248,23 +250,26 @@ export default function Users() {
         <span>Gestion des profils — Utilisateurs & Accès</span>
       </h2>
       <p className="prof-sous-titre">Répertoire des comptes du personnel, des comptes étudiants et des comptes enseignants de l'INJS.</p>
-      <div className={showTabBar ? 'prof-layout' : undefined}>
-        {showTabBar && (
-          <nav className="prof-nav" role="tablist" aria-label="Catégories de profils">
-            {availableTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={userTab === tab.id}
-                className={userTab === tab.id ? 'active' : ''}
-                onClick={() => setUserTabAndReset(tab.id)}
-              >
-                <i className={`bi ${tab.icon}`} aria-hidden="true"></i>{tab.label}
-              </button>
-            ))}
-          </nav>
-        )}
+      <div className="hab-layout">
+        <div className="d-flex flex-column gap-3">
+          <NavigationUtilisateursAcces compact />
+          {showTabBar && (
+            <nav className="prof-nav" role="tablist" aria-label="Catégories de profils">
+              {availableTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={userTab === tab.id}
+                  className={userTab === tab.id ? 'active' : ''}
+                  onClick={() => setUserTabAndReset(tab.id)}
+                >
+                  <i className={`bi ${tab.icon}`} aria-hidden="true"></i>{tab.label}
+                </button>
+              ))}
+            </nav>
+          )}
+        </div>
         <div className="prof-contenu">
           {/* Search + filter bar */}
           <div className="prof-carte">

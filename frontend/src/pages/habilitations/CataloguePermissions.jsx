@@ -1,9 +1,11 @@
 /** CataloguePermissions — catalogue humain des permissions CURP
- * (module.ressource.action, criticité, rôles, impact).
+ * (module.ressource.action, criticité, rôles octroyants, impact).
  *
  * Additive : consomme l'API existante GET /api/habilitations/permissions/
- * (pagination serveur) et ouvre la vue d'impact de chaque permission
- * (?code=…). Aucune logique métier dupliquée.
+ * (pagination serveur, filtres serveur module/ressource/action/criticité/q)
+ * et ouvre la vue d'impact de chaque permission (?code=…). Chaque ligne
+ * porte le nombre RÉEL de rôles qui l'octroient (M2M du référentiel).
+ * Aucune logique métier dupliquée.
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -12,19 +14,31 @@ import { EnChargement } from './partages'
 import SensibleBadge from './SensibleBadge'
 import './habilitations.css'
 
+const CRITICITES = ['', 'NORMALE', 'SENSIBLE', 'CRITIQUE']
+
 export default function CataloguePermissions() {
   const [page, setPage] = useState(1)
   const [donnees, setDonnees] = useState(null)
-  const [filtre, setFiltre] = useState('')
+  const [filtres, setFiltres] = useState({
+    q: '', module: '', ressource: '', action: '', criticite: '',
+  })
   const [erreur, setErreur] = useState('')
 
+  const majFiltre = (cle) => (e) => {
+    setFiltres((f) => ({ ...f, [cle]: e.target.value }))
+    setPage(1)
+  }
+
   useEffect(() => {
-    listerPermissions(page)
+    const actifs = Object.fromEntries(
+      Object.entries(filtres).filter(([, v]) => v !== ''),
+    )
+    listerPermissions({ page, ...actifs })
       .then(setDonnees)
       .catch((e) => setErreur(
         e?.response?.data?.detail || 'Catalogue des permissions indisponible.'
       ))
-  }, [page])
+  }, [page, filtres])
 
   if (erreur) {
     return (
@@ -43,9 +57,7 @@ export default function CataloguePermissions() {
     )
   }
 
-  const lignes = donnees.results.filter((p) =>
-    !filtre || `${p.code} ${p.libelle} ${p.module}`
-      .toLowerCase().includes(filtre.toLowerCase()))
+  const lignes = donnees.results
 
   return (
     <section data-testid="ecran-catalogue-permissions">
@@ -58,16 +70,57 @@ export default function CataloguePermissions() {
           référentiel CURP. La criticité provient du référentiel chargé ; le
           lien d'impact ouvre la vue « qui est concerné » de chaque permission.
         </p>
-        <input
-          className="form-control mb-2"
-          placeholder="Filtrer la page affichée par code, libellé ou module…"
-          data-testid="catalogue-filtre"
-          value={filtre}
-          onChange={(e) => setFiltre(e.target.value)}
-        />
+        <div className="hab-filtres">
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="catalogue-q">Recherche</label>
+            <input
+              id="catalogue-q" className="form-control"
+              placeholder="Code ou libellé…"
+              data-testid="catalogue-filtre"
+              value={filtres.q}
+              onChange={majFiltre('q')}
+            />
+          </div>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="catalogue-module">Module</label>
+            <input
+              id="catalogue-module" className="form-control" style={{ maxWidth: 160 }}
+              placeholder="ex. scolarite" data-testid="catalogue-module"
+              value={filtres.module} onChange={majFiltre('module')}
+            />
+          </div>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="catalogue-ressource">Ressource</label>
+            <input
+              id="catalogue-ressource" className="form-control" style={{ maxWidth: 140 }}
+              placeholder="ex. note" data-testid="catalogue-ressource"
+              value={filtres.ressource} onChange={majFiltre('ressource')}
+            />
+          </div>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="catalogue-action">Action</label>
+            <input
+              id="catalogue-action" className="form-control" style={{ maxWidth: 130 }}
+              placeholder="ex. valider" data-testid="catalogue-action"
+              value={filtres.action} onChange={majFiltre('action')}
+            />
+          </div>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="catalogue-criticite">Criticité</label>
+            <select
+              id="catalogue-criticite" className="form-select"
+              data-testid="catalogue-criticite" value={filtres.criticite}
+              onChange={majFiltre('criticite')}
+            >
+              {CRITICITES.map((c) => (
+                <option key={c} value={c}>{c || 'Toutes'}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         <table className="hab-table" data-testid="catalogue-table">
           <thead>
-            <tr><th>Code</th><th>Libellé</th><th>Module</th><th>Sensibilité</th><th>Impact</th></tr>
+            <tr><th>Code</th><th>Libellé</th><th>Module</th><th>Sensibilité</th><th>Rôles octroyants</th><th>Impact</th></tr>
           </thead>
           <tbody>
             {lignes.map((p) => (
@@ -83,6 +136,9 @@ export default function CataloguePermissions() {
                     </span>
                   )}
                 </td>
+                <td data-testid={`catalogue-roles-${p.code}`}>
+                  {p.total_roles ?? '—'}
+                </td>
                 <td>
                   <Link
                     className="hab-lien-impact"
@@ -96,7 +152,7 @@ export default function CataloguePermissions() {
               </tr>
             ))}
             {lignes.length === 0 && (
-              <tr><td colSpan="5" className="hab-muted">Aucune permission sur cette page ne correspond au filtre.</td></tr>
+              <tr><td colSpan="6" className="hab-muted">Aucune permission ne correspond aux filtres.</td></tr>
             )}
           </tbody>
         </table>

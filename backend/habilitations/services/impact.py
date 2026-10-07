@@ -372,6 +372,10 @@ def impact_utilisateur(user_id):
             'perimetres': [_perimetre(p) for p in attribution.perimetres.all()],
             'date_debut': attribution.date_debut,
             'date_fin': attribution.date_fin,
+            'attribue_par': (
+                attribution.attribue_par.get_username()
+                if attribution.attribue_par_id else ''
+            ),
             'modules': _grouper_par_module(permissions_role),
             'permissions': permissions_role,
         })

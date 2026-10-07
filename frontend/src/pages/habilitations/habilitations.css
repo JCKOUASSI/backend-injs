@@ -65,6 +65,28 @@
   box-shadow: 0 4px 12px rgba(30, 112, 235, 0.35);
 }
 
+.hab-nav-compact {
+  position: static;
+}
+
+.hab-nav a span {
+  min-width: 0;
+}
+
+.hab-layout > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .hab-layout > .d-flex {
+    position: static;
+  }
+  .hab-nav {
+    max-height: min(42vh, 24rem);
+    overflow-y: auto;
+  }
+}
+
 .hab-carte {
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(14px);
@@ -383,4 +405,13 @@
   color: #991B1B;
   border-radius: 10px;
   padding: 0.45rem 0.75rem;
+}
+
+/* Matrice : actions réelles affichées en vue détaillée. */
+.hab-matrice-actions {
+  font-size: 0.68rem;
+  font-weight: 600;
+  margin-top: 0.2rem;
+  text-align: left;
+  line-height: 1.25;
 }

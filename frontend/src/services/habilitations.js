@@ -69,9 +69,14 @@ export const listerRolesCurp = () =>
     return data.results || data
   })
 
-/** Catalogue des permissions (pagination serveur, API U2 existante). */
-export const listerPermissions = (page = 1) =>
-  api.get(`${BASE}/permissions/${urlParams({ page })}`).then((r) => r.data)
+/** Catalogue des permissions (pagination serveur, API U2 existante).
+ *  Lot d'intégration : filtres serveur module/ressource/action/criticité/q
+ *  et compteur réel de rôles octroyants (total_roles).
+ */
+export const listerPermissions = (params = {}) => {
+  const query = typeof params === 'number' ? { page: params } : { page: 1, ...params }
+  return api.get(`${BASE}/permissions/${urlParams(query)}`).then((r) => r.data)
+}
 
 export const recupererRole = (code) =>
   api.get(`${BASE}/roles/${encodeURIComponent(code)}/`).then((r) => r.data)

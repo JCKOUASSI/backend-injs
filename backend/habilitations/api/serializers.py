@@ -34,12 +34,17 @@ class RoleMetierSerializer(serializers.ModelSerializer):
 
 
 class PermissionMetierSerializer(serializers.ModelSerializer):
+    #: Nombre réel de rôles qui octroient cette permission (annotation du
+    #: queryset ; source de vérité : M2M ``RoleMetier.permissions``).
+    total_roles = serializers.IntegerField(read_only=True, default=0)
+
     class Meta:
         model = PermissionMetier
         fields = (
             'code', 'module', 'ressource', 'action', 'portee_maximale',
             'libelle', 'criticite', 'necessite_motif',
             'necessite_double_validation', 'journalisee', 'actif',
+            'total_roles',
         )
         read_only_fields = fields
 
