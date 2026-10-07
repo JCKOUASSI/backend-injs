@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { impactUtilisateur, messageErreur } from '@/services/habilitations'
+import { impactUtilisateur, listerComptes, messageErreur } from '@/services/habilitations'
 import { EnChargement } from './partages'
 import SensibleBadge from './SensibleBadge'
 import './habilitations.css'
@@ -38,6 +38,7 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
   const [chargement, setChargement] = useState(false)
   const [erreur, setErreur] = useState('')
   const [ouverts, setOuverts] = useState({})
+  const [comptes, setComptes] = useState([])
 
   const analyser = async (cible) => {
     const cibleNettoyee = (cible ?? userId).trim()
@@ -60,6 +61,15 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIdInitial])
 
+  // Sélecteur d'utilisateur : premières comptes de la liste réelle
+  // (pagination console). La saisie manuelle de l'identifiant reste possible.
+  useEffect(() => {
+    listerComptes({ page: 1 }).then((r) => {
+      setComptes(r.results || r || [])
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chargement initial uniquement
+  }, [])
+
   const basculer = (cle) =>
     setOuverts((etat) => ({ ...etat, [cle]: !etat[cle] }))
 
@@ -72,25 +82,57 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
         <p className="hab-muted">
           Utilisateur → Rôle → Module → Permission. Chaque branche est dérivée
           des attributions et dérogations effectives du compte (moteur CURP) ;
-          les octrois directs et retraits actifs sont distingués.
+          les octrois directs et retraits actifs sont distingués, avec la
+          période de validité, l'attribuant et le périmètre.
         </p>
         <div className="hab-filtres">
-          <input
-            className="form-control"
-            placeholder="Identifiant du compte Django…"
-            data-testid="acces-effectifs-id"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && analyser()}
-          />
-          <button
-            className="btn btn-primary btn-sm"
-            data-testid="acces-effectifs-analyser"
-            onClick={() => analyser()}
-            disabled={!userId.trim() || chargement}
-          >
-            Analyser
-          </button>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="acces-effectifs-choix">
+              Choisir un compte
+            </label>
+            <select
+              id="acces-effectifs-choix"
+              className="form-control"
+              data-testid="acces-effectifs-choix"
+              value={comptes.some((c) => String(c.user_id) === userId) ? userId : ''}
+              onChange={(e) => { setUserId(e.target.value); analyser(e.target.value) }}
+            >
+              <option value="">— Sélectionner —</option>
+              {comptes.map((c) => {
+                // L'endpoint impact/utilisateur attend la PK Django, pas la PK CURP.
+                const identifiant = String(c.user_id)
+                return (
+                  <option key={identifiant} value={identifiant}>
+                    {identifiant} — {c.username}{c.nom ? ` (${c.nom})` : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+          <div>
+            <label className="form-label hab-muted mb-1" htmlFor="acces-effectifs-id-label">
+              Ou saisir un identifiant
+            </label>
+            <input
+              id="acces-effectifs-id-label"
+              className="form-control"
+              placeholder="Identifiant du compte Django…"
+              data-testid="acces-effectifs-id"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && analyser()}
+            />
+          </div>
+          <div className="align-self-end">
+            <button
+              className="btn btn-primary btn-sm"
+              data-testid="acces-effectifs-analyser"
+              onClick={() => analyser()}
+              disabled={!userId.trim() || chargement}
+            >
+              Analyser
+            </button>
+          </div>
         </div>
       </div>
 
@@ -142,6 +184,29 @@ function Arbre({ donnees, ouverts, basculer }) {
                   <span className="hab-muted ms-1">
                     Niv. {r.niveau_effectif}
                   </span>
+                  <span
+                    className="hab-muted ms-2 d-inline-block"
+                    data-testid={`acces-effectifs-meta-${r.code}`}
+                  >
+                    {(r.date_debut || r.date_fin) && (
+                      <span data-testid={`acces-effectifs-periode-${r.code}`}>
+                        <i className="bi bi-calendar3 me-1" aria-hidden="true" />
+                        {r.date_debut || '…'} → {r.date_fin || 'sans échéance'}
+                      </span>
+                    )}
+                    {r.attribue_par && (
+                      <span className="ms-2" data-testid={`acces-effectifs-attribue-par-${r.code}`}>
+                        <i className="bi bi-person-check me-1" aria-hidden="true" />
+                        par {r.attribue_par}
+                      </span>
+                    )}
+                    {(r.perimetres?.length ?? 0) > 0 && (
+                      <span className="ms-2" data-testid={`acces-effectifs-perimetres-${r.code}`}>
+                        <i className="bi bi-geo me-1" aria-hidden="true" />
+                        {r.perimetres.map((p) => p.libelle).join(', ')}
+                      </span>
+                    )}
+                  </span>
                 </span>
               }
               enfants={r.modules.map((m) => (
@@ -176,6 +241,57 @@ function Arbre({ donnees, ouverts, basculer }) {
           </li>
         ))}
       </ul>
+
+      {(donnees.delegations_recues?.length ?? 0) > 0 && (
+        <div className="mt-2" data-testid="acces-effectifs-delegations">
+          <h4 className="h6">
+            <i className="bi bi-person-check me-1" />Délégations reçues
+            ({donnees.delegations_recues.length})
+          </h4>
+          <ul className="mb-0">
+            {donnees.delegations_recues.map((d, index) => (
+              <li key={`delegation-${d.id ?? index}`}>
+                {d.delegant?.username
+                  ? `${d.delegant.username} → ${donnees.username}`
+                  : `Délégation #${d.id ?? index}`}
+                {d.roles?.length ? ` — rôles : ${d.roles.join(', ')}` : ''}
+                {d.date_fin ? ` — jusqu'au ${d.date_fin}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(donnees.actions_sensibles_effectives?.length ?? 0) > 0 && (
+        <div className="mt-2" data-testid="acces-effectifs-actions-sensibles">
+          <h4 className="h6 text-danger">
+            <i className="bi bi-exclamation-triangle me-1" />Actions sensibles effectives
+            ({donnees.actions_sensibles_effectives.length})
+          </h4>
+          <ul className="mb-0">
+            {donnees.actions_sensibles_effectives.map((codeP) => (
+              <li key={codeP}><code>{codeP}</code></li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {donnees.modules_effectifs && donnees.modules_effectifs.length > 0 && (
+        <div className="mt-2" data-testid="acces-effectifs-modules">
+          <h4 className="h6">
+            <i className="bi bi-grid me-1" />Modules accessibles
+            ({donnees.modules_effectifs.length})
+          </h4>
+          <ul className="mb-0">
+            {donnees.modules_effectifs.map((m) => (
+              <li key={`module-${m.module}`}>
+                {m.module_libelle || m.module}{' '}
+                <span className="hab-muted">({m.permissions?.length ?? '?'} permission(s))</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
