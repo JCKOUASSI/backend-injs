@@ -313,18 +313,23 @@ jobs:
         shell: bash
         run: |
           set +e
-          flutter pub get --enforce-lockfile --verbose 2>&1 | tee "$RUNNER_TEMP/flutter-pub-get.log"
+          flutter pub get --enforce-lockfile 2>&1 | tee "$RUNNER_TEMP/flutter-pub-get.log"
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            echo "::group::Diagnostics détaillés de flutter pub get"
-            tail -n 30 "$RUNNER_TEMP/flutter-pub-get.log"
+            diagnostics="$RUNNER_TEMP/flutter-pub-diagnostics.log"
+            grep -Ei 'error:|because |lockfile|pubspec\.lock|sdk version|could not|no versions|exception|socket|connection|checksum|sha-256|version solving|dependency conflict|pub get' "$RUNNER_TEMP/flutter-pub-get.log" | tail -n 10 > "$diagnostics" || true
+            if [ ! -s "$diagnostics" ]; then
+              tail -n 10 "$RUNNER_TEMP/flutter-pub-get.log" > "$diagnostics"
+            fi
+            echo "::group::Diagnostics de flutter pub get"
+            cat "$diagnostics"
             echo "::endgroup::"
             while IFS= read -r line; do
               line=${line//'%'/'%25'}
               line=${line//$'\r'/'%0D'}
               line=${line//$'\n'/'%0A'}
               echo "::error title=Diagnostic flutter pub get::$line"
-            done < <(tail -n 30 "$RUNNER_TEMP/flutter-pub-get.log")
+            done < "$diagnostics"
             exit "$status"
           fi
 
