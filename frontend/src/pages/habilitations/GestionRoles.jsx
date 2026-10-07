@@ -23,6 +23,7 @@ import './habilitations.css'
 export default function GestionRoles() {
   const [roles, setRoles] = useState([])
   const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
   const [detail, setDetail] = useState(null)
   const [versions, setVersions] = useState([])
   const [motif, setMotif] = useState('')
@@ -33,7 +34,19 @@ export default function GestionRoles() {
   const [erreurComparaison, setErreurComparaison] = useState('')
   const [filtre, setFiltre] = useState('')
 
-  useEffect(() => { listerRolesCurp().then((r) => { setRoles(r); setChargement(false) }) }, [])
+  const chargerRoles = async () => {
+    setChargement(true)
+    setErreur('')
+    try {
+      setRoles(await listerRolesCurp())
+    } catch (e) {
+      setErreur(messageErreur(e, 'Référentiel des rôles indisponible.'))
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  useEffect(() => { chargerRoles() }, [])
 
   const chargerVersions = async (code) => {
     const reponse = await listerVersionsRole(code)
@@ -96,6 +109,14 @@ export default function GestionRoles() {
     !filtre || `${r.code} ${r.libelle} ${r.domaine}`.toLowerCase().includes(filtre.toLowerCase()))
 
   if (chargement) return <EnChargement />
+  if (erreur) return (
+    <section data-testid="ecran-roles">
+      <div className="hab-carte hab-avertissement" role="alert" data-testid="roles-erreur">
+        <p>{erreur}</p>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={chargerRoles}>Réessayer</button>
+      </div>
+    </section>
+  )
   return (
     <section data-testid="ecran-roles">
       <div className="hab-carte">
@@ -130,6 +151,9 @@ export default function GestionRoles() {
                   </td>
                 </tr>
               ))}
+              {rolesFiltres.length === 0 && (
+                <tr><td colSpan="7" className="hab-muted text-center py-3">Aucun rôle ne correspond au filtre.</td></tr>
+              )}
             </tbody>
           </table>
         </div>

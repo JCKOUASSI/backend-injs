@@ -51,7 +51,12 @@ export function Message403({ detail }) {
 }
 
 export function EnChargement({ message = 'Chargement…' }) {
-  return <p className="hab-muted"><div className="spinner-border spinner-border-sm me-2" />{message}</p>
+  return (
+    <div className="hab-muted" role="status">
+      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+      {message}
+    </div>
+  )
 }
 
 export function nomCompte(compte) {

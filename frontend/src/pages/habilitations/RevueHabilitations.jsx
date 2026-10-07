@@ -4,15 +4,37 @@
  * relève du prompt C5 / unité U7 : les actions sont volontairement absentes.
  */
 import { useEffect, useState } from 'react'
-import { recupererRevue } from '@/services/habilitations'
+import { messageErreur, recupererRevue } from '@/services/habilitations'
 import { BadgeSensible, EnChargement } from './partages'
 import './habilitations.css'
 
 export default function RevueHabilitations() {
   const [revue, setRevue] = useState(null)
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
 
-  useEffect(() => { recupererRevue().then(setRevue).catch(() => setRevue(null)) }, [])
-  if (!revue) return <EnChargement />
+  const charger = async () => {
+    setChargement(true)
+    setErreur('')
+    try {
+      setRevue(await recupererRevue())
+    } catch (e) {
+      setErreur(messageErreur(e, 'Chargement de la revue des habilitations impossible.'))
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  useEffect(() => { charger() }, [])
+  if (chargement) return <EnChargement message="Chargement de la revue…" />
+  if (erreur) return (
+    <section data-testid="ecran-revue">
+      <div className="hab-carte hab-avertissement" role="alert" data-testid="revue-erreur">
+        <p>{erreur}</p>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={charger}>Réessayer</button>
+      </div>
+    </section>
+  )
 
   const groupes = Object.entries(revue.groupes)
   const total = groupes.reduce((n, [, comptes]) => n + comptes.length, 0)

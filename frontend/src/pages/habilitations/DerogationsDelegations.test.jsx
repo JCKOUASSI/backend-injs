@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const actual = await importOriginal()
@@ -39,6 +40,29 @@ beforeEach(() => {
 })
 
 describe('Derogations', () => {
+  it('affiche une erreur et permet de relancer le chargement', async () => {
+    let tentatives = 0
+    apiController.setRoute(/\/habilitations\/derogations\/?$/, () => {
+      tentatives += 1
+      return tentatives === 1
+        ? Promise.reject({ response: { data: { detail: 'Dérogations temporairement indisponibles.' } } })
+        : { count: 0, results: [] }
+    })
+    monter(<Derogations />, '/administration/comptes/derogations', '/administration/comptes/derogations')
+    expect(await screen.findByTestId('derogations-erreur'))
+      .toHaveTextContent('Dérogations temporairement indisponibles.')
+    expect(screen.queryByText(/Chargement des dérogations/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByText('Aucune dérogation.')).toBeInTheDocument()
+  })
+
+  it('affiche le résultat vide après un chargement réussi', async () => {
+    apiController.setRoute(/\/habilitations\/derogations\/?$/, { count: 0, results: [] })
+    monter(<Derogations />, '/administration/comptes/derogations', '/administration/comptes/derogations')
+    expect(await screen.findByText('Aucune dérogation.')).toBeInTheDocument()
+  })
+
   it('propose une dérogation d\'octroi bornée avec motif', async () => {
     monter(<Derogations />, '/administration/comptes/derogations', '/administration/comptes/derogations')
     apiController.setRoute(/\/habilitations\/derogations\/?$/, { count: 0, results: [] })
@@ -84,6 +108,29 @@ describe('Derogations', () => {
 })
 
 describe('Delegations', () => {
+  it('affiche une erreur et permet de relancer le chargement', async () => {
+    let tentatives = 0
+    apiController.setRoute(/\/habilitations\/delegations\/?(\?|$)/, () => {
+      tentatives += 1
+      return tentatives === 1
+        ? Promise.reject({ response: { data: { detail: 'Délégations temporairement indisponibles.' } } })
+        : { count: 0, results: [] }
+    })
+    monter(<Delegations />, '/administration/comptes/delegations', '/administration/comptes/delegations')
+    expect(await screen.findByTestId('delegations-erreur'))
+      .toHaveTextContent('Délégations temporairement indisponibles.')
+    expect(screen.queryByText(/Chargement des délégations/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByText('Aucune délégation.')).toBeInTheDocument()
+  })
+
+  it('affiche le résultat vide après un chargement réussi', async () => {
+    apiController.setRoute(/\/habilitations\/delegations\/?(\?|$)/, { count: 0, results: [] })
+    monter(<Delegations />, '/administration/comptes/delegations', '/administration/comptes/delegations')
+    expect(await screen.findByText('Aucune délégation.')).toBeInTheDocument()
+  })
+
   it('refuse une délégation de soi à soi avant l\'appel API', async () => {
     monter(<Delegations />, '/administration/comptes/delegations', '/administration/comptes/delegations')
     apiController.setRoute(/\/habilitations\/delegations\/?(\?|$)/, { count: 0, results: [] })

@@ -14,14 +14,27 @@ export default function Derogations() {
   const { showToast } = useToast()
   const [comptes, setComptes] = useState([])
   const [donnees, setDonnees] = useState(null)
+  const [chargement, setChargement] = useState(true)
+  const [erreurChargement, setErreurChargement] = useState('')
   const [form, setForm] = useState(formVide)
   const [aRevoquer, setARevoquer] = useState(null)
 
-  const charger = () => listerDerogations().then(setDonnees)
-  useEffect(() => {
-    listerComptes({ page_size: 200 }).then((d) => setComptes(d.results || []))
-    charger()
-  }, [])
+  const charger = async () => {
+    setChargement(true)
+    setErreurChargement('')
+    try {
+      const [listeComptes, listeDerogations] = await Promise.all([
+        listerComptes({ page_size: 200 }), listerDerogations(),
+      ])
+      setComptes(listeComptes.results || [])
+      setDonnees(listeDerogations)
+    } catch (e) {
+      setErreurChargement(messageErreur(e, 'Chargement des dérogations impossible.'))
+    } finally {
+      setChargement(false)
+    }
+  }
+  useEffect(() => { charger() }, [])
 
   const maj = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const creer = async (e) => {
@@ -46,7 +59,15 @@ export default function Derogations() {
     charger()
   }
 
-  if (!donnees) return <EnChargement />
+  if (chargement) return <EnChargement message="Chargement des dérogations…" />
+  if (erreurChargement) return (
+    <section data-testid="ecran-derogations">
+      <div className="hab-carte hab-avertissement" role="alert" data-testid="derogations-erreur">
+        <p>{erreurChargement}</p>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={charger}>Réessayer</button>
+      </div>
+    </section>
+  )
   return (
     <section data-testid="ecran-derogations">
       <div className="hab-carte">

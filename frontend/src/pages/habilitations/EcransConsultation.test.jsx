@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const actual = await importOriginal()
@@ -33,6 +34,33 @@ beforeEach(() => {
 })
 
 describe('JournalHabilitations', () => {
+  it('affiche une erreur récupérable si le chargement du journal échoue', async () => {
+    apiController.setRoute(/\/journal\/integrite\/$/, { integre: true, total: 0 })
+    let tentatives = 0
+    apiController.setRoute(/\/habilitations\/journal\/?(\?|$)/, () => {
+      tentatives += 1
+      return tentatives === 1
+        ? Promise.reject({ response: { data: { detail: 'Journal temporairement indisponible.' } } })
+        : { count: 0, results: [] }
+    })
+    monter(<JournalHabilitations />, '/administration/comptes/journal', '/administration/comptes/journal')
+    expect(await screen.findByTestId('journal-erreur'))
+      .toHaveTextContent('Journal temporairement indisponible.')
+    expect(screen.queryByText('Chargement du journal…')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByText('Aucun événement.')).toBeInTheDocument()
+  })
+
+  it('rend visible l’échec de la vérification d’intégrité sans masquer le journal', async () => {
+    apiController.setRoute(/\/journal\/integrite\/$/, () => Promise.reject(new Error('échec')))
+    apiController.setRoute(/\/habilitations\/journal\/?(\?|$)/, { count: 0, results: [] })
+    monter(<JournalHabilitations />, '/administration/comptes/journal', '/administration/comptes/journal')
+    expect(await screen.findByTestId('integrite-journal-erreur'))
+      .toHaveTextContent('Vérification de l’intégrité du journal impossible.')
+    expect(await screen.findByText('Aucun événement.')).toBeInTheDocument()
+  })
+
   it('indique le chaînage intègre et liste les événements', async () => {
     apiController.setRoute(/\/journal\/integrite\/$/, { integre: true, total: 3, anomalies: [] })
     apiController.setRoute(/\/habilitations\/journal\/?(\?|$)/, {
@@ -87,6 +115,23 @@ describe('MatricePermissions', () => {
 })
 
 describe('RevueHabilitations — consultation en U4', () => {
+  it('affiche une erreur récupérable puis l’état vide après rechargement', async () => {
+    let tentatives = 0
+    apiController.setRoute(/\/comptes\/revue\/$/, () => {
+      tentatives += 1
+      return tentatives === 1
+        ? Promise.reject({ response: { data: { detail: 'Revue temporairement indisponible.' } } })
+        : { message: 'Consultation seule.', groupes: {} }
+    })
+    monter(<RevueHabilitations />, '/administration/comptes/revue', '/administration/comptes/revue')
+    expect(await screen.findByTestId('revue-erreur'))
+      .toHaveTextContent('Revue temporairement indisponible.')
+    expect(screen.queryByText('Chargement de la revue…')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByText("Aucun compte gouverné pour l'instant.")).toBeInTheDocument()
+  })
+
   it('affiche le message de consultation seule et les groupes', async () => {
     apiController.setRoute(/\/comptes\/revue\/$/, {
       consultation_seule: true,

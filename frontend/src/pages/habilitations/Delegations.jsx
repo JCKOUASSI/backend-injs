@@ -57,17 +57,31 @@ export default function Delegations() {
   const [comptes, setComptes] = useState([])
   const [roles, setRoles] = useState([])
   const [donnees, setDonnees] = useState(null)
+  const [chargement, setChargement] = useState(true)
+  const [erreurChargement, setErreurChargement] = useState('')
   const [form, setForm] = useState(formVide)
   const [aTerminer, setATerminer] = useState(null)
   const [aActiver, setAActiver] = useState(null)
   const [aTracer, setATracer] = useState(null)
 
-  const charger = () => listerDelegations({ page_size: 200 }).then(setDonnees)
-  useEffect(() => {
-    listerComptes({ page_size: 500 }).then((d) => setComptes(d.results || []))
-    listerRolesCurp().then(setRoles)
-    charger()
-  }, [])
+  const charger = async () => {
+    setChargement(true)
+    setErreurChargement('')
+    try {
+      const [listeComptes, listeRoles, listeDelegations] = await Promise.all([
+        listerComptes({ page_size: 500 }), listerRolesCurp(),
+        listerDelegations({ page_size: 200 }),
+      ])
+      setComptes(listeComptes.results || [])
+      setRoles(listeRoles)
+      setDonnees(listeDelegations)
+    } catch (e) {
+      setErreurChargement(messageErreur(e, 'Chargement des délégations impossible.'))
+    } finally {
+      setChargement(false)
+    }
+  }
+  useEffect(() => { charger() }, [])
 
   const maj = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -107,7 +121,15 @@ export default function Delegations() {
     }
   }
 
-  if (!donnees) return <EnChargement />
+  if (chargement) return <EnChargement message="Chargement des délégations…" />
+  if (erreurChargement) return (
+    <section data-testid="ecran-delegations">
+      <div className="hab-carte hab-avertissement" role="alert" data-testid="delegations-erreur">
+        <p>{erreurChargement}</p>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={charger}>Réessayer</button>
+      </div>
+    </section>
+  )
   return (
     <section data-testid="ecran-delegations">
       <div className="hab-carte">

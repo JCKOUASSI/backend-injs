@@ -1,6 +1,6 @@
 /** JournalHabilitations — consultation filtrable et vérification du chaînage. */
 import { useEffect, useState } from 'react'
-import { listerJournal, integriteJournal } from '@/services/habilitations'
+import { listerJournal, integriteJournal, messageErreur } from '@/services/habilitations'
 import { telechargerCsv } from '@/utils/habilitations'
 import { EnChargement } from './partages'
 import './habilitations.css'
@@ -14,15 +14,37 @@ const TYPES = [
 
 export default function JournalHabilitations() {
   const [donnees, setDonnees] = useState(null)
+  const [chargement, setChargement] = useState(true)
+  const [erreurChargement, setErreurChargement] = useState('')
   const [integrite, setIntegrite] = useState(null)
+  const [erreurIntegrite, setErreurIntegrite] = useState('')
   const [filtres, setFiltres] = useState({ type: '', q: '', date_min: '', date_max: '' })
   const [page, setPage] = useState(1)
 
-  useEffect(() => {
+  const chargerJournal = async () => {
+    setChargement(true)
+    setErreurChargement('')
     const params = Object.fromEntries(Object.entries(filtres).filter(([, v]) => v))
-    listerJournal({ ...params, page }).then(setDonnees)
-  }, [filtres, page])
-  useEffect(() => { integriteJournal().then(setIntegrite) }, [])
+    try {
+      setDonnees(await listerJournal({ ...params, page }))
+    } catch (e) {
+      setErreurChargement(messageErreur(e, 'Chargement du journal impossible.'))
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  const chargerIntegrite = async () => {
+    setErreurIntegrite('')
+    try {
+      setIntegrite(await integriteJournal())
+    } catch (e) {
+      setErreurIntegrite(messageErreur(e, 'Vérification de l’intégrité du journal impossible.'))
+    }
+  }
+
+  useEffect(() => { chargerJournal() }, [filtres, page])
+  useEffect(() => { chargerIntegrite() }, [])
 
   const maj = (k, v) => { setPage(1); setFiltres((f) => ({ ...f, [k]: v })) }
   const totalPages = donnees ? Math.max(1, Math.ceil(donnees.count / 50)) : 1
@@ -56,6 +78,12 @@ export default function JournalHabilitations() {
               : `ANOMALIE détectée : ${integrite.anomalies.join(', ')}`}
           </div>
         )}
+        {erreurIntegrite && (
+          <div className="hab-avertissement" role="alert" data-testid="integrite-journal-erreur">
+            <p>{erreurIntegrite}</p>
+            <button type="button" className="btn btn-sm btn-outline-primary" onClick={chargerIntegrite}>Réessayer la vérification</button>
+          </div>
+        )}
         <div className="hab-filtres">
           <select className="form-select" value={filtres.type} aria-label="Type d'événement"
                   onChange={(e) => maj('type', e.target.value)}>
@@ -71,7 +99,12 @@ export default function JournalHabilitations() {
         </div>
       </div>
       <div className="hab-carte">
-        {!donnees ? <EnChargement /> : (
+        {chargement ? <EnChargement message="Chargement du journal…" /> : erreurChargement ? (
+          <div className="hab-avertissement" role="alert" data-testid="journal-erreur">
+            <p>{erreurChargement}</p>
+            <button type="button" className="btn btn-sm btn-outline-primary" onClick={chargerJournal}>Réessayer</button>
+          </div>
+        ) : donnees && (
           <table className="hab-table">
             <thead><tr><th>N°</th><th>Horodatage</th><th>Événement</th><th>Acteur</th><th>Objet</th><th>Motif</th></tr></thead>
             <tbody>

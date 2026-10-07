@@ -55,11 +55,35 @@ beforeEach(() => {
 })
 
 describe('GestionRoles — versions (Lot B)', () => {
+  it('affiche une erreur récupérable si le chargement du référentiel échoue', async () => {
+    let tentatives = 0
+    apiController.setRoute('/habilitations/roles/', () => {
+      tentatives += 1
+      return tentatives === 1
+        ? Promise.reject({ response: { data: { detail: 'Référentiel temporairement indisponible.' } } })
+        : roles
+    })
+    monter()
+    expect(await screen.findByTestId('roles-erreur'))
+      .toHaveTextContent('Référentiel temporairement indisponible.')
+    expect(screen.queryByText('Chargement…')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByTestId('ecran-roles')).toBeInTheDocument()
+    expect(screen.getByTestId('ligne-role-SCOLARITE')).toBeInTheDocument()
+  })
+
   it('affiche le référentiel et le panneau de comparaison', async () => {
     apiController.setRoute(/roles\/$/, roles)
     monter()
     expect(await screen.findByTestId('ecran-roles')).toBeInTheDocument()
     expect(screen.getByTestId('comparaison-roles')).toBeInTheDocument()
+  })
+
+  it('affiche un état vide si le référentiel ne contient aucun rôle', async () => {
+    apiController.setRoute('/habilitations/roles/', [])
+    monter()
+    expect(await screen.findByText('Aucun rôle ne correspond au filtre.')).toBeInTheDocument()
   })
 
   it('exige un motif avant capture et poste la version', async () => {
