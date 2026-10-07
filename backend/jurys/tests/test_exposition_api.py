@@ -11,10 +11,11 @@ Invariants vérifiés ici :
 - les statistiques sont des agrégats des modèles, jamais des valeurs figées ;
 - aucune permission n'est relâchée, aucun accès anonyme.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -40,7 +41,8 @@ from scolarite.models import (
     UE,
 )
 
-from jurys.models import DecisionJury, SessionJury
+from jurys.models import DecisionJury, PropositionJury, SessionJury
+from jurys.services import _derniere_propositions
 
 User = get_user_model()
 
@@ -270,6 +272,27 @@ class JuryFiltresTests(ExpositionApiBase):
 
 class JuryAnomaliesTests(ExpositionApiBase):
     """Anomalies dérivées des contrôles réels du workflow."""
+
+    def test_derniere_proposition_par_inscription(self):
+        session_data = self._creer_session('Jury propositions')
+        session = SessionJury.objects.get(pk=session_data['id'])
+        inscription = self._inscrire('E001')
+        champs = {
+            'session': session,
+            'inscription': inscription,
+            'participant': inscription.etudiant.participant,
+            'resultat': {},
+            'empreinte': 'a' * 64,
+        }
+        ancienne = PropositionJury.objects.create(**champs)
+        recente = PropositionJury.objects.create(**champs)
+        PropositionJury.objects.filter(pk=ancienne.pk).update(
+            calcule_le=timezone.now() - timedelta(minutes=1),
+        )
+        PropositionJury.objects.filter(pk=recente.pk).update(calcule_le=timezone.now())
+
+        ids = list(_derniere_propositions(session).values_list('pk', flat=True))
+        self.assertEqual(ids, [recente.pk])
 
     def test_session_inexistante(self):
         reponse = self.client.get('/api/jurys/sessions/999999/anomalies/')

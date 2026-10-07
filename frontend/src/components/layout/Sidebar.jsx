@@ -56,7 +56,7 @@ function ecrireEtat(etat) {
   }
 }
 
-export default function Sidebar({ open = false, collapsed = false, onClose = () => {} }) {
+export default function Sidebar({ open = false, onClose = () => {} }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const chemin = location.pathname

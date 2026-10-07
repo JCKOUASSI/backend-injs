@@ -10,6 +10,13 @@ import os
 import sys
 from pathlib import Path
 
+# Le profil sandbox est conservé à la racine du monorepo (hors application
+# backend) ; exposer cette racine permet `--settings=arena.settings_sandbox`
+# depuis le répertoire backend sans modifier le PYTHONPATH à la main.
+_REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+if (_REPOSITORY_ROOT / 'arena').is_dir() and str(_REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPOSITORY_ROOT))
+
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).resolve().parent / '.env')

@@ -7,6 +7,7 @@ pas un échec.
 """
 
 from decimal import Decimal
+from pathlib import Path
 from unittest import TestCase
 
 from scolarite.pedagogie_validateur import (
@@ -20,6 +21,8 @@ from scolarite.pedagogie_validateur import (
     normaliser_ligne,
     valider_ligne,
 )
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 #: Ligne de référence parfaitement documentée (critères A→K tous PASS).
 VALIDE = {
@@ -253,13 +256,12 @@ class TestSecuriteStagingA53(TestCase):
     """TEST CRITIQUE A-5.4 — le staging actuel doit etre REFUSE."""
 
     STAGING = (
-        '/Users/jckouassi/projets/injs/backend-injs/workspace/26092026/'
-        'a53-express/referentiel-pedagogique-staging.csv'
+        REPOSITORY_ROOT / 'workspace' / '26092026' / 'a53-express'
+        / 'referentiel-pedagogique-staging.csv'
     )
 
     def test_27_staging_a53_entierement_refuse(self):
-        from pathlib import Path
-        if not Path(self.STAGING).exists():
+        if not self.STAGING.exists():
             self.skipTest('staging A-5.3 absent')
         from scolarite.pedagogie_validateur import valider_fichier
         r = valider_fichier(self.STAGING)
@@ -267,8 +269,7 @@ class TestSecuriteStagingA53(TestCase):
         self.assertEqual(sum(1 for lv in r['lignes'] if lv.importable), 0)
 
     def test_27b_aucune_cellule_importable(self):
-        from pathlib import Path
-        if not Path(self.STAGING).exists():
+        if not self.STAGING.exists():
             self.skipTest('staging A-5.3 absent')
         from scolarite.pedagogie_validateur import valider_fichier
         r = valider_fichier(self.STAGING)
@@ -281,17 +282,19 @@ class TestSecuriteStagingA53(TestCase):
 class TestPasDEcritureBase(TestCase):
     """Aucun acces base de donnees dans le validateur ni dans la commande."""
 
-    V = '/Users/jckouassi/projets/injs/backend-injs/backend/scolarite/pedagogie_validateur.py'
-    C = ('/Users/jckouassi/projets/injs/backend-injs/backend/scolarite/management/'
-         'commands/import_referentiel_pedagogique.py')
+    V = Path(__file__).resolve().parents[1] / 'pedagogie_validateur.py'
+    C = (
+        Path(__file__).resolve().parents[1] / 'management' / 'commands'
+        / 'import_referentiel_pedagogique.py'
+    )
 
     def test_28_validateur_sans_acces_db(self):
-        source = open(self.V, encoding='utf-8').read()
+        source = self.V.read_text(encoding='utf-8')
         for interdit in ('from django.db', 'import django', '.save()', '.objects'):
             self.assertNotIn(interdit, source, interdit)
 
     def test_29_commande_refuse_apply(self):
-        source = open(self.C, encoding='utf-8').read()
+        source = self.C.read_text(encoding='utf-8')
         self.assertIn("--apply n'est PAS implemente", source)
         # Aucune ECRITURE : .save() / .delete() / .create() / transaction
         for interdit in ('.save()', '.delete()', '.create(', 'bulk_create',

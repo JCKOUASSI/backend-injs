@@ -1,5 +1,5 @@
 /** JournalHabilitations — consultation filtrable et vérification du chaînage. */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { listerJournal, integriteJournal, messageErreur } from '@/services/habilitations'
 import { telechargerCsv } from '@/utils/habilitations'
 import { EnChargement } from './partages'
@@ -21,7 +21,7 @@ export default function JournalHabilitations() {
   const [filtres, setFiltres] = useState({ type: '', q: '', date_min: '', date_max: '' })
   const [page, setPage] = useState(1)
 
-  const chargerJournal = async () => {
+  const chargerJournal = useCallback(async () => {
     setChargement(true)
     setErreurChargement('')
     const params = Object.fromEntries(Object.entries(filtres).filter(([, v]) => v))
@@ -32,19 +32,19 @@ export default function JournalHabilitations() {
     } finally {
       setChargement(false)
     }
-  }
+  }, [filtres, page])
 
-  const chargerIntegrite = async () => {
+  const chargerIntegrite = useCallback(async () => {
     setErreurIntegrite('')
     try {
       setIntegrite(await integriteJournal())
     } catch (e) {
       setErreurIntegrite(messageErreur(e, 'Vérification de l’intégrité du journal impossible.'))
     }
-  }
+  }, [])
 
-  useEffect(() => { chargerJournal() }, [filtres, page])
-  useEffect(() => { chargerIntegrite() }, [])
+  useEffect(() => { chargerJournal() }, [chargerJournal])
+  useEffect(() => { chargerIntegrite() }, [chargerIntegrite])
 
   const maj = (k, v) => { setPage(1); setFiltres((f) => ({ ...f, [k]: v })) }
   const totalPages = donnees ? Math.max(1, Math.ceil(donnees.count / 50)) : 1

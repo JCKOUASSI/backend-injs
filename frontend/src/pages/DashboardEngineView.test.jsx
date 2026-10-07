@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 
 vi.mock('@/services/api', async (importOriginal) => {
   const actual = await importOriginal()
@@ -7,7 +7,7 @@ vi.mock('@/services/api', async (importOriginal) => {
   return { ...actual, default: mod.default, setSessionExpiredCallback: vi.fn() }
 })
 
-import apiMock, { apiController } from '@/test/utils/mockApi'
+import { apiController } from '@/test/utils/mockApi'
 import { renderWithProviders } from '@/test/utils/renderWithProviders'
 import { makeUser } from '@/test/utils/factories'
 import { useAuth } from '@/context/AuthContext'

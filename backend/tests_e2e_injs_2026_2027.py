@@ -35,11 +35,19 @@ import os
 import sys
 import json
 import hashlib
+from pathlib import Path
 from datetime import date, time, timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock
 
 import django
+
+# Le profil `arena` vit à la racine du monorepo, tandis que ce script est
+# lancé depuis `backend/` ; rendre les deux paquets importables sans PYTHONPATH.
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'arena.settings_sandbox')
 django.setup()
 

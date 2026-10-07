@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { safeLocalStorage } from './safeStorage'
 
 const CLE = 'test_safe_storage'

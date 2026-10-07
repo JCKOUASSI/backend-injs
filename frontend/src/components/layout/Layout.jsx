@@ -113,7 +113,6 @@ export default function Layout({ children, breadcrumb }) {
 
       <Sidebar
         open={sidebarOpen}
-        collapsed={sidebarCollapsed}
         onClose={handleSidebarClose}
       />
 

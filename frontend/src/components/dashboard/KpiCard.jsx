@@ -5,7 +5,6 @@ export default function KpiCard({
   value,
   subText,
   icon = 'bi-activity',
-  variant = 'blue',
   trend,
   trendLabel = 'vs 2025 – 2026',
   trendPositive = true,
