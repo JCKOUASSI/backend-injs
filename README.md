@@ -284,12 +284,14 @@ cd backend
 # Le manifeste WhiteNoise doit exister avant les tests qui rendent des templates :
 SECRET_KEY=ci-secret-key-not-for-production DEBUG=True python manage.py collectstatic --noinput
 python manage.py migrate --noinput
-python manage.py test --noinput -v 2          # suite complète (référence CI : 949 tests)
+python manage.py test --noinput -v 2          # suite complète (PostgreSQL en CI)
 python manage.py check_repo_hygiene           # hygiène du dépôt (gros fichiers, données suivies…)
 ```
 
-En bac à sable sans PostgreSQL, ajouter `--settings=arena.settings_sandbox` (SQLite jetable)
-ou `USE_SQLITE=1` : un écart de pliage des accents propre à SQLite est documenté dans
+En bac à sable sans PostgreSQL, lancer les migrations et tests avec `USE_SQLITE=1`
+(SQLite, chemin réglable via `SQLITE_PATH`). Réserver `--settings=arena.settings_sandbox`
+au profil d'aperçu iframe (cookies CHIPS et hôte `*.e2b.app`). Un écart de pliage des
+accents propre à SQLite est documenté dans
 [l'ADR-006](docs/ADR/ADR-006-unicite-libelles-insensible-casse.md) ; la référence reste
 PostgreSQL.
 
@@ -298,20 +300,22 @@ PostgreSQL.
 ```bash
 cd frontend
 npm ci
-npm run lint        # ESLint (0 erreur bloquante exigée)
-npm run build       # build de production (vérifie aussi le typage/imports)
+npm run lint          # ESLint (aucune erreur ni avertissement)
+npm run build         # build de production Vite
+npm run test:coverage # Vitest, tests unitaires et seuils de couverture
 ```
 
-Aucun framework de tests unitaires frontend n'est encore installé dans ce lot ; son ajout
-est prévu (tâche P00-04, Vitest).
+Les tests frontend utilisent Vitest et Testing Library (`npm run test:run` pour exécuter
+sans couverture). Les seuils de couverture sont définis dans `frontend/vitest.config.js`.
 
 ### 6.3 Mobile / PWA — Flutter
 
 ```bash
 cd qr_badge_mobile
+cp .env.example assets/app.env  # requis par la déclaration d'assets Flutter
 flutter pub get --enforce-lockfile
-flutter analyze     # analyse statique (exécutée en CI)
-flutter test        # tests Dart unitaires/widget du dossier test/
+flutter analyze                 # analyse statique (exécutée en CI)
+flutter test                    # tests Dart unitaires/widget du dossier test/
 ```
 
 ---

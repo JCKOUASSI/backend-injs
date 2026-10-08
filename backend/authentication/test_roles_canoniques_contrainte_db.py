@@ -1,13 +1,13 @@
-"""Tests de la contrainte PostgreSQL du lot L4b.
+"""Tests du garde-fou SQL du lot L4b.
 
 `User.Role.choices` n'est qu'un contrôle applicatif : il n'empêche ni un script
 SQL, ni un import, ni une requête directe d'écrire une valeur arbitraire dans
 `authentication_user.role`. La migration `authentication.0024` ajoute la
-contrainte `auth_user_role_canonique_l4b` qui ferme cette porte.
+contrainte PostgreSQL (ou les triggers SQLite du profil sandbox) qui ferme
+cette porte.
 
-Ces tests s'exécutent sur la base de test (SQLite en CI, PostgreSQL en local)
-et vérifient le comportement **réel** du SGBD, en contournant délibérément
-l'ORM et les validateurs Django pour ne tester que la contrainte.
+Ces tests vérifient le comportement **réel** du SGBD en contournant
+l'ORM et les validateurs Django pour ne tester que le garde-fou.
 """
 
 from django.contrib.auth import get_user_model

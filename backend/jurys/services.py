@@ -14,6 +14,8 @@ import json
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import F, Window
+from django.db.models.functions import RowNumber
 
 from scolarite.models import InscriptionAdministrative, journaliser
 from scolarite.validation_services import (
@@ -260,12 +262,22 @@ class Gravite(models.TextChoices):
 
 
 def _derniere_propositions(session):
-    """Dernier calcul par inscription (Propositions append-only)."""
+    """Dernier calcul par inscription (Propositions append-only).
+
+    La fonction fenêtre garde le même contrat que ``DISTINCT ON`` PostgreSQL,
+    tout en restant exécutable sur SQLite pour le sandbox et les tests locaux.
+    """
     return (
         PropositionJury.objects
         .filter(session=session)
-        .order_by('inscription_id', '-calcule_le')
-        .distinct('inscription_id')
+        .annotate(
+            _rang_calcul=Window(
+                expression=RowNumber(),
+                partition_by=[F('inscription_id')],
+                order_by=[F('calcule_le').desc(), F('pk').desc()],
+            ),
+        )
+        .filter(_rang_calcul=1)
     )
 
 

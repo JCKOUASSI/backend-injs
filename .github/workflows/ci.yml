@@ -11,7 +11,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (Django)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # La suite exhaustive Django a pris 56 min 54 s sur le run vert de
     # référence et 89 min 40 s sur le run le plus récent. 120 minutes laisse
@@ -28,21 +28,20 @@ jobs:
       DEBUG: "True"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/pip-cache
-          key: ${{ runner.os }}-arm64-pip-${{ hashFiles('backend/requirements.txt') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('backend/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-arm64-pip-
+            ${{ runner.os }}-${{ runner.arch }}-pip-
 
       - name: Démarrer PostgreSQL CI
         shell: bash
         run: |
-          # Le runner self-hosted partage Docker avec les autres jobs. La
-          # suppression et le démarrage non bornés pouvaient rester bloqués
-          # plusieurs heures dans docker rm/docker run.
+          # Même sur le runner hébergé, une opération Docker bloquée ne doit
+          # pas retenir le job : suppression et démarrage sont bornés ci-dessous.
           python3 - <<'PY'
           import subprocess
           import sys
@@ -109,9 +108,8 @@ jobs:
       - name: Installer les dépendances Python
         env:
           PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
-          # Le runner self-hosted peut subir des délais réseau intermittents
-          # vers PyPI. On conserve l'installation réelle, mais on augmente
-          # les retries et le timeout sans supprimer de contrôle.
+          # PyPI peut subir des délais réseau intermittents depuis le runner.
+          # On conserve l'installation réelle et augmente les retries/timeout.
           PIP_DEFAULT_TIMEOUT: "60"
           PIP_RETRIES: "8"
         run: .venv-ci/bin/pip install -r backend/requirements.txt
@@ -204,18 +202,21 @@ jobs:
         # répliques non dupliquées/orphelines du registre core.
         run: ../.venv-ci/bin/python manage.py audit_integrity_check
 
-      - name: Vérifier l'image Docker backend (collectstatic / permissions)
+      - name: Construire l'image Docker backend
+        run: docker build --progress=plain -t sygep-backend-ci ./backend
+
+      - name: Vérifier le propriétaire des fichiers statiques dans l'image
         run: |
-          docker build -t sygep-backend-ci ./backend
-          # Ces contrôles sont statiques : ils ne doivent pas déclencher
-          # l'entrypoint de production, qui attend PostgreSQL avant d'exécuter
-          # la commande. Le build ci-dessus valide déjà collectstatic.
           OWNER=$(docker run --rm --entrypoint python sygep-backend-ci -c "import os, pwd; print(pwd.getpwuid(os.stat('/app/staticfiles').st_uid).pw_name)")
           if [ "$OWNER" != "appuser" ]; then
             echo "::error::/app/staticfiles appartient à ${OWNER} (attendu: appuser)"
             exit 1
           fi
-          docker run --rm --entrypoint python sygep-backend-ci manage.py collectstatic --noinput --dry-run
+
+      - name: Vérifier collectstatic dans l'image sans lancer l'entrypoint
+        # L'entrypoint attend PostgreSQL ; fournir les réglages de build permet
+        # de tester uniquement la collecte, sans base ni secret de production.
+        run: docker run --rm -e SECRET_KEY -e DEBUG --entrypoint python sygep-backend-ci manage.py collectstatic --noinput --dry-run
 
       - name: Nettoyer PostgreSQL CI
         if: always()
@@ -238,12 +239,12 @@ jobs:
 
   frontend:
     name: Frontend (Vite / React)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -258,12 +259,12 @@ jobs:
 
   frontend-tests:
     name: Frontend tests (Vitest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -281,7 +282,7 @@ jobs:
 
       - name: Archiver le rapport de couverture HTML
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage
           path: frontend/coverage/
@@ -290,10 +291,10 @@ jobs:
 
   mobile:
     name: Mobile (Flutter)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -307,8 +308,31 @@ jobs:
           mkdir -p assets
           cp .env.example assets/app.env
 
-      - name: Pub get et analyse statique
+      - name: Pub get avec verrou strict
         working-directory: qr_badge_mobile
+        shell: bash
         run: |
-          flutter pub get --enforce-lockfile
-          flutter analyze
+          set +e
+          flutter pub get --enforce-lockfile 2>&1 | tee "$RUNNER_TEMP/flutter-pub-get.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            diagnostics="$RUNNER_TEMP/flutter-pub-diagnostics.log"
+            grep -Ei 'error:|because |lockfile|pubspec\.lock|sdk version|could not|no versions|exception|socket|connection|checksum|sha-256|version solving|dependency conflict|pub get' "$RUNNER_TEMP/flutter-pub-get.log" | tail -n 10 > "$diagnostics" || true
+            if [ ! -s "$diagnostics" ]; then
+              tail -n 10 "$RUNNER_TEMP/flutter-pub-get.log" > "$diagnostics"
+            fi
+            echo "::group::Diagnostics de flutter pub get"
+            cat "$diagnostics"
+            echo "::endgroup::"
+            while IFS= read -r line; do
+              line=${line//'%'/'%25'}
+              line=${line//$'\r'/'%0D'}
+              line=${line//$'\n'/'%0A'}
+              echo "::error title=Diagnostic flutter pub get::$line"
+            done < "$diagnostics"
+            exit "$status"
+          fi
+
+      - name: Analyse statique Flutter
+        working-directory: qr_badge_mobile
+        run: flutter analyze

@@ -12,9 +12,11 @@ Il fige aussi les ports canoniques (front 3000 avec ``strictPort``, API 8000)
 pour empêcher tout retour accidentel vers un autre port (ex. 5173).
 """
 from pathlib import Path
+from unittest import skipUnless
 
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.contrib.auth import get_user_model
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
 REPO = settings.BASE_DIR.parent
 OVERLAY = REPO / 'arena' / 'settings_sandbox.py'
@@ -72,12 +74,55 @@ class OverlayCsrfHardeningTests(SimpleTestCase):
         self.assertNotIn('preview_autologin', production)
         self.assertNotIn('PREVIEW_AUTOLOGIN_USERNAME', production)
 
+    def test_auto_login_suit_le_middleware_d_authentification(self):
+        # AutoLogin lit request.user : il doit s'exécuter après que Django l'a
+        # installé, dans le profil actif comme dans son générateur bootstrap.
+        insertion = (
+            'MIDDLEWARE.index("django.contrib.auth.middleware.AuthenticationMiddleware") + 1'
+        )
+        for profil in (OVERLAY, BOOTSTRAP):
+            with self.subTest(profil=profil.name):
+                self.assertIn(insertion, _lire(profil))
+
+    def test_bootstrap_fournit_un_mot_de_passe_aleatoire_a_l_admin_demo(self):
+        contenu = _lire(BOOTSTRAP)
+        self.assertIn('DJANGO_SUPERUSER_USERNAME=admin', contenu)
+        self.assertIn('DJANGO_SUPERUSER_EMAIL=admin@arena.invalid', contenu)
+        self.assertIn('DJANGO_SUPERUSER_PASSWORD="$SANDBOX_ADMIN_PASSWORD"', contenu)
+        self.assertIn('secrets.token_urlsafe(48)', contenu)
+
     def test_noms_de_cookies_dedies(self):
         # Un nom dédié neutralise définitivement tout vieux cookie csrftoken /
         # sessionid hérité du navigateur (cause du « incorrect length »).
         contenu = _lire(OVERLAY)
         self.assertIn('injs_csrftoken', contenu)
         self.assertNotIn('CSRF_COOKIE_NAME = "csrftoken"', contenu)
+
+
+@skipUnless(
+    getattr(settings, 'PREVIEW_AUTOLOGIN_ENABLED', False),
+    'Test intégré actif uniquement avec le profil de preview Arena.',
+)
+class PreviewAutoLoginTests(TestCase):
+    """Le compte de démonstration est utilisable dans l'admin embarqué."""
+
+    @override_settings(DEBUG=True)
+    def test_admin_est_connecte_et_post_ne_bloque_pas_sur_csrf(self):
+        get_user_model().objects.create_superuser(
+            'admin', 'admin@example.com', 'Temp#Pass123',
+        )
+        client = Client(enforce_csrf_checks=True)
+
+        page_admin = client.get('/admin/', HTTP_HOST='localhost')
+        self.assertEqual(
+            page_admin.status_code, 200,
+            f"Redirection inattendue vers {page_admin.headers.get('Location')!r}.",
+        )
+        self.assertTrue(page_admin.wsgi_request.user.is_authenticated)
+        self.assertEqual(page_admin.wsgi_request.user.username, 'admin')
+
+        deconnexion = client.post('/admin/logout/', {}, HTTP_HOST='localhost')
+        self.assertNotEqual(deconnexion.status_code, 403)
 
 
 class PortsCanoniquesTests(SimpleTestCase):

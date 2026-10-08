@@ -42,6 +42,15 @@ class CreneauTemplateIdempotenceTests(TestCase):
         self.assertEqual(creneau.heure_debut, time(8, 0))
         self.assertEqual(creneau.heure_fin, time(9, 59))
 
+    def test_les_heures_texte_sont_converties_et_normalisees(self):
+        creneau = CreneauTemplate.objects.create(
+            jour='LUNDI',
+            heure_debut='08:00:42.987654',
+            heure_fin='10:00:31.123456',
+        )
+        self.assertEqual(creneau.heure_debut, time(8, 0))
+        self.assertEqual(creneau.heure_fin, time(10, 0))
+
     def test_deux_creations_identiques_donnent_le_meme_creneau(self):
         """Idempotence : le micro-courb de l'horaire ne crée pas de doublon.
 

@@ -10,8 +10,6 @@
  *
  * Réutilise le style visuel existant de la console (hab-badge-sensible).
  */
-import { BadgeSensible } from './partages'
-
 const TITRES = {
   role: 'Rôle sensible : traçabilité et contrôles renforcés (MFA, double validation).',
   permission:

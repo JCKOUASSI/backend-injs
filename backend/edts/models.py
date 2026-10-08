@@ -22,7 +22,7 @@ service `edts.services.besoins` expose si besoin une notion **calculée** de
 promotion dérivée du Groupe, sans nouvelle table ni nouvelle clé étrangère.
 """
 
-from datetime import datetime
+from datetime import datetime, time
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -132,9 +132,18 @@ class CreneauTemplate(models.Model):
 
     @classmethod
     def normaliser(cls, valeur):
-        """Ramène une ``time`` à la granularité métier (minute), sans secondes."""
+        """Convertit une heure texte et la ramène à la minute métier."""
         if valeur is None:
             return None
+        if isinstance(valeur, datetime):
+            valeur = valeur.time()
+        elif isinstance(valeur, str):
+            try:
+                valeur = time.fromisoformat(valeur)
+            except ValueError as exc:
+                raise ValidationError('Saisissez une heure valide.') from exc
+        if not isinstance(valeur, time):
+            raise ValidationError('Saisissez une heure valide.')
         base = datetime(2000, 1, 1, valeur.hour, valeur.minute)
         return base.time()
 

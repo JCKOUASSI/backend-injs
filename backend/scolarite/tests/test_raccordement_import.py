@@ -5,6 +5,7 @@ Django (base `test_*` éphémère) et des lignes synthétiques en mémoire.
 """
 
 from decimal import Decimal
+from pathlib import Path
 from unittest import TestCase
 
 from django.test import TestCase as DjangoTestCase
@@ -201,17 +202,16 @@ class TestTracabiliteEtHash(DjangoTestCase):
 class TestAucuneEcriture(TestCase):
     """§27/§31 — aucun module A-6 ne contient d'écriture."""
 
-    F = ('/Users/jckouassi/projets/injs/backend-injs/backend/scolarite/'
-         'pedagogie_raccordement.py')
+    F = Path(__file__).resolve().parents[1] / 'pedagogie_raccordement.py'
 
     def test_31_aucune_ecriture_modele(self):
-        source = open(self.F, encoding='utf-8').read()
+        source = self.F.read_text(encoding='utf-8')
         for interdit in ('.save()', '.delete()', '.create(', 'bulk_create',
                          'transaction.atomic', 'update_or_create'):
             self.assertNotIn(interdit, source, interdit)
 
     def test_31b_lecture_seule_seulement(self):
-        source = open(self.F, encoding='utf-8').read()
+        source = self.F.read_text(encoding='utf-8')
         self.assertIn('objects.filter', source)
         self.assertNotIn('objects.create', source)
 

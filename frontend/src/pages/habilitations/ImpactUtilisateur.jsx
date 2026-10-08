@@ -83,8 +83,6 @@ export default function ImpactUtilisateur({ userIdInitial: userIdInitialProp = '
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIdInitial])
 
-  const arbre = donnees?.arbre
-
   return (
     <section data-testid="ecran-impact-utilisateur">
       <div className="hab-carte">

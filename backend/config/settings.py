@@ -188,24 +188,37 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database — PostgreSQL
-_postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': _postgres_db,
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
-        'TEST': {
-            'NAME': f'test_{_postgres_db}',
-        },
-        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
-        'CONN_HEALTH_CHECKS': True,
+# Database — PostgreSQL par défaut ; SQLite uniquement sur demande explicite
+# pour le développement/sandbox (USE_SQLITE=1). La CI et la production restent
+# sur PostgreSQL et ne peuvent pas basculer implicitement.
+if _env_flag('USE_SQLITE', default=False):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': _env_first('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3')),
+            'OPTIONS': {
+                'timeout': int(os.environ.get('SQLITE_TIMEOUT', '30')),
+            },
+        }
     }
-}
+else:
+    _postgres_db = os.environ.get('POSTGRES_DB', 'qr_badge')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _postgres_db,
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            # Les tests Django utilisent une base séparée (test_<nom>), jamais la base de dev.
+            'TEST': {
+                'NAME': f'test_{_postgres_db}',
+            },
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
+        }
+    }
 
 # Cache — Redis en prod si REDIS_URL (multi-réplicas) ; sinon FileBasedCache (workers Gunicorn)
 # (LocMemCache n'est pas partagé entre processus → throttling cassé en production)
