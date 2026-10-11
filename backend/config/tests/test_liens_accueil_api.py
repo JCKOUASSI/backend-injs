@@ -118,6 +118,7 @@ class ParcoursAdministrationTests(TestCase):
         self.assertIn('csrfmiddlewaretoken', reponse.content.decode('utf-8'))
 
 
+@override_settings(ALLOWED_HOSTS=['localhost', '127.0.0.1', '.e2b.app', '.arena.site', '.trycloudflare.com'])
 class LiensOuvrentOngletPremierNiveauTests(TestCase):
     """Garde-fou : tout lien de l'accueil doit s'ouvrir hors iframe.
 

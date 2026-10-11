@@ -14,6 +14,10 @@ import '../styles/login.css'
  * « CPFAE » ou « Responsable CPFAE » — verrouillé par Login.test.jsx et
  * core/tests/test_garde_fous_permanents.py.
  */
+// Comptes démo : visibles seulement si le build les active (VITE_DEMO_ACCOUNTS=1,
+// via .env.development / .env.test / .env.sandbox). Le build de production les
+// exclut : aucun identifiant n'est servi aux utilisateurs réels.
+const DEMO_ACTIF = import.meta.env.VITE_DEMO_ACCOUNTS === '1'
 const COMPTES_DEMO = [
   { username: 'admin', password: 'admin123', libelle: 'Administrateur', nom: 'Admin INJS' },
   { username: 'jckouassi', password: 'JckPcm@123', libelle: 'Chef INJS Admin', nom: 'Jean-Claude Kouassi' },
@@ -235,6 +239,7 @@ export default function Login() {
             </a>
           </div>
 
+          {DEMO_ACTIF && (
           <div className="login-demo">
             <strong>Comptes démo</strong>
             <p>Un clic suffit : les identifiants sont saisis et la connexion s&apos;effectue automatiquement.</p>
@@ -257,6 +262,7 @@ export default function Login() {
               ))}
             </div>
           </div>
+          )}
 
           <div className="login-form-footer">
             <span>Développé par Ophir Technologies</span>
