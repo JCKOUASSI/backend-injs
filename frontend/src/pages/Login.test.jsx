@@ -127,4 +127,50 @@ describe('pages/Login.jsx', () => {
     await waitFor(() => expect(window.localStorage.getItem('access_token')).toBe('access.jwt'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  // — Garde-fous permanents (demande 2026-10-10) ——————————————————————————
+  // Ces tests empêchent la réintroduction des comptes « Sygepcpfae » /
+  // « Responsable CPFAE » / « dfrc » et verrouillent la hauteur réduite des
+  // plaquettes démo. Ils sont cités dans le commentaire de COMPTES_DEMO.
+
+  it('garde-fou : aucune plaquette démo ne mentionne Sygepcpfae, CPFAE ni dfrc', () => {
+    renderLogin()
+    const plaquettes = document.querySelectorAll('.login-demo-compte')
+    expect(plaquettes.length).toBeGreaterThan(0)
+    for (const p of plaquettes) {
+      expect(p.textContent).not.toMatch(/sygep/i)
+      expect(p.textContent).not.toMatch(/cpfae/i)
+      expect(p.textContent).not.toMatch(/dfrc/i)
+    }
+  })
+
+  it('garde-fou : les plaquettes démo restent compactes (2 lignes, hauteur verrouillée)', () => {
+    renderLogin()
+    const plaquettes = document.querySelectorAll('.login-demo-compte')
+    for (const p of plaquettes) {
+      // Ligne 1 = rôle + nom, ligne 2 = identifiants → 2 enfants maximum.
+      expect(p.children.length).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('garde-fou : un clic sur une plaquette connecte sans aucune saisie', async () => {
+    const user = makeUser('ADMIN', { username: 'admin' })
+    apiMock.post.mockResolvedValueOnce({ data: makeLoginResponse(user) })
+    renderLogin()
+
+    await userEvent.click(document.querySelector('.login-demo-compte'))
+
+    await waitFor(() =>
+      expect(apiMock.post).toHaveBeenCalledWith('/auth/login/', { username: 'admin', password: 'admin123' }),
+    )
+    await waitFor(() => expect(window.localStorage.getItem('access_token')).toBe('access.jwt'))
+  })
+
+  it('garde-fou : le bouton administration pointe vers /admin/ dans la même fenêtre', () => {
+    renderLogin()
+    const lien = screen.getByTitle("Interface d'administration")
+    expect(lien).toHaveAttribute('href', '/admin/')
+    // Pas de target=_blank : l'aperçu (iframe) bloque les nouvelles fenêtres.
+    expect(lien).not.toHaveAttribute('target')
+  })
 })

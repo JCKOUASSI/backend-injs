@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.urls import reverse
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,28 @@ from formations.models import Formation, ModuleParticipant, ModuleFormateur, Ses
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from presences.models import Pointage, AuditLog
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_index(request):
+    """Index des exports disponibles (point d'atterrissage du lien d'accueil)."""
+    return Response({
+        'application': 'Exports PDF / Excel',
+        'exports': {
+            'formation_pdf': request.build_absolute_uri(reverse('export-pdf', args=[0])).replace('/0/', '/{id}/'),
+            'formation_excel': request.build_absolute_uri(reverse('export-excel', args=[0])).replace('/0/', '/{id}/'),
+            'module_pdf': request.build_absolute_uri(reverse('export-pdf-module', args=[0])).replace('/0/', '/{module_id}/'),
+            'module_excel': request.build_absolute_uri(reverse('export-excel-module', args=[0])).replace('/0/', '/{module_id}/'),
+            'session_pdf': request.build_absolute_uri(reverse('export-pdf-session', args=[0])).replace('/0/', '/{session_id}/'),
+            'session_excel': request.build_absolute_uri(reverse('export-pdf-session-excel', args=[0])).replace('/0/', '/{session_id}/'),
+            'finance_synthese_pdf': request.build_absolute_uri(reverse('export-finance-synthese-pdf')),
+            'finance_synthese_excel': request.build_absolute_uri(reverse('export-finance-synthese-excel')),
+            'finance_encadrants_pdf': request.build_absolute_uri(reverse('export-finance-encadrants-pdf')),
+            'finance_encadrants_excel': request.build_absolute_uri(reverse('export-finance-encadrants-excel')),
+            'liste_classe_pdf': request.build_absolute_uri(reverse('export-liste-classe-pdf')),
+        },
+    })
 
 
 def _calculer_duree_export(pointage):

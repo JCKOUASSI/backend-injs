@@ -2,6 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Index des exports (point d'atterrissage du lien « Exports PDF / Excel »
+    # de la page d'accueil API — garde-fous : config/tests/test_liens_accueil_api.py).
+    path('', views.export_index, name='export-index'),
     # Export par formation (toutes séances de tous les modules)
     path('formation/<int:pk>/pdf/', views.export_pdf, name='export-pdf'),
     path('formation/<int:pk>/excel/', views.export_excel, name='export-excel'),

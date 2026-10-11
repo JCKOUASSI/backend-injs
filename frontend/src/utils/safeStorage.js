@@ -15,6 +15,12 @@
 
 const CLE_SONDE = '__injs_probe_storage__'
 const MEMOIRE = new Map()
+// Clés dont la dernière écriture dans le stockage résolu a échoué (exception,
+// quota, ou écriture silencieusement ignorée — vérifiée par relecture). Pour
+// celles-ci seulement, getItem replie sur MEMOIRE quand le stockage renvoie
+// null ; une clé correctement écrite reste soumise à l'autorité du stockage
+// (qui a pu être volontairement vidé : tests, déconnexion, autre onglet).
+const ECRITURES_ECHOUEES = new Set()
 let _stockage = undefined // undefined = pas encore résolu ; null = mémoire
 
 function resoudreStockage() {
@@ -40,7 +46,12 @@ export const safeLocalStorage = {
     const stockage = resoudreStockage()
     if (stockage) {
       try {
-        return stockage.getItem(cle)
+        const valeur = stockage.getItem(cle)
+        if (valeur !== null) return valeur
+        // null : le stockage fait foi, sauf si la dernière écriture de cette
+        // clé a échoué (la valeur n'existe qu'en mémoire — sans ce repli, la
+        // session « disparaît » et les requêtes repartent sans authentification).
+        if (!ECRITURES_ECHOUEES.has(cle)) return null
       } catch {
         // Lecture impossible → tenter la mémoire (peut contenir une écriture
         // de secours posée après une panne du stockage).
@@ -50,16 +61,25 @@ export const safeLocalStorage = {
   },
 
   setItem(cle, valeur) {
+    const attendu = String(valeur)
     const stockage = resoudreStockage()
     if (stockage) {
       try {
-        stockage.setItem(cle, String(valeur))
-        return
+        stockage.setItem(cle, attendu)
+        // Relecture : certains contextes (quota exigu, stockage révoqué,
+        // mode privé) acceptent l'écriture sans la conserver — dans ce cas
+        // la valeur ne vit qu'en mémoire et getItem doit la retrouver.
+        if (stockage.getItem(cle) === attendu) {
+          ECRITURES_ECHOUEES.delete(cle)
+          MEMOIRE.set(cle, attendu)
+          return
+        }
       } catch {
         // Écriture impossible → conserver au moins en mémoire.
       }
+      ECRITURES_ECHOUEES.add(cle)
     }
-    MEMOIRE.set(cle, String(valeur))
+    MEMOIRE.set(cle, attendu)
   },
 
   removeItem(cle) {
@@ -71,6 +91,7 @@ export const safeLocalStorage = {
         // Déjà hors service → purge mémoire ci-dessous.
       }
     }
+    ECRITURES_ECHOUEES.delete(cle)
     MEMOIRE.delete(cle)
   },
 }

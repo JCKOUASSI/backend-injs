@@ -20,14 +20,16 @@ export default defineConfig(({ mode }) => {
   // afin que Django génère les bonnes URL absolues et les bons cookies CSRF.
   const forwardHeaders = (proxyReq, req) => {
     const host = req.headers['x-forwarded-host'] || req.headers.host
-    // Le proxy de l'aperçu Arena (*.e2b.app) est toujours expose en HTTPS,
-    // meme s'il ne propage pas (ou propage mal) X-Forwarded-Proto : on force
-    // https des que l'hote public transmis est un hote e2b.app. Un override
-    // explicite par variable d'environnement reste possible.
+    // Le proxy de l'aperçu est toujours exposé en HTTPS (e2b.app, arena.site,
+    // trycloudflare.com), meme s'il ne propage pas (ou propage mal)
+    // X-Forwarded-Proto : on force https dès que l'hôte public transmis est
+    // un hôte de passerelle. Un override explicite par variable d'environnement
+    // reste possible.
     const protoRecu = req.headers['x-forwarded-proto']
     const hotePublic = String(host || '')
     const forceHttps =
-      process.env.VITE_FORCE_HTTPS === '1' || /\.e2b\.app$/i.test(hotePublic)
+      process.env.VITE_FORCE_HTTPS === '1' ||
+      /\.(e2b\.app|arena\.site|trycloudflare\.com)$/i.test(hotePublic)
     const proto = forceHttps ? 'https' : protoRecu || 'http'
     proxyReq.setHeader('X-Forwarded-Host', host || '')
     proxyReq.setHeader('X-Forwarded-Proto', proto)
@@ -35,34 +37,37 @@ export default defineConfig(({ mode }) => {
   }
   const proxyOpts = {
     target: 'http://127.0.0.1:8000',
-    changeOrigin: true,
+    // changeOrigin: false — on conserve l'en-tête Host d'origine (hôte public
+    // de l'aperçu). Avec true, Django voyait « 127.0.0.1:8000 » : Origin/Referer
+    // ne correspondaient plus à l'hôte reçu et les URL générées étaient fausses.
+    changeOrigin: false,
     configure: (proxy) => {
       proxy.on('proxyReq', forwardHeaders)
     },
   }
 
+  // Proxy commun dev/preview : l'API Django reste sur 8000, le front sur 3000.
+  const proxy = {
+    // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
+    // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
+    '/api': proxyOpts,
+    // Interface d'administration Django : le bouton « administration » de la
+    // page de connexion doit fonctionner (décision produit du 2026-10-10).
+    // Clé regex pour cibler le segment exact « /admin » uniquement : la route
+    // SPA /administration/… ne doit PAS être happée par le proxy.
+    '^/admin(/|\\?|$)': proxyOpts,
+    // Fichiers servis par le backend (dont /static/admin/… de l'admin Django).
+    '/static': proxyOpts,
+    '/media': proxyOpts,
+  }
+
+  // Hôtes publics de l'aperçu intégré (iframe Arena) acceptés en dev comme
+  // en preview (build de production servi par `vite preview`).
+  const allowedHosts = ['.e2b.app', '.arena.site', '.trycloudflare.com', 'localhost', '127.0.0.1']
+
   return {
     plugins: [
       react(),
-      // L'administration Django ne doit jamais transiter par le port 3000,
-      // exposé au public via le proxy/le tunnel : elle reste réservée à
-      // http://127.0.0.1:8000/admin/. Blocage ciblé sur le segment exact
-      // 'admin' uniquement : les routes SPA /administration/… et les fichiers
-      // /static/admin/… ne sont pas concernés.
-      {
-        name: 'injs-blocage-admin',
-        configureServer(server) {
-          server.middlewares.use((req, res, next) => {
-            const chemin = decodeURIComponent((req.url || '').split('?')[0])
-            if (chemin === '/admin' || chemin.startsWith('/admin/')) {
-              res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-              res.end('Not Found')
-              return
-            }
-            next()
-          })
-        },
-      },
     ],
     resolve: { alias },
     server: {
@@ -70,17 +75,18 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       strictPort: true,
       host: true,
-      allowedHosts: ['.e2b.app', '.trycloudflare.com', 'localhost', '127.0.0.1'],
+      allowedHosts,
       hmr,
-      proxy: {
-        // Aligne le frontend sur le backend réellement écouté (127.0.0.1:8000).
-        // Les appels via chemin relatif /api contournent aussi les restrictions CORS.
-        '/api': proxyOpts,
-        // Fichiers servis par le backend. '/admin' n'est volontairement PAS
-        // proxifié : voir le plugin injs-blocage-admin ci-dessus.
-        '/static': proxyOpts,
-        '/media': proxyOpts,
-      },
+      proxy,
+    },
+    // `vite preview` sert dist/ (build de production auto-cohérent) sur le
+    // même port 3000 avec le même proxy API — utilisé pour l'aperçu intégré.
+    preview: {
+      port: 3000,
+      strictPort: true,
+      host: true,
+      allowedHosts,
+      proxy,
     },
     build: {
       outDir: 'dist',

@@ -2,7 +2,7 @@
 Script manuel HORS RUNTIME Django (P00-05) : CLI opérateur
 d'import/reprise — sorties print() de console volontaires ;
 exclu du garde-fou check_repo_hygiene.
-Script de seed — données de démonstration SYGEP-CPFAE.
+Script de seed — données de démonstration INJS LMD.
 Usage: python seed_data.py  (depuis backend/ avec venv activé)
 """
 import os
@@ -46,10 +46,6 @@ def reset_demo_user(username, password, **fields):
 admin_user = reset_demo_user(
     'admin', 'admin123', email='admin@injs.ci', first_name='Admin', last_name='INJS',
     role=User.Role.ADMIN, is_staff=True, is_superuser=True,
-)
-dfrc_user = reset_demo_user(
-    'dfrc', 'dfrc123', email='dfrc@injs.ci', first_name='Responsable', last_name='CPFAE',
-    role=User.Role.INJS_ADMIN, is_staff=True, is_superuser=False,
 )
 jck = reset_demo_user(
     'jckouassi', 'JckPcm@123', email='jck@injs.ci', first_name='Jean-Claude', last_name='Kouassi',
@@ -155,7 +151,7 @@ for i, formation in enumerate(formations):
                 **md,
                 'formateur': formateurs[i % len(formateurs)],
                 'superviseur': superviseurs[i % len(superviseurs)],
-                'creee_par': dfrc_user,
+                'creee_par': injs_user,
                 'date_debut': (now - timedelta(days=10)).date() if md['statut'] in ('TERMINEE','EN_COURS') else (now + timedelta(days=5)).date(),
                 'date_fin':   (now - timedelta(days=2)).date()  if md['statut'] == 'TERMINEE' else (now + timedelta(days=10)).date(),
             }

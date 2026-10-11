@@ -371,6 +371,83 @@
   font-family: inherit;
 }
 
+/* Comptes démo cliquables : un clic connecte sans saisie. Plaquettes
+   volontairement compactes (2 lignes) — garde-fou anti-régression 2026-10-10. */
+.login-demo-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.login-demo-compte {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0.26rem 0.55rem;
+  border: 1px solid rgba(12, 35, 70, 0.14);
+  border-radius: 8px;
+  background: #fff;
+  color: #0C2346;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.login-demo-compte:hover:not(:disabled) {
+  border-color: #2A7FFF;
+  box-shadow: 0 2px 8px rgba(42, 127, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.login-demo-compte:focus-visible {
+  outline: 2px solid #2A7FFF;
+  outline-offset: 1px;
+}
+
+.login-demo-compte:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Ligne 1 compacte : rôle + nom sur la même ligne (gain de hauteur). */
+.login-demo-ligne1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.login-demo-role {
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: #0C2346;
+  white-space: nowrap;
+}
+
+.login-demo-nom {
+  font-size: 0.64rem;
+  color: #34495f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.login-demo-id {
+  font-family: inherit;
+  font-size: 0.64rem;
+  line-height: 1.25;
+  color: #4B627D;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Pied de carte avec mention Ophir Technologies centrée */
 .login-form-footer {
   margin-top: auto;
