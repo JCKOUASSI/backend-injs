@@ -58,12 +58,6 @@ const selectGlobalSecretariat = async (nom) => {
   fireEvent.change(select, { target: { value: String(SECRETARIATS.find((s) => s.nom === nom).id) } })
   return select
 }
-const resetGlobalSecretariat = async () => {
-  const option = await screen.findByRole('option', { name: 'Tous les secrétariats' })
-  const select = option.closest('select')
-  fireEvent.change(select, { target: { value: '' } })
-}
-
 describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des données)', () => {
   beforeEach(() => {
     apiController.reset()
@@ -81,14 +75,6 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
       }
       return {}
     })
-    apiController.setRoute('/statistiques/point-journalier/', () => ({
-      tableaux: [],
-      tableaux_complets: [],
-    }))
-    apiController.setRoute('/statistiques/bilans/', () => ({
-      bilans: [],
-      tableaux_complets: [],
-    }))
     apiController.setRoute('/statistiques/alertes/seuils/', () => ({
       seuils: [],
       indicateurs: [],
@@ -119,29 +105,6 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
     expect(meta.get('secretariat_id')).toBe('2')
   })
 
-  it('[effectiveSecretariatId] utilise le secrétariat COURANT dans l’onglet Point Journalier', async () => {
-    // Régression visée : un useCallback omet effectiveSecretariatId dans ses
-    // dépendances ; on vérifie qu'aucune requête n'utilise un secrétariat périmé.
-    mountStats(adminMe())
-    await screen.findByRole('option', { name: 'INJS Marcory' })
-
-    await selectGlobalSecretariat('INJS Yopougon')
-    fireEvent.click(screen.getByRole('button', { name: 'Point Journalier' }))
-
-    await waitFor(() => expect(callsTo('/statistiques/point-journalier/').length).toBeGreaterThan(0))
-    const pj = callsTo('/statistiques/point-journalier/')
-    expect(pj.at(-1).get('secretariat_id')).toBe('3')
-    // Toutes les requêtes émises après le choix portent bien l'id courant.
-    for (const q of pj) expect(q.get('secretariat_id')).toBe('3')
-
-    // Repasser à « Tous » retire le paramètre et refait une requête.
-    await resetGlobalSecretariat()
-    await waitFor(() => {
-      const dernier = callsTo('/statistiques/point-journalier/').at(-1)
-      expect(dernier.get('secretariat_id')).toBe(null)
-    })
-  })
-
   it('[effectiveSecretariatId] porte le secrétariat courant dans l’onglet Rapports & Bilans', async () => {
     mountStats(adminMe())
     await screen.findByRole('option', { name: 'INJS Marcory' })
@@ -149,8 +112,7 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
     await selectGlobalSecretariat('INJS Marcory')
     fireEvent.click(screen.getByRole('button', { name: 'Rapports & Bilans' }))
 
-    await waitFor(() => expect(callsTo('/statistiques/bilans/').length).toBeGreaterThan(0))
-    expect(callsTo('/statistiques/bilans/').at(-1).get('secretariat_id')).toBe('2')
+    await waitFor(() => expect(lastDataCall().get('secretariat_id')).toBe('2'))
   })
 
   it('[effectiveSecretariatId] porte le secrétariat courant dans l’onglet Alertes (seuils)', async () => {
@@ -172,12 +134,9 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
     })
     mountStats(chef)
 
-    // Onglet par défaut = Point Journalier ; dès la PREMIÈRE requête l'id
+    // Onglet par défaut = Rapports ; dès la PREMIÈRE requête l'id
     // verrouillé est transmis (pas de fuite de données globales).
-    await waitFor(() => expect(callsTo('/statistiques/point-journalier/').length).toBeGreaterThan(0))
-    for (const q of callsTo('/statistiques/point-journalier/')) {
-      expect(q.get('secretariat_id')).toBe('77')
-    }
+    await waitFor(() => expect(callsTo('/statistiques/').filter((q) => !isMetaCall(q)).length).toBeGreaterThan(0))
 
     // Le chargement d'onglet et les méta-listes sont aussi verrouillés.
     await waitFor(() => {
@@ -196,11 +155,9 @@ describe('pages/Statistiques.jsx — périmètre secrétariat (isolation des don
     expect(screen.queryByRole('option', { name: 'Tous les secrétariats' })).not.toBeInTheDocument()
     expect(screen.getByText(/Secrétariat Pédagogique/)).toBeInTheDocument()
 
-    // Onglets autorisés : Point Journalier et Rapports ; les autres sont masqués.
-    expect(screen.getByRole('button', { name: 'Point Journalier' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Rapports & Bilans' }))
-    await waitFor(() => expect(callsTo('/statistiques/bilans/').length).toBeGreaterThan(0))
-    expect(callsTo('/statistiques/bilans/').at(-1).get('secretariat_id')).toBe('77')
+    // Onglet autorisé : Rapports uniquement ; les autres sont masqués.
+    expect(screen.getByRole('button', { name: 'Rapports & Bilans' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Point Journalier' })).not.toBeInTheDocument()
 
     expect(screen.queryByRole('button', { name: /vue d'ensemble/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pédagogique' })).not.toBeInTheDocument()
@@ -363,18 +320,6 @@ function deferred() {
 
 function installStdRoutes(overrides = {}) {
   apiController.setRoute('/statistiques/', (path) => statsDataFor(paramsOf(path), overrides))
-  apiController.setRoute(
-    '/statistiques/point-journalier/',
-    typeof overrides.pj === 'function'
-      ? (path) => overrides.pj(paramsOf(path), path)
-      : () => ({ tableaux: [], tableaux_complets: [] }),
-  )
-  apiController.setRoute(
-    '/statistiques/bilans/',
-    typeof overrides.bilans === 'function'
-      ? (path) => overrides.bilans(paramsOf(path), path)
-      : () => ({ bilans: [], tableaux_complets: [], total_bilans: 0 }),
-  )
   apiController.setRoute('/statistiques/secretariats/', () => ({
     secretariats: [], total: 0, auditeurs_notoires: null,
   }))
@@ -382,14 +327,6 @@ function installStdRoutes(overrides = {}) {
     seuils: [], indicateurs: [], synthese: {}, seuils_vides: true,
   }))
 }
-
-const PJ_TABLEAUX = [
-  {
-    id: 'pj-1', date: `${CURRENT_YEAR}-09-15`, date_fr: '15/09/2026',
-    formation_id: 10, formation: 'Licence 1 LSF', categorie: 'A',
-    taux_presence_jour: 0.9,
-  },
-]
 
 describe('Statistiques (LOT 38a) — socle : onglets, sections API et navigation', () => {
   beforeEach(() => {
@@ -399,13 +336,13 @@ describe('Statistiques (LOT 38a) — socle : onglets, sections API et navigation
     installStdRoutes()
   })
 
-  it("rend les 8 onglets pour un administrateur, avec la vue d'ensemble active par défaut", async () => {
+  it("rend les 7 onglets pour un administrateur, avec la vue d'ensemble active par défaut", async () => {
     mountStats(adminMe())
     await screen.findByRole('option', { name: 'INJS Marcory' })
 
     for (const label of [
       "Vue d'ensemble", 'Pédagogique', 'Administratif', 'Historique', 'Secrétariats',
-      'Rapports & Bilans', 'Point Journalier', 'Alertes',
+      'Rapports & Bilans', 'Alertes',
     ]) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
@@ -425,7 +362,6 @@ describe('Statistiques (LOT 38a) — socle : onglets, sections API et navigation
       { tab: 'Administratif', sections: ['admin_operationnel'] },
       { tab: 'Historique', sections: ['historique', 'pedagogiques', 'admin_operationnel'] },
       { tab: 'Alertes', sections: ['alertes', 'pedagogiques', 'admin_operationnel'] },
-      { tab: 'Point Journalier', sections: ['admin_operationnel'] },
       { tab: 'Rapports & Bilans', sections: ['admin_operationnel'] },
       { tab: "Vue d'ensemble", sections: ['kpis', 'pedagogiques', 'admin_operationnel', 'alertes_overview', 'alertes'] },
     ]
@@ -448,13 +384,10 @@ describe('Statistiques (LOT 38a) — socle : onglets, sections API et navigation
     expect(await screen.findByText('Aucun secrétariat trouvé')).toBeInTheDocument()
   })
 
-  it("affiche le panneau de période sur les onglets d'indicateurs, masqué en Point Journalier et Rapports", async () => {
+  it("affiche le panneau de période sur les onglets d'indicateurs, masqué en Rapports", async () => {
     mountStats(adminMe())
     await screen.findByText('PÉRIODE — INDICATEURS CLÉS')
 
-    fireEvent.click(tabButton('Point Journalier'))
-    await waitFor(() =>
-      expect(screen.queryByText('PÉRIODE — INDICATEURS CLÉS')).not.toBeInTheDocument())
     fireEvent.click(tabButton('Rapports & Bilans'))
     expect(screen.queryByText('PÉRIODE — INDICATEURS CLÉS')).not.toBeInTheDocument()
 
@@ -474,7 +407,6 @@ describe('Statistiques (LOT 38a) — socle : onglets, sections API et navigation
   it('ouvre directement l’onglet Rapports en sous-vue workflow via ?rbView=workflow', async () => {
     mountStats(adminMe(), '/statistiques?rbView=workflow')
     expect(await screen.findByText('Rapports périodiques — validation')).toBeInTheDocument()
-    // La vue « Bilans INJS » n'est pas affichée tant qu'on ne bascule pas.
     expect(screen.queryByText('Aucun bilan pour cette sélection')).not.toBeInTheDocument()
   })
 })
@@ -532,8 +464,6 @@ describe('Statistiques (LOT 38a) — états de chargement et d’erreur', () => 
       if (failData && !isMetaCall(q)) throw { response: { data: { detail: 'Coupure momentanée' } } }
       return statsDataFor(q)
     })
-    apiController.setRoute('/statistiques/point-journalier/', () => ({ tableaux: [], tableaux_complets: [] }))
-    apiController.setRoute('/statistiques/bilans/', () => ({ bilans: [], tableaux_complets: [] }))
     apiController.setRoute('/statistiques/secretariats/', () => ({ secretariats: [], total: 0 }))
     apiController.setRoute('/statistiques/alertes/seuils/', () => ({ seuils: [], indicateurs: [], synthese: {}, seuils_vides: true }))
     mountStats(adminMe())
@@ -568,18 +498,6 @@ describe('Statistiques (LOT 38a) — états de chargement et d’erreur', () => 
       expect(screen.queryByText('Actualisation…')).not.toBeInTheDocument())
   })
 
-  it('affiche le message d’erreur du Point Journalier dans l’état vide', async () => {
-    apiController.setRoute('/statistiques/', (path) => statsDataFor(paramsOf(path)))
-    apiController.setRoute('/statistiques/point-journalier/', () => {
-      throw { response: { data: { detail: 'Point journalier inaccessible' } } }
-    })
-    mountStats(adminMe())
-    await screen.findByRole('option', { name: 'INJS Marcory' })
-
-    fireEvent.click(tabButton('Point Journalier'))
-    expect(await screen.findByText('Aucun point journalier pour cette période')).toBeInTheDocument()
-    expect(screen.getByText('Point journalier inaccessible')).toBeInTheDocument()
-  })
 })
 
 describe('Statistiques (LOT 38a) — filtres d’en-tête (formation / secrétariat / actualisation)', () => {
@@ -736,35 +654,6 @@ describe('Statistiques (LOT 38a) — états vides et rendu minimal par onglet', 
     window.localStorage.clear()
     window.sessionStorage.clear()
     installStdRoutes()
-  })
-
-  it('Point Journalier vide : message, encart « Filtres actifs » et exports désactivés', async () => {
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Point Journalier'))
-
-    expect(await screen.findByText('Aucun point journalier pour cette période')).toBeInTheDocument()
-    expect(screen.getByText('Filtres actifs')).toBeInTheDocument()
-    expect(screen.getByText(/Essayez/)).toBeInTheDocument()
-    for (const label of ['Excel', 'PDF', 'Word']) {
-      expect(screen.getByRole('button', { name: label })).toBeDisabled()
-    }
-  })
-
-  it('Rapports & Bilans : vue bilans vide avec exports désactivés, puis bascule workflow', async () => {
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Rapports & Bilans'))
-
-    expect(await screen.findByText('Aucun bilan pour cette sélection')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Excel' })).toBeDisabled()
-
-    fireEvent.click(screen.getByRole('button', { name: /Rapports périodiques/ }))
-    expect(await screen.findByText('Rapports périodiques — validation')).toBeInTheDocument()
-    expect(screen.queryByText('Aucun bilan pour cette sélection')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Bilans INJS' }))
-    expect(await screen.findByText('Aucun bilan pour cette sélection')).toBeInTheDocument()
   })
 
   it('Historique vide : message d’aide contextuel', async () => {
@@ -938,8 +827,6 @@ function installSeuilsRoutes({ initialized = false } = {}) {
     const alerte = state.initialized ? [ALERTE_ACTIVE] : []
     return statsDataFor(q, { alertes: alerte, alertes_overview: alerte })
   })
-  apiController.setRoute('/statistiques/point-journalier/', () => ({ tableaux: [], tableaux_complets: [] }))
-  apiController.setRoute('/statistiques/bilans/', () => ({ bilans: [], tableaux_complets: [] }))
   apiController.setRoute('/statistiques/secretariats/', () => ({ secretariats: [], total: 0 }))
   return state
 }
@@ -1065,810 +952,6 @@ describe('Statistiques (LOT 38a) — alertes et configuration des seuils', () =>
   })
 })
 
-describe('Statistiques (LOT 38a) — exports Point Journalier et Bilans', () => {
-  let anchorClickSpy
-
-  beforeEach(() => {
-    apiController.reset()
-    window.localStorage.clear()
-    window.sessionStorage.clear()
-    URL.createObjectURL = vi.fn(() => 'blob:test-export')
-    URL.revokeObjectURL = vi.fn()
-    anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    installStdRoutes()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  const pjPayload = () => ({
-    total_tableaux: 1,
-    categories: ['A'],
-    formations: FORMATIONS,
-    tableaux: PJ_TABLEAUX,
-    // Pas de tableau complet en cache : le détail passera par un appel detail=1.
-    tableaux_complets: [],
-  })
-
-  const pjWithDetail = (q) => {
-    if (q.get('detail') === '1') {
-      return { tableau: { date: `${CURRENT_YEAR}-09-15`, matin: null, soir: null } }
-    }
-    return pjPayload()
-  }
-
-  it('Point Journalier : export Excel annuel avec les filtres actifs', async () => {
-    apiController.reset()
-    installStdRoutes({ pj: pjWithDetail })
-    apiMock.getBlob.mockResolvedValue({
-      blob: new Blob(['x']), fileName: 'PJ.xlsx', contentType: 'application/vnd.ms-excel',
-    })
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Point Journalier'))
-
-    const excelBtn = await screen.findByRole('button', { name: 'Excel' })
-    await waitFor(() => expect(excelBtn).not.toBeDisabled())
-    fireEvent.click(excelBtn)
-
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const url = apiMock.getBlob.mock.calls[0][0]
-    expect(url).toMatch(/^\/statistiques\/point-journalier-export\/\?/)
-    const q = paramsOf(url)
-    expect(q.get('export')).toBe('xlsx')
-    expect(q.get('annee')).toBe(String(CURRENT_YEAR))
-    expect(q.get('jour')).toBe(null) // aucune ligne sélectionnée : export annuel
-    expect(anchorClickSpy).toHaveBeenCalledTimes(1)
-    expect(URL.createObjectURL).toHaveBeenCalled()
-  })
-
-  it('Point Journalier : export PDF du tableau sélectionné (jour / formation / catégorie)', async () => {
-    apiController.reset()
-    installStdRoutes({ pj: pjWithDetail })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['p']), fileName: 'PJ.pdf' })
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Point Journalier'))
-
-    // Ouvrir le tableau depuis la liste de gauche (entête avec date_fr).
-    const entry = await screen.findByText('15/09/2026')
-    fireEvent.click(entry.closest('button'))
-    await waitFor(() => expect(callsTo('/statistiques/point-journalier/')
-      .some((q) => q.get('detail') === '1')).toBe(true))
-
-    fireEvent.click(screen.getByRole('button', { name: 'PDF' }))
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const q = paramsOf(apiMock.getBlob.mock.calls[0][0])
-    expect(q.get('export')).toBe('pdf')
-    expect(q.get('jour')).toBe(`${CURRENT_YEAR}-09-15`)
-    expect(q.get('formation_id')).toBe('10')
-    expect(q.get('categorie')).toBe('A')
-  })
-
-  it('Point Journalier : un échec d’export déclenche window.alert sans planter', async () => {
-    apiController.reset()
-    installStdRoutes({ pj: () => pjPayload() })
-    apiMock.getBlob.mockRejectedValue({ response: { data: { detail: 'Génération Excel KO' } } })
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Point Journalier'))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Word' }))
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Génération Excel KO'))
-    // Les boutons sont de nouveau utilisables (état exporting remis à null).
-    expect(screen.getByRole('button', { name: 'Excel' })).not.toBeDisabled()
-  })
-
-  it('Bilans : export Excel de la dimension module avec l’année et la dimension', async () => {
-    apiController.reset()
-    installStdRoutes({ bilans: () => ({
-      total_bilans: 1,
-      bilans: [{
-        id: 'b1', dimension: 'module', libelle: 'Module Alpha', sous_titre: 'L1',
-        module_id: 5, formation_id: 10, categorie: '—', inscrits: 12,
-      }],
-      tableaux_complets: [],
-      modules: [{ id: 5, intitule: 'Alpha' }],
-      formations: FORMATIONS,
-    }) })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['x']), fileName: 'B.xlsx' })
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Rapports & Bilans'))
-
-    const excelBtn = await screen.findByRole('button', { name: 'Excel' })
-    await waitFor(() => expect(excelBtn).not.toBeDisabled())
-    fireEvent.click(excelBtn)
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const q = paramsOf(apiMock.getBlob.mock.calls[0][0])
-    expect(apiMock.getBlob.mock.calls[0][0]).toMatch(/^\/statistiques\/bilans-export\/\?/)
-    expect(q.get('export')).toBe('xlsx')
-    expect(q.get('dimension')).toBe('module')
-    expect(q.get('annee')).toBe(String(CURRENT_YEAR))
-  })
-
-  it('Bilans : un échec d’export déclenche window.alert', async () => {
-    apiController.reset()
-    installStdRoutes({ bilans: () => ({
-      total_bilans: 1,
-      bilans: [{ id: 'b2', dimension: 'module', libelle: 'Module Beta', module_id: 6 }],
-      tableaux_complets: [],
-    }) })
-    apiMock.getBlob.mockRejectedValue(new Error('réseau'))
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Rapports & Bilans'))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'PDF' }))
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled())
-    expect(alertSpy.mock.calls[0][0]).toMatch(/réseau|téléchargement/i)
-  })
-
-  it('reflète l’état d’export (spinner) pendant le téléchargement puis réactive les boutons', async () => {
-    let resolveBlob
-    const pending = new Promise((res) => { resolveBlob = res })
-    apiController.reset()
-    installStdRoutes({ pj: () => pjPayload() })
-    apiMock.getBlob.mockReturnValue(pending)
-    mountStats(adminMe())
-    await screen.findByText('4 sections')
-    fireEvent.click(tabButton('Point Journalier'))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Excel' }))
-    // Pendant l'export, les autres formats sont désactivés.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).toBeDisabled())
-
-    resolveBlob({ blob: new Blob(['x']), fileName: 'PJ.xlsx' })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF' })).not.toBeDisabled())
-  })
-})
-
-// ════════════════════════════════════════════════════════════════════════════
-// LOT 38b — Bilans INJS (4 dimensions, navigation liste ↔ détail, exports) et
-// Bilan FAC complet (périmètre grades/groupes, génération, 4 sous-onglets,
-// exports avec meta justificatifs/difficultés). Tests PURS : aucune
-// modification de Statistiques.jsx.
-// ════════════════════════════════════════════════════════════════════════════
-
-const RB_CATS = ['A', 'B']
-const RB_MODS = [
-  { id: 5, intitule: 'Module Alpha' },
-  { id: 6, intitule: 'Module Beta' },
-]
-const RB_MATS = [
-  { intitule: 'Droit civil', ref_module_id: 5, formation_id: 10 },
-  { intitule: 'Grammaire LSF', formation_id: 11 },
-]
-
-const RB_BILANS = {
-  module: [
-    {
-      id: 'bm1', dimension: 'module', libelle: 'Module Alpha', sous_titre: 'Licence 1 LSF',
-      module_id: 5, formation_id: 10, formation: 'Licence 1 LSF', module: 'Module Alpha',
-      categorie: 'A', grade: 'A1', groupe: 'Groupe 1',
-      inscrits: 12, nb_groupes: 1, nb_pointages: 40,
-      annee: CURRENT_YEAR, periode_label: 'Toutes périodes',
-    },
-    {
-      id: 'bm2', dimension: 'module', libelle: 'Module orphelin', sous_titre: 'sans identifiant',
-      categorie: '—', inscrits: 5,
-    },
-  ],
-  matiere: [
-    {
-      id: 'bma1', dimension: 'matiere', libelle: 'Droit civil', sous_titre: 'Licence 1 LSF',
-      formation_id: 10, ref_module_id: 5, matiere_intitule: 'Droit civil',
-      categorie: 'A', inscrits: 20, nb_groupes: 2,
-    },
-    {
-      id: 'bma2', dimension: 'matiere', libelle: 'Grammaire LSF', sous_titre: 'Licence 2 LSF',
-      formation_id: 11, matiere_intitule: 'Grammaire LSF',
-      categorie: 'B', inscrits: 8,
-    },
-    {
-      id: 'bma3', dimension: 'matiere', libelle: 'Matière orpheline', sous_titre: 'sans formation',
-      categorie: '—', inscrits: 3,
-    },
-  ],
-  categorie: [
-    {
-      id: 'bc1', dimension: 'categorie', libelle: 'Catégorie A', sous_titre: 'Toutes formations',
-      categorie: 'A', inscrits: 30, nb_groupes: 4,
-    },
-    {
-      id: 'bc2', dimension: 'categorie', libelle: 'Catégorie sans code', sous_titre: '—',
-      categorie: '—',
-    },
-  ],
-  formation: [
-    {
-      id: 'bf1', dimension: 'formation', libelle: 'Bilan Licence 1 LSF',
-      sous_titre: 'Toutes périodes', formation_id: 10, formation: 'Licence 1 LSF',
-      categorie: '—', annee: CURRENT_YEAR, periode_label: 'Toutes périodes',
-    },
-    {
-      id: 'bf2', dimension: 'formation', libelle: 'Bilan sans formation', sous_titre: 'orphelin',
-      categorie: '—',
-    },
-  ],
-}
-
-const EFF_FIXTURE = {
-  effectifs_auditeurs: 1500, masculin_inscrits: 800, feminin_inscrits: 700,
-  effectifs_presents: 1200, pct_presents_total: 80,
-  masculin: 700, pct_masculin_presents: 58.33,
-  feminin: 500, pct_feminin_presents: 41.67,
-  absents: 300, pct_absents_total: 20,
-}
-const RB_TABLEAUX = {
-  module: { type: 'effectifs_module', titre: 'EFFECTIFS — MODULE ALPHA', ...EFF_FIXTURE },
-  matiere: { type: 'effectifs_matiere', titre: 'EFFECTIFS — DROIT CIVIL', nb_groupes: 2, ...EFF_FIXTURE },
-  categorie: { type: 'effectifs_categorie', titre: 'EFFECTIFS — CATÉGORIE A', ...EFF_FIXTURE },
-  formation: makeJTableau({
-    titre: 'BILAN PÉRIODE — LICENCE 1 LSF', formation_id: 10,
-    lignes: [{ categorie: 'A', totaux: jStats }],
-  }),
-}
-
-const rbCacheEntry = (bilan, tableau) => ({ bilan_id: bilan.id, bilan, tableau })
-
-function rbPayload(dim, liste, entries = []) {
-  return {
-    total_bilans: liste.length,
-    bilans: liste,
-    tableaux_complets: entries,
-    categories: RB_CATS,
-    modules: RB_MODS,
-    matieres: RB_MATS,
-    formations: FORMATIONS,
-    filtres_actifs: { annee: CURRENT_YEAR, periode_label: 'Toutes périodes' },
-  }
-}
-
-/**
- * Route `/statistiques/bilans/` : renvoie la liste adaptée à `dimension` et,
- * pour `detail=1`, le tableau ciblé via `detailFor(q)` (null par défaut).
- */
-function rbRoute({ detailFor = () => null, bilansFor } = {}) {
-  return (q) => {
-    if (q.get('detail') === '1') return { tableau: detailFor(q) }
-    const dim = q.get('dimension') || 'module'
-    const liste = bilansFor ? bilansFor(q, dim) : (RB_BILANS[dim] || [])
-    return rbPayload(dim, liste)
-  }
-}
-
-/** Ouvre l'onglet Rapports & Bilans (vue « Bilans INJS » par défaut). */
-async function openRapports() {
-  mountStats(adminMe())
-  await screen.findByText('4 sections')
-  fireEvent.click(tabButton('Rapports & Bilans'))
-}
-
-/** Select de la barre de filtres bilans identifié par le libellé d'une option. */
-const rbOptionSelect = (optionName) =>
-  screen.getByRole('option', { name: optionName }).closest('select')
-
-const dimensionBtn = (label) => screen.getByRole('button', { name: label })
-const bilanCalls = () => callsTo('/statistiques/bilans/')
-const listCalls = () => bilanCalls().filter((q) => q.get('detail') !== '1')
-const detailCalls = () => bilanCalls().filter((q) => q.get('detail') === '1')
-
-describe('Statistiques (LOT 38b) — Bilans INJS : liste, dimensions et filtres', () => {
-  beforeEach(() => {
-    apiController.reset()
-    window.localStorage.clear()
-    window.sessionStorage.clear()
-    installStdRoutes({ bilans: rbRoute() })
-  })
-
-  it('charge les bilans en dimension module avec tous les filtres de base (tous_tableaux=1)', async () => {
-    await openRapports()
-
-    expect(await screen.findByRole('button', { name: /Module Alpha/ })).toBeInTheDocument()
-    const q = listCalls().at(-1)
-    expect(q.get('annee')).toBe(String(CURRENT_YEAR))
-    expect(q.get('dimension')).toBe('module')
-    expect(q.get('tous_tableaux')).toBe('1')
-    expect(q.get('mois')).toBe(null)
-    expect(q.get('periode')).toBe(null)
-
-    // En-tête de la sidebar et libellés des lignes.
-    expect(screen.getByText(/2 bilans? · Par Module/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Tous les tableaux/ })).toHaveTextContent('2')
-    expect(screen.getAllByText('MOD')).toHaveLength(2) // un badge par ligne module
-    expect(screen.getByText(/Grade A1/)).toBeInTheDocument()
-    expect(screen.getByText(/Groupe 1/)).toBeInTheDocument()
-    expect(screen.getByText(/12 inscrits · 1 groupe · 40 pointages/)).toBeInTheDocument()
-  })
-
-  it('bascule entre les 4 dimensions et requête la bonne valeur de dimension', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    fireEvent.click(dimensionBtn('Par Catégorie'))
-    expect(await screen.findByRole('button', { name: /Catégorie A/ })).toBeInTheDocument()
-    await waitFor(() => expect(listCalls().at(-1).get('dimension')).toBe('categorie'))
-
-    fireEvent.click(dimensionBtn('Par Formation'))
-    expect(await screen.findByRole('button', { name: /Bilan Licence 1 LSF/ })).toBeInTheDocument()
-    await waitFor(() => expect(listCalls().at(-1).get('dimension')).toBe('formation'))
-
-    fireEvent.click(dimensionBtn('Par Matière'))
-    expect((await screen.findAllByText('MAT')).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: /Droit civil/ })).toBeInTheDocument()
-    await waitFor(() => {
-      const q = listCalls().at(-1)
-      expect(q.get('dimension')).toBe('matiere')
-      expect(q.get('module_id')).toBe(null) // aucun module_id en dimension matière
-    })
-    // Le sélecteur de module est remplacé par celui des matières.
-    expect(screen.queryByRole('option', { name: 'Tous modules' })).not.toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Toutes matières' })).toBeInTheDocument()
-
-    fireEvent.click(dimensionBtn('Par Module'))
-    await waitFor(() => expect(listCalls().at(-1).get('dimension')).toBe('module'))
-    expect(screen.getByRole('option', { name: 'Tous modules' })).toBeInTheDocument()
-  })
-
-  it('porte les filtres mois, catégorie, module, période et calendrier prévisionnel', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    fireEvent.change(rbOptionSelect('Septembre'), { target: { value: '9' } })
-    await waitFor(() => expect(listCalls().at(-1).get('mois')).toBe('9'))
-
-    fireEvent.change(rbOptionSelect('Cat. A'), { target: { value: 'A' } })
-    await waitFor(() => expect(listCalls().at(-1).get('categorie')).toBe('A'))
-
-    fireEvent.change(rbOptionSelect('Module Alpha'), { target: { value: '5' } })
-    await waitFor(() => expect(listCalls().at(-1).get('module_id')).toBe('5'))
-
-    fireEvent.change(rbOptionSelect('Mensuel'), { target: { value: 'MENSUEL' } })
-    await waitFor(() => expect(listCalls().at(-1).get('periode')).toBe('MENSUEL'))
-
-    const dateInput = document.querySelector('input[type="date"][title="Calendrier prévisionnel"]')
-    fireEvent.change(dateInput, { target: { value: '2026-09-01' } })
-    await waitFor(() => expect(listCalls().at(-1).get('calendrier')).toBe('2026-09-01'))
-  })
-
-  it('change l’année du bilan et répercute la valeur sur la requête', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    const anneeSel = screen.getByRole('option', { name: String(CURRENT_YEAR + 1) }).closest('select')
-    fireEvent.change(anneeSel, { target: { value: String(CURRENT_YEAR + 1) } })
-    await waitFor(() => expect(listCalls().at(-1).get('annee')).toBe(String(CURRENT_YEAR + 1)))
-  })
-
-  it('filtre par formation (sélecteur bilans) et transmet formation_id', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    // Le select bilans porte « Toutes formations » (sans « les »), distinct du
-    // sélecteur global d'en-tête « Toutes les formations ».
-    fireEvent.change(rbOptionSelect('Toutes formations'), { target: { value: '11' } })
-    await waitFor(() => expect(listCalls().at(-1).get('formation_id')).toBe('11'))
-  })
-
-  it('dimension matière : porte ref_module_id pour une matière référencée (clé r:id)', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    fireEvent.click(dimensionBtn('Par Matière'))
-    await screen.findByText('Droit civil')
-
-    fireEvent.change(rbOptionSelect('Droit civil'), { target: { value: 'r:5' } })
-    await waitFor(() => {
-      const q = listCalls().at(-1)
-      expect(q.get('ref_module_id')).toBe('5')
-      expect(q.get('module_id')).toBe(null)
-    })
-  })
-
-  it('dimension matière : les options matière sont filtrées selon la formation choisie', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-    fireEvent.click(dimensionBtn('Par Matière'))
-    await screen.findByText('Droit civil')
-
-    const matiereSel = screen.getByRole('option', { name: 'Toutes matières' }).closest('select')
-    expect(Array.from(matiereSel.options).map((o) => o.textContent)).toContain('Droit civil')
-
-    fireEvent.change(rbOptionSelect('Toutes formations'), { target: { value: '11' } })
-    await waitFor(() => {
-      const options = Array.from(matiereSel.options).map((o) => o.textContent)
-      expect(options).not.toContain('Droit civil') // formation_id 10
-      expect(options).toContain('Grammaire LSF') // formation_id 11
-    })
-  })
-
-  it('réinitialise la sélection quand un filtre change (retour à la vue d’ensemble)', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    // Ouvrir un bilan en détail (tableau en cache ci-dessous simulé par la
-    // même route renvoyant le tableau en détail).
-    fireEvent.click(screen.getByRole('button', { name: /Module Alpha/ }))
-    await waitFor(() => expect(detailCalls().length).toBeGreaterThan(0))
-    expect(screen.getByRole('button', { name: /Voir tous les tableaux/ })).toBeInTheDocument()
-
-    fireEvent.change(rbOptionSelect('Mensuel'), { target: { value: 'MENSUEL' } })
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /Voir tous les tableaux/ })).not.toBeInTheDocument())
-  })
-
-  it('le bouton Actualiser de la barre bilans relance le chargement', async () => {
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-    const avant = listCalls().length
-    expect(avant).toBeGreaterThan(0)
-
-    // En onglet rapports : 1 bouton Actualiser global (en-tête) + 1 bilans.
-    const btns = screen.getAllByRole('button', { name: /Actualiser/ })
-    fireEvent.click(btns[btns.length - 1])
-    await waitFor(() => expect(listCalls().length).toBeGreaterThan(avant))
-  })
-
-  it('affiche l’état vide « Aucun bilan » quand la liste revient vide, avec exports désactivés', async () => {
-    apiController.reset()
-    installStdRoutes({
-      bilans: () => ({
-        total_bilans: 0, bilans: [], tableaux_complets: [],
-        categories: [], modules: [], matieres: [], formations: FORMATIONS,
-      }),
-    })
-    await openRapports()
-    expect(await screen.findByText('Aucun bilan pour cette sélection')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Excel' })).toBeDisabled()
-  })
-})
-
-describe('Statistiques (LOT 38b) — Bilans INJS : vue d’ensemble et détails par type de tableau', () => {
-  beforeEach(() => {
-    apiController.reset()
-    window.localStorage.clear()
-    window.sessionStorage.clear()
-  })
-
-  it('vue d’ensemble : rend tous les tableaux complets et la navigation « Plein écran »', async () => {
-    const liste = [
-      { id: 'm1', dimension: 'module', libelle: 'Module Alpha', sous_titre: 'G1', module_id: 5, formation_id: 10, categorie: 'A' },
-      { id: 'm2', dimension: 'module', libelle: 'Module Beta', sous_titre: 'G2', module_id: 6, formation_id: 10, categorie: 'A' },
-    ]
-    const entries = [
-      rbCacheEntry(liste[0], RB_TABLEAUX.module),
-      rbCacheEntry(liste[1], { ...RB_TABLEAUX.module, titre: 'EFFECTIFS — MODULE BETA' }),
-    ]
-    // La route bilans (avec tableaux complets) est enregistrée AVANT les
-    // routes standard : la première route enregistrée est prioritaire.
-    apiController.setRoute('/statistiques/bilans/', (path) => {
-      const q = paramsOf(path)
-      if (q.get('detail') === '1') return { tableau: null }
-      return rbPayload('module', liste, entries)
-    })
-    installStdRoutes()
-
-    await openRapports()
-    expect(await screen.findByText('2 tableaux — Par Module')).toBeInTheDocument()
-    expect(screen.getByText('EFFECTIFS — MODULE ALPHA')).toBeInTheDocument()
-    expect(screen.getByText('EFFECTIFS — MODULE BETA')).toBeInTheDocument()
-    expect(screen.getByText(/Vue d'ensemble \(2026/)).toBeInTheDocument()
-
-    // Plein écran sur le deuxième tableau : sélection retrouvée par identifiant.
-    const pleinEcran = screen.getAllByRole('button', { name: /Plein écran/ })
-    fireEvent.click(pleinEcran[1])
-    expect(await screen.findByRole('button', { name: /Voir tous les tableaux/ })).toBeInTheDocument()
-    expect(screen.getByText('EFFECTIFS — MODULE BETA')).toBeInTheDocument()
-    // Le cache évite tout appel detail=1.
-    expect(detailCalls().length).toBe(0)
-
-    fireEvent.click(screen.getByRole('button', { name: /Voir tous les tableaux/ }))
-    expect(await screen.findByText('2 tableaux — Par Module')).toBeInTheDocument()
-  })
-
-  it('vue d’ensemble : message spécifique si aucun tableau complet n’est renvoyé', async () => {
-    installStdRoutes({ bilans: rbRoute() })
-    await openRapports()
-    expect(await screen.findByText('Aucun tableau à afficher pour cette sélection')).toBeInTheDocument()
-  })
-
-  it('détail module (cache) : tableau d’effectifs avec formatage français milliers et pourcentages', async () => {
-    const liste = RB_BILANS.module
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: RB_TABLEAUX.module }
-        return rbPayload('module', liste, [rbCacheEntry(liste[0], RB_TABLEAUX.module)])
-      },
-    })
-    await openRapports()
-    fireEvent.click(await screen.findByRole('button', { name: /Module Alpha/ }))
-
-    expect(await screen.findByText('EFFECTIFS — MODULE ALPHA')).toBeInTheDocument()
-    // Les en-têtes contiennent des <br/> : les cibler par nom accessible (role).
-    expect(screen.getByRole('columnheader', { name: /EFFECTIFS DES AUDITEURS/ })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: /^EFFECTIFS PRESENTS$/ })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'MASCULIN' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'FEMININ' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'ABSENTS' })).toBeInTheDocument()
-    // 1500 formaté avec le séparateur de milliers français (espace/insécable).
-    expect(screen.getByText(/1\s?500/)).toBeInTheDocument()
-    expect(screen.getByText(/800 H \/ 700 F inscrits/)).toBeInTheDocument()
-    // Pourcentage en virgule, 2 décimales (l'apostrophe du libellé est droite).
-    expect(screen.getByText(/80,00% de l'effectif total/)).toBeInTheDocument()
-    expect(screen.getByText(/20,00% de l'effectif total/)).toBeInTheDocument()
-  })
-
-  it('détail matière : bandeau d’agrégation des groupes puis tableau d’effectifs', async () => {
-    const liste = RB_BILANS.matiere
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: RB_TABLEAUX.matiere }
-        return rbPayload('matiere', liste, [rbCacheEntry(liste[0], RB_TABLEAUX.matiere)])
-      },
-    })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Matière'))
-    fireEvent.click(await screen.findByRole('button', { name: /Droit civil/ }))
-
-    // Texte fragmenté par un <strong> : matcher fonction sur le <p>.
-    expect(screen.getByText(
-      (_content, el) => el?.tagName === 'P' && /Agrégation de 2 groupes/.test(el.textContent),
-    )).toBeInTheDocument()
-    expect(screen.getByText('EFFECTIFS — DROIT CIVIL')).toBeInTheDocument()
-  })
-
-  it('détail catégorie : tableau d’effectifs', async () => {
-    const liste = RB_BILANS.categorie
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: RB_TABLEAUX.categorie }
-        return rbPayload('categorie', liste, [rbCacheEntry(liste[0], RB_TABLEAUX.categorie)])
-      },
-    })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Catégorie'))
-    fireEvent.click(await screen.findByRole('button', { name: /Catégorie A/ }))
-
-    expect(await screen.findByText('EFFECTIFS — CATÉGORIE A')).toBeInTheDocument()
-    expect(detailCalls().length).toBe(0) // servi depuis le cache
-  })
-
-  it('détail formation : modèle INJS bilan de période avec textarea justificatifs synchronisable', async () => {
-    const liste = RB_BILANS.formation
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: RB_TABLEAUX.formation }
-        return rbPayload('formation', liste, [rbCacheEntry(liste[0], RB_TABLEAUX.formation)])
-      },
-    })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Formation'))
-    fireEvent.click(await screen.findByRole('button', { name: /Bilan Licence 1 LSF/ }))
-
-    expect(await screen.findByText('BILAN PÉRIODE — LICENCE 1 LSF')).toBeInTheDocument()
-    expect(screen.getByText("NBRE D'ENCADRANTS")).toBeInTheDocument()
-    const zone = screen.getByPlaceholderText(/saisir les justificatifs/i)
-    expect(zone).toBeInTheDocument()
-
-    // La saisie est bien remontée au parent (servira à l'export) : la valeur
-    // reste affichée après frappe.
-    fireEvent.change(zone, { target: { value: 'Report de séance pour cause d’intempéries' } })
-    expect(zone.value).toBe('Report de séance pour cause d’intempéries')
-  })
-
-  it('détail sans cache : appelle l’API avec detail=1 et les bonnes clés (module)', async () => {
-    installStdRoutes({
-      bilans: rbRoute({ detailFor: () => RB_TABLEAUX.module }),
-    })
-    await openRapports()
-    fireEvent.click(await screen.findByRole('button', { name: /Module Alpha/ }))
-
-    await waitFor(() => expect(detailCalls().length).toBe(1))
-    const q = detailCalls()[0]
-    expect(q.get('detail')).toBe('1')
-    expect(q.get('dimension')).toBe('module')
-    expect(q.get('module_id')).toBe('5')
-    expect(q.get('formation_id')).toBe('10')
-    expect(q.get('categorie')).toBe('A')
-    expect(await screen.findByText('EFFECTIFS — MODULE ALPHA')).toBeInTheDocument()
-  })
-
-  it('détail matière sans cache : transmet ref_module_id et matiere_intitule', async () => {
-    installStdRoutes({
-      bilans: rbRoute({
-        detailFor: (q) => (q.get('matiere_intitule') === 'Grammaire LSF'
-          ? { ...RB_TABLEAUX.matiere, nb_groupes: 1, titre: 'EFFECTIFS — GRAMMAIRE LSF' }
-          : RB_TABLEAUX.matiere),
-      }),
-    })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Matière'))
-    fireEvent.click(await screen.findByRole('button', { name: /Grammaire LSF/ }))
-
-    await waitFor(() => expect(detailCalls().length).toBe(1))
-    const q = detailCalls()[0]
-    expect(q.get('dimension')).toBe('matiere')
-    expect(q.get('formation_id')).toBe('11')
-    expect(q.get('matiere_intitule')).toBe('Grammaire LSF')
-    expect(q.get('ref_module_id')).toBe(null) // matière sans module de référence (clé i:)
-    expect(await screen.findByText('EFFECTIFS — GRAMMAIRE LSF')).toBeInTheDocument()
-  })
-
-  it('garde-fous : un bilan mal identifié n’émet aucun appel detail=1', async () => {
-    const liste = [
-      RB_BILANS.module[1], // module sans module_id
-      RB_BILANS.matiere[2], // matière sans formation_id
-      RB_BILANS.categorie[1], // catégorie '—'
-      RB_BILANS.formation[1], // formation sans formation_id
-      { id: 'bx', dimension: 'inconnue', libelle: 'Bilan étrange', sous_titre: 'dimension inconnue', categorie: 'A' },
-    ]
-    installStdRoutes({ bilans: rbRoute({ bilansFor: () => liste }) })
-    await openRapports()
-
-    // Module / matière / catégorie sans clé : message « aucune séance ».
-    fireEvent.click(await screen.findByRole('button', { name: /Module orphelin/ }))
-    expect(await screen.findByText(/Aucune séance comptabilisable/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Matière orpheline/ }))
-    expect(await screen.findByText(/Aucune séance comptabilisable/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Catégorie sans code/ }))
-    expect(await screen.findByText(/Aucune séance comptabilisable/)).toBeInTheDocument()
-
-    // Formation sans id et dimension inconnue : carte de secours « Zone tableau bilan ».
-    fireEvent.click(screen.getByRole('button', { name: /Bilan sans formation/ }))
-    expect(await screen.findByText('Zone tableau bilan')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Bilan étrange/ }))
-    expect(await screen.findByText('Zone tableau bilan')).toBeInTheDocument()
-    expect(screen.getByText('BILAN — INCONNUE')).toBeInTheDocument()
-
-    expect(detailCalls().length).toBe(0)
-  })
-
-  it('carte de secours pour un type de tableau non modélisé, avec les chips de contexte', async () => {
-    const liste = [RB_BILANS.module[0]]
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: { type: 'autre_modele' } }
-        return rbPayload('module', liste, [rbCacheEntry(liste[0], { type: 'autre_modele' })])
-      },
-    })
-    await openRapports()
-    fireEvent.click(await screen.findByRole('button', { name: /Module Alpha/ }))
-
-    expect(await screen.findByText('Zone tableau bilan')).toBeInTheDocument()
-    expect(screen.getByText('BILAN — PAR MODULE')).toBeInTheDocument()
-    expect(screen.getByText(/Le modèle INJS pour ce bilan/)).toBeInTheDocument()
-    // Le libellé et le sous-titre sont repris dans l'en-tête ET dans la grille
-    // de contexte de la carte (d'où 2 occurrences chacun, sans compter les
-    // <option> des sélecteurs qui sont hors de la carte).
-    // <p> « Zone tableau bilan » → div jaune → carte de secours (2 niveaux).
-    const fallbackCard = screen.getByText('Zone tableau bilan').parentElement.parentElement
-    expect(within(fallbackCard).getAllByText('Module Alpha').length).toBeGreaterThanOrEqual(2)
-    expect(within(fallbackCard).getAllByText('Licence 1 LSF').length).toBeGreaterThanOrEqual(2)
-  })
-})
-
-describe('Statistiques (LOT 38b) — Bilans INJS : exports filtrés', () => {
-  let anchorCreateSpy
-
-  beforeEach(() => {
-    apiController.reset()
-    window.localStorage.clear()
-    window.sessionStorage.clear()
-    URL.createObjectURL = vi.fn(() => 'blob:rb-export')
-    URL.revokeObjectURL = vi.fn()
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    anchorCreateSpy = vi.spyOn(document, 'createElement')
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  const rbExportButton = (label) => document.querySelector(`button[title="Exporter les bilans filtrés (${label})"]`)
-
-  it('export PDF d’un module sélectionné : module_id, formation_id et catégorie ciblés', async () => {
-    installStdRoutes({ bilans: rbRoute() })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['p']), fileName: 'B.pdf' })
-    await openRapports()
-    fireEvent.click(await screen.findByRole('button', { name: /Module Alpha/ }))
-    await waitFor(() => expect(detailCalls().length).toBeGreaterThan(0))
-
-    fireEvent.click(rbExportButton('PDF'))
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const q = paramsOf(apiMock.getBlob.mock.calls[0][0])
-    expect(apiMock.getBlob.mock.calls[0][0]).toMatch(/^\/statistiques\/bilans-export\/\?/)
-    expect(q.get('export')).toBe('pdf')
-    expect(q.get('dimension')).toBe('module')
-    expect(q.get('module_id')).toBe('5')
-    expect(q.get('formation_id')).toBe('10')
-    expect(q.get('categorie')).toBe('A')
-  })
-
-  it('export Excel d’une matière (clé i:) : matiere_intitule sans module_id', async () => {
-    installStdRoutes({ bilans: rbRoute() })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['x']) })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Matière'))
-    fireEvent.click(await screen.findByRole('button', { name: /Grammaire LSF/ }))
-    await waitFor(() => expect(detailCalls().length).toBe(1))
-
-    fireEvent.click(rbExportButton('Excel'))
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const q = paramsOf(apiMock.getBlob.mock.calls[0][0])
-    expect(q.get('dimension')).toBe('matiere')
-    expect(q.get('matiere_intitule')).toBe('Grammaire LSF')
-    expect(q.get('formation_id')).toBe('11')
-    expect(q.get('ref_module_id')).toBe(null)
-    expect(q.get('module_id')).toBe(null)
-  })
-
-  it('export Word d’un bilan formation avec les justificatifs saisis', async () => {
-    const liste = RB_BILANS.formation
-    installStdRoutes({
-      bilans: (path) => {
-        const q = paramsOf(path)
-        if (q.get('detail') === '1') return { tableau: RB_TABLEAUX.formation }
-        return rbPayload('formation', liste, [rbCacheEntry(liste[0], RB_TABLEAUX.formation)])
-      },
-    })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['d']) })
-    await openRapports()
-    fireEvent.click(dimensionBtn('Par Formation'))
-    fireEvent.click(await screen.findByRole('button', { name: /Bilan Licence 1 LSF/ }))
-    expect(await screen.findByText('BILAN PÉRIODE — LICENCE 1 LSF')).toBeInTheDocument()
-
-    const zone = screen.getByPlaceholderText(/saisir les justificatifs/i)
-    fireEvent.change(zone, { target: { value: 'Justif export bilans' } })
-
-    fireEvent.click(rbExportButton('Word'))
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const q = paramsOf(apiMock.getBlob.mock.calls[0][0])
-    expect(q.get('export')).toBe('docx')
-    expect(q.get('formation_id')).toBe('10')
-    expect(q.get('justificatifs')).toBe('Justif export bilans')
-  })
-
-  it('utilise le nom de fichier par défaut BILANS_<année>.xlsx si le backend n’en fournit pas', async () => {
-    installStdRoutes({ bilans: rbRoute() })
-    apiMock.getBlob.mockResolvedValue({ blob: new Blob(['x']) }) // pas de fileName
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    fireEvent.click(rbExportButton('Excel'))
-    await waitFor(() => expect(apiMock.getBlob).toHaveBeenCalledTimes(1))
-    const anchors = anchorCreateSpy.mock.results
-      .map((r) => r.value)
-      .filter((el) => el && el.tagName === 'A')
-    expect(anchors.at(-1).download).toBe(`BILANS_${CURRENT_YEAR}.xlsx`)
-  })
-
-  it('un échec d’export bilans signale une alerte sans bloquer les boutons', async () => {
-    installStdRoutes({ bilans: rbRoute() })
-    apiMock.getBlob.mockRejectedValue({ response: { data: { detail: 'Export bilans indisponible' } } })
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
-
-    fireEvent.click(rbExportButton('PDF'))
-    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Export bilans indisponible'))
-    expect(rbExportButton('Excel')).not.toBeDisabled()
-  })
-})
-
-// ── Bilan FAC ─────────────────────────────────────────────────────────────────
-
 const FAC_PERIMETRE = {
   grades: ['A1', 'A2'],
   groupes: [
@@ -1949,7 +1032,7 @@ const FAC_ABSENT = {
  * Installe les routes Bilan FAC AVANT les routes standard (1re route
  * enregistrée prioritaire). `bilan`/`perimetre` sont des fonctions ou valeurs.
  */
-function installFacRoutes({ perimetre, fac, bilansFn } = {}) {
+function installFacRoutes({ perimetre, fac } = {}) {
   apiController.reset()
   apiController.setRoute('/statistiques/bilan-fac/perimetre/', (path) => {
     const v = typeof perimetre === 'function' ? perimetre(paramsOf(path)) : perimetre
@@ -1959,7 +1042,7 @@ function installFacRoutes({ perimetre, fac, bilansFn } = {}) {
     const v = typeof fac === 'function' ? fac(paramsOf(path)) : fac
     return v === undefined ? FAC_DATA : v
   })
-  installStdRoutes(bilansFn ? { bilans: bilansFn } : { bilans: rbRoute() })
+  installStdRoutes()
 }
 
 const facToggleButton = () => screen.getByRole('button', { name: /Bilan formation/ })
@@ -1969,6 +1052,12 @@ const facGenerateButton = () => screen.getByRole('button', { name: /Générer le
 const facExportButton = (label) => document.querySelector(`button[title="Exporter le bilan FAC (${label})"]`)
 const perimetreCalls = () => callsTo('/statistiques/bilan-fac/perimetre/')
 const facDataCalls = () => callsTo('/statistiques/bilan-fac/')
+
+async function openRapports() {
+  mountStats(adminMe())
+  await screen.findByText('4 sections')
+  fireEvent.click(tabButton('Rapports & Bilans'))
+}
 
 async function openFacAndSelectFormation(formationValue = '10') {
   fireEvent.click(facToggleButton())
@@ -2027,7 +1116,6 @@ describe('Statistiques (LOT 38b) — Bilan FAC : panneau, périmètre et garde-f
 
   it('utilise la formation du filtre global d’en-tête si aucune formation FAC n’est choisie', async () => {
     await openRapports()
-    await screen.findByRole('button', { name: /Module Alpha/ })
 
     // Sélecteur GLOBAL d'en-tête (« Toutes les formations »), distinct de celui
     // de la barre bilans (« Toutes formations » sans article).
@@ -2646,8 +1734,6 @@ function install38eRoutes(opts = {}) {
       alertes: alertesOverview, alertes_overview: alertesOverview,
     })
   })
-  apiController.setRoute('/statistiques/point-journalier/', () => ({ tableaux: [], tableaux_complets: [] }))
-  apiController.setRoute('/statistiques/bilans/', () => ({ bilans: [], tableaux_complets: [], total_bilans: 0 }))
   apiController.setRoute('/statistiques/alertes/seuils/', () => ({
     seuils: [], indicateurs: [], synthese: {}, seuils_vides: true,
   }))

@@ -1,15 +1,15 @@
 """
-Vues API — Module Statistiques & Bilans (SYGEP-CPFAE).
+Vues API — Module Statistiques & Bilans (INJS-LMD).
 
 Filtres disponibles sur GET /api/statistiques/ :
   ?formation_id=<id>     → stats pour une formation précise
   ?secretariat_id=<id>   → stats pour un secrétariat précis
   (combinables)
 """
-from datetime import timedelta, date
+from datetime import date
 import json
 
-from django.db.models import Count, Q, Sum, F
+from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -28,17 +28,9 @@ from presences.models import Pointage
 
 from .models import ConfigAlerteSeuil, Rapport, ObservationQualitative, SignatureRapport, NotificationRapport
 from .bilans import (
-    compute_bilans, compute_bilans_avec_tableaux, compute_bilan_effectifs_module,
-    compute_bilan_effectifs_matiere,
-    compute_bilan_effectifs_categorie, compute_bilan_periode_formation,
     compute_bilan_fac, list_bilan_fac_perimetre,
 )
-from .bilans_exports import build_bilans_export_response
 from .bilan_fac_exports import build_bilan_fac_export_response
-from .point_journalier import (
-    compute_point_journalier, compute_point_journalier_avec_tableaux, get_tableau_detail,
-)
-from .point_journalier_exports import build_export_response
 from .effectifs import (
     aggregation_seances_modules,
     count_sessions_comptabilisables,
@@ -917,7 +909,7 @@ INDICATEUR_META = {
 
 
 def _init_seuils_defaut():
-    """Crée les seuils CPFAE par défaut s'ils n'existent pas."""
+    """Crée les seuils par défaut s'ils n'existent pas."""
     created = []
     for indicateur, vals in SEUILS_DEFAUT.items():
         obj, was_created = ConfigAlerteSeuil.objects.get_or_create(
@@ -1336,7 +1328,7 @@ class AlertesSeuilsView(APIView):
         })
 
     def post(self, request):
-        """Initialise les seuils CPFAE par défaut."""
+        """Initialise les seuils par défaut."""
         if not _check_role(request.user, VALIDATION_ROLES):
             return Response({'detail': 'Accès non autorisé.'}, status=403)
         created = _init_seuils_defaut()
@@ -1602,302 +1594,6 @@ class RapportWorkflowView(APIView):
             commentaire=request.data.get('commentaire') or request.data.get('motif') or '',
         )
         return Response({'statut': rapport.statut})
-
-
-class PointJournalierView(APIView):
-    """
-    GET /api/statistiques/point-journalier/
-      ?annee=2026&mois=4&categorie=B&formation_id=&secretariat_id=
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        if not user_has_stats_access(request.user):
-            return Response({'detail': 'Accès non autorisé.'}, status=403)
-
-        scope, err = _scope_from_request(request)
-        if err:
-            return err
-
-        def _int(key):
-            v = request.query_params.get(key)
-            return int(v) if v and v.isdigit() else None
-
-        annee = _int('annee') or date.today().year
-        mois = _int('mois')
-        categorie = request.query_params.get('categorie') or None
-        jour = request.query_params.get('jour') or None
-        detail = request.query_params.get('detail', '').lower() in ('1', 'true', 'yes')
-        tous_tableaux = request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes')
-        kw = _scope_compute_kwargs(scope)
-
-        fmt = (request.query_params.get('export') or request.query_params.get('file_format') or '').lower()
-        if fmt in ('xlsx', 'pdf', 'docx', 'word', 'excel'):
-            fmt = 'xlsx' if fmt == 'excel' else fmt
-            try:
-                return build_export_response(
-                    fmt, annee, mois=mois, categorie=categorie, jour=jour, **kw,
-                )
-            except ValueError as exc:
-                return Response({'detail': str(exc)}, status=400)
-
-        if detail and jour and scope.formation_id:
-            grade = request.query_params.get('grade') or None
-            tb = get_tableau_detail(
-                annee, scope.formation_id, categorie or '—', jour, grade=grade, **kw,
-            )
-            if not tb:
-                return Response({'detail': 'Tableau introuvable.'}, status=404)
-            return Response({'tableau': tb})
-
-        if tous_tableaux and not detail and not jour:
-            return Response(compute_point_journalier_avec_tableaux(
-                annee=annee, mois=mois, categorie=categorie, **kw,
-            ))
-
-        return Response(compute_point_journalier(
-            annee=annee, mois=mois, categorie=categorie, jour=jour,
-            index_only=True, **kw,
-        ))
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def point_journalier_export(request):
-    """
-    GET /api/statistiques/point-journalier-export/?export=xlsx|pdf|docx
-    Retourne un fichier binaire (HttpResponse).
-    """
-    if not user_has_stats_access(request.user):
-        return Response({'detail': 'Accès non autorisé.'}, status=403)
-
-    def _int(key):
-        v = request.query_params.get(key)
-        return int(v) if v and v.isdigit() else None
-
-    fmt = (request.query_params.get('export') or request.query_params.get('file_format') or 'xlsx').lower()
-
-    annee = _int('annee') or date.today().year
-    mois = _int('mois')
-    categorie = request.query_params.get('categorie') or None
-    jour = request.query_params.get('jour') or None
-    grade = request.query_params.get('grade') or None
-
-    scope, err = _scope_from_request(request)
-    if err:
-        return err
-    kw = _scope_compute_kwargs(scope)
-
-    try:
-        raw = build_export_response(
-            fmt, annee, mois=mois, categorie=categorie, jour=jour, grade=grade, **kw,
-        )
-        from django.http import HttpResponse as DjangoHttpResponse
-        out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
-        if raw.get('Content-Disposition'):
-            out['Content-Disposition'] = raw['Content-Disposition']
-        return out
-    except ValueError as exc:
-        return Response({'detail': str(exc)}, status=400)
-    except Exception as exc:
-        return Response({'detail': f'Erreur export : {exc}'}, status=500)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def bilans_export(request):
-    """
-    GET /api/statistiques/bilans-export/?export=xlsx|pdf|docx
-    """
-    if not user_has_stats_access(request.user):
-        return Response({'detail': 'Accès non autorisé.'}, status=403)
-
-    def _int(key):
-        v = request.query_params.get(key)
-        return int(v) if v and v.isdigit() else None
-
-    fmt = (request.query_params.get('export') or request.query_params.get('file_format') or 'xlsx').lower()
-    dimension = request.query_params.get('dimension') or 'module'
-    annee = _int('annee') or date.today().year
-    mois = _int('mois')
-    module_id = _int('module_id')
-    ref_module_id = _int('ref_module_id')
-    categorie = request.query_params.get('categorie') or None
-    periode = request.query_params.get('periode') or None
-    calendrier = request.query_params.get('calendrier') or None
-    justificatifs_text = request.query_params.get('justificatifs') or None
-
-    scope, err = _scope_from_request(request, parse_module_id=True)
-    if err:
-        return err
-    kw = _scope_compute_kwargs(scope)
-
-    try:
-        raw = build_bilans_export_response(
-            fmt, dimension, annee, mois=mois, categorie=categorie,
-            module_id=module_id, periode=periode, calendrier=calendrier,
-            ref_module_id=ref_module_id, justificatifs_text=justificatifs_text, **kw,
-        )
-        from django.http import HttpResponse as DjangoHttpResponse
-        out = DjangoHttpResponse(raw.content, content_type=raw['Content-Type'], status=raw.status_code)
-        if raw.get('Content-Disposition'):
-            out['Content-Disposition'] = raw['Content-Disposition']
-        return out
-    except ValueError as exc:
-        return Response({'detail': str(exc)}, status=400)
-    except Exception as exc:
-        return Response({'detail': f'Erreur export : {exc}'}, status=500)
-
-
-def _parse_bilans_query_params(request):
-    def _int(key):
-        v = request.query_params.get(key)
-        return int(v) if v and v.isdigit() else None
-
-    return {
-        'annee': _int('annee') or date.today().year,
-        'mois': _int('mois'),
-        'module_id': _int('module_id'),
-        'ref_module_id': _int('ref_module_id'),
-        'formation_id_qp': _int('formation_id'),
-        'categorie': request.query_params.get('categorie') or None,
-        'periode': request.query_params.get('periode') or None,
-        'calendrier': request.query_params.get('calendrier') or None,
-        'dimension': request.query_params.get('dimension') or 'formation',
-        'detail': request.query_params.get('detail', '').lower() in ('1', 'true', 'yes'),
-        'tous_tableaux': request.query_params.get('tous_tableaux', '').lower() in ('1', 'true', 'yes'),
-        'matiere_intitule': request.query_params.get('matiere_intitule') or None,
-    }
-
-
-def _build_bilans_payload(request, scope, kw, params):
-    """
-    Calcule le payload bilans. Retourne (payload, error_response).
-    error_response est un Response DRF en cas d'erreur, sinon None.
-    """
-    annee = params['annee']
-    mois = params['mois']
-    module_id = params['module_id']
-    ref_module_id = params['ref_module_id']
-    categorie = params['categorie']
-    periode = params['periode']
-    calendrier = params['calendrier']
-    dimension = params['dimension']
-    detail = params['detail']
-    tous_tableaux = params['tous_tableaux']
-    formation_id = scope.formation_id
-    secretariat_id = scope.secretariat_id
-
-    if detail and dimension == 'categorie':
-        if not categorie:
-            return None, Response({'detail': 'Catégorie requise.'}, status=400)
-        tableau = compute_bilan_effectifs_categorie(
-            categorie, formation_id=formation_id, secretariat_id=secretariat_id,
-            annee=annee, mois=mois, calendrier=calendrier, periode=periode,
-            module_ids=kw.get('module_ids'),
-        )
-        if not tableau:
-            return None, Response({
-                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-            }, status=404)
-        return {'tableau': tableau}, None
-
-    if detail and dimension == 'matiere':
-        eff_formation = formation_id or params['formation_id_qp']
-        if not eff_formation:
-            return None, Response({'detail': 'Formation requise pour le bilan matière.'}, status=400)
-        matiere_intitule = params['matiere_intitule']
-        if not ref_module_id and not matiere_intitule:
-            return None, Response({'detail': 'ref_module_id ou matiere_intitule requis.'}, status=400)
-        tableau = compute_bilan_effectifs_matiere(
-            eff_formation,
-            ref_module_id=ref_module_id,
-            matiere_intitule=matiere_intitule,
-            categorie=categorie,
-            secretariat_id=secretariat_id,
-            annee=annee, mois=mois, calendrier=calendrier, periode=periode,
-            module_ids=kw.get('module_ids'),
-        )
-        if not tableau:
-            return None, Response({
-                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-            }, status=404)
-        return {'tableau': tableau}, None
-
-    if detail and module_id:
-        tableau = compute_bilan_effectifs_module(
-            module_id, categorie=categorie, annee=annee, mois=mois,
-            calendrier=calendrier, periode=periode,
-        )
-        if not tableau:
-            return None, Response({
-                'detail': 'Aucune séance comptabilisable sur la période filtrée.',
-            }, status=404)
-        return {'tableau': tableau}, None
-
-    if detail and formation_id:
-        tableau = compute_bilan_periode_formation(
-            formation_id, annee=annee, mois=mois, calendrier=calendrier,
-            periode=periode, secretariat_id=secretariat_id, categorie_filter=categorie,
-            module_ids=kw.get('module_ids'),
-        )
-        if not tableau:
-            return None, Response({'detail': 'Formation introuvable.'}, status=404)
-        return {'tableau': tableau}, None
-
-    if tous_tableaux:
-        return compute_bilans_avec_tableaux(
-            annee=annee, mois=mois, categorie=categorie,
-            module_id=module_id, periode=periode,
-            calendrier=calendrier, dimension=dimension,
-            ref_module_id=ref_module_id, **kw,
-        ), None
-
-    return compute_bilans(
-        annee=annee, mois=mois, categorie=categorie,
-        module_id=module_id, periode=periode,
-        calendrier=calendrier, dimension=dimension,
-        ref_module_id=ref_module_id, **kw,
-    ), None
-
-
-class BilansView(APIView):
-    """
-    GET /api/statistiques/bilans/
-      ?annee=&mois=&categorie=&module_id=&formation_id=&secretariat_id=
-      &periode=QUOTIDIEN|HEBDOMADAIRE|...&calendrier=YYYY-MM-DD
-      &dimension=module|matiere|categorie|formation
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        if not user_has_stats_access(request.user):
-            return Response({'detail': 'Accès non autorisé.'}, status=403)
-
-        params = _parse_bilans_query_params(request)
-
-        scope, err = _scope_from_request(request, parse_module_id=True)
-        if err:
-            return err
-        kw = _scope_compute_kwargs(scope)
-
-        from .cache_utils import (
-            get_stats_bilans_cached,
-            set_stats_bilans_cached,
-            stats_bilans_cache_key,
-        )
-
-        cache_key = stats_bilans_cache_key(request, scope, params)
-        cached = get_stats_bilans_cached(cache_key)
-        if cached is not None:
-            return Response(cached)
-
-        payload, error_response = _build_bilans_payload(request, scope, kw, params)
-        if error_response is not None:
-            return error_response
-
-        set_stats_bilans_cached(cache_key, payload)
-        return Response(payload)
 
 
 class ObservationsView(APIView):

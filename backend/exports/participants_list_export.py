@@ -32,7 +32,7 @@ _HEADER_LINES = [
     "RÉPUBLIQUE DE CÔTE D'IVOIRE",
     "Ministère de la Fonction Publique et de la Modernisation de l'Administration",
     "Direction de la Formation et du Renforcement des Capacités (DFRC)",
-    "Centre de Perfectionnement des Fonctionnaires et Agents de l'État — CPFAE",
+    "Institut National de la Jeunesse et des Sports (INJS)",
 ]
 
 _TABLE_HEADERS = ['N°', 'Matricule', 'Nom', 'Prénom', 'Sexe', 'Grade', 'Téléphone', 'Type concours', 'Moyenne', 'Crédits ECTS', 'Décision officielle']

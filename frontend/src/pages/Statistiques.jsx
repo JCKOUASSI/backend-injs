@@ -1,5 +1,5 @@
 /**
- * Statistiques.jsx — SYGEP-CPFAE
+ * Statistiques.jsx — INJS-LMD
  * Dashboard multi-onglets : Vue d'ensemble · Pédagogique · Administratif · Historique · Secrétariats · Rapports · Alertes
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -18,7 +18,6 @@ import {
 } from '../utils/financePeriod'
 import { isSecretariatScopedRole, lockedSecretariatId } from '../utils/roles'
 import { useStatsMeta } from '../hooks/useStatsMeta'
-import { PointJournalierTableauCPFAE, pjPct } from '../components/PointJournalierCPFAE'
 import { AuditeursNotoiresPanel, AuditeursNotoiresKpiStrip, filterAuditeursNotoires } from '../components/AuditeursNotoiresPanel'
 import RapportsWorkflowPanel from '../components/RapportsWorkflowPanel'
 
@@ -31,11 +30,6 @@ const STATUT_LABELS = {
   SORTIE_AUTO:'Sortie automatique',
 }
 const VALIDATION_ROLES = ['ADMIN','DIRECTION','CHEF_INJS_ADMIN','INJS_ADMIN']
-
-const RB_VIEWS = [
-  { id: 'bilans', label: 'Bilans INJS', icon: 'bi-table' },
-  { id: 'workflow', label: 'Rapports périodiques', icon: 'bi-file-earmark-check' },
-]
 
 /** Libellés harmonisés des taux pédagogiques (vague 1). */
 const TAUX_PEDAGOGIE = {
@@ -89,8 +83,8 @@ const AUDITEURS_NOTOIRES = {
   help: 'Inscrit à au moins un module démarré, sans aucune présence enregistrée, ou avec motif notoire renseigné.',
 }
 
-/** Onglets accessibles aux comptes secrétariat (point + bilans uniquement). */
-const SECRETARIAT_STATS_TABS = new Set(['point_journalier', 'rapports'])
+/** Onglets accessibles aux comptes secrétariat (rapports uniquement). */
+const SECRETARIAT_STATS_TABS = new Set(['rapports'])
 
 /** Onglets où le filtre période s'applique aux indicateurs clés. */
 const VH_PERIOD_TABS = new Set(['overview', 'pedagogy', 'admin', 'history', 'alertes'])
@@ -102,48 +96,17 @@ const TAB_SECTIONS = {
   admin: ['admin_operationnel'],
   history: ['historique', 'pedagogiques', 'admin_operationnel'],
   alertes: ['alertes', 'pedagogiques', 'admin_operationnel'],
-  point_journalier: ['admin_operationnel'],
   rapports: ['admin_operationnel'],
 }
 
 /** Méta (formations_liste, secretariats_liste, filtre_actif) — chargées via useStatsMeta. */
 const ALERTES_OVERVIEW_CODES = ['taux_presence', 'taux_execution_vh', 'saturation_groupe']
 
-const PJ_EXPORT_FORMATS = [
+const FAC_EXPORT_FORMATS = [
   { fmt: 'xlsx', icon: 'bi-file-earmark-excel', label: 'Excel', col: '#0b4489' },
   { fmt: 'pdf',  icon: 'bi-file-earmark-pdf',   label: 'PDF',   col: '#C62828' },
   { fmt: 'docx', icon: 'bi-file-earmark-word',  label: 'Word',  col: '#1565C0' },
 ]
-
-const RB_PERIODES = [
-  { value: '', label: 'Toutes périodes' },
-  { value: 'QUOTIDIEN', label: 'Quotidien' },
-  { value: 'HEBDOMADAIRE', label: 'Hebdomadaire' },
-  { value: 'MENSUEL', label: 'Mensuel' },
-  { value: 'TRIMESTRIEL', label: 'Trimestriel' },
-  { value: 'SEMESTRIEL', label: 'Semestriel' },
-  { value: 'ANNUEL', label: 'Annuel' },
-  { value: 'MI_PARCOURS', label: 'À mi-parcours' },
-]
-
-const RB_DIMENSIONS = [
-  { id: 'module', label: 'Par Module', icon: 'bi-book' },
-  { id: 'matiere', label: 'Par Matière', icon: 'bi-journals' },
-  { id: 'categorie', label: 'Par Catégorie', icon: 'bi-tag' },
-  { id: 'formation', label: 'Par Formation', icon: 'bi-journal-bookmark' },
-]
-
-function rbMatiereOptionValue(m) {
-  if (m.ref_module_id) return `r:${m.ref_module_id}`
-  return `i:${m.intitule}`
-}
-
-function rbParseMatiereKey(key) {
-  if (!key) return {}
-  if (key.startsWith('r:')) return { ref_module_id: Number(key.slice(2)) }
-  if (key.startsWith('i:')) return { matiere_intitule: key.slice(2) }
-  return {}
-}
 
 // ── Utilitaires graphiques (SVG natif) ───────────────────────────────────────
 function Empty({ label = 'Aucune donnée' }) {
@@ -1089,13 +1052,13 @@ function Card({ title, icon, children, col }) {
 // ── Composant principal ────────────────────────────────────────────────────────
 export default function Statistiques() {
   const { user } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const isSecretariatScoped = isSecretariatScopedRole(user?.role)
   const isEncadrantScoped = user?.role === 'ENCADRANT'
   const secretariatFilterLocked = isSecretariatScoped
   const userLockedSecretariatId = lockedSecretariatId(user)
   const [onglet, setOnglet] = useState(() => (
-    isSecretariatScopedRole(user?.role) ? 'point_journalier' : 'overview'
+    isSecretariatScopedRole(user?.role) ? 'rapports' : 'overview'
   ))
   const [data, setData] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
@@ -1152,38 +1115,6 @@ export default function Statistiques() {
   const [initSeuilsLoading, setInitSeuilsLoading] = useState(false)
   const [showGuideAlertes, setShowGuideAlertes] = useState(true)
 
-  // Point journalier
-  const [pjData, setPjData] = useState(null)
-  const [pjAllTableaux, setPjAllTableaux] = useState([])
-  const [pjDetail, setPjDetail] = useState(null)
-  const [loadingPj, setLoadingPj] = useState(false)
-  const [loadingPjDetail, setLoadingPjDetail] = useState(false)
-  const [pjAnnee, setPjAnnee] = useState(new Date().getFullYear())
-  const [pjMois, setPjMois] = useState('')
-  const [pjError, setPjError] = useState(null)
-  const [pjCategorie, setPjCategorie] = useState('')
-  const [pjFormationId, setPjFormationId] = useState('')
-  const [pjSelection, setPjSelection] = useState(null)
-  const [exportingPj, setExportingPj] = useState(null)
-
-  // Bilans & Rapports — filtres (entête type Point Journalier)
-  const [rbAnnee, setRbAnnee] = useState(new Date().getFullYear())
-  const [rbMois, setRbMois] = useState('')
-  const [rbCategorie, setRbCategorie] = useState('')
-  const [rbModuleId, setRbModuleId] = useState('')
-  const [rbMatiereKey, setRbMatiereKey] = useState('')
-  const [rbFormationId, setRbFormationId] = useState('')
-  const [rbPeriode, setRbPeriode] = useState('')
-  const [rbCalendrier, setRbCalendrier] = useState('')
-  const [rbDimension, setRbDimension] = useState('module')
-  const [rbData, setRbData] = useState(null)
-  const [rbAllTableaux, setRbAllTableaux] = useState([])
-  const [rbJustificatifsText, setRbJustificatifsText] = useState('')
-  const [rbSelection, setRbSelection] = useState(null)
-  const [rbDetail, setRbDetail] = useState(null)
-  const [loadingRb, setLoadingRb] = useState(false)
-  const [loadingRbDetail, setLoadingRbDetail] = useState(false)
-  const [exportingRb, setExportingRb] = useState(null)
   const [exportingFac, setExportingFac] = useState(null)
   const [facExportMeta, setFacExportMeta] = useState({ justificatifs: {}, difficultes: {} })
 
@@ -1199,7 +1130,7 @@ export default function Statistiques() {
   const [facGradesSelected, setFacGradesSelected] = useState([])
   const [facGroupesSelected, setFacGroupesSelected] = useState([])
   const [loadingFacPerimetre, setLoadingFacPerimetre] = useState(false)
-  const [rbView, setRbView] = useState(() => searchParams.get('rbView') || 'bilans')
+  const [rbView, setRbView] = useState(() => searchParams.get('rbView') || 'workflow')
 
   const canValidate = VALIDATION_ROLES.includes(user?.role)
   const prevLoadCtx = useRef({ onglet, formationId, secretariatId, appliedPeriodKey })
@@ -1214,23 +1145,15 @@ export default function Statistiques() {
 
   useEffect(() => {
     const v = searchParams.get('rbView')
-    if (v === 'workflow' || v === 'bilans') setRbView(v)
+    if (v === 'workflow') setRbView(v)
     if (searchParams.get('tab') === 'rapports' || searchParams.get('rbView') === 'workflow') {
       setOnglet('rapports')
     }
   }, [searchParams])
 
-  const setRbViewAndUrl = (view) => {
-    setRbView(view)
-    const next = new URLSearchParams(searchParams)
-    if (view === 'bilans') next.delete('rbView')
-    else next.set('rbView', view)
-    setSearchParams(next, { replace: true })
-  }
-
   useEffect(() => {
     if (isSecretariatScoped && !SECRETARIAT_STATS_TABS.has(onglet)) {
-      setOnglet('point_journalier')
+      setOnglet('rapports')
     }
   }, [isSecretariatScoped, onglet])
 
@@ -1348,138 +1271,9 @@ export default function Statistiques() {
     }
   }
 
-  const fetchPointJournalier = useCallback(async () => {
-    setLoadingPj(true)
-    setPjDetail(null)
-    setPjAllTableaux([])
-    setPjError(null)
-    try {
-      const params = new URLSearchParams({ annee: String(pjAnnee), tous_tableaux: '1' })
-      if (pjMois) params.set('mois', pjMois)
-      if (pjCategorie) params.set('categorie', pjCategorie)
-      if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      const res = await api.get(`/statistiques/point-journalier/?${params}`)
-      setPjData(res.data)
-      setPjAllTableaux(res.data.tableaux_complets || [])
-      setPjSelection(prev => {
-        if (!res.data.tableaux?.length) return null
-        if (prev !== null && prev < res.data.tableaux.length) return prev
-        return null
-      })
-    } catch (e) {
-      setPjData(null)
-      setPjAllTableaux([])
-      setPjSelection(null)
-      setPjDetail(null)
-      setPjError(e.response?.data?.detail || e.message || 'Erreur de chargement.')
-    } finally {
-      setLoadingPj(false)
-    }
-    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
-    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
-  }, [pjAnnee, pjMois, pjCategorie, pjFormationId, effectiveSecretariatId])
 
-  const fetchPjDetail = useCallback(async (tb) => {
-    if (!tb) {
-      setPjDetail(null)
-      return
-    }
-    setLoadingPjDetail(true)
-    try {
-      const params = new URLSearchParams({
-        annee: String(pjAnnee),
-        detail: '1',
-        jour: tb.date,
-        formation_id: String(tb.formation_id),
-        categorie: tb.categorie || '—',
-      })
-      if (tb.grade) params.set('grade', tb.grade)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      const res = await api.get(`/statistiques/point-journalier/?${params}`)
-      setPjDetail(res.data.tableau)
-    } catch {
-      setPjDetail(null)
-    } finally {
-      setLoadingPjDetail(false)
-    }
-    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
-    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
-  }, [pjAnnee, effectiveSecretariatId])
 
-  const downloadPointJournalier = async (format) => {
-    setExportingPj(format)
-    try {
-      const params = new URLSearchParams({ export: format, annee: String(pjAnnee) })
-      if (pjMois) params.set('mois', pjMois)
-      if (pjCategorie) params.set('categorie', pjCategorie)
-      if (pjFormationId) params.set('formation_id', pjFormationId)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      if (pjSelection !== null && pjData?.tableaux?.[pjSelection]) {
-        const tb = pjData.tableaux[pjSelection]
-        params.set('jour', tb.date)
-        params.set('formation_id', String(tb.formation_id))
-        if (tb.categorie) params.set('categorie', tb.categorie)
-        if (tb.grade) params.set('grade', tb.grade)
-      }
-      const { blob, fileName } = await api.getBlob(`/statistiques/point-journalier-export/?${params}`)
-      const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const moisPart = pjMois ? `_M${pjMois}` : '_annuel'
-      a.download = fileName || `POINT_JOURNALIER_${pjAnnee}${moisPart}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      const detail = e.response?.data?.detail
-      alert(detail || e.message || 'Erreur lors du téléchargement.')
-    } finally {
-      setExportingPj(null)
-    }
-  }
 
-  const fetchBilans = useCallback(async () => {
-    setLoadingRb(true)
-    setRbDetail(null)
-    setRbAllTableaux([])
-    try {
-      const effFormation = rbFormationId || formationId
-      const params = new URLSearchParams({
-        annee: String(rbAnnee),
-        dimension: rbDimension,
-        tous_tableaux: '1',
-      })
-      if (rbMois) params.set('mois', rbMois)
-      if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbDimension === 'matiere') {
-        const mk = rbParseMatiereKey(rbMatiereKey)
-        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
-      } else if (rbModuleId) {
-        params.set('module_id', rbModuleId)
-      }
-      if (effFormation) params.set('formation_id', effFormation)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      if (rbPeriode) params.set('periode', rbPeriode)
-      if (rbCalendrier) params.set('calendrier', rbCalendrier)
-      const res = await api.get(`/statistiques/bilans/?${params}`)
-      setRbData(res.data)
-      setRbAllTableaux(res.data.tableaux_complets || [])
-      setRbSelection(prev => {
-        if (!res.data.bilans?.length) return null
-        if (prev !== null && prev < res.data.bilans.length) return prev
-        return null
-      })
-    } catch {
-      setRbData(null)
-      setRbAllTableaux([])
-      setRbSelection(null)
-    } finally {
-      setLoadingRb(false)
-    }
-    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
-    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
-  }, [rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, effectiveSecretariatId])
 
   const fetchFacPerimetre = useCallback(async () => {
     const effFormation = facFormationId || formationId
@@ -1556,102 +1350,7 @@ export default function Statistiques() {
     facGradesSelected, facGroupesSelected, facPerimetre.grades, facGroupesVisibles,
   ])
 
-  const fetchRbDetail = useCallback(async (bilan) => {
-    if (!bilan) {
-      setRbDetail(null)
-      return
-    }
-    if (bilan.dimension === 'module' && !bilan.module_id) {
-      setRbDetail(null)
-      return
-    }
-    if (bilan.dimension === 'formation' && !bilan.formation_id) {
-      setRbDetail(null)
-      return
-    }
-    if (bilan.dimension === 'categorie' && (!bilan.categorie || bilan.categorie === '—')) {
-      setRbDetail(null)
-      return
-    }
-    if (bilan.dimension === 'matiere' && !bilan.formation_id) {
-      setRbDetail(null)
-      return
-    }
-    if (!['module', 'matiere', 'formation', 'categorie'].includes(bilan.dimension)) {
-      setRbDetail(null)
-      return
-    }
-    setLoadingRbDetail(true)
-    try {
-      const effFormation = rbFormationId || formationId
-      const params = new URLSearchParams({
-        annee: String(rbAnnee),
-        detail: '1',
-        dimension: bilan.dimension,
-      })
-      if (bilan.module_id) params.set('module_id', String(bilan.module_id))
-      if (bilan.formation_id) params.set('formation_id', String(bilan.formation_id))
-      else if (effFormation) params.set('formation_id', effFormation)
-      if (bilan.dimension === 'matiere') {
-        if (bilan.ref_module_id) params.set('ref_module_id', String(bilan.ref_module_id))
-        if (bilan.matiere_intitule) params.set('matiere_intitule', bilan.matiere_intitule)
-      }
-      if (rbMois) params.set('mois', rbMois)
-      const cat = (bilan.categorie && bilan.categorie !== '—') ? bilan.categorie : rbCategorie
-      if (cat) params.set('categorie', cat)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      if (rbPeriode) params.set('periode', rbPeriode)
-      if (rbCalendrier) params.set('calendrier', rbCalendrier)
-      const res = await api.get(`/statistiques/bilans/?${params}`)
-      setRbDetail(res.data.tableau)
-    } catch {
-      setRbDetail(null)
-    } finally {
-      setLoadingRbDetail(false)
-    }
-    // Le callback ne lit que effectiveSecretariatId (string), pas secretariatId
-    // directement : c'est lui qui figure dans les deps (LOT 6, cf. §10.2).
-  }, [rbAnnee, rbMois, rbCategorie, rbFormationId, rbPeriode, rbCalendrier, formationId, effectiveSecretariatId])
 
-  const downloadBilanExport = async (format) => {
-    setExportingRb(format)
-    try {
-      const effFormation = rbFormationId || formationId
-      const params = new URLSearchParams({ export: format, annee: String(rbAnnee), dimension: rbDimension })
-      if (rbMois) params.set('mois', rbMois)
-      if (rbCategorie) params.set('categorie', rbCategorie)
-      if (rbDimension === 'matiere') {
-        const mk = rbParseMatiereKey(rbMatiereKey)
-        if (mk.ref_module_id) params.set('ref_module_id', String(mk.ref_module_id))
-      } else if (rbModuleId) {
-        params.set('module_id', rbModuleId)
-      }
-      if (effFormation) params.set('formation_id', effFormation)
-      if (effectiveSecretariatId) params.set('secretariat_id', effectiveSecretariatId)
-      if (rbPeriode) params.set('periode', rbPeriode)
-      if (rbCalendrier) params.set('calendrier', rbCalendrier)
-      const bilan = rbSelection !== null && rbData?.bilans?.[rbSelection] ? rbData.bilans[rbSelection] : null
-      if (bilan?.module_id) params.set('module_id', String(bilan.module_id))
-      if (bilan?.formation_id) params.set('formation_id', String(bilan.formation_id))
-      if (bilan?.ref_module_id) params.set('ref_module_id', String(bilan.ref_module_id))
-      if (bilan?.matiere_intitule) params.set('matiere_intitule', bilan.matiere_intitule)
-      if (bilan?.categorie && bilan.categorie !== '—') params.set('categorie', bilan.categorie)
-      if (rbJustificatifsText.trim()) params.set('justificatifs', rbJustificatifsText.trim())
-      const { blob, fileName } = await api.getBlob(`/statistiques/bilans-export/?${params}`)
-      const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'xlsx'
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName || `BILANS_${rbAnnee}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      const detail = e.response?.data?.detail
-      alert(detail || e.message || 'Erreur lors du téléchargement.')
-    } finally {
-      setExportingRb(null)
-    }
-  }
 
   const downloadBilanFac = async (format) => {
     const effFormation = facFormationId || formationId
@@ -1715,8 +1414,6 @@ export default function Statistiques() {
 
   const handleRefreshAll = () => {
     fetchData(TAB_SECTIONS[onglet] || TAB_SECTIONS.overview)
-    if (onglet === 'point_journalier') fetchPointJournalier()
-    if (onglet === 'rapports') fetchBilans()
     if (onglet === 'secretariats') fetchSecStats()
     if (onglet === 'alertes') fetchSeuils()
   }
@@ -1779,41 +1476,10 @@ export default function Statistiques() {
     }
   }, [data?.filtre_actif?.scope_locked, data?.filtre_actif?.secretariat_id])
 
-  useEffect(() => {
-    if (onglet !== 'point_journalier') return
-    fetchPointJournalier()
-  }, [onglet, pjAnnee, pjMois, pjCategorie, pjFormationId, secretariatId, fetchPointJournalier])
 
-  useEffect(() => {
-    setRbJustificatifsText('')
-  }, [rbSelection, rbAnnee, rbMois, rbFormationId, rbPeriode, rbCalendrier, rbDimension])
 
-  useEffect(() => {
-    if (onglet !== 'rapports') return
-    fetchBilans()
-  }, [onglet, rbAnnee, rbMois, rbCategorie, rbModuleId, rbMatiereKey, rbFormationId, rbPeriode, rbCalendrier, rbDimension, formationId, secretariatId, fetchBilans])
 
-  useEffect(() => {
-    if (onglet !== 'rapports' || rbSelection === null || !rbData?.bilans?.length) return
-    const bilan = rbData.bilans[rbSelection]
-    const cached = rbAllTableaux.find(t => t.bilan_id === bilan.id)
-    if (cached?.tableau) {
-      setRbDetail(cached.tableau)
-      return
-    }
-    fetchRbDetail(bilan)
-  }, [onglet, rbSelection, rbData, rbAllTableaux, fetchRbDetail])
 
-  useEffect(() => {
-    if (onglet !== 'point_journalier' || pjSelection === null || !pjData?.tableaux?.length) return
-    const meta = pjData.tableaux[pjSelection]
-    const cached = pjAllTableaux.find(t => t.tableau_id === meta.id)
-    if (cached?.tableau) {
-      setPjDetail(cached.tableau)
-      return
-    }
-    fetchPjDetail(meta)
-  }, [onglet, pjSelection, pjData, pjAllTableaux, fetchPjDetail])
 
   const saveSeuils = async () => {
     try {
@@ -1837,7 +1503,6 @@ export default function Statistiques() {
     {id:'history',       icon:'bi-graph-up',             label:'Historique'},
     {id:'secretariats',  icon:'bi-building',             label:'Secrétariats'},
     {id:'rapports',      icon:'bi-file-earmark-text',    label:'Rapports & Bilans'},
-    {id:'point_journalier', icon:'bi-calendar2-check',   label:'Point Journalier'},
     {id:'alertes',       icon:'bi-bell',                 label:'Alertes'},
   ]
   const visibleOnglets = isSecretariatScoped
@@ -2543,25 +2208,6 @@ export default function Statistiques() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
-          {RB_VIEWS.map(v => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setRbViewAndUrl(v.id)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                padding: '0.45rem 0.85rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                border: rbView === v.id ? '2px solid #001a33' : '1px solid #e2e8f0',
-                background: rbView === v.id ? '#e8eef6' : '#fff',
-                color: rbView === v.id ? '#001a33' : '#64748b',
-              }}
-            >
-              <i className={`bi ${v.icon}`}/>{v.label}
-            </button>
-          ))}
-        </div>
-
         {rbView === 'workflow' && (
           <RapportsWorkflowPanel
             user={user}
@@ -2569,240 +2215,6 @@ export default function Statistiques() {
             secretariatId={effectiveSecretariatId}
             appliedVhPeriod={appliedVhPeriod}
           />
-        )}
-
-        {rbView === 'bilans' && (
-        <>
-        {/* ── Filtres bilans (même entête que Point Journalier) ─────────── */}
-        <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
-          <select className="form-select form-select-sm" style={{width:100}}
-            value={rbAnnee} onChange={e=>{ setRbAnnee(Number(e.target.value)); setRbSelection(null) }}>
-            {[rbAnnee-1, rbAnnee, rbAnnee+1].filter((y,i,a)=>a.indexOf(y)===i).sort().map(y=>(
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <select className="form-select form-select-sm" style={{width:130}}
-            value={rbMois} onChange={e=>{ setRbMois(e.target.value); setRbSelection(null) }}>
-            <option value="">Toute l'année</option>
-            {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m,i)=>(
-              <option key={i+1} value={String(i+1)}>{m}</option>
-            ))}
-          </select>
-          <select className="form-select form-select-sm" style={{width:120}}
-            value={rbCategorie} onChange={e=>{ setRbCategorie(e.target.value); setRbSelection(null) }}>
-            <option value="">Toutes catég.</option>
-            {(rbData?.categories||[]).map(c=>(
-              <option key={c} value={c}>Cat. {c}</option>
-            ))}
-          </select>
-          {rbDimension === 'matiere' ? (
-            <select className="form-select form-select-sm" style={{minWidth:160,maxWidth:220}}
-              value={rbMatiereKey} onChange={e=>{ setRbMatiereKey(e.target.value); setRbSelection(null) }}>
-              <option value="">Toutes matières</option>
-              {(rbData?.matieres||[])
-                .filter(m => !rbFormationId || String(m.formation_id) === rbFormationId)
-                .map(m => (
-                  <option key={rbMatiereOptionValue(m)} value={rbMatiereOptionValue(m)}>
-                    {m.intitule}
-                  </option>
-                ))}
-            </select>
-          ) : (
-            <select className="form-select form-select-sm" style={{minWidth:160,maxWidth:220}}
-              value={rbModuleId} onChange={e=>{ setRbModuleId(e.target.value); setRbSelection(null) }}>
-              <option value="">Tous modules</option>
-              {(rbData?.modules||[]).map(m=>(
-                <option key={m.id} value={m.id}>{m.intitule}</option>
-              ))}
-            </select>
-          )}
-          <select className="form-select form-select-sm" style={{minWidth:180,maxWidth:260}}
-            value={rbFormationId} onChange={e=>{ setRbFormationId(e.target.value); setRbModuleId(''); setRbMatiereKey(''); setRbSelection(null) }}>
-            <option value="">Toutes formations</option>
-            {(rbData?.formations||formations_liste||[]).map(f=>(
-              <option key={f.id} value={f.id}>{f.formation}</option>
-            ))}
-          </select>
-          <select className="form-select form-select-sm" style={{minWidth:150,maxWidth:180}}
-            value={rbPeriode} onChange={e=>{ setRbPeriode(e.target.value); setRbSelection(null) }}>
-            {RB_PERIODES.map(p=>(
-              <option key={p.value||'all'} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-          <div style={{display:'flex',flexDirection:'column',gap:'0.1rem'}}>
-            <span style={{fontSize:'0.65rem',color:'#94a3b8',lineHeight:1}}>Calendrier prév.</span>
-            <input
-              type="date"
-              className="form-control form-control-sm"
-              style={{width:155}}
-              title="Calendrier prévisionnel"
-              value={rbCalendrier}
-              onChange={e=>{ setRbCalendrier(e.target.value); setRbSelection(null) }}
-            />
-          </div>
-          <div style={{marginLeft:'auto', display:'flex', gap:'0.4rem', alignItems:'center', flexWrap:'nowrap'}}>
-            <button className="btn btn-sm btn-outline-secondary" onClick={fetchBilans} disabled={loadingRb}>
-              <i className="bi bi-arrow-clockwise me-1"/>Actualiser
-            </button>
-            {PJ_EXPORT_FORMATS.map(({ fmt, icon, label, col }) => (
-              <button
-                key={`rb-${fmt}`}
-                className="btn btn-sm"
-                disabled={!!exportingRb || loadingRb || !rbData?.bilans?.length}
-                style={{ background: col, color: '#fff', border: 'none', minWidth: 88, opacity: (exportingRb || loadingRb) ? 0.65 : 1 }}
-                onClick={() => downloadBilanExport(fmt)}
-                title={`Exporter les bilans filtrés (${label})`}
-              >
-                {exportingRb === fmt ? (
-                  <span className="spinner-border spinner-border-sm"/>
-                ) : (
-                  <><i className={`bi ${icon} me-1`}/>{label}</>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Type de bilan : Module · Catégorie · Formation */}
-        <div style={{display:'flex',gap:'0.35rem',marginBottom:'0.85rem',flexWrap:'wrap'}}>
-          {RB_DIMENSIONS.map(d=>(
-            <button
-              key={d.id}
-              type="button"
-              onClick={()=>{
-                setRbDimension(d.id)
-                setRbModuleId('')
-                setRbMatiereKey('')
-                setRbSelection(null)
-              }}
-              style={{
-                display:'inline-flex', alignItems:'center', gap:'0.35rem',
-                padding:'0.45rem 0.85rem', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontWeight:600,
-                border: rbDimension===d.id ? '2px solid #001a33' : '1px solid #e2e8f0',
-                background: rbDimension===d.id ? '#e8eef6' : '#fff',
-                color: rbDimension===d.id ? '#001a33' : '#64748b',
-              }}
-            >
-              <i className={`bi ${d.icon}`}/>{d.label}
-            </button>
-          ))}
-        </div>
-
-        <AuditeursNotoiresKpiStrip data={auditeursNotoires}/>
-
-        {/* Liste bilans + détail */}
-        {loadingRb ? (
-          <div style={{display:'flex',alignItems:'center',gap:'0.5rem',color:'#64748b',padding:'2rem',marginBottom:'1rem'}}>
-            <div className="spinner"/>Chargement des bilans…
-          </div>
-        ) : !rbData?.bilans?.length ? (
-          <div style={{marginBottom:'1.2rem'}}>
-            <Empty label="Aucun bilan pour cette sélection"/>
-          </div>
-        ) : (
-          <div style={{display:'grid',gridTemplateColumns:'minmax(220px,280px) 1fr',gap:'1rem',alignItems:'start',marginBottom:'1.2rem'}}>
-            <div style={{background:'#fff',borderRadius:10,boxShadow:'0 1px 4px rgba(0,0,0,0.07)',overflow:'hidden',maxHeight:'55vh',overflowY:'auto'}}>
-              <div style={{padding:'0.65rem 0.85rem',background:'#f8fafc',borderBottom:'1px solid #e2e8f0',fontSize:'0.78rem',color:'#64748b',fontWeight:600}}>
-                {rbData.total_bilans} bilan{rbData.total_bilans > 1 ? 's' : ''} · {RB_DIMENSIONS.find(d=>d.id===rbDimension)?.label}
-              </div>
-              <button
-                type="button"
-                onClick={()=>{ setRbSelection(null); setRbDetail(null) }}
-                style={{
-                  display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
-                  padding:'0.55rem 0.85rem', fontSize:'0.78rem', fontWeight:700,
-                  background: rbSelection === null ? '#e0f2fe' : '#fff',
-                  borderBottom:'2px solid #e2e8f0', color: rbSelection === null ? '#0369a1' : '#475569',
-                }}
-              >
-                <i className="bi bi-grid-3x3-gap me-1"/>
-                Tous les tableaux ({rbAllTableaux.length || rbData.total_bilans})
-              </button>
-              {rbData.bilans.map((b,i)=>(
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={()=>setRbSelection(i)}
-                  style={{
-                    display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
-                    padding:'0.55rem 0.85rem', fontSize:'0.78rem',
-                    background: rbSelection===i ? '#e8eef6' : '#fff',
-                    borderBottom:'1px solid #f1f5f9',
-                  }}
-                >
-                  <div style={{fontWeight:700, color:'#1e293b', marginBottom:'0.1rem'}}>
-                    {b.dimension==='categorie' && (
-                      <span style={{background:'#1565C018',color:'#1565C0',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
-                        CAT {b.categorie}
-                      </span>
-                    )}
-                    {b.dimension==='module' && (
-                      <span style={{background:'#7B1FA218',color:'#7B1FA2',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
-                        MOD
-                      </span>
-                    )}
-                    {b.dimension==='matiere' && (
-                      <span style={{background:'#0C3E9518',color:'#0C3E95',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
-                        MAT
-                      </span>
-                    )}
-                    {b.libelle}
-                  </div>
-                  <div style={{color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                    {b.sous_titre}
-                  </div>
-                  {b.dimension === 'module' && (b.grade || b.groupe) && (
-                    <div style={{color:'#94a3b8', fontSize:'0.7rem', marginTop:'0.05rem'}}>
-                      {b.grade ? `Grade ${b.grade}` : ''}{b.grade && b.groupe ? ' · ' : ''}{b.groupe || ''}
-                    </div>
-                  )}
-                  {b.inscrits != null && (
-                    <div style={{color:'#94a3b8', fontSize:'0.72rem', marginTop:'0.1rem'}}>
-                      {b.inscrits} inscrit{b.inscrits > 1 ? 's' : ''}
-                      {b.nb_groupes != null ? ` · ${b.nb_groupes} groupe${b.nb_groupes > 1 ? 's' : ''}` : ''}
-                      {b.nb_pointages != null ? ` · ${b.nb_pointages} pointages` : ''}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-            {rbSelection === null ? (
-              loadingRb && !rbAllTableaux.length ? (
-                <TabSpinner label="Chargement de tous les tableaux…"/>
-              ) : (
-              <BilansEnsemblePanel
-                items={rbAllTableaux}
-                bilans={rbData.bilans}
-                filtres={rbData.filtres_actifs}
-                dimension={rbDimension}
-                onSelectIndividuel={setRbSelection}
-              />
-              )
-            ) : rbData.bilans[rbSelection] && (
-              loadingRbDetail ? (
-                <div style={{display:'flex',alignItems:'center',gap:'0.5rem',color:'#64748b',padding:'2rem',background:'#fff',borderRadius:10,boxShadow:'0 1px 4px rgba(0,0,0,0.07)'}}>
-                  <div className="spinner"/>Chargement du tableau…
-                </div>
-              ) : (
-                <div style={{ minWidth: 0 }}>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary mb-2"
-                    onClick={()=>{ setRbSelection(null); setRbDetail(null) }}
-                  >
-                    <i className="bi bi-grid-3x3-gap me-1"/>Voir tous les tableaux
-                  </button>
-                  <BilanDetailPanel
-                    bilan={rbData.bilans[rbSelection]}
-                    tableau={rbDetail}
-                    filtres={rbData.filtres_actifs}
-                    justificatifsText={rbJustificatifsText}
-                    onJustificatifsChange={setRbJustificatifsText}
-                  />
-                </div>
-              )
-            )}
-          </div>
         )}
 
         {/* ── Bilan FAC ─────────────────────────────────────────────────────── */}
@@ -2850,7 +2262,7 @@ export default function Statistiques() {
                     onChange={e=>{ setFacFormationId(e.target.value); setFacData(null) }}
                   >
                     <option value="">— Sélectionner —</option>
-                    {(rbData?.formations || formations_liste || []).map(f=>(
+                    {(formations_liste || []).map(f=>(
                       <option key={f.id} value={f.id}>{f.formation}</option>
                     ))}
                   </select>
@@ -3052,199 +2464,6 @@ export default function Statistiques() {
         </div>
 
         </>
-        )}
-
-        </>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* Onglet — Point Journalier par catégorie et formation                 */}
-      {/* ══════════════════════════════════════════════════════════════════════ */}
-      {onglet==='point_journalier' && (
-        <div>
-          {secretariatFilterLocked && (
-            <div style={{
-              marginBottom: '0.75rem', padding: '0.55rem 0.85rem', borderRadius: 8,
-              background: '#e8eef6', border: '1px solid #c5d0e0', color: '#0a2a4d', fontSize: '0.82rem',
-            }}>
-              <i className="bi bi-building me-1"/>
-              Périmètre limité à votre secrétariat : <strong>{secretariatScopeLabel}</strong>
-            </div>
-          )}
-          {/* Filtres + Actualiser + exports (même ligne) */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:'0.5rem',alignItems:'center',marginBottom:'0.75rem'}}>
-            <select className="form-select form-select-sm" style={{width:100}}
-              value={pjAnnee} onChange={e=>{ setPjAnnee(Number(e.target.value)); setPjSelection(null) }}>
-              {[pjAnnee-1, pjAnnee, pjAnnee+1].filter((y,i,a)=>a.indexOf(y)===i).sort().map(y=>(
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <select className="form-select form-select-sm" style={{width:130}}
-              value={pjMois} onChange={e=>{ setPjMois(e.target.value); setPjSelection(null) }}>
-              <option value="">Toute l'année</option>
-              {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m,i)=>(
-                <option key={i+1} value={String(i+1)}>{m}</option>
-              ))}
-            </select>
-            <select className="form-select form-select-sm" style={{width:110}}
-              value={pjCategorie} onChange={e=>{ setPjCategorie(e.target.value); setPjSelection(null) }}>
-              <option value="">Toutes catég.</option>
-              {(pjData?.categories||[]).map(c=>(
-                <option key={c} value={c}>
-                  Cat. {c}
-                  {pjData?.categories_avec_donnees && !pjData.categories_avec_donnees.includes(c) ? ' (sans données)' : ''}
-                </option>
-              ))}
-            </select>
-            <select className="form-select form-select-sm" style={{minWidth:180,maxWidth:260}}
-              value={pjFormationId} onChange={e=>{ setPjFormationId(e.target.value); setPjSelection(null) }}>
-              <option value="">Toutes formations</option>
-              {(pjData?.formations||formations_liste||[]).map(f=>(
-                <option key={f.id} value={f.id}>{f.formation}</option>
-              ))}
-            </select>
-            <div style={{marginLeft:'auto', display:'flex', gap:'0.4rem', alignItems:'center', flexWrap:'nowrap'}}>
-              <button className="btn btn-sm btn-outline-secondary" onClick={fetchPointJournalier} disabled={loadingPj}>
-                <i className="bi bi-arrow-clockwise me-1"/>Actualiser
-              </button>
-              {PJ_EXPORT_FORMATS.map(({ fmt, icon, label, col }) => (
-                <button
-                  key={fmt}
-                  className="btn btn-sm"
-                  disabled={!!exportingPj || loadingPj || !pjData?.tableaux?.length}
-                  style={{ background: col, color: '#fff', border: 'none', minWidth: 88, opacity: (exportingPj || loadingPj) ? 0.65 : 1 }}
-                  onClick={() => downloadPointJournalier(fmt)}
-                  title={`Exporter la sélection filtrée (${label})`}
-                >
-                  {exportingPj === fmt ? (
-                    <span className="spinner-border spinner-border-sm"/>
-                  ) : (
-                    <><i className={`bi ${icon} me-1`}/>{label}</>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <AuditeursNotoiresKpiStrip data={auditeursNotoires}/>
-
-          {loadingPj ? (
-            <div style={{display:'flex',alignItems:'center',gap:'0.5rem',color:'#64748b',padding:'2rem'}}>
-              <div className="spinner"/>Chargement de tous les tableaux…
-            </div>
-          ) : !pjData?.tableaux?.length ? (
-            <div style={{ background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-              <Empty label="Aucun point journalier pour cette période"/>
-              {pjError && (
-                <p style={{ margin: '0.75rem 0 0', fontSize: '0.82rem', color: '#C62828' }}>{pjError}</p>
-              )}
-              <div style={{ margin: '1rem auto 0', maxWidth: 480, fontSize: '0.78rem', color: '#64748b', textAlign: 'left', background: '#f8fafc', borderRadius: 8, padding: '0.75rem 1rem', border: '1px solid #e2e8f0' }}>
-                <p style={{ margin: '0 0 0.5rem', fontWeight: 700, color: '#475569' }}>Filtres actifs</p>
-                <ul style={{ margin: 0, paddingLeft: '1.1rem', lineHeight: 1.6 }}>
-                  <li>Année : <b>{pjAnnee}</b></li>
-                  <li>Mois : <b>{pjMois ? ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][Number(pjMois)] : 'Toute l\'année'}</b></li>
-                  <li>Catégorie : <b>{pjCategorie || 'Toutes'}</b></li>
-                  <li>Formation : <b>{pjFormationId ? (pjData?.formations?.find(f => String(f.id) === pjFormationId)?.formation || pjFormationId) : 'Toutes'}</b></li>
-                  {secretariatId && <li>Secrétariat : filtre global actif</li>}
-                </ul>
-                {pjData?.mois_avec_donnees?.length > 0 && (
-                  <p style={{ margin: '0.65rem 0 0', fontSize: '0.76rem' }}>
-                    Mois avec données en {pjAnnee} :{' '}
-                    <b>{pjData.mois_avec_donnees.map(m => ['','Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'][m]).join(', ')}</b>
-                  </p>
-                )}
-                <p style={{ margin: '0.65rem 0 0', fontSize: '0.76rem' }}>
-                  Essayez <b>Toute l&apos;année</b>, une autre catégorie, ou vérifiez que des séances et pointages existent pour la période (import Excel / badgeage).
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div style={{display:'grid',gridTemplateColumns:'minmax(220px,280px) 1fr',gap:'1rem',alignItems:'start'}}>
-              {/* Liste des tableaux */}
-              <div style={{background:'#fff',borderRadius:10,boxShadow:'0 1px 4px rgba(0,0,0,0.07)',overflow:'hidden',maxHeight:'70vh',overflowY:'auto'}}>
-                <div style={{padding:'0.65rem 0.85rem',background:'#f8fafc',borderBottom:'1px solid #e2e8f0',fontSize:'0.78rem',color:'#64748b',fontWeight:600}}>
-                  {pjData.total_tableaux} tableau(x) — {pjAnnee}
-                </div>
-                <button
-                  type="button"
-                  onClick={()=>{ setPjSelection(null); setPjDetail(null) }}
-                  style={{
-                    display:'block', width:'100%', textAlign:'left', border:'none', cursor:'pointer',
-                    padding:'0.55rem 0.85rem', fontSize:'0.78rem', fontWeight:700,
-                    background: pjSelection === null ? '#e0f2fe' : '#fff',
-                    borderBottom:'2px solid #e2e8f0', color: pjSelection === null ? '#0369a1' : '#475569',
-                  }}
-                >
-                  <i className="bi bi-grid-3x3-gap me-1"/>
-                  Tous les tableaux ({pjAllTableaux.length || pjData.total_tableaux})
-                </button>
-                {pjData.tableaux.map((tb,i)=>(
-                  <button key={tb.id || `${tb.formation_id}-${tb.categorie}-${tb.date}`}
-                    onClick={()=>setPjSelection(i)}
-                    style={{
-                      display:'block',width:'100%',textAlign:'left',border:'none',cursor:'pointer',
-                      padding:'0.55rem 0.85rem',fontSize:'0.78rem',
-                      background:pjSelection===i?'#e8eef6':'#fff',
-                      borderBottom:'1px solid #f1f5f9',
-                    }}>
-                    <div style={{fontWeight:700,color:'#1e293b',marginBottom:'0.1rem'}}>
-                      <span style={{background:'#2277C118',color:'#2277C1',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
-                        CAT {tb.categorie}
-                      </span>
-                      {tb.grade && (
-                        <span style={{background:'#EDB13118',color:'#EDB131',borderRadius:4,padding:'0.05rem 0.35rem',marginRight:'0.3rem',fontSize:'0.72rem'}}>
-                          {tb.grade}
-                        </span>
-                      )}
-                      {tb.date_fr}
-                    </div>
-                    <div style={{color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                      {tb.formation}
-                    </div>
-                    <div style={{color:'#94a3b8',fontSize:'0.72rem',marginTop:'0.1rem'}}>
-                      Prés. jour : {(tb.taux_presence_jour * 100).toFixed(1)}%
-                      {' · '}Matin {tb.matin_horaire || tb.matin?.horaire || '—'} / Soir {tb.soir_horaire || tb.soir?.horaire || '—'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {pjSelection === null ? (
-                loadingPj && !pjAllTableaux.length ? (
-                  <TabSpinner label="Chargement de tous les tableaux…"/>
-                ) : (
-                <PointJournalierEnsemblePanel
-                  items={pjAllTableaux}
-                  tableaux={pjData.tableaux}
-                  annee={pjAnnee}
-                  onSelectIndividuel={setPjSelection}
-                />
-                )
-              ) : (
-                loadingPjDetail ? (
-                  <div style={{display:'flex',alignItems:'center',gap:'0.5rem',color:'#64748b',padding:'2rem',background:'#fff',borderRadius:10,boxShadow:'0 1px 4px rgba(0,0,0,0.07)'}}>
-                    <div className="spinner"/>Chargement du tableau…
-                  </div>
-                ) : pjDetail ? (
-                  <div style={{ minWidth: 0 }}>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-secondary mb-2"
-                      onClick={()=>{ setPjSelection(null); setPjDetail(null) }}
-                    >
-                      <i className="bi bi-grid-3x3-gap me-1"/>Voir tous les tableaux
-                    </button>
-                    <PointJournalierTableauCPFAE tb={pjDetail} />
-                  </div>
-                ) : (
-                  <div style={{ background: '#fff', borderRadius: 10, padding: '1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', color: '#64748b', fontSize: '0.85rem' }}>
-                    Impossible de charger le détail de ce tableau. Réessayez ou actualisez la liste.
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
@@ -3356,87 +2575,6 @@ export default function Statistiques() {
         </div>
         )
       })()}
-    </div>
-  )
-}
-
-// ── Point journalier (format CPFAE — voir PointJournalierCPFAE.jsx) ───────────
-
-function PointJournalierEnsemblePanel({ items, tableaux, annee, onSelectIndividuel }) {
-  const selectTableau = (tableauId) => {
-    const idx = (tableaux || []).findIndex(tb => tb.id === tableauId)
-    if (idx >= 0) onSelectIndividuel(idx)
-  }
-
-  if (!items?.length) {
-    return (
-      <div style={{
-        background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-      }}>
-        <Empty label="Aucun tableau à afficher pour cette sélection"/>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{
-      background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-      overflow: 'hidden', minWidth: 0,
-    }}>
-      <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
-        borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
-      }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-grid-3x3-gap me-2" style={{ color: '#EDB131' }}/>
-          {items.length} tableau{items.length > 1 ? 'x' : ''} — Point journalier {annee}
-        </h3>
-        <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-          Vue d&apos;ensemble de tous les points journaliers filtrés.
-          Utilisez le panneau de gauche pour afficher un seul tableau en plein écran.
-        </p>
-      </div>
-      <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem' }}>
-        {items.map((entry, i) => (
-          <div
-            key={entry.tableau_id}
-            id={`pj-tableau-${entry.tableau_id}`}
-            style={{
-              marginBottom: i < items.length - 1 ? '1.75rem' : 0,
-              paddingBottom: i < items.length - 1 ? '1.75rem' : 0,
-              borderBottom: i < items.length - 1 ? '2px dashed #e2e8f0' : 'none',
-            }}
-          >
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-              gap: '0.5rem', marginBottom: '0.65rem', flexWrap: 'wrap',
-            }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e293b' }}>
-                  <span style={{
-                    background: '#EDB13118', color: '#EDB131', borderRadius: 4,
-                    padding: '0.05rem 0.35rem', marginRight: '0.3rem', fontSize: '0.72rem',
-                  }}>CAT {entry.meta?.categorie}</span>
-                  {entry.meta?.date_fr} — {entry.meta?.formation}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Prés. jour : {pjPct(entry.meta?.taux_presence_jour ?? 0)}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-warning"
-                style={{ fontSize: '0.72rem', flexShrink: 0 }}
-                onClick={() => selectTableau(entry.tableau_id)}
-              >
-                <i className="bi bi-arrows-fullscreen me-1"/>Plein écran
-              </button>
-            </div>
-            <PointJournalierTableauCPFAE tb={entry.tableau} />
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -4175,7 +3313,7 @@ function BilanFACPanel({ data, sousOnglet, onChangeSousOnglet, onMetaChange, onE
           </div>
           {onExport && (
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {PJ_EXPORT_FORMATS.map(({ fmt, icon, label, col }) => (
+              {FAC_EXPORT_FORMATS.map(({ fmt, icon, label, col }) => (
                 <button
                   key={`fac-${fmt}`}
                   type="button"
@@ -5234,265 +4372,3 @@ function SecretariatDetailPanel({ row, detail }) {
   )
 }
 
-function BilansEnsemblePanel({ items, bilans, filtres, dimension, onSelectIndividuel }) {
-  const dimLabel = RB_DIMENSIONS.find(d => d.id === dimension)?.label || dimension
-
-  const selectBilan = (bilanId) => {
-    const idx = (bilans || []).findIndex(b => b.id === bilanId)
-    if (idx >= 0) onSelectIndividuel(idx)
-  }
-
-  if (!items?.length) {
-    return (
-      <div style={{
-        background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-      }}>
-        <Empty label="Aucun tableau à afficher pour cette sélection"/>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{
-      background: '#fff', borderRadius: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-      overflow: 'hidden', minWidth: 0,
-    }}>
-      <div style={{
-        padding: '0.85rem 1rem', background: 'linear-gradient(135deg, #e8eef6 0%, #d4deec 100%)',
-        borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 2,
-      }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-          <i className="bi bi-grid-3x3-gap me-2" style={{ color: 'var(--navy)' }}/>
-          {items.length} tableau{items.length > 1 ? 'x' : ''} — {dimLabel}
-        </h3>
-        <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-          Vue d&apos;ensemble ({filtres?.annee}{filtres?.periode_label ? ` · ${filtres.periode_label}` : ''}).
-          Utilisez le panneau de gauche pour afficher un seul tableau en plein écran.
-        </p>
-      </div>
-      <div style={{ maxHeight: '62vh', overflowY: 'auto', padding: '1rem' }}>
-        {items.map((entry, i) => (
-          <div
-            key={entry.bilan_id}
-            id={`rb-tableau-${entry.bilan_id}`}
-            style={{
-              marginBottom: i < items.length - 1 ? '1.75rem' : 0,
-              paddingBottom: i < items.length - 1 ? '1.75rem' : 0,
-              borderBottom: i < items.length - 1 ? '2px dashed #e2e8f0' : 'none',
-            }}
-          >
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-              gap: '0.5rem', marginBottom: '0.65rem', flexWrap: 'wrap',
-            }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e293b' }}>
-                  {entry.bilan?.libelle}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{entry.bilan?.sous_titre}</div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-success"
-                style={{ fontSize: '0.72rem', flexShrink: 0 }}
-                onClick={() => selectBilan(entry.bilan_id)}
-              >
-                <i className="bi bi-arrows-fullscreen me-1"/>Plein écran
-              </button>
-            </div>
-            <BilanDetailPanel
-              bilan={entry.bilan}
-              tableau={entry.tableau}
-              filtres={filtres}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function BilanEffectifsModuleTable({ data }) {
-  const thBase = {
-    padding: '0.45rem 0.5rem',
-    border: '1px solid #000',
-    fontWeight: 700,
-    fontSize: '0.72rem',
-    textAlign: 'center',
-    verticalAlign: 'middle',
-    lineHeight: 1.25,
-  }
-  const tdBase = {
-    padding: '0.65rem 0.5rem',
-    border: '1px solid #000',
-    textAlign: 'center',
-    verticalAlign: 'middle',
-    fontSize: '0.85rem',
-  }
-  const Soit = ({ children }) => (
-    <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '0.35rem', lineHeight: 1.35 }}>
-      <span style={{ textDecoration: 'underline' }}>soit</span> {children}
-    </div>
-  )
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <h3 style={{
-        textAlign: 'center', fontWeight: 700, fontSize: '0.88rem',
-        textDecoration: 'underline', textTransform: 'uppercase',
-        margin: '0 0 0.85rem', color: '#1e293b', lineHeight: 1.35,
-      }}>
-        {data.titre}
-      </h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
-        <thead>
-          <tr>
-            <th style={{ ...thBase, background: '#FCE7B4' }} rowSpan={2}>
-              EFFECTIFS<br/>DES AUDITEURS
-            </th>
-            <th style={{ ...thBase, background: '#FCE7B4' }} rowSpan={2}>
-              EFFECTIFS<br/>PRESENTS
-            </th>
-            <th style={{ ...thBase, background: '#D9D9D9' }} colSpan={2}>
-              EFFECTIFS PRESENTS PAR GENRE
-            </th>
-            <th style={{ ...thBase, background: '#77BCE7' }} rowSpan={2}>
-              ABSENTS
-            </th>
-          </tr>
-          <tr>
-            <th style={{ ...thBase, background: '#99CCFF' }}>MASCULIN</th>
-            <th style={{ ...thBase, background: '#FFCCFF' }}>FEMININ</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={tdBase}>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.effectifs_auditeurs)}</div>
-              {(data.masculin_inscrits != null || data.feminin_inscrits != null) && (
-                <Soit>
-                  {fmtNbFR(data.masculin_inscrits ?? 0)} H / {fmtNbFR(data.feminin_inscrits ?? 0)} F inscrits
-                </Soit>
-              )}
-            </td>
-            <td style={tdBase}>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.effectifs_presents)}</div>
-              <Soit>{fmtPctFR(data.pct_presents_total)}% de l&apos;effectif total</Soit>
-            </td>
-            <td style={tdBase}>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.masculin)}</div>
-              <Soit>{fmtPctFR(data.pct_masculin_presents)}% de l&apos;effectif des présents</Soit>
-            </td>
-            <td style={tdBase}>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.feminin)}</div>
-              <Soit>{fmtPctFR(data.pct_feminin_presents)}% de l&apos;effectif des présents</Soit>
-            </td>
-            <td style={tdBase}>
-              <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmtNbFR(data.absents)}</div>
-              <Soit>{fmtPctFR(data.pct_absents_total)}% de l&apos;effectif total</Soit>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function BilanDetailPanel({ bilan, tableau, filtres, justificatifsText, onJustificatifsChange }) {
-  const dimLabel = RB_DIMENSIONS.find(d => d.id === bilan.dimension)?.label || bilan.dimension
-
-  if (['module', 'matiere', 'categorie'].includes(bilan.dimension) && !tableau) {
-    return (
-      <div style={{
-        background: '#fff', borderRadius: 10, padding: '2rem', textAlign: 'center',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
-      }}>
-        <Empty label="Aucune séance comptabilisable sur la période filtrée — aucun tableau d'effectifs."/>
-      </div>
-    )
-  }
-
-  if (bilan.dimension === 'formation' && tableau?.type === 'bilan_periode_formation') {
-    return (
-      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
-        <BilanPeriodeFormationTable
-          data={tableau}
-          justificatifsText={justificatifsText}
-          onJustificatifsChange={onJustificatifsChange}
-        />
-      </div>
-    )
-  }
-
-  if (bilan.dimension === 'module' && tableau?.type === 'effectifs_module') {
-    return (
-      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
-        <BilanEffectifsModuleTable data={tableau} />
-      </div>
-    )
-  }
-
-  if (bilan.dimension === 'matiere' && tableau?.type === 'effectifs_matiere') {
-    return (
-      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
-        {tableau.nb_groupes != null && (
-          <p style={{ margin: '0 0 0.65rem', fontSize: '0.78rem', color: '#64748b' }}>
-            Agrégation de <strong>{tableau.nb_groupes}</strong> groupe{tableau.nb_groupes > 1 ? 's' : ''} —
-            étudiants uniques sur tous les groupes.
-          </p>
-        )}
-        <BilanEffectifsModuleTable data={tableau} />
-      </div>
-    )
-  }
-
-  if (bilan.dimension === 'categorie' && tableau?.type === 'effectifs_categorie') {
-    return (
-      <div style={{ background: '#fff', borderRadius: 10, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', minWidth: 0 }}>
-        <BilanEffectifsModuleTable data={tableau} />
-      </div>
-    )
-  }
-
-  return (
-    <div style={{background:'#fff',borderRadius:10,padding:'1rem',boxShadow:'0 1px 4px rgba(0,0,0,0.07)',minWidth:0}}>
-      <div style={{background:'#1565C0',color:'#fff',textAlign:'center',padding:'0.5rem 0.75rem',borderRadius:8,fontWeight:700,fontSize:'0.82rem',marginBottom:'0.75rem'}}>
-        BILAN — {dimLabel.toUpperCase()}
-      </div>
-      <h4 style={{margin:'0 0 0.35rem',fontWeight:800,color:'#1e293b',fontSize:'1rem'}}>{bilan.libelle}</h4>
-      <p style={{margin:'0 0 0.75rem',fontSize:'0.78rem',color:'#64748b'}}>{bilan.sous_titre}</p>
-
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'0.5rem',marginBottom:'0.85rem'}}>
-        {[
-          ['Période', bilan.periode_label || 'Toutes périodes'],
-          ['Année', bilan.annee],
-          ['Catégorie', bilan.categorie || '—'],
-          bilan.formation ? ['Formation', bilan.formation] : null,
-          bilan.module ? ['Module', bilan.module] : null,
-          bilan.inscrits != null ? ['Inscrits', bilan.inscrits] : null,
-          filtres?.calendrier ? ['Calendrier prév.', filtres.calendrier] : null,
-        ].filter(Boolean).map(([l,v])=>(
-          <div key={l} style={{background:'#f8fafc',borderRadius:8,padding:'0.5rem 0.65rem',border:'1px solid #e2e8f0'}}>
-            <div style={{fontSize:'0.68rem',color:'#94a3b8',fontWeight:600}}>{l}</div>
-            <div style={{fontSize:'0.85rem',fontWeight:700,color:'#1e293b',marginTop:'0.15rem'}}>{v}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{
-        background:'#fffceb', border:'1px dashed #fcdf4d', borderRadius:10,
-        padding:'1.25rem', textAlign:'center',
-      }}>
-        <i className="bi bi-table" style={{fontSize:'2rem',color:'#F5B100',display:'block',marginBottom:'0.5rem'}}/>
-        <p style={{margin:0,fontSize:'0.85rem',fontWeight:700,color:'#92660e'}}>
-          Zone tableau bilan
-        </p>
-        <p style={{margin:'0.35rem 0 0',fontSize:'0.78rem',color:'#64748b',maxWidth:420,marginLeft:'auto',marginRight:'auto'}}>
-          Le modèle INJS pour ce bilan ({dimLabel}) sera intégré ici dès validation du format.
-          Les filtres sélectionnés ci-dessus s&apos;appliqueront au tableau affiché et aux exports Excel, PDF et Word.
-        </p>
-      </div>
-    </div>
-  )
-}

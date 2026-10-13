@@ -220,8 +220,6 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
     def test_finance_allowed_on_finance_exports(self):
         self.client.force_authenticate(user=self.finance)
         urls = [
-            f'/api/exports/formateur/{self.formateur.pk}/pdf/',
-            f'/api/exports/formateur/{self.formateur.pk}/excel/',
             '/api/exports/finance/synthese/pdf/',
             '/api/exports/finance/synthese/excel/',
             '/api/exports/finance/encadrants/pdf/',
@@ -240,7 +238,7 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
 
     def test_direction_allowed_on_finance_exports(self):
         self.client.force_authenticate(user=self.direction)
-        res = self.client.get(f'/api/exports/formateur/{self.formateur.pk}/pdf/')
+        res = self.client.get('/api/exports/finance/synthese/pdf/')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.content.startswith(b'%PDF'))
 
@@ -248,7 +246,6 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
         self.client.force_authenticate(user=self.archive)
         urls = [
             f'/api/exports/formation/{self.formation.pk}/pdf/',
-            f'/api/exports/formateur/{self.formateur.pk}/pdf/',
             '/api/exports/finance/encadrants/pdf/',
         ]
         for url in urls:
@@ -260,7 +257,6 @@ class ExportFinanceAccessTest(ExportFixtureMixin, TestCase):
     def test_secretariat_blocked_on_finance_exports(self):
         self.client.force_authenticate(user=self.secretariat_user)
         urls = [
-            f'/api/exports/formateur/{self.formateur.pk}/pdf/',
             '/api/exports/finance/synthese/pdf/',
         ]
         for url in urls:
@@ -322,15 +318,6 @@ class ExportDataHelpersTest(ExportFixtureMixin, TestCase):
         )
         _, _, _, sortie = _calculer_duree_export(open_pt)
         self.assertEqual(sortie, 'En cours')
-
-    def test_finance_formateur_pdf_contains_formateur_name(self):
-        client = APIClient()
-        client.force_authenticate(user=self.finance)
-        res = client.get(f'/api/exports/formateur/{self.formateur.pk}/pdf/')
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        # Vérification légère du contenu PDF (texte compressé — recherche du nom encodé possible)
-        self.assertTrue(res.content.startswith(b'%PDF'))
-        self.assertGreater(len(res.content), 1000)
 
     def test_finance_synthese_excel_is_valid_workbook(self):
         from openpyxl import load_workbook

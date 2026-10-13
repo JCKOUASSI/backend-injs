@@ -8,7 +8,7 @@ import json
 from django.http import HttpResponse
 
 from .bilans import compute_bilan_fac
-from .bilans_exports import _fmt_nb, _safe_filename, _style_cell, _xlsx_styles
+from .export_commun import _fmt_nb, _safe_filename, _style_cell, _xlsx_styles
 
 
 def _fmt_pct_fac(n):
