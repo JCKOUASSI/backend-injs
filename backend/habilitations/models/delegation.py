@@ -52,6 +52,14 @@ class DelegationHabilitation(models.Model):
         blank=True, related_name='delegations_validees',
     )
     raison_arret = models.TextField(blank=True, default='')
+    # Double approbation : une délégation « sensible » (rôle sensible ou
+    # permission critique) exige deux validateurs distincts, ni le délégant
+    # ni le délégataire. La première validation est enregistrée ici.
+    premiere_validation_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        blank=True, related_name='delegations_premiere_validation',
+    )
+    premiere_validation_le = models.DateTimeField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     # U5 — dernier préavis d'expiration (J-7) envoyé, une seule fois.
@@ -70,6 +78,16 @@ class DelegationHabilitation(models.Model):
 
     def __str__(self):
         return f'{self.delegant_id} → {self.delegataire_id} [{self.statut}]'
+
+    def est_sensible(self):
+        """Vrai si la délégation porte un rôle sensible ou une permission critique."""
+        from .permission import PermissionMetier
+        return (
+            self.roles.filter(sensible=True).exists()
+            or self.permissions.filter(
+                criticite=PermissionMetier.Criticite.CRITIQUE,
+            ).exists()
+        )
 
     def est_active(self, aujourdhui=None):
         aujourdhui = aujourdhui or timezone.localdate()

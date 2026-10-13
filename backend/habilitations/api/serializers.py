@@ -121,4 +121,13 @@ def serialiser_delegation(delegation):
         'perimetres': [
             _perimetre_resume(p) for p in delegation.perimetres.all()
         ],
+        'sensible': delegation.est_sensible(),
+        'premiere_validation_par': (
+            delegation.premiere_validation_par.get_username()
+            if delegation.premiere_validation_par_id else None
+        ),
+        'premiere_validation_le': (
+            delegation.premiere_validation_le.isoformat()
+            if delegation.premiere_validation_le else None
+        ),
     }
