@@ -1,0 +1,955 @@
+
+# PROMPT MAÎTRE — REFONTE COMPLÈTE « UTILISATEURS & ACCÈS »
+## INJS-LMD 2026 — Administration des comptes, rôles, permissions et habilitations
+============================================================
+0. MISSION
+============================================================
+Refondre complètement le module « Utilisateurs & Accès » de
+l'application INJS-LMD 2026 afin d'en faire le centre de gouvernance
+des identités, comptes utilisateurs, rôles, permissions et habilitations
+de l'application.
+OBJECTIF PRINCIPAL :
+Permettre à l'administration INJS de :
+1. gérer efficacement les comptes utilisateurs ;
+2. créer, modifier, activer, suspendre et désactiver les comptes ;
+3. attribuer les rôles de manière contrôlée ;
+4. gérer les permissions ;
+5. comprendre précisément ce que chaque rôle/permission autorise ;
+6. connaître l'impact d'une habilitation sur les différents modules ;
+7. éviter les privilèges excessifs ;
+8. contrôler les accès sensibles ;
+9. tracer toutes les opérations d'administration ;
+10. contrôler périodiquement les habilitations ;
+11. gérer les délégations lorsque le métier les autorise ;
+12. disposer d'une vision claire des accès effectifs d'un utilisateur ;
+13. empêcher qu'une modification d'accès produise un effet métier
+    inattendu ou invisible.
+La refonte doit être STRUCTURELLE, fonctionnelle, UX/UI, backend,
+frontend, API, sécurité, audit et tests.
+NE PAS se limiter à une modification esthétique.
+============================================================
+1. RÈGLE ABSOLUE : AUDITER AVANT DE MODIFIER
+============================================================
+Avant toute modification :
+- auditer le dépôt ;
+- identifier la racine réelle ;
+- lire git status ;
+- identifier HEAD et la branche ;
+- identifier les modifications déjà présentes ;
+- préserver tout travail non commité ;
+- identifier le backend ;
+- identifier le frontend ;
+- identifier les modèles utilisateurs ;
+- identifier les rôles ;
+- identifier les permissions ;
+- identifier les groupes ;
+- identifier les mécanismes RBAC/ABAC éventuellement présents ;
+- identifier les endpoints API ;
+- identifier les écrans actuels ;
+- identifier les menus ;
+- identifier les middlewares ;
+- identifier les décorateurs/permissions DRF ;
+- identifier les contrôles d'accès frontend ;
+- identifier les contrôles d'accès backend ;
+- identifier les journaux/audits ;
+- identifier les délégations ;
+- identifier le provisioning ;
+- identifier les notifications ;
+- identifier les données existantes.
+NE RIEN SUPPRIMER avant d'avoir compris les dépendances.
+NE PAS inventer une architecture déjà existante.
+NE PAS remplacer un mécanisme fonctionnel sans vérifier son utilisation
+dans le reste de l'application.
+============================================================
+2. RÉFÉRENCE UX/UI FOURNIE
+============================================================
+La capture d'écran fournie par l'utilisateur constitue une référence
+fonctionnelle et ergonomique.
+Elle montre notamment une administration structurée autour de :
+- Comptes
+- Nouveau compte
+- Rôles
+- Matrice des permissions
+- Délégations
+- File de provisionnement
+- Opérations en masse
+- Notifications
+- Revue des habilitations
+- Journal
+- Organisation
+Avec un écran « Référentiel des rôles » comprenant notamment :
+- code ;
+- libellé ;
+- domaine ;
+- niveau ;
+- permissions ;
+- disponibilité ;
+- indication visuelle des rôles sensibles.
+REPRENDRE L'IDÉE UX/UI, PAS LE CODE.
+Le design final doit être cohérent avec l'identité visuelle actuelle
+de l'application INJS-LMD :
+- interface professionnelle ;
+- claire ;
+- moderne ;
+- lisible ;
+- responsive ;
+- cohérente avec le dashboard administrateur ;
+- hiérarchie visuelle nette ;
+- actions sensibles clairement signalées ;
+- tableaux exploitables ;
+- filtres/recherche efficaces ;
+- panneaux de détail accessibles ;
+- aucune surcharge inutile.
+============================================================
+3. PÉRIMÈTRE FONCTIONNEL CIBLE
+============================================================
+Le module « Utilisateurs & Accès » doit devenir un véritable centre
+d'administration des habilitations.
+Créer/organiser les sous-modules selon les besoins réellement constatés
+dans le code, avec au minimum les domaines suivants :
+A. Comptes
+B. Rôles
+C. Permissions
+D. Matrice des permissions
+E. Accès effectifs
+F. Délégations
+G. Provisionnement
+H. Opérations en masse
+I. Notifications
+J. Revue des habilitations
+K. Journal d'audit
+L. Organisation / périmètre
+Ne pas créer artificiellement des écrans si une fonctionnalité peut être
+regroupée de manière plus cohérente.
+============================================================
+4. ADMINISTRATION DES COMPTES
+============================================================
+Refondre la gestion des comptes.
+Un administrateur doit pouvoir :
+- rechercher un utilisateur ;
+- filtrer ;
+- consulter sa fiche ;
+- créer un compte ;
+- modifier les informations autorisées ;
+- activer ;
+- suspendre ;
+- désactiver ;
+- réactiver selon les règles ;
+- forcer certaines opérations de sécurité si prévues ;
+- attribuer/retirer un rôle ;
+- consulter les permissions héritées ;
+- consulter les permissions directes ;
+- consulter les accès effectifs ;
+- consulter l'historique des changements ;
+- consulter les dernières activités pertinentes ;
+- voir le statut du compte ;
+- voir son périmètre organisationnel ;
+- voir les modules accessibles ;
+- voir les fonctions sensibles accessibles.
+La fiche utilisateur doit répondre immédiatement à :
+« Que peut faire exactement cet utilisateur dans l'application ? »
+============================================================
+5. FICHE UTILISATEUR — VUE DES ACCÈS EFFECTIFS
+============================================================
+Créer une vue claire des habilitations effectives.
+Pour chaque utilisateur, distinguer :
+- permissions issues des rôles ;
+- permissions directes, si le système les autorise ;
+- permissions héritées ;
+- permissions temporairement déléguées ;
+- permissions refusées ;
+- permissions expirées ;
+- accès résultant du périmètre organisationnel.
+Afficher notamment :
+UTILISATEUR
+→ RÔLES
+→ PERMISSIONS
+→ MODULES
+→ FONCTIONNALITÉS
+→ ACTIONS AUTORISÉES
+Exemple :
+Utilisateur
+  └── INJS_ADMIN
+       ├── Utilisateurs & Accès
+       │    ├── consulter
+       │    ├── créer
+       │    ├── modifier
+       │    └── administrer
+       ├── Scolarité
+       │    ├── consulter
+       │    └── administrer
+       ├── Évaluations
+       │    ├── consulter
+       │    ├── saisir
+       │    └── contrôler
+       └── Présences
+            ├── consulter
+            └── administrer
+Le système doit permettre de distinguer clairement :
+« rôle attribué »
+de
+« droit effectivement utilisable ».
+============================================================
+6. GESTION DES RÔLES
+============================================================
+Refondre le référentiel des rôles.
+Pour chaque rôle afficher :
+- code ;
+- libellé ;
+- description ;
+- domaine ;
+- niveau de sensibilité ;
+- statut ;
+- disponibilité ;
+- nombre de permissions ;
+- nombre d'utilisateurs ;
+- modules impactés ;
+- fonctionnalités sensibles ;
+- date de création ;
+- dernière modification ;
+- origine ;
+- état système/personnalisable si cette distinction existe.
+Un rôle sensible doit être visuellement identifiable.
+Prévoir une fiche détaillée du rôle.
+La fiche doit répondre à :
+« Si j'attribue ce rôle à quelqu'un, que pourra-t-il faire ? »
+============================================================
+7. RÔLES CANONIQUES INJS
+============================================================
+Respecter strictement la gouvernance INJS.
+Les rôles canoniques INJS doivent être clairement identifiés,
+notamment :
+- INJS_ADMIN
+- CHEF_INJS_ADMIN
+Identifier également tous les autres rôles réellement présents dans
+le dépôt.
+IMPORTANT :
+CPFAE_ADMIN ne doit PAS devenir un rôle canonique INJS-LMD.
+S'il existe pour des raisons historiques/compatibilité :
+- le conserver sans destruction ;
+- le signaler comme historique/compatibilité ;
+- ne pas l'utiliser comme rôle métier INJS ;
+- ne pas introduire de logique Sygepcpfae/CPFAE dans les modules INJS.
+Aucune contamination métier INJS-LMD ↔ Sygepcpfae/CPFAE.
+============================================================
+8. PERMISSIONS
+============================================================
+Refondre la gestion des permissions.
+Une permission doit être compréhensible humainement.
+Éviter une simple liste technique de chaînes.
+Présenter idéalement :
+MODULE
+→ RESSOURCE
+→ ACTION
+→ PORTÉE
+Exemple conceptuel :
+Évaluations
+  Ressource : Notes
+  Actions :
+    - consulter
+    - saisir
+    - modifier
+    - contrôler
+    - verrouiller
+    - publier
+Les noms exacts doivent être dérivés du code existant.
+NE PAS inventer des permissions qui ne correspondent à aucune capacité
+réelle du système.
+============================================================
+9. MATRICE DES PERMISSIONS
+============================================================
+Créer une véritable matrice permettant de comprendre :
+ROLE × MODULE × ACTION
+Exemple :
+| Rôle | Module | Consulter | Créer | Modifier | Contrôler | Publier | Administrer |
+|------|--------|-----------|-------|----------|-----------|---------|-------------|
+Ajouter si pertinent :
+- portée ;
+- niveau de sensibilité ;
+- permission héritée ;
+- permission directe ;
+- restriction organisationnelle.
+La matrice doit être :
+- filtrable ;
+- recherchable ;
+- lisible ;
+- exploitable ;
+- exportable si une capacité d'export existe ou est pertinente ;
+- protégée contre les modifications accidentelles.
+============================================================
+10. IMPACT D'UNE PERMISSION
+============================================================
+C'est une exigence MAJEURE.
+Lorsqu'un administrateur consulte une permission, il doit pouvoir
+comprendre son impact.
+Pour chaque permission, rechercher et afficher :
+- module concerné ;
+- fonctionnalités concernées ;
+- routes API concernées ;
+- écrans concernés ;
+- actions concernées ;
+- rôles qui l'utilisent ;
+- utilisateurs qui l'héritent ;
+- niveau de sensibilité ;
+- conséquences potentielles.
+Exemple :
+Permission :
+EVALUATIONS.NOTES.MODIFIER
+Impact :
+- module Évaluations ;
+- Saisie des notes ;
+- modification des notes ;
+- contrôle des notes potentiellement impacté ;
+- utilisateurs héritant de cette permission ;
+- rôles concernés.
+NE PAS afficher un impact inventé.
+L'impact doit être dérivé du code et/ou d'un référentiel technique
+auditable.
+============================================================
+11. IMPACT D'UN RÔLE
+============================================================
+Depuis un rôle, afficher :
+Rôle
+→ Permissions
+→ Modules
+→ Fonctionnalités
+→ Utilisateurs
+→ Actions sensibles
+Permettre de répondre :
+« Que se passe-t-il si je donne ce rôle à cet utilisateur ? »
+Et :
+« Que se passe-t-il si je retire ce rôle ? »
+Si le système ne permet pas de simuler réellement le changement,
+fournir au minimum une vue d'impact avant/après.
+============================================================
+12. IMPACT D'UN UTILISATEUR
+============================================================
+Depuis un utilisateur :
+Utilisateur
+→ rôles
+→ permissions
+→ modules accessibles
+→ fonctionnalités accessibles
+→ actions sensibles
+→ périmètre organisationnel
+→ délégations
+→ exceptions
+→ historique
+Créer une notion d'« accès effectifs ».
+Cette vue est prioritaire.
+============================================================
+13. PORTÉE ORGANISATIONNELLE
+============================================================
+Si le système dispose de structures organisationnelles, identifier
+comment les droits sont limités par :
+- direction ;
+- département ;
+- service ;
+- établissement ;
+- formation ;
+- filière ;
+- promotion ;
+- groupe ;
+- autre périmètre réellement présent.
+Une permission ne doit pas nécessairement signifier :
+« accès à toute l'application ».
+Elle peut signifier :
+« accès à cette fonction dans ce périmètre ».
+Documenter et implémenter ce comportement uniquement s'il correspond
+au modèle réel.
+============================================================
+14. DÉLÉGATIONS
+============================================================
+Auditer puis refondre les délégations.
+Une délégation doit permettre de savoir :
+- qui délègue ;
+- à qui ;
+- quoi ;
+- pourquoi ;
+- périmètre ;
+- date de début ;
+- date de fin ;
+- état ;
+- approbation ;
+- révocation ;
+- historique.
+Les délégations temporaires doivent être automatiquement considérées
+comme expirées à la date prévue.
+Une délégation sensible doit nécessiter les contrôles appropriés.
+============================================================
+15. PROVISIONNEMENT
+============================================================
+Si le mécanisme existe, créer une file de provisionnement claire.
+Afficher :
+- demandeur ;
+- bénéficiaire ;
+- rôle demandé ;
+- permissions résultantes ;
+- justification ;
+- approbateur ;
+- date ;
+- statut ;
+- urgence ;
+- expiration éventuelle.
+États possibles à déterminer dans le code :
+- en attente ;
+- approuvé ;
+- rejeté ;
+- exécuté ;
+- expiré ;
+- annulé.
+NE PAS inventer des états inexistants sans nécessité architecturale.
+============================================================
+16. OPÉRATIONS EN MASSE
+============================================================
+Permettre les opérations de masse uniquement lorsqu'elles sont
+sécurisées.
+Exemples :
+- attribuer un rôle ;
+- retirer un rôle ;
+- activer ;
+- suspendre ;
+- désactiver ;
+- révoquer une délégation.
+OBLIGATOIRE :
+Toute opération de masse sensible doit :
+- afficher le nombre de comptes concernés ;
+- afficher un résumé ;
+- demander confirmation ;
+- afficher l'impact ;
+- produire une trace d'audit ;
+- gérer les erreurs partielles ;
+- ne jamais provoquer une modification silencieuse.
+============================================================
+17. REVUE DES HABILITATIONS
+============================================================
+Créer une fonction de revue périodique des accès.
+Objectif :
+identifier :
+- comptes inactifs ;
+- rôles excessifs ;
+- permissions sensibles ;
+- utilisateurs sans activité ;
+- délégations expirées ;
+- comptes avec trop de privilèges ;
+- rôles attribués sans justification ;
+- comptes orphelins ;
+- anomalies.
+Prévoir un tableau :
+UTILISATEUR | RÔLES | PERMISSIONS SENSIBLES | DERNIÈRE ACTIVITÉ |
+RISQUE | ACTION RECOMMANDÉE
+La revue doit être exploitable par l'administration.
+============================================================
+18. JOURNAL D'AUDIT IMMUTABLE
+============================================================
+La capture de référence montre explicitement :
+« Toute action sur les habilitations est tracée dans un journal
+immuable et horodaté. »
+Respecter ce principe.
+Tracer au minimum :
+- création de compte ;
+- modification de compte ;
+- activation ;
+- suspension ;
+- désactivation ;
+- attribution de rôle ;
+- retrait de rôle ;
+- modification de permission ;
+- délégation ;
+- révocation ;
+- approbation ;
+- rejet ;
+- opération de masse ;
+- changement de périmètre ;
+- changement sensible de configuration.
+Chaque événement doit contenir si disponible :
+- acteur ;
+- cible ;
+- action ;
+- ancienne valeur ;
+- nouvelle valeur ;
+- date/heure ;
+- résultat ;
+- justification ;
+- origine ;
+- adresse/IP ou contexte technique si déjà prévu ;
+- identifiant de corrélation.
+IMPORTANT :
+Le journal d'audit ne doit pas être présenté comme modifiable par
+l'utilisateur.
+============================================================
+19. SÉCURITÉ DES ACTIONS SENSIBLES
+============================================================
+Identifier les actions critiques.
+Exemples :
+- attribuer un rôle administrateur ;
+- retirer le dernier administrateur ;
+- modifier une permission sensible ;
+- désactiver un administrateur ;
+- modifier le périmètre d'un utilisateur ;
+- opération de masse ;
+- délégation privilégiée.
+Pour ces actions :
+- confirmation explicite ;
+- contrôle des droits de l'acteur ;
+- audit ;
+- avertissement ;
+- éventuellement double validation si le système le permet.
+Éviter toute possibilité d'auto-escalade de privilèges.
+Un administrateur ne doit pas pouvoir contourner silencieusement les
+règles de sécurité par le frontend.
+============================================================
+20. BACKEND / API
+============================================================
+Auditer puis refondre les API nécessaires.
+Pour chaque endpoint :
+- méthode ;
+- URL ;
+- authentification ;
+- permission ;
+- objet ;
+- paramètres ;
+- réponse ;
+- erreurs ;
+- audit ;
+- impact.
+Les contrôles de sécurité doivent être réalisés côté backend.
+Le frontend ne doit jamais être la seule barrière d'autorisation.
+Vérifier notamment :
+- filtrage queryset ;
+- permissions DRF ;
+- objets accessibles ;
+- actions ;
+- endpoints sensibles ;
+- opérations bulk ;
+- délégations ;
+- journal.
+Ajouter les tests nécessaires.
+============================================================
+21. FRONTEND
+============================================================
+Refondre les écrans React existants sans casser les autres modules.
+Créer une navigation cohérente :
+Utilisateurs & Accès
+├── Comptes
+├── Nouveau compte
+├── Rôles
+├── Permissions
+├── Matrice des permissions
+├── Délégations
+├── Provisionnement
+├── Opérations en masse
+├── Notifications
+├── Revue des habilitations
+├── Journal
+└── Organisation
+Adapter cette arborescence au système réel.
+Prévoir :
+- recherche ;
+- filtres ;
+- pagination ;
+- tri ;
+- badges d'état ;
+- badges de sensibilité ;
+- panneaux de détail ;
+- confirmation des actions sensibles ;
+- vues d'impact ;
+- feedback utilisateur ;
+- gestion des erreurs API ;
+- états loading/empty/error ;
+- responsive.
+============================================================
+22. DASHBOARD « UTILISATEURS & ACCÈS »
+============================================================
+Créer une vue d'ensemble permettant à l'administrateur de voir :
+- nombre total de comptes ;
+- comptes actifs ;
+- comptes suspendus ;
+- comptes désactivés ;
+- rôles ;
+- permissions ;
+- rôles sensibles ;
+- comptes privilégiés ;
+- délégations actives ;
+- délégations expirant prochainement ;
+- demandes de provisionnement ;
+- anomalies d'habilitation ;
+- dernières actions d'administration.
+Les indicateurs doivent provenir des données réelles.
+============================================================
+23. GESTION DU CYCLE DE VIE DU COMPTE
+============================================================
+Documenter et implémenter si supporté :
+Création
+→ Activation
+→ Utilisation
+→ Modification
+→ Suspension éventuelle
+→ Réactivation
+→ Désactivation
+→ Archivage éventuel
+Distinguer :
+- utilisateur ;
+- compte ;
+- état du compte ;
+- rôle ;
+- permission ;
+- habilitation ;
+- activité.
+Ne pas mélanger ces concepts.
+============================================================
+24. RÈGLES DE NON-RÉGRESSION
+============================================================
+La refonte ne doit pas casser :
+- authentification ;
+- connexion ;
+- récupération d'accès ;
+- RBAC existant ;
+- routes existantes ;
+- API existantes ;
+- dashboard ;
+- modules métiers ;
+- évaluations ;
+- scolarité ;
+- séances ;
+- présences ;
+- résultats ;
+- relevés ;
+- autres fonctionnalités.
+Avant suppression/remplacement d'un ancien mécanisme :
+- rechercher toutes ses références ;
+- analyser ses dépendances ;
+- migrer proprement ;
+- conserver la compatibilité si nécessaire.
+============================================================
+25. SÉPARATION INJS-LMD / CPFAE
+============================================================
+RÈGLE ABSOLUE :
+Le module Utilisateurs & Accès doit rester centré sur INJS-LMD.
+Ne pas introduire :
+- logique métier Sygepcpfae ;
+- modules CPFAE ;
+- rattachements CPFAE ;
+- permissions métier CPFAE ;
+- « point journalier CPFAE » ;
+- formations CPFAE présentées comme formations INJS.
+CPFAE_ADMIN peut exister historiquement pour compatibilité, mais ne doit
+pas être présenté comme rôle canonique INJS-LMD.
+============================================================
+26. TESTS
+============================================================
+Créer/mettre à jour les tests nécessaires.
+Backend :
+- création utilisateur ;
+- modification ;
+- activation ;
+- suspension ;
+- désactivation ;
+- attribution rôle ;
+- retrait rôle ;
+- permissions ;
+- accès effectifs ;
+- délégation ;
+- expiration ;
+- opérations bulk ;
+- audit ;
+- sécurité ;
+- absence d'escalade ;
+- séparation des périmètres.
+Frontend :
+- navigation ;
+- listes ;
+- filtres ;
+- création ;
+- édition ;
+- rôles ;
+- permissions ;
+- matrice ;
+- accès effectifs ;
+- délégations ;
+- audit ;
+- opérations sensibles ;
+- erreurs ;
+- permissions frontend.
+Tests d'intégration :
+Utilisateur
+→ rôle
+→ permission
+→ module
+→ fonctionnalité
+→ action.
+============================================================
+27. SCÉNARIOS DE VALIDATION
+============================================================
+Créer au minimum les scénarios suivants :
+SCÉNARIO 1
+Créer un utilisateur standard et lui attribuer un rôle.
+Vérifier exactement les modules accessibles.
+SCÉNARIO 2
+Attribuer un rôle sensible.
+Vérifier l'avertissement, les droits et l'audit.
+SCÉNARIO 3
+Retirer un rôle.
+Vérifier la disparition des accès correspondants.
+SCÉNARIO 4
+Modifier une permission.
+Vérifier l'impact sur les utilisateurs concernés.
+SCÉNARIO 5
+Créer une délégation temporaire.
+Vérifier son apparition dans les accès effectifs puis son expiration.
+SCÉNARIO 6
+Effectuer une opération de masse.
+Vérifier confirmation + résultat + audit.
+SCÉNARIO 7
+Tenter une opération interdite.
+Vérifier refus backend.
+SCÉNARIO 8
+Consulter le journal.
+Vérifier que toutes les opérations sensibles sont tracées.
+SCÉNARIO 9
+Comparer deux rôles.
+Vérifier les différences de permissions et d'impact.
+SCÉNARIO 10
+Comparer les accès effectifs avant/après une modification.
+============================================================
+28. CONTRÔLE D'IMPACT INTERMODULE
+============================================================
+Exigence fondamentale.
+Identifier tous les modules de l'application réellement protégés par
+les rôles/permissions.
+Construire une cartographie :
+RÔLE
+→ PERMISSION
+→ MODULE
+→ ÉCRAN
+→ ENDPOINT
+→ ACTION
+→ DONNÉES ACCESSIBLES
+Cette cartographie doit permettre à l'administration de comprendre les
+conséquences d'une modification d'habilitation.
+Si cette information n'est actuellement pas centralisée dans le code,
+mettre en place une architecture permettant de la documenter de façon
+fiable plutôt que d'afficher une information statique non vérifiable.
+============================================================
+29. RÉFÉRENTIEL CENTRAL DES HABILITATIONS
+============================================================
+Éviter autant que possible la duplication des règles entre :
+- backend ;
+- frontend ;
+- menus ;
+- boutons ;
+- API ;
+- documentation.
+Définir une source de vérité appropriée pour les permissions.
+Le frontend peut masquer une fonction, mais le backend doit toujours
+valider l'autorisation.
+============================================================
+30. MIGRATION DES DONNÉES EXISTANTES
+============================================================
+Avant toute migration :
+- inventaire ;
+- sauvegarde logique si le projet prévoit cette possibilité ;
+- mapping ;
+- analyse des doublons ;
+- analyse des rôles ;
+- analyse des permissions ;
+- compatibilité.
+NE PAS supprimer brutalement les rôles ou comptes historiques.
+Prévoir une migration réversible lorsque nécessaire.
+============================================================
+31. PERFORMANCE
+============================================================
+Éviter :
+- N+1 ;
+- chargements massifs inutiles ;
+- calcul des permissions utilisateur par requêtes répétitives ;
+- matrices impossibles à charger.
+Optimiser :
+- queryset ;
+- select_related ;
+- prefetch_related ;
+- pagination ;
+- filtres ;
+- agrégations ;
+- cache si réellement pertinent.
+============================================================
+32. RAPPORT D'AUDIT FINAL
+============================================================
+Avant clôture, produire un rapport précis :
+A. État initial
+B. Architecture existante
+C. Problèmes constatés
+D. Architecture cible
+E. Modèles modifiés
+F. API modifiées
+G. Frontend modifié
+H. Permissions
+I. Rôles
+J. Accès effectifs
+K. Délégations
+L. Audit
+M. Migration
+N. Tests
+O. Non-régressions
+P. Écarts restants
+Q. Fichiers modifiés
+R. Git
+Pour chaque fonctionnalité :
+PASS / PARTIEL / NON IMPLÉMENTÉ
+avec preuve.
+============================================================
+33. VALIDATION FINALE OBLIGATOIRE
+============================================================
+Avant de déclarer le chantier terminé :
+- git diff --check ;
+- tests backend ;
+- tests frontend ;
+- tests API ;
+- tests RBAC ;
+- tests permissions ;
+- tests audit ;
+- tests opérations sensibles ;
+- tests non-régression ;
+- vérification des routes ;
+- vérification des menus ;
+- vérification des rôles ;
+- vérification des permissions ;
+- vérification des accès effectifs ;
+- vérification des délégations ;
+- vérification du journal.
+Vérifier particulièrement :
+1. Un utilisateur sans permission ne peut pas accéder à l'API.
+2. Cacher un bouton frontend ne suffit jamais à autoriser une action.
+3. Un rôle sensible est correctement protégé.
+4. Une modification d'habilitation est auditée.
+5. Une opération de masse est contrôlée.
+6. Une délégation expirée ne produit plus d'accès.
+7. Les accès effectifs correspondent réellement aux droits backend.
+8. Les rôles INJS sont distincts des rôles historiques CPFAE.
+9. Aucun module métier INJS n'est contaminé par CPFAE.
+10. Les modules existants continuent de fonctionner.
+============================================================
+34. GIT — RÈGLES IMPÉRATIVES
+============================================================
+Pendant ce chantier :
+INTERDIT :
+- git reset --hard ;
+- git checkout destructif ;
+- git clean destructif ;
+- suppression massive ;
+- force push ;
+- rebase destructif ;
+- écrasement du travail existant.
+Préserver tous les travaux non commis.
+NE PAS faire de commit.
+NE PAS faire de push.
+À la fin, fournir :
+git status --short
+git diff --stat
+git diff --check
+et la liste exacte des fichiers modifiés.
+============================================================
+35. CRITÈRE DE RÉUSSITE
+============================================================
+Le chantier sera considéré comme réussi uniquement si le module
+« Utilisateurs & Accès » permet réellement à l'administration de
+répondre aux questions suivantes :
+1. Qui est cet utilisateur ?
+2. Son compte est-il actif ?
+3. Quels rôles possède-t-il ?
+4. Quelles permissions possède-t-il ?
+5. D'où viennent ces permissions ?
+6. Quels modules peut-il utiliser ?
+7. Quelles fonctionnalités peut-il exécuter ?
+8. Quelles actions sensibles peut-il effectuer ?
+9. Sur quel périmètre ?
+10. Quelles délégations possède-t-il ?
+11. Quand ces droits expirent-ils ?
+12. Qui a attribué ces droits ?
+13. Quand ont-ils été attribués ?
+14. Quel sera l'impact si je retire ce rôle ?
+15. Quel sera l'impact si j'ajoute ce rôle ?
+16. Quels autres utilisateurs seront impactés ?
+17. Quelles opérations sensibles ont été réalisées ?
+18. Qui les a réalisées ?
+19. Existe-t-il une anomalie d'habilitation ?
+20. Comment puis-je prouver l'état actuel des accès ?
+============================================================
+36. ORDRE D'EXÉCUTION
+============================================================
+Exécuter le chantier dans cet ordre :
+PHASE 1 — Audit complet
+PHASE 2 — Cartographie comptes/rôles/permissions
+PHASE 3 — Cartographie des impacts intermodules
+PHASE 4 — Architecture cible
+PHASE 5 — Backend / modèle d'autorisation
+PHASE 6 — API
+PHASE 7 — Frontend
+PHASE 8 — Comptes
+PHASE 9 — Rôles
+PHASE 10 — Permissions
+PHASE 11 — Accès effectifs
+PHASE 12 — Matrice
+PHASE 13 — Délégations
+PHASE 14 — Provisionnement
+PHASE 15 — Opérations en masse
+PHASE 16 — Revue des habilitations
+PHASE 17 — Journal d'audit
+PHASE 18 — Tests
+PHASE 19 — Tests de non-régression
+PHASE 20 — Validation finale
+Ne pas passer à une phase supérieure tant que l'audit nécessaire à cette
+phase n'est pas réalisé.
+============================================================
+37. RÈGLE FINALE
+============================================================
+Ne cherche pas simplement à rendre l'écran « Utilisateurs & Accès »
+plus beau.
+Construis un véritable CENTRE DE GOUVERNANCE DES ACCÈS INJS-LMD.
+Le résultat doit permettre de gérer :
+COMPTES
+    ↓
+RÔLES
+    ↓
+PERMISSIONS
+    ↓
+ACCÈS EFFECTIFS
+    ↓
+MODULES
+    ↓
+FONCTIONNALITÉS
+    ↓
+ACTIONS
+    ↓
+PÉRIMÈTRES
+    ↓
+AUDIT
+avec une traçabilité complète.
+La priorité absolue est la cohérence entre :
+CE QUE L'ADMINISTRATEUR VOIT
+        =
+CE QUE LE FRONTEND AUTORISE
+        =
+CE QUE L'API AUTORISE
+        =
+CE QUE LE BACKEND AUTORISE
+        =
+CE QUE L'UTILISATEUR PEUT RÉELLEMENT FAIRE.
+Commencer maintenant par l'audit du dépôt.
+Ne poser une question que si une décision métier indispensable est
+impossible à déterminer par le code, les tests, les migrations,
+la documentation ou les données existantes.
+Sinon, décider sur la base du dépôt, documenter la décision et poursuivre.
+À la fin : rapport complet, aucune commit, aucun push.
+
+Point particulièrement important
+
+J’ai volontairement placé « Accès effectifs » et « Impact intermodules » au centre de la refonte. C’est ce qui manque généralement aux simples écrans RBAC : avoir une liste de rôles et de permissions ne suffit pas.
+
+Le résultat recherché est plutôt :
+
+Compte → Rôle → Permission → Module → Fonctionnalité → Action → Périmètre → Impact → Audit
+
+Ainsi, avant d’attribuer INJS_ADMIN, par exemple, l’administrateur doit pouvoir comprendre exactement ce que cette attribution va ouvrir, et après l’attribution pouvoir constater les accès réellement effectifs.
+
+La capture montre déjà une bonne base ergonomique avec Comptes / Rôles / Matrice des permissions / Délégations / Provisionnement / Opérations en masse / Revue des habilitations / Journal ; le prompt transforme cette base en une véritable architecture de gouvernance, sans supposer que ces fonctionnalités sont déjà correctement implémentées.
