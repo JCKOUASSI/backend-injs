@@ -252,7 +252,7 @@ export default function Login() {
                   onClick={() => choisirCompte(compte)}
                   disabled={loading}
                   title={`Se connecter en tant que ${compte.nom} (${compte.libelle})`}
-                > 
+                >
                   <span className="login-demo-ligne1">
                     <span className="login-demo-role">{compte.libelle}</span>
                     <span className="login-demo-nom">{compte.nom}</span>

@@ -56,5 +56,3 @@ def _style_cell(cell, styles, fill='td_data', bold=False, align=None):
     cell.alignment = align or styles['align']
     cell.font = styles['font_bold'] if bold else styles['font_hdr']
     cell.fill = styles['fills'].get(fill, styles['fills']['td_data'])
-
-

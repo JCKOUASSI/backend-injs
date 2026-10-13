@@ -4371,4 +4371,3 @@ function SecretariatDetailPanel({ row, detail }) {
     </div>
   )
 }
-
