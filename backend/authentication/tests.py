@@ -137,7 +137,7 @@ class MeProfilePatchTests(TestCase):
             'last_name': 'Durand',
             'email': 'jeanne@example.com',
             'telephone': '0605040302',
-            'organisation': 'CPFAE',
+            'organisation': 'INJS',
             'grade': 'A3',
         }, format='json')
         self.assertEqual(resp.status_code, 200)
@@ -146,7 +146,7 @@ class MeProfilePatchTests(TestCase):
         self.assertEqual(resp.data['email'], 'jeanne@example.com')
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Jeanne')
-        self.assertEqual(self.user.organisation, 'CPFAE')
+        self.assertEqual(self.user.organisation, 'INJS')
 
     def test_patch_matricule_unique_conflict(self):
         other = make_user(username='other_mat', password='pass12345', role='ENCADRANT')
@@ -739,7 +739,7 @@ class BadgeAccountProvisionTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn('data:image', html)
-        self.assertIn('SYGEP-CPFAE', html)
+        self.assertIn('INJS-LMD', html)
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')

@@ -17,7 +17,7 @@ from habilitations.models import (
     PermissionMetier,
     RoleMetier,
 )
-from habilitations.permissions import ExigeDrapeauAdmin
+from habilitations.permissions import ExigeDrapeauAdmin, ExigePermissionParMethode
 from habilitations.services import comptes_admin as service
 from habilitations.services.journalisation import journaliser
 
@@ -45,7 +45,9 @@ def _meta(request):
 # Dérogations (geste borné : proposition et révocation ; instruction U5)
 # ---------------------------------------------------------------------------
 class DerogationListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.derogation.consulter', 'POST': 'administration.derogation.creer'}),
+    ]
 
     def get(self, request):
         qs = (
@@ -100,7 +102,9 @@ class DerogationListCreateView(APIView):
 
 
 class DerogationRevokeView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.derogation.modifier'}),
+    ]
 
     def post(self, request, pk):
         derogation = PermissionAttribuee.objects.filter(pk=pk).first()
@@ -124,7 +128,9 @@ class DerogationRevokeView(APIView):
 # Délégations (geste borné : création bornée, fin anticipée ; re-délégation U5)
 # ---------------------------------------------------------------------------
 class DelegationListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.delegation.consulter', 'POST': 'administration.delegation.creer'}),
+    ]
 
     def get(self, request):
         qs = (
@@ -196,7 +202,9 @@ class DelegationListCreateView(APIView):
 
 
 class DelegationTerminateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.delegation.modifier'}),
+    ]
 
     def post(self, request, pk):
         delegation = DelegationHabilitation.objects.filter(pk=pk).first()
@@ -221,7 +229,9 @@ class DelegationTerminateView(APIView):
 # Opérations en masse : APERÇU SEUL (l'écriture en transaction est U5)
 # ---------------------------------------------------------------------------
 class ImportApercuView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.consulter'}),
+    ]
 
     def post(self, request):
         serializer = SimulationImportSerializer(data=request.data)
@@ -240,7 +250,9 @@ class ImportApercuView(APIView):
 # Revue des habilitations — consultation (campagne signée C5/U7)
 # ---------------------------------------------------------------------------
 class RevueConsultationView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.revue.consulter'}),
+    ]
 
     def get(self, request):
         comptes = (

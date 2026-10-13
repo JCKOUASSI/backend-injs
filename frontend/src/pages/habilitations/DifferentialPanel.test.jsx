@@ -6,8 +6,8 @@ const differential = {
   gagnes: ['evaluations.note.saisir', 'evaluations.qcm.creer', 'scolarite.inscription.creer'],
   perdus: ['finance.engagement.valider'],
   conserves: [],
-  roles_ajoutes: ['SCOLARITE_CPFAE'],
-  roles_retires: ['FINANCE_CPFAE'],
+  roles_ajoutes: ['SCOLARITE_INJS'],
+  roles_retires: ['FINANCE_INJS'],
   avertissements: [],
   total_actuel: 10,
   total_cible: 12,
@@ -19,8 +19,8 @@ describe('DifferentialPanel — règle d\'interface S2', () => {
     expect(screen.getByTestId('differential-panel')).toBeInTheDocument()
     expect(screen.getByText(/Droits gagnés \(3\)/)).toBeInTheDocument()
     expect(screen.getByText(/Droits perdus \(1\)/)).toBeInTheDocument()
-    expect(screen.getByText(/Rôles ajoutés : SCOLARITE_CPFAE/)).toBeInTheDocument()
-    expect(screen.getByText(/Rôles retirés : FINANCE_CPFAE/)).toBeInTheDocument()
+    expect(screen.getByText(/Rôles ajoutés : SCOLARITE_INJS/)).toBeInTheDocument()
+    expect(screen.getByText(/Rôles retirés : FINANCE_INJS/)).toBeInTheDocument()
   })
 
   it('n\'affiche pas de case d\'acquittement quand rien ne change', () => {

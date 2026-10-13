@@ -43,12 +43,12 @@ def _logo_candidates():
     return [
         base_dir / 'static' / 'img' / 'logo-injs.png',
         base_dir.parent / 'frontend' / 'src' / 'assets' / 'logo.png',
-        base_dir / 'static' / 'img' / 'logo-sygepcpfae.png',
+        base_dir / 'static' / 'img' / 'logo-injs.png',
     ]
 
 
 def _logo_data_uri() -> str:
-    """Retourne le logo SYGEP-CPFAE encodé en data URI pour les emails HTML."""
+    """Retourne le logo INJS-LMD encodé en data URI pour les emails HTML."""
     global _LOGO_DATA_URI_CACHE
     if _LOGO_DATA_URI_CACHE is not None:
         return _LOGO_DATA_URI_CACHE
@@ -72,14 +72,14 @@ def _html_logo_block() -> str:
         return ''
     return (
         f"<div style='margin-bottom:14px;'>"
-        f"<img src='{data_uri}' alt='SYGEP-CPFAE' "
+        f"<img src='{data_uri}' alt='INJS-LMD' "
         f"style='width:88px; height:auto; display:inline-block;'>"
         f"</div>"
     )
 
 
 def _html_email_shell(*, title: str, subtitle: str, inner: str) -> str:
-    """Enveloppe HTML commune (charte SYGEP-CPFAE / frontend)."""
+    """Enveloppe HTML commune (charte INJS-LMD / frontend)."""
     logo = _html_logo_block()
     return f"""
 <!DOCTYPE html>
@@ -129,8 +129,8 @@ def send_welcome_email(user, plain_password, *, mobile: bool = False):
     app_url = _app_url()
 
     if mobile:
-        subject = "SYGEP-CPFAE — Vos identifiants application mobile"
-        platform_label = "l'application mobile SYGEP-CPFAE (badge QR)"
+        subject = "INJS-LMD — Vos identifiants application mobile"
+        platform_label = "l'application mobile INJS-LMD (badge QR)"
         usage_hint = (
             "Utilisez ces identifiants pour vous connecter à l'application mobile "
             "et badgez vos présences."
@@ -142,8 +142,8 @@ def send_welcome_email(user, plain_password, *, mobile: bool = False):
             "(Menu → Mon profil → Changer mon mot de passe)."
         )
     else:
-        subject = "Bienvenue sur SYGEP-CPFAE — Vos identifiants de connexion"
-        platform_label = "la plateforme SYGEP-CPFAE"
+        subject = "Bienvenue sur INJS-LMD — Vos identifiants de connexion"
+        platform_label = "la plateforme INJS-LMD"
         usage_hint = "Connectez-vous avec les identifiants ci-dessous."
         login_url_line = f"\nURL de connexion : {app_url}/login\n" if app_url else ''
         cta = _html_cta_button(app_url + '/login', 'Se connecter') if app_url else ''
@@ -167,7 +167,7 @@ Voici vos identifiants de connexion :
 Pour des raisons de sécurité, veuillez changer votre mot de passe dès votre première connexion.
 
 Cordialement,
-L'équipe DFRC — SYGEP-CPFAE
+L'équipe DFRC — INJS-LMD
 """
 
     inner = f"""
@@ -201,12 +201,12 @@ L'équipe DFRC — SYGEP-CPFAE
 
     <p style="margin-top:28px; color:{_TEXT_SECONDARY}; font-size:0.9rem; line-height:1.5;">
       Cordialement,<br>
-      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — SYGEP-CPFAE</strong>
+      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — INJS-LMD</strong>
     </p>
     """
 
     html_message = _html_email_shell(
-        title='SYGEP-CPFAE — DFRC',
+        title='INJS-LMD — DFRC',
         subtitle='Institut National de la Jeunesse et des Sports',
         inner=inner,
     )
@@ -234,7 +234,7 @@ def send_suspect_heartbeat_email(encadrant, personne_nom, personne_numero, forma
     encadrant_nom = encadrant.get_full_name() or encadrant.username
     app_url = _app_url()
 
-    subject = f"[SYGEP-CPFAE] Alerte présence — {personne_nom} hors ligne ({silence_minutes} min)"
+    subject = f"[INJS-LMD] Alerte présence — {personne_nom} hors ligne ({silence_minutes} min)"
 
     message = f"""Bonjour {encadrant_nom},
 
@@ -252,7 +252,7 @@ Son statut est passé à « Hors ligne — suspect ». Veuillez vérifier sa pr�
 {"Tableau de bord : " + app_url if app_url else ""}
 
 Cordialement,
-L'équipe DFRC — SYGEP-CPFAE
+L'équipe DFRC — INJS-LMD
 """
 
     cta = _html_cta_button(app_url, 'Accéder au tableau de bord') if app_url else ''
@@ -296,12 +296,12 @@ L'équipe DFRC — SYGEP-CPFAE
 
     <p style="margin-top:28px; color:{_TEXT_SECONDARY}; font-size:0.9rem; line-height:1.5;">
       Cordialement,<br>
-      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — SYGEP-CPFAE</strong>
+      <strong style="color:{_TEXT_PRIMARY};">L'équipe DFRC — INJS-LMD</strong>
     </p>
     """
 
     html_message = _html_email_shell(
-        title='SYGEP-CPFAE — DFRC',
+        title='INJS-LMD — DFRC',
         subtitle='Alerte de présence',
         inner=inner,
     )

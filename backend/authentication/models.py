@@ -16,12 +16,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         """Rôles canoniques INJS-LMD (12 rôles).
 
-        Lot L4a : `CPFAE_ADMIN` → `INJS_ADMIN` et `CHEF_CPFAE_ADMIN` →
-        `CHEF_INJS_ADMIN`. Ces deux identifiants étaient des vestiges de
-        l'application historique Sygepcpfae ; les libellés affichés étaient
-        déjà en terminologie INJS, seuls les codes portaient CPFAE.
-
-        Lot L4b : plus aucune chaîne CPFAE n'est acceptée ni persistée. Le
+        Seuls les rôles INJS-LMD sont acceptés ni persistés. Le
         verrou est double — `choices` côté applicatif, contrainte CHECK côté
         base (migration `authentication.0024`).
 
@@ -89,10 +84,6 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.role})"
-
-    @property
-    def is_chef_cpfae_admin(self):
-        return self.role == self.Role.CHEF_INJS_ADMIN
 
     @property
     def is_dfrc(self):

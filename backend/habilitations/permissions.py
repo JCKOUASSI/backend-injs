@@ -183,3 +183,51 @@ class ExigeDrapeauAdmin(BasePermission):
             return is_enabled('flag.curp_ui_admin', request.user)
         except Exception:
             return False
+
+
+class ExigePermissionParMethode(BasePermission):
+    """Une permission moteur par méthode HTTP (phase 3, refonte « Utilisateurs & Accès »).
+
+    ``table`` associe une méthode HTTP (``'GET'``, ``'POST'``…) au code de
+    permission moteur à exiger. Méthode absente de la table : la permission
+    s'abstient (la vue, elle, ne traite pas cette méthode et répond 405).
+    Ce n'est qu'une délégation vers :class:`ExigePermission` : mêmes modes
+    OFF / OBSERVATION / APPLICATION, même traçage ``ACCES_REFUSE``.
+    """
+
+    message = "Accès refusé par le moteur d'habilitation."
+
+    def __init__(self, table):
+        self.table = dict(table)
+
+    @classmethod
+    def pour(cls, table):
+        """Fabrique utilisable dans ``permission_classes`` (instanciée par DRF)."""
+        def fabrique():
+            return cls(table)
+        fabrique.__name__ = 'ExigePermissionParMethode'
+        return fabrique
+
+    def _delegue(self, request):
+        code = self.table.get(request.method)
+        if code is None:
+            return None
+        delegue = ExigePermission(code)
+        delegue.message = self.message
+        return delegue
+
+    def has_permission(self, request, view):
+        delegue = self._delegue(request)
+        if delegue is None:
+            return True
+        resultat = delegue.has_permission(request, view)
+        self.message = delegue.message
+        return resultat
+
+    def has_object_permission(self, request, view, obj):
+        delegue = self._delegue(request)
+        if delegue is None:
+            return True
+        resultat = delegue.has_object_permission(request, view, obj)
+        self.message = delegue.message
+        return resultat

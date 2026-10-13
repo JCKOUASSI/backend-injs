@@ -145,6 +145,21 @@ def activer_delegation(delegation, acteur, motif, meta=None):
             f"Une délégation {delegation.get_statut_display().lower()} ne peut être activée.",
             409,
         )
+    # Séparation des responsabilités : ni le délégant ni le délégataire ne
+    # peuvent valider leur propre délégation (anti auto-escalade).
+    if acteur is not None and acteur.pk in {
+        delegation.delegant.user_id, delegation.delegataire.user_id,
+    }:
+        message = 'Une délégation ne peut pas être validée par son délégant ou son délégataire.'
+        meta = meta or {}
+        journaliser(
+            JournalHabilitation.TypeEvenement.ACCES_REFUSE,
+            acteur=acteur, compte=delegation.delegataire, cible=delegation,
+            nouvelle_valeur={'code': 'DELEGATION_AUTO_VALIDATION'},
+            motif=message,
+            adresse_ip=meta.get('ip', ''), agent_utilisateur=meta.get('ua', ''),
+        )
+        raise ErreurConsole('DELEGATION_AUTO_VALIDATION', message, 403)
     controler_delegation(
         delegation.delegant, delegation.delegataire,
         list(delegation.roles.values_list('code', flat=True)),

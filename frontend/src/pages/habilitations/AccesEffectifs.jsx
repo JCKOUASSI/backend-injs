@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { impactUtilisateur, listerComptes, messageErreur } from '@/services/habilitations'
+import { accesEffectifsCompte, impactUtilisateur, listerComptes, messageErreur } from '@/services/habilitations'
 import { EnChargement } from './partages'
 import SensibleBadge from './SensibleBadge'
 import './habilitations.css'
@@ -30,6 +30,23 @@ function NoeudRepliable({ ouvert, onBasculer, id, contenu, enfants }) {
   )
 }
 
+// Libellés des motifs de refus du moteur (codes stables côté backend).
+const LIBELLES_MOTIFS = {
+  COMPTE_INVITE: 'compte en attente d’activation',
+  COMPTE_SUSPENDU: 'compte suspendu',
+  COMPTE_DESACTIVE: 'compte désactivé',
+  COMPTE_VERROUILLE: 'compte verrouillé',
+  COMPTE_EXPIRE: 'compte expiré',
+  COMPTE_EXPIRATION_ATTEINTE: 'date de fin de validité atteinte',
+  PERMISSION_RETIREE: 'permission retirée explicitement',
+  DELEGATION_NON_SIGNEE: 'délégation non signée',
+  DELEGATION_SANS_TITULAIRE_VALIDE: 'délégation sans titulaire valide',
+  CIBLE_HORS_PERIMETRE: 'hors du périmètre attribué',
+  MFA_REQUIS_NON_ACTIF: 'double authentification requise',
+  NIVEAU_INSUFFISANT: 'niveau d’accès insuffisant',
+  MODULE_REQUIS_ABSENT: 'module requis absent',
+}
+
 export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }) {
   const [params] = useSearchParams()
   const userIdInitial = userIdInitialProp || params.get('user') || ''
@@ -39,6 +56,7 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
   const [erreur, setErreur] = useState('')
   const [ouverts, setOuverts] = useState({})
   const [comptes, setComptes] = useState([])
+  const [decision, setDecision] = useState(null)
 
   const analyser = async (cible) => {
     const cibleNettoyee = (cible ?? userId).trim()
@@ -46,10 +64,19 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
     setChargement(true)
     setErreur('')
     try {
-      setDonnees(await impactUtilisateur(cibleNettoyee))
+      const impact = await impactUtilisateur(cibleNettoyee)
+      setDonnees(impact)
       setOuverts({})
+      setDecision(null)
+      // Décision backend : même moteur que l'autorisation réelle.
+      try {
+        if (impact?.compte_id) setDecision(await accesEffectifsCompte(impact.compte_id))
+      } catch {
+        setDecision(null)
+      }
     } catch (e) {
       setDonnees(null)
+      setDecision(null)
       setErreur(messageErreur(e, 'Utilisateur introuvable ou accès refusé.'))
     } finally {
       setChargement(false)
@@ -146,6 +173,36 @@ export default function AccesEffectifs({ userIdInitial: userIdInitialProp = '' }
         </div>
       )}
 
+      {decision && (
+        <div className="hab-carte mb-3" data-testid="acces-decision-backend">
+          <h3 className="h6">
+            Décision backend <span className="hab-muted">(moteur d'autorisation)</span>
+          </h3>
+          <p className="hab-muted mb-2">
+            Statut du compte : <strong>{decision.statut_compte}</strong> ·
+            {' '}{decision.synthese.autorisees} autorisée(s) ·
+            {' '}{decision.synthese.refusees} refusée(s)
+          </p>
+          {decision.roles_hors_periode?.length > 0 && (
+            <p className="hab-muted mb-2" data-testid="acces-roles-hors-periode">
+              Rôles hors période (sans effet) : {decision.roles_hors_periode.map((r) => r.code).join(', ')}
+            </p>
+          )}
+          <ul className="list-unstyled mb-0">
+            {decision.permissions.map((p) => (
+              <li key={p.code} data-testid={`decision-perm-${p.code}`}>
+                <span className={`hab-statut ${p.autorise ? 'hab-statut-ACTIF' : 'hab-statut-SUSPENDU'}`}>
+                  {p.autorise ? 'autorisée' : 'refusée'}
+                </span>{' '}
+                <code>{p.code}</code>
+                {!p.autorise && p.motifs?.length > 0 && (
+                  <span className="hab-muted"> — {p.motifs.map((m) => LIBELLES_MOTIFS[m] ?? m).join(' ; ')}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {donnees && !chargement && <Arbre donnees={donnees} ouverts={ouverts} basculer={basculer} />}
     </section>
   )

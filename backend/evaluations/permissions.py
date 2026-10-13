@@ -3,7 +3,7 @@
 Choix d'implémentation (conformément au contrat B.1 §23) :
 
 * Les **rôles** sont ceux déjà canoniques du projet (12 rôles). Aucun rôle
-  n'est créé, et ``CPFAE_ADMIN`` / ``CHEF_CPFAE_ADMIN`` restent proscrits.
+  n'est créé ; aucun rôle hors INJS-LMD n'est admis.
 * C1 n'ajoute **aucune** entrée au catalogue global
   ``habilitations.referentiel.catalogue_modules`` : modifier ce catalogue
   affecte la matrice de permissions de toutes les applications et relève
