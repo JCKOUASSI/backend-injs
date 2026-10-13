@@ -103,7 +103,7 @@ describe('utils/listFilters — filtres Modules', () => {
 
   it('buildModulesSearchParams ajoute la page et les filtres renseignés', () => {
     const p = buildModulesSearchParams(
-      { statut: 'EN_COURS', search: 'alpha', date_mode: 'all', date: '2026-01-15', grade: 'G2', vague: 'V1', secretariat_type: 'CPFAE', groupe: 'G3' },
+      { statut: 'EN_COURS', search: 'alpha', date_mode: 'all', date: '2026-01-15', grade: 'G2', vague: 'V1', secretariat_type: 'INJS', groupe: 'G3' },
       3,
       'alpha',
     )
@@ -112,7 +112,7 @@ describe('utils/listFilters — filtres Modules', () => {
     expect(p.get('search')).toBe('alpha')
     expect(p.get('grade')).toBe('G2')
     expect(p.get('vague')).toBe('V1')
-    expect(p.get('secretariat_type')).toBe('CPFAE')
+    expect(p.get('secretariat_type')).toBe('INJS')
     expect(p.get('groupe')).toBe('G3')
     expect(p.has('date')).toBe(false) // date ignorée tant que date_mode ≠ « date »
     expect(p.has('date_mode')).toBe(false) // « all » n’est pas émis

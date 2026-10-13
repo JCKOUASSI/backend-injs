@@ -34,7 +34,7 @@ export default function Users() {
   const { user: currentUser } = useAuth()
   const roleContext = currentUser?.role_context || {}
   const roleLabels = roleContext.labels || {}
-  const roleLabel = (role) => String(roleLabels[role] || role).replaceAll('CPFAE', 'INJS')
+  const roleLabel = (role) => String(roleLabels[role] || role)
   const badgeAccountRoles = roleContext.badge_account_roles || ['AUDITEUR', 'FORMATEUR']
   const canManageUsers = Boolean(roleContext.can_mutate_users)
   const creatableRoles = canManageUsers ? (roleContext.manageable_roles || []) : []
@@ -178,8 +178,7 @@ export default function Users() {
         } catch (err) {
           console.error('Suppression utilisateur:', err)
           // §10.14 (corrigé au LOT 37) : le toast d'erreur applique le même
-          // rebranding CPFAE -> INJS que les badges et les alertes des modales.
-          showToast(String(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' })).replaceAll('CPFAE', 'INJS'), 'error')
+          showToast(String(formatApiErrors(err.response?.data, { fallback: 'Erreur lors de la suppression.' })), 'error')
         }
       }
     })
@@ -399,7 +398,7 @@ export default function Users() {
             </div>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {formError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line', fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}>{String(formError).replaceAll('CPFAE', 'INJS')}</div>}
+                {formError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line', fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}>{String(formError)}</div>}
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label">Prénom</label>
@@ -503,7 +502,7 @@ export default function Users() {
             </div>
             <form onSubmit={handleEdit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-                {editError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{String(editError).replaceAll('CPFAE', 'INJS')}</div>}
+                {editError && <div className="alert alert-danger" style={{ whiteSpace: 'pre-line' }}>{String(editError)}</div>}
                 <div className="form-group">
                   <label className="form-label">Rôle</label>
                   <select
