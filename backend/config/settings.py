@@ -303,8 +303,12 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     # Format d'erreur harmonisé (payload DRF préservé + code machine en en-tête).
     'EXCEPTION_HANDLER': 'config.exceptions.unified_exception_handler',
+    # FlexibleJWTAuthentication : JWT standard + voies de secours déjà
+    # contractualisées (en-tête X-JWT-Access, paramètre ?access_token=) pour
+    # les passerelles d'aperçu qui filtrent l'en-tête Authorization. En
+    # production, seul le chemin Bearer est alimenté par le frontend.
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'authentication.auth_classes.FlexibleJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (

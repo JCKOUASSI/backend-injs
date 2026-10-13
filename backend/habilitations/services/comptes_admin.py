@@ -289,8 +289,139 @@ def _resoudre_attribution(ligne):
     return role, niveau, ligne
 
 
-@transaction.atomic
+
+# ---------------------------------------------------------------------------
+# Anti-escalade (phase 2 de la refonte « Utilisateurs & Accès »)
+# ---------------------------------------------------------------------------
+# Le backend est seule autorité : ces contrôles s'exécutent AVANT toute
+# écriture, quel que soit l'appelant (console, import de masse, API).
+
+
+def _rang(utilisateur):
+    """Rang hiérarchique (indice N0..N4) d'un utilisateur ; superuser = N4."""
+    from authentication.capabilities import (
+        NIVEAU_PROVISOIRE_PAR_ROLE, NIVEAUX_ORDRES,
+    )
+    if utilisateur is None:
+        return -1
+    if getattr(utilisateur, 'is_superuser', False):
+        return len(NIVEAUX_ORDRES) - 1
+    niveau = NIVEAU_PROVISOIRE_PAR_ROLE.get(getattr(utilisateur, 'role', ''), 'N0')
+    return NIVEAUX_ORDRES.index(niveau)
+
+
+def _rang_role_legacy(role_legacy):
+    from authentication.capabilities import (
+        NIVEAU_PROVISOIRE_PAR_ROLE, NIVEAUX_ORDRES,
+    )
+    niveau = NIVEAU_PROVISOIRE_PAR_ROLE.get(role_legacy, 'N0')
+    return NIVEAUX_ORDRES.index(niveau)
+
+
+def _refuser_escalade(compte, acteur, code, message, statut, meta, motif):
+    """Trace le refus (hors annulation) puis lève ErreurConsole."""
+    meta = meta or {}
+    journaliser(
+        JournalHabilitation.TypeEvenement.ACCES_REFUSE,
+        acteur=acteur, compte=compte,
+        nouvelle_valeur={'code': code},
+        motif=(motif or message)[:1000],
+        adresse_ip=meta.get('ip', ''), agent_utilisateur=meta.get('ua', ''),
+    )
+    raise ErreurConsole(code, message, statut)
+
+
+def _acteur_reel(acteur):
+    return acteur if (acteur and getattr(acteur, 'is_authenticated', False)) else None
+
+
+def verifier_anti_escalade(compte, acteur, *, lignes_roles=None, canal=None,
+                           transition=None, meta=None):
+    """Garde-fou d'un compte EXISTANT.
+
+    - auto-modification des droits, du canal ou du statut : interdite ;
+    - nouveau rôle sur un compte de rang supérieur au sien : interdit ;
+    - nouveau rôle SENSIBLE sur un compte de rang égal ou supérieur (ou sur
+      soi-même) : interdit en direct, il doit passer par une demande d'accès
+      approuvée par un tiers (file de provisionnement existante).
+    """
+    acteur = _acteur_reel(acteur)
+    if acteur is None or compte is None:
+        return
+    auto = compte.user_id is not None and compte.user_id == acteur.pk
+    actifs = set(compte.attributions.filter(
+        statut=AttributionRole.Statut.ACTIVE).values_list('role__code', flat=True))
+    changement_roles = (
+        lignes_roles is not None
+        and {l['role'] for l in lignes_roles} != actifs
+    )
+    changement_canal = canal is not None and canal != compte.canal
+    if auto and (changement_roles or changement_canal or transition is not None):
+        _refuser_escalade(
+            compte, acteur, 'AUTO_MODIFICATION_INTERDITE',
+            'Un administrateur ne peut pas modifier ses propres droits, son canal '
+            'ou son statut. Un autre administrateur doit intervenir.',
+            403, meta, 'Tentative d’auto-modification refusée.',
+        )
+    if not changement_roles:
+        return
+    nouveaux = {l['role'] for l in lignes_roles} - actifs
+    if not nouveaux:
+        return
+    rang_cible = _rang(compte.user)
+    rang_acteur = _rang(acteur)
+    if rang_cible > rang_acteur:
+        _refuser_escalade(
+            compte, acteur, 'ESCALADE_HIERARCHIQUE',
+            'Attribution refusée : ce compte est d’un rang supérieur au vôtre.',
+            403, meta, 'Élévation hiérarchique refusée.',
+        )
+    sensibles = set(RoleMetier.objects.filter(
+        code__in=nouveaux, sensible=True).values_list('code', flat=True))
+    if sensibles and rang_cible >= rang_acteur:
+        _refuser_escalade(
+            compte, acteur, 'ROLE_SENSIBLE_DEMANDE_REQUISE',
+            'Rôle sensible : attribution directe interdite pour ce compte. '
+            'Déposez une demande d’accès (ATTRIBUTION_ROLE) approuvée par un autre '
+            'administrateur.',
+            403, meta, f'Rôle sensible demandé en direct : {sorted(sensibles)}.',
+        )
+
+
+def verifier_anti_escalade_creation(acteur, payload, meta=None):
+    """Garde-fou d'une CRÉATION de compte (le compte n'existe pas encore)."""
+    acteur = _acteur_reel(acteur)
+    if acteur is None:
+        return
+    role_legacy = (payload.get('identifiants') or {}).get('role_legacy')
+    rang_cible = _rang_role_legacy(role_legacy) if role_legacy else -1
+    rang_acteur = _rang(acteur)
+    if rang_cible > rang_acteur:
+        _refuser_escalade(
+            None, acteur, 'ESCALADE_HIERARCHIQUE',
+            'Création refusée : le rôle d’accès demandé est d’un rang supérieur au vôtre.',
+            403, meta, f'Création de compte au rang supérieur ({role_legacy}).',
+        )
+    codes = {l.get('role') for l in (payload.get('roles') or [])}
+    sensibles = set(RoleMetier.objects.filter(
+        code__in=codes, sensible=True).values_list('code', flat=True))
+    if sensibles and rang_cible >= rang_acteur:
+        _refuser_escalade(
+            None, acteur, 'ROLE_SENSIBLE_DEMANDE_REQUISE',
+            'Rôle sensible : attribution directe interdite à la création. '
+            'Déposez une demande d’accès approuvée par un autre administrateur.',
+            403, meta, f'Rôle sensible à la création : {sorted(sensibles)}.',
+        )
+
+
 def creer_compte(acteur, payload, meta=None):
+    """Garde anti-escalade (avant écriture) puis création transactionnelle."""
+    verifier_anti_escalade_creation(acteur, payload, meta)
+    return _creer_compte_tx(acteur, payload, meta)
+
+
+@transaction.atomic
+def _creer_compte_tx(acteur, payload, meta=None):
     """Crée User + Personne + CompteUtilisateur + attributions.
 
     ``payload`` est validé en amont par le sérialiseur DRF.
@@ -339,8 +470,19 @@ def creer_compte(acteur, payload, meta=None):
     return compte
 
 
-@transaction.atomic
 def modifier_compte(compte, acteur, payload, meta=None):
+    """Garde anti-escalade (avant écriture) puis modification transactionnelle."""
+    verifier_anti_escalade(
+        compte, acteur,
+        lignes_roles=payload.get('roles'),
+        canal=payload.get('canal'),
+        meta=meta,
+    )
+    return _modifier_compte_tx(compte, acteur, payload, meta)
+
+
+@transaction.atomic
+def _modifier_compte_tx(compte, acteur, payload, meta=None):
     """Applique une modification après différentiel accepté.
 
     Exige ``differential_accepte`` vrai dès que des droits changent et un
@@ -462,6 +604,7 @@ def changer_statut(compte, acteur, transition, motif, meta=None):
     if not (motif or '').strip():
         raise ErreurConsole('MOTIF_REQUIS',
                             'Un motif est obligatoire pour changer le statut d’un compte.')
+    verifier_anti_escalade(compte, acteur, transition=transition, meta=meta)
     if not transition_legale(compte.statut, transition):
         journaliser(
             JournalHabilitation.TypeEvenement.TRANSITION_REFUSEE,

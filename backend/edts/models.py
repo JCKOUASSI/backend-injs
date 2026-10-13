@@ -17,7 +17,7 @@ Chaîne canonique INJS-LMD (décision d'architecture validée, 2026-09-28) :
 2026-09-28). Le modèle `scolarite.Groupe` est l'entité qui porte la promotion
 pédagogique : année académique + formation INJS + parcours/spécialité + niveau +
 vague + groupe. Créer une table `Promotion` reviendrait à reproduire
-l'architecture héritée CPFAE/Sygepcpfae, ce que le périmètre INJS interdit. Le
+l'architecture héritée des corpus legacy, ce que le périmètre INJS interdit. Le
 service `edts.services.besoins` expose si besoin une notion **calculée** de
 promotion dérivée du Groupe, sans nouvelle table ni nouvelle clé étrangère.
 """

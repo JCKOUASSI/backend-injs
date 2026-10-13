@@ -263,6 +263,10 @@ export const impactRole = (code) =>
 export const impactUtilisateur = (user_id) =>
   api.get(`${BASE}/impact/utilisateur/${user_id}/`).then((r) => r.data)
 
+// Décision backend par compte (statut, rôles en période, délégations, motifs).
+export const accesEffectifsCompte = (compte_id) =>
+  api.get(`${BASE}/comptes/${compte_id}/acces-effectifs/`).then((r) => r.data)
+
 export const dashboardHabilitations = () =>
   api.get(`${BASE}/dashboard/`).then((r) => r.data)
 

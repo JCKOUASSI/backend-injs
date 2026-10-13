@@ -264,16 +264,14 @@ class ConsoleU4Tests(APITestCase):
         self.assertFalse(compte.user.is_active)
 
     def _creer_admin_curp(self, username):
-        reponse = self.client.post(
-            '/api/habilitations/comptes/',
-            self._creer_payload(username=username, role='ADMIN_SYSTEME',
-                                legacy='ADMIN', niveau='N4',
-                                roles=[{'role': 'ADMIN_SYSTEME', 'niveau': 'N4',
-                                        'sensible_valide': True,
-                                        'motif': 'Administrateur'}]),
-            format='json',
-        )
-        return reponse.data['id']
+        # Amorçage hors console : depuis la phase 2 (anti-escalade), un
+        # administrateur ne peut plus attribuer en direct un rôle sensible à un
+        # compte de rang égal au sien (ROLE_SENSIBLE_DEMANDE_REQUISE). Ce test
+        # porte sur le seuil de deux administrateurs, pas sur la création.
+        from habilitations.tests import _u5_fixtures as fx
+        compte = fx.compte_curp(username, role_code='ADMIN_SYSTEME',
+                                role_legacy='ADMIN', niveau='N4')
+        return compte.pk
 
     def test_14_garde_deux_administrateurs_refuse_le_dernier_retrait(self):
         from habilitations.services.comptes_admin import administrateurs_actifs

@@ -4,7 +4,8 @@ from formations.models import Secretariat
 from formations.views import _resolve_secretariat_from_matricule
 
 
-@override_settings(PUBLIC_QR_SCAN_ENABLED=False)
+# DEBUG=True : évite le manifeste ManifestStaticFilesStorage (collectstatic absent en test).
+@override_settings(PUBLIC_QR_SCAN_ENABLED=False, DEBUG=True)
 class PublicBadgePageDisabledTest(TestCase):
     def test_badge_page_returns_disabled_message(self):
         res = self.client.get('/dashboard/badge/')
@@ -16,7 +17,7 @@ class PublicBadgePageDisabledTest(TestCase):
         self.assertNotContains(res, 'Page de badgeage')
 
 
-@override_settings(PUBLIC_QR_SCAN_ENABLED=True)
+@override_settings(PUBLIC_QR_SCAN_ENABLED=True, DEBUG=True)
 class PublicBadgePageEnabledTest(TestCase):
     def test_badge_page_renders_form(self):
         res = self.client.get('/dashboard/badge/')

@@ -159,7 +159,7 @@ class TestMotifsDeBlocage(TestCase):
         self.assertIsNone(B.duree_canevas_heures())
 
     def test_affectations_hors_perimetre_injs(self):
-        """Un cycle legacy (CPFAE/professorat) n'est pas une formation INJS."""
+        """Un cycle legacy (professorat, hors corpus INJS) n'est pas une formation INJS."""
         legacy = FabriqueLMD(self).creer_base(perimetre='LEGACY', filiere='',
                                              suffixe='-LEG')
         legacy.creer_maquette()

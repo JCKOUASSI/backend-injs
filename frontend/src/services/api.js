@@ -44,6 +44,20 @@ const getAuthHeaders = () => {
   }
 }
 
+/**
+ * Mémorise le refresh renouvelé par le backend (ROTATE_REFRESH_TOKENS=True :
+ * l'ancien jeton est révoqué après usage). En production le refresh vit dans
+ * le cookie HttpOnly et n'est jamais stocké localement (risque R6) ; le
+ * stockage local n'est alimenté qu'en mode fallback d'aperçu (VITE_REFRESH_FALLBACK=1)
+ * ou quand le backend n'a pas posé le cookie (contrat mobile).
+ */
+const _persisterRefreshRenouvele = (data) => {
+  const refreshFallback = import.meta.env.VITE_REFRESH_FALLBACK === '1'
+  if (data.refresh && (refreshFallback || !data.refresh_in_cookie)) {
+    safeLocalStorage.setItem('refresh_token', data.refresh)
+  }
+}
+
 const _doRefreshAccessToken = async () => {
   // 1) Voie privilégiée (risque R6) : refresh dans le cookie HttpOnly.
   //    Le cookie circule en same-site ; en dev cross-origin, le navigateur
@@ -58,6 +72,7 @@ const _doRefreshAccessToken = async () => {
     if (cookieRes.ok) {
       const data = await cookieRes.json()
       safeLocalStorage.setItem('access_token', data.access)
+      _persisterRefreshRenouvele(data)
       return data.access
     }
   } catch {
@@ -75,6 +90,7 @@ const _doRefreshAccessToken = async () => {
   if (!res.ok) throw new Error('Refresh failed')
   const data = await res.json()
   safeLocalStorage.setItem('access_token', data.access)
+  _persisterRefreshRenouvele(data)
   return data.access
 }
 
@@ -116,8 +132,29 @@ const buildUrl = (path, params) => {
   return `${url}${url.includes('?') ? '&' : '?'}${suffix}`
 }
 
+// Aperçu intégré : certaines passerelles suppriment les en-têtes
+// d'authentification (Authorization, X-JWT-Access) — les requêtes arrivent
+// alors « sans informations d'authentification » même avec un jeton valide.
+// FlexibleJWTAuthentication prévoit ce cas : le jeton d'accès peut être passé
+// en paramètre de requête (?access_token=). Double verrou, JAMAIS actif en
+// production ni dans les tests (contrat « absence de fuite de jeton ») :
+//   1. VITE_AUTH_QUERY_FALLBACK=1, posé uniquement dans le .env d'aperçu ;
+//   2. l'onglet doit être servi par un hôte d'aperçu intégré (*.arena.site,
+//      *.e2b.app) — la passerelle qui filtre les en-têtes n'existe pas ailleurs.
+const authQueryFallback = (() => {
+  if (import.meta.env.VITE_AUTH_QUERY_FALLBACK !== '1') return false
+  if (typeof window === 'undefined') return false
+  return /(\.arena\.site|\.e2b\.app)$/.test(window.location.hostname)
+})()
+const avecJetonEnRequete = (urlSansJeton) => {
+  if (!authQueryFallback) return urlSansJeton
+  const token = safeLocalStorage.getItem('access_token')
+  if (!token) return urlSansJeton
+  return `${urlSansJeton}${urlSansJeton.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(token)}`
+}
+
 const request = async (method, path, body, config = {}) => {
-  const url = buildUrl(path, config.params)
+  const urlBase = buildUrl(path, config.params)
   const isFormData = body instanceof FormData
   const headers = {
     ...(!isFormData && body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -131,7 +168,7 @@ const request = async (method, path, body, config = {}) => {
     ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   }
 
-  let res = await fetch(url, init)
+  let res = await fetch(avecJetonEnRequete(urlBase), init)
 
   const isLoginRequest = path === '/auth/login/' || path.startsWith('/auth/login?')
   if (isLoginRequest && res.ok) {
@@ -141,8 +178,11 @@ const request = async (method, path, body, config = {}) => {
   if (res.status === 401 && !isLoginRequest) {
     try {
       const newToken = await refreshAccessToken()
+      // Rejouement authentifié : en-têtes ET paramètre de requête reconstruits
+      // avec le jeton RENOUVELÉ (l'ancien peut être révoqué / filtré).
       init.headers.Authorization = `Bearer ${newToken}`
-      res = await fetch(url, init)
+      init.headers['X-JWT-Access'] = newToken
+      res = await fetch(avecJetonEnRequete(urlBase), init)
     } catch {
       _onSessionExpired()
       throw new Error('Session expired')
@@ -153,13 +193,16 @@ const request = async (method, path, body, config = {}) => {
 }
 
 const getBlob = async (path) => {
-  const url = `${API_BASE_URL}${path}`
+  const urlBase = `${API_BASE_URL}${path}`
   const headers = getAuthHeaders()
-  let res = await fetch(url, { method: 'GET', headers })
+  let res = await fetch(avecJetonEnRequete(urlBase), { method: 'GET', headers })
   if (res.status === 401) {
     try {
       const newToken = await refreshAccessToken()
-      res = await fetch(url, { method: 'GET', headers: { ...headers, Authorization: `Bearer ${newToken}` } })
+      res = await fetch(avecJetonEnRequete(urlBase), {
+        method: 'GET',
+        headers: { ...headers, Authorization: `Bearer ${newToken}`, 'X-JWT-Access': newToken },
+      })
     } catch {
       _onSessionExpired()
       throw new Error('Session expired')

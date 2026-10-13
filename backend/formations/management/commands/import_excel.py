@@ -482,7 +482,7 @@ class Command(BaseCommand):
         c = cat.strip().upper()
         if not c:
             return c
-        # Variantes collées CPFAE uniquement : "FABA" -> "FAB A".
+        # Variantes collées sans espace : "FABA" -> "FAB A".
         # Ne pas découper les codes INJS (SFC, SST, SFO, SAC, SSC…).
         import re as _re
         m = _re.fullmatch(r'(FAB|FAC|FAR)\s*([A-D])', c)
@@ -496,7 +496,7 @@ class Command(BaseCommand):
         return text.casefold()
 
     def _secretariat_type_from_participant(self, raw_categorie='', grade=''):
-        """Clé RefTypeSecretariat pour un étudiant INJS / CPFAE.
+        """Clé RefTypeSecretariat pour un étudiant INJS.
 
         Les libellés pédagogiques (Élève Professeur, Étudiant LMD…) ne sont pas
         des types de secrétariat : on les rattache à SET ou SFC.
@@ -587,7 +587,7 @@ class Command(BaseCommand):
 
     def _resolve_ref_site(self, site_name):
         """
-        Résout un libellé Excel (ex. « CPFAE-AGC ») en instance RefSite.
+        Résout un libellé Excel (ex. « SITE-AGC ») en instance RefSite.
         Crée le site référentiel s'il n'existe pas encore.
         """
         name = self._str(site_name)

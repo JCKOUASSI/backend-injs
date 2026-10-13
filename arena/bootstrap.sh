@@ -29,10 +29,12 @@ from config.settings import *  # noqa: E402,F403
 
 # Keep the preview profile intentionally separate from production settings.
 DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".e2b.app"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".e2b.app", ".arena.site", ".trycloudflare.com"]
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
     *CSRF_TRUSTED_ORIGINS,
     "https://*.e2b.app",
+    "https://*.arena.site",
+    "https://*.trycloudflare.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]))
@@ -51,12 +53,16 @@ CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = False
 X_FRAME_OPTIONS = "DENY"
-DEV_FRAME_ANCESTORS = "'self' https://*.e2b.app http://localhost:3000"
+DEV_FRAME_ANCESTORS = "'self' https://*.e2b.app https://*.arena.site https://*.trycloudflare.com http://localhost:3000"
 
 # bootstrap.sh provisions this disposable account with a random password;
 # AutoLoginApercuMiddleware still checks DEBUG, the admin path, and its flags.
 PREVIEW_AUTOLOGIN_USERNAME = "admin"
-PREVIEW_AUTOLOGIN_ENABLED = True
+# Désactivé volontairement (demande 2026-10-10) : la VRAIE fenêtre de connexion
+# de l'admin Django (/admin/login/) doit s'afficher et accepter admin/admin123.
+# Verrouillé par core/tests/test_garde_fous_permanents.py (lockstep avec
+# arena/settings_sandbox.py — ne jamais régénérer ce bloc à True).
+PREVIEW_AUTOLOGIN_ENABLED = False
 
 MIDDLEWARE = list(MIDDLEWARE)
 MIDDLEWARE.insert(0, "arena.partitioned_cookies.PartitionedCookieMiddleware")

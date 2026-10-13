@@ -1379,16 +1379,6 @@ export const ECRANS = {
     note: 'Source : /api/scolarite/groupes/effectifs/',
   },
 
-  stats_resultats: {
-    id: 'stats_resultats',
-    titre: 'Résultats',
-    fil: 'Statistiques',
-    icone: 'bi-graph-up-arrow',
-    introduction: 'Bilans de résultats publiés par le service statistiques.',
-    endpoint: '/statistiques/bilans/',
-    note: 'Source : /api/statistiques/bilans/',
-  },
-
   stats_finances: {
     id: 'stats_finances',
     type: 'indicateurs',

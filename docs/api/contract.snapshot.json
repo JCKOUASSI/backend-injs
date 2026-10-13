@@ -396,6 +396,242 @@
         "204": null
       }
     },
+    "DELETE /api/v1/auth/users/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/evaluations/questionnaires/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/evaluations/questionnaires/{questionnaire_pk}/questions/{id}/": {
+      "parameters": [
+        "id",
+        "questionnaire_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/formateurs/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/participants/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/batiments/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/categories/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/grades/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/modules/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/salles/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/sites/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/types-secretariat/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/ref/vagues/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{formation_pk}/modules/{module_pk}/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{formation_pk}/modules/{module_pk}/formateurs/{formateur_id}/remove/": {
+      "parameters": [
+        "formateur_id",
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/colonnes/{colonne_pk}/": {
+      "parameters": [
+        "colonne_pk",
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{formation_pk}/modules/{module_pk}/participants/{participant_id}/remove/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk",
+        "participant_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{formation_pk}/sessions/{session_pk}/delete/": {
+      "parameters": [
+        "formation_pk",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{id}/formateurs/{formateur_id}/remove/": {
+      "parameters": [
+        "formateur_id",
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/formations/{id}/participants/{participant_id}/remove/": {
+      "parameters": [
+        "id",
+        "participant_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/presences/devices/{device_id}/unbind/": {
+      "parameters": [
+        "device_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
+    "DELETE /api/v1/statistiques/rapports/{rapport_id}/": {
+      "parameters": [
+        "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "204": null
+      }
+    },
     "GET /api/administrations/courriers/": {
       "parameters": [],
       "request_keys": null,
@@ -799,6 +1035,83 @@
         }
       }
     },
+    "GET /api/dashboard/admissions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/enseignant/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/etudiant/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/examens/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/finances/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/jurys/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/logistique/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/overview/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/pedagogie/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/presences/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/dashboard/scolarite/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/devices/": {
       "parameters": [],
       "request_keys": null,
@@ -871,6 +1184,84 @@
       }
     },
     "GET /api/edts/emplois/{id}/grille/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/audit/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/availability/rooms/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/availability/teachers/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/constraints/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/items/{id}/move/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/slots/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/versions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/{id}/audit/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/{id}/grille/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/edts/lmd/{id}/result/": {
       "parameters": [
         "id"
       ],
@@ -955,6 +1346,544 @@
         "200": null
       }
     },
+    "GET /api/evaluations-academiques/epreuves/{id}/presences/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "epreuve": null,
+            "evaluation_participant": null,
+            "heure_arrivee": null,
+            "heure_depart": null,
+            "id": null,
+            "motif": null,
+            "observation": null,
+            "saisi_le": null,
+            "saisi_par": null,
+            "statut": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/": {
+      "parameters": [
+        "ecue_id",
+        "session_id",
+        "statut",
+        "type_evaluation_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "affectation_pedagogique": null,
+            "bareme": null,
+            "composants": {
+              "[]": {
+                "actif": null,
+                "bareme": null,
+                "code": null,
+                "evaluation": null,
+                "id": null,
+                "libelle": null,
+                "obligatoire": null,
+                "ordre": null,
+                "poids": null
+              }
+            },
+            "composition_verrouillee": null,
+            "created_at": null,
+            "date_prevue": null,
+            "description": null,
+            "ecue": null,
+            "ecue_code": null,
+            "id": null,
+            "libelle": null,
+            "poids": null,
+            "regle_version": null,
+            "session": null,
+            "statut": null,
+            "type_code": null,
+            "type_evaluation": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "affectation_pedagogique": null,
+          "bareme": null,
+          "composants": {
+            "[]": {
+              "actif": null,
+              "bareme": null,
+              "code": null,
+              "evaluation": null,
+              "id": null,
+              "libelle": null,
+              "obligatoire": null,
+              "ordre": null,
+              "poids": null
+            }
+          },
+          "composition_verrouillee": null,
+          "created_at": null,
+          "date_prevue": null,
+          "description": null,
+          "ecue": null,
+          "ecue_code": null,
+          "id": null,
+          "libelle": null,
+          "poids": null,
+          "regle_version": null,
+          "session": null,
+          "statut": null,
+          "type_code": null,
+          "type_evaluation": null
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/{id}/composants/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "bareme": null,
+            "code": null,
+            "evaluation": null,
+            "id": null,
+            "libelle": null,
+            "obligatoire": null,
+            "ordre": null,
+            "poids": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/{id}/epreuves/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "bareme": null,
+            "date": null,
+            "duree_minutes": null,
+            "enseignant_responsable": null,
+            "evaluation": null,
+            "groupe": null,
+            "heure_debut": null,
+            "heure_fin": null,
+            "id": null,
+            "motif_annulation": null,
+            "salle": null,
+            "salle_nom": null,
+            "statut": null,
+            "surveillants": {
+              "[]": {
+                "epreuve": null,
+                "formateur": null,
+                "formateur_nom": null,
+                "id": null,
+                "role": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/{id}/participants/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "eligible_rattrapage": null,
+            "evaluation": null,
+            "groupe": null,
+            "id": null,
+            "inscription_pedagogique": null,
+            "matricule": null,
+            "motif": null,
+            "nom_affiche": null,
+            "source": null,
+            "statut_participation": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/evaluations/{id}/participants/{participant_pk}/preparation/": {
+      "parameters": [
+        "id",
+        "participant_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "avec_dispense": null,
+          "calculable": null,
+          "complet": null,
+          "composants": {
+            "[]": {
+              "absent": null,
+              "bareme": null,
+              "code": null,
+              "composant_id": null,
+              "libelle": null,
+              "note_id": null,
+              "obligatoire": null,
+              "poids": null,
+              "quotient": null,
+              "statut_note": null,
+              "valeur": null
+            }
+          },
+          "diagnostics": {
+            "[]": {
+              "code": null,
+              "consequence": null,
+              "decision": null,
+              "detail": null,
+              "message": null
+            }
+          },
+          "empreinte": null,
+          "evaluation_id": null,
+          "formule_version": null,
+          "imputation_absence": null,
+          "imputation_absence_decision": null,
+          "moyenne": null,
+          "participant_id": null,
+          "regle_snapshot": null,
+          "schema_version": null,
+          "session_id": null,
+          "statut_participation": null
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/notes/historique/": {
+      "parameters": [
+        "action",
+        "evaluation_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "action": null,
+            "ancienne_valeur": null,
+            "auteur": null,
+            "created_at": null,
+            "grade": null,
+            "id": null,
+            "motif": null,
+            "nouvelle_valeur": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/regles/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "categorie": null,
+            "code": null,
+            "description": null,
+            "id": null,
+            "libelle": null,
+            "source": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/regles/versions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "date_effet": null,
+            "date_fin": null,
+            "id": null,
+            "niveau": null,
+            "parametres": null,
+            "publiee_le": null,
+            "publiee_par": null,
+            "ref_formation": null,
+            "regle": null,
+            "regle_code": null,
+            "semestre": null,
+            "verrouillee": null,
+            "version": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/releves/": {
+      "parameters": [
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "contenu": null,
+            "decision_valeur": null,
+            "genere_le": null,
+            "genere_par": null,
+            "id": null,
+            "inscription": null,
+            "nom_fichier": null,
+            "participant_matricule": null,
+            "session": null,
+            "sha256": null,
+            "verrouillee": null,
+            "version": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/releves/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "contenu": null,
+          "decision_valeur": null,
+          "genere_le": null,
+          "genere_par": null,
+          "id": null,
+          "inscription": null,
+          "nom_fichier": null,
+          "participant_matricule": null,
+          "session": null,
+          "sha256": null,
+          "verrouillee": null,
+          "version": null
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/resultats/ecue/": {
+      "parameters": [
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "avec_dispense": null,
+            "bareme": null,
+            "calcule_le": null,
+            "complet": null,
+            "detail": null,
+            "ecue": null,
+            "empreinte": null,
+            "formule_version": null,
+            "id": null,
+            "imputation_absence": null,
+            "inscription_pedagogique": null,
+            "migration_status": null,
+            "moyenne": null,
+            "moyenne_brute": null,
+            "regle_snapshot": null,
+            "regle_version": null,
+            "session": null,
+            "source": null,
+            "statut": null,
+            "verrouillee": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/resultats/passage/": {
+      "parameters": [
+        "inscription_id",
+        "niveau_id",
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "code": null,
+          "credits_acquis": null,
+          "credits_requis": null,
+          "decision_jury": null,
+          "eligibilite": null,
+          "empreinte": null,
+          "justification": null,
+          "niveau_cible": null,
+          "semestres": {
+            "[]": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/resultats/semestre/": {
+      "parameters": [
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "bareme": null,
+            "calcule_le": null,
+            "compense": null,
+            "credits_acquis": null,
+            "credits_attendus": null,
+            "detail": null,
+            "empreinte": null,
+            "id": null,
+            "inscription": null,
+            "migration_status": null,
+            "moyenne": null,
+            "moyenne_brute": null,
+            "regle_snapshot": null,
+            "regle_version": null,
+            "semestre": null,
+            "session": null,
+            "source": null,
+            "statut": null,
+            "statut_semestre": null,
+            "verrouillee": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/resultats/ue/": {
+      "parameters": [
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "bareme": null,
+            "calcule_le": null,
+            "credits": null,
+            "detail": null,
+            "empreinte": null,
+            "id": null,
+            "inscription": null,
+            "migration_status": null,
+            "moyenne": null,
+            "moyenne_brute": null,
+            "regle_snapshot": null,
+            "regle_version": null,
+            "session": null,
+            "source": null,
+            "statut": null,
+            "statut_ue": null,
+            "ue": null,
+            "verrouillee": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/sessions/": {
+      "parameters": [
+        "annee_id",
+        "niveau_id",
+        "parcours_id",
+        "ref_formation_id",
+        "semestre_id",
+        "statut",
+        "type_session"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "annee_academique": null,
+            "annee_libelle": null,
+            "created_at": null,
+            "date_debut": null,
+            "date_fin": null,
+            "id": null,
+            "libelle": null,
+            "maquette": null,
+            "maquette_version": null,
+            "nb_evaluations": null,
+            "niveau": null,
+            "niveau_code": null,
+            "parcours": null,
+            "ref_formation": null,
+            "regle_version": null,
+            "semestre": null,
+            "session_origine": null,
+            "statut": null,
+            "type_session": null,
+            "verrouillee": null
+          }
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/sessions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "annee_academique": null,
+          "annee_libelle": null,
+          "created_at": null,
+          "date_debut": null,
+          "date_fin": null,
+          "id": null,
+          "libelle": null,
+          "maquette": null,
+          "maquette_version": null,
+          "nb_evaluations": null,
+          "niveau": null,
+          "niveau_code": null,
+          "parcours": null,
+          "ref_formation": null,
+          "regle_version": null,
+          "semestre": null,
+          "session_origine": null,
+          "statut": null,
+          "type_session": null,
+          "verrouillee": null
+        }
+      }
+    },
+    "GET /api/evaluations-academiques/types-evaluation/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "categorie": null,
+            "code": null,
+            "id": null,
+            "libelle": null
+          }
+        }
+      }
+    },
     "GET /api/evaluations/formations/{formation_pk}/decisions/": {
       "parameters": [
         "formation_pk"
@@ -1033,6 +1962,13 @@
         "200": null
       }
     },
+    "GET /api/exports/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/exports/finance/encadrants/excel/": {
       "parameters": [],
       "request_keys": null,
@@ -1056,24 +1992,6 @@
     },
     "GET /api/exports/finance/synthese/pdf/": {
       "parameters": [],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/exports/formateur/{formateur_pk}/excel/": {
-      "parameters": [
-        "formateur_pk"
-      ],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/exports/formateur/{formateur_pk}/pdf/": {
-      "parameters": [
-        "formateur_pk"
-      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -1210,6 +2128,13 @@
       }
     },
     "GET /api/finances-etudiantes/remboursements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/formateurs/list/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -1380,6 +2305,13 @@
       }
     },
     "GET /api/formations/list/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/formations/lmd/formations/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -1948,10 +2880,26 @@
         "200": null
       }
     },
+    "GET /api/habilitations/comptes/{id}/acces-effectifs/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/comptes/{id}/effective-permissions/": {
       "parameters": [
         "id"
       ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/dashboard/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null
@@ -1964,8 +2912,51 @@
         "200": null
       }
     },
+    "GET /api/habilitations/demandes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/demandes/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/habilitations/derogations/": {
       "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/impact/permission/{code}/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/impact/role/{code}/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/impact/utilisateur/{user_id}/": {
+      "parameters": [
+        "user_id"
+      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -2083,7 +3074,8 @@
               "necessite_double_validation": null,
               "necessite_motif": null,
               "portee_maximale": null,
-              "ressource": null
+              "ressource": null,
+              "total_roles": null
             }
           }
         }
@@ -2145,6 +3137,24 @@
         "200": null
       }
     },
+    "GET /api/habilitations/roles/{code}/comparer/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/habilitations/roles/{code}/versions/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/health/": {
       "parameters": [],
       "request_keys": null,
@@ -2160,7 +3170,19 @@
       }
     },
     "GET /api/juries/sessions/": {
-      "parameters": [],
+      "parameters": [
+        "annee_academique",
+        "formation",
+        "maquette",
+        "niveau",
+        "ordering",
+        "page",
+        "parcours",
+        "q",
+        "semestre",
+        "statut",
+        "type_session"
+      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -2175,7 +3197,105 @@
         "200": null
       }
     },
+    "GET /api/juries/sessions/{id}/anomalies/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/juries/sessions/{id}/membres/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/juries/sessions/{id}/pv/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/juries/sessions/{id}/statistiques/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/": {
+      "parameters": [
+        "annee_academique",
+        "formation",
+        "maquette",
+        "niveau",
+        "ordering",
+        "page",
+        "parcours",
+        "q",
+        "semestre",
+        "statut",
+        "type_session"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/{id}/anomalies/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/{id}/membres/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/{id}/pv/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/jurys/sessions/{id}/statistiques/": {
       "parameters": [
         "id"
       ],
@@ -2445,6 +3565,13 @@
       }
     },
     "GET /api/presences/seances-edt/du-jour/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/presences/seances-edt/supervision/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -3184,6 +4311,13 @@
         "200": null
       }
     },
+    "GET /api/scolarite/reinscriptions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/stages/conventions/": {
       "parameters": [],
       "request_keys": null,
@@ -3277,34 +4411,6 @@
       }
     },
     "GET /api/statistiques/bilan-fac/perimetre/": {
-      "parameters": [],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/statistiques/bilans-export/": {
-      "parameters": [],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/statistiques/bilans/": {
-      "parameters": [],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/statistiques/point-journalier-export/": {
-      "parameters": [],
-      "request_keys": null,
-      "responses": {
-        "200": null
-      }
-    },
-    "GET /api/statistiques/point-journalier/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -3444,6 +4550,84 @@
         "200": null
       }
     },
+    "GET /api/timetable/lmd/audit/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/availability/rooms/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/availability/teachers/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/constraints/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/items/{id}/move/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/slots/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/versions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/{id}/audit/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/{id}/grille/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/timetable/lmd/{id}/result/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "GET /api/timetable/publics/": {
       "parameters": [],
       "request_keys": null,
@@ -3452,6 +4636,1913 @@
       }
     },
     "GET /api/timetable/referentiel-enseignants/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/auth/capabilities/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "capacites": null,
+          "hierarchie": {
+            "[]": null
+          },
+          "niveau": null,
+          "niveau_provisoire": null,
+          "perimetres": {
+            "formations": null,
+            "groupes": null,
+            "niveaux": {
+              "[]": null
+            },
+            "secretariats": null
+          },
+          "role": null,
+          "role_context": null,
+          "roles": {
+            "[]": null
+          },
+          "version": null
+        }
+      }
+    },
+    "GET /api/v1/auth/me/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/auth/roles/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/auth/users/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "email": null,
+              "first_name": null,
+              "grade": null,
+              "id": null,
+              "is_active": null,
+              "last_name": null,
+              "matricule": null,
+              "must_change_password": null,
+              "organisation": null,
+              "role": null,
+              "roles": null,
+              "secretariat": null,
+              "secretariat_nom": null,
+              "telephone": null,
+              "username": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/auth/users/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "email": null,
+          "first_name": null,
+          "grade": null,
+          "id": null,
+          "is_active": null,
+          "last_name": null,
+          "matricule": null,
+          "must_change_password": null,
+          "organisation": null,
+          "role": null,
+          "roles": null,
+          "secretariat": null,
+          "secretariat_nom": null,
+          "telephone": null,
+          "username": null
+        }
+      }
+    },
+    "GET /api/v1/core/audit/": {
+      "parameters": [
+        "acteur",
+        "action",
+        "date_debut",
+        "date_fin",
+        "objet",
+        "page",
+        "source"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "acteur": null,
+              "acteur_label": null,
+              "acteur_nom": null,
+              "action": null,
+              "action_libelle": null,
+              "code": null,
+              "detail": null,
+              "horodatage": null,
+              "ip_address": null,
+              "objet_id": null,
+              "objet_libelle": null,
+              "objet_type": null,
+              "source": null,
+              "source_libelle": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/core/audit/{code}/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "acteur": null,
+          "acteur_label": null,
+          "acteur_nom": null,
+          "action": null,
+          "action_libelle": null,
+          "code": null,
+          "detail": null,
+          "horodatage": null,
+          "ip_address": null,
+          "objet_id": null,
+          "objet_libelle": null,
+          "objet_type": null,
+          "source": null,
+          "source_libelle": null
+        }
+      }
+    },
+    "GET /api/v1/dashboard/admissions/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/enseignant/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/etudiant/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/examens/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/finances/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/jurys/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/logistique/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/overview/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/pedagogie/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/presences/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/dashboard/scolarite/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/formations/{formation_pk}/decisions/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/mes-questionnaires/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/modules/{module_pk}/moyennes/": {
+      "parameters": [
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/modules/{module_pk}/resultats/": {
+      "parameters": [
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/questionnaires/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/questionnaires/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/questionnaires/{id}/analyse/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/questionnaires/{id}/export/{fmt}/": {
+      "parameters": [
+        "fmt",
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/evaluations/questionnaires/{id}/resultats/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/finance/encadrants/excel/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/finance/encadrants/pdf/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/finance/synthese/excel/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/finance/synthese/pdf/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/formation/{id}/excel/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/formation/{id}/pdf/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/module/{module_pk}/excel/": {
+      "parameters": [
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/module/{module_pk}/pdf/": {
+      "parameters": [
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/participants/liste-classe/excel/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/participants/liste-classe/pdf/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/session/{session_pk}/excel/": {
+      "parameters": [
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/exports/session/{session_pk}/pdf/": {
+      "parameters": [
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "created_at": null,
+              "formation": null,
+              "id": null,
+              "intitule": null,
+              "module": null,
+              "module_input": null,
+              "modules_list": null,
+              "nb_participants": null,
+              "nb_presents": null,
+              "numero_formation": null,
+              "ref_formation": null,
+              "ref_formation_intitule": null,
+              "updated_at": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/formations/archives/modules/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/archives/stats/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/finance/ajustements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/finance/dashboard/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/finance/encadrants/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/finance/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/finance/settings/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/formateurs/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "created_at": null,
+              "email": null,
+              "id": null,
+              "nb_formations": null,
+              "nom": null,
+              "numero_compte_bancaire": null,
+              "numero_piece_identite": null,
+              "numerobadge": null,
+              "observations": null,
+              "organisation": null,
+              "prenom": null,
+              "secretariats": {
+                "[]": null
+              },
+              "secretariats_noms": null,
+              "specialite": null,
+              "telephone": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/formations/formateurs/finance-report/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/formateurs/list/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/formateurs/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "created_at": null,
+          "email": null,
+          "id": null,
+          "nb_formations": null,
+          "nom": null,
+          "numero_compte_bancaire": null,
+          "numero_piece_identite": null,
+          "numerobadge": null,
+          "observations": null,
+          "organisation": null,
+          "prenom": null,
+          "secretariats": {
+            "[]": null
+          },
+          "secretariats_noms": null,
+          "specialite": null,
+          "telephone": null
+        }
+      }
+    },
+    "GET /api/v1/formations/formateurs/{id}/donnees-sensibles/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/list/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/lmd/formations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/notes/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/participants/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "categorie": null,
+              "created_at": null,
+              "date_naissance": null,
+              "email": null,
+              "grade": null,
+              "grade_groupe": null,
+              "groupe": null,
+              "id": null,
+              "libelle_concours": null,
+              "lieu_naissance": null,
+              "matricule": null,
+              "motif_notoire": null,
+              "nom": null,
+              "prenom": null,
+              "salle": null,
+              "secretariat": null,
+              "secretariat_nom": null,
+              "sexe": null,
+              "site": null,
+              "telephone": null,
+              "telephone2": null,
+              "type_concours": null,
+              "vague": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/formations/participants/list/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/participants/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "categorie": null,
+          "created_at": null,
+          "date_naissance": null,
+          "email": null,
+          "grade": null,
+          "grade_groupe": null,
+          "groupe": null,
+          "id": null,
+          "libelle_concours": null,
+          "lieu_naissance": null,
+          "matricule": null,
+          "motif_notoire": null,
+          "nom": null,
+          "prenom": null,
+          "salle": null,
+          "secretariat": null,
+          "secretariat_nom": null,
+          "sexe": null,
+          "site": null,
+          "telephone": null,
+          "telephone2": null,
+          "type_concours": null,
+          "vague": null
+        }
+      }
+    },
+    "GET /api/v1/formations/participants/{id}/formations/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/batiments/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/categories/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/excel/{kind}/": {
+      "parameters": [
+        "kind"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/formations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/grades/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/modules/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/salles/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/sites/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/types-secretariat/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/ref/vagues/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/referentiels/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/referentiels/gestion/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/secretariats/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "created_at": null,
+              "description": null,
+              "id": null,
+              "membres": null,
+              "nb_formations": null,
+              "nb_modules": null,
+              "nb_participants": null,
+              "nom": null,
+              "numero": null,
+              "responsable": null,
+              "type": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/formations/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "created_at": null,
+          "description": null,
+          "id": null,
+          "membres": null,
+          "nb_formations": null,
+          "nb_modules": null,
+          "nb_participants": null,
+          "nom": null,
+          "numero": null,
+          "responsable": null,
+          "type": null
+        }
+      }
+    },
+    "GET /api/v1/formations/secretariats/{id}/participants/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/stats/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/superviseur/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/superviseur/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/superviseur/{id}/qr/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/archives/cahier/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/full/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/colonnes/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/fiche/pdf/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/fiche/{participant_pk}/pdf/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk",
+        "participant_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/historique/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/modules/{module_pk}/presences/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{formation_pk}/sessions/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "created_at": null,
+          "formateurs": null,
+          "formation": null,
+          "id": null,
+          "intitule": null,
+          "module": null,
+          "module_input": null,
+          "modules": null,
+          "modules_list": null,
+          "nb_participants": null,
+          "nb_presents": null,
+          "numero_formation": null,
+          "participants": null,
+          "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
+          "sessions": null,
+          "updated_at": null
+        }
+      }
+    },
+    "GET /api/v1/formations/{id}/detail/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{id}/formateurs/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{id}/qr-image/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/formations/{id}/sessions/{session_pk}/qr-image/": {
+      "parameters": [
+        "id",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/parametres/": {
+      "parameters": [
+        "ordering",
+        "search"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "can_edit": null,
+            "can_view": null,
+            "categorie": null,
+            "choices_json": null,
+            "cle": null,
+            "cree_le": null,
+            "cree_par_username": null,
+            "description": null,
+            "est_critique": null,
+            "id": null,
+            "libelle": null,
+            "modifiable": null,
+            "modifie_le": null,
+            "modifie_par_username": null,
+            "ordre": null,
+            "type": null,
+            "valeur": null,
+            "valeur_defaut": null
+          }
+        }
+      }
+    },
+    "GET /api/v1/parametres/categories/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "can_edit": null,
+          "can_view": null,
+          "categorie": null,
+          "choices_json": null,
+          "cle": null,
+          "cree_le": null,
+          "cree_par_username": null,
+          "description": null,
+          "est_critique": null,
+          "id": null,
+          "libelle": null,
+          "modifiable": null,
+          "modifie_le": null,
+          "modifie_par_username": null,
+          "ordre": null,
+          "type": null,
+          "valeur": null,
+          "valeur_defaut": null
+        }
+      }
+    },
+    "GET /api/v1/parametres/flags/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "flags": null
+        }
+      }
+    },
+    "GET /api/v1/parametres/types/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "can_edit": null,
+          "can_view": null,
+          "categorie": null,
+          "choices_json": null,
+          "cle": null,
+          "cree_le": null,
+          "cree_par_username": null,
+          "description": null,
+          "est_critique": null,
+          "id": null,
+          "libelle": null,
+          "modifiable": null,
+          "modifie_le": null,
+          "modifie_par_username": null,
+          "ordre": null,
+          "type": null,
+          "valeur": null,
+          "valeur_defaut": null
+        }
+      }
+    },
+    "GET /api/v1/parametres/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "can_edit": null,
+          "can_view": null,
+          "categorie": null,
+          "choices_json": null,
+          "cle": null,
+          "cree_le": null,
+          "cree_par_username": null,
+          "description": null,
+          "est_critique": null,
+          "id": null,
+          "libelle": null,
+          "modifiable": null,
+          "modifie_le": null,
+          "modifie_par_username": null,
+          "ordre": null,
+          "type": null,
+          "valeur": null,
+          "valeur_defaut": null
+        }
+      }
+    },
+    "GET /api/v1/parametres/{id}/historique/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "can_edit": null,
+          "can_view": null,
+          "categorie": null,
+          "choices_json": null,
+          "cle": null,
+          "cree_le": null,
+          "cree_par_username": null,
+          "description": null,
+          "est_critique": null,
+          "id": null,
+          "libelle": null,
+          "modifiable": null,
+          "modifie_le": null,
+          "modifie_par_username": null,
+          "ordre": null,
+          "type": null,
+          "valeur": null,
+          "valeur_defaut": null
+        }
+      }
+    },
+    "GET /api/v1/presences/audit-logs/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/devices/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/formations/{id}/dashboard/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/formations/{id}/presences/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/formations/{token}/offline-data/": {
+      "parameters": [
+        "token"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/me/fiche/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/me/historique/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/mobile/config/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/participant/lookup/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/participant/{id}/fiche-admin/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/participant/{id}/historique/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/participant/{id}/notes-fiche/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/participant/{id}/notes-fiche/export/{fmt}/": {
+      "parameters": [
+        "fmt",
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/presences/seances-edt/du-jour/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/presences/seances-edt/supervision/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/presences/seances-edt/{id}/presences/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/presences/seances-edt/{id}/qr/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/rattrapages/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/rattrapages/modules/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/rattrapages/participants/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/rattrapages/seances/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/scan/check-status/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/scan/offline-data/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/scan/secure/check-status/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/stats/alertes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/stats/notifications/recues/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/presences/stats/taux/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/referentiels/grades-enseignant/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/grades-enseignant/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/journal/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "action": null,
+              "detail": null,
+              "horodatage": null,
+              "id": null,
+              "object_id": null,
+              "utilisateur": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/journal/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "action": null,
+          "detail": null,
+          "horodatage": null,
+          "id": null,
+          "object_id": null,
+          "utilisateur": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/modes-paiement/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/modes-paiement/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-decision/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-decision/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-document/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-document/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-espace-sportif/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-espace-sportif/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-evaluation/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-evaluation/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-frais/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-frais/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-notification/": {
+      "parameters": [
+        "page"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "count": null,
+          "next": null,
+          "previous": null,
+          "results": {
+            "[]": {
+              "actif": null,
+              "annee_academique": null,
+              "archive": null,
+              "code": null,
+              "cree_le": null,
+              "date_activation": null,
+              "date_desactivation": null,
+              "description": null,
+              "id": null,
+              "libelle": null,
+              "modifie_le": null
+            }
+          }
+        }
+      }
+    },
+    "GET /api/v1/referentiels/types-notification/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "GET /api/v1/statistiques/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/alertes/seuils/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/bilan-fac-export/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/bilan-fac/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/bilan-fac/perimetre/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/rapports/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/rapports/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/rapports/{rapport_id}/": {
+      "parameters": [
+        "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/rapports/{rapport_id}/observations/": {
+      "parameters": [
+        "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "GET /api/v1/statistiques/secretariats/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -3646,6 +6737,126 @@
       "request_keys": null,
       "responses": {
         "200": null
+      }
+    },
+    "PATCH /api/evaluations-academiques/evaluations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "affectation_pedagogique": null,
+        "bareme": null,
+        "composants": {
+          "[]": {
+            "actif": null,
+            "bareme": null,
+            "code": null,
+            "evaluation": null,
+            "id": null,
+            "libelle": null,
+            "obligatoire": null,
+            "ordre": null,
+            "poids": null
+          }
+        },
+        "composition_verrouillee": null,
+        "created_at": null,
+        "date_prevue": null,
+        "description": null,
+        "ecue": null,
+        "ecue_code": null,
+        "id": null,
+        "libelle": null,
+        "poids": null,
+        "regle_version": null,
+        "session": null,
+        "statut": null,
+        "type_code": null,
+        "type_evaluation": null
+      },
+      "responses": {
+        "200": {
+          "affectation_pedagogique": null,
+          "bareme": null,
+          "composants": {
+            "[]": {
+              "actif": null,
+              "bareme": null,
+              "code": null,
+              "evaluation": null,
+              "id": null,
+              "libelle": null,
+              "obligatoire": null,
+              "ordre": null,
+              "poids": null
+            }
+          },
+          "composition_verrouillee": null,
+          "created_at": null,
+          "date_prevue": null,
+          "description": null,
+          "ecue": null,
+          "ecue_code": null,
+          "id": null,
+          "libelle": null,
+          "poids": null,
+          "regle_version": null,
+          "session": null,
+          "statut": null,
+          "type_code": null,
+          "type_evaluation": null
+        }
+      }
+    },
+    "PATCH /api/evaluations-academiques/sessions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "annee_academique": null,
+        "annee_libelle": null,
+        "created_at": null,
+        "date_debut": null,
+        "date_fin": null,
+        "id": null,
+        "libelle": null,
+        "maquette": null,
+        "maquette_version": null,
+        "nb_evaluations": null,
+        "niveau": null,
+        "niveau_code": null,
+        "parcours": null,
+        "ref_formation": null,
+        "regle_version": null,
+        "semestre": null,
+        "session_origine": null,
+        "statut": null,
+        "type_session": null,
+        "verrouillee": null
+      },
+      "responses": {
+        "200": {
+          "annee_academique": null,
+          "annee_libelle": null,
+          "created_at": null,
+          "date_debut": null,
+          "date_fin": null,
+          "id": null,
+          "libelle": null,
+          "maquette": null,
+          "maquette_version": null,
+          "nb_evaluations": null,
+          "niveau": null,
+          "niveau_code": null,
+          "parcours": null,
+          "ref_formation": null,
+          "regle_version": null,
+          "semestre": null,
+          "session_origine": null,
+          "statut": null,
+          "type_session": null,
+          "verrouillee": null
+        }
       }
     },
     "PATCH /api/evaluations/decisions/{id}/": {
@@ -3954,6 +7165,13 @@
       }
     },
     "PATCH /api/juries/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/jurys/notifications/": {
       "parameters": [],
       "request_keys": null,
       "responses": {
@@ -4374,6 +7592,621 @@
     "PATCH /api/timetable/emplois/{id}/": {
       "parameters": [
         "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/auth/me/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/auth/users/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "email": null,
+        "first_name": null,
+        "grade": null,
+        "id": null,
+        "is_active": null,
+        "last_name": null,
+        "matricule": null,
+        "organisation": null,
+        "password": null,
+        "role": null,
+        "secretariat": null,
+        "telephone": null,
+        "username": null
+      },
+      "responses": {
+        "200": {
+          "email": null,
+          "first_name": null,
+          "grade": null,
+          "id": null,
+          "is_active": null,
+          "last_name": null,
+          "matricule": null,
+          "organisation": null,
+          "password": null,
+          "role": null,
+          "secretariat": null,
+          "telephone": null,
+          "username": null
+        }
+      }
+    },
+    "PATCH /api/v1/evaluations/decisions/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/evaluations/questionnaires/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/evaluations/questionnaires/{questionnaire_pk}/questions/{id}/": {
+      "parameters": [
+        "id",
+        "questionnaire_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/finance/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/finance/settings/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/formateurs/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "email": null,
+        "id": null,
+        "nb_formations": null,
+        "nom": null,
+        "numero_compte_bancaire": null,
+        "numero_piece_identite": null,
+        "numerobadge": null,
+        "observations": null,
+        "organisation": null,
+        "prenom": null,
+        "secretariats": {
+          "[]": null
+        },
+        "secretariats_noms": null,
+        "specialite": null,
+        "telephone": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "email": null,
+          "id": null,
+          "nb_formations": null,
+          "nom": null,
+          "numero_compte_bancaire": null,
+          "numero_piece_identite": null,
+          "numerobadge": null,
+          "observations": null,
+          "organisation": null,
+          "prenom": null,
+          "secretariats": {
+            "[]": null
+          },
+          "secretariats_noms": null,
+          "specialite": null,
+          "telephone": null
+        }
+      }
+    },
+    "PATCH /api/v1/formations/formateurs/{id}/donnees-sensibles/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/notes/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/participants/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "categorie": null,
+        "created_at": null,
+        "date_naissance": null,
+        "email": null,
+        "grade": null,
+        "grade_groupe": null,
+        "groupe": null,
+        "id": null,
+        "libelle_concours": null,
+        "lieu_naissance": null,
+        "matricule": null,
+        "motif_notoire": null,
+        "nom": null,
+        "prenom": null,
+        "salle": null,
+        "secretariat": null,
+        "secretariat_nom": null,
+        "sexe": null,
+        "site": null,
+        "telephone": null,
+        "telephone2": null,
+        "type_concours": null,
+        "vague": null
+      },
+      "responses": {
+        "200": {
+          "categorie": null,
+          "created_at": null,
+          "date_naissance": null,
+          "email": null,
+          "grade": null,
+          "grade_groupe": null,
+          "groupe": null,
+          "id": null,
+          "libelle_concours": null,
+          "lieu_naissance": null,
+          "matricule": null,
+          "motif_notoire": null,
+          "nom": null,
+          "prenom": null,
+          "salle": null,
+          "secretariat": null,
+          "secretariat_nom": null,
+          "sexe": null,
+          "site": null,
+          "telephone": null,
+          "telephone2": null,
+          "type_concours": null,
+          "vague": null
+        }
+      }
+    },
+    "PATCH /api/v1/formations/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "description": null,
+        "id": null,
+        "membres": null,
+        "nb_formations": null,
+        "nb_modules": null,
+        "nb_participants": null,
+        "nom": null,
+        "numero": null,
+        "responsable": null,
+        "type": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "description": null,
+          "id": null,
+          "membres": null,
+          "nb_formations": null,
+          "nb_modules": null,
+          "nb_participants": null,
+          "nom": null,
+          "numero": null,
+          "responsable": null,
+          "type": null
+        }
+      }
+    },
+    "PATCH /api/v1/formations/{formation_pk}/modules/{module_pk}/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/{formation_pk}/sessions/{session_pk}/update/": {
+      "parameters": [
+        "formation_pk",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "formateurs": null,
+        "formation": null,
+        "id": null,
+        "intitule": null,
+        "module": null,
+        "module_input": null,
+        "modules": null,
+        "modules_list": null,
+        "nb_participants": null,
+        "nb_presents": null,
+        "numero_formation": null,
+        "participants": null,
+        "participants_attendus": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
+        "sessions": null,
+        "updated_at": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "formateurs": null,
+          "formation": null,
+          "id": null,
+          "intitule": null,
+          "module": null,
+          "module_input": null,
+          "modules": null,
+          "modules_list": null,
+          "nb_participants": null,
+          "nb_presents": null,
+          "numero_formation": null,
+          "participants": null,
+          "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
+          "sessions": null,
+          "updated_at": null
+        }
+      }
+    },
+    "PATCH /api/v1/parametres/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "confirmation": null,
+        "motif_modification": null,
+        "valeur": null
+      },
+      "responses": {
+        "200": {
+          "confirmation": null,
+          "motif_modification": null,
+          "valeur": null
+        }
+      }
+    },
+    "PATCH /api/v1/presences/me/fiche/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/presences/stats/notifications/recues/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/referentiels/grades-enseignant/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/modes-paiement/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-decision/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-document/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-espace-sportif/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-evaluation/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-frais/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/referentiels/types-notification/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "PATCH /api/v1/statistiques/rapports/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PATCH /api/v1/statistiques/rapports/{rapport_id}/": {
+      "parameters": [
+        "rapport_id"
       ],
       "request_keys": null,
       "responses": {
@@ -4848,6 +8681,49 @@
         "200": null
       }
     },
+    "POST /api/edts/lmd/generate/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/lmd/items/{id}/cancel/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/lmd/items/{id}/move/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/lmd/{id}/publish/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/edts/lmd/{id}/validate/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/enseignants/affectations/": {
       "parameters": [],
       "request_keys": null,
@@ -4921,6 +8797,382 @@
       "request_keys": null,
       "responses": {
         "200": null
+      }
+    },
+    "POST /api/evaluations-academiques/epreuves/{id}/presences/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "epreuve": null,
+        "evaluation_participant": null,
+        "heure_arrivee": null,
+        "heure_depart": null,
+        "id": null,
+        "motif": null,
+        "observation": null,
+        "saisi_le": null,
+        "saisi_par": null,
+        "statut": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "epreuve": null,
+            "evaluation_participant": null,
+            "heure_arrivee": null,
+            "heure_depart": null,
+            "id": null,
+            "motif": null,
+            "observation": null,
+            "saisi_le": null,
+            "saisi_par": null,
+            "statut": null
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/evaluations/create/": {
+      "parameters": [],
+      "request_keys": {
+        "affectation_pedagogique": null,
+        "bareme": null,
+        "composants": {
+          "[]": {
+            "actif": null,
+            "bareme": null,
+            "code": null,
+            "evaluation": null,
+            "id": null,
+            "libelle": null,
+            "obligatoire": null,
+            "ordre": null,
+            "poids": null
+          }
+        },
+        "composition_verrouillee": null,
+        "created_at": null,
+        "date_prevue": null,
+        "description": null,
+        "ecue": null,
+        "ecue_code": null,
+        "id": null,
+        "libelle": null,
+        "poids": null,
+        "regle_version": null,
+        "session": null,
+        "statut": null,
+        "type_code": null,
+        "type_evaluation": null
+      },
+      "responses": {
+        "201": {
+          "affectation_pedagogique": null,
+          "bareme": null,
+          "composants": {
+            "[]": {
+              "actif": null,
+              "bareme": null,
+              "code": null,
+              "evaluation": null,
+              "id": null,
+              "libelle": null,
+              "obligatoire": null,
+              "ordre": null,
+              "poids": null
+            }
+          },
+          "composition_verrouillee": null,
+          "created_at": null,
+          "date_prevue": null,
+          "description": null,
+          "ecue": null,
+          "ecue_code": null,
+          "id": null,
+          "libelle": null,
+          "poids": null,
+          "regle_version": null,
+          "session": null,
+          "statut": null,
+          "type_code": null,
+          "type_evaluation": null
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/evaluations/{id}/composants/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "bareme": null,
+        "code": null,
+        "evaluation": null,
+        "id": null,
+        "libelle": null,
+        "obligatoire": null,
+        "ordre": null,
+        "poids": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "bareme": null,
+            "code": null,
+            "evaluation": null,
+            "id": null,
+            "libelle": null,
+            "obligatoire": null,
+            "ordre": null,
+            "poids": null
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/evaluations/{id}/epreuves/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "bareme": null,
+        "date": null,
+        "duree_minutes": null,
+        "enseignant_responsable": null,
+        "evaluation": null,
+        "groupe": null,
+        "heure_debut": null,
+        "heure_fin": null,
+        "id": null,
+        "motif_annulation": null,
+        "salle": null,
+        "salle_nom": null,
+        "statut": null,
+        "surveillants": {
+          "[]": {
+            "epreuve": null,
+            "formateur": null,
+            "formateur_nom": null,
+            "id": null,
+            "role": null
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "bareme": null,
+            "date": null,
+            "duree_minutes": null,
+            "enseignant_responsable": null,
+            "evaluation": null,
+            "groupe": null,
+            "heure_debut": null,
+            "heure_fin": null,
+            "id": null,
+            "motif_annulation": null,
+            "salle": null,
+            "salle_nom": null,
+            "statut": null,
+            "surveillants": {
+              "[]": {
+                "epreuve": null,
+                "formateur": null,
+                "formateur_nom": null,
+                "id": null,
+                "role": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/evaluations/{id}/participants/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "eligible_rattrapage": null,
+        "evaluation": null,
+        "groupe": null,
+        "id": null,
+        "inscription_pedagogique": null,
+        "matricule": null,
+        "motif": null,
+        "nom_affiche": null,
+        "source": null,
+        "statut_participation": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "eligible_rattrapage": null,
+            "evaluation": null,
+            "groupe": null,
+            "id": null,
+            "inscription_pedagogique": null,
+            "matricule": null,
+            "motif": null,
+            "nom_affiche": null,
+            "source": null,
+            "statut_participation": null
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/regles/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "categorie": null,
+        "code": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "source": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "categorie": null,
+            "code": null,
+            "description": null,
+            "id": null,
+            "libelle": null,
+            "source": null
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/regles/versions/": {
+      "parameters": [],
+      "request_keys": {
+        "date_effet": null,
+        "date_fin": null,
+        "id": null,
+        "niveau": null,
+        "parametres": null,
+        "publiee_le": null,
+        "publiee_par": null,
+        "ref_formation": null,
+        "regle": null,
+        "regle_code": null,
+        "semestre": null,
+        "verrouillee": null,
+        "version": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "date_effet": null,
+            "date_fin": null,
+            "id": null,
+            "niveau": null,
+            "parametres": null,
+            "publiee_le": null,
+            "publiee_par": null,
+            "ref_formation": null,
+            "regle": null,
+            "regle_code": null,
+            "semestre": null,
+            "verrouillee": null,
+            "version": null
+          }
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/releves/generer/": {
+      "parameters": [
+        "inscription_id",
+        "session_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": {
+          "contenu": null,
+          "decision_valeur": null,
+          "genere_le": null,
+          "genere_par": null,
+          "id": null,
+          "inscription": null,
+          "nom_fichier": null,
+          "participant_matricule": null,
+          "session": null,
+          "sha256": null,
+          "verrouillee": null,
+          "version": null
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/sessions/create/": {
+      "parameters": [],
+      "request_keys": {
+        "annee_academique": null,
+        "annee_libelle": null,
+        "created_at": null,
+        "date_debut": null,
+        "date_fin": null,
+        "id": null,
+        "libelle": null,
+        "maquette": null,
+        "maquette_version": null,
+        "nb_evaluations": null,
+        "niveau": null,
+        "niveau_code": null,
+        "parcours": null,
+        "ref_formation": null,
+        "regle_version": null,
+        "semestre": null,
+        "session_origine": null,
+        "statut": null,
+        "type_session": null,
+        "verrouillee": null
+      },
+      "responses": {
+        "201": {
+          "annee_academique": null,
+          "annee_libelle": null,
+          "created_at": null,
+          "date_debut": null,
+          "date_fin": null,
+          "id": null,
+          "libelle": null,
+          "maquette": null,
+          "maquette_version": null,
+          "nb_evaluations": null,
+          "niveau": null,
+          "niveau_code": null,
+          "parcours": null,
+          "ref_formation": null,
+          "regle_version": null,
+          "semestre": null,
+          "session_origine": null,
+          "statut": null,
+          "type_session": null,
+          "verrouillee": null
+        }
+      }
+    },
+    "POST /api/evaluations-academiques/types-evaluation/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "categorie": null,
+        "code": null,
+        "id": null,
+        "libelle": null
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "actif": null,
+            "categorie": null,
+            "code": null,
+            "id": null,
+            "libelle": null
+          }
+        }
       }
     },
     "POST /api/evaluations/formations/{formation_pk}/decisions/recalculer/": {
@@ -5634,6 +9886,22 @@
         "200": null
       }
     },
+    "POST /api/habilitations/demandes/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/demandes/{id}/action/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/habilitations/derogations/": {
       "parameters": [],
       "request_keys": null,
@@ -5744,8 +10012,39 @@
         "200": null
       }
     },
+    "POST /api/habilitations/roles/{code}/versions/": {
+      "parameters": [
+        "code"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/habilitations/roles/{code}/versions/{numero}/restaurer/": {
+      "parameters": [
+        "code",
+        "numero"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "POST /api/juries/sessions/": {
-      "parameters": [],
+      "parameters": [
+        "annee_academique",
+        "formation",
+        "maquette",
+        "niveau",
+        "ordering",
+        "page",
+        "parcours",
+        "q",
+        "semestre",
+        "statut",
+        "type_session"
+      ],
       "request_keys": null,
       "responses": {
         "200": null
@@ -5770,6 +10069,52 @@
       }
     },
     "POST /api/juries/sessions/{id}/membres/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/jurys/sessions/": {
+      "parameters": [
+        "annee_academique",
+        "formation",
+        "maquette",
+        "niveau",
+        "ordering",
+        "page",
+        "parcours",
+        "q",
+        "semestre",
+        "statut",
+        "type_session"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/jurys/sessions/{id}/action/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/jurys/sessions/{id}/decisions/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/jurys/sessions/{id}/membres/": {
       "parameters": [
         "id"
       ],
@@ -7112,6 +11457,1558 @@
         "200": null
       }
     },
+    "POST /api/timetable/lmd/generate/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/lmd/items/{id}/cancel/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/lmd/items/{id}/move/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/lmd/{id}/publish/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/timetable/lmd/{id}/validate/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/login/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/logout/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/me/change-password/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/mfa/confirm/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/mfa/disable/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/mfa/setup/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/mfa/verify/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/auth/token/refresh/": {
+      "parameters": [],
+      "request_keys": {
+        "access": null,
+        "refresh": null
+      },
+      "responses": {
+        "200": {
+          "access": null,
+          "refresh": null
+        }
+      }
+    },
+    "POST /api/v1/auth/users/": {
+      "parameters": [],
+      "request_keys": {
+        "email": null,
+        "first_name": null,
+        "grade": null,
+        "id": null,
+        "last_name": null,
+        "matricule": null,
+        "organisation": null,
+        "password": null,
+        "role": null,
+        "secretariat": null,
+        "telephone": null,
+        "username": null
+      },
+      "responses": {
+        "201": {
+          "email": null,
+          "first_name": null,
+          "grade": null,
+          "id": null,
+          "last_name": null,
+          "matricule": null,
+          "organisation": null,
+          "password": null,
+          "role": null,
+          "secretariat": null,
+          "telephone": null,
+          "username": null
+        }
+      }
+    },
+    "POST /api/v1/evaluations/formations/{formation_pk}/decisions/recalculer/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/evaluations/modules/{module_pk}/moyennes/recalculer/": {
+      "parameters": [
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/evaluations/questionnaires/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/evaluations/questionnaires/{id}/statut/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/evaluations/questionnaires/{questionnaire_pk}/questions/": {
+      "parameters": [
+        "questionnaire_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/evaluations/soumettre/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/": {
+      "parameters": [],
+      "request_keys": {
+        "created_at": null,
+        "formation": null,
+        "id": null,
+        "intitule": null,
+        "module": null,
+        "module_input": null,
+        "modules_list": null,
+        "nb_participants": null,
+        "nb_presents": null,
+        "numero_formation": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
+        "updated_at": null
+      },
+      "responses": {
+        "201": {
+          "created_at": null,
+          "formation": null,
+          "id": null,
+          "intitule": null,
+          "module": null,
+          "module_input": null,
+          "modules_list": null,
+          "nb_participants": null,
+          "nb_presents": null,
+          "numero_formation": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
+          "updated_at": null
+        }
+      }
+    },
+    "POST /api/v1/formations/finance/ajustements/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/finance/ajustements/{id}/rejeter/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/finance/ajustements/{id}/valider/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/formateurs/": {
+      "parameters": [],
+      "request_keys": {
+        "created_at": null,
+        "email": null,
+        "id": null,
+        "nb_formations": null,
+        "nom": null,
+        "numero_compte_bancaire": null,
+        "numero_piece_identite": null,
+        "numerobadge": null,
+        "observations": null,
+        "organisation": null,
+        "prenom": null,
+        "secretariats": {
+          "[]": null
+        },
+        "secretariats_noms": null,
+        "specialite": null,
+        "telephone": null
+      },
+      "responses": {
+        "201": {
+          "created_at": null,
+          "email": null,
+          "id": null,
+          "nb_formations": null,
+          "nom": null,
+          "numero_compte_bancaire": null,
+          "numero_piece_identite": null,
+          "numerobadge": null,
+          "observations": null,
+          "organisation": null,
+          "prenom": null,
+          "secretariats": {
+            "[]": null
+          },
+          "secretariats_noms": null,
+          "specialite": null,
+          "telephone": null
+        }
+      }
+    },
+    "POST /api/v1/formations/import-excel/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/participants/": {
+      "parameters": [],
+      "request_keys": {
+        "categorie": null,
+        "created_at": null,
+        "date_naissance": null,
+        "email": null,
+        "grade": null,
+        "grade_groupe": null,
+        "groupe": null,
+        "id": null,
+        "libelle_concours": null,
+        "lieu_naissance": null,
+        "matricule": null,
+        "motif_notoire": null,
+        "nom": null,
+        "prenom": null,
+        "salle": null,
+        "secretariat": null,
+        "secretariat_nom": null,
+        "sexe": null,
+        "site": null,
+        "telephone": null,
+        "telephone2": null,
+        "type_concours": null,
+        "vague": null
+      },
+      "responses": {
+        "201": {
+          "categorie": null,
+          "created_at": null,
+          "date_naissance": null,
+          "email": null,
+          "grade": null,
+          "grade_groupe": null,
+          "groupe": null,
+          "id": null,
+          "libelle_concours": null,
+          "lieu_naissance": null,
+          "matricule": null,
+          "motif_notoire": null,
+          "nom": null,
+          "prenom": null,
+          "salle": null,
+          "secretariat": null,
+          "secretariat_nom": null,
+          "sexe": null,
+          "site": null,
+          "telephone": null,
+          "telephone2": null,
+          "type_concours": null,
+          "vague": null
+        }
+      }
+    },
+    "POST /api/v1/formations/ref/batiments/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/categories/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/excel/{kind}/": {
+      "parameters": [
+        "kind"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/formations/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/grades/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/modules/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/salles/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/sites/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/types-secretariat/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/ref/vagues/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/secretariats/": {
+      "parameters": [],
+      "request_keys": {
+        "created_at": null,
+        "description": null,
+        "id": null,
+        "membres": null,
+        "nb_formations": null,
+        "nb_modules": null,
+        "nb_participants": null,
+        "nom": null,
+        "numero": null,
+        "responsable": null,
+        "type": null
+      },
+      "responses": {
+        "201": {
+          "created_at": null,
+          "description": null,
+          "id": null,
+          "membres": null,
+          "nb_formations": null,
+          "nb_modules": null,
+          "nb_participants": null,
+          "nom": null,
+          "numero": null,
+          "responsable": null,
+          "type": null
+        }
+      }
+    },
+    "POST /api/v1/formations/superviseur/{id}/generate-qr/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/generate-qr/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/": {
+      "parameters": [
+        "formation_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/archive/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/assign-superviseur/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/formateurs/add/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/bulk/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/colonnes/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/notes/workflow/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/participants/add/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/sessions/new/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/modules/{module_pk}/unarchive/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/sessions/{session_pk}/generate-qr/": {
+      "parameters": [
+        "formation_pk",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/sessions/{session_pk}/start/": {
+      "parameters": [
+        "formation_pk",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{formation_pk}/sessions/{session_pk}/stop/": {
+      "parameters": [
+        "formation_pk",
+        "session_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{id}/assign-superviseur/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{id}/formateurs/add/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/formations/{id}/participants/add/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/formations/{id}/close-session/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/formations/{id}/force-badgeage-auditeurs-bulk/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/formations/{id}/force-pointage/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/presences/seances-edt/scan/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/presences/seances-edt/{id}/autoclore/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/presences/seances-edt/{id}/emargement/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/presences/seances-edt/{id}/qr/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/rattrapages/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/rattrapages/{id}/annuler/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/rattrapages/{id}/generer-presence/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/scan/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/scan/secure/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/scan/secure/heartbeat/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/presences/stats/notifications/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/referentiels/grades-enseignant/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/grades-enseignant/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/grades-enseignant/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/modes-paiement/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/modes-paiement/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/modes-paiement/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-decision/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-decision/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-decision/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-document/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-document/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-document/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-espace-sportif/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-espace-sportif/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-espace-sportif/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-evaluation/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-evaluation/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-evaluation/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-frais/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-frais/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-frais/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-notification/": {
+      "parameters": [],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "201": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-notification/{id}/archiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/referentiels/types-notification/{id}/reactiver/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "actif": null,
+        "annee_academique": null,
+        "archive": null,
+        "code": null,
+        "cree_le": null,
+        "date_activation": null,
+        "date_desactivation": null,
+        "description": null,
+        "id": null,
+        "libelle": null,
+        "modifie_le": null
+      },
+      "responses": {
+        "200": {
+          "actif": null,
+          "annee_academique": null,
+          "archive": null,
+          "code": null,
+          "cree_le": null,
+          "date_activation": null,
+          "date_desactivation": null,
+          "description": null,
+          "id": null,
+          "libelle": null,
+          "modifie_le": null
+        }
+      }
+    },
+    "POST /api/v1/statistiques/alertes/seuils/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/statistiques/rapports/": {
+      "parameters": [],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/statistiques/rapports/{rapport_id}/observations/": {
+      "parameters": [
+        "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "POST /api/v1/statistiques/rapports/{rapport_id}/workflow/": {
+      "parameters": [
+        "rapport_id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
     "PUT /api/admissions/ref/{ressource}/{id}/": {
       "parameters": [
         "id",
@@ -7184,6 +13081,33 @@
       "request_keys": null,
       "responses": {
         "200": null
+      }
+    },
+    "PUT /api/evaluations-academiques/composants/{id}/notes/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "[]": {
+          "evaluation_participant_id": null,
+          "valeur": null
+        }
+      },
+      "responses": {
+        "200": {
+          "[]": {
+            "bareme": null,
+            "component": null,
+            "evaluation_participant": null,
+            "id": null,
+            "motif_correction": null,
+            "saisie_le": null,
+            "saisie_par": null,
+            "statut": null,
+            "valeur": null,
+            "verrouillee": null
+          }
+        }
       }
     },
     "PUT /api/formations/formateurs/{id}/": {
@@ -7498,6 +13422,323 @@
       "parameters": [
         "id"
       ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/auth/users/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "email": null,
+        "first_name": null,
+        "grade": null,
+        "id": null,
+        "is_active": null,
+        "last_name": null,
+        "matricule": null,
+        "organisation": null,
+        "password": null,
+        "role": null,
+        "secretariat": null,
+        "telephone": null,
+        "username": null
+      },
+      "responses": {
+        "200": {
+          "email": null,
+          "first_name": null,
+          "grade": null,
+          "id": null,
+          "is_active": null,
+          "last_name": null,
+          "matricule": null,
+          "organisation": null,
+          "password": null,
+          "role": null,
+          "secretariat": null,
+          "telephone": null,
+          "username": null
+        }
+      }
+    },
+    "PUT /api/v1/formations/formateurs/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "email": null,
+        "id": null,
+        "nb_formations": null,
+        "nom": null,
+        "numero_compte_bancaire": null,
+        "numero_piece_identite": null,
+        "numerobadge": null,
+        "observations": null,
+        "organisation": null,
+        "prenom": null,
+        "secretariats": {
+          "[]": null
+        },
+        "secretariats_noms": null,
+        "specialite": null,
+        "telephone": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "email": null,
+          "id": null,
+          "nb_formations": null,
+          "nom": null,
+          "numero_compte_bancaire": null,
+          "numero_piece_identite": null,
+          "numerobadge": null,
+          "observations": null,
+          "organisation": null,
+          "prenom": null,
+          "secretariats": {
+            "[]": null
+          },
+          "secretariats_noms": null,
+          "specialite": null,
+          "telephone": null
+        }
+      }
+    },
+    "PUT /api/v1/formations/participants/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "categorie": null,
+        "created_at": null,
+        "date_naissance": null,
+        "email": null,
+        "grade": null,
+        "grade_groupe": null,
+        "groupe": null,
+        "id": null,
+        "libelle_concours": null,
+        "lieu_naissance": null,
+        "matricule": null,
+        "motif_notoire": null,
+        "nom": null,
+        "prenom": null,
+        "salle": null,
+        "secretariat": null,
+        "secretariat_nom": null,
+        "sexe": null,
+        "site": null,
+        "telephone": null,
+        "telephone2": null,
+        "type_concours": null,
+        "vague": null
+      },
+      "responses": {
+        "200": {
+          "categorie": null,
+          "created_at": null,
+          "date_naissance": null,
+          "email": null,
+          "grade": null,
+          "grade_groupe": null,
+          "groupe": null,
+          "id": null,
+          "libelle_concours": null,
+          "lieu_naissance": null,
+          "matricule": null,
+          "motif_notoire": null,
+          "nom": null,
+          "prenom": null,
+          "salle": null,
+          "secretariat": null,
+          "secretariat_nom": null,
+          "sexe": null,
+          "site": null,
+          "telephone": null,
+          "telephone2": null,
+          "type_concours": null,
+          "vague": null
+        }
+      }
+    },
+    "PUT /api/v1/formations/ref/batiments/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/categories/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/grades/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/modules/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/salles/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/sites/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/types-secretariat/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/ref/vagues/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/secretariats/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "description": null,
+        "id": null,
+        "membres": null,
+        "nb_formations": null,
+        "nb_modules": null,
+        "nb_participants": null,
+        "nom": null,
+        "numero": null,
+        "responsable": null,
+        "type": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "description": null,
+          "id": null,
+          "membres": null,
+          "nb_formations": null,
+          "nb_modules": null,
+          "nb_participants": null,
+          "nom": null,
+          "numero": null,
+          "responsable": null,
+          "type": null
+        }
+      }
+    },
+    "PUT /api/v1/formations/{formation_pk}/modules/{module_pk}/": {
+      "parameters": [
+        "formation_pk",
+        "module_pk"
+      ],
+      "request_keys": null,
+      "responses": {
+        "200": null
+      }
+    },
+    "PUT /api/v1/formations/{id}/": {
+      "parameters": [
+        "id"
+      ],
+      "request_keys": {
+        "created_at": null,
+        "formateurs": null,
+        "formation": null,
+        "id": null,
+        "intitule": null,
+        "module": null,
+        "module_input": null,
+        "modules": null,
+        "modules_list": null,
+        "nb_participants": null,
+        "nb_presents": null,
+        "numero_formation": null,
+        "participants": null,
+        "participants_attendus": null,
+        "ref_formation": null,
+        "ref_formation_intitule": null,
+        "sessions": null,
+        "updated_at": null
+      },
+      "responses": {
+        "200": {
+          "created_at": null,
+          "formateurs": null,
+          "formation": null,
+          "id": null,
+          "intitule": null,
+          "module": null,
+          "module_input": null,
+          "modules": null,
+          "modules_list": null,
+          "nb_participants": null,
+          "nb_presents": null,
+          "numero_formation": null,
+          "participants": null,
+          "participants_attendus": null,
+          "ref_formation": null,
+          "ref_formation_intitule": null,
+          "sessions": null,
+          "updated_at": null
+        }
+      }
+    },
+    "PUT /api/v1/statistiques/alertes/seuils/": {
+      "parameters": [],
       "request_keys": null,
       "responses": {
         "200": null

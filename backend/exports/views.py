@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.urls import reverse
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,28 @@ from formations.models import Formation, ModuleParticipant, ModuleFormateur, Ses
 FormationParticipant = ModuleParticipant
 FormationFormateur = ModuleFormateur
 from presences.models import Pointage, AuditLog
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_index(request):
+    """Index des exports disponibles (point d'atterrissage du lien d'accueil)."""
+    return Response({
+        'application': 'Exports PDF / Excel',
+        'exports': {
+            'formation_pdf': request.build_absolute_uri(reverse('export-pdf', args=[0])).replace('/0/', '/{id}/'),
+            'formation_excel': request.build_absolute_uri(reverse('export-excel', args=[0])).replace('/0/', '/{id}/'),
+            'module_pdf': request.build_absolute_uri(reverse('export-pdf-module', args=[0])).replace('/0/', '/{module_id}/'),
+            'module_excel': request.build_absolute_uri(reverse('export-excel-module', args=[0])).replace('/0/', '/{module_id}/'),
+            'session_pdf': request.build_absolute_uri(reverse('export-pdf-session', args=[0])).replace('/0/', '/{session_id}/'),
+            'session_excel': request.build_absolute_uri(reverse('export-pdf-session-excel', args=[0])).replace('/0/', '/{session_id}/'),
+            'finance_synthese_pdf': request.build_absolute_uri(reverse('export-finance-synthese-pdf')),
+            'finance_synthese_excel': request.build_absolute_uri(reverse('export-finance-synthese-excel')),
+            'finance_encadrants_pdf': request.build_absolute_uri(reverse('export-finance-encadrants-pdf')),
+            'finance_encadrants_excel': request.build_absolute_uri(reverse('export-finance-encadrants-excel')),
+            'liste_classe_pdf': request.build_absolute_uri(reverse('export-liste-classe-pdf')),
+        },
+    })
 
 
 def _calculer_duree_export(pointage):
@@ -50,7 +73,7 @@ CI_ORANGE = '#F5B100'
 CI_LIGHT_GREEN = '#E8EFF5'
 CI_LIGHT_ORANGE = '#FFF8E0'
 
-# Modèle CPFAE — fiche de paie formateur
+# Fiche de paie formateur (rapport finance)
 CI_PAIE_BLUE = '#DDEBF7'
 CI_PAIE_ORANGE = '#FCE7B4'
 CI_PAIE_GREEN = '#77BCE7'
@@ -185,7 +208,7 @@ def _finance_paie_pied_texte(export_opts):
 
 
 def _finance_paie_pied_de_page(export_opts):
-    """Pied de page officiel : mention confidentielle + coordonnées CPFAE."""
+    """Pied de page officiel : mention confidentielle + coordonnées de l'établissement."""
     return _finance_paie_pied_titre(export_opts), _finance_paie_pied_texte(export_opts)
 
 
@@ -210,7 +233,7 @@ def _session_realized_minutes_for_formateur(formateur_id, session, now=None):
         if pt.duree_presence_minutes is not None:
             total += float(pt.duree_presence_minutes)
         else:
-            # Règle commune SYGEP : durée clampée au créneau de la séance.
+            # Règle commune de durée : durée clampée au créneau de la séance.
             total += pointage_minutes_clampees(pt, now=now)
     return round(total, 1)
 
@@ -2364,456 +2387,6 @@ def export_excel_session(request, session_pk):
     buffer.seek(0)
 
     filename = f"rapport_session_{session.id}.xlsx"
-    response = HttpResponse(
-        buffer,
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def export_finance_formateur_pdf(request, formateur_pk):
-    """Export PDF — état récapitulatif des modules dispensés (modèle CPFAE)."""
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.utils import simpleSplit
-
-    if not _check_finance_export_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
-    ctx = _finance_formateur_export_context(formateur, request)
-    export_opts = ctx['export']
-    fmt = ctx.get('formateur') or {}
-    recap_modules = ctx.get('recap_modules') or []
-    periode = ctx.get('periode') or {}
-
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=1.8 * cm, rightMargin=1.8 * cm,
-        topMargin=1.2 * cm, bottomMargin=2.8 * cm,
-    )
-    styles = getSampleStyleSheet()
-    dash = '—' * 32
-
-    style_hdr_left = ParagraphStyle(
-        'PaieHdrL', parent=styles['Normal'],
-        fontSize=7.5, leading=10, alignment=TA_LEFT,
-    )
-    style_hdr_right = ParagraphStyle(
-        'PaieHdrR', parent=styles['Normal'],
-        fontSize=8.5, leading=11, alignment=TA_RIGHT,
-    )
-    style_title = ParagraphStyle(
-        'PaieTitle', parent=styles['Normal'],
-        fontSize=10, leading=13, alignment=TA_CENTER,
-        fontName='Helvetica-Bold', spaceAfter=8, spaceBefore=6,
-    )
-    style_body = ParagraphStyle(
-        'PaieBody', parent=styles['Normal'],
-        fontSize=9, leading=12, alignment=TA_LEFT,
-    )
-    style_body_center = ParagraphStyle(
-        'PaieBodyC', parent=styles['Normal'],
-        fontSize=9, leading=12, alignment=TA_CENTER,
-    )
-    style_small = ParagraphStyle(
-        'PaieSmall', parent=styles['Normal'],
-        fontSize=7, leading=9, alignment=TA_LEFT, textColor=colors.HexColor('#333333'),
-    )
-    style_confidentiel = ParagraphStyle(
-        'PaieConf', parent=styles['Normal'],
-        fontSize=9, leading=12, alignment=TA_LEFT, fontName='Helvetica-Bold',
-        spaceBefore=10,
-    )
-
-    def _esc(text):
-        return str(text or '').replace('&', '&amp;')
-
-    def _cell(text, *, bold=False, center=False, size=9):
-        content = _esc(text)
-        if bold:
-            content = f'<b>{content}</b>'
-        style = style_body_center if center else style_body
-        if size != 9:
-            style = ParagraphStyle(
-                f'PaieCell{size}', parent=style,
-                fontSize=size, leading=size + 2,
-            )
-        return Paragraph(content, style)
-
-    elements = []
-
-    left_hdr = '<br/>'.join([
-        _esc(_FINANCE_PAIE_HEADER_LEFT[0]),
-        dash,
-        _esc(_FINANCE_PAIE_HEADER_LEFT[1]),
-        _esc(_FINANCE_PAIE_HEADER_LEFT[2]),
-        dash,
-        _esc(_FINANCE_PAIE_HEADER_LEFT[3]),
-        _esc(_FINANCE_PAIE_HEADER_LEFT[4]),
-    ])
-    right_hdr = '<br/>'.join([
-        f'<b>{_esc(_FINANCE_PAIE_HEADER_RIGHT[0])}</b>',
-        f'<i>{_esc(_FINANCE_PAIE_HEADER_RIGHT[1])}</i>',
-        dash,
-    ])
-    header_table = Table(
-        [[Paragraph(left_hdr, style_hdr_left), Paragraph(right_hdr, style_hdr_right)]],
-        colWidths=[10.5 * cm, 6.5 * cm],
-    )
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 0.35 * cm))
-
-    titre = _finance_paie_build_title(recap_modules, export_opts, periode)
-    elements.append(Paragraph(f'<u>{_esc(titre)}</u>', style_title))
-    elements.append(Spacer(1, 0.25 * cm))
-
-    col_widths = [0.9 * cm, 6.0 * cm, 2.6 * cm, 2.4 * cm, 2.0 * cm, 2.0 * cm]
-    table_data = []
-    formateur_label = _finance_paie_formateur_label(fmt)
-    table_data.append([_cell(formateur_label, bold=True), '', '', '', '', ''])
-
-    table_data.append([
-        _cell('N°', bold=True, center=True),
-        _cell('MODULES', bold=True, center=True),
-        _cell('CATEGORIE/GRADE', bold=True, center=True),
-        _cell('GROUPES', bold=True, center=True),
-        _cell('VOLUME RÉALISÉ', bold=True, center=True),
-        _cell('VOLUME PLANIFIÉ', bold=True, center=True),
-    ])
-
-    total_realise = 0
-    total_planifie = 0
-    for idx, item in enumerate(recap_modules, start=1):
-        heures_realise = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
-        heures_planifie = _finance_paie_volume_heures(item.get('total_creneau_periode_minutes'))
-        total_realise += heures_realise
-        total_planifie += heures_planifie
-        table_data.append([
-            _cell(idx, center=True),
-            _cell((item.get('module_intitule') or '-').upper()),
-            _cell(item.get('grade') or '-', center=True),
-            _cell(_finance_paie_format_groupe(item.get('groupe')), center=True),
-            _cell(heures_realise, center=True),
-            _cell(heures_planifie, center=True),
-        ])
-
-    if not recap_modules:
-        table_data.append([
-            _cell('—', center=True),
-            _cell('Aucun module sur la période'),
-            _cell('—', center=True),
-            _cell('—', center=True),
-            _cell(0, center=True),
-            _cell(0, center=True),
-        ])
-
-    table_data.append([
-        _cell('TOTAL VOLUME HORAIRE', bold=True, center=True),
-        '', '', '',
-        _cell(total_realise, bold=True, center=True),
-        _cell(total_planifie, bold=True, center=True),
-    ])
-
-    main_table = Table(table_data, colWidths=col_widths)
-    n_rows = len(table_data)
-    main_style = [
-        ('GRID', (0, 0), (-1, -1), 0.75, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('SPAN', (0, 0), (-1, 0)),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(CI_PAIE_BLUE)),
-        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor(CI_PAIE_ORANGE)),
-        ('BACKGROUND', (0, n_rows - 1), (-1, n_rows - 1), colors.HexColor(CI_PAIE_GREEN)),
-        ('SPAN', (0, n_rows - 1), (3, n_rows - 1)),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 2), (1, n_rows - 2), 'LEFT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-    ]
-    main_table.setStyle(TableStyle(main_style))
-    elements.append(main_table)
-    elements.append(Spacer(1, 0.5 * cm))
-
-    # ── Bloc identité & observations (fiche complète) ──
-    identite_lignes = []
-    if fmt.get('specialite'):
-        identite_lignes.append(f"<b>Spécialité :</b> {_esc(fmt.get('specialite'))}")
-    if fmt.get('organisation'):
-        identite_lignes.append(f"<b>Organisation :</b> {_esc(fmt.get('organisation'))}")
-    if fmt.get('email'):
-        identite_lignes.append(f"<b>E-mail :</b> {_esc(fmt.get('email'))}")
-    if fmt.get('telephone'):
-        identite_lignes.append(f"<b>Téléphone :</b> {_esc(fmt.get('telephone'))}")
-    if fmt.get('numero_piece_identite'):
-        identite_lignes.append(f"<b>N° pièce d'identité :</b> {_esc(fmt.get('numero_piece_identite'))}")
-    if fmt.get('numero_compte_bancaire'):
-        identite_lignes.append(f"<b>N° compte bancaire (RIB) :</b> {_esc(fmt.get('numero_compte_bancaire'))}")
-    if identite_lignes:
-        elements.append(Paragraph('<u>IDENTITÉ</u>', style_confidentiel))
-        for ligne in identite_lignes:
-            elements.append(Paragraph(ligne, style_body))
-        elements.append(Spacer(1, 0.4 * cm))
-
-    observations_txt = (fmt.get('observations') or '').strip()
-    if observations_txt:
-        elements.append(Paragraph('<u>OBSERVATIONS</u>', style_confidentiel))
-        for para in observations_txt.split('\n'):
-            elements.append(Paragraph(_esc(para) or '&nbsp;', style_body))
-        elements.append(Spacer(1, 0.5 * cm))
-
-    for line in _finance_paie_contacts(export_opts):
-        elements.append(Paragraph(_esc(line), style_body))
-    elements.append(Spacer(1, 0.6 * cm))
-
-    pied_titre, pied_adresse = _finance_paie_pied_de_page(export_opts)
-    page_w, page_h = A4
-    left_m = 1.8 * cm
-    right_m = 1.8 * cm
-    usable_w = page_w - left_m - right_m
-
-    def _draw_footer(canvas, doc):
-        canvas.saveState()
-        y_base = 1.0 * cm
-        # Adresse (petite police, multiligne)
-        canvas.setFont('Helvetica', 7)
-        canvas.setFillColor(colors.HexColor('#333333'))
-        addr_lines = simpleSplit(pied_adresse, 'Helvetica', 7, usable_w)
-        line_h = 9
-        for i, line in enumerate(reversed(addr_lines)):
-            canvas.drawString(left_m, y_base + i * line_h, line)
-        y_titre = y_base + len(addr_lines) * line_h + 3
-        # Titre confidentiel (gras)
-        canvas.setFont('Helvetica-Bold', 9)
-        canvas.setFillColor(colors.black)
-        canvas.drawString(left_m, y_titre, pied_titre)
-        canvas.restoreState()
-
-    doc.build(elements, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
-    buffer.seek(0)
-    filename = f"fiche_paie_{formateur.numerobadge or formateur.pk}.pdf"
-    response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def export_finance_formateur_excel(request, formateur_pk):
-    """Export Excel — état récapitulatif des modules dispensés (modèle CPFAE)."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-
-    if not _check_finance_export_access(request):
-        return Response({'detail': 'Accès réservé à la direction et à la finance.'}, status=403)
-
-    formateur = get_object_or_404(Formateur.objects.prefetch_related('secretariats'), pk=formateur_pk)
-    ctx = _finance_formateur_export_context(formateur, request)
-    export_opts = ctx['export']
-    fmt = ctx.get('formateur') or {}
-    recap_modules = ctx.get('recap_modules') or []
-    periode = ctx.get('periode') or {}
-    last_col = 6
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Modules dispensés"
-
-    blue_fill = PatternFill(start_color='DDEBF7', end_color='DDEBF7', fill_type='solid')
-    orange_fill = PatternFill(start_color='FCE7B4', end_color='FCE7B4', fill_type='solid')
-    green_fill = PatternFill(start_color='77BCE7', end_color='77BCE7', fill_type='solid')
-    black_border = Border(
-        left=Side(style='thin', color='000000'),
-        right=Side(style='thin', color='000000'),
-        top=Side(style='thin', color='000000'),
-        bottom=Side(style='thin', color='000000'),
-    )
-    dash = '—' * 28
-    row_idx = 1
-
-    left_lines = [
-        _FINANCE_PAIE_HEADER_LEFT[0], dash,
-        _FINANCE_PAIE_HEADER_LEFT[1], _FINANCE_PAIE_HEADER_LEFT[2], dash,
-        _FINANCE_PAIE_HEADER_LEFT[3], _FINANCE_PAIE_HEADER_LEFT[4],
-    ]
-    right_lines = [
-        _FINANCE_PAIE_HEADER_RIGHT[0], _FINANCE_PAIE_HEADER_RIGHT[1], dash,
-    ]
-    max_hdr = max(len(left_lines), len(right_lines))
-    for i in range(max_hdr):
-        left_val = left_lines[i] if i < len(left_lines) else ''
-        right_val = right_lines[i] if i < len(right_lines) else ''
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=3)
-        ws.merge_cells(start_row=row_idx, start_column=4, end_row=row_idx, end_column=5)
-        c_left = ws.cell(row=row_idx, column=1, value=left_val)
-        c_left.font = Font(size=8)
-        c_left.alignment = Alignment(horizontal='left', wrap_text=True)
-        c_right = ws.cell(row=row_idx, column=4, value=right_val)
-        c_right.font = Font(size=9, bold=(i == 0))
-        c_right.alignment = Alignment(horizontal='right', wrap_text=True)
-        row_idx += 1
-
-    row_idx += 1
-    titre = _finance_paie_build_title(recap_modules, export_opts, periode)
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    title_cell = ws.cell(row=row_idx, column=1, value=titre)
-    title_cell.font = Font(bold=True, size=10, underline='single')
-    title_cell.alignment = Alignment(horizontal='center', wrap_text=True)
-    row_idx += 2
-
-    formateur_label = _finance_paie_formateur_label(fmt)
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    name_cell = ws.cell(row=row_idx, column=1, value=formateur_label)
-    name_cell.font = Font(bold=True, size=10)
-    name_cell.fill = blue_fill
-    name_cell.border = black_border
-    name_cell.alignment = Alignment(horizontal='left')
-    row_idx += 1
-
-    headers = ['N°', 'MODULES', 'CATEGORIE/GRADE', 'GROUPES', 'VOLUME RÉALISÉ', 'VOLUME PLANIFIÉ']
-    for col, h in enumerate(headers, start=1):
-        cell = ws.cell(row=row_idx, column=col, value=h)
-        cell.font = Font(bold=True, size=9)
-        cell.fill = orange_fill
-        cell.border = black_border
-        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    row_idx += 1
-
-    total_realise = 0
-    total_planifie = 0
-    if recap_modules:
-        for idx, item in enumerate(recap_modules, start=1):
-            heures_realise = _finance_paie_volume_heures(item.get('total_duree_realisee_minutes'))
-            heures_planifie = _finance_paie_volume_heures(item.get('total_creneau_periode_minutes'))
-            total_realise += heures_realise
-            total_planifie += heures_planifie
-            values = [
-                idx,
-                (item.get('module_intitule') or '-').upper(),
-                item.get('grade') or '-',
-                _finance_paie_format_groupe(item.get('groupe')),
-                heures_realise,
-                heures_planifie,
-            ]
-            for col, val in enumerate(values, start=1):
-                cell = ws.cell(row=row_idx, column=col, value=val)
-                cell.border = black_border
-                cell.alignment = Alignment(
-                    horizontal='left' if col == 2 else 'center',
-                    vertical='center',
-                    wrap_text=True,
-                )
-            row_idx += 1
-    else:
-        for col, val in enumerate(['—', 'Aucun module sur la période', '—', '—', 0, 0], start=1):
-            cell = ws.cell(row=row_idx, column=col, value=val)
-            cell.border = black_border
-        row_idx += 1
-
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=4)
-    total_label = ws.cell(row=row_idx, column=1, value='TOTAL VOLUME HORAIRE')
-    total_label.font = Font(bold=True, size=9)
-    total_label.fill = green_fill
-    total_label.border = black_border
-    total_label.alignment = Alignment(horizontal='center')
-    total_realise_cell = ws.cell(row=row_idx, column=5, value=total_realise)
-    total_realise_cell.font = Font(bold=True, size=9)
-    total_realise_cell.fill = green_fill
-    total_realise_cell.border = black_border
-    total_realise_cell.alignment = Alignment(horizontal='center')
-    total_planifie_cell = ws.cell(row=row_idx, column=6, value=total_planifie)
-    total_planifie_cell.font = Font(bold=True, size=9)
-    total_planifie_cell.fill = green_fill
-    total_planifie_cell.border = black_border
-    total_planifie_cell.alignment = Alignment(horizontal='center')
-    row_idx += 2
-
-    # ── Bloc identité & observations (fiche complète) ──
-    identite_pairs = []
-    if fmt.get('specialite'):
-        identite_pairs.append(('Spécialité', fmt.get('specialite')))
-    if fmt.get('organisation'):
-        identite_pairs.append(('Organisation', fmt.get('organisation')))
-    if fmt.get('email'):
-        identite_pairs.append(('E-mail', fmt.get('email')))
-    if fmt.get('telephone'):
-        identite_pairs.append(('Téléphone', fmt.get('telephone')))
-    if fmt.get('numero_piece_identite'):
-        identite_pairs.append(("N° pièce d'identité", fmt.get('numero_piece_identite')))
-    if fmt.get('numero_compte_bancaire'):
-        identite_pairs.append(('N° compte bancaire (RIB)', fmt.get('numero_compte_bancaire')))
-    if identite_pairs:
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        hdr = ws.cell(row=row_idx, column=1, value='IDENTITÉ')
-        hdr.font = Font(bold=True, size=10)
-        row_idx += 1
-        for label, value in identite_pairs:
-            lbl = ws.cell(row=row_idx, column=1, value=label)
-            lbl.font = Font(bold=True, size=9)
-            ws.merge_cells(start_row=row_idx, start_column=2, end_row=row_idx, end_column=last_col)
-            ws.cell(row=row_idx, column=2, value=str(value)).font = Font(size=9)
-            row_idx += 1
-        row_idx += 1
-
-    observations_txt = (fmt.get('observations') or '').strip()
-    if observations_txt:
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        obs_hdr = ws.cell(row=row_idx, column=1, value='OBSERVATIONS')
-        obs_hdr.font = Font(bold=True, size=10)
-        row_idx += 1
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        obs_cell = ws.cell(row=row_idx, column=1, value=observations_txt)
-        obs_cell.font = Font(size=9)
-        obs_cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
-        row_idx += 2
-
-    for text in _finance_paie_contacts(export_opts):
-        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-        cell = ws.cell(row=row_idx, column=1, value=text)
-        cell.font = Font(size=9)
-        cell.alignment = Alignment(wrap_text=True, horizontal='left')
-        row_idx += 1
-
-    row_idx += 1
-    pied_titre, pied_adresse = _finance_paie_pied_de_page(export_opts)
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    pied_title_cell = ws.cell(row=row_idx, column=1, value=pied_titre)
-    pied_title_cell.font = Font(bold=True, size=9)
-    pied_title_cell.alignment = Alignment(horizontal='left')
-    row_idx += 1
-    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=last_col)
-    pied_addr_cell = ws.cell(row=row_idx, column=1, value=pied_adresse)
-    pied_addr_cell.font = Font(size=7)
-    pied_addr_cell.alignment = Alignment(wrap_text=True, horizontal='left')
-    row_idx += 1
-
-    ws.column_dimensions['A'].width = 5
-    ws.column_dimensions['B'].width = 38
-    ws.column_dimensions['C'].width = 16
-    ws.column_dimensions['D'].width = 14
-    ws.column_dimensions['E'].width = 14
-    ws.column_dimensions['F'].width = 14
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    filename = f"fiche_paie_{formateur.numerobadge or formateur.pk}.xlsx"
     response = HttpResponse(
         buffer,
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

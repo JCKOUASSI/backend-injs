@@ -185,7 +185,7 @@ class IsUserMutationAllowed(BasePermission):
 
     message = (
         "Vous n'avez pas les droits pour créer ou modifier des comptes utilisateurs. "
-        "Réservé aux rôles : Administrateur, Chef CPFAE Admin, CPFAE Admin, "
+        "Réservé aux rôles : Administrateur, Chef INJS Admin, INJS Admin, "
         "Chef Secrétariat et Secrétariat."
     )
 

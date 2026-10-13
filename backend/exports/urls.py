@@ -2,6 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Index des exports (point d'atterrissage du lien « Exports PDF / Excel »
+    # de la page d'accueil API — garde-fous : config/tests/test_liens_accueil_api.py).
+    path('', views.export_index, name='export-index'),
     # Export par formation (toutes séances de tous les modules)
     path('formation/<int:pk>/pdf/', views.export_pdf, name='export-pdf'),
     path('formation/<int:pk>/excel/', views.export_excel, name='export-excel'),
@@ -12,8 +15,6 @@ urlpatterns = [
     path('session/<int:session_pk>/pdf/', views.export_pdf_session, name='export-pdf-session'),
     path('session/<int:session_pk>/excel/', views.export_excel_session, name='export-pdf-session-excel'),
     # Export finance par formateur
-    path('formateur/<int:formateur_pk>/pdf/', views.export_finance_formateur_pdf, name='export-finance-formateur-pdf'),
-    path('formateur/<int:formateur_pk>/excel/', views.export_finance_formateur_excel, name='export-finance-formateur-excel'),
     # Export finance consolidé (tous les formateurs)
     path('finance/synthese/pdf/', views.export_finance_synthese_pdf, name='export-finance-synthese-pdf'),
     path('finance/synthese/excel/', views.export_finance_synthese_excel, name='export-finance-synthese-excel'),

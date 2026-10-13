@@ -1,6 +1,32 @@
 import os
+import re
 
 from django.http import HttpResponse, JsonResponse
+
+# Passerelles TLS de l'aperçu : le trafic y est TOUJOURS en https, même quand
+# X-Forwarded-Proto n'est pas (ou est mal) propagé.
+_HOTE_PASSERELLE = re.compile(r'\.(e2b\.app|arena\.site|trycloudflare\.com)$', re.I)
+
+
+def _scheme(request):
+    """Schéma public réel (https derrière les passerelles de l'aperçu).
+
+    Garde-fou (2026-10-10) : les liens générés en « http:// » depuis une page
+    servie en https sont bloqués comme contenu mixte par l'iframe d'aperçu —
+    « impossible d'accéder aux liens de l'API, en particulier Administration
+    Django ». Verrouillé par config/tests/test_liens_accueil_api.py.
+    """
+    if request.is_secure():
+        return 'https'
+    proto = request.headers.get('X-Forwarded-Proto', '').split(',')[0].strip().lower()
+    if proto == 'https':
+        return 'https'
+    hote = (request.headers.get('X-Forwarded-Host') or request.get_host()).split(':')[0]
+    return 'https' if _HOTE_PASSERELLE.search(hote) else 'http'
+
+
+def _hote(request):
+    return request.headers.get('X-Forwarded-Host') or request.get_host()
 
 
 def _frontend_url(request):
@@ -14,25 +40,26 @@ def _frontend_url(request):
     explicite = os.environ.get('FRONTEND_URL')
     if explicite:
         return explicite.rstrip('/')
-    proto = 'https' if request.is_secure() else 'http'
-    host = request.headers.get('X-Forwarded-Host') or request.get_host()
+    host = _hote(request)
     if host.startswith('8000-'):
         host = f'3000-{host[len("8000-"):]}'
     elif ':' in host:
         host = f'{host.split(":", 1)[0]}:3000'
-    return f'{proto}://{host}'
+    return f'{_scheme(request)}://{host}'
 
 
 def _api_links(request):
-    base = request.build_absolute_uri('/').rstrip('/')
-    frontend = _frontend_url(request)
+    # Liens RELATIFS pour la page HTML : ils résolvent toujours, quel que soit
+    # le schéma/hôte public de la passerelle (pas de contenu mixte en iframe).
+    # Le contrat JSON reste en absolu mais avec le schéma public réel.
+    base = f'{_scheme(request)}://{_hote(request)}'
     return {
         'application': 'INJS LMD API',
         'organisation': 'INJS — Institut National de la Jeunesse et des Sports',
         'version': '1.0',
         'links': {
-            'frontend': frontend,
-            'documentation': f'{base}/api/docs/',
+            'frontend': _frontend_url(request),
+            'documentation': f'{base}/api/v1/docs/',
             'schema': f'{base}/api/schema/',
             'admin': f'{base}/admin/',
             'dashboard': f'{base}/dashboard/',
@@ -46,6 +73,17 @@ def _api_links(request):
             'admissions': f'{base}/api/admissions/',
             'presences': f'{base}/api/scan/',
             'exports': f'{base}/api/exports/',
+        },
+        # Cibles relatives servies telles quelles par la page HTML.
+        'routes': {
+            'documentation': '/api/v1/docs/',
+            'schema': '/api/schema/',
+            'admin': '/admin/',
+            'dashboard': '/dashboard/',
+            'login': '/api/auth/login/',
+            'formations': '/api/formations/',
+            'presences': '/api/scan/',
+            'exports': '/api/exports/',
         },
     }
 
@@ -62,19 +100,21 @@ def api_root(request):
     if not wants_html:
         return JsonResponse(payload)
 
-    links = payload['links']
-    auth = links['auth']
+    routes = payload['routes']
     rows = [
-        ('Application web (React)', links['frontend']),
-        ('Documentation API (Swagger)', links['documentation']),
-        ('Schéma OpenAPI', links['schema']),
-        ('Administration Django', links['admin']),
-        ('Dashboard Direction', links['dashboard']),
-        ('Connexion API', auth['login']),
-        ('Formations', links['formations']),
-        ('Badgeage (scan QR)', links['presences']),
-        ('Exports PDF / Excel', links['exports']),
+        ('Application web (React)', payload['links']['frontend']),
+        ('Documentation API (Swagger)', routes['documentation']),
+        ('Schéma OpenAPI', routes['schema']),
+        ('Administration Django', routes['admin']),
+        ('Dashboard Direction', routes['dashboard']),
+        ('Connexion API', routes['login']),
+        ('Formations', routes['formations']),
+        ('Badgeage (scan QR)', routes['presences']),
+        ('Exports PDF / Excel', routes['exports']),
     ]
+    # Navigation dans la même fenêtre : dans l'aperçu (iframe), une nouvelle
+    # fenêtre (target=_blank) est bloquée silencieusement, donc le lien ne
+    # faisait rien. Les pages Django admin acceptent l'affichage dans l'aperçu.
     list_items = '\n'.join(
         f'        <li><a href="{url}">{label}</a></li>' for label, url in rows
     )
@@ -102,7 +142,7 @@ def api_root(request):
 {list_items}
   </ul>
   <footer>
-    Réponse JSON : <code>{request.build_absolute_uri()}?format=json</code>
+    Réponse JSON : <code><a href="?format=json">{_scheme(request)}://{_hote(request)}/?format=json</a></code>
   </footer>
 </body>
 </html>"""

@@ -53,6 +53,11 @@ urlpatterns = [
         views_admin.CompteStatutView.as_view(), name='hab-compte-statut',
     ),
     path(
+        'comptes/<int:pk>/acces-effectifs/',
+        views_admin.CompteAccesEffectifsView.as_view(),
+        name='hab-compte-acces-effectifs',
+    ),
+    path(
         'comptes/<int:pk>/effective-permissions/',
         org.ComptePermissionsEffectivesView.as_view(),
         name='hab-compte-effective-permissions',

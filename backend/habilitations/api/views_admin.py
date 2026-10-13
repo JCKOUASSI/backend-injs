@@ -18,7 +18,7 @@ from habilitations.models import (
     Personne,
     RoleMetier,
 )
-from habilitations.permissions import ExigeDrapeauAdmin
+from habilitations.permissions import ExigeDrapeauAdmin, ExigePermissionParMethode
 from habilitations.referentiel.catalogue_modules import MODULES
 from habilitations.referentiel.chargement import niveaux_du_role
 from habilitations.services import comptes_admin as service
@@ -57,7 +57,9 @@ def _queryset_comptes():
 # Comptes : liste, création, fiche, différentiel, modification, statut
 # ---------------------------------------------------------------------------
 class CompteListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.compte.consulter', 'POST': 'administration.compte.creer'}),
+    ]
 
     def get(self, request):
         qs = _queryset_comptes()
@@ -111,7 +113,9 @@ class CompteListCreateView(APIView):
 
 
 class CompteDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.compte.consulter'}),
+    ]
 
     def _objet(self, pk):
         return _queryset_comptes().filter(pk=pk).first()
@@ -134,7 +138,9 @@ class CompteDetailView(APIView):
 
 
 class CompteDifferentialView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.consulter'}),
+    ]
 
     def post(self, request, pk):
         compte = CompteUtilisateur.objects.filter(pk=pk).first()
@@ -150,7 +156,9 @@ class CompteDifferentialView(APIView):
 
 
 class CompteModifierView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'PATCH': 'administration.compte.modifier'}),
+    ]
 
     def patch(self, request, pk):
         compte = _queryset_comptes().filter(pk=pk).first()
@@ -170,7 +178,9 @@ class CompteModifierView(APIView):
 
 
 class CompteStatutView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.modifier'}),
+    ]
 
     def post(self, request, pk):
         compte = _queryset_comptes().filter(pk=pk).first()
@@ -194,7 +204,9 @@ class CompteStatutView(APIView):
 # Personnes (recherche préalable de l'assistant)
 # ---------------------------------------------------------------------------
 class PersonneRechercheView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.personne.consulter'}),
+    ]
 
     def get(self, request):
         terme = request.query_params.get('q', '').strip()
@@ -212,7 +224,9 @@ class PersonneRechercheView(APIView):
 # Référentiel : rôle détaillé, titulaires, matrice compacte
 # ---------------------------------------------------------------------------
 class RoleDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.role.consulter'}),
+    ]
 
     def get(self, request, code):
         role = RoleMetier.objects.filter(code=code).prefetch_related('permissions').first()
@@ -237,7 +251,9 @@ class RoleDetailView(APIView):
 
 
 class MatriceView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.permission.consulter'}),
+    ]
 
     def get(self, request):
         """Vue compacte rôle × module (niveaux), pour l'écran matrice."""
@@ -284,7 +300,9 @@ class MatriceView(APIView):
 # Journal : consultation filtrable et intégrité du chaînage
 # ---------------------------------------------------------------------------
 class JournalView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.journal.consulter'}),
+    ]
 
     def get(self, request):
         qs = JournalHabilitation.objects.select_related('acteur')
@@ -313,7 +331,9 @@ class JournalView(APIView):
 
 
 class JournalIntegriteView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.journal.consulter'}),
+    ]
 
     def get(self, request):
         anomalies = verifier_chaine()
@@ -323,3 +343,28 @@ class JournalIntegriteView(APIView):
             'total': JournalHabilitation.objects.count(),
             'verifie_le': timezone.now().isoformat(),
         })
+
+
+class CompteAccesEffectifsView(APIView):
+    """Accès effectifs d'un compte, calculés par le moteur ``est_autorise()``.
+
+    Lecture seule. Source de vérité unique : la décision affichée est celle que
+    le backend applique réellement (statut, périmètre, délégation, retrait, MFA).
+    """
+
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.permission.consulter'}),
+    ]
+
+    def get(self, request, pk):
+        from habilitations.services.acces_effectifs import acces_effectifs
+        compte = (
+            CompteUtilisateur.objects
+            .select_related('user', 'personne')
+            .filter(pk=pk)
+            .first()
+        )
+        if compte is None:
+            return Response({'detail': 'Compte introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(acces_effectifs(compte))

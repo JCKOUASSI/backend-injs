@@ -172,7 +172,7 @@ class RefFormation(models.Model):
 
         Une ligne ``INJS`` est une formation validée par la source métier
         (docs/audits/A-4.5 §2, nomenclature des 8 filières). Une ligne
-        ``LEGACY`` provient d'un autre corpus (CPFAE / Sygepcpfae, plans de
+        ``LEGACY`` provient d'un autre corpus (corpus legacy, plans de
         professorat) et n'appartient pas au référentiel INJS. ``NON_DETERMINE``
         est l'état par défaut : aucune valeur n'est inventée.
         """
@@ -188,7 +188,7 @@ class RefFormation(models.Model):
         max_length=20, choices=Perimetre.choices, default=Perimetre.NON_DETERMINE,
         db_index=True,
         help_text='L6 : INJS = filière validée par la source métier ; LEGACY = corpus '
-                  'étranger (CPFAE/Sygepcpfae) exclu du référentiel INJS.',
+                  'étranger (legacy) exclu du référentiel INJS.',
     )
     filiere_code = models.CharField(
         max_length=10, blank=True, default='', db_index=True,
@@ -1021,7 +1021,7 @@ class FinanceSettings(models.Model):
         blank=True,
         default='',
         verbose_name='Organisme',
-        help_text='Nom affiché sur les états financiers (ex. CPFAE).',
+        help_text='Nom affiché sur les états financiers (ex. INJS).',
     )
     export_adresse = models.TextField(
         blank=True,

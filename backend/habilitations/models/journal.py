@@ -78,6 +78,7 @@ class JournalHabilitation(models.Model):
         IMPORTA_ANNULE = 'IMPORTA_ANNULE', 'Annulation d’import en masse'
         EXPIRATION_AUTO = 'EXPIRATION_AUTO', 'Expiration automatique à terme'
         DELEGATION_ACTIVEE = 'DELEGATION_ACTIVEE', 'Activation de délégation'
+        DELEGATION_PREMIERE_VALIDATION = 'DELEGATION_PREMIERE_VALIDATION', 'Première validation de délégation sensible (double approbation)'
         ACTION_DELEGUEE = 'ACTION_DELEGUEE', 'Action exercée par délégation'
         # LOT 3 — organisation administrative (directions/départements/services).
         ORGANISATION_MODIFIEE = 'ORGANISATION_MODIFIEE', \

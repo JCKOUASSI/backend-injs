@@ -13,7 +13,7 @@ _bulk_role_sync_depth = 0
 # Lot L4b : la compatibilité transitoire `ROLES_LEGACY` / `normalize_role()` a
 # été supprimée. L'audit du 26/09/2026 a établi qu'aucun code de production,
 # aucune API, aucun client web ou mobile et aucune ligne de base n'utilisait
-# encore la chaîne historique `CPFAE_ADMIN` : la conserver n'était qu'un
+# encore une chaîne historique hors INJS-LMD : la conserver n'était qu'un
 # contrat avec personne. Le RBAC est désormais verrouillé applicativement
 # (`User.Role.choices`) **et** en base (contrainte CHECK, migration
 # `authentication.0024`).

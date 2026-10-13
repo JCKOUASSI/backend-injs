@@ -6,7 +6,7 @@ faire un utilisateur, à partir des modèles et services CURP existants :
 
 * rôles / comptes : ``RoleMetier``, ``AttributionRole``, ``PermissionAttribuee``
   (dérogations), ``DelegationHabilitation``, ``CompteUtilisateur`` ;
-* résolution effective : ``comptes_admin.permissions_effectives`` — AUCUNE
+* résolution effective : ``acces_effectifs`` (décision ``est_autorise``) — AUCUNE
   logique d'accès effectif parallèle n'est introduite ici ;
 * catalogues : ``referentiel.catalogue_roles`` (fanion sensible),
   ``referentiel.catalogue_modules`` (libellés des modules, niveau des verbes,
@@ -32,7 +32,7 @@ from ..referentiel.catalogue_modules import (
     PERMISSIONS_CRITIQUES,
 )
 from ..referentiel.catalogue_roles import ROLES_PAR_CODE
-from .comptes_admin import permissions_effectives
+from .acces_effectifs import acces_effectifs
 
 #: Taille maximale des listes de comptes renvoyées par une vue d'impact
 #: (les totaux restent exacts ; les listes ne sont qu'un échantillon).
@@ -304,10 +304,10 @@ def impact_utilisateur(user_id):
     ``profil_habilitation``. Retourne ``None`` si ni compte ni utilisateur
     n'existe (la vue décidera du 404).
 
-    La résolution effective est DÉLÉGUÉE à
-    ``comptes_admin.permissions_effectives`` — aucune logique parallèle :
-    attributions de rôles actives + dérogations actives, retraits
-    prioritaires. L'arbre distingue l'origine de chaque accès (rôle porteur
+    La résolution effective est DÉLÉGUÉE à ``acces_effectifs`` — aucune
+    logique parallèle : statut du compte, rôles en période, dérogations,
+    délégations et périmètres sont appliqués par ``moteur.est_autorise``.
+    Seules les permissions AUTORISÉES entrent dans l'arbre et les totaux. L'arbre distingue l'origine de chaque accès (rôle porteur
     ou octroi direct) ; les accès retirés sont listés à part, jamais
     « simulés ».
     """
@@ -355,14 +355,18 @@ def impact_utilisateur(user_id):
     ]
 
     # Résolution effective : service CURP existant, jamais réinventé ici.
-    effectifs = permissions_effectives(compte)
+    decisions = acces_effectifs(compte)['permissions']
+    effectifs = {p['code'] for p in decisions if p['autorise']}
 
     # Arbre d'accès : rôle → module → permissions (catalogue du rôle).
     arbre_roles = []
     codes_herites = set()
     for attribution in roles_actifs:
         role = attribution.role
-        permissions_role = sorted(role.permissions.values_list('code', flat=True))
+        permissions_role = sorted(
+            code for code in role.permissions.values_list('code', flat=True)
+            if code in effectifs
+        )
         codes_herites.update(permissions_role)
         arbre_roles.append({
             'code': role.code,

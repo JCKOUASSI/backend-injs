@@ -157,10 +157,10 @@ class Command(BaseCommand):
                 + ', '.join(rapport['cycles_etrangers_inclus']),
             )
         else:
-            lignes.append('CONTRÔLE 0 cycle CPFAE/DEBUG dans le périmètre INJS.')
+            lignes.append('CONTRÔLE 0 cycle étranger/DEBUG dans le périmètre INJS.')
         lignes.append(
             f'CONTRÔLE {rapport["nb_cycles_injs"]} cycles INJS, '
             f'{rapport["nb_cycles_legacy"]} cycles legacy conservés hors périmètre.',
         )
         lignes.append('SKIPPED  UE/ECUE/parcours/maquettes : non créés (§12, §13).')
-        lignes.append('SKIPPED  aucune suppression : données CPFAE conservées (§9).')
+        lignes.append('SKIPPED  aucune suppression : données legacy archivées (§9).')

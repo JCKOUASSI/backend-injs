@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from administrations.models import Departement, Direction
 from habilitations.models import CompteUtilisateur
-from habilitations.permissions import ExigeDrapeauAdmin
+from habilitations.permissions import ExigeDrapeauAdmin, ExigePermissionParMethode
 from habilitations.services import comptes_admin as service
 from habilitations.services.journalisation import journaliser
 from ressources_humaines.models import Service
@@ -159,7 +159,9 @@ def _ser_compte_bref(compte):
 # Directions
 # ---------------------------------------------------------------------------
 class DirectionListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'POST': 'administration.politique.creer'}),
+    ]
 
     def get(self, request):
         items = Direction.objects.all()
@@ -197,7 +199,9 @@ class DirectionListCreateView(APIView):
 
 
 class DirectionDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'PATCH': 'administration.politique.modifier'}),
+    ]
 
     def _get(self, request, pk):
         return Direction.objects.filter(pk=pk).first()
@@ -248,7 +252,9 @@ class DirectionDetailView(APIView):
 # Départements
 # ---------------------------------------------------------------------------
 class DepartementListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'POST': 'administration.politique.creer'}),
+    ]
 
     def get(self, request):
         qs = Departement.objects.select_related('direction').all()
@@ -299,7 +305,9 @@ class DepartementListCreateView(APIView):
 
 
 class DepartementDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'PATCH': 'administration.politique.modifier'}),
+    ]
 
     def _get(self, request, pk):
         return Departement.objects.select_related('direction').filter(pk=pk).first()
@@ -376,7 +384,9 @@ class DepartementDetailView(APIView):
 # Services
 # ---------------------------------------------------------------------------
 class ServiceListCreateView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'POST': 'administration.politique.creer'}),
+    ]
 
     def get(self, request):
         qs = Service.objects.select_related('departement').all()
@@ -428,7 +438,9 @@ class ServiceListCreateView(APIView):
 
 
 class ServiceDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.politique.consulter', 'PATCH': 'administration.politique.modifier'}),
+    ]
 
     def _get(self, request, pk):
         return Service.objects.select_related('departement').filter(pk=pk).first()
@@ -502,7 +514,9 @@ class ServiceDetailView(APIView):
 class DepartementComptesView(APIView):
     """Rattache ou détache des comptes d'un département (M2M du compte)."""
 
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.modifier', 'DELETE': 'administration.compte.modifier'}),
+    ]
 
     def _get(self, request, pk):
         return Departement.objects.filter(pk=pk).first()
@@ -557,7 +571,9 @@ class DepartementComptesView(APIView):
 class ServiceComptesView(APIView):
     """Rattache ou détache des comptes d'un service (M2M du compte)."""
 
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.modifier', 'DELETE': 'administration.compte.modifier'}),
+    ]
 
     def _get(self, request, pk):
         return Service.objects.filter(pk=pk).first()
@@ -620,7 +636,9 @@ class ComptePermissionsEffectivesView(APIView):
     Lecture seule ; ne modifie aucun droit.
     """
 
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.permission.consulter'}),
+    ]
 
     def get(self, request, pk):
         compte = (

@@ -10,7 +10,7 @@ import '../styles/formationsLmd.css'
  *     FORMATIONS INJS → PARCOURS → NIVEAUX → SEMESTRES → MAQUETTES → UE → ECUE
  *
  * Source unique : `GET /api/formations/lmd/formations/`. La séparation entre le
- * référentiel INJS et le corpus legacy CPFAE/Sygepcpfae est appliquée **côté
+ * référentiel INJS et le corpus legacy hors INJS est appliquée **côté
  * serveur** (queryset `perimetre = INJS`) : cet écran n'applique aucun filtre
  * métier local, il rend ce que l'API retourne. Si une formation étrangère
  * parvenait à l'API, elle serait visible ici — c'est la traçabilité en bout de

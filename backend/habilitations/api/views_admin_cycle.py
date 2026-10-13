@@ -16,7 +16,7 @@ from habilitations.models import (
     NotificationHabilitation,
     PropositionProvisionnement,
 )
-from habilitations.permissions import ExigeDrapeauAdmin
+from habilitations.permissions import ExigeDrapeauAdmin, ExigePermissionParMethode
 from habilitations.services import drapeaux
 from habilitations.services.comptes_admin import ErreurConsole
 from habilitations.services.delegations_u5 import (
@@ -82,7 +82,9 @@ def _serialiser_proposition(p):
 # File de validation humaine
 # ---------------------------------------------------------------------------
 class PropositionListView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.attribution.consulter'}),
+    ]
 
     def get(self, request):
         qs = PropositionProvisionnement.objects.select_related('compte_cible__user')
@@ -105,7 +107,9 @@ class PropositionListView(APIView):
 
 
 class PropositionApprouverView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.attribution.valider'}),
+    ]
 
     def post(self, request, pk):
         proposition = PropositionProvisionnement.objects.filter(pk=pk).first()
@@ -126,7 +130,9 @@ class PropositionApprouverView(APIView):
 
 
 class PropositionRejeterView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.attribution.valider'}),
+    ]
 
     def post(self, request, pk):
         proposition = PropositionProvisionnement.objects.filter(pk=pk).first()
@@ -147,7 +153,9 @@ class PropositionRejeterView(APIView):
 class ProvisionScanView(APIView):
     """Déclenche manuellement les sondes (pour la démo et la supervision)."""
 
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.attribution.creer'}),
+    ]
 
     def post(self, request):
         declencheurs = request.data.get('declencheurs')
@@ -169,7 +177,9 @@ class ProvisionScanView(APIView):
 # Imports en masse : exécution transactionnelle et annulation
 # ---------------------------------------------------------------------------
 class ImportExecuterView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.creer'}),
+    ]
 
     def post(self, request):
         if not drapeaux.import_masse_actif():
@@ -195,7 +205,9 @@ class ImportExecuterView(APIView):
 
 
 class ImportDetailView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.compte.consulter'}),
+    ]
 
     def get(self, request, reference):
         execution = ExecutionImport.objects.filter(reference=reference).first()
@@ -205,7 +217,9 @@ class ImportDetailView(APIView):
 
 
 class ImportAnnulerView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.compte.modifier'}),
+    ]
 
     def post(self, request, reference):
         execution = ExecutionImport.objects.filter(reference=reference).first()
@@ -227,7 +241,9 @@ class ImportAnnulerView(APIView):
 # Notifications
 # ---------------------------------------------------------------------------
 class NotificationListView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'GET': 'administration.revue.consulter'}),
+    ]
 
     def get(self, request):
         qs = NotificationHabilitation.objects.filter(destinataire=request.user)
@@ -242,7 +258,9 @@ class NotificationListView(APIView):
 
 
 class NotificationLireView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.revue.modifier'}),
+    ]
 
     def post(self, request, pk):
         from django.utils import timezone
@@ -259,7 +277,9 @@ class NotificationLireView(APIView):
 
 
 class NotificationToutLireView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.revue.modifier'}),
+    ]
 
     def post(self, request):
         from django.utils import timezone
@@ -273,7 +293,9 @@ class NotificationToutLireView(APIView):
 # Délégation : activation et traçabilité des actions déléguées
 # ---------------------------------------------------------------------------
 class DelegationActiverView(APIView):
-    permission_classes = GARDE
+    permission_classes = GARDE + [
+        ExigePermissionParMethode.pour({'POST': 'administration.delegation.creer'}),
+    ]
 
     def post(self, request, pk):
         delegation = DelegationHabilitation.objects.filter(pk=pk).first()

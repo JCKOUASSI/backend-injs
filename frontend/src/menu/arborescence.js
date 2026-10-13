@@ -1296,16 +1296,6 @@ export const ARBORESCENCE = [
         },
       },
       {
-        id: 'statistiques.resultats',
-        libelle: 'Résultats',
-        chemin: '/statistiques/resultats',
-        ecran: 'stats_resultats',
-        droit: {
-          curp: ['statistiques.indicateur.consulter'],
-          legacy: [['statistiques', 'voir']],
-        },
-      },
-      {
         id: 'statistiques.finances',
         libelle: 'Finances',
         chemin: '/statistiques/finances',

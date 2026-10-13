@@ -111,8 +111,12 @@ export default function Delegations() {
   }
   const confirmerActivation = async (motif) => {
     try {
-      await activerDelegation(aActiver.id, motif)
-      showToast('Délégation activée après contrôle des droits détenus.', 'success')
+      const reponse = await activerDelegation(aActiver.id, motif)
+      if (reponse && reponse.statut === 'PROPOSEE') {
+        showToast('Première validation enregistrée. Une seconde validation, par une autre personne, est requise.', 'success')
+      } else {
+        showToast('Délégation activée après contrôle des droits détenus.', 'success')
+      }
       setAActiver(null)
       charger()
     } catch (e) {
@@ -185,7 +189,15 @@ export default function Delegations() {
                 <td>{d.delegataire}</td>
                 <td>{(d.roles || []).join(', ') || '—'}</td>
                 <td>{d.date_fin}</td>
-                <td>{d.statut}</td>
+                <td>
+                  {d.statut}
+                  {d.statut === 'PROPOSEE' && d.premiere_validation_par && (
+                    <div className="small text-muted">1re validation : {d.premiere_validation_par}</div>
+                  )}
+                  {d.sensible && d.statut === 'PROPOSEE' && !d.premiere_validation_par && (
+                    <div className="small text-muted">Délégation sensible : double validation requise</div>
+                  )}
+                </td>
                 <td>
                   <div className="d-flex gap-1 flex-wrap">
                     {d.statut === 'PROPOSEE' && (

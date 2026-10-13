@@ -145,6 +145,21 @@ def activer_delegation(delegation, acteur, motif, meta=None):
             f"Une délégation {delegation.get_statut_display().lower()} ne peut être activée.",
             409,
         )
+    # Séparation des responsabilités : ni le délégant ni le délégataire ne
+    # peuvent valider leur propre délégation (anti auto-escalade).
+    if acteur is not None and acteur.pk in {
+        delegation.delegant.user_id, delegation.delegataire.user_id,
+    }:
+        message = 'Une délégation ne peut pas être validée par son délégant ou son délégataire.'
+        meta = meta or {}
+        journaliser(
+            JournalHabilitation.TypeEvenement.ACCES_REFUSE,
+            acteur=acteur, compte=delegation.delegataire, cible=delegation,
+            nouvelle_valeur={'code': 'DELEGATION_AUTO_VALIDATION'},
+            motif=message,
+            adresse_ip=meta.get('ip', ''), agent_utilisateur=meta.get('ua', ''),
+        )
+        raise ErreurConsole('DELEGATION_AUTO_VALIDATION', message, 403)
     controler_delegation(
         delegation.delegant, delegation.delegataire,
         list(delegation.roles.values_list('code', flat=True)),
@@ -153,6 +168,35 @@ def activer_delegation(delegation, acteur, motif, meta=None):
         list(delegation.perimetres.values_list('pk', flat=True)),
         delegation.date_debut,
     )
+    # Double approbation des délégations sensibles : la première validation
+    # est enregistrée sans activer ; la seconde doit venir d'une autre personne.
+    if delegation.est_sensible():
+        if delegation.premiere_validation_par_id is None:
+            delegation.premiere_validation_par = acteur
+            delegation.premiere_validation_le = timezone.now()
+            delegation.save(update_fields=[
+                'premiere_validation_par', 'premiere_validation_le',
+                'date_modification',
+            ])
+            journaliser(
+                JournalHabilitation.TypeEvenement.DELEGATION_PREMIERE_VALIDATION,
+                acteur=acteur, compte=delegation.delegataire, cible=delegation,
+                nouvelle_valeur={'delegant': delegation.delegant.user.get_username()},
+                motif=motif or 'Première validation (délégation sensible).',
+                adresse_ip=meta.get('ip', ''), agent_utilisateur=meta.get('ua', ''),
+            )
+            return delegation
+        if acteur is not None and acteur.pk == delegation.premiere_validation_par_id:
+            message = ('La seconde validation d’une délégation sensible doit être '
+                       'faite par une autre personne que la première.')
+            journaliser(
+                JournalHabilitation.TypeEvenement.ACCES_REFUSE,
+                acteur=acteur, compte=delegation.delegataire, cible=delegation,
+                nouvelle_valeur={'code': 'DOUBLE_VALIDATION_MEME_ACTEUR'},
+                motif=message,
+                adresse_ip=meta.get('ip', ''), agent_utilisateur=meta.get('ua', ''),
+            )
+            raise ErreurConsole('DOUBLE_VALIDATION_MEME_ACTEUR', message, 403)
     delegation.statut = DelegationHabilitation.Statut.ACTIVE
     delegation.valide_par = acteur
     delegation.save()

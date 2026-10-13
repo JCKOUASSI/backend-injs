@@ -549,23 +549,6 @@ describe('pages/Users.jsx — présentation de la liste, données dégradées et
     expect(roleBadge('Bid E').textContent).toBe('ROLE_BIDON')
   })
 
-  it('remplace CPFAE par INJS dans les libellés de rôle renvoyés par le backend', async () => {
-    const me = makeUser('ADMIN', {
-      username: 'cpfaadmin',
-      role_context: {
-        labels: { ...LABELS, INJS_ADMIN: 'Administrateur CPFAE' },
-        badge_account_roles: ['AUDITEUR', 'FORMATEUR'],
-        can_mutate_users: true,
-        manageable_roles: ['INJS_ADMIN', 'ENCADRANT'],
-        staff_filter_roles: [],
-      },
-    })
-    setup(me, { rows: [cu(8, { role: 'INJS_ADMIN', first_name: 'Cpf', last_name: 'X' })] })
-    await waitForResults(1)
-    // Le remplacement vaut pour le badge de la ligne (le libellé est aussi dans le filtre).
-    expect(roleBadge('Cpf X').textContent).toBe('Administrateur INJS')
-  })
-
   it("n'offre modifier/supprimer que sur les lignes dont le rôle est gérable", async () => {
     setup(adminMe(), {
       rows: [
@@ -910,19 +893,6 @@ describe('pages/Users.jsx — création de comptes (LOT 36)', () => {
     expect(within(modal).queryByText(/ce secrétariat a déjà un chef secrétariat/i)).not.toBeInTheDocument()
   })
 
-  it("remplace CPFAE par INJS dans les erreurs de création renvoyées par le serveur", async () => {
-    setup(adminMe(), { rows: [cu(1)] })
-    await waitForResults(1)
-    apiMock.post.mockRejectedValueOnce(
-      Object.assign(new Error('bad'), { response: { data: { detail: 'Accès CPFAE refusé' } } }),
-    )
-
-    const modal = await openCreate()
-    fillCreate(modal, { username: 'x1', password: 'Secret-123' })
-    submitCreate(modal)
-    expect(await within(modal).findByText('Accès INJS refusé')).toBeInTheDocument()
-  })
-
   it("affiche le message générique quand la création échoue sans réponse serveur", async () => {
     setup(adminMe(), { rows: [cu(1)] })
     await waitForResults(1)
@@ -1074,13 +1044,13 @@ describe('pages/Users.jsx — édition d\'un utilisateur (LOT 36)', () => {
     expect(screen.queryByRole('heading', { name: /^modifier — /i })).not.toBeInTheDocument()
   })
 
-  it('affiche les erreurs de validation (avec CPFAE->INJS) puis le message générique, sans fermer', async () => {
+  it('affiche les erreurs de validation puis le message générique, sans fermer', async () => {
     setup(adminMe(), { rows: [cu(33, { first_name: 'Err', last_name: 'Edit' })] })
     await waitForResults(1)
 
     const modal = await openEdit('Err Edit')
     apiMock.patch.mockRejectedValueOnce(
-      Object.assign(new Error('bad'), { response: { data: { detail: 'Compte CPFAE verrouillé' } } }),
+      Object.assign(new Error('bad'), { response: { data: { detail: 'Compte INJS verrouillé' } } }),
     )
     submitEdit(modal)
     expect(await within(modal).findByText('Compte INJS verrouillé')).toBeInTheDocument()
@@ -1174,22 +1144,6 @@ describe('pages/Users.jsx — suppression confirmée (LOT 36)', () => {
     fireEvent.click(within(boite).getByRole('button', { name: 'Annuler' }))
     expect(overlayNode()).toBeNull()
     expect(apiMock.delete).not.toHaveBeenCalled()
-  })
-
-  it("régression §10.14 (LOT 37) : réécrit CPFAE en INJS dans le toast d'erreur de suppression comme partout ailleurs", async () => {
-    // Avant le LOT 37, le toast d'erreur de suppression affichait le message
-    // serveur brut ; il applique désormais le même rebranding CPFAE -> INJS que
-    // les libellés de rôle et les alertes des modales création/édition.
-    setup(adminMe(), { rows: [cu(51, { first_name: 'Sup', last_name: 'Prime' })] })
-    await waitForResults(1)
-    apiMock.delete.mockRejectedValueOnce(
-      Object.assign(new Error('forbidden'), { response: { data: { detail: 'Compte CPFAE protégé' } } }),
-    )
-
-    const boite = await askDelete('Sup Prime')
-    fireEvent.click(within(boite).getByRole('button', { name: 'Confirmer' }))
-    expect(await screen.findByText('Compte INJS protégé')).toBeInTheDocument()
-    expect(screen.queryByText('Compte CPFAE protégé')).not.toBeInTheDocument()
   })
 
   it('notifie le message générique quand la suppression échoue sans réponse serveur', async () => {

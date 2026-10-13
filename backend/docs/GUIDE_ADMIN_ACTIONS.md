@@ -2,7 +2,7 @@
 
 Manuel d’utilisation pour réaliser **chaque action métier** depuis l’interface d’administration (`/admin/`).
 
-**Public :** secrétariats, encadrants, administrateurs CPFAE.
+**Public :** secrétariats, encadrants, administrateurs INJS.
 
 ---
 
@@ -25,7 +25,7 @@ Manuel d’utilisation pour réaliser **chaque action métier** depuis l’inter
 |---------|-------------|
 | **Sidebar gauche** | Cliquer sur le titre d’une section (Navigation, Pédagogie, etc.) pour l’ouvrir/fermer |
 | **Accueil admin** | Tableau de bord avec raccourcis et statistiques |
-| **Dashboard web** | Ouvre l’application opérationnelle CPFAE (hors admin) |
+| **Dashboard web** | Ouvre l’application opérationnelle INJS (hors admin) |
 | **Barre de recherche** (en haut) | Recherche globale dans l’admin |
 | **Bouton Filtres** (sur les listes) | Ouvre le panneau de filtres à droite |
 | **Ajouter …** (en haut à droite d’une liste) | Créer un nouvel enregistrement |
@@ -61,7 +61,7 @@ Manuel d’utilisation pour réaliser **chaque action métier** depuis l’inter
 
 **Menu :** Navigation → **Dashboard web**
 
-Ouvre l’interface utilisateur CPFAE (gestion quotidienne des formations, badgeage, etc.).
+Ouvre l’interface utilisateur INJS (gestion quotidienne des formations, badgeage, etc.).
 
 ### 1.3 Diagnostic volume horaire
 
@@ -483,7 +483,7 @@ Vous ne voyez que les données de **votre périmètre** :
 
 | Rôle | Ce que vous voyez |
 |------|-------------------|
-| Admin / CPFAE / Direction / Finance | Données globales |
+| Admin / INJS / Direction / Finance | Données globales |
 | Secrétariat | Données de votre secrétariat |
 | Encadrant | Modules et séances que vous supervisez |
 

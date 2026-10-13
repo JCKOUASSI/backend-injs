@@ -1,7 +1,7 @@
 """L6 — API du référentiel officiel INJS-LMD.
 
-Sépare strictement le périmètre fonctionnel INJS du corpus legacy CPFAE /
-Sygepcpfae. Un seul point d'entrée : ``GET /api/formations/lmd/formations/``,
+Sépare strictement le périmètre fonctionnel INJS du corpus legacy hors INJS.
+Un seul point d'entrée : ``GET /api/formations/lmd/formations/``,
 qui renvoie la chaîne
 
     FORMATIONS INJS → PARCOURS → NIVEAUX → SEMESTRES → MAQUETTES → UE → ECUE
@@ -147,7 +147,7 @@ def formations_lmd_api(request):
     """GET /api/formations/lmd/formations/ — référentiel INJS validé.
 
     Ne retourne **que** les formations relevant de la source métier INJS
-    (A-4.5 §2). Aucun corpus CPFAE / Sygepcpfae / DEBUG FORM ne peut y figurer :
+    (A-4.5 §2). Aucun corpus legacy / DEBUG FORM ne peut y figurer :
     le queryset filtre ``perimetre = INJS`` **et** exclut explicitement les
     intitulés porteurs de marqueurs étrangers (L6 §10).
     """
