@@ -47,13 +47,7 @@ RUNTIME_TEST_PATH_MARKERS = ("/tests/", "/test/")
 # Scripts manuels historiques placés à la racine de backend/ (sortie opérateur
 # légitime, hors runtime serveur) — liste explicite et fermée.
 RUNTIME_EXCLUDED_ROOT_SCRIPTS = (
-    "backend/analyse_dossier.py",
-    "backend/analyze_edt.py",
-    "backend/build_import_from_donnees.py",
     "backend/count_groups.py",
-    "backend/count_seances.py",
-    "backend/extract_modules_edt.py",
-    "backend/generate_import_files.py",
     "backend/generate_import_formateurs.py",
     "backend/seed_data.py",
     "backend/tests_e2e_injs_2026_2027.py",
@@ -272,6 +266,9 @@ def lire_contenus_runtime(tracked_files):
     for raw in tracked_files:
         chemin = raw.strip().replace("\\", "/")
         if not est_python_runtime(chemin):
+            continue
+        # Fichier suivi mais supprimé du disque : rien à scanner.
+        if not (repo_root / chemin).is_file():
             continue
         with (repo_root / chemin).open(encoding="utf-8") as fichier:
             contenus[chemin] = fichier.read()

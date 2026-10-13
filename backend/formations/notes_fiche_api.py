@@ -144,7 +144,7 @@ def _build_fiche_context(request, module, participant_ids=None):
         'colonnes': [_serialize_colonne(c) for c in colonnes],
         'rows': rows,
         'stats': stats,
-        'edite_le_label': f'Édité le {edite_le} par {edite_par} — CPFAE / SYGEP',
+        'edite_le_label': f'Édité le {edite_le} par {edite_par} — INJS-LMD',
     }
 
 

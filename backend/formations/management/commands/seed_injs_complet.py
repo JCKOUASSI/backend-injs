@@ -7,7 +7,7 @@ Exécute et certifie l'ensemble de la chaîne fonctionnelle de bout en bout :
 - Vague 3 : Évaluations CC/Examens, Jurys LMD, PV Officiel et Diplômes scellés SHA-256.
 - Vague 4 : Finances Étudiantes, Échéanciers, Quittances, Rapprochement et Vacations.
 - Vague 5 : Domaines Transversaux (Stages LMD, GED/Administration, RH, Patrimoine Marcory).
-- Vague 6 : Statistiques Décisionnelles CPFAE 17 colonnes, BI et Rapports institutionnels.
+- Vague 6 : Statistiques Décisionnelles 17 colonnes, BI et Rapports institutionnels.
 """
 from decimal import Decimal
 from datetime import date
@@ -29,7 +29,6 @@ from stages.models import OrganismeAccueil, ConventionStage
 from administrations.models import Direction, Departement, Courrier, DocumentOfficiel
 from ressources_humaines.models import Service, Fonction, Agent, AffectationRH
 from patrimoine.models import Equipement, Vehicule, Inventaire, ReservationEspace
-from statistiques.point_journalier import compute_point_journalier
 
 
 class Command(BaseCommand):
@@ -44,14 +43,8 @@ class Command(BaseCommand):
         self.stdout.write("\n>>> Exécution de la chaîne complète des lots 1.1 à 5.1...")
         call_command('seed_lot5_1_transverse')
 
-        # 2. Consolidation des Statistiques Décisionnelles et BI (Lot 6.1)
-        self.stdout.write("\n>>> Consolidation des Statistiques Décisionnelles et Bilans CPFAE 17 colonnes...")
+        # 2. Statistiques décisionnelles : calcul du point journalier retiré du périmètre.
         annee = AnneeAcademique.objects.get(libelle='2026-2027')
-        formation_fac = Formation.objects.filter(ref_formation__code='FAC').first() or Formation.objects.first()
-
-        pj_data = compute_point_journalier(annee.date_debut.year, formation_id=formation_fac.id if formation_fac else None)
-        total_tableaux = len(pj_data.get('tableaux', []))
-        self.stdout.write(f"  Point Journalier 17 colonnes calculé : {total_tableaux} tableau(x) généré(s)")
 
         # 3. Matrice de Certification Finale
         self.stdout.write("\n================================================================================")
@@ -73,7 +66,7 @@ class Command(BaseCommand):
             ("Administration & GED", f"{Direction.objects.count()} directions, {Departement.objects.count()} départements, {DocumentOfficiel.objects.count()} documents"),
             ("Ressources Humaines", f"{Service.objects.count()} services, {Fonction.objects.count()} fonctions, {Agent.objects.count()} agents"),
             ("Patrimoine Marcory", f"{Equipement.objects.count()} équipements de pointe, {Vehicule.objects.count()} véhicules, {ReservationEspace.objects.count()} réservation"),
-            ("Statistiques 17 Colonnes", f"Format matriciel CPFAE/INJS certifié conforme avec exports"),
+            ("Statistiques 17 Colonnes", f"Format matriciel INJS certifié conforme avec exports"),
         ]
 
         for domaine, detail in checks:

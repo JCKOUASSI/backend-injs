@@ -165,7 +165,7 @@ def affectations_planifiables(
     """Queryset des affectations éligibles, relations réelles uniquement (étape B).
 
     Le périmètre INJS est appliqué par la qualification ``perimetre`` de la
-    RefFormation (service L6). Un cycle legacy (CPFAE, Sygepcpfae, plans de
+    RefFormation (service L6). Un cycle legacy (corpus hors INJS, plans de
     professorat) est donc **exclu de la planification**, sans être supprimé.
     """
     from formations.referentiel_injs_l6 import formations_injs
@@ -302,7 +302,7 @@ def calculate_teaching_needs(
                     'explication': (
                         'Des affectations pédagogiques existent, mais aucune ne porte '
                         'une formation INJS validée (périmètre L6). Les cycles legacy '
-                        'CPFAE/Sygepcpfae ne sont pas des formations INJS.'
+                        'hors INJS ne sont pas des formations INJS.'
                     ),
                     'action_recommandee': (
                         'Vérifier le périmètre INJS des formations rattachées, ou '

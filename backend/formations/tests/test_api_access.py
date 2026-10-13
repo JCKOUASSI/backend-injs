@@ -269,7 +269,7 @@ class ReferentielAPIAccessTests(TestCase):
         res = self.client.get('/api/formations/referentiels/')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_cpfae_can_access_ref_formations(self):
+    def test_admin_can_access_ref_formations(self):
         admin = make_user('admin_ref', role='INJS_ADMIN')
         self.client.force_authenticate(admin)
         res = self.client.get('/api/formations/ref/formations/')

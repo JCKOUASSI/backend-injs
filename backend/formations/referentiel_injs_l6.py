@@ -11,10 +11,10 @@ Ce module ne crée aucun modèle : il s'appuie exclusively sur
 * ``FILIERES_INJS``          — les 8 filières validées (valeurs attestées) ;
 * ``CORPUS_INJS``            — les intitulés de cycles rattachés à ces filières ;
 * ``formations_injs()``      — queryset ``RefFormation`` strictement INJS ;
-* ``signaler_ecarts()``      — contrôle d'intégrité (8 filières, 0 CPFAE, 0 DEBUG).
+* ``signaler_ecarts()``      — contrôle d'intégrité (8 filières, 0 cycle hors INJS, 0 DEBUG).
 
 Aucune valeur n'est inventée : seules les données attestées par la source
-métier sont écrites. Les legacy CPFAE/Sygepcpfae ne sont ni renommés, ni
+métier sont écrites. Les legacy hors INJS ne sont ni renommés, ni
 réutilisés, ni mappés (§1, §8 L6) — ils sont seulement *exclus* du périmètre
 fonctionnel INJS (§9), jamais supprimés.
 """
@@ -73,7 +73,7 @@ CORPUS_LEGACY = [
 # Marqueurs de rejet : toute ligne dont l'intitulé en porte un est refusée du
 # périmètre INJS, quelle que soit sa qualification en base (§10).
 MARQUEURS_ETRANGERS = (
-    'CPFAE', 'SYGEPCPFAE', 'DEBUG FORM', 'DEBUG',
+    'DEBUG FORM', 'DEBUG',
     'ADMINISTRATION DE BASE', 'ADMINISTRATION COMPLÉMENTAIRE',
     'FINANCES PUBLIQUES',
 )
@@ -94,10 +94,8 @@ def formations_injs(actif_only=False):
     """
     qs = RefFormation.objects.filter(perimetre=RefFormation.Perimetre.INJS)
     qs = qs.exclude(
-        Q(intitule__icontains='CPFAE')
-        | Q(intitule__icontains='DEBUG FORM')
+        Q(intitule__icontains='DEBUG FORM')
         | Q(intitule__icontains='DEBUG')
-        | Q(intitule__icontains='Sygepcpfae')
     )
     return qs.filter(actif=True) if actif_only else qs
 
@@ -125,7 +123,7 @@ def signaler_ecarts():
     par_filiere = filieres_injs()
     manquantes = [c for c, qs in par_filiere.items() if not qs.exists()]
     intruses = formations_injs().filter(
-        Q(intitule__icontains='CPFAE') | Q(intitule__icontains='DEBUG')
+        Q(intitule__icontains='DEBUG')
     )
     return {
         'nb_filieres_attendues': len(FILIERES_INJS),

@@ -108,7 +108,7 @@ def _parametres_lmd(request):
     if formation_id is not None and not formations_injs().filter(pk=formation_id).exists():
         incoherence.append(
             f'La formation #{formation_id} n’est pas une formation INJS validée '
-            '(périmètre L6). Les cycles legacy CPFAE/professorat sont exclus.'
+            '(périmètre L6). Les cycles legacy hors INJS (ex. professorat) sont exclus.'
         )
         formation_id = None
     if parcours_id is not None and formation_id is not None:

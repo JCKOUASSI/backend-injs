@@ -394,8 +394,8 @@ existant — `ROLE_HIERARCHY`, ensembles de rôles et classes de permission) :
 |---|---|---|---|---|
 | `ADMIN` | Administrateur | **N4** | `INJS_ENTIER` | Admin Django + web + mobile ; tous droits, paramétrage |
 | `DIRECTION` | Direction | **N4** | `INJS_ENTIER` | Web ; supervision globale, statistiques, finances, validations |
-| `CHEF_CPFAE_ADMIN` | Chef INJS Admin | **N4** | `INJS_ENTIER` (ou `DIRECTION`) | Admin Django + web ; administration des utilisateurs et structures |
-| `CPFAE_ADMIN` | INJS Admin | **N4** | `SERVICE`/établissement | Admin Django + web ; gestion opérationnelle et référentiels |
+| `CHEF_INJS_ADMIN` | Chef INJS Admin | **N4** | `INJS_ENTIER` (ou `DIRECTION`) | Admin Django + web ; administration des utilisateurs et structures |
+| `INJS_ADMIN` | INJS Admin | **N4** | `SERVICE`/établissement | Admin Django + web ; gestion opérationnelle et référentiels |
 | `CHEF_SECRETARIAT` | Chef Secrétariat | **N3** | `SERVICE` (secrétariat rattaché) | Web ; valide les opérations de scolarité, gère les comptes |
 | `SECRETARIAT` | Secrétariat | **N2** | `SERVICE`/`FORMATION` | Web ; saisie inscriptions, modules, participants, imports Excel |
 | `FINANCE` | Finance | **N3** sur le domaine financier, **N1** ailleurs | `INJS_ENTIER` (finances) | Web ; factures, paiements, relances, validations financières |
@@ -495,10 +495,10 @@ antérieurs que la phase documentaire ne peut pas renommer sans toucher au code,
 migrations, à la CI, aux images ou aux canaux de publication des magasins d'applications :
 
 - dossier `qr_badge_mobile/`, images/conteneurs Docker `qr-badge-*`, image de CI
-  `sygep-backend-ci`, nom de base de données par défaut ;
+  `injs-backend-ci`, nom de base de données par défaut ;
 - noms de classes/énumérations côté backend (par ex. permissions de direction
-  `IsDFRC…`, `Pointage.Statut.FORCE_DFRC`), clés de rôles `CPFAE_ADMIN`/`CHEF_CPFAE_ADMIN`
-  (les 12 rôles sont figés par DA-05) ;
+  `IsDFRC…`, `Pointage.Statut.FORCE_DFRC`) ;
+  les 12 rôles canoniques sont figés par DA-05 (les anciennes clés CPFAE sont archivées, voir `core/migrations/0002`) ;
 - socle HTML legacy, service worker, courriels et anciens logos ;
 - URL GitHub Pages et noms de fichiers des pages légales déjà publiés pour les stores.
 

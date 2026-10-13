@@ -34,7 +34,7 @@ def _formation_defaults(**overrides):
     row = {
         'Formation': 'Cycle import test',
         'Module (titre)': 'Module site test',
-        'Site': 'CPFAE',
+        'Site': 'SITE-TEST',
         'Bâtiment': 'Bâtiment Principal',
         'Salle': 'Salle Polyvalente',
         'Date début': '2026-05-05 08:00',
@@ -101,19 +101,19 @@ class ImportFormationsRefSiteTest(TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(created, 1)
         self.assertEqual(updated, 0)
-        self.assertEqual(RefSite.objects.filter(nom='CPFAE').count(), 1)
+        self.assertEqual(RefSite.objects.filter(nom='SITE-TEST').count(), 1)
 
         mod = Module.objects.get(intitule='Module site test')
-        self.assertEqual(mod.site.nom, 'CPFAE')
-        self.assertEqual(mod.site_legacy, 'CPFAE')
+        self.assertEqual(mod.site.nom, 'SITE-TEST')
+        self.assertEqual(mod.site_legacy, 'SITE-TEST')
         self.assertEqual(mod.batiment, 'Bâtiment Principal')
         self.assertEqual(mod.salle, 'Salle Polyvalente')
 
     def test_import_reuses_existing_ref_site(self):
-        existing = RefSite.objects.create(nom='CPFAE', actif=True)
+        existing = RefSite.objects.create(nom='SITE-TEST', actif=True)
         errors = []
         self.cmd._import_formations(build_formations_sheet({}), errors)
-        self.assertEqual(RefSite.objects.filter(nom='CPFAE').count(), 1)
+        self.assertEqual(RefSite.objects.filter(nom='SITE-TEST').count(), 1)
         mod = Module.objects.get(intitule='Module site test')
         self.assertEqual(mod.site_id, existing.id)
 
@@ -204,7 +204,7 @@ class ImportExcelAPITest(TestCase):
         self.assertEqual(res.data['created'], 1)
         self.assertEqual(res.data['errors'], [])
         mod = Module.objects.get(intitule='Module site test')
-        self.assertEqual(mod.site.nom, 'CPFAE')
+        self.assertEqual(mod.site.nom, 'SITE-TEST')
 
 
 SEANCE_HEADERS = (

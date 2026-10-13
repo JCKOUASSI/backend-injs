@@ -90,7 +90,7 @@ urlpatterns = [
     # Référentiels CRUD
     path('ref/formations/', api_views.ref_formation_list, name='api-ref-formation-list'),
     path('ref/formations/<int:pk>/', api_views.ref_formation_detail, name='api-ref-formation-detail'),
-    # L6 — référentiel officiel INJS-LMD (filtré serveur, aucun corpus CPFAE)
+    # L6 — référentiel officiel INJS-LMD (filtré serveur, aucun corpus hors INJS)
     path('lmd/formations/', api_lmd.formations_lmd_api, name='api-lmd-formations'),
     path('ref/modules/', api_views.ref_module_list, name='api-ref-module-list'),
     path('ref/modules/<int:pk>/', api_views.ref_module_detail, name='api-ref-module-detail'),

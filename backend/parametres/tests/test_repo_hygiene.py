@@ -95,7 +95,7 @@ class PerimetreRuntimeTests(TestCase):
         self._hors_runtime("backend/formations/migrations/0001_initial.py")
         self._hors_runtime("backend/scripts/seed_mobile_users.py")
         self._hors_runtime("backend/seed_data.py")
-        self._hors_runtime("backend/count_seances.py")
+        self._hors_runtime("backend/count_groups.py")
         self._hors_runtime("backend/manage.py.bak")
         self._hors_runtime("frontend/src/main.jsx")
         self._hors_runtime("backend/formations/module_test.py")
