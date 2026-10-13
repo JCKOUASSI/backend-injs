@@ -137,3 +137,25 @@ class EvenementAudit(models.Model):
         raise JournalImmuableError(
             f'L’événement d’audit {self.code} est immuable : suppression interdite.'
         )
+
+
+class ArchiveDonneeLegacy(models.Model):
+    """Snapshot réversible des données du corpus legacy archivé (CPFAE / SYGEP).
+
+    Chaque ligne conserve les valeurs d'origine d'un objet avant archivage, pour
+    qu'une migration inverse puisse les restituer à l'identique. Rien n'est
+    supprimé : l'archivage ne fait que désactiver et qualifier « LEGACY ».
+    """
+
+    modele = models.CharField(max_length=100)
+    objet_pk = models.CharField(max_length=64)
+    valeurs_avant = models.JSONField(default=dict)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Donnée legacy archivée'
+        verbose_name_plural = 'Données legacy archivées'
+        indexes = [models.Index(fields=['modele', 'objet_pk'])]
+
+    def __str__(self):
+        return f'{self.modele}#{self.objet_pk}'
